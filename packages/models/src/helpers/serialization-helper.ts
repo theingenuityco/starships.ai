@@ -1,72 +1,51 @@
 /**
  * Lean serialization helpers for repository methods
- * Provides standardized fromDatabase/toDatabase methods
+ * Provides standardized fromDatabase/toDatabase methods with snake_case ↔ camelCase conversion
  */
 
 import { plainToInstance, instanceToPlain } from 'class-transformer';
 import 'reflect-metadata';
 
 /**
- * Safely deserialize database record to entity with error handling
+ * Convert camelCase to snake_case
  */
-function safeDeserialize<T>(
-  entityClass: new () => T,
-  data: unknown,
-  options: {
-    enableImplicitConversion?: boolean;
-    excludeExtraneousValues?: boolean;
-    strategy?: 'excludeAll' | 'exposeAll';
-  } = {}
-): T {
-  // Check if entityClass is valid
-  if (!entityClass || typeof entityClass !== 'function') {
-    throw new Error('Invalid entity class provided');
-  }
-
-  if (data === null || data === undefined) {
-    throw new Error('Cannot deserialize null or undefined data');
-  }
-
-  if (typeof data !== 'object') {
-    throw new Error(`Expected object for ${entityClass.name} deserialization`);
-  }
-
-  const defaultOptions = {
-    strategy: 'excludeAll' as const, // Respect @Expose decorators
-    excludeExtraneousValues: true, // Filter out non-exposed properties
-    enableImplicitConversion: false, // Let @Transform decorators handle conversions explicitly
-    ...options,
-  };
-
-  const entity = plainToInstance(entityClass, data, defaultOptions);
-
-  if (!entity) {
-    throw new Error(`Failed to create ${entityClass.name} instance from data`);
-  }
-
-  return entity;
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
 /**
- * Safely deserialize array of database records to entities
+ * Convert snake_case to camelCase
  */
-function safeDeserializeArray<T>(entityClass: new () => T, dataArray: unknown[], options?: Parameters<typeof safeDeserialize>[2]): T[] {
-  if (!Array.isArray(dataArray)) {
-    throw new Error(`Expected array for ${entityClass.name} array deserialization, got ${typeof dataArray}`);
-  }
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
 
-  return dataArray.map((item, index) => {
-    try {
-      return safeDeserialize(entityClass, item, options);
-    } catch (error) {
-      throw new Error(`Array deserialization failed at index ${index}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  });
+/**
+ * Convert object keys from camelCase to snake_case for PostgreSQL
+ */
+function convertKeysToSnakeCase(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[camelToSnake(key)] = value;
+  }
+  return result;
+}
+
+/**
+ * Convert object keys from snake_case to camelCase for entities
+ */
+function convertKeysToCamelCase(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[snakeToCamel(key)] = value;
+  }
+  return result;
 }
 
 /**
  * Standardized method to deserialize single database record to entity
  * Replaces fromDatabaseRecord static methods on entities
+ * Automatically converts snake_case to camelCase
  */
 export function fromDatabase<T>(entityClass: new () => T, data: unknown): T {
   // Handle entity class validation first for proper error messages
@@ -83,7 +62,16 @@ export function fromDatabase<T>(entityClass: new () => T, data: unknown): T {
   }
 
   const record = data as Record<string, unknown>;
-  return safeDeserialize(entityClass, record);
+  // Convert snake_case keys to camelCase for entity compatibility
+  const camelCaseRecord = convertKeysToCamelCase(record);
+
+  // For entities with JSONB fields, we need to preserve nested object structure
+  // Use less restrictive deserialization to avoid stripping nested properties
+  return plainToInstance(entityClass, camelCaseRecord, {
+    strategy: 'exposeAll', // Include all properties by default
+    excludeExtraneousValues: false, // Don't filter out non-decorated nested properties
+    enableImplicitConversion: true, // Allow type conversions
+  });
 }
 
 /**
@@ -91,7 +79,27 @@ export function fromDatabase<T>(entityClass: new () => T, data: unknown): T {
  * Replaces fromDatabaseRecord static methods on entities for arrays
  */
 export function fromDatabaseArray<T>(entityClass: new () => T, dataArray: unknown[]): T[] {
-  return safeDeserializeArray(entityClass, dataArray);
+  if (!Array.isArray(dataArray)) {
+    throw new Error(`Expected array for ${entityClass.name} array deserialization, got ${typeof dataArray}`);
+  }
+
+  return dataArray.map((item, index) => {
+    try {
+      // Convert snake_case keys to camelCase for each item
+      if (item && typeof item === 'object') {
+        const camelCaseItem = convertKeysToCamelCase(item as Record<string, unknown>);
+        // Use less restrictive deserialization to preserve nested JSONB structures
+        return plainToInstance(entityClass, camelCaseItem, {
+          strategy: 'exposeAll',
+          excludeExtraneousValues: false,
+          enableImplicitConversion: true,
+        });
+      }
+      throw new Error(`Invalid item at index ${index}`);
+    } catch (error) {
+      throw new Error(`Array deserialization failed at index ${index}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
 }
 
 /**
@@ -116,17 +124,19 @@ export function toEntityInstance<T>(entityClass: new () => T, data: Record<strin
 /**
  * Standardized method to serialize entities to database format
  * Replaces toDatabaseFormat instance methods on entities
+ * Automatically converts camelCase to snake_case for PostgreSQL
  */
 export function toDatabase(entity: unknown): Record<string, unknown> {
   if (!entity || typeof entity !== 'object') {
     throw new Error('Entity must be a valid object for serialization');
   }
 
-  // Use instanceToPlain to apply @Transform decorators for serialization
+  // Use instanceToPlain to convert entity to plain object
+  // Key: don't filter nested properties - PostgreSQL JSONB handles objects directly
+  // exposeUnsetFields: false prevents undefined from being serialized
   const serialized = instanceToPlain(entity, {
-    strategy: 'excludeAll', // Only serialize @Expose decorated properties
-    excludeExtraneousValues: true,
-    enableImplicitConversion: false,
+    exposeUnsetFields: false,
+    enableCircularCheck: true,
   });
 
   // Fail fast if serialization produces no result
@@ -134,12 +144,7 @@ export function toDatabase(entity: unknown): Record<string, unknown> {
     throw new Error(`Serialization failed for entity: ${entity.constructor?.name || 'Unknown'}`);
   }
 
-  // Fail fast if no properties are exposed for serialization
-  if (Object.keys(serialized).length === 0) {
-    throw new Error(`No properties exposed for serialization in entity: ${entity.constructor?.name || 'Unknown'}`);
-  }
-
-  // Remove undefined properties from serialized object
+  // Remove undefined properties
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(serialized)) {
     if (value !== undefined) {
@@ -147,10 +152,11 @@ export function toDatabase(entity: unknown): Record<string, unknown> {
     }
   }
 
-  // Fail fast if all properties were undefined
+  // Fail fast if no properties to serialize
   if (Object.keys(result).length === 0) {
-    throw new Error(`All exposed properties are undefined in entity: ${entity.constructor?.name || 'Unknown'}`);
+    throw new Error(`No properties to serialize in entity: ${entity.constructor?.name || 'Unknown'}`);
   }
 
-  return result;
+  // Convert camelCase keys to snake_case for PostgreSQL compatibility
+  return convertKeysToSnakeCase(result);
 }

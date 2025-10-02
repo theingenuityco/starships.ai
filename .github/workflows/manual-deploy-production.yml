@@ -180,10 +180,12 @@ jobs:
             --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
             --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
-            --from-literal=NEO4J_URI="${{ secrets.NEO4J_URI }}" \
-            --from-literal=NEO4J_USERNAME="${{ secrets.NEO4J_USERNAME }}" \
-            --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
-            --from-literal=NEO4J_DATABASE="${{ secrets.NEO4J_DATABASE }}" \
+            --from-literal=POSTGRES_HOST="${{ secrets.POSTGRES_HOST }}" \
+            --from-literal=POSTGRES_PORT="${{ secrets.POSTGRES_PORT }}" \
+            --from-literal=POSTGRES_USER="${{ secrets.POSTGRES_USER }}" \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+            --from-literal=POSTGRES_DATABASE="${{ secrets.POSTGRES_DATABASE }}" \
+            --from-literal=POSTGRES_SSL="${{ secrets.POSTGRES_SSL }}" \
             --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
             --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \

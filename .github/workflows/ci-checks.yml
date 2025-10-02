@@ -90,11 +90,13 @@ jobs:
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
-      # Neo4j (mock values for CI build)
-      NEO4J_URI: ${{ secrets.NEO4J_URI }}
-      NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
-      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
-      NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE }}
+      # PostgreSQL (mock values for CI build)
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+      POSTGRES_SSL: ${{ secrets.POSTGRES_SSL }}
 
       # LLM Providers (optional for build)
       DEFAULT_LLM_PROVIDER: ${{ vars.DEFAULT_LLM_PROVIDER }}

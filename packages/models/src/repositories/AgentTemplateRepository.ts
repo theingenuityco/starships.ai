@@ -1,26 +1,20 @@
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest, ToolTemplateModel } from '@starships/protocol';
 
 export class AgentTemplateRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('AgentTemplateRepository', connection);
+  constructor() {
+    super('AgentTemplateRepository');
   }
 
   async findAll(): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const query = `MATCH (t:AgentTemplate) RETURN t ORDER BY t.createdAt DESC`;
-        const result = await connection.executeQuery<{ t: AgentTemplateModel }>(query);
-        return fromDatabaseArray(
-          AgentTemplateEntity,
-          result.map((record) => record.t)
-        );
+        const result = await super.findAllEntities<Record<string, unknown>>('agent_templates', 'created_at DESC');
+        return fromDatabaseArray(AgentTemplateEntity, result);
       },
       'findAll',
       'AgentTemplate'
@@ -34,28 +28,24 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('ID is required for findById operation');
         }
 
-        const query = `
-        MATCH (t:AgentTemplate {id: $id})
-        RETURN t
-      `;
-        const connection = this.getConnection();
-        const results = await connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
-        const template = results.length > 0 ? results[0].t : null;
-
-        if (!template) {
+        const result = await super.findEntityById<Record<string, unknown>>('agent_templates', id);
+        if (!result) {
           return null;
         }
 
-        const baseTemplate = fromDatabase(AgentTemplateEntity, template);
+        const baseTemplate = fromDatabase(AgentTemplateEntity, result);
 
-        // Get assigned tool template slugs from relationships
-        const toolTemplatesQuery = `
-          MATCH (at:AgentTemplate {id: $id})-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate)
-          RETURN tt.slug as slug
-          ORDER BY tt.name
-        `;
+        // Get assigned tool template slugs from junction table
+        const connection = this.getConnection();
+        const toolResults = await connection.query<{ slug: string }>(
+          `SELECT tt.slug
+           FROM tool_templates tt
+           JOIN agent_template_tool_templates attt ON tt.id = attt.tool_template_id
+           WHERE attt.agent_template_id = $1
+           ORDER BY tt.name`,
+          [id]
+        );
 
-        const toolResults = await connection.executeQuery<{ slug: string }>(toolTemplatesQuery, { id });
         const assignedToolSlugs = toolResults.map((result) => result.slug);
 
         return {
@@ -76,14 +66,9 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('Slug is required for findBySlug operation');
         }
 
-        const query = `
-        MATCH (t:AgentTemplate {slug: $slug})
-        RETURN t
-      `;
-
-        const results = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { slug });
-        const template = results.length > 0 ? results[0].t : null;
-        return template ? fromDatabase(AgentTemplateEntity, template) : null;
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE slug = $1', [slug]);
+        return result ? fromDatabase(AgentTemplateEntity, result) : null;
       },
       'findBySlug',
       'AgentTemplate',
@@ -94,9 +79,6 @@ export class AgentTemplateRepository extends BaseRepository {
   async create(data: CreateAgentTemplateRequest): Promise<AgentTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // validate using data
-        await AgentTemplateEntity.validate(data, 'create');
-
         const now = new Date().toISOString();
 
         // Use provided slug or generate from name
@@ -125,9 +107,15 @@ export class AgentTemplateRepository extends BaseRepository {
           updatedAt: now,
         };
 
+        // validate using data
+        await AgentTemplateEntity.validate(templateProps, 'create');
+
         // Create entity instance from plain object, then serialize
         const templateEntity = toEntityInstance(AgentTemplateEntity, templateProps);
-        const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', toDatabase(templateEntity));
+        const databaseFormat = toDatabase(templateEntity);
+        const result = await this.createEntity<Record<string, unknown>>('agent_templates', databaseFormat);
+
+        const template = fromDatabase(AgentTemplateEntity, result);
 
         // Create relationships for assigned tool templates
         if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
@@ -135,23 +123,18 @@ export class AgentTemplateRepository extends BaseRepository {
 
           for (const toolSlug of data.assignedToolSlugs) {
             // Find tool template by slug
-            const toolTemplateResult = await connection.executeQuery<{ id: string }>(
-              'MATCH (tt:ToolTemplate {slug: $toolSlug}) RETURN tt.id as id',
-              { toolSlug }
-            );
+            const toolTemplateResult = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [
+              toolSlug,
+            ]);
 
-            if (toolTemplateResult.length > 0) {
-              // Create relationship
-
-              await this.addToolTemplateRelationship(template.id, toolTemplateResult[0].id);
+            if (toolTemplateResult) {
+              // Create relationship using junction table
+              await this.addToolTemplateRelationship(template.id, toolTemplateResult.id);
             }
           }
-        } else {
-          console.log(`[AGENT-TEMPLATE-REPO] No assignedToolSlugs provided for agent template ${template.id}`);
         }
 
-        // Transform database result back to domain model
-        return fromDatabase(AgentTemplateEntity, template);
+        return template;
       },
       'create',
       'AgentTemplate'
@@ -168,20 +151,19 @@ export class AgentTemplateRepository extends BaseRepository {
         // Handle tool template relationships if assignedToolSlugs is being updated
         if (updates.assignedToolSlugs !== undefined) {
           // Remove existing relationships
-          await connection.executeWrite('MATCH (at:AgentTemplate {id: $id})-[r:USES_TOOL_TEMPLATE]->() DELETE r', { id });
+          await connection.query('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [id]);
 
           // Add new relationships
           if (updates.assignedToolSlugs.length > 0) {
             for (const toolSlug of updates.assignedToolSlugs) {
               // Find tool template by slug
-              const toolTemplateResult = await connection.executeQuery<{ id: string }>(
-                'MATCH (tt:ToolTemplate {slug: $toolSlug}) RETURN tt.id as id',
-                { toolSlug }
-              );
+              const toolTemplateResult = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [
+                toolSlug,
+              ]);
 
-              if (toolTemplateResult.length > 0) {
-                // Create relationship
-                await this.addToolTemplateRelationship(id, toolTemplateResult[0].id);
+              if (toolTemplateResult) {
+                // Create relationship using junction table
+                await this.addToolTemplateRelationship(id, toolTemplateResult.id);
               }
             }
           }
@@ -196,16 +178,19 @@ export class AgentTemplateRepository extends BaseRepository {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { assignedToolSlugs: _, ...propsWithoutToolSlugs } = updateProps;
 
-        const result = await connection.executeWrite<{ t: AgentTemplateModel }>(
-          'MATCH (t:AgentTemplate) WHERE t.id = $id SET t += $updates RETURN t',
-          {
-            id,
-            updates: toDatabase(toEntityInstance(AgentTemplateEntity, propsWithoutToolSlugs)),
-          }
-        );
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(AgentTemplateEntity, propsWithoutToolSlugs));
 
-        const template = result[0]?.t || null;
-        return template ? fromDatabase(AgentTemplateEntity, template) : null;
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.findById(id);
+        }
+
+        const result = await this.updateEntity<Record<string, unknown>>('agent_templates', id, filteredUpdateData);
+        return result ? fromDatabase(AgentTemplateEntity, result) : null;
       },
       'update',
       'AgentTemplate',
@@ -220,18 +205,8 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('ID is required for delete operation');
         }
 
-        const connection = this.getConnection();
-
-        // Clean up all relationships:
-        // - AgentTemplate-[:USES_TOOL_TEMPLATE]->ToolTemplate
-        // - Agent-[:CREATED_FROM]->AgentTemplate
-        // DETACH DELETE will automatically remove all relationships
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (t:AgentTemplate) WHERE t.id = $id DETACH DELETE t RETURN count(t) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
+        // Delete will cascade to remove relationships via foreign key constraints
+        return await this.deleteEntity('agent_templates', id);
       },
       'delete',
       'AgentTemplate',
@@ -246,18 +221,12 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('Category is required for findByCategory operation');
         }
 
-        const query = `
-        MATCH (t:AgentTemplate {category: $category})
-        WHERE t.isPublic = true
-        RETURN t
-        ORDER BY t.usageCount DESC
-      `;
-
-        const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { category });
-        return fromDatabaseArray(
-          AgentTemplateEntity,
-          result.map((record) => record.t)
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM agent_templates WHERE category = $1 AND is_public = true ORDER BY usage_count DESC',
+          [category]
         );
+        return fromDatabaseArray(AgentTemplateEntity, result);
       },
       'findByCategory',
       'AgentTemplate'
@@ -275,28 +244,20 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('Search query cannot exceed 200 characters');
         }
 
-        const searchQuery = `
-        MATCH (t:AgentTemplate)
-        WHERE (
-          toLower(t.name) CONTAINS toLower($query) OR
-          toLower(t.description) CONTAINS toLower($query)
-        )
-        RETURN t,
-          CASE
-            WHEN toLower(t.name) CONTAINS toLower($query) THEN 3
-            WHEN toLower(t.description) CONTAINS toLower($query) THEN 2
-            ELSE 1
-          END as relevance
-        ORDER BY relevance DESC, t.usageCount DESC, t.rating DESC
-      `;
-
-        const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(searchQuery, {
-          query,
-        });
-        return fromDatabaseArray(
-          AgentTemplateEntity,
-          result.map((record) => record.t)
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT *,
+           CASE
+             WHEN LOWER(name) LIKE LOWER($1) THEN 3
+             WHEN LOWER(description) LIKE LOWER($1) THEN 2
+             ELSE 1
+           END as relevance
+           FROM agent_templates
+           WHERE LOWER(name) LIKE LOWER($1) OR LOWER(description) LIKE LOWER($1)
+           ORDER BY relevance DESC, usage_count DESC`,
+          [`%${query}%`]
         );
+        return fromDatabaseArray(AgentTemplateEntity, result);
       },
       'searchTemplates',
       'AgentTemplate'
@@ -310,12 +271,11 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('ID is required for incrementUsageCount operation');
         }
 
-        const query = `
-        MATCH (t:AgentTemplate {id: $id})
-        SET t.usageCount = t.usageCount + 1, t.updatedAt = $now
-      `;
-
-        await this.getConnection().executeWrite(query, { id, now: new Date().toISOString() });
+        const connection = this.getConnection();
+        await connection.query('UPDATE agent_templates SET usage_count = usage_count + 1, updated_at = $2 WHERE id = $1', [
+          id,
+          new Date().toISOString(),
+        ]);
       },
       'incrementUsageCount',
       'AgentTemplate',
@@ -339,34 +299,13 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const connection = this.getConnection();
 
-        // Check if both entities exist
-        const checkQuery = `
-          MATCH (at:AgentTemplate {id: $agentTemplateId})
-          MATCH (tt:ToolTemplate {id: $toolTemplateId})
-          RETURN at.id, tt.id
-        `;
-
-        const checkResult = await connection.executeQuery<{ 'at.id': string; 'tt.id': string }>(checkQuery, {
-          agentTemplateId,
-          toolTemplateId,
-        });
-
-        if (!checkResult || checkResult.length === 0) {
-          throw new Error('AgentTemplate or ToolTemplate not found');
-        }
-
-        // Create relationship if it doesn't exist
-        const relationshipQuery = `
-          MATCH (at:AgentTemplate {id: $agentTemplateId})
-          MATCH (tt:ToolTemplate {id: $toolTemplateId})
-          MERGE (at)-[:USES_TOOL_TEMPLATE {createdAt: $createdAt}]->(tt)
-        `;
-
-        await connection.executeWrite(relationshipQuery, {
-          agentTemplateId,
-          toolTemplateId,
-          createdAt: new Date().toISOString(),
-        });
+        // Insert into junction table (ON CONFLICT DO NOTHING to avoid duplicates)
+        await connection.query(
+          `INSERT INTO agent_template_tool_templates (agent_template_id, tool_template_id, created_at)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (agent_template_id, tool_template_id) DO NOTHING`,
+          [agentTemplateId, toolTemplateId, new Date().toISOString()]
+        );
       },
       'addToolTemplateRelationship',
       'AgentTemplate',
@@ -385,12 +324,10 @@ export class AgentTemplateRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const query = `
-          MATCH (at:AgentTemplate {id: $agentTemplateId})-[r:USES_TOOL_TEMPLATE]->(tt:ToolTemplate {id: $toolTemplateId})
-          DELETE r
-        `;
-
-        await connection.executeWrite(query, { agentTemplateId, toolTemplateId });
+        await connection.query('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1 AND tool_template_id = $2', [
+          agentTemplateId,
+          toolTemplateId,
+        ]);
       },
       'removeToolTemplateRelationship',
       'AgentTemplate',
@@ -409,17 +346,16 @@ export class AgentTemplateRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const query = `
-          MATCH (at:AgentTemplate {id: $agentTemplateId})-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate)
-          RETURN tt
-          ORDER BY tt.name
-        `;
-
-        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>(query, { agentTemplateId });
-        return fromDatabaseArray(
-          ToolTemplateEntity,
-          result.map((record) => record.tt)
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT tt.*
+           FROM tool_templates tt
+           JOIN agent_template_tool_templates attt ON tt.id = attt.tool_template_id
+           WHERE attt.agent_template_id = $1
+           ORDER BY tt.name`,
+          [agentTemplateId]
         );
+
+        return fromDatabaseArray(ToolTemplateEntity, result);
       },
       'getToolTemplates',
       'AgentTemplate',

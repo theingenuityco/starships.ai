@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by AgentEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
@@ -24,14 +23,24 @@ export class ToolEntity implements ToolModel {
   slug!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
+
+  // Foreign key relationships
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  starshipId!: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  templateId?: string;
 
   // Core ToolParams fields
   @Expose()
@@ -45,7 +54,6 @@ export class ToolEntity implements ToolModel {
   description!: string;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   parameters!: {
     type: 'object';
@@ -54,20 +62,17 @@ export class ToolEntity implements ToolModel {
   };
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 
   // BaseParams fields
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   transforms?: TransformOperation[];
 
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   mutations?: TransformOperation[];
 
@@ -79,7 +84,6 @@ export class ToolEntity implements ToolModel {
   // Tool-specific fields
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsObject()
   configuration?: Record<string, unknown>;
 
@@ -106,6 +110,8 @@ export class ToolEntity implements ToolModel {
         slug: dataRecord.slug || '',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        starshipId: dataRecord.starshipId || '',
+        templateId: dataRecord.templateId,
         name: dataRecord.name || '',
         description: dataRecord.description || '',
         parameters: dataRecord.parameters || { type: 'object', properties: {} },

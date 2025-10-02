@@ -1,24 +1,19 @@
 import { ToolEntity } from '@/entities/ToolEntity';
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { ToolModel, CreateToolRequest, UpdateToolRequest, ToolSearchParams, ToolTemplateModel } from '@starships/protocol';
 
 export class ToolRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('ToolRepository', connection);
+  constructor() {
+    super('ToolRepository');
   }
 
   async findAll(): Promise<ToolModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ t: ToolModel }>('MATCH (t:Tool) RETURN t ORDER BY t.createdAt DESC');
-        return fromDatabaseArray(
-          ToolEntity,
-          result.map((record) => record.t)
-        );
+        const result = await super.findAllEntities<Record<string, unknown>>('tools', 'created_at DESC');
+        return fromDatabaseArray(ToolEntity, result);
       },
       'findAll',
       'Tool'
@@ -28,10 +23,8 @@ export class ToolRepository extends BaseRepository {
   async findById(id: string): Promise<ToolModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ t: ToolModel }>('MATCH (t:Tool) WHERE t.id = $id RETURN t', { id });
-        const tool = result[0]?.t || null;
-        return tool ? fromDatabase(ToolEntity, tool) : null;
+        const result = await super.findEntityById<Record<string, unknown>>('tools', id);
+        return result ? fromDatabase(ToolEntity, result) : null;
       },
       'findById',
       'Tool',
@@ -43,16 +36,11 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ t: ToolModel }>(
-          'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN t ORDER BY t.createdAt DESC',
-          { starshipId }
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM tools WHERE starship_id = $1 ORDER BY created_at DESC',
+          [starshipId]
         );
-        return result && result.length > 0
-          ? fromDatabaseArray(
-              ToolEntity,
-              result.map((record) => record.t)
-            )
-          : [];
+        return fromDatabaseArray(ToolEntity, result);
       },
       'findByStarship',
       'Tool'
@@ -63,12 +51,11 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ t: ToolModel }>(
-          'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE t.slug = $slug AND s.id = $starshipId RETURN t',
-          { slug, starshipId }
-        );
-        const tool = result[0]?.t || null;
-        return tool ? fromDatabase(ToolEntity, tool) : null;
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tools WHERE slug = $1 AND starship_id = $2', [
+          slug,
+          starshipId,
+        ]);
+        return result ? fromDatabase(ToolEntity, result) : null;
       },
       'findBySlugAndStarship',
       'Tool',
@@ -80,16 +67,11 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ t: ToolModel }>(
-          'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE t.slug IN $slugs AND s.id = $starshipId RETURN t ORDER BY t.createdAt DESC',
-          { slugs, starshipId }
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM tools WHERE slug = ANY($1) AND starship_id = $2 ORDER BY created_at DESC',
+          [slugs, starshipId]
         );
-        return result && result.length > 0
-          ? fromDatabaseArray(
-              ToolEntity,
-              result.map((record) => record.t)
-            )
-          : [];
+        return fromDatabaseArray(ToolEntity, result);
       },
       'findBySlugs',
       'Tool'
@@ -100,33 +82,25 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        let query = 'MATCH (t:Tool)';
-        const whereConditions: string[] = [];
-        const queryParams: Record<string, unknown> = {};
+        let query = 'SELECT * FROM tools WHERE 1=1';
+        const sqlParams: unknown[] = [];
+        let paramIndex = 1;
 
         if (params.isEnabled !== undefined) {
-          whereConditions.push('t.isEnabled = $isEnabled');
-          queryParams.isEnabled = params.isEnabled;
+          query += ` AND is_enabled = $${paramIndex++}`;
+          sqlParams.push(params.isEnabled);
         }
 
         if (params.query) {
-          whereConditions.push('(t.name CONTAINS $query OR t.description CONTAINS $query)');
-          queryParams.query = params.query;
+          query += ` AND (LOWER(name) LIKE LOWER($${paramIndex++}) OR LOWER(description) LIKE LOWER($${paramIndex++}))`;
+          sqlParams.push(`%${params.query}%`);
+          sqlParams.push(`%${params.query}%`);
         }
 
-        if (whereConditions.length > 0) {
-          query += ' WHERE ' + whereConditions.join(' AND ');
-        }
+        query += ' ORDER BY created_at DESC';
 
-        query += ' RETURN t ORDER BY t.createdAt DESC';
-
-        const result = await connection.executeQuery<{ t: ToolModel }>(query, queryParams);
-        return result && result.length > 0
-          ? fromDatabaseArray(
-              ToolEntity,
-              result.map((record) => record.t)
-            )
-          : [];
+        const result = await connection.query<Record<string, unknown>>(query, sqlParams);
+        return fromDatabaseArray(ToolEntity, result);
       },
       'search',
       'Tool'
@@ -136,12 +110,9 @@ export class ToolRepository extends BaseRepository {
   async create(data: CreateToolRequest, starshipId: string): Promise<ToolModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate using entity
-        await ToolEntity.validate(data, 'create');
-
         const now = new Date().toISOString();
 
-        // Create tool properties without ID (Neo4j will generate it)
+        // Create tool properties including starship relationship
         const toolProps = {
           // Core ToolParams fields
           name: data.name,
@@ -157,34 +128,23 @@ export class ToolRepository extends BaseRepository {
           configuration: data.configuration,
           isEnabled: data.isEnabled ?? true,
 
+          // Relationship field
+          starshipId: starshipId,
+
           // Database-specific fields
           createdAt: now,
           updatedAt: now,
         };
 
+        // Validate using entity
+        await ToolEntity.validate(toolProps, 'create');
+
         // Create entity instance from plain object, then serialize
         const toolEntity = toEntityInstance(ToolEntity, toolProps);
-        const tool = await this.createEntityWithAutoId<ToolModel>('Tool', toDatabase(toolEntity));
+        const databaseFormat = toDatabase(toolEntity);
+        const result = await this.createEntity<Record<string, unknown>>('tools', databaseFormat);
 
-        // Create relationship to starship with slug metadata
-        const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (s:Starship {id: $starshipId}), (t:Tool {id: $toolId})
-           CREATE (t)-[:DEPLOYED_ON {
-             key: $key,
-             toolSlug: $toolSlug,
-             deployedAt: $timestamp
-           }]->(s)`,
-          {
-            starshipId: starshipId,
-            toolId: tool.id,
-            key: `${tool.id}_${starshipId}`,
-            toolSlug: data.slug,
-            timestamp: now,
-          }
-        );
-
-        return fromDatabase(ToolEntity, tool);
+        return fromDatabase(ToolEntity, result);
       },
       'create',
       'Tool'
@@ -194,19 +154,24 @@ export class ToolRepository extends BaseRepository {
   async update(id: string, updates: UpdateToolRequest): Promise<ToolModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
         };
 
-        const result = await connection.executeWrite<{ t: ToolModel }>('MATCH (t:Tool) WHERE t.id = $id SET t += $updates RETURN t', {
-          id,
-          updates: toDatabase(toEntityInstance(ToolEntity, updateProps)),
-        });
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(ToolEntity, updateProps));
 
-        const tool = result[0]?.t || null;
-        return tool ? fromDatabase(ToolEntity, tool) : null;
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.findById(id);
+        }
+
+        const result = await this.updateEntity<Record<string, unknown>>('tools', id, filteredUpdateData);
+        return result ? fromDatabase(ToolEntity, result) : null;
       },
       'update',
       'Tool',
@@ -220,56 +185,25 @@ export class ToolRepository extends BaseRepository {
         const connection = this.getConnection();
 
         // Validate starshipId exists
-        const starshipCheck = await connection.executeQuery('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
+        const starshipCheck = await connection.queryOne<{ count: string }>('SELECT COUNT(*) as count FROM starships WHERE id = $1', [
           starshipId,
-        });
+        ]);
 
-        if (!starshipCheck[0] || starshipCheck[0].count === 0) {
+        if (!starshipCheck || parseInt(starshipCheck.count) === 0) {
           this.handleNotFound('Starship', starshipId);
         }
 
-        // Get tool to preserve slug for relationship
-        const toolResult = await connection.executeQuery<{ t: ToolModel }>('MATCH (t:Tool) WHERE t.id = $toolId RETURN t', { toolId });
+        // Update tool's starship assignment
+        const result = await this.updateEntity<Record<string, unknown>>('tools', toolId, {
+          starship_id: starshipId,
+          updated_at: new Date().toISOString(),
+        });
 
-        if (!toolResult[0]?.t) {
+        if (!result) {
           this.handleNotFound('Tool', toolId);
         }
 
-        const tool = toolResult[0].t;
-
-        // Remove existing DEPLOYED_ON relationships
-        await connection.executeWrite('MATCH (t:Tool {id: $toolId})-[r:DEPLOYED_ON]->() DELETE r', { toolId });
-
-        // Create new DEPLOYED_ON relationship
-        await connection.executeWrite(
-          `MATCH (s:Starship {id: $starshipId}), (t:Tool {id: $toolId})
-           CREATE (t)-[:DEPLOYED_ON {
-             key: $key,
-             toolSlug: $toolSlug,
-             deployedAt: $timestamp,
-             isActive: true
-           }]->(s)`,
-          {
-            starshipId,
-            toolId,
-            key: `${toolId}_${starshipId}`,
-            toolSlug: tool.slug,
-            timestamp: new Date().toISOString(),
-          }
-        );
-
-        // Update tool updatedAt
-        const result = await connection.executeWrite<{ t: ToolModel }>(
-          `MATCH (t:Tool) WHERE t.id = $toolId
-           SET t.updatedAt = $timestamp
-           RETURN t`,
-          {
-            toolId,
-            timestamp: new Date().toISOString(),
-          }
-        );
-
-        return fromDatabase(ToolEntity, result[0].t);
+        return fromDatabase(ToolEntity, result);
       },
       'updateStarship',
       'Tool',
@@ -283,17 +217,16 @@ export class ToolRepository extends BaseRepository {
         const connection = this.getConnection();
 
         // Find the template
-        const templateResult = await connection.executeQuery<{ tt: ToolTemplateModel }>(
-          'MATCH (tt:ToolTemplate) WHERE tt.slug = $templateSlug RETURN tt',
-          { templateSlug }
-        );
+        const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE slug = $1', [
+          templateSlug,
+        ]);
 
-        if (!templateResult[0]?.tt) {
+        if (!templateResult) {
           this.handleNotFound('ToolTemplate', templateSlug);
         }
 
         // Properly deserialize template data using ToolTemplateEntity
-        const template = fromDatabase(ToolTemplateEntity, templateResult[0].tt);
+        const template = fromDatabase(ToolTemplateEntity, templateResult);
 
         // Create tool from template
         const toolData: CreateToolRequest = {
@@ -311,21 +244,11 @@ export class ToolRepository extends BaseRepository {
 
         const tool = await this.create(toolData, starshipId);
 
-        // Create CREATED_FROM relationship
-        await connection.executeWrite(
-          `MATCH (t:Tool {id: $toolId}), (tt:ToolTemplate {id: $templateId})
-           CREATE (t)-[:CREATED_FROM {createdAt: $createdAt}]->(tt)`,
-          {
-            toolId: tool.id,
-            templateId: template.id,
-            createdAt: new Date().toISOString(),
-          }
-        );
-
-        // Increment template usage count
-        await connection.executeWrite('MATCH (tt:ToolTemplate) WHERE tt.slug = $templateSlug SET tt.usageCount = tt.usageCount + 1', {
+        // Record the template relationship and increment usage count
+        await connection.query('UPDATE tool_templates SET usage_count = usage_count + 1, updated_at = $2 WHERE slug = $1', [
           templateSlug,
-        });
+          new Date().toISOString(),
+        ]);
 
         return tool;
       },
@@ -336,19 +259,20 @@ export class ToolRepository extends BaseRepository {
 
   /**
    * Get the ToolTemplate that this Tool was created from
+   * Note: In PostgreSQL, we can track this via tool slug matching template slug
    */
   async getSourceTemplate(toolId: string): Promise<ToolTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const query = `
-          MATCH (t:Tool {id: $toolId})-[:CREATED_FROM]->(tt:ToolTemplate)
-          RETURN tt
-        `;
-
-        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>(query, { toolId });
-        const template = result[0]?.tt || null;
-        return template ? fromDatabase(ToolTemplateEntity, template) : null;
+        const result = await connection.queryOne<Record<string, unknown>>(
+          `SELECT tt.*
+           FROM tool_templates tt
+           JOIN tools t ON t.slug = tt.slug
+           WHERE t.id = $1`,
+          [toolId]
+        );
+        return result ? fromDatabase(ToolTemplateEntity, result) : null;
       },
       'getSourceTemplate',
       'Tool',
@@ -359,16 +283,8 @@ export class ToolRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-
-        // Clean up all relationships including Agent-[:USES_TOOL]->Tool relationships
-        // DETACH DELETE will automatically remove all relationships
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (t:Tool) WHERE t.id = $id DETACH DELETE t RETURN count(t) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
+        // Delete will cascade to remove relationships via foreign key constraints
+        return await this.deleteEntity('tools', id);
       },
       'delete',
       'Tool',

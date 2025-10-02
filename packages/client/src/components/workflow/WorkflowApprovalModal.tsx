@@ -9,11 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, Eye, MessageSquare } from 'lucide-react'
-import { WorkflowVisualization } from '@/components/workflow/WorkflowVisualization'
-import type { WorkflowModel } from '@starships/protocol'
 
 // Client-side workflow type for compatibility
-type WorkflowDSL = WorkflowModel | any
+type WorkflowDSL = any
 
 export interface WorkflowApprovalModalProps {
   workflow: WorkflowDSL | null
@@ -188,15 +186,6 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({ wo
             </div>
 
             <Separator />
-
-            {/* Workflow Visualization */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Eye className="w-4 h-4" />
-                Workflow Preview
-              </h3>
-              <WorkflowVisualization workflow={workflow} showControls={true} className="border-0 shadow-none" />
-            </div>
 
             {/* Rejection Reason Input */}
             <AnimatePresence>

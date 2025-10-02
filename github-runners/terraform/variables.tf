@@ -49,7 +49,7 @@ variable "runner_subnet_id" {
 variable "runner_instance_type" {
   description = "Instance type for runners"
   type        = string
-  default     = "t3.small"
+  default     = "t3.medium"
 }
 
 variable "lambda_cryptography_layer" {

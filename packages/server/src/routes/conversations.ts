@@ -261,7 +261,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     const bodyValidation = validateData(
       z.object({
         title: z.string().min(1).max(100).optional(),
-        starshipId: NanoidSchema.optional(),
+        starshipId: NanoidSchema,
         agentId: NanoidSchema.optional(),
       }),
       req.body,

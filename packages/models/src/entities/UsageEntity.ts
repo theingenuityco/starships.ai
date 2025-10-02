@@ -3,9 +3,9 @@
  *
  * Persists provider-reported usage per assistant turn and links it to both
  * Starship and Conversation. This replaces message-level usage storage.
+ * Uses camelCase properties - serialization-helper converts to/from snake_case for database.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { UsageModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
@@ -27,27 +27,23 @@ export class UsageEntity implements UsageModel {
   @Length(1, 255)
   conversationId!: string;
 
-  // Provider-reported usage
+  // Provider-reported usage (camelCase - serialization-helper handles DB conversion)
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
-  prompt_tokens!: number;
+  promptTokens!: number;
 
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
-  completion_tokens!: number;
+  completionTokens!: number;
 
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
-  total_tokens!: number;
+  totalTokens!: number;
 
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
   cost!: number;
@@ -59,16 +55,10 @@ export class UsageEntity implements UsageModel {
   @Length(1, 255)
   model?: string;
 
-  // Timestamps
+  // Timestamp
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
-
-  @Expose()
-  @Transformers.DateTransform()
-  @IsISO8601()
-  updatedAt!: string;
 
   /**
    * Validation method leveraging class-validator
@@ -86,13 +76,12 @@ export class UsageEntity implements UsageModel {
         id: dataRecord.id || 'temp-id', // replaced by repository auto-id
         starshipId: dataRecord.starshipId,
         conversationId: dataRecord.conversationId,
-        prompt_tokens: dataRecord.prompt_tokens,
-        completion_tokens: dataRecord.completion_tokens,
-        total_tokens: dataRecord.total_tokens,
+        promptTokens: dataRecord.promptTokens,
+        completionTokens: dataRecord.completionTokens,
+        totalTokens: dataRecord.totalTokens,
         cost: dataRecord.cost,
         model: dataRecord.model,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
-        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         ...dataRecord,
       });
     } else {

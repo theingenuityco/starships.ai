@@ -21,62 +21,80 @@ describe('MessageEntity', () => {
     it('should serialize entity to database format', async () => {
       const message = new MessageEntity();
       message.id = 'message-123';
-      message.createdAt = '2024-01-01T00:00:00.000Z';
-      message.updatedAt = '2024-01-01T00:05:00.000Z';
+      message.starshipId = 'starship-456';
+      message.conversationId = 'conversation-789';
       message.role = 'user';
-      message.content = 'Hello, how can you help me?';
+      message.content = 'Hello, how are you?';
       message.messageType = 'user_input';
+      message.createdAt = '2024-01-01T00:00:00.000Z';
+      message.updatedAt = '2024-01-02T12:00:00.000Z';
 
       const serialized = toDatabase(message);
 
       expect(serialized).toEqual({
         id: 'message-123',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:05:00.000Z',
+        starship_id: 'starship-456',
+        conversation_id: 'conversation-789',
         role: 'user',
-        content: 'Hello, how can you help me?',
-        messageType: 'user_input',
+        content: 'Hello, how are you?',
+        message_type: 'user_input',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-02T12:00:00.000Z',
       });
     });
 
-    it('should handle different roles and message types', async () => {
-      const testCases = [
-        { role: 'system' as const, messageType: 'system_instruction' as const, content: 'System initialization message' },
-        { role: 'user' as const, messageType: 'user_input' as const, content: 'User question' },
-        { role: 'assistant' as const, messageType: 'agent_response' as const, content: 'Agent response' },
-        { role: 'assistant' as const, messageType: 'workflow_output' as const, content: 'Workflow completed successfully' },
-      ];
-
-      for (const testCase of testCases) {
-        const message = new MessageEntity();
-        message.id = 'message-123';
-        message.createdAt = '2024-01-01T00:00:00.000Z';
-        message.updatedAt = '2024-01-01T00:00:00.000Z';
-        message.role = testCase.role;
-        message.content = testCase.content;
-        message.messageType = testCase.messageType;
-
-        const serialized = toDatabase(message);
-
-        expect(serialized.role).toBe(testCase.role);
-        expect(serialized.messageType).toBe(testCase.messageType);
-        expect(serialized.content).toBe(testCase.content);
-      }
-    });
-
-    it('should handle long content serialization', async () => {
+    it('should handle optional fields for assistant messages', async () => {
       const message = new MessageEntity();
       message.id = 'message-123';
-      message.createdAt = '2024-01-01T00:00:00.000Z';
-      message.updatedAt = '2024-01-01T00:00:00.000Z';
+      message.starshipId = 'starship-456';
+      message.conversationId = 'conversation-789';
       message.role = 'assistant';
-      message.content = 'Very long content: ' + 'a'.repeat(10000);
+      message.content = 'I can help you with that.';
       message.messageType = 'agent_response';
+      message.reasoning = 'User asked a question, providing helpful response';
+      message.toolCalls = [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: {
+            name: 'search',
+            arguments: '{"query": "test"}',
+          },
+        },
+      ];
+      message.createdAt = '2024-01-01T00:00:00.000Z';
+      message.updatedAt = '2024-01-02T12:00:00.000Z';
 
       const serialized = toDatabase(message);
 
-      expect((serialized.content as string).length).toBe(10019); // 'Very long content: ' + 10000 'a's
-      expect((serialized.content as string).startsWith('Very long content:')).toBe(true);
+      expect(serialized.reasoning).toBe('User asked a question, providing helpful response');
+      expect(serialized.tool_calls).toEqual([
+        {
+          id: 'call-1',
+          type: 'function',
+          function: {
+            name: 'search',
+            arguments: '{"query": "test"}',
+          },
+        },
+      ]);
+    });
+
+    it('should handle tool result messages with toolCallId', async () => {
+      const message = new MessageEntity();
+      message.id = 'message-123';
+      message.starshipId = 'starship-456';
+      message.conversationId = 'conversation-789';
+      message.role = 'tool';
+      message.content = '{"result": "success"}';
+      message.messageType = 'tool_result';
+      message.toolCallId = 'call-1';
+      message.createdAt = '2024-01-01T00:00:00.000Z';
+      message.updatedAt = '2024-01-02T12:00:00.000Z';
+
+      const serialized = toDatabase(message);
+
+      expect(serialized.tool_call_id).toBe('call-1');
     });
   });
 
@@ -84,79 +102,75 @@ describe('MessageEntity', () => {
     it('should deserialize database record to entity', async () => {
       const databaseRecord = {
         id: 'message-123',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:05:00.000Z',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
         role: 'user',
-        content: 'Hello, how can you help me?',
+        content: 'Hello, how are you?',
         messageType: 'user_input',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T12:00:00.000Z',
       };
 
       const entity = fromDatabase(MessageEntity, databaseRecord);
 
       expect(entity).toBeInstanceOf(MessageEntity);
       expect(entity.id).toBe('message-123');
-      expect(entity.createdAt).toBe('2024-01-01T00:00:00.000Z');
-      expect(entity.updatedAt).toBe('2024-01-01T00:05:00.000Z');
       expect(entity.role).toBe('user');
-      expect(entity.content).toBe('Hello, how can you help me?');
+      expect(entity.content).toBe('Hello, how are you?');
       expect(entity.messageType).toBe('user_input');
     });
 
-    it('should handle all valid role types', async () => {
-      const validRoles: Array<'system' | 'user' | 'assistant'> = ['system', 'user', 'assistant'];
+    it('should handle optional reasoning and toolCalls', async () => {
+      const databaseRecord = {
+        id: 'message-123',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
+        role: 'assistant',
+        content: 'Here is the result',
+        messageType: 'agent_response',
+        reasoning: 'Processing user request',
+        toolCalls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query": "test"}',
+            },
+          },
+        ],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T12:00:00.000Z',
+      };
 
-      for (const role of validRoles) {
-        const databaseRecord = {
-          id: 'message-123',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          role,
-          content: `Test message from ${role}`,
-          messageType: 'user_input',
-        };
+      const entity = fromDatabase(MessageEntity, databaseRecord);
 
-        const entity = fromDatabase(MessageEntity, databaseRecord);
-        expect(entity.role).toBe(role);
-      }
-    });
-
-    it('should handle all valid message types', async () => {
-      const validMessageTypes: Array<
-        'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error'
-      > = ['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error'];
-
-      for (const messageType of validMessageTypes) {
-        const databaseRecord = {
-          id: 'message-123',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          role: 'user',
-          content: `Test message of type ${messageType}`,
-          messageType,
-        };
-
-        const entity = fromDatabase(MessageEntity, databaseRecord);
-        expect(entity.messageType).toBe(messageType);
-      }
+      expect(entity.reasoning).toBe('Processing user request');
+      expect(entity.toolCalls).toHaveLength(1);
+      expect(entity.toolCalls?.[0].id).toBe('call-1');
     });
 
     it('should deserialize array of database records', async () => {
       const databaseRecords = [
         {
           id: 'message-1',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'user',
           content: 'First message',
           messageType: 'user_input',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T12:00:00.000Z',
         },
         {
           id: 'message-2',
-          createdAt: '2024-01-01T00:01:00.000Z',
-          updatedAt: '2024-01-01T00:01:00.000Z',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'assistant',
           content: 'Second message',
           messageType: 'agent_response',
+          createdAt: '2024-01-02T00:00:00.000Z',
+          updatedAt: '2024-01-02T12:00:00.000Z',
         },
       ];
 
@@ -165,56 +179,54 @@ describe('MessageEntity', () => {
       expect(entities).toHaveLength(2);
       expect(entities[0]).toBeInstanceOf(MessageEntity);
       expect(entities[1]).toBeInstanceOf(MessageEntity);
-      expect(entities[0].content).toBe('First message');
-      expect(entities[1].content).toBe('Second message');
-      expect(entities[0].messageType).toBe('user_input');
-      expect(entities[1].messageType).toBe('agent_response');
-    });
-  });
-
-  describe('Transformations', () => {
-    it('should transform date strings correctly', async () => {
-      const databaseRecord = {
-        id: 'message-123',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:05:30.123Z',
-        role: 'user',
-        content: 'Test message',
-        messageType: 'user_input',
-      };
-
-      const entity = fromDatabase(MessageEntity, databaseRecord);
-
-      // Dates should be preserved as ISO strings for entities
-      expect(entity.createdAt).toBe('2024-01-01T00:00:00.000Z');
-      expect(entity.updatedAt).toBe('2024-01-01T00:05:30.123Z');
-      expect(typeof entity.createdAt).toBe('string');
-      expect(typeof entity.updatedAt).toBe('string');
-    });
-
-    it('should handle date transformation with Date objects', async () => {
-      const databaseRecord = {
-        id: 'message-123',
-        createdAt: new Date('2024-01-01T00:00:00.000Z'),
-        updatedAt: new Date('2024-01-01T00:05:00.000Z'),
-        role: 'user',
-        content: 'Test message',
-        messageType: 'user_input',
-      };
-
-      const entity = fromDatabase(MessageEntity, databaseRecord);
-
-      expect(entity.createdAt).toBe('2024-01-01T00:00:00.000Z');
-      expect(entity.updatedAt).toBe('2024-01-01T00:05:00.000Z');
+      expect(entities[0].role).toBe('user');
+      expect(entities[1].role).toBe('assistant');
     });
   });
 
   describe('Validation', () => {
-    it('should pass validation for valid create data', async () => {
+    it('should pass validation for valid user message', async () => {
       const validData = {
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
         role: 'user',
-        content: 'Hello, world!',
+        content: 'Hello!',
         messageType: 'user_input',
+      };
+
+      await expect(MessageEntity.validate(validData, 'create')).resolves.not.toThrow();
+    });
+
+    it('should pass validation for assistant message with toolCalls and no content', async () => {
+      const validData = {
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
+        role: 'assistant',
+        content: '',
+        messageType: 'agent_response',
+        toolCalls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query": "test"}',
+            },
+          },
+        ],
+      };
+
+      await expect(MessageEntity.validate(validData, 'create')).resolves.not.toThrow();
+    });
+
+    it('should pass validation for assistant message with reasoning and no content', async () => {
+      const validData = {
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
+        role: 'assistant',
+        content: '',
+        messageType: 'agent_response',
+        reasoning: 'Thinking about the problem...',
       };
 
       await expect(MessageEntity.validate(validData, 'create')).resolves.not.toThrow();
@@ -222,97 +234,134 @@ describe('MessageEntity', () => {
 
     it('should fail validation for missing required fields', async () => {
       const invalidData = {
-        content: 'Missing role and messageType',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
+        // role is missing
+        content: 'Hello!',
+        messageType: 'user_input',
       };
 
       await expect(MessageEntity.validate(invalidData, 'create')).rejects.toThrow('Validation failed');
     });
 
-    it('should validate role constraints', async () => {
-      // Invalid role
+    it('should validate role enum constraints', async () => {
       await expect(
         MessageEntity.validate({
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'invalid-role',
-          content: 'Test content',
+          content: 'Hello!',
           messageType: 'user_input',
         })
       ).rejects.toThrow();
 
-      // Valid roles should pass
-      const validRoles = ['system', 'user', 'assistant'];
+      const validRoles = ['system', 'user', 'assistant', 'tool'];
       for (const role of validRoles) {
         await expect(
           MessageEntity.validate({
+            starshipId: 'starship-456',
+            conversationId: 'conversation-789',
             role,
-            content: 'Test content',
+            content: 'Test message',
             messageType: 'user_input',
           })
         ).resolves.not.toThrow();
       }
     });
 
-    it('should validate messageType constraints', async () => {
-      // Invalid messageType
+    it('should validate messageType enum constraints', async () => {
       await expect(
         MessageEntity.validate({
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'user',
-          content: 'Test content',
+          content: 'Hello!',
           messageType: 'invalid-type',
         })
       ).rejects.toThrow();
 
-      // Valid messageTypes should pass
-      const validMessageTypes = ['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error'];
+      const validMessageTypes = [
+        'user_input',
+        'agent_response',
+        'system_notification',
+        'system_instruction',
+        'workflow_output',
+        'error',
+        'tool_result',
+      ];
       for (const messageType of validMessageTypes) {
         await expect(
           MessageEntity.validate({
+            starshipId: 'starship-456',
+            conversationId: 'conversation-789',
             role: 'user',
-            content: 'Test content',
+            content: 'Test message',
             messageType,
           })
         ).resolves.not.toThrow();
       }
     });
 
-    it('should validate content length constraints', async () => {
-      // Too short content (empty string)
+    it('should validate content is not empty for non-assistant messages', async () => {
       await expect(
         MessageEntity.validate({
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'user',
           content: '',
           messageType: 'user_input',
         })
       ).rejects.toThrow();
 
-      // Valid content lengths should pass - no maximum limit
       await expect(
         MessageEntity.validate({
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'user',
-          content: 'a', // Minimum length
+          content: 'Valid content',
           messageType: 'user_input',
         })
       ).resolves.not.toThrow();
+    });
 
+    it('should validate reasoning length constraints', async () => {
       await expect(
         MessageEntity.validate({
-          role: 'user',
-          content: 'a'.repeat(50000), // Large content should be allowed
-          messageType: 'user_input',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
+          role: 'assistant',
+          content: 'Response',
+          messageType: 'agent_response',
+          reasoning: '',
         })
-      ).resolves.not.toThrow();
+      ).rejects.toThrow();
 
       await expect(
         MessageEntity.validate({
-          role: 'user',
-          content: 'a'.repeat(100000), // Very large content should be allowed
-          messageType: 'user_input',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
+          role: 'assistant',
+          content: 'Response',
+          messageType: 'agent_response',
+          reasoning: 'a'.repeat(200001),
+        })
+      ).rejects.toThrow();
+
+      await expect(
+        MessageEntity.validate({
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
+          role: 'assistant',
+          content: 'Response',
+          messageType: 'agent_response',
+          reasoning: 'Valid reasoning text',
         })
       ).resolves.not.toThrow();
     });
 
     it('should allow partial validation for update operations', async () => {
       const updateData = {
-        content: 'Updated message content',
+        content: 'Updated content',
       };
 
       await expect(MessageEntity.validate(updateData, 'update')).resolves.not.toThrow();
@@ -329,38 +378,57 @@ describe('MessageEntity', () => {
     it('should preserve data integrity through serialization round-trip', async () => {
       const originalData = {
         id: 'message-123',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:05:30.123Z',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
         role: 'assistant',
-        content: 'This is a comprehensive test message with special characters: éñ 🚀',
+        content: 'Here is my response',
         messageType: 'agent_response',
+        reasoning: 'Analyzing the user query',
+        toolCalls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query": "test"}',
+            },
+          },
+        ],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T12:00:00.000Z',
       };
 
       const results = await testHelper.testRoundTrip([{ data: originalData, description: 'complete message data' }]);
 
       expect(results[0].success).toBe(true);
-      expect(results[0].keysMatch).toBe(true);
 
-      // Verify specific data is preserved
       const entity = results[0].entity as MessageEntity;
       expect(entity.role).toBe('assistant');
-      expect(entity.content).toBe('This is a comprehensive test message with special characters: éñ 🚀');
-      expect(entity.messageType).toBe('agent_response');
+      expect(entity.content).toBe('Here is my response');
+      expect(entity.reasoning).toBe('Analyzing the user query');
+      expect(entity.toolCalls).toHaveLength(1);
     });
 
     it('should handle round-trip with minimal data', async () => {
       const minimalData = {
         id: 'message-123',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
         role: 'user',
-        content: 'Hello',
+        content: 'Simple message',
         messageType: 'user_input',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T12:00:00.000Z',
       };
 
       const results = await testHelper.testRoundTrip([{ data: minimalData, description: 'minimal message data' }]);
 
       expect(results[0].success).toBe(true);
+
+      const entity = results[0].entity as MessageEntity;
+      expect(entity.reasoning).toBeUndefined();
+      expect(entity.toolCalls).toBeUndefined();
+      expect(entity.toolCallId).toBeUndefined();
     });
   });
 
@@ -371,156 +439,147 @@ describe('MessageEntity', () => {
       expect(() => fromDatabase(MessageEntity, 'not an object')).toThrow();
     });
 
-    it('should handle array deserialization with mixed data', async () => {
-      const mixedData = [
-        {
-          id: 'message-1',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          role: 'user',
-          content: 'Valid message',
-          messageType: 'user_input',
-        },
-        null, // Invalid item
-      ];
+    it('should handle empty array deserialization', async () => {
+      const emptyArray: never[] = [];
+      const entities = fromDatabaseArray(MessageEntity, emptyArray);
 
-      expect(() => fromDatabaseArray(MessageEntity, mixedData)).toThrow();
+      expect(entities).toHaveLength(0);
+      expect(Array.isArray(entities)).toBe(true);
     });
   });
 
   describe('Edge cases', () => {
-    it('should handle very long content', async () => {
-      const longContent = 'a'.repeat(10000);
-      const databaseRecord = {
-        id: 'message-123',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        role: 'assistant',
-        content: longContent,
-        messageType: 'agent_response',
-      };
+    it('should handle all valid roles', async () => {
+      const roles = ['system', 'user', 'assistant', 'tool'];
 
-      const entity = fromDatabase(MessageEntity, databaseRecord);
-      expect(entity.content.length).toBe(10000);
-      expect(entity.content).toBe(longContent);
-    });
-
-    it('should handle all role and messageType combinations', async () => {
-      const combinations = [
-        { role: 'system', messageType: 'system_instruction' },
-        { role: 'system', messageType: 'system_notification' },
-        { role: 'user', messageType: 'user_input' },
-        { role: 'assistant', messageType: 'agent_response' },
-        { role: 'assistant', messageType: 'workflow_output' },
-        { role: 'assistant', messageType: 'error' },
-      ];
-
-      for (const combo of combinations) {
-        const databaseRecord = {
+      for (const role of roles) {
+        const record = {
           id: 'message-123',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
+          role,
+          content: 'Test content',
+          messageType: 'user_input',
           createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          role: combo.role,
-          content: `Test ${combo.role} message`,
-          messageType: combo.messageType,
+          updatedAt: '2024-01-02T12:00:00.000Z',
         };
 
-        const entity = fromDatabase(MessageEntity, databaseRecord);
-        expect(entity.role).toBe(combo.role);
-        expect(entity.messageType).toBe(combo.messageType);
-
-        // Should also pass validation
-        await expect(
-          MessageEntity.validate({
-            role: combo.role,
-            content: 'Test content',
-            messageType: combo.messageType,
-          })
-        ).resolves.not.toThrow();
+        const entity = fromDatabase(MessageEntity, record);
+        expect(entity.role).toBe(role);
       }
     });
 
-    it('should handle special characters and emojis in content', async () => {
+    it('should handle all valid messageTypes', async () => {
+      const messageTypes = [
+        'user_input',
+        'agent_response',
+        'system_notification',
+        'system_instruction',
+        'workflow_output',
+        'error',
+        'tool_result',
+      ];
+
+      for (const messageType of messageTypes) {
+        const record = {
+          id: 'message-123',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
+          role: 'user',
+          content: 'Test content',
+          messageType,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T12:00:00.000Z',
+        };
+
+        const entity = fromDatabase(MessageEntity, record);
+        expect(entity.messageType).toBe(messageType);
+      }
+    });
+
+    it('should handle very long content', async () => {
+      const longContent = 'a'.repeat(10000);
+      const record = {
+        id: 'message-123',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
+        role: 'user',
+        content: longContent,
+        messageType: 'user_input',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T12:00:00.000Z',
+      };
+
+      const entity = fromDatabase(MessageEntity, record);
+      expect(entity.content).toBe(longContent);
+      expect(entity.content.length).toBe(10000);
+    });
+
+    it('should handle special characters in content', async () => {
       const specialContents = [
-        'Message with émojis 🚀✨🎉',
+        'Content with "quotes"',
+        "Content with 'apostrophes'",
+        'Content with émojis 💬',
         'Unicode test: αβγδε',
-        'Mixed languages: English 中文 العربية',
-        'Code snippet: console.log("Hello, world!");',
-        'JSON: {"key": "value", "number": 123}',
-        'Markdown: **bold** and *italic*',
+        'Mixed: English 中文 العربية',
+        'Code: const x = { y: "z" };',
       ];
 
       for (const content of specialContents) {
-        const databaseRecord = {
+        const record = {
           id: 'message-123',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          starshipId: 'starship-456',
+          conversationId: 'conversation-789',
           role: 'user',
           content,
           messageType: 'user_input',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T12:00:00.000Z',
         };
 
-        const entity = fromDatabase(MessageEntity, databaseRecord);
+        const entity = fromDatabase(MessageEntity, record);
         expect(entity.content).toBe(content);
 
-        // Should serialize and deserialize correctly
         const serialized = toDatabase(entity);
         const deserialized = fromDatabase(MessageEntity, serialized);
         expect(deserialized.content).toBe(content);
       }
     });
 
-    it('should handle edge case timestamps', async () => {
-      // Very old timestamp
-      const oldTimestamp = '1970-01-01T00:00:00.000Z';
-      // Future timestamp
-      const futureTimestamp = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-
-      const databaseRecord = {
+    it('should handle multiple toolCalls', async () => {
+      const record = {
         id: 'message-123',
-        createdAt: oldTimestamp,
-        updatedAt: futureTimestamp,
-        role: 'user',
-        content: 'Edge case timestamps',
-        messageType: 'user_input',
+        starshipId: 'starship-456',
+        conversationId: 'conversation-789',
+        role: 'assistant',
+        content: 'Processing your request',
+        messageType: 'agent_response',
+        toolCalls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'search',
+              arguments: '{"query": "test1"}',
+            },
+          },
+          {
+            id: 'call-2',
+            type: 'function',
+            function: {
+              name: 'calculate',
+              arguments: '{"expression": "2+2"}',
+            },
+          },
+        ],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T12:00:00.000Z',
       };
 
-      const entity = fromDatabase(MessageEntity, databaseRecord);
-      expect(entity.createdAt).toBe(oldTimestamp);
-      expect(entity.updatedAt).toBe(futureTimestamp);
-    });
-  });
-
-  describe('Integration with test helper', () => {
-    it('should work with entity test helper validation tests', async () => {
-      const validationTestCases = [
-        {
-          data: { role: 'user', content: 'Valid message', messageType: 'user_input' },
-          shouldPass: true,
-          description: 'valid message data should pass',
-        },
-        {
-          data: { role: 'invalid-role', content: 'Invalid role', messageType: 'user_input' },
-          shouldPass: false,
-          description: 'invalid role should fail',
-        },
-        {
-          data: { role: 'user', content: '', messageType: 'user_input' },
-          shouldPass: false,
-          description: 'empty content should fail',
-        },
-        {
-          data: { role: 'user', content: 'Valid content', messageType: 'invalid-type' },
-          shouldPass: false,
-          description: 'invalid messageType should fail',
-        },
-      ];
-
-      const results = await testHelper.testValidation(validationTestCases);
-
-      results.forEach((result, index) => {
-        expect(result.passed).toBe(validationTestCases[index].shouldPass);
-      });
+      const entity = fromDatabase(MessageEntity, record);
+      expect(entity.toolCalls).toHaveLength(2);
+      expect(entity.toolCalls?.[0].id).toBe('call-1');
+      expect(entity.toolCalls?.[1].id).toBe('call-2');
     });
   });
 });

@@ -34,9 +34,7 @@ export class Tool extends BaseNode<ToolParams> {
     try {
       // Extract tool arguments from input
       const inputData = ExecutionItemUtils.unwrapSingle(input);
-      // console.log(`[TOOL NODE ${params.name}] Input data:`, JSON.stringify(inputData));
       const toolArgs = this.extractToolArguments(inputData);
-      // console.log(`[TOOL NODE ${params.name}] Extracted tool args:`, JSON.stringify(toolArgs));
 
       // Emit tool_started event
       const eventCallback = this.getOptions()?.eventCallback;
@@ -61,7 +59,6 @@ export class Tool extends BaseNode<ToolParams> {
       // Execute the tool's blueprint using depth-aware Runner selection
       // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
       const parentExecution = this.getOptions()?.execution;
-      // console.log(`[TOOL NODE ${params.name}] Creating execution with toolArgs:`, JSON.stringify(toolArgs));
       subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
       const engineConfig: EngineConfig = {

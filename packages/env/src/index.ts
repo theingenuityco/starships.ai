@@ -34,11 +34,13 @@ export function getEnvConfig(): EnvironmentConfig {
     CLIENT_URL: process.env.CLIENT_URL || `http://localhost:${DEFAULT_CLIENT_PORT}`,
     SERVER_URL: process.env.SERVER_URL || `http://localhost:${DEFAULT_SERVER_PORT}`,
 
-    // Neo4j Database Configuration
-    NEO4J_URI: process.env.NEO4J_URI || 'bolt://localhost:7687',
-    NEO4J_USERNAME: process.env.NEO4J_USERNAME || 'neo4j',
-    NEO4J_PASSWORD: process.env.NEO4J_PASSWORD || 'password',
-    NEO4J_DATABASE: process.env.NEO4J_DATABASE || 'neo4j',
+    // PostgreSQL Database Configuration
+    POSTGRES_HOST: process.env.POSTGRES_HOST || 'localhost',
+    POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+    POSTGRES_USER: process.env.POSTGRES_USER || 'postgres',
+    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || 'password',
+    POSTGRES_DATABASE: process.env.POSTGRES_DATABASE || 'starships',
+    POSTGRES_SSL: process.env.POSTGRES_SSL === 'true',
 
     // LLM Provider Configuration
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,

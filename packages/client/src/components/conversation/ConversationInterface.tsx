@@ -14,7 +14,7 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 
 interface ConversationInterfaceProps {
-  starshipId?: string
+  starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
 }

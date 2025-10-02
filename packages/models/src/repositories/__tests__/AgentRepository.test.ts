@@ -19,15 +19,15 @@ jest.mock('nanoid', () => ({
 describe('AgentRepository', () => {
   let repository: AgentRepository;
   let mockConnection: {
-    executeQuery: jest.Mock;
-    executeWrite: jest.Mock;
+    query: jest.Mock;
+    queryOne: jest.Mock;
   };
 
   beforeEach(() => {
     // Create fresh mock connection for each test
     mockConnection = {
-      executeQuery: jest.fn(),
-      executeWrite: jest.fn(),
+      query: jest.fn(),
+      queryOne: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new AgentRepository();
@@ -41,10 +41,10 @@ describe('AgentRepository', () => {
     });
   });
 
-  describe('entity migration note', () => {
-    it('should note that serialization has moved to entity layer', () => {
-      // Serialization methods like serializeComplexFields, deserializeComplexFields, and getSafeValue
-      // have been removed from repositories and are now handled by AgentEntity
+  describe('database migration note', () => {
+    it('should note that database has been migrated from Neo4j to PostgreSQL', () => {
+      // Database has been migrated from Neo4j (Cypher) to PostgreSQL (SQL)
+      // Tests now use query() and queryOne() methods instead of executeQuery() and executeWrite()
       expect(true).toBe(true);
     });
   });
@@ -53,21 +53,21 @@ describe('AgentRepository', () => {
     describe('findAll', () => {
       it('should return all agents', async () => {
         const mockAgents = [
-          { id: 'agent-1', name: 'Agent 1' },
-          { id: 'agent-2', name: 'Agent 2' },
+          { id: 'agent-1', name: 'Agent 1', created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
+          { id: 'agent-2', name: 'Agent 2', created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
         ];
-        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
+        mockConnection.query.mockResolvedValue(mockAgents);
 
         const result = await repository.findAll();
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
+        expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM agents ORDER BY created_at DESC');
         expect(result).toHaveLength(2);
         expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
         expect(result[1]).toEqual(expect.objectContaining({ id: 'agent-2', name: 'Agent 2' }));
       });
 
       it('should handle empty result', async () => {
-        mockConnection.executeQuery.mockResolvedValue([]);
+        mockConnection.query.mockResolvedValue([]);
 
         const result = await repository.findAll();
 
@@ -75,7 +75,7 @@ describe('AgentRepository', () => {
       });
 
       it('should handle database errors', async () => {
-        mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
+        mockConnection.query.mockRejectedValue(new Error('Database error'));
 
         await expect(repository.findAll()).rejects.toThrow(DatabaseError);
       });
@@ -83,17 +83,22 @@ describe('AgentRepository', () => {
 
     describe('findById', () => {
       it('should return agent by id', async () => {
-        const mockAgent = { id: 'agent-1', name: 'Agent 1' };
-        mockConnection.executeQuery.mockResolvedValue([{ a: mockAgent }]);
+        const mockAgent = {
+          id: 'agent-1',
+          name: 'Agent 1',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        };
+        mockConnection.query.mockResolvedValue([mockAgent]);
 
         const result = await repository.findById('agent-1');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id: 'agent-1' });
+        expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM agents WHERE id = $1', ['agent-1']);
         expect(result).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
       });
 
       it('should return null when agent not found', async () => {
-        mockConnection.executeQuery.mockResolvedValue([]);
+        mockConnection.query.mockResolvedValue([]);
 
         const result = await repository.findById('non-existent');
 
@@ -101,7 +106,7 @@ describe('AgentRepository', () => {
       });
 
       it('should handle database errors', async () => {
-        mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
+        mockConnection.query.mockRejectedValue(new Error('Database error'));
 
         await expect(repository.findById('agent-1')).rejects.toThrow(DatabaseError);
       });
@@ -127,34 +132,22 @@ describe('AgentRepository', () => {
           description: 'Test Description',
           model: 'gpt-4',
           temperature: 0.7,
-          maxTokens: 1000,
+          max_tokens: 1000,
           timeout: 30000,
-          systemPrompt: 'Test agent',
-          state: { messages: [], tools: [] },
-          blueprint: { type: 'test', nodes: [], edges: [] },
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          system_prompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
+          blueprint: '{"type":"test","nodes":[],"edges":[]}',
+          starship_id: 'starship-123',
+          deployed_at: '2024-01-01T00:00:00.000Z',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
         };
 
-        // Mock createEntityWithAutoId call
-        mockConnection.executeWrite
-          .mockResolvedValueOnce([{ n: mockCreatedAgent }]) // createEntityWithAutoId
-          .mockResolvedValueOnce([]); // relationship creation
+        mockConnection.query.mockResolvedValue([mockCreatedAgent]);
 
         const result = await repository.create(mockAgentData, 'starship-123');
 
-        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
-          1,
-          expect.stringContaining('CREATE (n:Agent)'),
-          expect.objectContaining({
-            props: expect.objectContaining({
-              name: 'Test Agent',
-              systemPrompt: 'Test agent',
-              state: '{"messages":[],"tools":[]}',
-              blueprint: '{"type":"test","nodes":[],"edges":[]}',
-            }),
-          })
-        );
+        expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO agents'), expect.any(Array));
         expect(result.id).toBe('test-nanoid-1234');
         expect(result.name).toBe('Test Agent');
       });
@@ -166,66 +159,54 @@ describe('AgentRepository', () => {
       });
 
       it('should handle database errors', async () => {
-        mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+        mockConnection.query.mockRejectedValue(new Error('Database error'));
 
         await expect(repository.create(mockAgentData, 'starship-123')).rejects.toThrow(DatabaseError);
       });
 
-      it('should create Neo4j relationship', async () => {
+      it('should create agent with starship foreign key', async () => {
         const mockCreatedAgent = {
           id: 'test-nanoid-1234',
           name: 'Test Agent',
           description: 'Test Description',
           model: 'gpt-4',
           temperature: 0.7,
-          maxTokens: 1000,
+          max_tokens: 1000,
           timeout: 30000,
-          systemPrompt: 'Test agent',
-          state: { messages: [], tools: [] },
-          blueprint: { type: 'test', nodes: [], edges: [] },
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          system_prompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
+          blueprint: '{"type":"test","nodes":[],"edges":[]}',
+          starship_id: 'starship-123',
+          deployed_at: '2024-01-01T00:00:00.000Z',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
         };
 
-        // Mock createEntityWithAutoId call first, then relationship creation
-        mockConnection.executeWrite
-          .mockResolvedValueOnce([{ n: mockCreatedAgent }]) // createEntityWithAutoId
-          .mockResolvedValueOnce([]); // relationship creation
+        mockConnection.query.mockResolvedValue([mockCreatedAgent]);
 
         await repository.create(mockAgentData, 'starship-123');
 
-        expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2); // Once for agent, once for relationship
-        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
-          2,
-          expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
-          expect.objectContaining({
-            starshipId: 'starship-123',
-            agentId: 'test-nanoid-1234',
-          })
+        expect(mockConnection.query).toHaveBeenCalledWith(
+          expect.stringContaining('INSERT INTO agents'),
+          expect.arrayContaining([expect.anything()])
         );
       });
     });
 
     describe('update', () => {
       it('should update agent successfully', async () => {
-        const mockAgent = { id: 'agent-1', name: 'Updated Agent' };
+        const mockAgent = { id: 'agent-1', name: 'Updated Agent', updated_at: '2024-01-01T00:00:00.000Z' };
         const updates = { name: 'Updated Agent' };
-        mockConnection.executeWrite.mockResolvedValue([{ a: mockAgent }]);
+        mockConnection.query.mockResolvedValue([mockAgent]);
 
         const result = await repository.update('agent-1', updates);
 
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a', {
-          id: 'agent-1',
-          updates: expect.objectContaining({
-            ...updates,
-            updatedAt: expect.any(String),
-          }),
-        });
+        expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE agents'), expect.any(Array));
         expect(result).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Updated Agent' }));
       });
 
       it('should return null when agent not found', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
+        mockConnection.query.mockResolvedValue([]);
 
         const result = await repository.update('non-existent', { name: 'Updated' });
 
@@ -233,7 +214,7 @@ describe('AgentRepository', () => {
       });
 
       it('should handle database errors', async () => {
-        mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+        mockConnection.query.mockRejectedValue(new Error('Database error'));
 
         await expect(repository.update('agent-1', { name: 'Updated' })).rejects.toThrow(DatabaseError);
       });
@@ -241,19 +222,16 @@ describe('AgentRepository', () => {
 
     describe('delete', () => {
       it('should delete agent successfully', async () => {
-        mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
+        mockConnection.query.mockResolvedValue({ rowCount: 1 });
 
         const result = await repository.delete('agent-1');
 
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          'MATCH (a:Agent) WHERE a.id = $id DETACH DELETE a RETURN count(a) as deletedCount',
-          { id: 'agent-1' }
-        );
+        expect(mockConnection.query).toHaveBeenCalledWith('DELETE FROM agents WHERE id = $1', ['agent-1']);
         expect(result).toBe(true);
       });
 
       it('should return false when agent not found', async () => {
-        mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 0 }]);
+        mockConnection.query.mockResolvedValue({ rowCount: 0 });
 
         const result = await repository.delete('non-existent');
 
@@ -261,7 +239,7 @@ describe('AgentRepository', () => {
       });
 
       it('should handle database errors', async () => {
-        mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+        mockConnection.query.mockRejectedValue(new Error('Database error'));
 
         await expect(repository.delete('agent-1')).rejects.toThrow(DatabaseError);
       });
@@ -271,15 +249,22 @@ describe('AgentRepository', () => {
   describe('Relationship Methods', () => {
     describe('findByStarship', () => {
       it('should return starship agents', async () => {
-        const mockAgents = [{ id: 'agent-1', name: 'Agent 1' }];
-        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
+        const mockAgents = [
+          {
+            id: 'agent-1',
+            name: 'Agent 1',
+            starship_id: 'starship-123',
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          },
+        ];
+        mockConnection.query.mockResolvedValue(mockAgents);
 
         const result = await repository.findByStarship('starship-123');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a',
-          { starshipId: 'starship-123' }
-        );
+        expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM agents WHERE starship_id = $1 ORDER BY created_at DESC', [
+          'starship-123',
+        ]);
         expect(result).toHaveLength(1);
         expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
       });
@@ -287,34 +272,26 @@ describe('AgentRepository', () => {
 
     describe('updateStarship', () => {
       it('should update agent starshipId successfully', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 1 }]); // Starship exists
-        mockConnection.executeWrite
-          .mockResolvedValueOnce([]) // Remove relationship
-          .mockResolvedValueOnce([]) // Create relationship
-          .mockResolvedValueOnce([{ a: { id: 'agent-123' } }]); // Update agent
+        mockConnection.queryOne.mockResolvedValue({ count: '1' }); // Starship exists
+        mockConnection.query.mockResolvedValue([{ id: 'agent-123', starship_id: 'starship-456', updated_at: '2024-01-01T00:00:00.000Z' }]); // Update agent
 
         const result = await repository.updateStarship('agent-123', 'starship-456');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
-          starshipId: 'starship-456',
-        });
+        expect(mockConnection.queryOne).toHaveBeenCalledWith('SELECT COUNT(*) as count FROM starships WHERE id = $1', ['starship-456']);
         expect(result).toMatchObject({ id: 'agent-123' });
       });
 
       it('should throw error when starship not found', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 0 }]); // Starship doesn't exist
+        mockConnection.queryOne.mockResolvedValue({ count: '0' }); // Starship doesn't exist
 
         await expect(repository.updateStarship('agent-123', 'non-existent')).rejects.toThrow(NotFoundError);
       });
 
       it('should throw error when agent not found', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 1 }]); // Starship exists
-        mockConnection.executeWrite
-          .mockResolvedValueOnce([]) // Remove relationship
-          .mockResolvedValueOnce([]) // Create relationship
-          .mockResolvedValueOnce([]); // Update agent - empty result
+        mockConnection.queryOne.mockResolvedValue({ count: '1' }); // Starship exists
+        mockConnection.query.mockResolvedValue([]); // Update agent - empty result
 
-        await expect(repository.updateStarship('non-existent', 'starship-456')).rejects.toThrow(DatabaseError);
+        await expect(repository.updateStarship('non-existent', 'starship-456')).rejects.toThrow(NotFoundError);
       });
     });
   });
@@ -322,15 +299,14 @@ describe('AgentRepository', () => {
   describe('Query Methods', () => {
     describe('searchAgents', () => {
       it('should search agents with fulltext search', async () => {
-        const mockAgents = [{ id: 'agent-1', name: 'Matching Agent' }];
-        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a, score: 0.95 })));
+        const mockAgents = [
+          { id: 'agent-1', name: 'Matching Agent', created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
+        ];
+        mockConnection.query.mockResolvedValue(mockAgents);
 
         const result = await repository.searchAgents('test query');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
-          { query: 'test query' }
-        );
+        expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('to_tsvector'), ['test query']);
         expect(result).toHaveLength(1);
         expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Matching Agent' }));
       });
@@ -339,22 +315,25 @@ describe('AgentRepository', () => {
 
   describe('Error Scenarios', () => {
     it('should handle constraint violation errors', async () => {
-      const constraintError = new Error('constraint violation');
-      mockConnection.executeQuery.mockRejectedValue(constraintError);
+      // PostgreSQL constraint violation error with proper error code
+      const constraintError = Object.assign(new Error('duplicate key value violates unique constraint'), {
+        code: '23505', // PostgreSQL unique_violation error code
+      });
+      mockConnection.query.mockRejectedValue(constraintError);
 
       await expect(repository.findAll()).rejects.toThrow(ConflictError);
     });
 
     it('should handle connection errors', async () => {
       const connectionError = new Error('connection failed');
-      mockConnection.executeQuery.mockRejectedValue(connectionError);
+      mockConnection.query.mockRejectedValue(connectionError);
 
       await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
 
     it('should handle timeout errors', async () => {
       const timeoutError = new Error('operation timeout');
-      mockConnection.executeQuery.mockRejectedValue(timeoutError);
+      mockConnection.query.mockRejectedValue(timeoutError);
 
       await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });

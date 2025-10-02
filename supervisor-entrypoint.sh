@@ -38,18 +38,33 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
             # Start PostgreSQL temporarily for initialization
             su-exec postgres pg_ctl -D /var/lib/postgresql/data -w start
             
+            # Wait for PostgreSQL to be ready
+            for i in $(seq 1 30); do
+                if su-exec postgres pg_isready -q; then
+                    echo "PostgreSQL is ready for initialization"
+                    break
+                fi
+                echo "Waiting for PostgreSQL to be ready... ($i/30)"
+                sleep 1
+            done
+            
+            # Export environment variables for init scripts
+            export POSTGRES_DATABASE="${POSTGRES_DATABASE:-starships}"
+            export POSTGRES_USER="${POSTGRES_USER:-postgres}"
+            export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-password}"
+            
             # Run all .sh and .sql scripts
             for f in /docker-entrypoint-initdb.d/*; do
                 case "$f" in
                     *.sh)
                         if [ -x "$f" ]; then
                             echo "Running $f"
-                            su-exec postgres "$f"
+                            su-exec postgres sh -c "POSTGRES_DATABASE='$POSTGRES_DATABASE' POSTGRES_USER='$POSTGRES_USER' POSTGRES_PASSWORD='$POSTGRES_PASSWORD' $f"
                         fi
                         ;;
                     *.sql)
                         echo "Running $f"
-                        su-exec postgres psql -v ON_ERROR_STOP=1 --username postgres < "$f"
+                        su-exec postgres psql -v ON_ERROR_STOP=1 --username postgres --dbname postgres < "$f"
                         ;;
                     *)
                         echo "Ignoring $f"

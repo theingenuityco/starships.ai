@@ -459,7 +459,7 @@ Simple and efficient debug configurations for development:
 
 ## 📄 License
 
-Proprietary - All rights reserved by The Ingenuity Labs Inc.
+Proprietary - All rights reserved by The Ingenuity Labs, Inc.
 
 ---
 

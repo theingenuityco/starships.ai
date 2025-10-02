@@ -33,16 +33,15 @@ if [ -n "$POSTGRES_HOST" ]; then
     if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
         echo "PostgreSQL host points to localhost, starting internal PostgreSQL..."
         
-        # Ensure PostgreSQL runtime directory exists
-        mkdir -p /run/postgresql /var/log/postgresql
-        chown -R postgres:postgres /run/postgresql /var/log/postgresql
-        chmod 775 /run/postgresql
-        
         # Check if supervisor is managing PostgreSQL (when running with supervisor)
         if [ -f /var/run/supervisord.pid ]; then
             echo "PostgreSQL is managed by supervisor"
         else
             echo "Starting PostgreSQL manually..."
+            # Ensure PostgreSQL runtime directory exists (only when not using supervisor)
+            mkdir -p /run/postgresql /var/log/postgresql
+            chown -R postgres:postgres /run/postgresql /var/log/postgresql
+            chmod 775 /run/postgresql
             # Start PostgreSQL in background if not using supervisor
             su postgres -c 'pg_ctl start -D /var/lib/postgresql/data' || true
         fi

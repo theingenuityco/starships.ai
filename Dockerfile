@@ -56,11 +56,6 @@ COPY --chown=nodejs:node supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
 COPY --chown=nodejs:node . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
-# Copy PostgreSQL initialization script (standard pattern)
-RUN mkdir -p /docker-entrypoint-initdb.d
-COPY --chown=postgres:postgres init-postgres.sh /docker-entrypoint-initdb.d/
-RUN chmod +x /docker-entrypoint-initdb.d/init-postgres.sh
-
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
 

@@ -33,20 +33,13 @@ RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
 ENV POSTGRES_VERSION=15
 ENV PGDATA=/var/lib/postgresql/data
 
-# Install su-exec for user switching and configure PostgreSQL
+# Install su-exec for user switching and prepare PostgreSQL directories
+# PostgreSQL will be initialized at runtime by supervisor-entrypoint.sh
+# This allows proper volume mount support without overwriting initialization
 RUN apk add --no-cache su-exec && \
     mkdir -p /var/lib/postgresql/data && \
     chown -R postgres:postgres /var/lib/postgresql && \
-    chmod 700 /var/lib/postgresql/data && \
-    # Initialize PostgreSQL cluster as postgres user
-    su-exec postgres initdb -D /var/lib/postgresql/data && \
-    # Configure PostgreSQL
-    echo "listen_addresses = '*'" >> /var/lib/postgresql/data/postgresql.conf && \
-    echo "port = 5432" >> /var/lib/postgresql/data/postgresql.conf && \
-    echo "max_connections = 100" >> /var/lib/postgresql/data/postgresql.conf && \
-    echo "shared_buffers = 128MB" >> /var/lib/postgresql/data/postgresql.conf && \
-    echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf && \
-    echo "local all all trust" >> /var/lib/postgresql/data/pg_hba.conf
+    chmod 700 /var/lib/postgresql/data
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate

@@ -1,0 +1,24 @@
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Check runner
+        run: |
+          echo "✅ Running on self-hosted runner!"
+          echo "Hostname: $(hostname)"
+          echo "OS: $(uname -a)"
+          echo "Date: $(date)"
+          echo "Working directory: $(pwd)"
+
+      - name: Test basic commands
+        run: |
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Git version: $(git --version)"

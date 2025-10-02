@@ -3,6 +3,7 @@
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { ToolFormDrawer, ToolFormDrawerRef } from '@/components/conversation/ToolFormDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -12,6 +13,8 @@ import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
+import { toast } from 'sonner'
+import { registerToolFormController, unregisterToolFormController } from '@/lib/tool-form-controller'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -30,8 +33,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
 
-  // Ref for direct communication with message input
+  // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
+  const toolFormDrawerRef = useRef<ToolFormDrawerRef>(null)
+
+  // Tool form drawer state
+  const [toolFormDrawerOpen, setToolFormDrawerOpen] = useState(false)
 
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [] } = useConversationStreamed(currentConversationId)
@@ -156,6 +163,48 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [hasMessages, currentConversationId])
 
+  // Handle tool form save
+  const handleToolFormSave = useCallback((data: any) => {
+    console.log('Tool form data:', data)
+    toast.success('Tool created successfully!', {
+      description: `${data.name} has been created and is ready to use.`,
+    })
+    setToolFormDrawerOpen(false)
+    toolFormDrawerRef.current?.resetForm()
+  }, [])
+
+  // Register tool form controller for programmatic access
+  useEffect(() => {
+    const controller = {
+      openDrawer: () => setToolFormDrawerOpen(true),
+      closeDrawer: () => setToolFormDrawerOpen(false),
+      updateField: (field: string, value: string | boolean) => {
+        toolFormDrawerRef.current?.updateField(field as any, value)
+      },
+      getFormData: () => toolFormDrawerRef.current?.getFormData() ?? null,
+      resetForm: () => toolFormDrawerRef.current?.resetForm(),
+      submitForm: () => {
+        const formData = toolFormDrawerRef.current?.getFormData()
+        if (formData) {
+          handleToolFormSave(formData)
+        }
+      },
+      setFormData: (data: any) => {
+        Object.entries(data).forEach(([field, value]) => {
+          if (value !== undefined && (typeof value === 'string' || typeof value === 'boolean')) {
+            toolFormDrawerRef.current?.updateField(field as any, value)
+          }
+        })
+      },
+    }
+
+    registerToolFormController(controller)
+
+    return () => {
+      unregisterToolFormController()
+    }
+  }, [handleToolFormSave])
+
   // Show loading state
   if (isLoading) {
     return (
@@ -246,6 +295,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           </ConversationMessageInput>
         </div>
       </div>
+
+      {/* Tool Form Drawer */}
+      <ToolFormDrawer ref={toolFormDrawerRef} open={toolFormDrawerOpen} onOpenChange={setToolFormDrawerOpen} onSave={handleToolFormSave} starshipId={starshipId} />
     </div>
   )
 }

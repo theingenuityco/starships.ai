@@ -30,7 +30,7 @@ const CreateMessageSchema = z.object({
   hasAttachments: z.boolean().optional(),
   tokenCount: z.number().min(0).optional(),
   processingTimeMs: z.number().min(0).optional(),
-  tool_call_id: z.string().optional(), // Reference to the tool call that generated this result
+  toolCallId: z.string().optional(), // Reference to the tool call that generated this result
 });
 
 const UpdateMessageSchema = CreateMessageSchema.partial().omit({ starshipId: true });

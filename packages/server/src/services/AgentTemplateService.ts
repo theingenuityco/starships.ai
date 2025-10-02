@@ -1,5 +1,5 @@
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, AgentTemplateRepository, ToolRepository, Neo4jConnection, StarshipRepository } from '@starships/models';
+import { AgentRepository, AgentTemplateRepository, ToolRepository, StarshipRepository } from '@starships/models';
 import { AgentModel, AgentTemplateModel, StarshipModel } from '@starships/protocol';
 
 export class AgentTemplateService {
@@ -8,11 +8,11 @@ export class AgentTemplateService {
   private agentRepository: AgentRepository;
   private toolRepository: ToolRepository;
 
-  constructor(connection: Neo4jConnection) {
-    this.templateRepository = new AgentTemplateRepository(connection);
-    this.starshipRepository = new StarshipRepository(connection);
-    this.agentRepository = new AgentRepository(connection);
-    this.toolRepository = new ToolRepository(connection);
+  constructor() {
+    this.templateRepository = new AgentTemplateRepository();
+    this.starshipRepository = new StarshipRepository();
+    this.agentRepository = new AgentRepository();
+    this.toolRepository = new ToolRepository();
   }
 
   async getAllTemplates(): Promise<AgentTemplateModel[]> {

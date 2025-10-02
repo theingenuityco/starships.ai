@@ -4,7 +4,6 @@
  * Environment variable entity with encryption support
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { EnvironmentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsString, Length, IsISO8601, IsOptional, validate, ValidationError } from 'class-validator';
@@ -36,12 +35,10 @@ export class EnvironmentEntity implements EnvironmentModel {
   description?: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 

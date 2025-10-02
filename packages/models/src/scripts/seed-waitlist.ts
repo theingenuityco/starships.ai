@@ -3,7 +3,6 @@
  * Automatically adds approved emails to the waitlist on server startup
  */
 
-import { getConnection } from '@/helpers/database';
 import { WaitlistRepository } from '@/repositories/WaitlistRepository';
 import { logger } from '@/helpers/logging';
 
@@ -24,11 +23,8 @@ export async function seedWaitlist(): Promise<void> {
   try {
     logger.info('Starting waitlist seeding...');
 
-    // Get the existing connection that was initialized by the server
-    const connection = getConnection();
-
     // Create the waitlist repository
-    const waitlistRepo = new WaitlistRepository(connection);
+    const waitlistRepo = new WaitlistRepository();
 
     // Initialize schema using the repository's method
     await waitlistRepo.initializeSchema();

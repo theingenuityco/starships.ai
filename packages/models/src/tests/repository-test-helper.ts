@@ -1,19 +1,21 @@
 /**
- * Comprehensive repository test helper for all repositories
+ * Comprehensive repository test helper for PostgreSQL repositories
  */
 
 import { getConnection } from '@/helpers/database';
 
 export class RepositoryTestHelper {
   public mockConnection: {
-    executeQuery: jest.Mock;
-    executeWrite: jest.Mock;
+    query: jest.Mock;
+    queryOne: jest.Mock;
+    queryCount: jest.Mock;
   };
 
   constructor() {
     this.mockConnection = {
-      executeQuery: jest.fn(),
-      executeWrite: jest.fn(),
+      query: jest.fn(),
+      queryOne: jest.fn(),
+      queryCount: jest.fn(),
     };
 
     // Mock getConnection to always return our mock
@@ -21,52 +23,61 @@ export class RepositoryTestHelper {
   }
 
   reset() {
-    this.mockConnection.executeQuery.mockClear();
-    this.mockConnection.executeWrite.mockClear();
-    this.mockConnection.executeQuery.mockResolvedValue([]);
-    this.mockConnection.executeWrite.mockResolvedValue([]);
+    this.mockConnection.query.mockClear();
+    this.mockConnection.queryOne.mockClear();
+    this.mockConnection.queryCount.mockClear();
+    this.mockConnection.query.mockResolvedValue([]);
+    this.mockConnection.queryOne.mockResolvedValue(null);
+    this.mockConnection.queryCount.mockResolvedValue(0);
   }
 
   // Mock patterns for different repository operations
-  mockFindQuery(data: unknown, alias: string = 'n') {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  mockFindQuery(data: unknown, _alias?: string) {
     if (Array.isArray(data)) {
-      this.mockConnection.executeQuery.mockResolvedValue(data.map((item) => ({ [alias]: item })));
+      this.mockConnection.query.mockResolvedValue(data);
     } else if (data) {
-      this.mockConnection.executeQuery.mockResolvedValue([{ [alias]: data }]);
+      this.mockConnection.query.mockResolvedValue([data]);
+      this.mockConnection.queryOne.mockResolvedValue(data);
     } else {
-      this.mockConnection.executeQuery.mockResolvedValue([]);
+      this.mockConnection.query.mockResolvedValue([]);
+      this.mockConnection.queryOne.mockResolvedValue(null);
     }
   }
 
   mockCreateWrite(data: unknown) {
-    // Mock for createEntityWithAutoId pattern
-    this.mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
+    // Mock for PostgreSQL INSERT ... RETURNING pattern
+    this.mockConnection.query.mockResolvedValue([data]);
   }
 
   mockMergeWrite(data: unknown) {
-    // Mock for mergeEntityWithAutoId pattern
-    this.mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
+    // Mock for PostgreSQL INSERT ... ON CONFLICT pattern
+    this.mockConnection.query.mockResolvedValue([data]);
   }
 
-  mockUpdateWrite(data: unknown, alias: string = 'u') {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  mockUpdateWrite(data: unknown, _alias?: string) {
     if (data) {
-      this.mockConnection.executeWrite.mockResolvedValue([{ [alias]: data }]);
+      this.mockConnection.query.mockResolvedValue([data]);
     } else {
-      this.mockConnection.executeWrite.mockResolvedValue([]);
+      this.mockConnection.query.mockResolvedValue([]);
     }
   }
 
   mockDeleteWrite(deleted: boolean = true) {
-    this.mockConnection.executeWrite.mockResolvedValue([{ deletedCount: deleted ? 1 : 0 }]);
+    this.mockConnection.query.mockResolvedValue({ rowCount: deleted ? 1 : 0 });
   }
 
   mockConstraintError() {
-    const constraintError = new Error('Neo.ClientError.Schema.ConstraintValidationFailed: constraint violation');
-    this.mockConnection.executeWrite.mockRejectedValue(constraintError);
+    const constraintError = Object.assign(new Error('duplicate key value violates unique constraint'), {
+      code: '23505', // PostgreSQL unique_violation error code
+    });
+    this.mockConnection.query.mockRejectedValue(constraintError);
   }
 
   mockDatabaseError() {
-    this.mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
-    this.mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+    this.mockConnection.query.mockRejectedValue(new Error('Database error'));
+    this.mockConnection.queryOne.mockRejectedValue(new Error('Database error'));
+    this.mockConnection.queryCount.mockRejectedValue(new Error('Database error'));
   }
 }

@@ -14,17 +14,16 @@ global.console = {
   info: jest.fn() as jest.MockedFunction<typeof console.info>,
 };
 
-// Mock neo4j driver for database operations
-const mockDriver = {
-  session: jest.fn(() => ({
-    run: jest.fn(),
-    close: jest.fn(),
-  })),
+// Mock PostgreSQL connection for database operations
+const mockConnection = {
+  query: jest.fn(),
+  queryOne: jest.fn(),
   close: jest.fn(),
+  connect: jest.fn(),
 };
 
 // Global test utilities
-(global as Record<string, unknown>).createMockDriver = () => mockDriver;
+(global as Record<string, unknown>).createMockConnection = () => mockConnection;
 
 // Mock user data
 (global as Record<string, unknown>).createMockUser = (overrides: Record<string, unknown> = {}) => ({
@@ -127,56 +126,61 @@ const mockDriver = {
 (global as Record<string, unknown>).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>
   new ConflictError(message);
 
-// Mock database session with common patterns
-(global as Record<string, unknown>).createMockDatabaseSession = () => {
-  const session = {
-    run: jest.fn(),
+// Mock database connection with common patterns
+(global as Record<string, unknown>).createMockDatabaseConnection = () => {
+  const connection = {
+    query: jest.fn(),
+    queryOne: jest.fn(),
     close: jest.fn(),
   };
 
   // Common return patterns for different query types
-  session.run.mockImplementation((query: string) => {
-    if (query.includes('CREATE')) {
-      return Promise.resolve({ records: [] });
+  connection.query.mockImplementation((query: string) => {
+    if (query.includes('INSERT')) {
+      return Promise.resolve({ rows: [] });
     }
-    if (query.includes('MATCH')) {
-      return Promise.resolve({ records: [] });
+    if (query.includes('SELECT')) {
+      return Promise.resolve({ rows: [] });
     }
     if (query.includes('DELETE')) {
-      return Promise.resolve({ summary: { counters: { nodesDeleted: 1 } } });
+      return Promise.resolve({ rowCount: 1 });
     }
-    return Promise.resolve({ records: [] });
+    return Promise.resolve({ rows: [] });
   });
 
-  return session;
+  connection.queryOne.mockImplementation(() => {
+    return Promise.resolve(null);
+  });
+
+  return connection;
 };
 
 // Mock repository error scenarios
-(global as Record<string, unknown>).mockRepositoryError = (session: Record<string, unknown>, errorType: string) => {
-  const mockSession = session as { run: { mockRejectedValue: (error: Error) => void } };
+(global as Record<string, unknown>).mockRepositoryError = (connection: Record<string, unknown>, errorType: string) => {
+  const mockConnection = connection as { query: { mockRejectedValue: (error: Error) => void } };
   switch (errorType) {
     case 'constraint':
-      mockSession.run.mockRejectedValue(new Error('constraint violation'));
+      mockConnection.query.mockRejectedValue(new Error('constraint violation'));
       break;
     case 'connection':
-      mockSession.run.mockRejectedValue(new Error('connection failed'));
+      mockConnection.query.mockRejectedValue(new Error('connection failed'));
       break;
     case 'timeout':
-      mockSession.run.mockRejectedValue(new Error('operation timeout'));
+      mockConnection.query.mockRejectedValue(new Error('operation timeout'));
       break;
     case 'query':
-      mockSession.run.mockRejectedValue(new Error('syntax error in query'));
+      mockConnection.query.mockRejectedValue(new Error('syntax error in query'));
       break;
     default:
-      mockSession.run.mockRejectedValue(new Error('unknown database error'));
+      mockConnection.query.mockRejectedValue(new Error('unknown database error'));
   }
 };
 
 // Mock successful repository operations
-(global as Record<string, unknown>).mockRepositorySuccess = (session: Record<string, unknown>, data: unknown) => {
-  const mockSession = session as { run: { mockResolvedValue: (value: unknown) => void } };
-  mockSession.run.mockResolvedValue({
-    records: data ? [{ get: () => data }] : [],
+(global as Record<string, unknown>).mockRepositorySuccess = (connection: Record<string, unknown>, data: unknown) => {
+  const mockConnection = connection as { query: { mockResolvedValue: (value: unknown) => void } };
+  mockConnection.query.mockResolvedValue({
+    rows: data ? [data] : [],
   });
 };
 

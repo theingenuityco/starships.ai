@@ -15,18 +15,19 @@ async function main() {
   }
 
   // Validate required environment variables
-  if (!process.env.NEO4J_URI || !process.env.NEO4J_USERNAME || !process.env.NEO4J_PASSWORD) {
-    console.error('❌ Missing required Neo4j environment variables');
-    console.error('Please set NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD');
+  if (!process.env.POSTGRES_HOST || !process.env.POSTGRES_USER || !process.env.POSTGRES_PASSWORD) {
+    console.error('❌ Missing required PostgreSQL environment variables');
+    console.error('Please set POSTGRES_HOST, POSTGRES_USER, and POSTGRES_PASSWORD');
     process.exit(1);
   }
 
   // Initialize database connection for other commands
   const config = {
-    uri: process.env.NEO4J_URI,
-    username: process.env.NEO4J_USERNAME,
-    password: process.env.NEO4J_PASSWORD,
-    database: process.env.NEO4J_DATABASE,
+    host: process.env.POSTGRES_HOST!,
+    port: parseInt(process.env.POSTGRES_PORT || '5432'),
+    user: process.env.POSTGRES_USER!,
+    password: process.env.POSTGRES_PASSWORD!,
+    database: process.env.POSTGRES_DATABASE || 'starships',
   };
 
   const connection = createConnection(config);
@@ -123,7 +124,7 @@ Examples:
   const result = await backupManager.restoreFromBackup(backupPath);
   if (result.success) {
     console.log('✅ Restore completed successfully!');
-    console.log(`📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
+    console.log(`📊 Restored: ${result.restoredTables} tables, ${result.restoredRecords} records`);
   } else {
     console.error('❌ Restore failed!');
     result.errors.forEach((error) => console.error(`   - ${error}`));
@@ -182,10 +183,11 @@ Global Options:
   --help, -h        Show help for specific command
 
 Environment Variables (Required):
-  NEO4J_URI         Neo4j connection URI
-  NEO4J_USERNAME    Neo4j username
-  NEO4J_PASSWORD    Neo4j password
-  NEO4J_DATABASE    Neo4j database name (optional)
+  POSTGRES_HOST     PostgreSQL host
+  POSTGRES_PORT     PostgreSQL port (default: 5432)
+  POSTGRES_USER     PostgreSQL username
+  POSTGRES_PASSWORD PostgreSQL password
+  POSTGRES_DATABASE PostgreSQL database name (default: starships)
 
 Examples:
   npm run backup create

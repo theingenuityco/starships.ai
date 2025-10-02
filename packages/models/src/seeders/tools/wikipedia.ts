@@ -13,35 +13,39 @@ export const wikipediaTool: ToolParams = {
     properties: {
       query: {
         type: 'string',
-        description: 'Search query or exact page title for Wikipedia. Use established topic names that likely have dedicated articles. Broader, well-known terms work better than specific combinations.'
+        description: 'Search query or exact page title for Wikipedia. Use established topic names that likely have dedicated articles. Broader, well-known terms work better than specific combinations.',
+        
+        // COMMENTED OUT - MAIN BRANCH VERSION (simpler description):
+        // description: 'Search query or exact page title for Wikipedia',
       },
       action: {
         type: 'string',
         enum: ['search', 'summary', 'content', 'sections'],
-        description: 'Type of operation: search (find articles), summary (quick overview), content (full article), sections (article structure)'
+        description:
+          'Type of operation: search (find articles), summary (quick overview), content (full article), sections (article structure)',
       },
       limit: {
         type: 'number',
-        description: 'Number of search results to return (1-10, default 5)'
+        description: 'Number of search results to return (1-10, default 5)',
       },
       language: {
         type: 'string',
-        description: 'Wikipedia language code (e.g., "en", "es", "fr", default "en")'
-      }
+        description: 'Wikipedia language code (e.g., "en", "es", "fr", default "en")',
+      },
     },
-    required: ['query', 'action']
+    required: ['query', 'action'],
   },
   blueprint: {
     nodes: [
-      { 
-        ref: 'start_1', 
-        type: 'start', 
-        name: 'Start', 
-        description: 'Receive Wikipedia query parameters', 
+      {
+        ref: 'start_1',
+        type: 'start',
+        name: 'Start',
+        description: 'Receive Wikipedia query parameters',
         parameters: {
           // Pass through the input from Tool node
-          output: '{{ $input() }}'
-        } 
+          output: '{{ $input() }}',
+        },
       },
       {
         ref: 'prepare_request',
@@ -138,10 +142,10 @@ export const wikipediaTool: ToolParams = {
             {
               operation: 'add',
               path: '/state/wikipedia_metadata',
-              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}'
-            }
-          ]
-        }
+              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}',
+            },
+          ],
+        },
       },
       {
         ref: 'fetch_wikipedia',
@@ -152,8 +156,8 @@ export const wikipediaTool: ToolParams = {
           url: '{{ $lastOutputOf("prepare_request")[0].json.request.url }}',
           method: '{{ $lastOutputOf("prepare_request")[0].json.request.method }}',
           headers: '{{ $lastOutputOf("prepare_request")[0].json.request.headers }}',
-          timeout: 30000
-        }
+          timeout: 30000,
+        },
       },
       {
         ref: 'combine_data',
@@ -183,8 +187,8 @@ export const wikipediaTool: ToolParams = {
               }
             };
           `,
-          timeout: 5000
-        }
+          timeout: 5000,
+        },
       },
       {
         ref: 'process_response',
@@ -393,33 +397,33 @@ export const wikipediaTool: ToolParams = {
               };
             }
           `,
-          timeout: 5000
-        }
+          timeout: 5000,
+        },
       },
-      { 
-        ref: 'end_1', 
-        type: 'end', 
-        name: 'End', 
-        description: 'Return Wikipedia query results', 
-        parameters: { 
-          output: '{{ $input() }}'
-        } 
-      }
+      {
+        ref: 'end_1',
+        type: 'end',
+        name: 'End',
+        description: 'Return Wikipedia query results',
+        parameters: {
+          output: '{{ $input() }}',
+        },
+      },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare_request' },
       { ref: 'e2', from: 'prepare_request', to: 'fetch_wikipedia' },
       { ref: 'e3', from: 'fetch_wikipedia', to: 'combine_data' },
       { ref: 'e4', from: 'combine_data', to: 'process_response' },
-      { ref: 'e5', from: 'process_response', to: 'end_1' }
+      { ref: 'e5', from: 'process_response', to: 'end_1' },
     ],
     metadata: {
       version: '1.0.0',
       author: 'Starships.ai',
       requiresApiKey: false,
-      rateLimit: 'Wikipedia API rate limits apply (200 requests per hour per IP)'
-    }
-  }
+      rateLimit: 'Wikipedia API rate limits apply (200 requests per hour per IP)',
+    },
+  },
 };
 
 /**
@@ -435,25 +439,16 @@ export const wikipediaToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   // Template metadata
   slug: 'wikipedia-search',
   category: 'data',
-  exampleUsage: JSON.stringify({
-    search: { name: 'wikipedia_search', arguments: { query: 'artificial intelligence', action: 'search' } },
-    summary: { name: 'wikipedia_search', arguments: { query: 'Machine learning', action: 'summary' } },
-    content: { name: 'wikipedia_search', arguments: { query: 'Deep learning', action: 'content' } },
-    sections: { name: 'wikipedia_search', arguments: { query: 'Neural network', action: 'sections' } }
-  }, null, 2),
-  requiresApiKey: false,
-  configurationFields: [
+  exampleUsage: JSON.stringify(
     {
-      name: 'defaultLanguage',
-      type: 'string',
-      description: 'Default Wikipedia language code (e.g., "en", "es", "fr")',
-      required: false
+      search: { name: 'wikipedia_search', arguments: { query: 'artificial intelligence', action: 'search' } },
+      summary: { name: 'wikipedia_search', arguments: { query: 'Machine learning', action: 'summary' } },
+      content: { name: 'wikipedia_search', arguments: { query: 'Deep learning', action: 'content' } },
+      sections: { name: 'wikipedia_search', arguments: { query: 'Neural network', action: 'sections' } },
     },
-    {
-      name: 'maxResultsLimit',
-      type: 'number',
-      description: 'Maximum number of search results to return (1-10)',
-      required: false
-    }
-  ]
+    null,
+    2
+  ),
+  requiresApiKey: false,
+  configurationFields: [],
 };

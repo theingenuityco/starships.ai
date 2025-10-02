@@ -127,8 +127,8 @@ Returns comprehensive schema with:
                     schema: {
                       role: { type: 'string', enum: ['system', 'user', 'assistant', 'tool'] },
                       content: { type: 'string' },
-                      tool_call_id: { type: 'string', required: false, description: 'For tool role messages' },
-                      tool_calls: { type: 'array', required: false, description: 'Function calls made by assistant' }
+                      toolCallId: { type: 'string', required: false, description: 'For tool role messages' },
+                      toolCalls: { type: 'array', required: false, description: 'Function calls made by assistant' }
                     }
                   },
                   temperature: {
@@ -187,7 +187,7 @@ Returns comprehensive schema with:
                 behavior: {
                   streaming: 'Always enabled for better UX',
                   apiKey: 'Required via env("OPEN_ROUTER_KEY") or autopilot.setCredentials()',
-                  output: 'OpenRouter response format with choices[], message.content, message.tool_calls',
+                  output: 'OpenRouter response format with choices[], message.content, message.toolCalls',
                   events: 'Emits content_chunk during streaming, content_complete when done'
                 },
                 validation: [
@@ -215,7 +215,7 @@ Returns comprehensive schema with:
                     properties: {
                       messages: {
                         type: 'array',
-                        description: 'Conversation history [{role, content, tool_calls?, tool_call_id?}]'
+                        description: 'Conversation history [{role, content, toolCalls?, toolCallId?}]'
                       },
                       tools: {
                         type: 'array',
@@ -235,7 +235,7 @@ Returns comprehensive schema with:
                 },
                 behavior: {
                   blueprintGeneration: 'Creates default tool-calling loop if blueprint not provided',
-                  toolLoop: 'Start -> LLM -> Conditional(tool_calls?) -> Tool -> Mutate -> LLM (loop)',
+                  toolLoop: 'Start -> LLM -> Conditional(toolCalls?) -> Tool -> Mutate -> LLM (loop)',
                   errorHandling: 'failOnNodeError: false by default for conversation resilience',
                   messageOrdering: 'systemPrompt -> state.messages -> input messages',
                   runner: 'ChildProcessRunner for depth=0, LocalRunner for depth>0'
@@ -402,7 +402,7 @@ Returns comprehensive schema with:
                   },
                   toolCallId: {
                     type: 'string',
-                    description: 'ID linking to originating assistant tool_call'
+                    description: 'ID linking to originating assistant toolCall'
                   }
                 },
                 behavior: {

@@ -69,8 +69,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           if (Array.isArray(cur.reasoningChunks) && (!Array.isArray(merged.reasoningChunks) || merged.reasoningChunks.length === 0)) {
             merged.reasoningChunks = cur.reasoningChunks
           }
-          if ((merged as any).tool_calls == null || (merged as any).tool_calls.length === 0) {
-            ;(merged as any).tool_calls = cur.tool_calls
+          if ((merged as any).toolCalls == null || (merged as any).toolCalls.length === 0) {
+            ;(merged as any).toolCalls = cur.toolCalls
           }
           merged.streaming = cur.streaming || merged.streaming
           collapsedMessages.push(merged)
@@ -79,7 +79,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
         }
       }
 
-      // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or tool_calls).
+      // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or toolCalls).
       // Preserve if it's actively streaming (so caret can show) and only drop if non-streaming.
       if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
         const streaming = Boolean((cur as any)?.streaming)
@@ -87,7 +87,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
         const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
         const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
         const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
-        const hasToolCalls = Array.isArray(cur?.tool_calls) && cur.tool_calls.length > 0
+        const hasToolCalls = Array.isArray(cur?.toolCalls) && cur.toolCalls.length > 0
 
         if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls)) {
           // Keep actively streaming assistant shells visible
@@ -117,7 +117,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
     baseMessages.forEach(msg => {
       if (msg.messageType === 'tool_result') {
-        const rid = (msg as any).tool_call_id ?? (msg as any).call_id ?? (msg as any).id
+        const rid = (msg as any).toolCallId ?? (msg as any).call_id ?? (msg as any).id
         if (rid != null) {
           toolResultsMap.set(String(rid), msg)
         }
@@ -129,9 +129,9 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
     for (const message of baseMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
-      if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
-        const toolCallIds = ((message as any).tool_calls || [])
-          .map((tc: any) => (tc as any).id ?? (tc as any).call_id ?? (tc as any).tool_call_id ?? (tc as any).function?.id)
+      if (message.role === 'assistant' && (message as any).toolCalls?.length > 0) {
+        const toolCallIds = ((message as any).toolCalls || [])
+          .map((tc: any) => (tc as any).id ?? (tc as any).call_id ?? (tc as any).toolCallId ?? (tc as any).function?.id)
           .filter(Boolean)
           .map((id: any) => String(id))
         const toolResults: any[] = []
@@ -161,8 +161,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       }
     }
 
-    // UI guard: drop blank assistant shells (no content/chunks/reasoning and no tool_calls).
-    // NOTE: Do NOT treat toolResults alone as renderable; without tool_calls the tool panel won't show.
+    // UI guard: drop blank assistant shells (no content/chunks/reasoning and no toolCalls).
+    // NOTE: Do NOT treat toolResults alone as renderable; without toolCalls the tool panel won't show.
     const pruned = groupedMessages.filter(msg => {
       if (msg.role !== 'assistant' || msg.messageType === 'tool_result') return true
       const a: any = msg as any
@@ -170,7 +170,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       const hasChunks = Array.isArray(a?.chunks) && a.chunks.length > 0
       const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
       const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray(a?.tool_calls) && a.tool_calls.length > 0
+      const hasToolCalls = Array.isArray(a?.toolCalls) && a.toolCalls.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls
     })
 
@@ -279,7 +279,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       const hasChunks = Array.isArray(msg.chunks) && msg.chunks.length > 0
       const hasRChunks = Array.isArray((msg as any)?.reasoningChunks) && (msg as any).reasoningChunks.length > 0
       const hasReasoning = typeof (msg as any)?.reasoning === 'string' && (msg as any).reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray((msg as any)?.tool_calls) && (msg as any).tool_calls.length > 0
+      const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
       const hasToolResults = Array.isArray((msg as any)?.toolResults) && (msg as any).toolResults.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults
     }
@@ -439,7 +439,7 @@ const MemoizedMessageBubble = memo(
                 reasoning={(message as any).reasoning}
                 reasoningChunks={(message as any).reasoningChunks}
                 agentName={agentName}
-                toolCalls={(message as any).tool_calls}
+                toolCalls={(message as any).toolCalls}
                 toolResults={(message as any).toolResults}
                 messageType={message.messageType}
               />
@@ -475,8 +475,8 @@ const MemoizedMessageBubble = memo(
     if (prevChunks !== nextChunks) return false
 
     // Re-render when tool calls count changes
-    const prevCalls = (prevProps.message as any).tool_calls?.length ?? 0
-    const nextCalls = (nextProps.message as any).tool_calls?.length ?? 0
+    const prevCalls = (prevProps.message as any).toolCalls?.length ?? 0
+    const nextCalls = (nextProps.message as any).toolCalls?.length ?? 0
     if (prevCalls !== nextCalls) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later

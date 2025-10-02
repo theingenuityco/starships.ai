@@ -29,10 +29,10 @@
     "backup:create": "cd deploy && npm run backup:create",
     "backup:restore": "cd deploy && npm run backup:restore",
     "backup:list": "cd deploy && npm run backup:list",
-    "neo4j:install": "docker run -d --name starships-neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:latest || echo 'Container may already exist. Use neo4j:reset to recreate.'",
-    "neo4j:reset": "docker stop starships-neo4j 2>/dev/null || true && docker rm starships-neo4j 2>/dev/null || true && echo 'Neo4j container cleaned up. Use neo4j:install to recreate.'",
-    "neo4j:shell": "docker exec -it starships-neo4j cypher-shell -u neo4j -p starships2024! || echo 'Container not running. Use neo4j:start first.'",
-    "neo4j:backup": "docker exec starships-neo4j neo4j-admin database dump --database=neo4j --to-path=/backups --verbose || echo 'Backup failed. Ensure container is running.'"
+    "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:18 || echo 'Container may already exist. Use postgres:reset to recreate.'",
+    "postgres:reset": "docker stop starships-postgres 2>/dev/null || true && docker rm starships-postgres 2>/dev/null || true && echo 'PostgreSQL container cleaned up. Use postgres:install to recreate.'",
+    "postgres:shell": "docker exec -it starships-postgres psql -U postgres -d starships || echo 'Container not running. Use postgres:start first.'",
+    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -56,13 +56,12 @@
   },
   "pnpm": {
     "overrides": {
-      "prismjs": ">=1.30.0",
       "form-data": ">=4.0.4",
       "@eslint/plugin-kit@<0.3.4": ">=0.3.4"
     },
     "onlyBuiltDependencies": [
       "@tailwindcss/oxide",
-      "bcrypt",
+      "core-js-pure",
       "cpu-features",
       "esbuild",
       "protobufjs",

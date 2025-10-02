@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
@@ -89,12 +88,10 @@ export class StarshipEntity implements StarshipModel {
   status!: StarshipStatus;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 

@@ -31,14 +31,19 @@ export class Tool extends BaseNode<ToolParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     let inputData: unknown;
     try {
+      // KEEPING PARALLEL EXECUTION VERSION - Smart routing for universal executor
       const params = this.getParams();
       inputData = ExecutionItemUtils.unwrapSingle(input);
+      
+      // COMMENTED OUT - MAIN BRANCH VERSION (simple single tool execution):
+      // const inputData = ExecutionItemUtils.unwrapSingle(input);
+      // const toolArgs = this.extractToolArguments(inputData);
 
 
       // Check if this is the universal tool executor for parallel execution
       const isUniversalExecutor = params.name === 'universal_tool_executor';
 
-      // Smart routing based on input and configuration
+      // KEEPING PARALLEL EXECUTION VERSION - Smart routing based on input and configuration
       if (isUniversalExecutor && Array.isArray(inputData)) {
         // Universal executor mode - handle array of tool calls
         if (inputData.length > 1) {

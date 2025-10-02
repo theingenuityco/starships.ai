@@ -15,9 +15,6 @@ export { MessageService } from './MessageService';
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';
 
-// Workflow services
-export { WorkflowService } from './WorkflowService';
-
 // Agent execution services (replacing agents/ directory)
 export { ToolService } from './ToolService';
 

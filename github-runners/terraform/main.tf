@@ -202,20 +202,16 @@ resource "aws_iam_role_policy" "lambda" {
 
 # CloudWatch Log Group removed for cost optimization
 
-# Package Lambda function
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambda"
-  output_path = "${path.module}/lambda_function.zip"
-}
+# Lambda deployment package is built by github-runners/lambda/build.sh
+# Using prebuilt ZIP copied to ${path.module}/lambda_function.zip
 
 # Lambda Function
 resource "aws_lambda_function" "webhook" {
-  filename         = data.archive_file.lambda_zip.output_path
+  filename         = "${path.module}/lambda_function.zip"
   function_name    = "github-runner-webhook"
   role            = aws_iam_role.lambda.arn
   handler         = "handler.lambda_handler"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  source_code_hash = filebase64sha256("${path.module}/lambda_function.zip")
   runtime         = "python3.11"
   timeout         = 60
   memory_size     = 256
@@ -300,11 +296,11 @@ resource "aws_lambda_permission" "api_gateway" {
 
 # Lambda function for cleanup (runs hourly)
 resource "aws_lambda_function" "cleanup" {
-  filename         = data.archive_file.lambda_zip.output_path
+  filename         = "${path.module}/lambda_function.zip"
   function_name    = "github-runner-cleanup"
   role            = aws_iam_role.lambda.arn
   handler         = "cleanup.lambda_handler"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  source_code_hash = filebase64sha256("${path.module}/lambda_function.zip")
   runtime         = "python3.11"
   timeout         = 60
   memory_size     = 128

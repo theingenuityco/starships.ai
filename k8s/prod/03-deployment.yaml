@@ -50,11 +50,8 @@ spec:
             - containerPort: 4000
               name: backend
               protocol: TCP
-            - containerPort: 7474
-              name: neo4j-http
-              protocol: TCP
-            - containerPort: 7687
-              name: neo4j-bolt
+            - containerPort: 5432
+              name: postgres
               protocol: TCP
 
           # Production Environment Variables
@@ -108,27 +105,37 @@ spec:
                   name: starships-secrets
                   key: JWT_SECRET
 
-            # Neo4j Configuration (with auth enabled)
-            - name: NEO4J_URI
+            # PostgreSQL Configuration (with auth enabled)
+            - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
-                  key: NEO4J_URI
-            - name: NEO4J_USERNAME
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
-                  key: NEO4J_USERNAME
-            - name: NEO4J_PASSWORD
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
-                  key: NEO4J_PASSWORD
-            - name: NEO4J_DATABASE
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
-                  key: NEO4J_DATABASE
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_DATABASE
+            - name: POSTGRES_SSL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_SSL
 
             # LLM Provider Configuration
             - name: OPENAI_API_KEY
@@ -201,6 +208,10 @@ spec:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
 
+            # PostgreSQL Data Directory
+            - name: PGDATA
+              value: '/var/lib/postgresql/data/pgdata'
+
           # Resource Limits
           resources:
             requests:
@@ -212,16 +223,17 @@ spec:
 
           # Volume Mounts
           volumeMounts:
-            - name: neo4j-data
-              mountPath: /var/lib/neo4j/data
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: data
             - name: app-sessions
               mountPath: /app/data/sessions
 
       # Volumes
       volumes:
-        - name: neo4j-data
+        - name: postgres-data
           persistentVolumeClaim:
-            claimName: neo4j-data-pvc
+            claimName: postgres-data-pvc
         - name: app-sessions
           persistentVolumeClaim:
             claimName: sessions-pvc

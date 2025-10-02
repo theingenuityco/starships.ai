@@ -249,7 +249,7 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url):
     # Instance configuration
     instance_params = {
         'ImageId': RUNNER_AMI_ID,
-        'InstanceType': 't3.small',
+        'InstanceType': 't3.medium',
         'MaxCount': 1,
         'MinCount': 1,
         'UserData': user_data,

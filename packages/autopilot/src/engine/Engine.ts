@@ -399,7 +399,17 @@ export class Engine {
       let processedInputItems = nodeInputItems;
 
       // Execute the handler first (inline transforms will run after on the output)
-      let outputItems = await handler.execute(processedInputItems);
+      let outputItems: ExecutionItem[];
+      try {
+        outputItems = await handler.execute(processedInputItems);
+      } catch (error) {
+        console.error('[ERROR Engine.executeNode] handler_failed', {
+          nodeRef: currentNode.ref,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        throw error;
+      }
 
       // Record primary node output immediately (as a normal node result)
       execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
@@ -413,7 +423,15 @@ export class Engine {
       // Execute inline mutations if present (mutations can use lastOutputOf/current state).
       // IMPORTANT: Skip when the current node IS the dedicated mutate node to avoid double-processing.
       if (inlineParams?.mutations?.length && currentNode.type !== 'mutate') {
-        await this.executeInlineMutate(inlineParams.mutations, execution);
+        try {
+          await this.executeInlineMutate(inlineParams.mutations, execution);
+        } catch (error) {
+          console.error('[ERROR Engine.executeNode] inline_mutations_failed', {
+            nodeRef: currentNode.ref,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
+        }
         // Mutations modify state; keep primary output as-is unless you intend otherwise
         // Optionally, could attach mutate result to primary result if desired
       }
@@ -506,10 +524,12 @@ export class Engine {
     }
 
     if (!targetEdge) {
+      console.warn('Engine.getNextNode: no matching edge', { current: execution.currentNodeRef, edgeCondition, outgoingEdges });
       return null;
     }
 
-    return blueprint.nodes.find((node) => node.ref === targetEdge.to) || null;
+    const next = blueprint.nodes.find((node) => node.ref === targetEdge.to) || null;
+    return next;
   }
 
   // Extract final output from End node (if its handler produced a result)

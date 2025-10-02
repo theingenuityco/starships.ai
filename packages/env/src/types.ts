@@ -14,11 +14,13 @@ export interface EnvironmentConfig {
   CLIENT_URL: string;
   SERVER_URL: string;
 
-  // Neo4j Database Configuration
-  NEO4J_URI: string;
-  NEO4J_USERNAME: string;
-  NEO4J_PASSWORD: string;
-  NEO4J_DATABASE: string;
+  // PostgreSQL Database Configuration
+  POSTGRES_HOST: string;
+  POSTGRES_PORT: number;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string;
+  POSTGRES_DATABASE: string;
+  POSTGRES_SSL: boolean;
 
   // LLM Provider Configuration
   OPENAI_API_KEY?: string;

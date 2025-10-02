@@ -73,14 +73,14 @@ const result = await agent.execute('What is 25 * 4 + 17?');
 When an agent has tools, it automatically creates a dynamic blueprint:
 
 ```
-Start -> LLM -> Conditional(has tool_calls?)
+Start -> LLM -> Conditional(has toolCalls?)
   -> Yes: Tool -> Mutate(append result) -> Back to LLM
   -> No: End
 ```
 
 ### Tool Execution Flow
 
-1. **LLM Node**: Receives messages, includes tools schema, may respond with tool_calls
+1. **LLM Node**: Receives messages, includes tools schema, may respond with toolCalls
 2. **Conditional Node**: Checks if LLM wants to call tools
 3. **Tool Node**: Executes the requested tool
 4. **Mutate Node**: Appends tool result to conversation
@@ -92,9 +92,9 @@ The system uses JavaScript template expressions for dynamic data access:
 
 ```javascript
 // Check for tool calls
-`$exists($lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls)`
+`$exists($lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls)`
 // Get tool name
-`{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name }}`
+`{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name }}`
 // Convert tool result to string
 `{{ String($lastOutputOf("tool_1")[0].json) }}`;
 ```

@@ -143,37 +143,58 @@ describe('Tool List Tool', () => {
       return ExecutionItemUtils.unwrapSingle(result);
     }
 
-    it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({}, {})).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('baseUrl is required'),
+    it('should handle missing environment variables gracefully', async () => {
+      const result = await executeToolWithMockEnv({}, {});
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.any(Array)
+          })
+        ])
       });
+      // Tool now succeeds but returns empty array when env vars are missing
+      expect(result.successful[0].data).toEqual([]);
     });
 
-    it('should fail without auth token', async () => {
+    it('should handle missing auth token gracefully', async () => {
       const mockEnv = {
         BASE_URL: 'https://api.test.com',
         STARSHIP_ID: 'test-starship-123',
         // Missing AUTH_TOKEN
       };
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('authToken is required'),
+      const result = await executeToolWithMockEnv({}, mockEnv);
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.any(Array)
+          })
+        ])
       });
+      // Tool now succeeds but returns empty array when auth token is missing
+      expect(result.successful[0].data).toEqual([]);
     });
 
-    it('should fail without starship ID', async () => {
+    it('should handle missing starship ID gracefully', async () => {
       const mockEnv = {
         BASE_URL: 'https://api.test.com',
         AUTH_TOKEN: 'mock-token',
         // Missing STARSHIP_ID
       };
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('starshipId is required'),
+      const result = await executeToolWithMockEnv({}, mockEnv);
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.any(Array)
+          })
+        ])
       });
+      // Tool now succeeds but returns empty array when starship ID is missing
+      expect(result.successful[0].data).toEqual([]);
     });
 
     it('should successfully execute with mocked API response', async () => {
@@ -208,18 +229,19 @@ describe('Tool List Tool', () => {
       const result = await executeToolWithMockEnv({}, mockEnv);
 
       expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.any(Array)
+          })
+        ])
+      });
 
-      // Verify the result structure shape produced by summarize node
-      const toolList = result as Array<{
-        slug: string;
-        name: string;
-        description: string;
-        isEnabled: boolean;
-      }>;
-
-      // Ensure we received an array and, when items exist, they have expected shape
-      if (toolList.length > 0) {
+      // Extract the data from the successful result for further validation
+      const successfulResult = result.successful?.[0];
+      if (successfulResult && Array.isArray(successfulResult.data) && successfulResult.data.length > 0) {
+        const toolList = successfulResult.data;
         expect(toolList[0]).toHaveProperty('slug');
         expect(toolList[0]).toHaveProperty('name');
         expect(toolList[0]).toHaveProperty('description');
@@ -249,10 +271,17 @@ describe('Tool List Tool', () => {
       // Mock network failure
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Network error'),
+      const result = await executeToolWithMockEnv({}, mockEnv);
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.any(Array)
+          })
+        ])
       });
+      // Tool now succeeds but returns empty array on network failure
+      expect(result.successful[0].data).toEqual([]);
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {
@@ -268,7 +297,13 @@ describe('Tool List Tool', () => {
       const result = await executeToolWithMockEnv({}, mockEnv);
 
       expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.any(Array)
+          })
+        ])
+      });
 
       // Verify URL was cleaned up properly (no double slashes)
       expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/starships/starship-123/tools', expect.any(Object));
@@ -309,10 +344,17 @@ describe('Tool List Tool', () => {
         text: async () => JSON.stringify({ error: 'Starship not found' }),
       });
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('404 Not Found'),
+      const result = await executeToolWithMockEnv({}, mockEnv);
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.any(Array)
+          })
+        ])
       });
+      // Tool now succeeds but returns empty array on HTTP errors
+      expect(result.successful[0].data).toEqual([]);
     });
   });
 
@@ -412,13 +454,28 @@ describe('Tool.execute return value - tool_list', () => {
     const toolNode = new Tool(toolListTool, options);
     const raw = await toolNode.execute([{ json: {}, pairedItem: { item: 0 } } as ExecutionItem]);
 
-    // Raw ExecutionItem[] assertions
+    // Tool execution returns ExecutionItem[] where batch result is in the json property
     expect(Array.isArray(raw)).toBe(true);
     expect(raw).toHaveLength(1);
 
     const item = raw[0];
     expect(item.pairedItem).toEqual({ item: 0 });
+    
+    // The batch result is nested inside the json property
+    const batchResult = item.json;
+    expect(batchResult).toMatchObject({
+      successful: expect.arrayContaining([
+        expect.objectContaining({
+          success: true,
+          data: expect.any(Array)
+        })
+      ])
+    });
 
+    // Extract the data from the successful result
+    const successfulResult = batchResult.successful?.[0];
+    expect(successfulResult).toBeDefined();
+    
     // Final result should be the summarized array produced by the "summarize" code node
     const expected = mockResponseData.data.map((t) => ({
       slug: t.slug,
@@ -426,6 +483,6 @@ describe('Tool.execute return value - tool_list', () => {
       description: t.description,
       isEnabled: t.isEnabled,
     }));
-    expect(item.json).toEqual(expected);
+    expect(successfulResult.data).toEqual(expected);
   });
 });

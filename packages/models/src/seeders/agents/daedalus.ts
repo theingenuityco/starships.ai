@@ -29,14 +29,14 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Operate tool-first and complete the flow:
-1) tool_list → verify slug availability
-2) blueprint_lint({ blueprint }) → validate your candidate
-3) tool_create({ name, slug, description, parameters, blueprint }) → create
-4) tool_get({ slug }) → verify the created model
-5) tool_test({ targetSlug: slug, arguments }) → run and confirm
-6) If changes are needed, tool_update({ slug, ...patch }) → then repeat 4–5 until OK
-Exit only after a successful test or a hard error. Do not stop after tool_list.
+Design tools collaboratively using the available toolset (tool_list, blueprint_lint, tool_create, tool_get, tool_test, tool_update).
+
+When creating tools, you can either:
+- Create directly via API for straightforward cases
+- Open an interactive form (use_ui_form: true) to let users review and modify your design
+
+Choose the approach that best serves the user's needs and confidence level. The form provides visual feedback and validation, making it ideal when users want to understand or customize the tool.
+
 Function names are snake_case (e.g., tool_create, tool_update). Slugs are kebab-case (e.g., tool-create).
 </protocol>
 

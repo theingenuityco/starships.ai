@@ -27,9 +27,10 @@ fi
 # Avoid writing .pyc files into the zip (and avoid cross-version pyc issues)
 export PYTHONDONTWRITEBYTECODE=1
 
-# Install pure-Python deps directly into the package directory
-# boto3, requests, PyJWT are pure-Python → no manylinux wheels needed
-$PIP install --upgrade --no-cache-dir --target ./package -r requirements.txt
+# Install dependencies for Lambda's Linux x86_64 runtime
+$PIP install --upgrade --no-cache-dir --target ./package \
+  --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.11 \
+  -r requirements.txt
 
 # Copy Lambda function files
 echo "📄 Copying Lambda functions..."

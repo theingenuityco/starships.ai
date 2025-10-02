@@ -1,7 +1,7 @@
 import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
-import type { UsageModel, LLMUsage } from '@starships/protocol';
+import type { UsageModel, LLMUsage, UserUsageTotals } from '@starships/protocol';
 
 /**
  * UsageRepository
@@ -168,6 +168,53 @@ export class UsageRepository extends BaseRepository {
       'listByConversation',
       'Usage',
       conversationId
+    );
+  }
+
+  /**
+   * Aggregate totals for a user across all owned starships.
+   * Returns summed token/cost totals and total request count (usage records).
+   */
+  async getTotalsByUser(userId: string): Promise<UserUsageTotals> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!userId?.trim()) {
+          throw new Error('userId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{
+          prompt_tokens: string;
+          completion_tokens: string;
+          total_tokens: string;
+          cost: string;
+          request_count: string;
+        }>(
+          `SELECT
+            COALESCE(SUM(u.prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(u.completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(u.total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(u.cost), 0) AS cost,
+            COUNT(u.id) AS request_count
+           FROM usage u
+           JOIN starships s ON u.starship_id = s.id
+           WHERE s.owner_id = $1`,
+          [userId]
+        );
+
+        return {
+          totals: {
+            promptTokens: Number(result?.prompt_tokens) || 0,
+            completionTokens: Number(result?.completion_tokens) || 0,
+            totalTokens: Number(result?.total_tokens) || 0,
+            cost: Number(result?.cost) || 0,
+          },
+          requestCount: Number(result?.request_count) || 0,
+        };
+      },
+      'getTotalsByUser',
+      'Usage',
+      userId
     );
   }
 }

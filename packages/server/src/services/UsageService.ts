@@ -1,5 +1,5 @@
 import { UsageRepository } from '@starships/models';
-import type { UsageModel, LLMUsage } from '@starships/protocol';
+import type { UsageModel, LLMUsage, UserUsageTotals } from '@starships/protocol';
 
 export interface CreateUsageForTurnParams {
   starshipId: string;
@@ -47,6 +47,11 @@ export class UsageService {
 
   async listByConversation(conversationId: string, options?: { limit?: number; offset?: number }): Promise<UsageModel[]> {
     return this.repo.listByConversation(conversationId, options);
+  }
+
+  // Aggregate totals across all starships owned by a user
+  async getTotalsByUser(userId: string): Promise<UserUsageTotals> {
+    return this.repo.getTotalsByUser(userId);
   }
 }
 

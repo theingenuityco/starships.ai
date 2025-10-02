@@ -26,9 +26,7 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
       "label": "Type Check All",
@@ -40,9 +38,7 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
       "label": "Build Server",
@@ -57,9 +53,7 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
       "label": "Build Client",
@@ -74,9 +68,7 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
       "label": "Build Autopilot",
@@ -91,9 +83,7 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
       "label": "Build Models",
@@ -108,15 +98,13 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
-      "label": "Start Neo4j Database",
+      "label": "Start PostgreSQL Database",
       "type": "shell",
       "command": "pnpm",
-      "args": ["run", "neo4j:install"],
+      "args": ["run", "postgres:install"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -125,10 +113,10 @@
       "problemMatcher": []
     },
     {
-      "label": "Stop and Reset Neo4j",
+      "label": "Stop and Reset PostgreSQL",
       "type": "shell",
       "command": "pnpm",
-      "args": ["run", "neo4j:reset"],
+      "args": ["run", "postgres:reset"],
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -146,9 +134,7 @@
         "reveal": "always",
         "panel": "new"
       },
-      "problemMatcher": [
-        "$eslint-stylish"
-      ]
+      "problemMatcher": ["$eslint-stylish"]
     },
     {
       "label": "Run All Tests",
@@ -181,10 +167,7 @@
     {
       "label": "Pre-Debug Setup",
       "dependsOrder": "sequence",
-      "dependsOn": [
-        "Install Dependencies",
-        "Type Check All"
-      ],
+      "dependsOn": ["Install Dependencies", "Type Check All"],
       "group": "build",
       "presentation": {
         "reveal": "always",

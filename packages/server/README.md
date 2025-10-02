@@ -472,9 +472,11 @@ NODE_ENV=production
 CORS_ORIGIN=http://localhost:3000
 
 # Database Configuration
-NEO4J_URI=[NEO4J-LOCAL-URL]
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password
+POSTGRES_DATABASE=starships
 
 # LLM Provider Configuration
 OPENAI_API_KEY=your_openai_key
@@ -761,29 +763,29 @@ services:
       - '4000:4000'
     environment:
       - NODE_ENV=production
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USERNAME=neo4j
-      - NEO4J_PASSWORD=password
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DATABASE=starships
     depends_on:
-      - neo4j
+      - postgres
     restart: unless-stopped
 
-  neo4j:
-    image: neo4j:5.15
+  postgres:
+    image: postgres:15
     ports:
-      - '7474:7474'
-      - '7687:7687'
+      - '5432:5432'
     environment:
-      - NEO4J_AUTH=neo4j/password
-      - NEO4J_PLUGINS=["apoc"]
+      - POSTGRES_DB=starships
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
     volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  neo4j_data:
-  neo4j_logs:
+  postgres_data:
 ```
 
 ## 🚀 Performance
@@ -827,17 +829,17 @@ GET /health/detailed # Detailed health information
    lsof -i :4000
 
    # Check environment variables
-   printenv | grep -E "(PORT|NEO4J|OPENAI|ANTHROPIC)"
+   printenv | grep -E "(PORT|POSTGRES|OPENAI|ANTHROPIC)"
    ```
 
 2. **Database connection issues**
 
    ```bash
-   # Test Neo4j connection
-   cypher-shell -u neo4j -p password
+   # Test PostgreSQL connection
+   psql -h localhost -U postgres -d starships
 
    # Check database logs
-   docker logs neo4j-container
+   docker logs postgres-container
    ```
 
 3. **API key errors**
@@ -876,7 +878,7 @@ node --inspect-brk dist/index.js
 - **stripe**: Payment processing and subscription management
 - **jose**: JWT token validation and management
 - **@starships/autopilot**: Workflow execution engine with AI integration
-- **@starships/models**: Neo4j database with migration system
+- **@starships/models**: PostgreSQL database with migration system
 - **@starships/protocol**: Shared types for agents and workflows
 - **@starships/core**: MCP HTTP bridge services
 

@@ -46,8 +46,7 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 // Helper function to get AgentTemplateService instance
 function getAgentTemplateService(): AgentTemplateService | null {
   try {
-    const connection = getConnection();
-    return new AgentTemplateService(connection);
+    return new AgentTemplateService();
   } catch (error) {
     console.error('Failed to get AgentTemplateService:', error);
     return null;

@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
-import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel, TemplateCategory } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
@@ -63,12 +62,10 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   slug!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -91,7 +88,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.TemperatureTransform()
   @IsNumber()
   @Min(0)
   @Max(2)
@@ -99,14 +95,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.MaxTokensTransform()
   @IsNumber()
   @Min(1)
   @Max(100000)
   maxTokens?: number;
 
   @Expose()
-  @LLMTransformers.TimeoutTransform()
   @IsNumber()
   @Min(1000)
   @Max(300000)
@@ -118,12 +112,10 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   systemPrompt?: string;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   state!: AgentState;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 
@@ -153,7 +145,8 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @AgentTemplateTransformers.PreviewPromptsTransform()
+  @IsArray()
+  @IsString({ each: true })
   previewPrompts?: string[];
 
   /**

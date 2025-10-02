@@ -20,18 +20,19 @@ class BackupRestoreTestSuite {
 
     try {
       // Validate required environment variables
-      if (!process.env.NEO4J_URI || !process.env.NEO4J_USERNAME || !process.env.NEO4J_PASSWORD) {
-        console.error('❌ Missing required Neo4j environment variables');
-        console.error('Please set NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD');
+      if (!process.env.POSTGRES_HOST || !process.env.POSTGRES_USER || !process.env.POSTGRES_PASSWORD) {
+        console.error('❌ Missing required PostgreSQL environment variables');
+        console.error('Please set POSTGRES_HOST, POSTGRES_USER, and POSTGRES_PASSWORD');
         process.exit(1);
       }
 
       // Initialize database connection
       const config = {
-        uri: process.env.NEO4J_URI,
-        username: process.env.NEO4J_USERNAME,
-        password: process.env.NEO4J_PASSWORD,
-        database: process.env.NEO4J_DATABASE,
+        host: process.env.POSTGRES_HOST!,
+        port: parseInt(process.env.POSTGRES_PORT || '5432'),
+        user: process.env.POSTGRES_USER!,
+        password: process.env.POSTGRES_PASSWORD!,
+        database: process.env.POSTGRES_DATABASE || 'starships',
       };
 
       const connection = createConnection(config);

@@ -19,9 +19,8 @@ export interface UsageModel extends LLMUsage {
   // Optional provider/model identifier associated with this turn
   model?: string;
 
-  // Timestamps
+  // Timestamp
   createdAt: string;
-  updatedAt: string;
 }
 
 // Re-export LLMUsage directly for usage totals

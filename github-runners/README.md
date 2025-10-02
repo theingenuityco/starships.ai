@@ -32,6 +32,7 @@ github-runners/
 ## 🚀 Quick Commands
 
 ### Update Lambda Function
+
 ```bash
 cd lambda
 ./build.sh
@@ -40,11 +41,13 @@ terraform apply
 ```
 
 ### Check Lambda Logs
+
 ```bash
 aws logs tail /aws/lambda/github-runner-webhook --follow --region us-east-1
 ```
 
 ### Monitor EC2 Instances
+
 ```bash
 aws ec2 describe-instances \
   --filters "Name=tag:Type,Values=github-runner" \
@@ -55,20 +58,25 @@ aws ec2 describe-instances \
 ## 🔧 Configuration
 
 ### Change Instance Type
+
 Edit `lambda/handler.py` line 247:
+
 ```python
-'InstanceType': 't3.small',  # Change to t3.medium if needed
+'InstanceType': 't3.medium',  # Change to t3.medium if needed
 ```
 
 ### Update Runner Version
+
 Edit `lambda/handler.py` line 208:
+
 ```bash
 RUNNER_VERSION="2.321.0"  # Update to latest version
 ```
 
 ## 📊 Cost Monitoring
 
-Current setup (t3.small spot instances):
+Current setup (t3.medium spot instances):
+
 - **Per job**: ~$0.002 (5 min average)
 - **Monthly estimate**: $15-20 (1000 jobs)
 
@@ -89,15 +97,18 @@ Current setup (t3.small spot instances):
 ## 📝 Troubleshooting
 
 ### Lambda not receiving webhooks
+
 1. Check webhook URL in GitHub App settings
 2. Verify webhook secret matches
 
 ### EC2 instances not launching
+
 1. Check Lambda logs for errors
 2. Verify IAM permissions
 3. Check EC2 service quotas
 
 ### Runner not picking up jobs
+
 1. Verify GitHub App installation
 2. Check runner registration token
 3. Review EC2 user data logs

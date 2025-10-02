@@ -5,11 +5,21 @@
  * Follows the layered architecture pattern established by ConversationEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
 import type { LlmToolCall } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsEnum, IsISO8601, IsString, Length, MinLength, validate, ValidationError, IsOptional, ValidateIf } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsISO8601,
+  IsString,
+  Length,
+  MinLength,
+  validate,
+  ValidationError,
+  IsOptional,
+  ValidateIf,
+} from 'class-validator';
 
 export class MessageEntity implements MessageModel {
   @Expose()
@@ -18,14 +28,23 @@ export class MessageEntity implements MessageModel {
   id!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
+
+  // Foreign key relationships
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  starshipId!: string;
+
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  conversationId!: string;
 
   @Expose()
   @IsEnum(['system', 'user', 'assistant', 'tool'])
@@ -37,7 +56,7 @@ export class MessageEntity implements MessageModel {
     (o: MessageEntity) =>
       !(
         o.role === 'assistant' &&
-        ((Array.isArray(o.tool_calls) && o.tool_calls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
+        ((Array.isArray(o.toolCalls) && o.toolCalls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
       )
   )
   @MinLength(1) // Ensure non-empty when required; no max length cap
@@ -55,17 +74,17 @@ export class MessageEntity implements MessageModel {
   @Length(1, 200000)
   reasoning?: string;
 
-  // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
+  // Optional toolCalls persisted for assistant messages when function calling is used (autopilot types)
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
-  tool_calls?: LlmToolCall[];
+  @IsArray()
+  toolCalls?: LlmToolCall[];
 
-  // Optional tool_call_id for tool result messages - references the tool call that generated this result
+  // Optional toolCallId for tool result messages - references the tool call that generated this result
   @Expose()
   @IsOptional()
   @IsString()
-  tool_call_id?: string;
+  toolCallId?: string;
 
   /**
    * Simple validation function using class-validator
@@ -84,6 +103,8 @@ export class MessageEntity implements MessageModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        starshipId: dataRecord.starshipId || 'temp-starship-id', // Temp value for validation
+        conversationId: dataRecord.conversationId || 'temp-conversation-id', // Temp value for validation
         role: dataRecord.role, // Don't provide defaults during validation
         content: dataRecord.content, // Don't provide defaults during validation
         messageType: dataRecord.messageType, // Don't provide defaults during validation

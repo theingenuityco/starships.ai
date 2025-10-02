@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
@@ -20,14 +19,25 @@ export class AgentEntity implements AgentModel {
   id!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
+
+  // Foreign key relationships
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  starshipId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  templateId?: string;
 
   // Core AgentParams fields
   @Expose()
@@ -48,7 +58,6 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.TemperatureTransform()
   @IsNumber()
   @Min(0)
   @Max(2)
@@ -56,14 +65,12 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.MaxTokensTransform()
   @IsNumber()
   @Min(1)
   @Max(100000)
   maxTokens?: number;
 
   @Expose()
-  @LLMTransformers.TimeoutTransform()
   @IsNumber()
   @Min(1000)
   @Max(300000)
@@ -75,12 +82,10 @@ export class AgentEntity implements AgentModel {
   systemPrompt?: string; // System prompt moved to root level
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   state!: AgentState; // Runtime state with messages and tools
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
 
@@ -101,6 +106,8 @@ export class AgentEntity implements AgentModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        starshipId: dataRecord.starshipId,
+        templateId: dataRecord.templateId,
         name: dataRecord.name || '',
         description: dataRecord.description,
         model: dataRecord.model || '',

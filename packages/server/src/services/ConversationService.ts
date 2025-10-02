@@ -31,7 +31,7 @@ export class ConversationService {
   private usageService: UsageService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
-  // Track accumulated tool_calls during streaming per conversation
+  // Track accumulated toolCalls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
@@ -57,48 +57,14 @@ export class ConversationService {
   }
 
   /**
-   * Best-effort parser for tool_call function.arguments into JSON
-   * - Handles already-object input
-   * - Handles quoted/double-encoded JSON strings
-   * - Returns undefined when parsing fails
-   */
-  private parseToolArguments(raw: unknown): Record<string, unknown> | undefined {
-    try {
-      if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
-      if (typeof raw !== 'string') return undefined;
-      let s = raw.replace(/\r/g, '').trim();
-      for (let i = 0; i < 3; i++) {
-        const first = s[0];
-        const last = s[s.length - 1];
-        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-          s = s.slice(1, -1);
-        }
-        try {
-          const parsed = JSON.parse(s);
-          if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
-        } catch {
-          /* ignore */
-        }
-      }
-      try {
-        const parsed = JSON.parse(s);
-        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
-      } catch {
-        /* ignore */
-      }
-      return undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
    * Create a new conversation
    */
-  async createConversation(data: ConversationModel & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
+  async createConversation(
+    data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
+  ): Promise<ConversationModel> {
     const conversation = await this.conversationRepository.create({
       title: data.title || 'New Conversation',
-      status: 'active',
+      status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
     });
@@ -173,7 +139,7 @@ export class ConversationService {
     orderBy: 'createdAt' = 'createdAt',
     orderDirection: 'asc' | 'desc' = 'asc'
   ): Promise<MessageModel[]> {
-    return this.conversationRepository.getConversationMessages(conversationId, orderBy, orderDirection);
+    return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
   }
 
   /**
@@ -281,10 +247,13 @@ export class ConversationService {
         ...starshipEnv,
       };
 
+      // Guard against NULL/undefined persisted JSONB state (now nullable)
+      const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
+
       const agentWithTools: AgentParams = {
         ...agentModel,
         state: {
-          ...agentModel.state,
+          ...baseState,
           tools: resolvedTools,
           // Do not inject secrets into state
           starshipId: starship.id,
@@ -297,14 +266,14 @@ export class ConversationService {
         secureEnv,
       });
 
-      // Convert database messages to LLM format, preserving tool_calls and tool results
+      // Convert database messages to LLM format, preserving toolCalls and tool results
       // Tool message sanitization and rule injection now handled by Agent.ts
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.reasoning && { reasoning: msg.reasoning }),
-        ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
-        ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
+        ...(msg.toolCalls && { toolCalls: msg.toolCalls }),
+        ...(msg.toolCallId && { toolCallId: msg.toolCallId }),
       }));
 
       // Prepare input for agent execution - Agent will handle memory state and ordering internally
@@ -378,6 +347,7 @@ export class ConversationService {
         }
         // Stream content chunks in real-time (supports both delta.* and message.* providers)
         const chunkContent = (event as LLMEvent).data?.chunk;
+
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
           const choice0: any = chunkContent.choices[0] || {};
           const delta: any = choice0?.delta || {};
@@ -387,8 +357,8 @@ export class ConversationService {
           const contentFromMessage = typeof messageNode?.content === 'string' ? messageNode.content : '';
           const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
 
-          const toolCallsFromDelta: any[] = Array.isArray(delta?.tool_calls) ? delta.tool_calls : [];
-          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.tool_calls) ? messageNode.tool_calls : [];
+          const toolCallsFromDelta: any[] = Array.isArray(delta?.toolCalls) ? delta.toolCalls : [];
+          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.toolCalls) ? messageNode.toolCalls : [];
           const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
           // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
@@ -455,48 +425,18 @@ export class ConversationService {
               return '';
             }
           };
-          // Best-effort parser for tool_call function.arguments into JSON
-          const tryParseToolArgs = (raw: any): any => {
-            try {
-              if (raw && typeof raw === 'object') return raw;
-              if (typeof raw !== 'string') return undefined;
-              let s = raw.replace(/\r/g, '').trim();
-              for (let i = 0; i < 3; i++) {
-                const first = s[0];
-                const last = s[s.length - 1];
-                if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-                  s = s.slice(1, -1);
-                }
-                try {
-                  const parsed = JSON.parse(s);
-                  if (parsed && typeof parsed === 'object') return parsed;
-                } catch {
-                  /* ignore */
-                }
-              }
-              try {
-                const parsed = JSON.parse(s);
-                if (parsed && typeof parsed === 'object') return parsed;
-              } catch {
-                /* ignore */
-              }
-              return undefined;
-            } catch {
-              return undefined;
-            }
-          };
           const reasoningFromDelta = extractReasoning(delta);
           const reasoningFromMessage = extractReasoning(messageNode);
           const hasReasoning =
             (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
 
-          // Guard: if no active accumulator and we have content OR tool_calls OR reasoning, start a new placeholder stream.
+          // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
           // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
           if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               // Acquire lock upfront to avoid race between parallel content_chunk events
               this.streamingContent.set(conversationId, '');
-              // Clear tool_calls accumulator for this new stream to prevent reuse from previous LLM calls
+              // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
               this.streamingToolCalls.delete(conversationId);
 
               const assistantMessage: MessageModel = {
@@ -516,7 +456,7 @@ export class ConversationService {
                   streaming: true,
                   chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                   reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
-                  tool_calls: [], // Initialize empty tool_calls array for replace operations
+                  toolCalls: [], // Initialize empty toolCalls array for replace operations
                 },
               };
               await this.streamingService.broadcastDelta(conversationId, shell);
@@ -595,7 +535,7 @@ export class ConversationService {
             }
           }
 
-          // Process tool_calls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
+          // Process toolCalls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
           if (hasToolCalls) {
             try {
               if (toolCallsFromDelta.length > 0) {
@@ -612,46 +552,62 @@ export class ConversationService {
                   const target = acc[idx];
                   if (rawTc?.id) target.id = rawTc.id;
                   if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+
+                  // Accumulate arguments as string, parse later when complete
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
+                    target.function.arguments = (target.function.arguments as string) + rawTc.function.arguments;
                   }
                 }
 
                 this.streamingToolCalls.set(conversationId, acc);
 
-                // Only broadcast valid tool calls (those with a non-empty function name)
+                // Parse accumulated arguments strings into objects for broadcasting
                 const toolCallsValue = acc
                   .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                  .map((tc) => ({
-                    id: tc.id,
-                    type: 'function',
-                    function: {
-                      name: tc.function.name,
-                      arguments: tc.function?.arguments || '',
-                      ...(() => {
-                        const obj = this.parseToolArguments(tc.function?.arguments);
-                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
-                      })(),
-                    },
-                  }));
+                  .map((tc) => {
+                    let argsObj: unknown = {};
+                    const argsStr = tc.function?.arguments;
+                    if (typeof argsStr === 'string' && argsStr) {
+                      try {
+                        argsObj = JSON.parse(argsStr);
+                      } catch {
+                        argsObj = {}; // If parsing fails, use empty object
+                      }
+                    }
+                    return {
+                      id: tc.id,
+                      type: tc.type,
+                      function: {
+                        name: tc.function.name,
+                        arguments: argsObj, // Now it's a parsed object
+                      },
+                    };
+                  });
 
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',
-                  path: '/messages/-1/tool_calls',
+                  path: '/messages/-1/toolCalls',
                   value: toolCallsValue,
                 });
               } else if (toolCallsFromMessage.length > 0) {
-                // Snapshot tool_calls from message node (no incremental indices)
+                // Snapshot toolCalls from message node (no incremental indices)
+                // Parse arguments immediately into objects
                 const normalized = toolCallsFromMessage.map((tc: any) => {
-                  const args = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
-                  const obj = this.parseToolArguments(args);
+                  const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                  let argsObj: unknown = {};
+                  if (argsStr) {
+                    try {
+                      argsObj = JSON.parse(argsStr);
+                    } catch {
+                      argsObj = {};
+                    }
+                  }
                   return {
                     id: tc?.id,
                     type: 'function',
                     function: {
                       name: tc?.function?.name,
-                      arguments: args,
-                      ...(obj && typeof obj === 'object' ? { arguments_json: obj } : {}),
+                      arguments: argsObj, // Store as parsed object
                     },
                   };
                 });
@@ -661,12 +617,12 @@ export class ConversationService {
                 // Broadcast only valid entries (non-empty function name)
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',
-                  path: '/messages/-1/tool_calls',
+                  path: '/messages/-1/toolCalls',
                   value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
                 });
               }
             } catch (e) {
-              // ignore tool_call parse errors to avoid breaking streaming
+              // ignore toolCall parse errors to avoid breaking streaming
               console.warn('[STREAMING] Tool call processing error:', e);
             }
           }
@@ -679,8 +635,10 @@ export class ConversationService {
         if ((event.executionDepth ?? 0) > 0) {
           break;
         }
-        // Guard: if there's no active stream (no accumulator), ignore completion to avoid corrupting state
-        if (!this.streamingContent.has(conversationId)) {
+        // Guard: if there's no active stream AND no accumulated tool calls, ignore completion
+        // (tool-only responses may not have content stream but still need persistence)
+        const hasToolCalls = this.streamingToolCalls.has(conversationId) && (this.streamingToolCalls.get(conversationId)?.length || 0) > 0;
+        if (!this.streamingContent.has(conversationId) && !hasToolCalls) {
           break;
         }
 
@@ -690,16 +648,16 @@ export class ConversationService {
         const model = llmEvent.data?.model;
 
         // Build a strongly-typed usage payload with required numeric fields
-        // Defaults ensure compatibility with MessageUsage (prompt_tokens/completion_tokens/total_tokens are required)
+        // LLMUsage now uses camelCase - pass directly to UsageService
         const usagePayload = llmUsage
           ? {
-              prompt_tokens: typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0,
-              completion_tokens: typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0,
-              total_tokens:
-                typeof llmUsage.total_tokens === 'number'
-                  ? llmUsage.total_tokens
-                  : (typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0) +
-                    (typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0),
+              promptTokens: typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0,
+              completionTokens: typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0,
+              totalTokens:
+                typeof llmUsage.totalTokens === 'number'
+                  ? llmUsage.totalTokens
+                  : (typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0) +
+                    (typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0),
               // Cost in USD (OpenRouter usage.cost). Mandatory; default to 0 if missing.
               cost: Number(llmUsage.cost) || 0,
               ...(typeof model === 'string' ? { model } : {}),
@@ -716,9 +674,9 @@ export class ConversationService {
               await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
-                prompt_tokens: usagePayload.prompt_tokens,
-                completion_tokens: usagePayload.completion_tokens,
-                total_tokens: usagePayload.total_tokens,
+                promptTokens: usagePayload.promptTokens,
+                completionTokens: usagePayload.completionTokens,
+                totalTokens: usagePayload.totalTokens,
                 cost: usagePayload.cost,
                 model: usagePayload.model,
               });
@@ -731,42 +689,60 @@ export class ConversationService {
         const finalContent = this.streamingContent.get(conversationId) || '';
         const finalReasoning = this.streamingReasoning.get(conversationId) || '';
         const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
+
         const validToolCalls = finalToolCallsAcc.filter(
           (tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0
         );
-
         // Build finalization task: ensure final patches and persistence complete in order.
         try {
           // Content was already incrementally streamed to /messages/-1/content during chunks
 
           // Persist and patch id/updatedAt while placeholder is still active.
-          // Persist if we have content OR at least one valid tool_call (tool-only responses).
+          // Persist if we have content OR at least one valid toolCall (tool-only responses).
           if (
             (finalContent && finalContent.trim().length > 0) ||
             validToolCalls.length > 0 ||
             (finalReasoning && finalReasoning.trim().length > 0)
           ) {
             try {
+              // Parse accumulated arguments strings into objects for database storage
+              const toolCallsForDb = validToolCalls.map((tc) => {
+                let argsObj: unknown = {};
+                const argsStr = tc.function?.arguments;
+
+                // Arguments accumulated as strings, parse them now
+                if (typeof argsStr === 'string') {
+                  if (argsStr === '' || !argsStr.trim()) {
+                    argsObj = {};
+                  } else {
+                    try {
+                      argsObj = JSON.parse(argsStr);
+                    } catch {
+                      console.warn('[DEBUG] Failed to parse tool arguments, using empty object:', argsStr);
+                      argsObj = {};
+                    }
+                  }
+                } else {
+                  argsObj = argsStr ?? {};
+                }
+
+                return {
+                  id: tc.id,
+                  type: 'function' as const,
+                  function: {
+                    name: tc.function.name,
+                    arguments: argsObj, // Parsed object for JSONB storage
+                  },
+                };
+              });
+
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'assistant',
                 content: finalContent,
                 messageType: 'agent_response',
                 ...(finalReasoning && { reasoning: finalReasoning }),
-                ...(validToolCalls.length > 0 && {
-                  tool_calls: validToolCalls.map((tc) => ({
-                    id: tc.id,
-                    type: 'function',
-                    function: {
-                      name: tc.function.name,
-                      arguments: tc.function?.arguments || '',
-                      ...(() => {
-                        const obj = this.parseToolArguments(tc.function?.arguments);
-                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
-                      })(),
-                    },
-                  })),
-                }),
+                ...(validToolCalls.length > 0 && { toolCalls: toolCallsForDb }),
               });
 
               await this.streamingService.broadcastDelta(conversationId, {
@@ -801,7 +777,7 @@ export class ConversationService {
               console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
             }
           } else {
-            console.log('[STREAMING] Skipping persistence - empty content and no valid tool_calls');
+            console.log('[STREAMING] Skipping persistence - empty content and no valid toolCalls');
           }
 
           // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close
@@ -809,6 +785,7 @@ export class ConversationService {
           // Always clear trackers when we are done with finalization
           this.streamingContent.delete(conversationId);
           this.streamingToolCalls.delete(conversationId);
+          this.streamingReasoning.delete(conversationId);
         }
         break;
       }
@@ -972,21 +949,8 @@ export class ConversationService {
       }
 
       case 'tool_started': {
-        // Log argument preview to verify parsing/shape reaching the Tool node
-        try {
-          const tEvent = event as ToolEvent;
-          const args = tEvent.data?.arguments;
-          const preview = args !== undefined ? JSON.stringify(args).slice(0, 1000) : undefined;
-          console.log('[STREAMING] Tool started:', tEvent.data?.toolName, {
-            toolCallId: tEvent.data?.toolCallId,
-            argsType: typeof args,
-            argsPreview: preview,
-          });
-        } catch {
-          const tEvent = event as ToolEvent;
-          console.log('[STREAMING] Tool started:', tEvent.data?.toolName);
-        }
-        // Tool started - we can optionally broadcast this or track it
+        const toolEvt = event as ToolEvent;
+        console.log('[STREAMING] Tool started:', toolEvt.data?.toolName);
         break;
       }
 
@@ -1032,7 +996,10 @@ export class ConversationService {
                 role: 'tool',
                 content: toolContent,
                 messageType: 'tool_result',
-                tool_call_id: tcid,
+                ...(toolEvt.data?.toolCallId ? { toolCallId: toolEvt.data.toolCallId } : {}),
+                
+                // COMMENTED OUT - BRANCH VERSION (inconsistent naming):
+                // tool_call_id: tcid,
               });
 
               console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);

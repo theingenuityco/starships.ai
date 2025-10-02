@@ -238,24 +238,30 @@ export class StarshipService {
   }
 
   /**
-   * Get starship memories
+   * Get starship memories (placeholder - feature not implemented yet)
    */
   async getStarshipMemories(starshipId: string): Promise<any[]> {
-    return this.starshipRepository.getMemories(starshipId);
+    // TODO: Implement memory management when the feature is needed
+    console.warn(`Memory management not yet implemented for starship ${starshipId}`);
+    return [];
   }
 
   /**
-   * Get memory count for starship
+   * Get memory count for starship (placeholder - feature not implemented yet)
    */
   async getMemoryCount(starshipId: string): Promise<number> {
-    return this.starshipRepository.getMemoryCount(starshipId);
+    // TODO: Implement memory management when the feature is needed
+    console.warn(`Memory management not yet implemented for starship ${starshipId}`);
+    return 0;
   }
 
   /**
-   * Remove memory from starship
+   * Remove memory from starship (placeholder - feature not implemented yet)
    */
   async removeMemory(starshipId: string, memoryId: string): Promise<boolean> {
-    return this.starshipRepository.removeMemory(starshipId, memoryId);
+    // TODO: Implement memory management when the feature is needed
+    console.warn(`Memory management not yet implemented for starship ${starshipId} memory ${memoryId}`);
+    return false;
   }
 
   /**
@@ -350,7 +356,7 @@ export class StarshipService {
   static async createDefaultAgent(userId: string, starshipId: string): Promise<any | null> {
     try {
       const connection = getConnection();
-      const templateService = new AgentTemplateService(connection);
+      const templateService = new AgentTemplateService();
 
       // Find the "Daedalus" template to use as the default toolwright
       const templates = await templateService.searchTemplates('Daedalus');

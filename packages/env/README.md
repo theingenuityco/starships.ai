@@ -20,7 +20,7 @@ const config = getEnvConfig();
 
 console.log(config.SERVER_PORT); // number
 console.log(config.NODE_ENV); // string
-console.log(config.NEO4J_URI); // string
+console.log(config.POSTGRES_HOST); // string
 // ... all other environment variables with proper typing
 ```
 
@@ -43,10 +43,12 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 
 ### Database Configuration
 
-- `NEO4J_URI` (string) - Neo4j connection URI, defaults to 'bolt://localhost:7687'
-- `NEO4J_USERNAME` (string) - Neo4j username, defaults to 'neo4j'
-- `NEO4J_PASSWORD` (string) - Neo4j password, defaults to 'password'
-- `NEO4J_DATABASE` (string) - Neo4j database name, defaults to 'neo4j'
+- `POSTGRES_HOST` (string) - PostgreSQL host, defaults to 'localhost'
+- `POSTGRES_PORT` (number) - PostgreSQL port, defaults to 5432
+- `POSTGRES_USER` (string) - PostgreSQL username, defaults to 'postgres'
+- `POSTGRES_PASSWORD` (string) - PostgreSQL password, defaults to 'password'
+- `POSTGRES_DATABASE` (string) - PostgreSQL database name, defaults to 'starships'
+- `POSTGRES_SSL` (boolean) - PostgreSQL SSL connection, defaults to false
 
 ### LLM Provider Configuration
 

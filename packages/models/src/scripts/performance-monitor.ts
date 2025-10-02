@@ -1,7 +1,7 @@
 import { getConnection } from '@/helpers/database';
 
 /**
- * Database Performance Monitoring and Query Optimization
+ * Database Performance Monitoring and Query Optimization for PostgreSQL
  *
  * Provides real-time performance monitoring, query analysis,
  * and optimization recommendations for the workflow system.
@@ -120,35 +120,58 @@ export class PerformanceMonitor {
   }> {
     try {
       // Get database statistics
-      const dbStats = await this.connection.executeQuery(
-        `CALL db.stats.retrieve('GRAPH COUNTS') YIELD data
-         RETURN data`
-      );
+      const dbStats = await this.connection.query<{
+        total_connections: string;
+        active_connections: string;
+        database_size: string;
+      }>(`
+        SELECT 
+          (SELECT setting FROM pg_settings WHERE name = 'max_connections') as total_connections,
+          (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') as active_connections,
+          pg_size_pretty(pg_database_size(current_database())) as database_size
+      `);
 
-      // Get index statistics (if available)
-      const indexStats = await this.connection.executeQuery(
-        `SHOW INDEXES YIELD name, type, state, populationPercent
-         RETURN collect({
-           name: name,
-           type: type,
-           state: state,
-           populationPercent: populationPercent
-         }) as indexes`
-      );
+      // Get index statistics
+      const indexStats = await this.connection.query<{
+        schemaname: string;
+        tablename: string;
+        indexname: string;
+        idx_scan: number;
+        idx_tup_read: number;
+        idx_tup_fetch: number;
+      }>(`
+        SELECT schemaname, tablename, indexname, idx_scan, idx_tup_read, idx_tup_fetch
+        FROM pg_stat_user_indexes 
+        WHERE schemaname = 'public'
+        ORDER BY idx_scan DESC
+        LIMIT 20
+      `);
+
+      const dbStat = dbStats[0] || { total_connections: '0', active_connections: '0', database_size: '0' };
 
       return {
-        activeConnections: 1, // Neo4j doesn't expose this easily
-        queryQueueLength: 0,
-        memoryUsage: (dbStats[0]?.data || {}) as Record<string, unknown>,
-        indexStats: (indexStats[0]?.indexes || []) as Record<string, unknown>[],
+        activeConnections: parseInt(dbStat.active_connections || '0'),
+        queryQueueLength: 0, // PostgreSQL doesn't expose queue length directly
+        memoryUsage: {
+          totalConnections: dbStat.total_connections,
+          activeConnections: dbStat.active_connections,
+          databaseSize: dbStat.database_size,
+        },
+        indexStats: indexStats.map((stat) => ({
+          name: stat.indexname,
+          table: stat.tablename,
+          scans: stat.idx_scan,
+          tupsRead: stat.idx_tup_read,
+          tupsFetch: stat.idx_tup_fetch,
+        })),
       };
     } catch (error) {
       console.error('Failed to get current stats:', error);
       return {
         activeConnections: 0,
         queryQueueLength: 0,
-        memoryUsage: {} as Record<string, unknown>,
-        indexStats: [] as Record<string, unknown>[],
+        memoryUsage: {},
+        indexStats: [],
       };
     }
   }
@@ -201,32 +224,34 @@ export class PerformanceMonitor {
    */
   private async analyzeIndexUsage(): Promise<IndexUsageStats[]> {
     try {
-      const indexes = await this.connection.executeQuery<{
-        name: string;
-        type: string;
-        state: string;
-        populationPercent: number;
-      }>(
-        `SHOW INDEXES 
-         YIELD name, type, state, populationPercent
-         WHERE name CONTAINS 'workflow' OR name CONTAINS 'starship' OR name CONTAINS 'agent'
-         RETURN name, type, state, populationPercent`
-      );
+      const indexes = await this.connection.query<{
+        indexname: string;
+        tablename: string;
+        idx_scan: number;
+        size: string;
+      }>(`
+        SELECT 
+          i.indexname,
+          i.tablename,
+          i.idx_scan,
+          pg_size_pretty(pg_relation_size(c.oid)) as size
+        FROM pg_stat_user_indexes i
+        JOIN pg_class c ON c.relname = i.indexname
+        WHERE i.schemaname = 'public'
+        ORDER BY i.idx_scan DESC
+      `);
 
       return indexes.map((index) => {
-        // Calculate usage from recent queries
-        const usageCount = this.queryMetrics.filter((m) => m.indexesUsed?.includes(index.name)).length;
-
         let effectiveness: 'high' | 'medium' | 'low' | 'unused' = 'unused';
-        if (usageCount > 100) effectiveness = 'high';
-        else if (usageCount > 10) effectiveness = 'medium';
-        else if (usageCount > 0) effectiveness = 'low';
+        if (index.idx_scan > 1000) effectiveness = 'high';
+        else if (index.idx_scan > 100) effectiveness = 'medium';
+        else if (index.idx_scan > 0) effectiveness = 'low';
 
         return {
-          indexName: index.name,
-          usageCount,
-          averageSelectivity: index.populationPercent / 100,
-          lastUsed: new Date().toISOString(), // Would need actual tracking
+          indexName: index.indexname,
+          usageCount: index.idx_scan,
+          averageSelectivity: 0.5, // Would need actual statistics
+          lastUsed: new Date().toISOString(),
           effectiveness,
         };
       });
@@ -326,15 +351,15 @@ export class PerformanceMonitor {
       });
     }
 
-    // Index issues
-    const failedIndexes = indexUsage.filter((i) => i.indexName.includes('FAILED'));
-    if (failedIndexes.length > 0) {
+    // Too many unused indexes
+    const unusedIndexes = indexUsage.filter((i) => i.effectiveness === 'unused');
+    if (unusedIndexes.length > 10) {
       alerts.push({
-        severity: 'critical',
-        type: 'index_failure',
-        message: `${failedIndexes.length} indexes are in failed state`,
+        severity: 'warning',
+        type: 'unused_indexes',
+        message: `${unusedIndexes.length} indexes are unused and consuming space`,
         timestamp: new Date().toISOString(),
-        details: { failedIndexes: failedIndexes.map((i) => i.indexName) },
+        details: { unusedIndexes: unusedIndexes.map((i) => i.indexName) },
       });
     }
 
@@ -401,25 +426,34 @@ export class PerformanceMonitor {
    */
   private async storePerformanceReport(report: PerformanceReport): Promise<void> {
     try {
-      await this.connection.executeWrite(
-        `CREATE (pr:PerformanceReport {
-          id: $reportId,
-          timestamp: $timestamp,
-          period: $period,
-          summary: $summary,
-          alertCount: $alertCount,
-          recommendationCount: $recommendationCount,
-          data: $data
-        })`,
-        {
-          reportId: `perf_report_${Date.now()}`,
-          timestamp: report.timestamp,
-          period: report.period,
-          summary: report.summary,
-          alertCount: report.alerts.length,
-          recommendationCount: report.recommendations.length,
-          data: JSON.stringify(report),
-        }
+      // Ensure performance_reports table exists
+      await this.connection.query(`
+        CREATE TABLE IF NOT EXISTS performance_reports (
+          id VARCHAR(255) PRIMARY KEY,
+          timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+          period VARCHAR(50) NOT NULL,
+          summary JSONB NOT NULL,
+          alert_count INTEGER DEFAULT 0,
+          recommendation_count INTEGER DEFAULT 0,
+          data JSONB NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
+      await this.connection.query(
+        `
+        INSERT INTO performance_reports (id, timestamp, period, summary, alert_count, recommendation_count, data)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `,
+        [
+          `perf_report_${Date.now()}`,
+          report.timestamp,
+          report.period,
+          JSON.stringify(report.summary),
+          report.alerts.length,
+          report.recommendations.length,
+          JSON.stringify(report),
+        ]
       );
     } catch (error) {
       console.error('Failed to store performance report:', error);
@@ -435,20 +469,15 @@ export class PerformanceMonitor {
     slowQueryTrend: Array<{ date: string; slowQueries: number }>;
   }> {
     try {
-      const reports = await this.connection.executeQuery<{
+      const reports = await this.connection.query<{
         timestamp: string;
-        summary: {
-          totalQueries: number;
-          averageExecutionTime: number;
-          slowQueries: number;
-        };
-      }>(
-        `MATCH (pr:PerformanceReport)
-         WHERE datetime(pr.timestamp) > datetime() - duration({days: $days})
-         RETURN pr.timestamp as timestamp, pr.summary as summary
-         ORDER BY pr.timestamp ASC`,
-        { days }
-      );
+        summary: string;
+      }>(`
+        SELECT timestamp, summary
+        FROM performance_reports 
+        WHERE timestamp > NOW() - INTERVAL '${days} days'
+        ORDER BY timestamp ASC
+      `);
 
       const queryVolumeByDay: Array<{ date: string; count: number }> = [];
       const averageResponseTimeByDay: Array<{ date: string; avgTime: number }> = [];
@@ -456,7 +485,7 @@ export class PerformanceMonitor {
 
       reports.forEach((report) => {
         const date = report.timestamp.split('T')[0];
-        const summary = report.summary;
+        const summary = JSON.parse(report.summary);
 
         queryVolumeByDay.push({ date, count: summary.totalQueries });
         averageResponseTimeByDay.push({ date, avgTime: summary.averageExecutionTime });
@@ -479,39 +508,13 @@ export class PerformanceMonitor {
   }
 
   /**
-   * Optimize query cache based on usage patterns
+   * Optimize query patterns based on usage
    */
   async optimizeQueryCache(): Promise<void> {
     try {
-      // Update cache TTL based on query patterns
-      const cacheNodes = await this.connection.executeQuery<{
-        id: string;
-        type: string;
-        lastUpdated: number;
-      }>(
-        `MATCH (cache:QueryCache)
-         RETURN cache.id as id, cache.type as type, cache.lastUpdated as lastUpdated`
-      );
-
-      for (const cache of cacheNodes) {
-        const relatedQueries = this.queryMetrics.filter((m) => m.queryType.includes(cache.type.replace('_', '')));
-
-        // Adjust TTL based on query frequency
-        let newTTL = 300000; // 5 minutes default
-        if (relatedQueries.length > 100) {
-          newTTL = 60000; // 1 minute for high-frequency queries
-        } else if (relatedQueries.length < 10) {
-          newTTL = 600000; // 10 minutes for low-frequency queries
-        }
-
-        await this.connection.executeWrite(
-          `MATCH (cache:QueryCache {id: $cacheId})
-           SET cache.ttl = $newTTL, cache.optimizedAt = datetime().epochMillis`,
-          { cacheId: cache.id, newTTL }
-        );
-      }
-
-      console.log('🔧 Query cache optimized based on usage patterns');
+      console.log('🔧 Query cache optimization not yet implemented for PostgreSQL');
+      // TODO: Implement PostgreSQL-specific query optimization
+      // Could involve analyzing pg_stat_statements, updating work_mem settings, etc.
     } catch (error) {
       console.error('Failed to optimize query cache:', error);
     }

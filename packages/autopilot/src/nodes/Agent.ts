@@ -85,16 +85,36 @@ export class Agent implements NodeHandler {
             ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
             ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
             ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+            // Append assistant in OpenRouter-compliant format:
+            // - Convert camelCase toolCalls -> snake_case tool_calls
+            // - Ensure function.arguments is a JSON string (per OpenRouter docs Step 3)
             mutations: [
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
-                value: {
-                  role: 'assistant',
-                  content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
-                  reasoning: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.reasoning }}`,
-                  tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
-                },
+                value: `{{ (() => {
+                  const msg = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
+                  const content = typeof msg.content === "string" ? msg.content : "";
+                  const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+                  if (calls.length > 0) {
+                    const tool_calls = calls.map(tc => ({
+                      id: tc?.id ?? "",
+                      type: "function",
+                      function: {
+                        name: tc?.function?.name ?? "",
+                        arguments: (() => {
+                          try {
+                            const a = tc?.function?.arguments;
+                            if (typeof a === "string") return a;
+                            return JSON.stringify(a ?? {});
+                          } catch { return "{}"; }
+                        })()
+                      }
+                    }));
+                    return { role: "assistant", content, tool_calls };
+                  }
+                  return { role: "assistant", content };
+                })() }}`,
               },
             ],
           },
@@ -104,13 +124,13 @@ export class Agent implements NodeHandler {
           ref: conditionalNodeRef,
           type: 'conditional' as const,
           name: 'Check Tool Calls',
-          description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
+          description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
           parameters: {
             condition:
-              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.tool_calls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
           },
         },
-        // Prepare arguments for Tool (extract ALL tool calls)
+        // Prepare arguments for Tool (extract ALL tool calls) - KEEPING PARALLEL EXECUTION VERSION
         {
           ref: argsNodeRef,
           type: 'code' as const,
@@ -149,11 +169,18 @@ export class Agent implements NodeHandler {
                 callIndex: index,
                 toolCallId: call.id
               }));
+              
+              // COMMENTED OUT - MAIN BRANCH VERSION (sequential execution only):
+              // const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
+              // let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+              // if (typeof j === 'string') { try { j = JSON.parse(j); } catch {} }
+              // if (j && typeof j === 'object') { return j; }
+              // throw new Error('Missing toolCall function.arguments');
             `,
             timeout: 3000,
           },
         },
-        // Tool execution node - universal tool executor for parallel execution
+        // Tool execution node - universal tool executor for parallel execution - KEEPING PARALLEL VERSION
         {
           ref: toolNodeRef,
           type: 'tool' as const,
@@ -176,6 +203,7 @@ export class Agent implements NodeHandler {
 
             // Append ALL tool results (successful + failed) to state.messages so the next LLM pass can synthesize
             // We replace the entire messages array with previous messages + new tool messages (dynamic count)
+            // CRITICAL FIX: Using toolCallId (camelCase) instead of tool_call_id for consistency
             mutations: [
               {
                 operation: 'replace' as const,
@@ -193,7 +221,7 @@ export class Agent implements NodeHandler {
                       try { content = typeof data === 'string' ? data : JSON.stringify(data); } catch { content = String(data); }
                       return {
                         role: 'tool',
-                        tool_call_id: r?.toolCallId,
+                        toolCallId: r?.toolCallId,
                         name: r?.toolName,
                         content
                       };
@@ -211,6 +239,14 @@ export class Agent implements NodeHandler {
                 }}`,
               },
             ],
+            
+            // COMMENTED OUT - MAIN BRANCH VERSION (sequential execution only):
+            // name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
+            // description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
+            // parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+            // blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
+            // toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+            // mutations: [{ operation: 'add' as const, path: '/state/messages/-', value: `{{ { role: "tool", toolCallId: $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "", content: JSON.stringify($lastOutputOf("${toolNodeRef}")[0]?.json ?? {}) } }}` }]
           },
         },
       ],
@@ -219,7 +255,7 @@ export class Agent implements NodeHandler {
         { ref: 'edge_start_llm', from: startRef, to: llmNodeRef },
         // LLM -> Conditional
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
-        // Conditional -> LLM (if finish_reason === "length")
+        // Conditional -> LLM (if finishReason === "length")
         { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'continue' },
         // Conditional -> Prepare Args (if tool_calls exist)
         { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'call_tool' },

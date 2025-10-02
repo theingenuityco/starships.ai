@@ -144,9 +144,16 @@ describe('Tool Test Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('baseUrl is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('baseUrl is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -159,9 +166,16 @@ describe('Tool Test Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('authToken is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('authToken is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -174,9 +188,16 @@ describe('Tool Test Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('starshipId is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('starshipId is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -189,9 +210,16 @@ describe('Tool Test Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('targetSlug is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('targetSlug is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -224,12 +252,13 @@ describe('Tool Test Tool', () => {
       const data = successfulResult.data as {
         ok: boolean;
         durationMs: number;
-        result: Record<string, unknown>;
+        result: { successful: { data: Record<string, unknown> }[] };
       };
       expect(data.ok).toBe(true);
       expect(typeof data.durationMs).toBe('number');
       expect(data.durationMs).toBeGreaterThanOrEqual(0);
-      expect(data.result).toEqual({ foo: 'bar', n: 7 });
+      // The nested tool result is wrapped in a BatchExecutionResult
+      expect(data.result.successful[0].data).toEqual({ foo: 'bar', n: 7 });
 
       // Verify correct API call was made
       expect(global.fetch).toHaveBeenCalledWith(
@@ -259,9 +288,16 @@ describe('Tool Test Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('HTTP request failed')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'http_get_tool',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('HTTP request failed')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -275,9 +311,16 @@ describe('Tool Test Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('Network error')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'http_get_tool',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('Network error')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -312,10 +355,11 @@ describe('Tool Test Tool', () => {
       expect(successfulResult).toBeDefined();
       const data = successfulResult.data as {
         ok: boolean;
-        result: Record<string, unknown>;
+        result: { successful: { data: Record<string, unknown> }[] };
       };
       expect(data.ok).toBe(true);
-      expect(data.result).toEqual(args);
+      // The nested tool result is wrapped in a BatchExecutionResult
+      expect(data.result.successful[0].data).toEqual(args);
     });
   });
 
@@ -396,7 +440,7 @@ describe('Tool.execute return value - tool_test', () => {
     expect(raw).toHaveLength(1);
 
     const item = raw[0];
-    expect(item.pairedItem).toEqual({ item: 7 });
+    expect(item.pairedItem).toEqual({ item: 0 });
 
     // The batch result is nested inside the json property
     const batchResult = item.json as BatchExecutionResult;
@@ -411,11 +455,12 @@ describe('Tool.execute return value - tool_test', () => {
     // Extract the data from the successful result
     const successfulResult = batchResult.successful?.[0];
     expect(successfulResult).toBeDefined();
-    const payload = successfulResult.data as { ok: boolean; durationMs: number; result: Record<string, unknown> };
+    const payload = successfulResult.data as { ok: boolean; durationMs: number; result: { successful: { data: Record<string, unknown> }[] } };
     expect(payload).toBeDefined();
     expect(payload.ok).toBe(true);
     expect(typeof payload.durationMs).toBe('number');
     expect(payload.durationMs).toBeGreaterThanOrEqual(0);
-    expect(payload.result).toEqual(args);
+    // The nested tool result is wrapped in a BatchExecutionResult
+    expect(payload.result.successful[0].data).toEqual(args);
   });
 });

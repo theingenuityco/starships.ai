@@ -274,9 +274,16 @@ describe('Calculator Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('Expression is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'calc_1',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('Expression is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -290,9 +297,16 @@ describe('Calculator Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('must be a string')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'calc_1',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('must be a string')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -306,9 +320,16 @@ describe('Calculator Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('invalid characters')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'calc_1',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('invalid characters')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -322,9 +343,16 @@ describe('Calculator Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('Complex expressions not supported')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'calc_1',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('Complex expressions not supported')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -338,9 +366,16 @@ describe('Calculator Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('Expression is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'calc_1',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('Expression is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -363,9 +398,16 @@ describe('Calculator Tool', () => {
           successful: expect.arrayContaining([
             expect.objectContaining({
               success: true,
-              data: expect.objectContaining({
-                error: expect.stringContaining('invalid characters')
-              })
+              data: expect.arrayContaining([
+                expect.objectContaining({
+                  nodeRef: 'calc_1',
+                  items: expect.arrayContaining([
+                    expect.objectContaining({
+                      error: expect.stringContaining('invalid characters')
+                    })
+                  ])
+                })
+              ])
             })
           ])
         });

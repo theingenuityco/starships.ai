@@ -122,9 +122,16 @@ describe('Tool Create Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('baseUrl is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('baseUrl is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -137,9 +144,16 @@ describe('Tool Create Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('authToken is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('authToken is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -152,9 +166,16 @@ describe('Tool Create Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('starshipId is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('starshipId is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -167,9 +188,16 @@ describe('Tool Create Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('name is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('name is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -266,9 +294,16 @@ describe('Tool Create Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('HTTP request failed')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'http_create',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('HTTP request failed')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -291,9 +326,16 @@ describe('Tool Create Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('Network error')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'http_create',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('Network error')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -378,7 +420,7 @@ describe('Tool.execute return value - tool_create', () => {
     expect(raw).toHaveLength(1);
 
     const item = raw[0];
-    expect(item.pairedItem).toEqual({ item: 2 });
+    expect(item.pairedItem).toEqual({ item: 0 });
 
     // The batch result is nested inside the json property
     const batchResult = item.json as BatchExecutionResult;

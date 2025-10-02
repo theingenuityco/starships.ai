@@ -123,9 +123,16 @@ describe('Tool Get Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('baseUrl is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('baseUrl is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -138,9 +145,16 @@ describe('Tool Get Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('authToken is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('authToken is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -153,9 +167,16 @@ describe('Tool Get Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('starshipId is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('starshipId is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -168,9 +189,16 @@ describe('Tool Get Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('slug is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'prepare',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('slug is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -250,9 +278,16 @@ describe('Tool Get Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('404 Not Found')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'http_get',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('404 Not Found')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });

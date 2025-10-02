@@ -94,32 +94,45 @@
     },
     "@starships/protocol#type-check": {
       "dependsOn": ["@starships/autopilot#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**"],
       "outputs": []
     },
     "@starships/models#type-check": {
       "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "tsconfig.json",
+        "../../packages/env/dist/**",
+        "../../packages/errors/dist/**",
+        "../../packages/protocol/dist/**"
+      ],
       "outputs": []
     },
     "@starships/server#type-check": {
       "dependsOn": ["@starships/errors#build", "@starships/models#build", "@starships/protocol#build", "@starships/autopilot#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "tsconfig.json",
+        "../../packages/errors/dist/**",
+        "../../packages/models/dist/**",
+        "../../packages/protocol/dist/**",
+        "../../packages/autopilot/dist/**"
+      ],
       "outputs": []
     },
     "@starships/client#type-check": {
       "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**", "../../packages/protocol/dist/**"],
       "outputs": []
     },
     "@starships/errors#type-check": {
       "dependsOn": ["@starships/protocol#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/protocol/dist/**"],
       "outputs": []
     },
     "@starships/reverse-proxy#type-check": {
       "dependsOn": ["@starships/env#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/env/dist/**"],
       "outputs": []
     },
     "type-check": {

@@ -46,8 +46,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build dependencies for type-check
+        run: pnpm run build --filter=@starships/autopilot --filter=@starships/protocol --filter=@starships/errors --filter=@starships/env --filter=@starships/models
+
       - name: Type check all packages
-        run: pnpm run type-check --force
+        run: pnpm run type-check
 
   test:
     name: Test Check

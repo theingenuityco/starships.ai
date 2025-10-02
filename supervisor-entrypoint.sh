@@ -7,6 +7,11 @@ echo "Starting Starships.ai with supervisor..."
 if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
     echo "Checking PostgreSQL data directory..."
     
+    # Ensure PostgreSQL runtime directory exists with correct permissions
+    mkdir -p /run/postgresql /var/log/postgresql
+    chown -R postgres:postgres /run/postgresql /var/log/postgresql
+    chmod 775 /run/postgresql
+    
     # Check if data directory is empty or uninitialized
     if [ ! -f "/var/lib/postgresql/data/postgresql.conf" ]; then
         echo "PostgreSQL data directory is not initialized. Initializing now..."

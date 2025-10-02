@@ -37,9 +37,10 @@ ENV PGDATA=/var/lib/postgresql/data
 # PostgreSQL will be initialized at runtime by supervisor-entrypoint.sh
 # This allows proper volume mount support without overwriting initialization
 RUN apk add --no-cache su-exec && \
-    mkdir -p /var/lib/postgresql/data && \
-    chown -R postgres:postgres /var/lib/postgresql && \
-    chmod 700 /var/lib/postgresql/data
+    mkdir -p /var/lib/postgresql/data /run/postgresql /var/log/postgresql && \
+    chown -R postgres:postgres /var/lib/postgresql /run/postgresql /var/log/postgresql && \
+    chmod 700 /var/lib/postgresql/data && \
+    chmod 775 /run/postgresql
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
@@ -75,10 +76,7 @@ RUN --mount=type=secret,id=stripe_secret_key \
 
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker && \
-    mkdir -p /var/lib/postgresql/data /var/log/postgresql && \
-    chown -R nodejs:node data && \
-    chown -R postgres:postgres /var/lib/postgresql && \
-    chown -R postgres:postgres /var/log/postgresql
+    chown -R nodejs:node data
 
 # Supervisor config will be created dynamically by supervisor-entrypoint.sh
 # based on whether POSTGRES_EXTERNAL_HOST is set

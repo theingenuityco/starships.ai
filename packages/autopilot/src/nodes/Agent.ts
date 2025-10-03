@@ -169,28 +169,29 @@ export class Agent implements NodeHandler {
             toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
           },
         },
-        // Code node to add tool result to state (runs after tool execution)
+        // Mutate node to add tool result to state (runs after tool execution)
         {
           ref: toolResultNodeRef,
-          type: 'code' as const,
+          type: 'mutate' as const,
           name: 'Add Tool Result',
           description: 'Add tool result message to conversation state',
           parameters: {
-            code: `
-              const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
-              const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
-              const toolResultMessage = {
-                role: "tool",
-                tool_call_id: toolCallId,
-                content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
-              };
-              // Add to state.messages directly in code to avoid template resolution issues
-              if (Array.isArray(state.messages)) {
-                state.messages.push(toolResultMessage);
-              }
-              return toolResultMessage;
-            `,
-            timeout: 3000,
+            mutations: [
+              {
+                operation: 'add' as const,
+                path: '/state/messages/-',
+                value: `{{ (() => {
+                  const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
+                  const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+                  const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+                  return {
+                    role: "tool",
+                    tool_call_id: toolCallId,
+                    content: content
+                  };
+                })() }}`,
+              },
+            ],
           },
         },
       ],

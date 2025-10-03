@@ -5,6 +5,7 @@ import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
 
+import AccountForm from '@/components/profile/AccountForm'
 import { UserUsage } from '@/components/profile/UserUsage'
 
 export default function ProfilePage(): React.JSX.Element {
@@ -49,6 +50,9 @@ export default function ProfilePage(): React.JSX.Element {
                   <h3 id="account-section" className="text-lg font-semibold">
                     Account
                   </h3>
+                  <div className="mt-4">
+                    <AccountForm />
+                  </div>
                 </section>
               </TabsContent>
 

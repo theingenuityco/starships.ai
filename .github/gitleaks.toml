@@ -1,0 +1,33 @@
+title = "Gitleaks config: enable generic-api-key with smart allowlists"
+[extend]
+# Extend the built-in default ruleset
+useDefault = true
+# -------------------------------------------------------------------
+# GLOBAL ALLOWS
+# -------------------------------------------------------------------
+[[allowlists]]
+description = "Ignore obvious fake/placeholder/test keys in docs and test assets"
+condition = "OR"
+regexTarget = "match"
+regexes = [
+  # Generic placeholders
+  '''(?i)\b(REDACTED|PLACEHOLDER|DUMMY|EXAMPLE|FAKE|MOCK|SAMPLE|TEST)\b''',
+  # Keys explicitly starting with 'test', 'fake', 'dummy', etc.
+  '''(?i)\b(?:test|fake|dummy|mock|sample)[-_]?(?:key|api|token|secret)?[-_0-9a-z]*\b''',
+  # Stripe & similar test keys (sk-test-xxx etc.)
+  '''(?i)\bsk[-_]?test[-_0-9a-z]+\b''',
+  # Any starship-style fake keys
+  '''(?i)\bstarship[-_a-z0-9]*\b''',
+  # iv:auth or iv:test style prefixes
+  '''(?i)\biv:(?:auth|test)[:\-]?[0-9a-z]+\b''',
+  # Very short trivial values (abc, 123, abcd, xyz, qwerty…)
+  '''^(?:123|abc|abcd|xyz|qwerty)$'''
+]
+paths = [
+  '''(^|/)docs/.*\.(md|txt|rst)$''',
+  '''(^|/)__tests__(/|$)''',
+  '''(^|/)tests?(/|$)''',
+  '''(^|/)fixtures?(/|$)''',
+  '''(^|/)mocks?(/|$)''',
+  '''(^|/)examples?(/|$)'''
+]

@@ -73,7 +73,7 @@ export function UserUsage(): React.JSX.Element {
           <UsageTable
             isDaily={isDaily}
             loadingList={loadingList}
-            rows={rows as any[]}
+            rows={rows}
             numberGroup={numberGroup}
             usd={usd}
             formatDay={formatDay}

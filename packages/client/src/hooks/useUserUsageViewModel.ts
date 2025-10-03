@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserUsageTotals, useUserDailyUsageList, useUserDailyModelUsageList } from '@/hooks/useUsage'
-import type { PaginationMeta } from '@starships/protocol'
+import type { PaginationMeta, DailyUsageRow, DailyModelUsageRow } from '@starships/protocol'
 
 export const numberCompact = (n: number): string => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 
@@ -21,6 +21,8 @@ export const formatDay = (isoDay: string): string => {
     return isoDay
   }
 }
+
+export type UsageRow = DailyUsageRow | DailyModelUsageRow
 
 /**
  * ViewModel/Service for the UserUsage component (Layered Architecture)
@@ -55,7 +57,7 @@ export function useUserUsageViewModel() {
   const loadingList = isDaily ? daily.isLoading : dailyModel.isLoading
 
   const pagination: PaginationMeta | undefined = list?.pagination
-  const rows = list?.records ?? []
+  const rows = (list?.records ?? []) as UsageRow[]
   const total = pagination?.total ?? 0
   const hasNext = pagination?.has_next ?? false
   const hasPrev = pagination?.has_prev ?? false

@@ -2,11 +2,14 @@
 
 import React from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import type { DailyUsageRow, DailyModelUsageRow } from '@starships/protocol'
+
+type UsageRow = DailyUsageRow | DailyModelUsageRow
 
 export interface UsageTableProps {
   isDaily: boolean
   loadingList: boolean
-  rows: any[]
+  rows: UsageRow[]
   numberGroup: (n: number) => string
   usd: (n: number) => string
   formatDay: (s: string) => string
@@ -50,10 +53,10 @@ export function UsageTable({ isDaily, loadingList, rows, numberGroup, usd, forma
                 </tr>
               )}
               {!loadingList &&
-                rows.map((r: any, idx: number) => (
-                  <tr key={`${isDaily ? r.day : r.day + '-' + (r.model || 'nomodel')}-${idx}`} className="border-b border-border/30">
+                rows.map((r, idx) => (
+                  <tr key={`${isDaily ? r.day : r.day + '-' + ('model' in r && r.model ? r.model : 'nomodel')}-${idx}`} className="border-b border-border/30">
                     <td className="py-2 pr-3">{formatDay(r.day)}</td>
-                    {!isDaily && <td className="py-2 pr-3 font-mono">{r.model ?? '—'}</td>}
+                    {!isDaily && <td className="py-2 pr-3 font-mono">{'model' in r ? r.model ?? '—' : '—'}</td>}
                     <td className="py-2 pr-3 text-right">{numberGroup(Number(r.requestCount ?? 0))}</td>
                     <td className="py-2 pr-3 text-right">{numberGroup(Number(r.totals?.promptTokens ?? 0))}</td>
                     <td className="py-2 pr-3 text-right">{numberGroup(Number(r.totals?.completionTokens ?? 0))}</td>

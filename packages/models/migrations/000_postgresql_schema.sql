@@ -273,6 +273,9 @@ CREATE INDEX idx_usage_starship_id ON usage(starship_id);
 CREATE INDEX idx_usage_conversation_id ON usage(conversation_id);
 CREATE INDEX idx_usage_created_at ON usage(created_at);
 CREATE INDEX idx_usage_model ON usage(model);
+-- Composite indexes for owner-scoped queries and filters
+CREATE INDEX idx_usage_starship_created_at ON usage(starship_id, created_at);
+CREATE INDEX idx_usage_starship_model ON usage(starship_id, model);
 
 -- ============================================================================
 -- WAITLIST TABLE

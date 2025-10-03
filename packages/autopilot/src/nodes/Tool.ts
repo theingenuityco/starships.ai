@@ -35,11 +35,6 @@ export class Tool extends BaseNode<ToolParams> {
       const params = this.getParams();
       inputData = ExecutionItemUtils.unwrapSingle(input);
       
-      // COMMENTED OUT - MAIN BRANCH VERSION (simple single tool execution):
-      // const inputData = ExecutionItemUtils.unwrapSingle(input);
-      // const toolArgs = this.extractToolArguments(inputData);
-
-
       // Check if this is the universal tool executor for parallel execution
       const isUniversalExecutor = params.name === 'universal_tool_executor';
 

@@ -169,13 +169,6 @@ export class Agent implements NodeHandler {
                 callIndex: index,
                 toolCallId: call.id
               }));
-              
-              // COMMENTED OUT - MAIN BRANCH VERSION (sequential execution only):
-              // const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              // let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
-              // if (typeof j === 'string') { try { j = JSON.parse(j); } catch {} }
-              // if (j && typeof j === 'object') { return j; }
-              // throw new Error('Missing toolCall function.arguments');
             `,
             timeout: 3000,
           },
@@ -239,14 +232,6 @@ export class Agent implements NodeHandler {
                 }}`,
               },
             ],
-            
-            // COMMENTED OUT - MAIN BRANCH VERSION (sequential execution only):
-            // name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
-            // description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
-            // parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-            // blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
-            // toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
-            // mutations: [{ operation: 'add' as const, path: '/state/messages/-', value: `{{ { role: "tool", toolCallId: $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "", content: JSON.stringify($lastOutputOf("${toolNodeRef}")[0]?.json ?? {}) } }}` }]
           },
         },
       ],

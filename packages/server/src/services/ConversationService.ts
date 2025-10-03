@@ -266,14 +266,39 @@ export class ConversationService {
         secureEnv,
       });
 
-      // Convert database messages to LLM format, preserving toolCalls and tool results
-      const llmMessages = messages.map((msg) => ({
-        role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-        content: msg.content,
-        ...(msg.reasoning && { reasoning: msg.reasoning }),
-        ...(msg.toolCalls && { toolCalls: msg.toolCalls }),
-        ...(msg.toolCallId && { toolCallId: msg.toolCallId }),
-      }));
+      // Convert database messages to OpenRouter format
+      // OpenRouter standardizes format and translates to provider-specific formats automatically
+      const llmMessages = messages.map((msg) => {
+        const baseMessage: any = {
+          role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+          content: msg.content,
+        };
+
+        // Add reasoning if present
+        if (msg.reasoning) {
+          baseMessage.reasoning = msg.reasoning;
+        }
+
+        // For assistant messages with tool calls, use OpenRouter snake_case format
+        if (msg.role === 'assistant' && msg.toolCalls && Array.isArray(msg.toolCalls)) {
+          baseMessage.tool_calls = msg.toolCalls.map((tc: any) => ({
+            id: tc.id,
+            type: tc.type || 'function',
+            function: {
+              name: tc.function?.name,
+              arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
+            },
+          }));
+        }
+
+        // For tool result messages, use OpenRouter snake_case format
+        // OpenRouter translates tool_call_id to provider-specific format (e.g., tool_use_id for Anthropic)
+        if (msg.role === 'tool' && msg.toolCallId) {
+          baseMessage.tool_call_id = msg.toolCallId;
+        }
+
+        return baseMessage;
+      });
 
       // Prepare input for agent execution - Agent will handle memory state and ordering internally
       const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);

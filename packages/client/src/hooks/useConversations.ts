@@ -263,6 +263,7 @@ type StreamedChunk =
   | { type: 'replace_reasoning'; value: string }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
+  | { type: 'ui_action'; payload: any }
   | { type: 'complete' }
   | { type: 'error'; error: any }
 
@@ -441,6 +442,10 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             // Allow trailing finalize patches (id/content/reasoning), then end shortly
             seenComplete = true
             schedulePostCompleteEnd()
+            break
+          }
+          case 'ui_action': {
+            push({ type: 'ui_action', payload: parsed })
             break
           }
           case 'error': {
@@ -664,6 +669,16 @@ export function useConversationStreamed(conversationId: string | null) {
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
 
+  // Extract last UI action payload (from 'ui_action' SSE events) for consumers
+  const lastUIAction = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return null
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (c?.type === 'ui_action') return c.payload ?? null
+    }
+    return null
+  }, [chunks])
+
   // Invalidate usage totals on end-of-turn (SSE 'complete') to update context bar post-turn
   useEffect(() => {
     if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
@@ -742,6 +757,8 @@ export function useConversationStreamed(conversationId: string | null) {
     isResponding,
     isAssistantStreaming,
     isAwaitingAssistant,
+    // Expose last UI action payload from SSE
+    lastUIAction,
     isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,

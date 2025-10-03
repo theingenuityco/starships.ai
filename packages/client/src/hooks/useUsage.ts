@@ -1,6 +1,6 @@
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
-import type { ApiResponse, LLMUsage, UsageModel, PaginationMeta } from '@starships/protocol'
+import type { ApiResponse, LLMUsage, UsageModel, PaginationMeta, UserUsageTotals, DailyUsageRow, DailyModelUsageRow } from '@starships/protocol'
 export const USAGE_QUERY_KEYS = {
   conversationTotals: (conversationId: string) => ['usage', 'conversation', conversationId, 'totals'] as const,
   starshipTotals: (starshipId: string) => ['usage', 'starship', starshipId, 'totals'] as const,
@@ -10,28 +10,6 @@ export const USAGE_QUERY_KEYS = {
   userDaily: (userId: string, page: number, limit: number, order?: 'ASC' | 'DESC') => ['usage', 'user', userId, 'daily', { page, limit, order: order || 'DESC' }] as const,
   userDailyModel: (userId: string, page: number, limit: number, order?: 'ASC' | 'DESC') => ['usage', 'user', userId, 'daily-model', { page, limit, order: order || 'DESC' }] as const,
 } as const
-
-// Local client-side types (avoid build-order issues with protocol dist)
-export interface UserUsageTotals {
-  totals: LLMUsage
-  requestCount: number
-}
-
-/**
- * Local shapes to avoid cross-package build-order issues
- */
-export interface DailyUsageRow {
-  day: string
-  totals: LLMUsage
-  requestCount: number
-}
-
-export interface DailyModelUsageRow {
-  day: string
-  model: string | null
-  totals: LLMUsage
-  requestCount: number
-}
 
 export function useConversationUsageTotals(conversationId: string | null) {
   return useQuery({

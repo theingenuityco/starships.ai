@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState } from 'react'
+import React from 'react'
 import { Coins, Activity, Cpu, ArrowDown, ArrowUp, Receipt } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
-import { useAuth } from '@/hooks/useAuth'
-import { useUserUsageTotals, useUserDailyUsageList, useUserDailyModelUsageList } from '@/hooks/useUsage'
+import { useUserUsageViewModel } from '@/hooks/useUserUsageViewModel'
 import { cn } from '@/lib/utils'
 
 interface MetricCardProps {
@@ -33,58 +32,32 @@ function MetricCard({ title, value, icon, description, className }: MetricCardPr
   )
 }
 
-const numberCompact = (n: number): string => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
-
-const numberGroup = (n: number): string => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n)
-
-const usd = (n: number): string => `$${(Number.isFinite(n) ? n : 0).toFixed(2)}`
-const formatDay = (isoDay: string): string => {
-  try {
-    const [yStr, mStr, dStr] = isoDay.split('-')
-    const y = Number(yStr)
-    const m = Number(mStr) - 1
-    const d = Number(dStr)
-    const dt = new Date(Date.UTC(y, m, d))
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  } catch {
-    return isoDay
-  }
-}
-
 export function UserUsage(): React.JSX.Element {
-  const { user } = useAuth()
-  const userId = user?.id ?? null
-
-  const { data: totals, isLoading: loadingTotals } = useUserUsageTotals(userId)
-
-  const totalTokens = Number(totals?.totals.totalTokens ?? 0)
-  const promptTokens = Number(totals?.totals.promptTokens ?? 0)
-  const completionTokens = Number(totals?.totals.completionTokens ?? 0)
-  const totalCost = Number(totals?.totals.cost ?? 0)
-  const totalRequests = Number(totals?.requestCount ?? 0)
-
-  // Derived
-  const avgTokensPerRequest = totalRequests > 0 ? Math.round(totalTokens / totalRequests) : 0
-  const avgCostPerRequest = totalRequests > 0 ? totalCost / totalRequests : 0
-
-  const isLoading = loadingTotals
-
-  // Toggle: false = Day only, true = Day + Model
-  const [modeDayModel, setModeDayModel] = useState(false)
-  const [page, setPage] = useState(1)
-
-  const daily = useUserDailyUsageList(userId, { page, limit: 20, order: 'DESC' })
-  const dailyModel = useUserDailyModelUsageList(userId, { page, limit: 20, order: 'DESC' })
-
-  const isDaily = !modeDayModel
-  const list = isDaily ? daily.data : dailyModel.data
-  const loadingList = isDaily ? daily.isLoading : dailyModel.isLoading
-
-  const pagination = list?.pagination
-  const rows = list?.records ?? []
-  const total = pagination?.total ?? 0
-  const hasNext = pagination?.has_next ?? false
-  const hasPrev = pagination?.has_prev ?? false
+  const {
+    isLoading,
+    totalCost,
+    totalTokens,
+    promptTokens,
+    completionTokens,
+    totalRequests,
+    avgTokensPerRequest,
+    avgCostPerRequest,
+    modeDayModel,
+    setModeDayModel,
+    page,
+    setPage,
+    isDaily,
+    rows,
+    loadingList,
+    pagination,
+    total,
+    hasNext,
+    hasPrev,
+    numberCompact,
+    numberGroup,
+    usd,
+    formatDay,
+  } = useUserUsageViewModel()
 
   return (
     <div className="space-y-6">

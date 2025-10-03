@@ -9,6 +9,9 @@ import { DatabaseError } from '@starships/errors';
 import { RepositoryTestHelper } from '../../tests/repository-test-helper';
 import { createCipheriv, createHash, randomBytes } from 'crypto';
 
+// Deterministic test master key derived from a non-secret seed
+const TEST_MASTER_KEY = createHash('sha256').update('unit-test-key').digest('hex');
+
 // Mock nanoid for predictable IDs
 jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'test-env-id-123'),
@@ -22,7 +25,7 @@ jest.mock('@/helpers/database', () => ({
 // Mock env config for encryption key
 jest.mock('@starships/env', () => ({
   getEnvConfig: jest.fn(() => ({
-    ENCRYPTION_KEY: 'test-encryption-key-32-characters-long-enough',
+    ENCRYPTION_KEY: TEST_MASTER_KEY,
   })),
 }));
 
@@ -311,7 +314,7 @@ describe('EnvironmentRepository', () => {
   describe('getDecryptedEnvironment', () => {
     it('should return decrypted environment variables as record', async () => {
       // Create a properly encrypted value for testing
-      const masterKey = 'test-encryption-key-32-characters-long-enough';
+      const masterKey = TEST_MASTER_KEY;
       const starshipId = 'starship-123';
       const key = createHash('sha256')
         .update(masterKey + starshipId)
@@ -346,7 +349,7 @@ describe('EnvironmentRepository', () => {
 
     it('should skip invalid encrypted values', async () => {
       // Create a properly encrypted value for one key
-      const masterKey = 'test-encryption-key-32-characters-long-enough';
+      const masterKey = TEST_MASTER_KEY;
       const starshipId = 'starship-123';
       const key = createHash('sha256')
         .update(masterKey + starshipId)

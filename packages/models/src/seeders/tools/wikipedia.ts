@@ -14,9 +14,6 @@ export const wikipediaTool: ToolParams = {
       query: {
         type: 'string',
         description: 'Search query or exact page title for Wikipedia. Use established topic names that likely have dedicated articles. Broader, well-known terms work better than specific combinations.',
-        
-        // COMMENTED OUT - MAIN BRANCH VERSION (simpler description):
-        // description: 'Search query or exact page title for Wikipedia',
       },
       action: {
         type: 'string',

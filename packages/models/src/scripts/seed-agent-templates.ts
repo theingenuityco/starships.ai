@@ -90,8 +90,3 @@ export async function seedAgentTemplates(): Promise<void> {
     // Don't throw - we don't want to prevent server startup if template seeding fails
   }
 }
-
-// COMMENTED OUT - EXECUTION BLOCK (using main branch approach - cleaner without direct execution):
-// if (require.main === module) {
-//   seedAgentTemplates();
-// }

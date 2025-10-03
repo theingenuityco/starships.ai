@@ -997,9 +997,6 @@ export class ConversationService {
                 content: toolContent,
                 messageType: 'tool_result',
                 ...(toolEvt.data?.toolCallId ? { toolCallId: toolEvt.data.toolCallId } : {}),
-                
-                // COMMENTED OUT - BRANCH VERSION (inconsistent naming):
-                // tool_call_id: tcid,
               });
 
               console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);

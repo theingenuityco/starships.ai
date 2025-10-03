@@ -151,3 +151,14 @@ The system is designed to be intuitive without rigid scripts:
 - The UI provides all necessary feedback (form, validation, toasts)
 
 This creates a fluid, natural experience for both the agent and the user.
+
+## SSE UI Action Event
+
+- The server emits a dedicated SSE event type `ui_action` when a tool returns a payload like:
+  - `{"__ui_action":"open_tool_form","formData":{...}}`
+  - `{"__ui_action":"update_tool_form","patch":{...}}`
+  - `{"__ui_action":"submit_tool_form"}`
+  - `{"__ui_action":"close_tool_form"}`
+- The client consumes `ui_action` alongside regular `message`/`delta` events to drive the Tool Form Drawer without polluting the chat stream.
+
+This preserves a clean separation of concerns: chat remains conversational while UI actions are out-of-band.

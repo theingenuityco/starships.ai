@@ -796,8 +796,55 @@ export class ConversationService {
 
       case 'node_completed': {
         // Handle tool node completion - persist tool result messages
-        // Note: Due to type constraints, we'll handle tool result persistence differently
-        console.log('[STREAMING] Node completed event received');
+        // Also detect UI actions emitted by code/end nodes and forward them to the client via SSE
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: any = execEvent?.data?.execution;
+          const results: any[] = Array.isArray(execution?.results) ? execution.results : [];
+
+          // Walk results from the end to find a JSON payload that declares a UI action
+          let uiPayload: any = null;
+          for (let i = results.length - 1; i >= 0 && !uiPayload; i--) {
+            const items = Array.isArray(results[i]?.items) ? results[i].items : [];
+            for (let j = items.length - 1; j >= 0 && !uiPayload; j--) {
+              const json = items[j]?.json && typeof items[j].json === 'object' ? items[j].json : null;
+              if (!json) continue;
+              if (json && (json as any).__ui_action) {
+                uiPayload = json;
+                break;
+              }
+              const maybeResult = (json as any)?.result;
+              if (maybeResult && typeof maybeResult === 'object' && (maybeResult as any).__ui_action) {
+                uiPayload = maybeResult;
+                break;
+              }
+            }
+          }
+
+          if (uiPayload && typeof uiPayload.__ui_action === 'string') {
+            // New SSE event: send as 'ui_action' for clean separation
+            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
+
+            // Back-compat: also emit a lightweight assistant message containing the UI instruction payload.
+            const now = new Date().toISOString();
+            const uiMessage = {
+              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              role: 'assistant',
+              content: JSON.stringify(uiPayload),
+              messageType: 'agent_response',
+              createdAt: now,
+              updatedAt: now,
+            };
+            await this.streamingService.broadcastDelta(conversationId, {
+              op: 'add',
+              path: '/messages/-',
+              value: uiMessage,
+            });
+          }
+        } catch (e) {
+          console.warn('[STREAMING] UI action detection failed on node_completed:', e);
+        }
+
         // Other persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
         break;
       }

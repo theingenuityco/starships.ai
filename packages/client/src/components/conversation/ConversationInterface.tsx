@@ -36,12 +36,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const toolFormDrawerRef = useRef<ToolFormDrawerRef>(null)
+  const lastUIActionKeyRef = useRef<string | null>(null)
 
   // Tool form drawer state
   const [toolFormDrawerOpen, setToolFormDrawerOpen] = useState(false)
 
   // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [] } = useConversationStreamed(currentConversationId)
+  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId)
   const prevStreamingRef = useRef(false)
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
@@ -95,39 +96,31 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [onConversationChange]
   )
 
-  // Message presence is derived from store; no local handler
-
-  // Streaming is now handled internally by useConversation hook
-  // No need for external event handler management
-
   // Handle suggestion click
   const handleSuggestionClick = useCallback((suggestion: string) => {
-    // Use ref to directly call the input component method
     if (messageInputRef.current?.handleSuggestionSubmit) {
       messageInputRef.current.handleSuggestionSubmit(suggestion)
     }
   }, [])
 
-  // Reset conversation when external conversation ID changes (only when the value actually changes)
+  // Reset conversation when external conversation ID changes
   useEffect(() => {
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
   }, [externalConversationId])
 
-  // Restore selected agent from conversation data (fixes refresh issue)
+  // Restore selected agent from conversation data
   useEffect(() => {
     if (!currentConversationId) return
 
-    // First priority: Use conversation agents from API (persisted agent relationships)
     if (conversationAgents.length > 0) {
-      const conversationAgent = conversationAgents[0] // Use first agent from conversation
+      const conversationAgent = conversationAgents[0]
       if (conversationAgent && (!selectedAgent || selectedAgent.id !== conversationAgent.id)) {
         setSelectedAgent(conversationAgent)
         return
       }
     }
 
-    // Second priority: Try to restore from UI store conversation data
     if (conversationData?.agentId && starshipAgentsData.length > 0) {
       const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId)
       if (storedAgent && (!selectedAgent || selectedAgent.id !== storedAgent.id)) {
@@ -136,7 +129,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
 
-    // Fallback: auto-select first agent if none selected (for new conversations)
     if (!selectedAgent && starshipAgentsData.length > 0) {
       setSelectedAgent(starshipAgentsData[0])
     }
@@ -173,37 +165,114 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toolFormDrawerRef.current?.resetForm()
   }, [])
 
-  // Detect special UI action responses from tools
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length) return
-
-    // Check the last assistant message for UI actions
-    const lastMessage = liveMessages[liveMessages.length - 1]
-    if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+  // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
+  const handleUIPayload = useCallback(
+    (payload: any) => {
       try {
-        // Try to parse content if it's a string
-        const content = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
+        if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
+        const key = JSON.stringify(payload)
+        if (lastUIActionKeyRef.current === key) return
+        lastUIActionKeyRef.current = key
 
-        // Check for UI action
-        if (content?.__ui_action === 'open_tool_form' && content?.formData) {
-          // Open form with data
+        const action = (payload as any).__ui_action as string
+
+        const ensureOpenThen = (fn: () => void) => {
           setTimeout(() => {
-            toolFormDrawerRef.current?.resetForm()
+            if (action === 'open_tool_form') {
+              toolFormDrawerRef.current?.resetForm()
+            }
             setToolFormDrawerOpen(true)
-            setTimeout(() => {
-              if (toolFormDrawerRef.current) {
-                Object.entries(content.formData).forEach(([field, value]) => {
+            setTimeout(() => fn(), 150)
+          }, 100)
+        }
+
+        switch (action) {
+          case 'open_tool_form': {
+            const form = (payload as any).formData || (payload as any).data || {}
+            ensureOpenThen(() => {
+              if (toolFormDrawerRef.current && form && typeof form === 'object') {
+                Object.entries(form).forEach(([field, value]) => {
                   toolFormDrawerRef.current?.updateField(field as any, value as any)
                 })
               }
-            }, 150)
-          }, 100)
+            })
+            break
+          }
+
+          case 'update_tool_form': {
+            const patch = (payload as any).patch || (payload as any).formData || (payload as any).data || {}
+            if (!toolFormDrawerRef.current) {
+              ensureOpenThen(() => {
+                if (toolFormDrawerRef.current && patch && typeof patch === 'object') {
+                  Object.entries(patch).forEach(([field, value]) => {
+                    toolFormDrawerRef.current?.updateField(field as any, value as any)
+                  })
+                }
+              })
+            } else {
+              if (patch && typeof patch === 'object') {
+                Object.entries(patch).forEach(([field, value]) => {
+                  toolFormDrawerRef.current?.updateField(field as any, value as any)
+                })
+              }
+            }
+            break
+          }
+
+          case 'submit_tool_form': {
+            const submit = () => {
+              const formData = toolFormDrawerRef.current?.getFormData()
+              if (formData) {
+                handleToolFormSave(formData)
+              }
+            }
+            if (!toolFormDrawerRef.current) {
+              ensureOpenThen(submit)
+            } else {
+              submit()
+            }
+            break
+          }
+
+          case 'close_tool_form': {
+            setToolFormDrawerOpen(false)
+            break
+          }
+
+          default:
+            break
         }
+      } catch {
+        // ignore
+      }
+    },
+    [handleToolFormSave]
+  )
+
+  // Detect special UI action responses from assistant messages (back-compat path)
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length) return
+
+    const lastMessage = liveMessages[liveMessages.length - 1]
+    if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+      try {
+        const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
+        handleUIPayload(payload)
       } catch {
         // Not JSON or doesn't have UI action, ignore
       }
     }
-  }, [currentConversationId, liveMessages])
+  }, [currentConversationId, liveMessages, handleUIPayload])
+
+  // Consume SSE 'ui_action' events directly (clean channel)
+  useEffect(() => {
+    if (!currentConversationId || !lastUIAction) return
+    try {
+      handleUIPayload(lastUIAction as any)
+    } catch {
+      // ignore
+    }
+  }, [currentConversationId, lastUIAction, handleUIPayload])
 
   // Register tool form controller for programmatic access
   useEffect(() => {

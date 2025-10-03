@@ -273,6 +273,9 @@ CREATE INDEX idx_usage_starship_id ON usage(starship_id);
 CREATE INDEX idx_usage_conversation_id ON usage(conversation_id);
 CREATE INDEX idx_usage_created_at ON usage(created_at);
 CREATE INDEX idx_usage_model ON usage(model);
+-- Composite indexes for owner-scoped queries and filters
+CREATE INDEX idx_usage_starship_created_at ON usage(starship_id, created_at);
+CREATE INDEX idx_usage_starship_model ON usage(starship_id, model);
 
 -- ============================================================================
 -- WAITLIST TABLE
@@ -343,7 +346,6 @@ CREATE INDEX idx_messages_search ON messages USING GIN(to_tsvector('english', co
 CREATE INDEX idx_users_search ON users USING GIN(to_tsvector('english', COALESCE(display_name, '') || ' ' || COALESCE(email, '')));
 CREATE INDEX idx_starships_search ON starships USING GIN(to_tsvector('english', name || ' ' || COALESCE(slug, '')));
 CREATE INDEX idx_tools_search ON tools USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')));
-CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')));
 
 -- ============================================================================
 -- NOTE: Triggers removed for simplicity

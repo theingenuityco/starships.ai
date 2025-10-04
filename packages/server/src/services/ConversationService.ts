@@ -933,17 +933,33 @@ export class ConversationService {
       }
 
       case 'tool_call_detected': {
+        // Drop nested tool call detections (only emit from top-level LLM)
+        if ((event.executionDepth ?? 0) > 0) {
+          console.log('[STREAMING] Skipping nested tool_call_detected at depth', event.executionDepth);
+          break;
+        }
+
         const toolEvt = event as ToolEvent;
-        console.log('[STREAMING] Tool call detected:', toolEvt.data?.toolName);
+        console.log('[STREAMING] 🎯 Tool call detected at depth 0:', {
+          toolName: toolEvt.data?.toolName,
+          toolCallId: toolEvt.data?.toolCallId,
+          conversationId,
+          isActive: this.streamingService?.isActive(conversationId),
+        });
 
         // Broadcast tool_call_detected via ui_action event channel
         // This triggers UI form opening for specific tools like tool_create
         if (this.streamingService && this.streamingService.isActive(conversationId)) {
-          await this.streamingService.broadcastUIAction(conversationId, {
+          const payload = {
             __ui_action: 'tool_call_detected',
             toolCallId: toolEvt.data?.toolCallId,
             toolName: toolEvt.data?.toolName,
-          });
+          };
+          console.log('[STREAMING] 📤 Broadcasting ui_action:', payload);
+          await this.streamingService.broadcastUIAction(conversationId, payload);
+          console.log('[STREAMING] ✅ ui_action broadcast complete');
+        } else {
+          console.warn('[STREAMING] ⚠️  StreamingService not active, cannot broadcast tool_call_detected');
         }
         break;
       }

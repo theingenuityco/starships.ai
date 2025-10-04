@@ -187,6 +187,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         }
 
         switch (action) {
+          case 'tool_call_detected': {
+            const toolName = (payload as any).toolName
+            const toolCallId = (payload as any).toolCallId
+
+            console.log('🎯 Tool call detected:', { toolName, toolCallId })
+
+            // Open form for tool_create
+            if (toolName === 'tool_create') {
+              console.log('📂 Opening tool form drawer for tool_create')
+              toolFormDrawerRef.current?.resetForm()
+              setToolFormDrawerOpen(true)
+            }
+            break
+          }
+
           case 'open_tool_form': {
             const form = (payload as any).formData || (payload as any).data || {}
             ensureOpenThen(() => {
@@ -273,6 +288,47 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // ignore
     }
   }, [currentConversationId, lastUIAction, handleUIPayload])
+
+  // Stream tool arguments into form as they arrive
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length || !toolFormDrawerOpen) return
+
+    // Find the last assistant message with streaming toolCalls (reverse iteration)
+    let lastAssistant: any = null
+    for (let i = liveMessages.length - 1; i >= 0; i--) {
+      const m = liveMessages[i]
+      if (m.role === 'assistant' && (m as any).streaming === true) {
+        lastAssistant = m
+        break
+      }
+    }
+
+    if (!lastAssistant || !(lastAssistant as any).toolCalls) return
+
+    const toolCalls = (lastAssistant as any).toolCalls || []
+    const toolCreateCall = toolCalls.find((tc: any) => tc?.function?.name === 'tool_create')
+
+    if (toolCreateCall && toolCreateCall.function?.arguments) {
+      const args = toolCreateCall.function.arguments
+      console.log('📥 Streaming tool_create arguments into form:', args)
+
+      // Update form fields as they become available
+      if (args.name && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('name', args.name)
+      }
+      if (args.description && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('description', args.description)
+      }
+      if (args.parameters && toolFormDrawerRef.current) {
+        const paramsStr = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
+        toolFormDrawerRef.current.updateField('parameters', paramsStr)
+      }
+      if (args.blueprint && toolFormDrawerRef.current) {
+        const blueprintStr = typeof args.blueprint === 'string' ? args.blueprint : JSON.stringify(args.blueprint, null, 2)
+        toolFormDrawerRef.current.updateField('blueprint', blueprintStr)
+      }
+    }
+  }, [currentConversationId, liveMessages, toolFormDrawerOpen])
 
   // Register tool form controller for programmatic access
   useEffect(() => {

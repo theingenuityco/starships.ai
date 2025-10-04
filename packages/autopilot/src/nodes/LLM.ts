@@ -307,40 +307,78 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
-   * Normalize OpenAI SDK chunks to use camelCase toolCalls
+   * Normalize OpenAI SDK chunks to use camelCase throughout
+   * Converts: finish_reason → finishReason, tool_calls → toolCalls, etc.
    * This ensures compatibility with ConversationService expectations
    */
-  private normalizeChunkToolCalls(chunk: OpenAI.Chat.Completions.ChatCompletionChunk): OpenAI.Chat.Completions.ChatCompletionChunk {
+  private normalizeChunkToolCalls(chunk: OpenAI.Chat.Completions.ChatCompletionChunk): Record<string, unknown> {
     if (!chunk.choices || !Array.isArray(chunk.choices)) {
-      return chunk;
+      return chunk as unknown as Record<string, unknown>;
     }
 
     const normalizedChoices = chunk.choices.map((choice) => {
-      if (!choice.delta || typeof choice.delta !== 'object') {
-        return choice;
+      const normalized: Record<string, unknown> = {
+        index: choice.index,
+      };
+
+      // Normalize finish_reason → finishReason
+      if (choice.finish_reason) {
+        normalized.finishReason = choice.finish_reason;
       }
 
-      const delta = choice.delta as Record<string, unknown>;
+      // Normalize delta object
+      if (choice.delta && typeof choice.delta === 'object') {
+        const delta = choice.delta as Record<string, unknown>;
+        const normalizedDelta: Record<string, unknown> = {};
 
-      // If tool_calls exists, convert to toolCalls
-      if ('tool_calls' in delta && Array.isArray(delta.tool_calls)) {
-        const { tool_calls, ...rest } = delta;
-        return {
-          ...choice,
-          delta: {
-            ...rest,
-            toolCalls: tool_calls,
-          },
-        };
+        // Copy standard fields
+        if (delta.content) normalizedDelta.content = delta.content;
+        if (delta.role) normalizedDelta.role = delta.role;
+
+        // Normalize tool_calls → toolCalls
+        if ('tool_calls' in delta && Array.isArray(delta.tool_calls)) {
+          normalizedDelta.toolCalls = delta.tool_calls;
+        }
+
+        // Handle any other delta fields
+        Object.keys(delta).forEach((key) => {
+          if (!['content', 'role', 'tool_calls'].includes(key)) {
+            normalizedDelta[key] = delta[key];
+          }
+        });
+
+        normalized.delta = normalizedDelta;
       }
 
-      return choice;
+      return normalized;
     });
 
+    // Normalize usage from snake_case to camelCase
+    let normalizedUsage: Record<string, unknown> | undefined;
+    if (chunk.usage) {
+      normalizedUsage = {
+        promptTokens: chunk.usage.prompt_tokens ?? 0,
+        completionTokens: chunk.usage.completion_tokens ?? 0,
+        totalTokens: chunk.usage.total_tokens ?? 0,
+        ...(typeof chunk.usage.completion_tokens_details === 'object' && chunk.usage.completion_tokens_details !== null
+          ? {
+              completionTokensDetails: {
+                reasoningTokens: (chunk.usage.completion_tokens_details as Record<string, unknown>).reasoning_tokens ?? 0,
+              },
+            }
+          : {}),
+      };
+    }
+
     return {
-      ...chunk,
+      id: chunk.id,
+      object: chunk.object,
+      created: chunk.created,
+      model: chunk.model,
       choices: normalizedChoices,
-    } as OpenAI.Chat.Completions.ChatCompletionChunk;
+      // Include normalized usage if present
+      ...(normalizedUsage ? { usage: normalizedUsage } : {}),
+    };
   }
 
   /**

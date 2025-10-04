@@ -295,6 +295,12 @@ export class LLM extends BaseNode<LlmParams> {
         if (functionName && typeof functionName === 'string' && toolCallId && !this.emittedToolCalls.has(toolCallId)) {
           this.emittedToolCalls.add(toolCallId);
 
+          console.log('[LLM] 🎯 Emitting tool_call_detected:', {
+            toolCallId,
+            toolName: functionName,
+            executionDepth,
+          });
+
           await eventCallback({
             type: 'tool_call_detected',
             timestamp: new Date().toISOString(),
@@ -304,6 +310,8 @@ export class LLM extends BaseNode<LlmParams> {
               toolName: functionName,
             },
           });
+
+          console.log('[LLM] ✅ tool_call_detected event emitted');
         }
       }
     }

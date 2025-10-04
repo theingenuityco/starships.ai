@@ -375,11 +375,19 @@ export class LLM extends BaseNode<LlmParams> {
             if (t.id) target.id = t.id;
             if (t.function?.name) target.function.name = t.function.name;
             if (t.function?.arguments) {
+              const beforeLength = target.function.arguments?.length || 0;
               target.function.arguments = (target.function.arguments || '') + t.function.arguments;
+              console.log(
+                `[LLM STREAMING] Delta tool call args accumulated: ${beforeLength} -> ${target.function.arguments.length} (+${t.function.arguments.length})`
+              );
               // Note: JSON parsing is deferred to buildFinalResponse to avoid parsing incomplete JSON
             }
           }
         } else if (hasMessageToolCalls) {
+          const messageArgsLength = messageToolCalls[0]?.function?.arguments?.length || 0;
+          console.log(
+            `[LLM STREAMING] Message snapshot tool calls received with args length: ${messageArgsLength}, existing accumulated: ${choices[index].toolCalls?.length || 0} calls`
+          );
           type NormalizedToolCall = { id?: string; function: { name?: string; arguments: string; argumentsJson?: unknown } };
           const normalized: NormalizedToolCall[] = messageToolCalls.map((tc) => {
             const args = typeof tc.function?.arguments === 'string' ? tc.function.arguments : '';
@@ -420,10 +428,12 @@ export class LLM extends BaseNode<LlmParams> {
             (tc): tc is { id?: string; function: { name: string; arguments: string } } =>
               typeof tc.function.name === 'string' && tc.function.name.length > 0
           );
-          if (!choices[index].toolCalls) {
-            choices[index].toolCalls = [];
+          // Only replace toolCalls if we haven't been accumulating deltas
+          // This prevents overwriting properly accumulated delta data with potentially truncated message snapshots
+          if (!choices[index].toolCalls || choices[index].toolCalls.length === 0) {
+            choices[index].toolCalls = valid;
           }
-          choices[index].toolCalls = valid;
+          // Otherwise, keep the accumulated delta data which is more complete
         }
 
         if (finishReason) {
@@ -572,65 +582,85 @@ export class LLM extends BaseNode<LlmParams> {
       object: metadata.object,
       created: metadata.created,
       model: metadata.model,
-      choices: choices.map((choice, index) => ({
-        index,
-        message: {
-          role: 'assistant' as LLMMessageRole,
-          content: choice.content,
-          ...(choice.reasoning ? { reasoning: choice.reasoning } : {}),
-          ...(choice.reasoningDetails ? { reasoningDetails: choice.reasoningDetails } : {}),
-          ...(choice.toolCalls && choice.toolCalls.some(isValidToolCall)
-            ? {
-                toolCalls: (choice.toolCalls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
-                  // Parse accumulated arguments string to object for LlmFunctionCall.arguments
-                  const argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : '';
-                  let argsObj: unknown = {};
-                  if (argsStr) {
-                    try {
-                      let s = argsStr.replace(/\r/g, '').trim();
-                      let parsed = false;
-                      for (let k = 0; k < 3; k++) {
-                        const first = s[0],
-                          last = s[s.length - 1];
-                        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-                          s = s.slice(1, -1);
-                        }
-                        try {
-                          const result = JSON.parse(s);
-                          if (result && typeof result === 'object') {
-                            argsObj = result as unknown;
-                            parsed = true;
-                            break;
+      choices: choices.map((choice, index) => {
+        // Log accumulated tool call arguments before final parsing
+        if (choice.toolCalls && choice.toolCalls.length > 0) {
+          choice.toolCalls.forEach((tc, idx) => {
+            const argsLength = typeof tc.function?.arguments === 'string' ? tc.function.arguments.length : 0;
+            console.log(`[LLM FINAL] Tool call ${idx} '${tc.function.name}' has ${argsLength} chars accumulated before parse`);
+          });
+        }
+
+        return {
+          index,
+          message: {
+            role: 'assistant' as LLMMessageRole,
+            content: choice.content,
+            ...(choice.reasoning ? { reasoning: choice.reasoning } : {}),
+            ...(choice.reasoningDetails ? { reasoningDetails: choice.reasoningDetails } : {}),
+            ...(choice.toolCalls && choice.toolCalls.some(isValidToolCall)
+              ? {
+                  toolCalls: (choice.toolCalls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
+                    // Parse accumulated arguments string to object for LlmFunctionCall.arguments
+                    const argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : '';
+                    let argsObj: unknown = {};
+
+                    if (argsStr && argsStr.length > 0) {
+                      try {
+                        // Try direct parse first
+                        argsObj = JSON.parse(argsStr);
+                        console.log(`[LLM FINAL] Successfully parsed ${argsStr.length} chars for tool '${tc.function.name}'`);
+                      } catch (parseError) {
+                        console.error(`[LLM FINAL] Failed to parse tool '${tc.function.name}' arguments:`, {
+                          argsLength: argsStr.length,
+                          argsPreview: argsStr.substring(0, 100),
+                          argsSuffix: argsStr.substring(Math.max(0, argsStr.length - 100)),
+                          error: parseError instanceof Error ? parseError.message : String(parseError),
+                        });
+
+                        // Try fallback parsing with quote stripping
+                        let s = argsStr.replace(/\r/g, '').trim();
+                        let parsed = false;
+                        for (let k = 0; k < 3; k++) {
+                          const first = s[0],
+                            last = s[s.length - 1];
+                          if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                            s = s.slice(1, -1);
                           }
-                        } catch {
-                          /* ignore */
+                          try {
+                            const result = JSON.parse(s);
+                            if (result && typeof result === 'object') {
+                              argsObj = result as unknown;
+                              parsed = true;
+                              console.log(`[LLM FINAL] Fallback parse succeeded after ${k + 1} quote strip attempts`);
+                              break;
+                            }
+                          } catch {
+                            /* ignore */
+                          }
+                        }
+                        if (!parsed) {
+                          console.error(`[LLM FINAL] All parse attempts failed for tool '${tc.function.name}', using empty object`);
+                          argsObj = {};
                         }
                       }
-                      if (!parsed) {
-                        const result = JSON.parse(s);
-                        if (result && typeof result === 'object') {
-                          argsObj = result as unknown;
-                        }
-                      }
-                    } catch {
-                      // If parsing fails, use empty object
-                      argsObj = {};
                     }
-                  }
-                  return {
-                    id: tc.id || `call_${index}_${i}`,
-                    type: 'function',
-                    function: {
-                      name: tc.function.name, // guaranteed string by isValidToolCall
-                      arguments: argsObj, // Parsed object per LlmFunctionCall type
-                    },
-                  };
-                }),
-              }
-            : {}),
-        },
-        finishReason: choice.finishReason || 'stop',
-      })),
+
+                    return {
+                      id: tc.id || `call_${index}_${i}`,
+                      type: 'function',
+                      function: {
+                        name: tc.function.name, // guaranteed string by isValidToolCall
+                        arguments: argsObj, // Parsed object per LlmFunctionCall type
+                      },
+                    };
+                  }),
+                }
+              : {}),
+          },
+          finishReason: choice.finishReason || 'stop',
+        };
+      }),
       usage: normalizedUsage,
     };
   }

@@ -37,6 +37,16 @@ export interface StreamingHeartbeat {
 }
 
 /**
+ * UI action payload for out-of-band UI instructions over SSE
+ */
+export interface UIActionPayload {
+  __ui_action: 'open_tool_form' | 'update_tool_form' | 'submit_tool_form' | 'close_tool_form';
+  formData?: Record<string, unknown>;
+  patch?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+}
+
+/**
  * Union type of all possible streaming events
  */
 export type StreamingEvent =
@@ -44,6 +54,7 @@ export type StreamingEvent =
   | { type: 'heartbeat'; data: StreamingHeartbeat }
   | { type: 'delta'; data: Operation }
   | { type: 'message'; data: MessageModel }
+  | { type: 'ui_action'; data: UIActionPayload }
   | { type: 'complete'; data: void }
   | { type: 'error'; data: StreamingError };
 
@@ -66,4 +77,4 @@ export interface StreamingState {
 /**
  * SSE event types
  */
-export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'message' | 'complete' | 'error';
+export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'message' | 'ui_action' | 'complete' | 'error';

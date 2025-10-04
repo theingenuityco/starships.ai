@@ -8,8 +8,9 @@ import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
-import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
+import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -27,6 +28,8 @@ interface ConversationMessageInputProps {
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   onMessageSent?: () => void // Simplified callback for UI state updates
+  onToggleToolForm?: () => void // Callback to toggle tool form drawer
+  isToolFormOpen?: boolean // Current state of tool form drawer
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
@@ -38,7 +41,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onToggleToolForm, isToolFormOpen = false, disabled = false, minimal = false, children }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -303,6 +306,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         >
           {/* Main Input Section - Only Text Input */}
           <div className={cn('flex items-end', minimal ? 'p-3' : 'p-4')}>
+            {/* Minimal mode: Tool button on left */}
+            {minimal && onToggleToolForm && (
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onToggleToolForm}
+                    className={cn(
+                      'h-8 w-8 rounded-full shrink-0 transition-colors mr-2',
+                      isToolFormOpen ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+                    )}
+                    disabled={disabled || isStreamingEffective}
+                  >
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
+                  {isToolFormOpen ? 'Close Tool Form' : 'Create Tool'}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Text Input */}
             <div className="flex-1 min-w-0">
               <textarea
@@ -324,7 +350,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               />
             </div>
 
-            {/* Minimal mode: Send button inline */}
+            {/* Minimal mode: Send button on right */}
             {minimal && (
               <Button
                 onClick={handleSubmit}
@@ -344,28 +370,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           {!minimal && (
             <div className="border-t border-border/20 bg-muted/10 px-4 py-3">
               <div className="flex items-center justify-between">
-                {/* Left Side - Selectors */}
-                <div className="flex items-center gap-3">{children}</div>
+                {/* Left Side - Selectors and Tool Button */}
+                <div className="flex items-center gap-3">
+                  {children}
+                  {/* Create Tool Button */}
+                  {onToggleToolForm && (
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={onToggleToolForm}
+                          className={cn(
+                            'h-8 w-8 rounded-full shrink-0 transition-colors',
+                            isToolFormOpen ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+                          )}
+                          disabled={disabled || isStreamingEffective}
+                        >
+                          <Wrench className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
+                        {isToolFormOpen ? 'Close Tool Form' : 'Create Tool'}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
 
-                {/* Right Side - Action Buttons */}
+                {/* Right Side - Send Button */}
                 <div className="flex items-center gap-2">
-                  {/* File Attachment */}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled || isStreamingEffective}>
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-
-                  {/* Voice Recording */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleVoiceToggle}
-                    className={cn('h-8 w-8 rounded-full shrink-0 transition-colors', isRecording ? 'text-red-500 hover:text-red-600 bg-red-500/10' : 'text-muted-foreground hover:text-foreground')}
-                    disabled={disabled || isStreamingEffective}
-                  >
-                    {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </Button>
-
-                  {/* Send Button */}
                   <Button
                     onClick={handleSubmit}
                     disabled={!canSend}

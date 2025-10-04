@@ -9,6 +9,8 @@ export { echoToolTemplate } from './echo';
 export { wikipediaToolTemplate } from './wikipedia';
 export { duckduckgoToolTemplate } from './duckduckgo';
 export { openalexToolTemplate } from './openalex';
+export { braveSearchToolTemplate } from './brave-search';
+export { firecrawlToolTemplate } from './firecrawl';
 export { toolListToolTemplate } from './tool-list';
 export { toolGetToolTemplate } from './tool-get';
 export { toolCreateToolTemplate } from './tool-create';
@@ -25,6 +27,8 @@ import { echoToolTemplate } from './echo';
 import { wikipediaToolTemplate } from './wikipedia';
 import { duckduckgoToolTemplate } from './duckduckgo';
 import { openalexToolTemplate } from './openalex';
+import { braveSearchToolTemplate } from './brave-search';
+import { firecrawlToolTemplate } from './firecrawl';
 import { toolListToolTemplate } from './tool-list';
 import { toolGetToolTemplate } from './tool-get';
 import { toolCreateToolTemplate } from './tool-create';
@@ -41,6 +45,8 @@ export const ALL_TOOL_TEMPLATES = [
   wikipediaToolTemplate,
   duckduckgoToolTemplate,
   openalexToolTemplate,
+  braveSearchToolTemplate,
+  firecrawlToolTemplate,
   toolListToolTemplate,
   toolGetToolTemplate,
   toolCreateToolTemplate,

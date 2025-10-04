@@ -239,10 +239,23 @@ export abstract class BaseRepository {
     const { id: _id, ...propsWithoutId } = properties;
     const propsWithGeneratedId = { ...propsWithoutId, id: generatedId };
 
+    // Process JSON fields properly
+    const processedProps: Record<string, unknown> = {};
+    const jsonFields = ['parameters', 'blueprint', 'configuration_fields', 'transforms', 'mutations'];
+    
+    for (const [key, value] of Object.entries(propsWithGeneratedId)) {
+      if (jsonFields.includes(key) && value !== null && value !== undefined) {
+        // Serialize objects/arrays to JSON strings for JSONB columns
+        processedProps[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      } else {
+        processedProps[key] = value;
+      }
+    }
+
     // Build column names and placeholders
-    const columns = Object.keys(propsWithGeneratedId);
+    const columns = Object.keys(processedProps);
     const placeholders = columns.map((_, index) => `$${index + 1}`);
-    const values = Object.values(propsWithGeneratedId);
+    const values = Object.values(processedProps);
 
     const query = `
       INSERT INTO ${tableName} (${columns.join(', ')})
@@ -275,12 +288,24 @@ export abstract class BaseRepository {
     const { id: _updateId, ...updateProps } = updates;
     const propsWithTimestamp = { ...updateProps, updated_at: new Date().toISOString() };
 
-    // Build SET clause
-    const setClause = Object.keys(propsWithTimestamp)
+    // Build SET clause and properly serialize JSON fields
+    const processedProps: Record<string, unknown> = {};
+    const jsonFields = ['parameters', 'blueprint', 'configuration_fields', 'transforms', 'mutations'];
+    
+    for (const [key, value] of Object.entries(propsWithTimestamp)) {
+      if (jsonFields.includes(key) && value !== null && value !== undefined) {
+        // Serialize objects/arrays to JSON strings for JSONB columns
+        processedProps[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      } else {
+        processedProps[key] = value;
+      }
+    }
+
+    const setClause = Object.keys(processedProps)
       .map((key, index) => `${key} = $${index + 2}`)
       .join(', ');
 
-    const values = [id, ...Object.values(propsWithTimestamp)];
+    const values = [id, ...Object.values(processedProps)];
 
     const query = `
       UPDATE ${tableName}

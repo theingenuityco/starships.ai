@@ -64,15 +64,24 @@ describe('LLM Node Handler', () => {
           id: 'test-123',
           model: 'anthropic/claude-3.5-sonnet',
           created: 1234567890,
-          choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: null }],
-        },
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
-          choices: [{ index: 0, delta: { content: ' there!' }, finish_reason: null }],
-        },
+          id: 'test-123',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: ' there!' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+          id: 'test-123',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
           usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-        },
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
       mockCreate.mockResolvedValue(mockStream);
@@ -121,11 +130,19 @@ describe('LLM Node Handler', () => {
       // Mock simple response
       const mockStream = createMockStream([
         {
-          choices: [{ index: 0, delta: { content: 'Test response' }, finish_reason: null }],
-        },
+          id: 'test-456',
+          model: 'openai/gpt-4-turbo',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'Test response' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-        },
+          id: 'test-456',
+          model: 'openai/gpt-4-turbo',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
       mockCreate.mockResolvedValue(mockStream);
@@ -209,11 +226,19 @@ describe('LLM Node Handler', () => {
       // Simulate stream that has some valid chunks
       const mockStream = createMockStream([
         {
-          choices: [{ index: 0, delta: { content: 'Recovery' }, finish_reason: null }],
-        },
+          id: 'test-recovery',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'Recovery' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-        },
+          id: 'test-recovery',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
       mockCreate.mockResolvedValue(mockStream);
@@ -323,17 +348,25 @@ describe('LLM Node Handler', () => {
 
       const mockStream = createMockStream([
         {
+          id: 'test-multi',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
           choices: [
-            { index: 0, delta: { content: 'Choice 1' }, finish_reason: null },
-            { index: 1, delta: { content: 'Choice 2' }, finish_reason: null },
+            { index: 0, delta: { content: 'Choice 1' }, finish_reason: null, logprobs: null },
+            { index: 1, delta: { content: 'Choice 2' }, finish_reason: null, logprobs: null },
           ],
-        },
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
+          id: 'test-multi',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
           choices: [
-            { index: 0, delta: {}, finish_reason: 'stop' },
-            { index: 1, delta: {}, finish_reason: 'stop' },
+            { index: 0, delta: {}, finish_reason: 'stop', logprobs: null },
+            { index: 1, delta: {}, finish_reason: 'stop', logprobs: null },
           ],
-        },
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
       mockCreate.mockResolvedValue(mockStream);
@@ -359,11 +392,16 @@ describe('LLM Node Handler', () => {
           id: 'test-non-stream',
           model: 'anthropic/claude-3.5-sonnet',
           created: Date.now(),
-          choices: [{ index: 0, delta: { content: 'Non-streaming response' }, finish_reason: null }],
-        },
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'Non-streaming response' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-        },
+          id: 'test-non-stream',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: Date.now(),
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
       mockCreate.mockResolvedValue(mockStream);

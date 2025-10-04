@@ -189,7 +189,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
             {/* Form Sections */}
             <div className="space-y-6 border-t border-border/40 pt-6">
               {/* Basic Information */}
-              <div>
+              <div className="px-1">
                 <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Sparkles className="w-5 h-5 text-primary" />
                   Basic Information
@@ -251,7 +251,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
               </div>
 
               {/* Configuration */}
-              <div>
+              <div className="px-1">
                 <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Package className="w-5 h-5 text-primary" />
                   Configuration
@@ -282,7 +282,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
               </div>
 
               {/* Technical Details */}
-              <div>
+              <div className="px-1">
                 <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Bot className="w-5 h-5 text-primary" />
                   Technical Details

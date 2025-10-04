@@ -7,7 +7,7 @@
 
 import type { UserModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
+import { IsEmail, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the UserEntity
@@ -131,16 +131,6 @@ export class UserEntity implements UserModel {
   @Length(6, 255) // Minimum password length for security
   password?: string;
 
-  // Stripe integration
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  @Matches(/^cus_[a-zA-Z0-9]+$/, {
-    message: 'Stripe Customer ID must be in format: cus_xxxxxxxx',
-  })
-  stripeCustomerId?: string;
-
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -161,7 +151,6 @@ export class UserEntity implements UserModel {
         displayName: dataRecord.displayName,
         avatar: dataRecord.avatar,
         password: dataRecord.password,
-        stripeCustomerId: dataRecord.stripeCustomerId,
         ...dataRecord,
       });
     } else {
@@ -186,13 +175,6 @@ export class UserEntity implements UserModel {
    */
   hasCompleteProfile(): boolean {
     return !!(this.email && this.displayName);
-  }
-
-  /**
-   * Helper method to check if user has Stripe integration
-   */
-  hasStripeIntegration(): boolean {
-    return !!this.stripeCustomerId;
   }
 
   /**

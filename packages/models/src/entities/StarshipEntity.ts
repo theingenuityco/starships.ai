@@ -5,9 +5,9 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
+import type { StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the StarshipEntity
@@ -95,29 +95,6 @@ export class StarshipEntity implements StarshipModel {
   @IsISO8601()
   updatedAt!: string;
 
-  // Stripe integration fields
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  subscriptionId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsEnum(['scout', 'cruiser', 'draught'])
-  plan?: StarshipClass;
-
-  @Expose()
-  @IsOptional()
-  @IsEnum(['monthly', 'yearly'])
-  billingPeriod?: BillingPeriod;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  stripeCustomerId?: string;
-
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -141,10 +118,6 @@ export class StarshipEntity implements StarshipModel {
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        subscriptionId: dataRecord.subscriptionId,
-        plan: dataRecord.plan,
-        billingPeriod: dataRecord.billingPeriod,
-        stripeCustomerId: dataRecord.stripeCustomerId,
         ...dataRecord,
       });
     } else {
@@ -230,31 +203,6 @@ export class StarshipEntity implements StarshipModel {
    */
   isNew(): boolean {
     return this.getAgeInDays() <= 7;
-  }
-
-  /**
-   * Helper method to check if starship has Stripe integration
-   */
-  hasStripeIntegration(): boolean {
-    return !!(this.subscriptionId || this.stripeCustomerId);
-  }
-
-  /**
-   * Helper method to check if starship is on a paid plan
-   */
-  isPaidPlan(): boolean {
-    return this.class !== 'scout' || this.hasStripeIntegration();
-  }
-
-  /**
-   * Helper method to get billing display info
-   */
-  getBillingInfo(): { plan: string; period?: string; status: string } {
-    return {
-      plan: this.plan ? this.getClassDisplayName() : this.getClassDisplayName(),
-      period: this.billingPeriod ? (this.billingPeriod === 'monthly' ? 'Monthly' : 'Yearly') : undefined,
-      status: this.getStatusDisplayName(),
-    };
   }
 
   /**

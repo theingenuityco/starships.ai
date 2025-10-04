@@ -499,9 +499,6 @@ importers:
       openai:
         specifier: ^5.8.4
         version: 5.10.1(ws@8.18.3)(zod@4.1.5)
-      stripe:
-        specifier: ^18.4.0
-        version: 18.4.0(@types/node@22.16.0)
       ws:
         specifier: ^8.18.3
         version: 8.18.3
@@ -5521,15 +5518,6 @@ packages:
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
-
-  stripe@18.4.0:
-    resolution: {integrity: sha512-LKFeDnDYo4U/YzNgx2Lc9PT9XgKN0JNF1iQwZxgkS4lOw5NunWCnzyH5RhTlD3clIZnf54h7nyMWkS8VXPmtTQ==}
-    engines: {node: '>=12.*'}
-    peerDependencies:
-      '@types/node': '>=12.x.x'
-    peerDependenciesMeta:
-      '@types/node':
-        optional: true
 
   style-to-js@1.1.17:
     resolution: {integrity: sha512-xQcBGDxJb6jjFCTzvQtfiPn6YvvP2O8U1MDIPNfJQlWMYfktPy+iGsHE7cssjs7y84d9fQaK4UF3RIJaAHSoYA==}
@@ -11929,12 +11917,6 @@ snapshots:
   strip-json-comments@2.0.1: {}
 
   strip-json-comments@3.1.1: {}
-
-  stripe@18.4.0(@types/node@22.16.0):
-    dependencies:
-      qs: 6.14.0
-    optionalDependencies:
-      '@types/node': 22.16.0
 
   style-to-js@1.1.17:
     dependencies:

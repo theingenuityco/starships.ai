@@ -1,15 +1,14 @@
 # @starships/server
 
-Production-ready Express.js API server powering the starships.ai platform. Features starship management, workflow orchestration, agent deployment, conversation handling, and Stripe billing with comprehensive security and monitoring.
+Production-ready Express.js API server powering the starships.ai platform. Features starship management, workflow orchestration, agent deployment, conversation handling, and comprehensive security and monitoring.
 
 ## 🚀 Features
 
-- **Starship Management**: Complete CRUD operations with subscription billing and agent deployment
+- **Starship Management**: Complete CRUD operations with agent deployment
 - **Workflow Orchestration**: Advanced workflow planning and execution with AI-powered orchestrators
 - **Agent Marketplace**: Agent creation, templates, and deployment management
 - **Conversation System**: Chat interfaces with message history and structured logging
 - **Workflow Integration**: Integration with autopilot workflow execution system
-- **Stripe Integration**: Complete subscription billing with webhook idempotency and portal management
 - **JWT Authentication**: Secure authentication with middleware protection
 - **Waitlist Management**: Early access user onboarding system
 - **Health Monitoring**: Comprehensive health checks and system metrics
@@ -51,10 +50,8 @@ src/
 │   ├── starships.ts           # Starship CRUD and billing operations
 │   ├── users.ts               # User management endpoints
 │   ├── waitlist.ts            # Waitlist management endpoints
-│   └── webhooks.ts            # Stripe webhook handling
 ├── services/
 │   ├── StarshipService.ts            # Starship lifecycle management
-│   ├── SubscriptionService.ts        # Stripe subscription management
 │   └── (other services as needed)
 ├── middleware/
 │   ├── auth.ts                       # Authentication middleware
@@ -399,33 +396,6 @@ Content-Type: application/json
 
 All communication is handled through REST API endpoints with JSON request/response format.
 
-### Stripe Billing Integration
-
-#### Stripe Webhook
-
-```http
-POST /webhooks/stripe
-Stripe-Signature: <webhook-signature>
-Content-Type: application/json
-
-{
-  "type": "checkout.session.completed",
-  "data": {
-    "object": {
-      "subscription": "sub_1234567890",
-      "customer": "cus_1234567890"
-    }
-  }
-}
-```
-
-**Features:**
-
-- Idempotency protection for webhook events
-- Automatic subscription status updates
-- Payment failure handling and retries
-- Billing portal integration
-
 ### Comprehensive Health Monitoring
 
 #### Detailed Health Check
@@ -443,10 +413,6 @@ GET /health/detailed
     "database": {
       "status": "healthy",
       "latency": 12
-    },
-    "stripe": {
-      "status": "healthy",
-      "lastWebhook": "2024-01-15T10:25:00Z"
     }
   },
   "metrics": {
@@ -489,9 +455,6 @@ JWT_SECRET=your_jwt_secret_key_32_chars_min
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRODUCT_SCOUT_ID=prod_scout_...
-STRIPE_PRODUCT_CRUISER_ID=prod_cruiser_...
-STRIPE_PRODUCT_DRAUGHT_ID=prod_draught_...
 
 # Native Tool APIs (for encrypted storage)
 FIRECRAWL_API_KEY=your_firecrawl_key
@@ -875,7 +838,6 @@ node --inspect-brk dist/index.js
 ### Core Dependencies
 
 - **express**: Web framework for Node.js
-- **stripe**: Payment processing and subscription management
 - **jose**: JWT token validation and management
 - **@starships/autopilot**: Workflow execution engine with AI integration
 - **@starships/models**: PostgreSQL database with migration system

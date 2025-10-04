@@ -9,11 +9,7 @@
     "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc --build && tsc-alias -p tsconfig.json",
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts",
-    "stripe:setup": "tsx scripts/setup-stripe.ts",
-    "stripe:setup:dev": "NODE_ENV=development tsx scripts/setup-stripe.ts",
-    "stripe:listen": "stripe listen --forward-to localhost:4000/webhooks/stripe",
-    "stripe:trigger": "stripe trigger checkout.session.completed"
+    "lint": "eslint src --ext .ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
@@ -38,7 +34,6 @@
     "jose": "^6.0.11",
     "lodash": "^4.17.21",
     "openai": "^5.8.4",
-    "stripe": "^18.4.0",
     "ws": "^8.18.3",
     "zod": "^4.1.5"
   },

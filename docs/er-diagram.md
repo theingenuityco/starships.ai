@@ -17,7 +17,6 @@ erDiagram
         string display_name
         string avatar
         string password
-        string stripe_customer_id UK
         timestamp created_at
         timestamp updated_at
     }
@@ -30,10 +29,6 @@ erDiagram
         string name
         int max_agents "Class-based limits"
         string status "active|inactive|restricted|disabled|pending_payment"
-        string subscription_id UK
-        string plan "scout|cruiser|draught"
-        string billing_period "monthly|yearly"
-        string stripe_customer_id
         timestamp created_at
         timestamp updated_at
     }

@@ -171,17 +171,34 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
       <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl !p-0" hideOverlay onInteractOutside={e => e.preventDefault()}>
         <ScrollArea className="h-full p-6">
           <div className="space-y-6">
-            <SheetHeader className="space-y-4">
-              {/* Main Header with Icon and Title */}
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 p-4 rounded-xl bg-primary/10 border border-primary/20 transition-all hover:bg-primary/20 hover:border-primary/30">
+            <SheetHeader className="space-y-4 overflow-visible">
+              {/* Main Header with Icon and Editable Title */}
+              <div className="flex items-start gap-4 overflow-visible">
+                <div className="flex-shrink-0 p-4 rounded-xl bg-primary/10 border border-primary/20 transition-all hover:bg-primary/20 hover:border-primary/30 mt-1.5">
                   <Wrench className="w-8 h-8 text-primary" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-2xl font-bold text-left mb-2 text-foreground">Create Tool</SheetTitle>
-                  <SheetDescription className="text-left text-base leading-relaxed text-muted-foreground">
-                    Configure your tool with the details below. Fill in all required fields to create a custom tool for your starship.
-                  </SheetDescription>
+                <div className="flex-1 space-y-2 overflow-visible">
+                  <div className="px-1.5 pt-1.5">
+                    <Input
+                      id="tool-name-header"
+                      placeholder="Enter tool name..."
+                      value={formData.name}
+                      onChange={e => handleFieldChange('name', e.target.value)}
+                      className={`text-2xl font-bold h-auto py-2 px-3 ${errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    />
+                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name}</p>}
+                  </div>
+                  <div className="px-1.5 pb-1.5">
+                    <Textarea
+                      id="tool-description-header"
+                      placeholder="Describe what this tool does..."
+                      value={formData.description}
+                      onChange={e => handleFieldChange('description', e.target.value)}
+                      className={`text-base resize-none ${errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      rows={2}
+                    />
+                    {errors.description && <p className="text-sm text-destructive mt-1">{errors.description}</p>}
+                  </div>
                 </div>
               </div>
             </SheetHeader>
@@ -195,37 +212,6 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                   Basic Information
                 </h3>
                 <div className="space-y-4">
-                  {/* Tool Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tool-name" className="text-foreground">
-                      Tool Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="tool-name"
-                      placeholder="e.g., Weather Lookup"
-                      value={formData.name}
-                      onChange={e => handleFieldChange('name', e.target.value)}
-                      className={errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
-                    />
-                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-                  </div>
-
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tool-description" className="text-foreground">
-                      Description <span className="text-destructive">*</span>
-                    </Label>
-                    <Textarea
-                      id="tool-description"
-                      placeholder="Describe what this tool does..."
-                      value={formData.description}
-                      onChange={e => handleFieldChange('description', e.target.value)}
-                      className={errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}
-                      rows={3}
-                    />
-                    {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
-                  </div>
-
                   {/* Category */}
                   <div className="space-y-2">
                     <Label htmlFor="tool-category" className="text-foreground">

@@ -56,18 +56,31 @@ export class LLM extends BaseNode<LlmParams> {
         },
       });
 
-      // Prepare request options - ensure all numeric params are actually numbers
+      // Prepare request options - only include params that are explicitly provided
+      // This allows OpenRouter/model providers to use their own defaults
       const requestOptions: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
         model: params.model,
         messages: (messages || params.messages) as OpenAI.Chat.ChatCompletionMessageParam[],
-        temperature: typeof params.temperature === 'number' ? params.temperature : 0.7,
-        max_tokens: typeof params.maxTokens === 'number' ? params.maxTokens : 1024,
-        top_p: typeof params.topP === 'number' ? params.topP : 1.0,
-        frequency_penalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : 0,
-        presence_penalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : 0,
         stream: true,
         stream_options: { include_usage: true }, // OpenRouter usage accounting
       };
+
+      // Only add optional parameters if explicitly provided
+      if (typeof params.temperature === 'number') {
+        requestOptions.temperature = params.temperature;
+      }
+      if (typeof params.maxTokens === 'number') {
+        requestOptions.max_tokens = params.maxTokens;
+      }
+      if (typeof params.topP === 'number') {
+        requestOptions.top_p = params.topP;
+      }
+      if (typeof params.frequencyPenalty === 'number') {
+        requestOptions.frequency_penalty = params.frequencyPenalty;
+      }
+      if (typeof params.presencePenalty === 'number') {
+        requestOptions.presence_penalty = params.presencePenalty;
+      }
 
       // Add function calling support if tools are provided
       if (params.tools && Array.isArray(params.tools) && params.tools.length > 0) {

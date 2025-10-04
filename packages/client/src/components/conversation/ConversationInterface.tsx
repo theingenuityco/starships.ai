@@ -407,7 +407,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   return (
     <div
-      className="relative flex flex-col h-screen bg-background transition-all duration-300 ease-in-out"
+      className="relative flex flex-col h-screen bg-background transition-all duration-500 ease-in-out"
       style={{
         marginLeft: '5.5rem', // Account for fixed navigation (left-6 + w-16 = 1.5rem + 4rem)
         marginRight: toolFormDrawerOpen ? 'calc(min(42rem, 100vw - 3rem) + 1.5rem)' : '0',

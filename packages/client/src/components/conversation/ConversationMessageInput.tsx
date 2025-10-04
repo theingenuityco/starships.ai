@@ -28,7 +28,8 @@ interface ConversationMessageInputProps {
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   onMessageSent?: () => void // Simplified callback for UI state updates
-  onOpenToolForm?: () => void // Callback to open tool form drawer
+  onToggleToolForm?: () => void // Callback to toggle tool form drawer
+  isToolFormOpen?: boolean // Current state of tool form drawer
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
@@ -40,7 +41,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onOpenToolForm, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onToggleToolForm, isToolFormOpen = false, disabled = false, minimal = false, children }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -352,21 +353,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 {/* Right Side - Action Buttons */}
                 <div className="flex items-center gap-2">
                   {/* Create Tool Button */}
-                  {onOpenToolForm && (
+                  {onToggleToolForm && (
                     <Tooltip delayDuration={300}>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={onOpenToolForm}
-                          className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+                          onClick={onToggleToolForm}
+                          className={cn(
+                            'h-8 w-8 rounded-full shrink-0 transition-colors',
+                            isToolFormOpen ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+                          )}
                           disabled={disabled || isStreamingEffective}
                         >
                           <Wrench className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
-                        Create Tool
+                        {isToolFormOpen ? 'Close Tool Form' : 'Create Tool'}
                       </TooltipContent>
                     </Tooltip>
                   )}

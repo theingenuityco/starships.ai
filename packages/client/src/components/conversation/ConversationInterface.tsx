@@ -465,7 +465,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             starshipId={starshipId}
             conversationId={currentConversationId}
             onConversationStart={handleConversationStart}
-            onOpenToolForm={() => setToolFormDrawerOpen(true)}
+            onToggleToolForm={() => setToolFormDrawerOpen(prev => !prev)}
+            isToolFormOpen={toolFormDrawerOpen}
             disabled={!selectedAgent}
             minimal={showMessagesArea}
           >

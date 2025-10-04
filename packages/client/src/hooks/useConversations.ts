@@ -278,14 +278,8 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   // Controller to explicitly close SSE on completion or aborts
   const localController = new AbortController()
 
-  // Track post-complete lifecycle; immediately terminate stream to allow next turn
+  // Track if we've seen a complete event (for state tracking, but don't close connection)
   let seenComplete = false
-  const schedulePostCompleteEnd = () => {
-    end()
-    try {
-      localController.abort()
-    } catch {}
-  }
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
   const queue: StreamedChunk[] = []
@@ -399,38 +393,32 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             if (op === 'replace' && replaceToolCallsRe.test(path)) {
               const value = Array.isArray(raw.value) ? raw.value : []
               push({ type: 'replace_tool_calls', value })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Replace content / reasoning
             if (op === 'replace' && replaceContentRe.test(path)) {
               push({ type: 'replace_content', value: typeof raw.value === 'string' ? raw.value : '' })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Update id / updatedAt on the last assistant
             if (op === 'replace' && replaceIdRe.test(path)) {
               push({ type: 'update_last_assistant', fields: { id: String(raw.value) } as Partial<ClientMessage> })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             if (op === 'replace' && replaceUpdatedAtRe.test(path)) {
               push({ type: 'update_last_assistant', fields: { updatedAt: String(raw.value) } as Partial<ClientMessage> })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Mark streaming flag
             if (op === 'replace' && replaceStreamingRe.test(path) && raw.value === false) {
               push({ type: 'mark_last_assistant_streaming', streaming: false })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             break
@@ -439,9 +427,9 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             // Ensure we flip streaming=false before completion (UI caret off)
             push({ type: 'mark_last_assistant_streaming', streaming: false })
             push({ type: 'complete' })
-            // Allow trailing finalize patches (id/content/reasoning), then end shortly
+            // Mark that we've seen complete, but don't close the connection
+            // The connection should stay open for the entire conversation
             seenComplete = true
-            schedulePostCompleteEnd()
             break
           }
           case 'ui_action': {

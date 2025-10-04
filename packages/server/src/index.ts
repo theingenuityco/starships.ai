@@ -24,6 +24,7 @@ import { createServer } from 'http';
 import agentTemplateRoutes from '@/routes/agent-templates';
 import agentRoutes from '@/routes/agents';
 import authRoutes from '@/routes/auth';
+import billingRoutes from '@/routes/billing';
 import conversationRoutes from '@/routes/conversations';
 import environmentRoutes from '@/routes/environment';
 import messageRoutes from '@/routes/messages';
@@ -71,6 +72,8 @@ const dbConnection = createConnection({
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
 // Middleware - Order is important!
+// Stripe Checkout webhook requires raw body for signature verification
+app.use('/api/v1/credits/webhook', express.raw({ type: 'application/json' }));
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
@@ -85,6 +88,7 @@ app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1', agentRoutes);
 app.use('/api/v1', agentTemplateRoutes);
+app.use('/api/v1', billingRoutes);
 app.use('/api/v1', conversationRoutes);
 app.use('/api/v1', environmentRoutes);
 app.use('/api/v1', messageRoutes);

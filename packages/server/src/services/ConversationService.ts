@@ -670,7 +670,8 @@ export class ConversationService {
           try {
             const starship = await this.getConversationStarship(conversationId);
             if (starship) {
-              await this.usageService.createUsageForTurn({
+              // Create usage record
+              const usageRecord = await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
                 promptTokens: usagePayload.promptTokens,
@@ -679,6 +680,25 @@ export class ConversationService {
                 cost: usagePayload.cost,
                 model: usagePayload.model,
               });
+
+              // Deduct credits for usage (best effort - don't fail the turn if credit deduction fails)
+              try {
+                const { CreditService } = await import('@/services/CreditService');
+                const creditService = new CreditService();
+                await creditService.ensureBalanceRow(starship.ownerId);
+                const deductResult = await creditService.deductForUsage(starship.ownerId, usagePayload.cost, usageRecord.id);
+
+                if (!deductResult.ok) {
+                  console.warn(`[CREDITS] Insufficient balance for user ${starship.ownerId}, cost: ${usagePayload.cost}`);
+                } else {
+                  console.log(
+                    `[CREDITS] Deducted ${usagePayload.cost} credits from user ${starship.ownerId}, remaining: ${deductResult.remaining}`
+                  );
+                }
+              } catch (creditError) {
+                console.error('[CREDITS] Failed to deduct credits:', creditError);
+                // Don't fail the conversation if credit deduction fails
+              }
             }
           } catch (e) {
             console.error('[STREAMING] Failed to persist usage record:', e);

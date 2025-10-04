@@ -333,6 +333,43 @@ CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('
 -- ============================================================================
 
 -- ============================================================================
+-- USER CREDITS TABLE
+-- ============================================================================
+
+CREATE TABLE user_credits (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    balance DECIMAL(12,6) NOT NULL DEFAULT 0 CHECK (balance >= 0),
+    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id)
+);
+
+-- ============================================================================
+-- CREDIT TRANSACTIONS TABLE
+-- ============================================================================
+
+CREATE TABLE credit_transactions (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount DECIMAL(12,6) NOT NULL,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('purchase','usage','refund','promo')),
+    description TEXT,
+    stripe_payment_id VARCHAR(255),
+    usage_id VARCHAR(255) REFERENCES usage(id),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Credit indexes
+CREATE INDEX idx_user_credits_user_id ON user_credits(user_id);
+CREATE INDEX idx_credit_tx_user ON credit_transactions(user_id);
+CREATE INDEX idx_credit_tx_created ON credit_transactions(created_at DESC);
+CREATE INDEX idx_credit_tx_type ON credit_transactions(type);
+CREATE UNIQUE INDEX ux_credit_tx_stripe ON credit_transactions(stripe_payment_id) WHERE stripe_payment_id IS NOT NULL;
+
+-- ============================================================================
 -- COMMENTS FOR DOCUMENTATION
 -- ============================================================================
 
@@ -347,6 +384,8 @@ COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
 COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
+COMMENT ON TABLE user_credits IS 'User credit balances for prepaid billing';
+COMMENT ON TABLE credit_transactions IS 'Immutable ledger of all credit transactions';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';
 COMMENT ON TABLE conversation_agents IS 'Many-to-many relationship between conversations and agents';

@@ -169,6 +169,25 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { conversationId } = paramValidation;
     const { content } = bodyValidation;
 
+    // Check credit balance before processing message
+    const userId = req.user!.id;
+    const { CreditService } = await import('@/services/CreditService');
+    const creditService = new CreditService();
+
+    try {
+      const balance = await creditService.getBalance(userId);
+      if (balance <= 0) {
+        sendError(res, 'CREDIT_LIMIT_REACHED', 'Credit limit reached. Please top up to continue.', 402, {
+          action: 'GO_TO_BILLING',
+          redirectPath: '/profile?tab=billing',
+        });
+        return;
+      }
+    } catch (creditError) {
+      console.error('[CREDITS] Failed to check balance:', creditError);
+      // Continue with conversation if credit check fails (don't block on credit system issues)
+    }
+
     // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
     const conversationService = new ConversationService();
     conversationService

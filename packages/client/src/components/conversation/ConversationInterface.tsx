@@ -28,7 +28,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model)
-  const budgetTokens = agentContextLength ?? 0
+  const budgetTokens = agentContextLength
 
   // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
@@ -395,7 +395,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {showMessagesArea ? (
         <>
-          <ConversationContextBar conversationId={currentConversationId} budgetTokens={budgetTokens} />
+          <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
           <div className="flex-1 min-h-0">
             <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
           </div>

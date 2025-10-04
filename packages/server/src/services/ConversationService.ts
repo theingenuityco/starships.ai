@@ -932,6 +932,22 @@ export class ConversationService {
         break;
       }
 
+      case 'tool_call_detected': {
+        const toolEvt = event as ToolEvent;
+        console.log('[STREAMING] Tool call detected:', toolEvt.data?.toolName);
+
+        // Broadcast tool_call_detected via ui_action event channel
+        // This triggers UI form opening for specific tools like tool_create
+        if (this.streamingService && this.streamingService.isActive(conversationId)) {
+          await this.streamingService.broadcastUIAction(conversationId, {
+            __ui_action: 'tool_call_detected',
+            toolCallId: toolEvt.data?.toolCallId,
+            toolName: toolEvt.data?.toolName,
+          });
+        }
+        break;
+      }
+
       case 'tool_started': {
         const toolEvt = event as ToolEvent;
         console.log('[STREAMING] Tool started:', toolEvt.data?.toolName);

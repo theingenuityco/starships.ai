@@ -68,6 +68,8 @@ interface StreamChunk {
 }
 
 export class LLM extends BaseNode<LlmParams> {
+  private emittedToolCalls: Set<string> = new Set();
+
   constructor(params: LlmParams, options?: NodeHandlerOptions) {
     super(params, options);
   }
@@ -200,6 +202,10 @@ export class LLM extends BaseNode<LlmParams> {
 
           try {
             const parsed = JSON.parse(data);
+
+            // Emit tool_call_detected event before processing chunk
+            await this.emitToolCallDetectedIfNeeded(parsed, executionDepth);
+
             this.processStreamChunk(parsed, responseMetadata, choices);
 
             if (parsed.usage) {
@@ -259,6 +265,47 @@ export class LLM extends BaseNode<LlmParams> {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       throw new Error(`LLM streaming execution failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Emit tool_call_detected event when we first detect a tool call
+   */
+  private async emitToolCallDetectedIfNeeded(parsed: StreamChunk, executionDepth: number): Promise<void> {
+    const eventCallback = this.getEventCallback();
+    if (!eventCallback) return;
+
+    const choices = parsed.choices;
+    if (!choices || !Array.isArray(choices)) return;
+
+    for (const choice of choices) {
+      const delta = choice?.delta;
+      if (!delta || typeof delta !== 'object') continue;
+
+      const toolCalls = delta.tool_calls;
+      if (!Array.isArray(toolCalls)) continue;
+
+      for (const toolCall of toolCalls) {
+        if (!toolCall || typeof toolCall !== 'object') continue;
+
+        const toolCallId = toolCall.id;
+        const functionName = toolCall.function?.name;
+
+        // Emit event only on first detection of this tool call with a function name
+        if (functionName && typeof functionName === 'string' && toolCallId && !this.emittedToolCalls.has(toolCallId)) {
+          this.emittedToolCalls.add(toolCallId);
+
+          await eventCallback({
+            type: 'tool_call_detected',
+            timestamp: new Date().toISOString(),
+            executionDepth,
+            data: {
+              toolCallId,
+              toolName: functionName,
+            },
+          });
+        }
+      }
     }
   }
 

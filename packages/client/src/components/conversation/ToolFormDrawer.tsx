@@ -172,6 +172,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
         <ScrollArea className="h-full p-6">
           <div className="space-y-6">
             <SheetHeader className="space-y-4 overflow-visible">
+              <SheetTitle className="sr-only">Tool Form</SheetTitle>
               {/* Main Header with Icon and Editable Title */}
               <div className="flex items-start gap-4 overflow-visible">
                 <div className="flex-shrink-0 p-4 rounded-xl bg-primary/10 border border-primary/20 transition-all hover:bg-primary/20 hover:border-primary/30 mt-1.5">

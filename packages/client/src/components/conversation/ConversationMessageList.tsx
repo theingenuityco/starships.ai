@@ -354,9 +354,9 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
-        <div className="max-w-4xl mx-auto space-y-2">
+    <div className="h-full flex flex-col bg-transparent">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
+        <div className="max-w-4xl mx-auto space-y-2 bg-transparent">
           {renderMessages.map(message => (
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} />
           ))}

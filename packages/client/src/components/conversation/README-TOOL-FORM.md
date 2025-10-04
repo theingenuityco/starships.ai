@@ -1,14 +1,14 @@
 # Tool Form Drawer Integration
 
-This document explains how to use the tool form drawer feature for creating tools with Daedalus or other agents.
+This document explains how the tool form drawer feature works for creating tools with Daedalus or other agents.
 
 ## Overview
 
-The tool form drawer provides a UI for creating custom tools during conversations. It can be controlled programmatically by agents like Daedalus to guide users through the tool creation process.
+The tool form drawer provides a UI for creating custom tools during conversations. It is controlled through SSE (Server-Sent Events) UI action events sent from the backend during agent tool execution.
 
 ## Components
 
-### 1. ToolFormDrawer
+### ToolFormDrawer
 
 The main drawer component that displays the tool creation form.
 
@@ -33,129 +33,39 @@ interface ToolFormDrawerRef {
 }
 ```
 
-### 2. Tool Form Controller
+## How It Works
 
-Provides programmatic control over the drawer.
+### Backend to Frontend Flow
 
-**Location:** [`packages/client/src/lib/tool-form-controller.ts`](../../lib/tool-form-controller.ts)
+1. **User Request:** "Hey Daedalus, can you help me create a weather tool?"
 
-**API:**
+2. **Agent Calls Tool:** Daedalus calls `tool_create` with tool parameters
 
-```typescript
-import { openToolFormDrawer, populateToolForm, openAndPopulateToolForm } from '@/lib/tool-form-controller'
-
-// Open the drawer
-openToolFormDrawer()
-
-// Populate form fields
-populateToolForm({
-  name: 'Weather Lookup',
-  description: 'Get current weather for any city',
-  category: 'data',
-  exampleUsage: 'getWeather({ city: "San Francisco" })',
-  requiresApiKey: true,
-  parameters: {
-    type: 'object',
-    properties: {
-      city: {
-        type: 'string',
-        description: 'City name'
-      }
-    },
-    required: ['city']
-  },
-  blueprint: {
-    nodes: [...],
-    edges: [...]
-  }
-})
-
-// Or do both in one call
-openAndPopulateToolForm({
-  name: 'Weather Lookup',
-  description: 'Get current weather for any city',
-  // ... other fields
-})
-```
-
-## Usage Flow
-
-### For Daedalus Agent
-
-When a user asks Daedalus to create a tool, the flow should be:
-
-1. **User Request:**
-
-   ```
-   User: "Hey Daedalus, can you help me create a weather tool?"
-   ```
-
-2. **Daedalus Opens Drawer:**
+3. **Backend Emits SSE Event:** Server broadcasts a `ui_action` SSE event:
 
    ```typescript
-   // In agent code or via message handling
-   import { openToolFormDrawer } from '@/lib/tool-form-controller'
-   openToolFormDrawer()
+   {
+     __ui_action: 'tool_call_detected',
+     toolName: 'tool_create',
+     toolCallId: '...'
+   }
    ```
 
-3. **Daedalus Populates Fields:**
+4. **Frontend Opens Drawer:** [`ConversationInterface.tsx`](./ConversationInterface.tsx:190-202) receives the event and opens the drawer
 
-   ```typescript
-   import { populateToolForm } from '@/lib/tool-form-controller'
+5. **Stream Arguments:** As tool arguments stream in, the form fields are updated in real-time (lines 293-346)
 
-   populateToolForm({
-     name: 'Weather Lookup',
-     description: 'Fetches current weather data for any city using OpenWeather API',
-     category: 'data',
-     exampleUsage: 'Use this tool to get temperature, humidity, and conditions for a specific city',
-     requiresApiKey: true,
-     parameters: {
-       type: 'object',
-       properties: {
-         city: { type: 'string', description: 'City name' },
-         units: { type: 'string', description: 'Temperature units (metric/imperial)', enum: ['metric', 'imperial'] },
-       },
-       required: ['city'],
-     },
-     blueprint: {
-       nodes: [
-         { id: 'start', type: 'Start', position: { x: 0, y: 0 }, parameters: {} },
-         {
-           id: 'http',
-           type: 'HttpRequest',
-           position: { x: 200, y: 0 },
-           parameters: {
-             url: 'https://api.openweathermap.org/data/2.5/weather',
-             method: 'GET',
-           },
-         },
-         { id: 'end', type: 'End', position: { x: 400, y: 0 }, parameters: {} },
-       ],
-       edges: [
-         { source: 'start', target: 'http' },
-         { source: 'http', target: 'end' },
-       ],
-     },
-   })
-   ```
+6. **User Reviews and Saves:** User reviews the pre-populated form and clicks "Save Tool"
 
-4. **User Reviews and Modifies:**
+### SSE UI Actions
 
-   ```
-   User: "Can you change the description to be more specific?"
-   ```
+The system supports these UI action types:
 
-5. **Daedalus Updates Field:**
-
-   ```typescript
-   import { getToolFormController } from '@/lib/tool-form-controller'
-
-   const controller = getToolFormController()
-   controller?.updateField('description', 'Real-time weather data including temperature, humidity, wind speed, and conditions')
-   ```
-
-6. **User Saves:**
-   The user clicks "Save Tool" button, which triggers validation and submission.
+- `tool_call_detected` - Opens the drawer when `tool_create` is called
+- `open_tool_form` - Opens drawer with initial form data
+- `update_tool_form` - Updates specific form fields
+- `submit_tool_form` - Triggers form submission
+- `close_tool_form` - Closes the drawer
 
 ## Available Categories
 
@@ -225,75 +135,17 @@ The blueprint field expects a workflow definition:
 }
 ```
 
-## Example: Full Tool Creation
-
-```typescript
-import { openAndPopulateToolForm } from '@/lib/tool-form-controller'
-
-openAndPopulateToolForm({
-  name: 'GitHub Issue Creator',
-  description: 'Creates a new issue in a GitHub repository',
-  category: 'automation',
-  exampleUsage: 'createGitHubIssue({ repo: "owner/repo", title: "Bug report", body: "Description" })',
-  requiresApiKey: true,
-  parameters: {
-    type: 'object',
-    properties: {
-      repo: {
-        type: 'string',
-        description: 'Repository in format owner/repo',
-      },
-      title: {
-        type: 'string',
-        description: 'Issue title',
-      },
-      body: {
-        type: 'string',
-        description: 'Issue body/description',
-      },
-      labels: {
-        type: 'array',
-        description: 'Array of label names',
-        items: { type: 'string' },
-      },
-    },
-    required: ['repo', 'title'],
-  },
-  blueprint: {
-    nodes: [
-      { id: 'start', type: 'Start', position: { x: 0, y: 0 }, parameters: {} },
-      {
-        id: 'create-issue',
-        type: 'HttpRequest',
-        position: { x: 200, y: 0 },
-        parameters: {
-          url: 'https://api.github.com/repos/{{ input.repo }}/issues',
-          method: 'POST',
-          headers: {
-            Authorization: 'Bearer {{ config.githubToken }}',
-            Accept: 'application/vnd.github+json',
-          },
-          body: {
-            title: '{{ input.title }}',
-            body: '{{ input.body }}',
-            labels: '{{ input.labels }}',
-          },
-        },
-      },
-      { id: 'end', type: 'End', position: { x: 400, y: 0 }, parameters: { output: '{{ create-issue.output }}' } },
-    ],
-    edges: [
-      { source: 'start', target: 'create-issue' },
-      { source: 'create-issue', target: 'end' },
-    ],
-  },
-})
-```
-
 ## Integration Points
 
 ### ConversationInterface
 
-The drawer is integrated into [`ConversationInterface.tsx`](./ConversationInterface.tsx:257-263) and is available throughout conversations.
+The drawer is integrated into [`ConversationInterface.tsx`](./ConversationInterface.tsx) and handles:
 
-### Event Handling
+1. **SSE Event Consumption** (lines 283-290): Listens to `lastUIAction` from `useConversationStreamed`
+2. **Tool Argument Streaming** (lines 293-346): Updates form fields as tool arguments stream in
+3. **Form State Management**: Controls drawer open/close state
+4. **Form Submission**: Handles saving tool data via API
+
+### Event Handling in handleUIPayload
+
+Located at lines 169-265 in ConversationInterface.tsx, this function processes UI action events and controls the drawer accordingly.

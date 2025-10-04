@@ -28,92 +28,47 @@ A comprehensive drawer component with:
   - Styled to match AgentDetailsDrawer theme
   - Exposed ref methods for programmatic control
 
-### 2. Tool Form Controller
-
-**File:** [`packages/client/src/lib/tool-form-controller.ts`](./src/lib/tool-form-controller.ts)
-
-Global controller for programmatic access with methods:
-
-- `openToolFormDrawer()` - Opens the drawer
-- `populateToolForm(data)` - Fills form fields
-- `openAndPopulateToolForm(data)` - Open and populate in one call
-- `getToolFormController()` - Access to full controller
-
-### 3. Integration with ConversationInterface
+### 2. Integration with ConversationInterface
 
 **File:** [`packages/client/src/components/conversation/ConversationInterface.tsx`](./src/components/conversation/ConversationInterface.tsx)
 
 - Integrated drawer into conversation flow
-- Registered global controller on mount
+- Listens to SSE `ui_action` events
+- Streams tool arguments into form in real-time
 - Added save handler with toast notifications
-- Clean unmount handling
 
-### 4. Documentation
+### 3. Documentation
 
 **Files:**
 
 - [`packages/client/src/components/conversation/README-TOOL-FORM.md`](./src/components/conversation/README-TOOL-FORM.md) - Complete usage guide
-- [`packages/client/src/components/conversation/ToolFormDrawer.example.tsx`](./src/components/conversation/ToolFormDrawer.example.tsx) - Working examples
 
-## Usage Example
+## How It Works
 
-### For Daedalus Agent
+### Backend to Frontend Flow
 
-```typescript
-import { openAndPopulateToolForm } from '@/lib/tool-form-controller'
+When Daedalus creates a tool, the flow is:
 
-// When user says: "Hey daedalus, can you help me create a weather tool"
-openAndPopulateToolForm({
-  name: 'Weather Lookup',
-  description: 'Fetches current weather data for any city',
-  category: 'data',
-  exampleUsage: 'getWeather({ city: "San Francisco" })',
-  requiresApiKey: true,
-  parameters: {
-    type: 'object',
-    properties: {
-      city: {
-        type: 'string',
-        description: 'City name',
-      },
-    },
-    required: ['city'],
-  },
-  blueprint: {
-    nodes: [
-      /* workflow nodes */
-    ],
-    edges: [
-      /* workflow edges */
-    ],
-  },
-})
-```
+1. **User Request:** "Hey daedalus, can you help me create a weather tool"
 
-### Incremental Updates
+2. **Daedalus Calls Tool:** Daedalus calls `tool_create` with the tool parameters
 
-```typescript
-import { getToolFormController } from '@/lib/tool-form-controller'
+3. **Backend Emits SSE Event:** Server broadcasts a `ui_action` SSE event with `tool_call_detected`
 
-const controller = getToolFormController()
+4. **Frontend Opens Drawer:** ConversationInterface receives the event and opens the drawer
 
-// Daedalus can update individual fields as the conversation progresses
-controller?.updateField('name', 'Weather Lookup Tool')
-controller?.updateField('description', 'Updated description')
-controller?.updateField('category', 'data')
-```
+5. **Stream Arguments:** As the tool arguments stream in from the LLM, they are populated into the form fields in real-time
 
-## Conversation Flow
+6. **User Reviews and Saves:** User reviews the pre-populated form and clicks "Save Tool"
 
-1. **User:** "Hey daedalus, can you help me create a weather tool"
-2. **Daedalus:** "Sure, let's get started"
-   - _Opens tool form drawer using `openToolFormDrawer()`_
-3. **Daedalus:** _Fills the form with initial data_
-   - _Uses `populateToolForm()` with suggested values_
-4. **User:** "Can you please help me change the description"
-5. **Daedalus:** _Changes description in the form_
-   - _Uses `controller.updateField('description', 'new value')`_
-6. **User:** Reviews and clicks "Save Tool"
+## Technical Implementation
+
+The drawer is controlled through:
+
+1. **SSE Events:** Backend emits `ui_action` events during tool execution
+2. **Ref-based Updates:** Form fields are updated via `toolFormDrawerRef.current?.updateField()`
+3. **Real-time Streaming:** Tool arguments stream into the form as they arrive from the LLM
+4. **State Management:** Drawer open/close state managed via React state
 
 ## Available Categories
 
@@ -141,16 +96,15 @@ All implementations passed:
 ### New Files
 
 1. `packages/client/src/components/conversation/ToolFormDrawer.tsx` (349 lines)
-2. `packages/client/src/lib/tool-form-controller.ts` (129 lines)
-3. `packages/client/src/components/conversation/README-TOOL-FORM.md` (documentation)
-4. `packages/client/src/components/conversation/ToolFormDrawer.example.tsx` (254 lines)
-5. `packages/client/TOOL-FORM-SUMMARY.md` (this file)
+2. `packages/client/src/components/conversation/README-TOOL-FORM.md` (documentation)
+3. `packages/client/TOOL-FORM-SUMMARY.md` (this file)
 
 ### Modified Files
 
 1. `packages/client/src/components/conversation/ConversationInterface.tsx`
    - Added ToolFormDrawer import and integration
-   - Added tool form controller registration
+   - Added SSE event handling for UI actions
+   - Added real-time tool argument streaming
    - Added save handler
 
 ## Next Steps for Backend Integration
@@ -185,7 +139,7 @@ To make this fully functional, the backend should:
 ## Benefits
 
 1. **Interactive Creation:** Daedalus can guide users through tool creation
-2. **Programmatic Control:** Full API for updating form fields
+2. **Real-time Streaming:** Form fields populate as the LLM generates tool arguments
 3. **Visual Feedback:** Beautiful UI matching the app's design
 4. **Validation:** Built-in form validation and error handling
 5. **Flexibility:** Support for complex tool definitions with blueprints
@@ -193,4 +147,4 @@ To make this fully functional, the backend should:
 
 ## Conclusion
 
-The tool form drawer is fully implemented and ready for use. Daedalus or other agents can now open the drawer, populate fields, and help users create custom tools through natural conversation.
+The tool form drawer is fully implemented and ready for use. When Daedalus calls the `tool_create` tool, the drawer automatically opens and streams the tool arguments in real-time, allowing users to review and modify before saving.

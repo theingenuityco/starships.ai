@@ -4,7 +4,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
-import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -14,23 +14,6 @@ const router: Router = Router();
 
 // Zod schemas for validation
 const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
-
-const StarshipClassSchema = z.enum(['scout', 'cruiser', 'draught']);
-const StarshipStatusSchema = z.enum(['active', 'inactive', 'pending_payment', 'restricted', 'disabled']);
-const CreateStarshipSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  class: StarshipClassSchema,
-});
-
-const UpdateStarshipSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  status: StarshipStatusSchema.optional(),
-  class: StarshipClassSchema.optional(),
-});
 
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
@@ -71,7 +54,7 @@ const checkAuth = (req: Request, res: Response): boolean => {
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
-    const { name, class: starshipClass, plan, billingPeriod } = req.body;
+    const { name, class: starshipClass } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 

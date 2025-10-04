@@ -167,8 +167,8 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
   const categories: ToolTemplateCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl !p-0">
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+      <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl !p-0" hideOverlay>
         <ScrollArea className="h-full p-6">
           <div className="space-y-6">
             <SheetHeader className="space-y-4">

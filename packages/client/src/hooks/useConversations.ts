@@ -263,6 +263,7 @@ type StreamedChunk =
   | { type: 'replace_reasoning'; value: string }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
+  | { type: 'ui_action'; payload: any }
   | { type: 'complete' }
   | { type: 'error'; error: any }
 
@@ -277,14 +278,8 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   // Controller to explicitly close SSE on completion or aborts
   const localController = new AbortController()
 
-  // Track post-complete lifecycle; immediately terminate stream to allow next turn
+  // Track if we've seen a complete event (for state tracking, but don't close connection)
   let seenComplete = false
-  const schedulePostCompleteEnd = () => {
-    end()
-    try {
-      localController.abort()
-    } catch {}
-  }
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
   const queue: StreamedChunk[] = []
@@ -398,38 +393,32 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             if (op === 'replace' && replaceToolCallsRe.test(path)) {
               const value = Array.isArray(raw.value) ? raw.value : []
               push({ type: 'replace_tool_calls', value })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Replace content / reasoning
             if (op === 'replace' && replaceContentRe.test(path)) {
               push({ type: 'replace_content', value: typeof raw.value === 'string' ? raw.value : '' })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Update id / updatedAt on the last assistant
             if (op === 'replace' && replaceIdRe.test(path)) {
               push({ type: 'update_last_assistant', fields: { id: String(raw.value) } as Partial<ClientMessage> })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             if (op === 'replace' && replaceUpdatedAtRe.test(path)) {
               push({ type: 'update_last_assistant', fields: { updatedAt: String(raw.value) } as Partial<ClientMessage> })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Mark streaming flag
             if (op === 'replace' && replaceStreamingRe.test(path) && raw.value === false) {
               push({ type: 'mark_last_assistant_streaming', streaming: false })
-              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             break
@@ -438,9 +427,13 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             // Ensure we flip streaming=false before completion (UI caret off)
             push({ type: 'mark_last_assistant_streaming', streaming: false })
             push({ type: 'complete' })
-            // Allow trailing finalize patches (id/content/reasoning), then end shortly
+            // Mark that we've seen complete, but don't close the connection
+            // The connection should stay open for the entire conversation
             seenComplete = true
-            schedulePostCompleteEnd()
+            break
+          }
+          case 'ui_action': {
+            push({ type: 'ui_action', payload: parsed })
             break
           }
           case 'error': {
@@ -664,6 +657,16 @@ export function useConversationStreamed(conversationId: string | null) {
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
 
+  // Extract last UI action payload (from 'ui_action' SSE events) for consumers
+  const lastUIAction = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return null
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (c?.type === 'ui_action') return c.payload ?? null
+    }
+    return null
+  }, [chunks])
+
   // Invalidate usage totals on end-of-turn (SSE 'complete') to update context bar post-turn
   useEffect(() => {
     if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
@@ -673,11 +676,27 @@ export function useConversationStreamed(conversationId: string | null) {
     }
   }, [chunks, conversationId, queryClient])
 
-  // Derived streaming flags
-  const isAssistantStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])
+  // Check if we've received a 'complete' event in the chunk stream
+  const hasCompleteEvent = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      if (chunks[i].type === 'complete') return true
+      // Stop checking once we hit a new 'append' of a user message (new turn started)
+      if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
+    }
+    return false
+  }, [chunks])
+
+  // Derived streaming flags - ensure we stop streaming when complete event is received
+  const isAssistantStreaming = useMemo(() => {
+    if (hasCompleteEvent) return false
+    return computedMessages.some(m => (m as any)?.streaming === true)
+  }, [computedMessages, hasCompleteEvent])
 
   // Awaiting assistant = after the last user message, no assistant progress yet and the stream is open
   const isAwaitingAssistant = useMemo(() => {
+    // If we've received a complete event, we're no longer awaiting
+    if (hasCompleteEvent) return false
     if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
 
     let lastUserIdx = -1
@@ -708,7 +727,7 @@ export function useConversationStreamed(conversationId: string | null) {
     if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
     if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
     return false
-  }, [computedMessages, messagesQuery.fetchStatus])
+  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
@@ -721,10 +740,9 @@ export function useConversationStreamed(conversationId: string | null) {
       return response.data
     },
     onSuccess: (_res, variables) => {
-      if (variables?.conversationId) {
-        // Ensure stream is active or re-opened for the next turn
-        queryClient.refetchQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(variables.conversationId) })
-      }
+      // Don't refetch - the SSE stream is already active and will receive new messages automatically
+      // Refetching would close the existing connection and open a new one, causing the server
+      // to lose the connection while the agent is still broadcasting
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
@@ -742,6 +760,8 @@ export function useConversationStreamed(conversationId: string | null) {
     isResponding,
     isAssistantStreaming,
     isAwaitingAssistant,
+    // Expose last UI action payload from SSE
+    lastUIAction,
     isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,

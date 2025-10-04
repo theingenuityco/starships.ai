@@ -3,6 +3,7 @@
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { ToolFormDrawer, ToolFormDrawerRef } from '@/components/conversation/ToolFormDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -12,6 +13,7 @@ import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
+import { toast } from 'sonner'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -25,16 +27,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model)
-  const budgetTokens = agentContextLength ?? 0
+  const budgetTokens = agentContextLength
 
   // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
 
-  // Ref for direct communication with message input
+  // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
+  const toolFormDrawerRef = useRef<ToolFormDrawerRef>(null)
+  const lastUIActionKeyRef = useRef<string | null>(null)
+
+  // Tool form drawer state
+  const [toolFormDrawerOpen, setToolFormDrawerOpen] = useState(false)
 
   // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [] } = useConversationStreamed(currentConversationId)
+  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId)
   const prevStreamingRef = useRef(false)
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
@@ -88,39 +95,31 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [onConversationChange]
   )
 
-  // Message presence is derived from store; no local handler
-
-  // Streaming is now handled internally by useConversation hook
-  // No need for external event handler management
-
   // Handle suggestion click
   const handleSuggestionClick = useCallback((suggestion: string) => {
-    // Use ref to directly call the input component method
     if (messageInputRef.current?.handleSuggestionSubmit) {
       messageInputRef.current.handleSuggestionSubmit(suggestion)
     }
   }, [])
 
-  // Reset conversation when external conversation ID changes (only when the value actually changes)
+  // Reset conversation when external conversation ID changes
   useEffect(() => {
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
   }, [externalConversationId])
 
-  // Restore selected agent from conversation data (fixes refresh issue)
+  // Restore selected agent from conversation data
   useEffect(() => {
     if (!currentConversationId) return
 
-    // First priority: Use conversation agents from API (persisted agent relationships)
     if (conversationAgents.length > 0) {
-      const conversationAgent = conversationAgents[0] // Use first agent from conversation
+      const conversationAgent = conversationAgents[0]
       if (conversationAgent && (!selectedAgent || selectedAgent.id !== conversationAgent.id)) {
         setSelectedAgent(conversationAgent)
         return
       }
     }
 
-    // Second priority: Try to restore from UI store conversation data
     if (conversationData?.agentId && starshipAgentsData.length > 0) {
       const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId)
       if (storedAgent && (!selectedAgent || selectedAgent.id !== storedAgent.id)) {
@@ -129,7 +128,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
 
-    // Fallback: auto-select first agent if none selected (for new conversations)
     if (!selectedAgent && starshipAgentsData.length > 0) {
       setSelectedAgent(starshipAgentsData[0])
     }
@@ -155,6 +153,196 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return () => clearTimeout(t)
     }
   }, [hasMessages, currentConversationId])
+
+  // Handle tool form save
+  const handleToolFormSave = useCallback((data: any) => {
+    console.log('Tool form data:', data)
+    toast.success('Tool created successfully!', {
+      description: `${data.name} has been created and is ready to use.`,
+    })
+    setToolFormDrawerOpen(false)
+    toolFormDrawerRef.current?.resetForm()
+  }, [])
+
+  // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
+  const handleUIPayload = useCallback(
+    (payload: any) => {
+      try {
+        if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
+        const key = JSON.stringify(payload)
+        if (lastUIActionKeyRef.current === key) return
+        lastUIActionKeyRef.current = key
+
+        const action = (payload as any).__ui_action as string
+
+        const ensureOpenThen = (fn: () => void) => {
+          setTimeout(() => {
+            if (action === 'open_tool_form') {
+              toolFormDrawerRef.current?.resetForm()
+            }
+            setToolFormDrawerOpen(true)
+            setTimeout(() => fn(), 150)
+          }, 100)
+        }
+
+        switch (action) {
+          case 'tool_call_detected': {
+            const toolName = (payload as any).toolName
+            const toolCallId = (payload as any).toolCallId
+
+            console.log('🎯 Tool call detected:', { toolName, toolCallId })
+
+            // Open form for tool_create
+            if (toolName === 'tool_create') {
+              console.log('📂 Opening tool form drawer for tool_create')
+              toolFormDrawerRef.current?.resetForm()
+              setToolFormDrawerOpen(true)
+            }
+            break
+          }
+
+          case 'open_tool_form': {
+            const form = (payload as any).formData || (payload as any).data || {}
+            ensureOpenThen(() => {
+              if (toolFormDrawerRef.current && form && typeof form === 'object') {
+                Object.entries(form).forEach(([field, value]) => {
+                  toolFormDrawerRef.current?.updateField(field as any, value as any)
+                })
+              }
+            })
+            break
+          }
+
+          case 'update_tool_form': {
+            const patch = (payload as any).patch || (payload as any).formData || (payload as any).data || {}
+            if (!toolFormDrawerRef.current) {
+              ensureOpenThen(() => {
+                if (toolFormDrawerRef.current && patch && typeof patch === 'object') {
+                  Object.entries(patch).forEach(([field, value]) => {
+                    toolFormDrawerRef.current?.updateField(field as any, value as any)
+                  })
+                }
+              })
+            } else {
+              if (patch && typeof patch === 'object') {
+                Object.entries(patch).forEach(([field, value]) => {
+                  toolFormDrawerRef.current?.updateField(field as any, value as any)
+                })
+              }
+            }
+            break
+          }
+
+          case 'submit_tool_form': {
+            const submit = () => {
+              const formData = toolFormDrawerRef.current?.getFormData()
+              if (formData) {
+                handleToolFormSave(formData)
+              }
+            }
+            if (!toolFormDrawerRef.current) {
+              ensureOpenThen(submit)
+            } else {
+              submit()
+            }
+            break
+          }
+
+          case 'close_tool_form': {
+            setToolFormDrawerOpen(false)
+            break
+          }
+
+          default:
+            break
+        }
+      } catch {
+        // ignore
+      }
+    },
+    [handleToolFormSave]
+  )
+
+  // Detect special UI action responses from assistant messages (back-compat path)
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length) return
+
+    const lastMessage = liveMessages[liveMessages.length - 1]
+    if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+      try {
+        const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
+        handleUIPayload(payload)
+      } catch {
+        // Not JSON or doesn't have UI action, ignore
+      }
+    }
+  }, [currentConversationId, liveMessages, handleUIPayload])
+
+  // Consume SSE 'ui_action' events directly (clean channel)
+  useEffect(() => {
+    if (!currentConversationId || !lastUIAction) return
+    try {
+      handleUIPayload(lastUIAction as any)
+    } catch {
+      // ignore
+    }
+  }, [currentConversationId, lastUIAction, handleUIPayload])
+
+  // Stream tool arguments into form as they arrive
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length || !toolFormDrawerOpen) return
+
+    // Find the last assistant message with toolCalls (reverse iteration)
+    // Look for both streaming and completed messages to handle cases where
+    // the drawer opens after streaming has finished
+    let lastAssistant: any = null
+    for (let i = liveMessages.length - 1; i >= 0; i--) {
+      const m = liveMessages[i]
+      if (m.role === 'assistant' && (m as any).toolCalls && Array.isArray((m as any).toolCalls)) {
+        lastAssistant = m
+        break
+      }
+    }
+
+    if (!lastAssistant || !(lastAssistant as any).toolCalls) return
+
+    const toolCalls = (lastAssistant as any).toolCalls || []
+    const toolCreateCall = toolCalls.find((tc: any) => tc?.function?.name === 'tool_create')
+
+    if (toolCreateCall && toolCreateCall.function?.arguments) {
+      const args: any = toolCreateCall.function.arguments
+
+      // Only try to populate if arguments actually exist
+      if (!args || (typeof args === 'object' && Object.keys(args).length === 0)) {
+        return // Arguments not yet available
+      }
+
+      // Update form fields as they become available
+      if (args.name && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('name', args.name)
+      }
+      if (args.description && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('description', args.description)
+      }
+      if (args.category && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('category', args.category)
+      }
+      if (args.exampleUsage && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('exampleUsage', args.exampleUsage)
+      }
+      if (args.requiresApiKey !== undefined && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('requiresApiKey', args.requiresApiKey)
+      }
+      if (args.parameters && toolFormDrawerRef.current) {
+        const paramsStr = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
+        toolFormDrawerRef.current.updateField('parameters', paramsStr)
+      }
+      if (args.blueprint && toolFormDrawerRef.current) {
+        const blueprintStr = typeof args.blueprint === 'string' ? args.blueprint : JSON.stringify(args.blueprint, null, 2)
+        toolFormDrawerRef.current.updateField('blueprint', blueprintStr)
+      }
+    }
+  }, [currentConversationId, liveMessages, toolFormDrawerOpen])
 
   // Show loading state
   if (isLoading) {
@@ -185,11 +373,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   return (
-    <div className="relative flex flex-col h-screen bg-background">
+    <div
+      className="relative flex flex-col h-screen bg-background transition-all duration-500 ease-in-out"
+      style={{
+        marginLeft: '5.5rem', // Account for fixed navigation (left-6 + w-16 = 1.5rem + 4rem)
+        marginRight: toolFormDrawerOpen ? 'calc(min(42rem, 100vw - 3rem) + 1.5rem)' : '0',
+      }}
+    >
       {/* Messages Area or Welcome Screen */}
       {showMessagesArea ? (
         <>
-          <ConversationContextBar conversationId={currentConversationId} budgetTokens={budgetTokens} />
+          <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
           <div className="flex-1 min-h-0">
             <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
           </div>
@@ -198,8 +392,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
           {/* Welcome Section */}
           <div className="text-center mb-8 max-w-2xl opacity-100">
-            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Meet Your AI Agents</h1>
-            <p className="text-muted-foreground text-lg font-light">Connect with specialized agents for focused assistance</p>
+            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+            <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
           </div>
 
           {/* Spacer for floating input */}
@@ -238,6 +432,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             starshipId={starshipId}
             conversationId={currentConversationId}
             onConversationStart={handleConversationStart}
+            onToggleToolForm={() => setToolFormDrawerOpen(prev => !prev)}
+            isToolFormOpen={toolFormDrawerOpen}
             disabled={!selectedAgent}
             minimal={showMessagesArea}
           >
@@ -246,6 +442,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           </ConversationMessageInput>
         </div>
       </div>
+
+      {/* Tool Form Drawer */}
+      <ToolFormDrawer ref={toolFormDrawerRef} open={toolFormDrawerOpen} onOpenChange={setToolFormDrawerOpen} onSave={handleToolFormSave} starshipId={starshipId} />
     </div>
   )
 }

@@ -8,7 +8,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createStarshipNavigatorBlueprint(): Blueprint {
   const agent = new Agent({
     name: 'Sybil Navigator',
-    model: 'anthropic/claude-sonnet-4',
+    model: 'anthropic/claude-sonnet-4.5',
     temperature: 0.4,
     maxTokens: 2000,
   });
@@ -63,7 +63,7 @@ export const sybilTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updat
     'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',
   category: 'general',
 
-  model: 'anthropic/claude-sonnet-4',
+  model: 'anthropic/claude-sonnet-4.5',
   temperature: 0.5,
   maxTokens: 2000,
 

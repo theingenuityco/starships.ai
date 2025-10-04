@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: tool_create
- * Create a new Tool instance on a starship via server REST API
+ * Create a new Tool instance on a starship via server REST API or UI form
  */
 export const toolCreateTool: ToolParams = {
   name: 'tool_create',
@@ -14,7 +14,7 @@ Creates executable tools that can be invoked by agents, with complete Autopilot 
 
 ## Required Parameters
 - **name**: Human-readable tool name (e.g., "Weather Lookup", "Send Email")
-- **slug**: Unique kebab-case identifier (e.g., "weather-lookup", "send-email") 
+- **slug**: Unique kebab-case identifier (e.g., "weather-lookup", "send-email")
 - **description**: Clear description of tool functionality and usage
 - **parameters**: JSON Schema defining tool input structure with validation rules
 - **blueprint**: Complete Autopilot workflow blueprint with nodes, edges, and execution logic
@@ -96,7 +96,7 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL, headers and body',
+        description: 'Build URL, headers and body for API creation',
         parameters: {
           code: `
             const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
@@ -140,7 +140,8 @@ Automatically inferred from agent state (do not pass manually):
                 'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               },
-              body
+              body,
+              mode: 'direct_api'
             };
           `,
           timeout: 3000,
@@ -163,7 +164,7 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: '',
+        description: 'Return created tool',
         parameters: {
           output: '{{ $lastOutputOf("http_create")[0].json }}',
         },

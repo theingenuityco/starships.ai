@@ -8,8 +8,9 @@ import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
-import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
+import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -27,6 +28,7 @@ interface ConversationMessageInputProps {
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   onMessageSent?: () => void // Simplified callback for UI state updates
+  onOpenToolForm?: () => void // Callback to open tool form drawer
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
@@ -38,7 +40,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onOpenToolForm, disabled = false, minimal = false, children }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -349,6 +351,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
                 {/* Right Side - Action Buttons */}
                 <div className="flex items-center gap-2">
+                  {/* Create Tool Button */}
+                  {onOpenToolForm && (
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={onOpenToolForm}
+                          className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+                          disabled={disabled || isStreamingEffective}
+                        >
+                          <Wrench className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
+                        Create Tool
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
                   {/* File Attachment */}
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled || isStreamingEffective}>
                     <Paperclip className="h-4 w-4" />

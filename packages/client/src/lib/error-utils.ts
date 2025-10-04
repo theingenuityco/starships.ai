@@ -21,10 +21,33 @@ export interface ApiError {
 export function extractErrorMessage(error: unknown, defaultMessage: string): string {
   const apiError = error as ApiError
 
+  // Handle structured server errors { error: { code, message, details } }
+  const serverError = apiError?.response?.data?.error
+  if (serverError && typeof serverError === 'object' && serverError !== null) {
+    const message = (serverError as any).message || defaultMessage
+    const details = (serverError as any).details || ''
+    return details ? `${message}\n${details}` : message
+  }
+
+  // Fallback to legacy error format
   const message = apiError?.response?.data?.error || apiError?.message || defaultMessage
   const details = apiError?.response?.data?.details || ''
 
   return details ? `${message}\n${details}` : message
+}
+
+/**
+ * Extract error code from server error response
+ * @param error - The error object
+ * @returns Error code string or null if not found
+ */
+export function extractErrorCode(error: unknown): string | null {
+  const apiError = error as ApiError
+  const serverError = apiError?.response?.data?.error
+  if (serverError && typeof serverError === 'object' && serverError !== null) {
+    return (serverError as any).code || null
+  }
+  return null
 }
 
 /**

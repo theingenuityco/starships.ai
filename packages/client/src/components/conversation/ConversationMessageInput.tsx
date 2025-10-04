@@ -8,8 +8,11 @@ import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
+import { extractErrorCode } from '@/lib/error-utils'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { CreditLimitBanner } from './CreditLimitBanner'
+import { useCreditBalance } from '@/hooks/useCreditBalance'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -43,12 +46,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
     const [isRecording, setIsRecording] = useState(false)
+    const [creditLimitReached, setCreditLimitReached] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
 
     // Use streamedQuery-based conversation hook
     const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null)
     const isStreamingEffective = isResponding
+    const { data: creditBalance } = useCreditBalance()
+    const isCreditExhausted = typeof creditBalance === 'number' && creditBalance <= 0
+    const creditLimitActive = Boolean(creditLimitReached || isCreditExhausted)
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
@@ -158,6 +165,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         })
           .catch(error => {
             console.error('Failed to send message:', error)
+
+            // Check if it's a credit limit error
+            const errorCode = extractErrorCode(error)
+            if (errorCode === 'CREDIT_LIMIT_REACHED') {
+              setCreditLimitReached(true)
+            }
+
             // Restore message on error
             setMessage(messageToSend)
           })
@@ -274,7 +288,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
-    const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent
+    const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent && !creditLimitActive
 
     // Expose methods to parent component via ref
     useImperativeHandle(
@@ -288,15 +302,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       [handleSuggestionSubmit]
     )
 
+    const handleGoToBilling = () => {
+      window.location.href = '/profile?tab=billing'
+    }
+
     return (
       <div className="relative opacity-100">
+        {/* Credit Limit Banner */}
+        {creditLimitActive && <CreditLimitBanner minimal={minimal} joinWithComposer onGoToBilling={handleGoToBilling} />}
+
         {/* Input Container */}
         <div
           className={cn(
-            'relative transition-all',
-            minimal
-              ? 'frosted-glass-card rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
-              : 'frosted-glass-card rounded-2xl shadow-frosted-xl focus-within:ring-2 focus-within:ring-primary/20',
+            'relative transition-all frosted-glass-card shadow-frosted-xl',
+            minimal ? 'focus-within:ring-1 focus-within:ring-primary/15' : 'focus-within:ring-2 focus-within:ring-primary/20',
+            creditLimitActive ? (minimal ? 'rounded-b-xl rounded-t-none border-t-0' : 'rounded-b-2xl rounded-t-none border-t-0') : minimal ? 'rounded-xl' : 'rounded-2xl',
             'focus-within:border-primary/40',
             disabled && 'opacity-50'
           )}
@@ -311,7 +331,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 onChange={handleTextareaChange}
                 onKeyPress={handleKeyPress}
                 placeholder={getPlaceholder()}
-                disabled={disabled || sending || isStreamingEffective}
+                disabled={disabled || sending || isStreamingEffective || creditLimitActive}
                 className={cn(
                   'w-full bg-transparent resize-none',
                   minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
@@ -384,7 +404,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         </div>
 
         {/* Agent Indicator - Only show in non-minimal mode */}
-        {!minimal && selectedAgent && (
+        {!minimal && selectedAgent && !creditLimitActive && (
           <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
             {isStreamingEffective ? `${selectedAgent.name} is responding...` : sending ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
           </div>

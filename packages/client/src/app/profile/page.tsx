@@ -7,6 +7,9 @@ import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
 
 import AccountForm from '@/components/profile/AccountForm'
 import { UserUsage } from '@/components/profile/UserUsage'
+import CreditBalanceCard from '@/components/profile/CreditBalanceCard'
+import CreditTopupForm from '@/components/profile/CreditTopupForm'
+import CreditTransactionHistory from '@/components/profile/CreditTransactionHistory'
 
 export default function ProfilePage(): React.JSX.Element {
   return (
@@ -61,11 +64,22 @@ export default function ProfilePage(): React.JSX.Element {
               </TabsContent>
 
               <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="billing-section" className="text-lg font-semibold">
-                    Billing
-                  </h3>
-                </section>
+                <div className="space-y-6">
+                  <section aria-labelledby="billing-section" className="rounded-xl border border-border/40 bg-background p-6">
+                    <h3 id="billing-section" className="text-lg font-semibold mb-4">
+                      Billing & Credits
+                    </h3>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <CreditBalanceCard onTopupClick={() => {}} />
+                      <CreditTopupForm />
+                    </div>
+
+                    <div className="mt-6">
+                      <CreditTransactionHistory />
+                    </div>
+                  </section>
+                </div>
               </TabsContent>
 
               <TabsContent value="usage">

@@ -163,6 +163,9 @@ importers:
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@stripe/stripe-js':
+        specifier: ^8.0.0
+        version: 8.0.0
       '@tanstack/react-query':
         specifier: 5.81.5
         version: 5.81.5(react@19.1.0)
@@ -499,6 +502,9 @@ importers:
       openai:
         specifier: ^5.8.4
         version: 5.10.1(ws@8.18.3)(zod@4.1.5)
+      stripe:
+        specifier: ^19.1.0
+        version: 19.1.0(@types/node@22.16.0)
       ws:
         specifier: ^8.18.3
         version: 8.18.3
@@ -1864,6 +1870,10 @@ packages:
 
   '@sinonjs/fake-timers@13.0.5':
     resolution: {integrity: sha512-36/hTbH2uaWuGVERyC6da9YwGWnzUZXuPro/F2LfsdOsLnCojz/iSH8MxUt/FD2S5XBSVPhmArFUXcpCQ2Hkiw==}
+
+  '@stripe/stripe-js@8.0.0':
+    resolution: {integrity: sha512-dLvD55KT1cBmrqzgYRgY42qNcw6zW4HS5oRZs0xRvHw9gBWig5yDnWNop/E+/t2JK+OZO30zsnupVBN2MqW2mg==}
+    engines: {node: '>=12.16'}
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
@@ -5519,6 +5529,15 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
+  stripe@19.1.0:
+    resolution: {integrity: sha512-FjgIiE98dMMTNssfdjMvFdD4eZyEzdWAOwPYqzhPRNZeg9ggFWlPXmX1iJKD5pPIwZBaPlC3SayQQkwsPo6/YQ==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      '@types/node': '>=16'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   style-to-js@1.1.17:
     resolution: {integrity: sha512-xQcBGDxJb6jjFCTzvQtfiPn6YvvP2O8U1MDIPNfJQlWMYfktPy+iGsHE7cssjs7y84d9fQaK4UF3RIJaAHSoYA==}
 
@@ -7509,6 +7528,8 @@ snapshots:
   '@sinonjs/fake-timers@13.0.5':
     dependencies:
       '@sinonjs/commons': 3.0.1
+
+  '@stripe/stripe-js@8.0.0': {}
 
   '@swc/helpers@0.5.15':
     dependencies:
@@ -11917,6 +11938,12 @@ snapshots:
   strip-json-comments@2.0.1: {}
 
   strip-json-comments@3.1.1: {}
+
+  stripe@19.1.0(@types/node@22.16.0):
+    dependencies:
+      qs: 6.14.0
+    optionalDependencies:
+      '@types/node': 22.16.0
 
   style-to-js@1.1.17:
     dependencies:

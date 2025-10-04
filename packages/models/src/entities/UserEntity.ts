@@ -40,21 +40,40 @@ export class UserTransformers {
   }
 
   /**
-   * Transform avatar URL to ensure valid format
+   * Transform avatar to ensure valid format:
+   * - http/https URL
+   * - data URL (inline image)
+   * - relative path (served asset)
+   * - emoji (single or ZWJ sequence)
    */
   static AvatarTransform() {
     return Transform(({ value }) => {
       if (!value) return value;
       if (typeof value === 'string') {
         const trimmed = value.trim();
-        // Basic URL validation
+        if (trimmed.length === 0) return undefined;
+
+        // Absolute http(s) URL
         if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
           return trimmed;
         }
-        // If it's a relative path or data URL, return as-is
-        if (trimmed.startsWith('/') || trimmed.startsWith('data:')) {
+
+        // Relative path or data URL
+        if (trimmed.startsWith('/')) {
           return trimmed;
         }
+        if (/^data:image\//i.test(trimmed) || trimmed.startsWith('data:')) {
+          return trimmed;
+        }
+
+        // Emoji (supports single emoji or ZWJ sequences)
+        try {
+          if (/\p{Extended_Pictographic}/u.test(trimmed)) return trimmed;
+        } catch {
+          // Fallback for environments lacking Unicode property escapes
+          if (/[\u{1F300}-\u{1FAFF}\u{1F1E6}-\u{1F1FF}]/u.test(trimmed)) return trimmed;
+        }
+
         // Invalid format, return undefined
         return undefined;
       }

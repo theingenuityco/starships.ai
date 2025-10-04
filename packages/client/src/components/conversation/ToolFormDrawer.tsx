@@ -168,10 +168,10 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl">
-        <ScrollArea className="h-full -mx-6">
-          <div className="px-6 pb-6 space-y-6">
-            <SheetHeader className="space-y-4 pt-2">
+      <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl !p-0">
+        <ScrollArea className="h-full p-6">
+          <div className="space-y-6">
+            <SheetHeader className="space-y-4">
               {/* Main Header with Icon and Title */}
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 p-4 rounded-xl bg-primary/10 border border-primary/20 transition-all hover:bg-primary/20 hover:border-primary/30">
@@ -187,10 +187,10 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
             </SheetHeader>
 
             {/* Form Sections */}
-            <div className="space-y-6 pt-6 border-t border-border/40">
+            <div className="space-y-6 border-t border-border/40 pt-6">
               {/* Basic Information */}
-              <div className="p-5 rounded-xl frosted-glass-card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
+              <div>
+                <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Sparkles className="w-5 h-5 text-primary" />
                   Basic Information
                 </h3>
@@ -251,8 +251,8 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
               </div>
 
               {/* Configuration */}
-              <div className="p-5 rounded-xl frosted-glass-card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
+              <div>
+                <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Package className="w-5 h-5 text-primary" />
                   Configuration
                 </h3>
@@ -282,8 +282,8 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
               </div>
 
               {/* Technical Details */}
-              <div className="p-5 rounded-xl frosted-glass-card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
+              <div>
+                <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Bot className="w-5 h-5 text-primary" />
                   Technical Details
                 </h3>
@@ -325,7 +325,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 pb-2">
+              <div className="flex gap-3 pt-4 border-t border-border/40">
                 <Button size="lg" className="flex-1 shadow-lg hover:shadow-xl" onClick={handleSave}>
                   <Save className="w-4 h-4 mr-2" />
                   Save Tool

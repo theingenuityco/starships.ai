@@ -425,8 +425,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
           {/* Welcome Section */}
           <div className="text-center mb-8 max-w-2xl opacity-100">
-            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Meet Your AI Agents</h1>
-            <p className="text-muted-foreground text-lg font-light">Connect with specialized agents for focused assistance</p>
+            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let's Build</h1>
+            <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
           </div>
 
           {/* Spacer for floating input */}

@@ -112,7 +112,7 @@ export const braveSearchTool: ToolParams = {
             }
             
             // Get API key from environment
-            const apiKey = process.env.BRAVE_SEARCH_API_KEY;
+            const apiKey = env('BRAVE_SEARCH_API_KEY');
             if (!apiKey) {
               throw new Error('BRAVE_SEARCH_API_KEY environment variable is required');
             }

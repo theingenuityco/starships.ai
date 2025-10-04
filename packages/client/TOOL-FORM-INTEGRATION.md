@@ -66,7 +66,6 @@ Opens a drawer with the tool pre-filled for user review and modification.
 ### Client Components
 
 - [`ToolFormDrawer.tsx`](./src/components/conversation/ToolFormDrawer.tsx) - Form UI component
-- [`tool-form-controller.ts`](./src/lib/tool-form-controller.ts) - Programmatic control
 - [`ConversationInterface.tsx`](./src/components/conversation/ConversationInterface.tsx) - Integration point
 
 ### Backend Integration

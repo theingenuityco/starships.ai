@@ -374,77 +374,80 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   return (
     <div
-      className="relative flex flex-col h-screen bg-background transition-all duration-500 ease-in-out"
+      className="relative flex flex-col h-screen transition-all duration-500 ease-in-out overflow-hidden"
       style={{
         marginLeft: '5.5rem', // Account for fixed navigation (left-6 + w-16 = 1.5rem + 4rem)
         marginRight: toolFormDrawerOpen ? 'calc(min(42rem, 100vw - 3rem) + 1.5rem)' : '0',
       }}
     >
-      {/* Messages Area or Welcome Screen */}
-      {showMessagesArea ? (
-        <>
-          <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
-          <div className="flex-1 min-h-0">
-            <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
-          </div>
-        </>
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
-          {/* Welcome Section */}
-          <div className="text-center mb-8 max-w-2xl opacity-100">
-            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-            <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-          </div>
+      {/* Content container */}
+      <div className="relative z-[2] flex flex-col h-full">
+        {/* Messages Area or Welcome Screen */}
+        {showMessagesArea ? (
+          <>
+            <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
+            <div className="flex-1 min-h-0">
+              <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
+            {/* Welcome Section */}
+            <div className="text-center mb-8 max-w-2xl opacity-100">
+              <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+              <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+            </div>
 
-          {/* Spacer for floating input */}
-          <div className="h-32 mb-8"></div>
+            {/* Spacer for floating input */}
+            <div className="h-32 mb-8"></div>
 
-          {/* Suggestions */}
-          <div className="space-y-3 max-w-2xl w-full opacity-100">
-            {AGENT_SUGGESTIONS.map((suggestion, index) => (
-              <button
-                key={suggestion}
-                className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
-                onClick={() => handleSuggestionClick(suggestion)}
-              >
-                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                  <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
-                </div>
-                <span className="flex-1">{suggestion}</span>
-              </button>
-            ))}
+            {/* Suggestions */}
+            <div className="space-y-3 max-w-2xl w-full opacity-100">
+              {AGENT_SUGGESTIONS.map((suggestion, index) => (
+                <button
+                  key={suggestion}
+                  className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                  </div>
+                  <span className="flex-1">{suggestion}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Floating Input - Position changes based on state */}
+        <div
+          ref={inputContainerRef}
+          className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out"
+          style={{
+            bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)',
+          }}
+        >
+          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
+            <ConversationMessageInput
+              ref={messageInputRef}
+              selectedAgent={selectedAgent}
+              starshipId={starshipId}
+              conversationId={currentConversationId}
+              onConversationStart={handleConversationStart}
+              onToggleToolForm={() => setToolFormDrawerOpen(prev => !prev)}
+              isToolFormOpen={toolFormDrawerOpen}
+              disabled={!selectedAgent}
+              minimal={showMessagesArea}
+            >
+              {/* Footer Content - Agent Selector */}
+              <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
+            </ConversationMessageInput>
           </div>
         </div>
-      )}
 
-      {/* Floating Input - Position changes based on state */}
-      <div
-        ref={inputContainerRef}
-        className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out"
-        style={{
-          bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)',
-        }}
-      >
-        <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
-          <ConversationMessageInput
-            ref={messageInputRef}
-            selectedAgent={selectedAgent}
-            starshipId={starshipId}
-            conversationId={currentConversationId}
-            onConversationStart={handleConversationStart}
-            onToggleToolForm={() => setToolFormDrawerOpen(prev => !prev)}
-            isToolFormOpen={toolFormDrawerOpen}
-            disabled={!selectedAgent}
-            minimal={showMessagesArea}
-          >
-            {/* Footer Content - Agent Selector */}
-            <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
-          </ConversationMessageInput>
-        </div>
+        {/* Tool Form Drawer */}
+        <ToolFormDrawer ref={toolFormDrawerRef} open={toolFormDrawerOpen} onOpenChange={setToolFormDrawerOpen} onSave={handleToolFormSave} starshipId={starshipId} />
       </div>
-
-      {/* Tool Form Drawer */}
-      <ToolFormDrawer ref={toolFormDrawerRef} open={toolFormDrawerOpen} onOpenChange={setToolFormDrawerOpen} onSave={handleToolFormSave} starshipId={starshipId} />
     </div>
   )
 }

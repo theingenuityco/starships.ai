@@ -688,11 +688,27 @@ export function useConversationStreamed(conversationId: string | null) {
     }
   }, [chunks, conversationId, queryClient])
 
-  // Derived streaming flags
-  const isAssistantStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])
+  // Check if we've received a 'complete' event in the chunk stream
+  const hasCompleteEvent = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      if (chunks[i].type === 'complete') return true
+      // Stop checking once we hit a new 'append' of a user message (new turn started)
+      if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
+    }
+    return false
+  }, [chunks])
+
+  // Derived streaming flags - ensure we stop streaming when complete event is received
+  const isAssistantStreaming = useMemo(() => {
+    if (hasCompleteEvent) return false
+    return computedMessages.some(m => (m as any)?.streaming === true)
+  }, [computedMessages, hasCompleteEvent])
 
   // Awaiting assistant = after the last user message, no assistant progress yet and the stream is open
   const isAwaitingAssistant = useMemo(() => {
+    // If we've received a complete event, we're no longer awaiting
+    if (hasCompleteEvent) return false
     if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
 
     let lastUserIdx = -1
@@ -723,7 +739,7 @@ export function useConversationStreamed(conversationId: string | null) {
     if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
     if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
     return false
-  }, [computedMessages, messagesQuery.fetchStatus])
+  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant

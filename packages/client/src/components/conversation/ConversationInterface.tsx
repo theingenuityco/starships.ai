@@ -293,11 +293,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length || !toolFormDrawerOpen) return
 
-    // Find the last assistant message with streaming toolCalls (reverse iteration)
+    // Find the last assistant message with toolCalls (reverse iteration)
+    // Look for both streaming and completed messages to handle cases where
+    // the drawer opens after streaming has finished
     let lastAssistant: any = null
     for (let i = liveMessages.length - 1; i >= 0; i--) {
       const m = liveMessages[i]
-      if (m.role === 'assistant' && (m as any).streaming === true) {
+      if (m.role === 'assistant' && (m as any).toolCalls && Array.isArray((m as any).toolCalls)) {
         lastAssistant = m
         break
       }
@@ -309,8 +311,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const toolCreateCall = toolCalls.find((tc: any) => tc?.function?.name === 'tool_create')
 
     if (toolCreateCall && toolCreateCall.function?.arguments) {
-      const args = toolCreateCall.function.arguments
-      console.log('📥 Streaming tool_create arguments into form:', args)
+      const args: any = toolCreateCall.function.arguments
+
+      // Only try to populate if arguments actually exist
+      if (!args || (typeof args === 'object' && Object.keys(args).length === 0)) {
+        return // Arguments not yet available
+      }
 
       // Update form fields as they become available
       if (args.name && toolFormDrawerRef.current) {
@@ -318,6 +324,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
       if (args.description && toolFormDrawerRef.current) {
         toolFormDrawerRef.current.updateField('description', args.description)
+      }
+      if (args.category && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('category', args.category)
+      }
+      if (args.exampleUsage && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('exampleUsage', args.exampleUsage)
+      }
+      if (args.requiresApiKey !== undefined && toolFormDrawerRef.current) {
+        toolFormDrawerRef.current.updateField('requiresApiKey', args.requiresApiKey)
       }
       if (args.parameters && toolFormDrawerRef.current) {
         const paramsStr = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)

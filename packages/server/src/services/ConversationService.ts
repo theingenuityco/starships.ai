@@ -9,6 +9,7 @@ import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
+import { parse as parsePartialJson } from 'partial-json';
 
 /**
  * Autopilot child process configuration
@@ -585,7 +586,7 @@ export class ConversationService {
 
                 this.streamingToolCalls.set(conversationId, acc);
 
-                // Parse accumulated arguments strings into objects for broadcasting
+                // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
                 const toolCallsValue = acc
                   .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
                   .map((tc) => {
@@ -593,9 +594,16 @@ export class ConversationService {
                     const argsStr = tc.function?.arguments;
                     if (typeof argsStr === 'string' && argsStr) {
                       try {
+                        // Try full JSON.parse first for complete JSON
                         argsObj = JSON.parse(argsStr);
                       } catch {
-                        argsObj = {}; // If parsing fails, use empty object
+                        try {
+                          // Use partial-json for incomplete JSON during streaming
+                          argsObj = parsePartialJson(argsStr);
+                        } catch {
+                          // If both fail, use empty object
+                          argsObj = {};
+                        }
                       }
                     }
                     return {
@@ -603,7 +611,7 @@ export class ConversationService {
                       type: tc.type,
                       function: {
                         name: tc.function.name,
-                        arguments: argsObj, // Now it's a parsed object
+                        arguments: argsObj, // Parsed object (may be partial)
                       },
                     };
                   });
@@ -615,7 +623,7 @@ export class ConversationService {
                 });
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot toolCalls from message node (no incremental indices)
-                // Parse arguments immediately into objects
+                // Parse arguments using partial-json for robustness
                 const normalized = toolCallsFromMessage.map((tc: any) => {
                   const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
                   let argsObj: unknown = {};
@@ -623,7 +631,11 @@ export class ConversationService {
                     try {
                       argsObj = JSON.parse(argsStr);
                     } catch {
-                      argsObj = {};
+                      try {
+                        argsObj = parsePartialJson(argsStr);
+                      } catch {
+                        argsObj = {};
+                      }
                     }
                   }
                   return {

@@ -681,7 +681,7 @@ export class ConversationService {
                 model: usagePayload.model,
               });
 
-              // Deduct credits for usage (best effort - don't fail the turn if credit deduction fails)
+              // Deduct credits for usage (enforced - fail the turn if credit deduction fails or insufficient)
               try {
                 const { CreditService } = await import('@/services/CreditService');
                 const creditService = new CreditService();
@@ -689,7 +689,49 @@ export class ConversationService {
                 const deductResult = await creditService.deductForUsage(starship.ownerId, usagePayload.cost, usageRecord.id);
 
                 if (!deductResult.ok) {
-                  console.warn(`[CREDITS] Insufficient balance for user ${starship.ownerId}, cost: ${usagePayload.cost}`);
+                  const message = `Insufficient credits. Required: $${Number(usagePayload.cost).toFixed(4)}, available: $${Number(
+                    deductResult.remaining || 0
+                  ).toFixed(4)}. Please top up to continue.`;
+
+                  console.warn(`[CREDITS] ${message}`);
+
+                  // Broadcast error to streaming clients
+                  if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                    await this.streamingService.broadcastError(conversationId, {
+                      streamId: conversationId,
+                      errorCode: 'INSUFFICIENT_CREDITS',
+                      message,
+                      timestamp: new Date().toISOString(),
+                      recoverable: false,
+                    });
+                  }
+
+                  // Persist error message into timeline
+                  const errorMessage = await this.messageService.createMessage({
+                    conversationId,
+                    role: 'system',
+                    content: `❌ ${message}`,
+                    messageType: 'error',
+                  });
+
+                  if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                    const delta: Operation = {
+                      op: 'add',
+                      path: '/messages/-',
+                      value: errorMessage,
+                    };
+                    await this.streamingService.broadcastDelta(conversationId, delta);
+                  }
+
+                  // Update conversation status to archived to prevent further turns
+                  await this.updateConversationStatus(conversationId, 'archived');
+
+                  // Clear streaming accumulators and abort finalization
+                  this.streamingContent.delete(conversationId);
+                  this.streamingToolCalls.delete(conversationId);
+                  this.streamingReasoning.delete(conversationId);
+
+                  return;
                 } else {
                   console.log(
                     `[CREDITS] Deducted ${usagePayload.cost} credits from user ${starship.ownerId}, remaining: ${deductResult.remaining}`
@@ -697,7 +739,41 @@ export class ConversationService {
                 }
               } catch (creditError) {
                 console.error('[CREDITS] Failed to deduct credits:', creditError);
-                // Don't fail the conversation if credit deduction fails
+
+                const message = 'Credit deduction failed. Please try again later or contact support.';
+                if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                  await this.streamingService.broadcastError(conversationId, {
+                    streamId: conversationId,
+                    errorCode: 'CREDIT_DEDUCTION_FAILED',
+                    message,
+                    timestamp: new Date().toISOString(),
+                    recoverable: false,
+                  });
+                }
+
+                const errorMessage = await this.messageService.createMessage({
+                  conversationId,
+                  role: 'system',
+                  content: `❌ ${message}`,
+                  messageType: 'error',
+                });
+
+                if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                  const delta: Operation = {
+                    op: 'add',
+                    path: '/messages/-',
+                    value: errorMessage,
+                  };
+                  await this.streamingService.broadcastDelta(conversationId, delta);
+                }
+
+                await this.updateConversationStatus(conversationId, 'archived');
+
+                this.streamingContent.delete(conversationId);
+                this.streamingToolCalls.delete(conversationId);
+                this.streamingReasoning.delete(conversationId);
+
+                return;
               }
             }
           } catch (e) {

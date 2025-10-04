@@ -7,6 +7,7 @@
 import { CreditTransactionEntity } from '@/entities/CreditTransactionEntity';
 import { fromDatabaseArray } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
+import { randomUUID } from 'crypto';
 
 export class CreditRepository extends BaseRepository {
   constructor() {
@@ -84,7 +85,7 @@ export class CreditRepository extends BaseRepository {
           await client.query(
             `INSERT INTO credit_transactions (id, user_id, amount, type, description, stripe_payment_id, created_at)
              VALUES ($1, $2, $3, 'purchase', $4, $5, NOW())`,
-            [`tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, userId, amount, description, stripePaymentId]
+            [`tx_${randomUUID()}`, userId, amount, description, stripePaymentId]
           );
         });
       },
@@ -115,13 +116,15 @@ export class CreditRepository extends BaseRepository {
           await connection.query(
             `INSERT INTO credit_transactions (id, user_id, amount, type, usage_id, created_at)
              VALUES ($1, $2, $3, 'usage', $4, NOW())`,
-            [`tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, userId, -amount, usageId]
+            [`tx_${randomUUID()}`, userId, -amount, usageId]
           );
 
           return { ok: true, remaining: Number(result.balance) };
         }
 
-        return { ok: false, remaining: 0 };
+        // Fetch actual remaining balance when deduction fails
+        const current = await connection.queryOne<{ balance: string }>(`SELECT balance FROM user_credits WHERE user_id = $1`, [userId]);
+        return { ok: false, remaining: Number(current?.balance) || 0 };
       },
       'deductForUsage',
       'UserCredit',

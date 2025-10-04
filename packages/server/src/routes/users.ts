@@ -26,10 +26,42 @@ const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+// Flexible avatar schema: allows http/https URLs, data URLs, relative paths, or emoji
+const AvatarSchema = z
+  .string()
+  .max(500)
+  .refine(
+    (val) => {
+      if (typeof val !== 'string') return false;
+      const v = val.trim();
+      if (v.length === 0) return false;
+
+      // Absolute http(s) URL
+      if (/^https?:\/\//i.test(v)) return true;
+
+      // Data URL (commonly used for inline images)
+      if (/^data:image\//i.test(v)) return true;
+
+      // Relative path (served asset)
+      if (v.startsWith('/')) return true;
+
+      // Emoji (supports single emoji or ZWJ sequences)
+      try {
+        return /\p{Extended_Pictographic}/u.test(v);
+      } catch {
+        // Fallback for environments lacking Unicode property escapes
+        return /[\u{1F300}-\u{1FAFF}\u{1F1E6}-\u{1F1FF}]/u.test(v);
+      }
+    },
+    {
+      message: 'Invalid avatar format. Provide a URL, data URL, relative path, or an emoji.',
+    }
+  );
+
 const CreateUserSchema = z.object({
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
-  avatar: z.string().url().max(500).optional(),
+  avatar: AvatarSchema.optional(),
   stripeCustomerId: z
     .string()
     .regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format')
@@ -39,7 +71,7 @@ const CreateUserSchema = z.object({
 const UpdateUserSchema = z.object({
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
-  avatar: z.string().url().max(500).optional(),
+  avatar: AvatarSchema.optional(),
   stripeCustomerId: z
     .string()
     .regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format')
@@ -49,7 +81,7 @@ const UpdateUserSchema = z.object({
 const UpdateUserProfileSchema = z.object({
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
-  avatar: z.string().url().max(500).optional(),
+  avatar: AvatarSchema.optional(),
   currentPassword: z.string().min(6).optional(),
   newPassword: z.string().min(6).optional(),
 });

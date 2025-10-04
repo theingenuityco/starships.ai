@@ -19,7 +19,7 @@ export default function ProfilePage(): React.JSX.Element {
                 <UserIcon className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">My Profile</h1>
               </div>
-              <p className="text-muted-foreground">Manage your account, starship, billing, and usage.</p>
+              <p className="text-muted-foreground">Manage your account, billing, and usage.</p>
             </div>
 
             {/* Sections using shared Tabs UI with improved alignment */}
@@ -29,10 +29,6 @@ export default function ProfilePage(): React.JSX.Element {
                   <TabsTrigger value="account" className="gap-2 rounded-xl px-4 py-2">
                     <UserIcon className="h-4 w-4" />
                     <span>Account</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="starship" className="gap-2 rounded-xl px-4 py-2">
-                    <Rocket className="h-4 w-4" />
-                    <span>Starship</span>
                   </TabsTrigger>
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-4 py-2">
                     <CreditCard className="h-4 w-4" />

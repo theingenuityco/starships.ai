@@ -740,10 +740,9 @@ export function useConversationStreamed(conversationId: string | null) {
       return response.data
     },
     onSuccess: (_res, variables) => {
-      if (variables?.conversationId) {
-        // Ensure stream is active or re-opened for the next turn
-        queryClient.refetchQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(variables.conversationId) })
-      }
+      // Don't refetch - the SSE stream is already active and will receive new messages automatically
+      // Refetching would close the existing connection and open a new one, causing the server
+      // to lose the connection while the agent is still broadcasting
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'

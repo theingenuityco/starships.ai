@@ -168,69 +168,69 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl">
-        <ScrollArea className="h-full -mx-6 -mt-6 -mb-6">
-          <div className="p-6">
-            <SheetHeader className="space-y-4">
+      <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl">
+        <ScrollArea className="h-full -mx-6">
+          <div className="px-6 pb-6 space-y-6">
+            <SheetHeader className="space-y-4 pt-2">
               {/* Main Header with Icon and Title */}
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 p-4 rounded-xl bg-primary/20 group-hover:bg-primary/30 transition-colors">
+                <div className="flex-shrink-0 p-4 rounded-xl bg-primary/10 border border-primary/20 transition-all hover:bg-primary/20 hover:border-primary/30">
                   <Wrench className="w-8 h-8 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-2xl font-bold text-left mb-2">Create Tool</SheetTitle>
-                  <SheetDescription className="text-left text-base leading-relaxed">
+                  <SheetTitle className="text-2xl font-bold text-left mb-2 text-foreground">Create Tool</SheetTitle>
+                  <SheetDescription className="text-left text-base leading-relaxed text-muted-foreground">
                     Configure your tool with the details below. Fill in all required fields to create a custom tool for your starship.
                   </SheetDescription>
                 </div>
               </div>
             </SheetHeader>
 
-            <Separator className="my-6" />
-
             {/* Form Sections */}
-            <div className="space-y-6">
+            <div className="space-y-6 pt-6 border-t border-border/40">
               {/* Basic Information */}
-              <Card className="p-4 frosted-glass-card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <div className="p-5 rounded-xl frosted-glass-card">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Sparkles className="w-5 h-5 text-primary" />
                   Basic Information
                 </h3>
                 <div className="space-y-4">
                   {/* Tool Name */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-name">
-                      Tool Name <span className="text-red-500">*</span>
+                    <Label htmlFor="tool-name" className="text-foreground">
+                      Tool Name <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="tool-name"
                       placeholder="e.g., Weather Lookup"
                       value={formData.name}
                       onChange={e => handleFieldChange('name', e.target.value)}
-                      className={errors.name ? 'border-red-500' : ''}
+                      className={errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
                     />
-                    {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
                   </div>
 
                   {/* Description */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-description">
-                      Description <span className="text-red-500">*</span>
+                    <Label htmlFor="tool-description" className="text-foreground">
+                      Description <span className="text-destructive">*</span>
                     </Label>
                     <Textarea
                       id="tool-description"
                       placeholder="Describe what this tool does..."
                       value={formData.description}
                       onChange={e => handleFieldChange('description', e.target.value)}
-                      className={errors.description ? 'border-red-500' : ''}
+                      className={errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}
                       rows={3}
                     />
-                    {errors.description && <p className="text-sm text-red-500">{errors.description}</p>}
+                    {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
                   </div>
 
                   {/* Category */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-category">Category</Label>
+                    <Label htmlFor="tool-category" className="text-foreground">
+                      Category
+                    </Label>
                     <div className="grid grid-cols-2 gap-2">
                       {categories.map(cat => (
                         <button
@@ -238,7 +238,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                           type="button"
                           onClick={() => handleFieldChange('category', cat)}
                           className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
-                            formData.category === cat ? `${getCategoryColor(cat)} border-2` : 'border-muted-foreground/20 bg-muted/10 hover:bg-muted/20'
+                            formData.category === cat ? `${getCategoryColor(cat)} border-2` : 'border-border/40 bg-muted/5 hover:bg-muted/10 hover:border-border/60'
                           }`}
                         >
                           {getCategoryIcon(cat)}
@@ -248,83 +248,89 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
 
               {/* Configuration */}
-              <Card className="p-4 frosted-glass-card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <div className="p-5 rounded-xl frosted-glass-card">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Package className="w-5 h-5 text-primary" />
                   Configuration
                 </h3>
                 <div className="space-y-4">
                   {/* Example Usage */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-example">Example Usage</Label>
+                    <Label htmlFor="tool-example" className="text-foreground">
+                      Example Usage
+                    </Label>
                     <Textarea id="tool-example" placeholder="Show how to use this tool..." value={formData.exampleUsage} onChange={e => handleFieldChange('exampleUsage', e.target.value)} rows={3} />
                   </div>
 
                   {/* Requires API Key */}
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 border border-muted-foreground/20">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/10 border border-border/40">
                     <input
                       type="checkbox"
                       id="tool-requires-api-key"
                       checked={formData.requiresApiKey}
                       onChange={e => handleFieldChange('requiresApiKey', e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="w-4 h-4 rounded border-input text-primary focus:ring-primary focus:ring-offset-background"
                     />
-                    <Label htmlFor="tool-requires-api-key" className="cursor-pointer flex-1">
+                    <Label htmlFor="tool-requires-api-key" className="cursor-pointer flex-1 text-foreground">
                       Requires API Key
                     </Label>
                   </div>
                 </div>
-              </Card>
+              </div>
 
               {/* Technical Details */}
-              <Card className="p-4 frosted-glass-card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <div className="p-5 rounded-xl frosted-glass-card">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
                   <Bot className="w-5 h-5 text-primary" />
                   Technical Details
                 </h3>
                 <div className="space-y-4">
                   {/* Parameters Schema */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-parameters">Parameters Schema (JSON)</Label>
+                    <Label htmlFor="tool-parameters" className="text-foreground">
+                      Parameters Schema (JSON)
+                    </Label>
                     <Textarea
                       id="tool-parameters"
                       placeholder='{"type": "object", "properties": {...}}'
                       value={formData.parameters}
                       onChange={e => handleFieldChange('parameters', e.target.value)}
-                      className={`font-mono text-xs ${errors.parameters ? 'border-red-500' : ''}`}
+                      className={`font-mono text-xs ${errors.parameters ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                       rows={8}
                     />
-                    {errors.parameters && <p className="text-sm text-red-500">{errors.parameters}</p>}
+                    {errors.parameters && <p className="text-sm text-destructive">{errors.parameters}</p>}
                     <p className="text-xs text-muted-foreground">Define the input parameters for this tool in JSON format</p>
                   </div>
 
                   {/* Blueprint */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-blueprint">Blueprint (JSON)</Label>
+                    <Label htmlFor="tool-blueprint" className="text-foreground">
+                      Blueprint (JSON)
+                    </Label>
                     <Textarea
                       id="tool-blueprint"
                       placeholder='{"nodes": [], "edges": []}'
                       value={formData.blueprint}
                       onChange={e => handleFieldChange('blueprint', e.target.value)}
-                      className={`font-mono text-xs ${errors.blueprint ? 'border-red-500' : ''}`}
+                      className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                       rows={8}
                     />
-                    {errors.blueprint && <p className="text-sm text-red-500">{errors.blueprint}</p>}
+                    {errors.blueprint && <p className="text-sm text-destructive">{errors.blueprint}</p>}
                     <p className="text-xs text-muted-foreground">Define the workflow blueprint for this tool</p>
                   </div>
                 </div>
-              </Card>
+              </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <Button size="lg" className="flex-1" onClick={handleSave}>
+              <div className="flex gap-3 pt-4 pb-2">
+                <Button size="lg" className="flex-1 shadow-lg hover:shadow-xl" onClick={handleSave}>
                   <Save className="w-4 h-4 mr-2" />
                   Save Tool
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => onOpenChange(false)}>
+                <Button size="lg" variant="outline" className="hover:bg-muted/50" onClick={() => onOpenChange(false)}>
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>

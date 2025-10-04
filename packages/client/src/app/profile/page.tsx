@@ -4,6 +4,7 @@ import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import AccountForm from '@/components/profile/AccountForm'
 import { UserUsage } from '@/components/profile/UserUsage'
@@ -12,6 +13,34 @@ import CreditTopupForm from '@/components/profile/CreditTopupForm'
 import CreditTransactionHistory from '@/components/profile/CreditTransactionHistory'
 
 export default function ProfilePage(): React.JSX.Element {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const ALLOWED_TABS = ['account', 'billing', 'usage'] as const
+  type Tab = (typeof ALLOWED_TABS)[number]
+
+  const tabParamRaw = searchParams.get('tab') || ''
+  const tabParam = tabParamRaw.toLowerCase()
+  const isValidTab = (ALLOWED_TABS as readonly string[]).includes(tabParam)
+
+  React.useEffect(() => {
+    if (!isValidTab) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('tab', 'account')
+      router.replace(`${pathname}?${params.toString()}`)
+    }
+  }, [isValidTab, pathname, router, searchParams])
+
+  const currentTab: Tab = isValidTab ? (tabParam as Tab) : 'account'
+
+  const handleTabChange = (next: string) => {
+    if (!(ALLOWED_TABS as readonly string[]).includes(next)) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', next)
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
   return (
     <PageLayout>
       <div className="bg-background">
@@ -26,7 +55,7 @@ export default function ProfilePage(): React.JSX.Element {
             </div>
 
             {/* Sections using shared Tabs UI with improved alignment */}
-            <Tabs defaultValue="account" className="space-y-6">
+            <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
                   <TabsTrigger value="account" className="gap-2 rounded-xl px-4 py-2">

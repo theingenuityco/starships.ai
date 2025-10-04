@@ -46,28 +46,6 @@ export class StarshipService {
   }
 
   /**
-   * Create a paid starship with pending payment status
-   */
-  async createPaidStarship(
-    data: CreateStarshipData & {
-      plan: 'cruiser' | 'draught';
-      billingPeriod: 'monthly' | 'yearly';
-    }
-  ): Promise<StarshipModel> {
-    const starship = await this.starshipRepository.create({
-      ownerId: data.ownerId,
-      name: data.name,
-      class: data.class,
-      slug: data.slug,
-      status: 'pending_payment',
-      plan: data.plan,
-      billingPeriod: data.billingPeriod,
-    });
-
-    return starship;
-  }
-
-  /**
    * Get starships by owner
    */
   async getStarshipsByOwner(ownerId: string): Promise<StarshipModel[]> {
@@ -166,61 +144,6 @@ export class StarshipService {
    */
   async updateStarshipStatus(starshipId: string, status: StarshipModel['status']): Promise<boolean> {
     return this.starshipRepository.updateStatus(starshipId, status);
-  }
-
-  /**
-   * Update starship payment status
-   */
-  async updatePaymentStatus(
-    starshipId: string,
-    status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
-    additionalFields?: Partial<StarshipModel>
-  ): Promise<void> {
-    return this.starshipRepository.updatePaymentStatus(starshipId, status, additionalFields);
-  }
-
-  /**
-   * Update subscription details
-   */
-  async updateSubscription(
-    starshipId: string,
-    updates: {
-      subscriptionId?: string;
-      status?: 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
-      plan?: 'scout' | 'cruiser' | 'draught';
-      billingPeriod?: 'monthly' | 'yearly';
-    }
-  ): Promise<void> {
-    return this.starshipRepository.updateSubscription(starshipId, updates);
-  }
-
-  /**
-   * Find starship by subscription ID
-   */
-  async getStarshipBySubscriptionId(subscriptionId: string): Promise<StarshipModel | null> {
-    return this.starshipRepository.findBySubscriptionId(subscriptionId);
-  }
-
-  /**
-   * Find starship by Stripe customer ID
-   */
-  async getStarshipByStripeCustomerId(customerId: string): Promise<StarshipModel | null> {
-    return this.starshipRepository.findByStripeCustomerId(customerId);
-  }
-
-  /**
-   * Count free starships for user
-   */
-  async countFreeStarships(userId: string): Promise<number> {
-    return this.starshipRepository.countFreeStarships(userId);
-  }
-
-  /**
-   * Check if user can create more scout starships
-   */
-  async canCreateScoutStarship(userId: string): Promise<boolean> {
-    const scoutCount = await this.countFreeStarships(userId);
-    return scoutCount < 3; // Scout limit is 3
   }
 
   /**

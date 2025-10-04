@@ -46,14 +46,12 @@ describe('UserEntity', () => {
       user.id = 'user-123';
       user.email = 'test@example.com';
       user.createdAt = '2024-01-01T00:00:00.000Z';
-      user.stripeCustomerId = 'cus_123abc';
 
       const serialized = toDatabase(user);
 
       expect(serialized.display_name).toBeUndefined();
       expect(serialized.avatar).toBeUndefined();
       expect(serialized.password).toBeUndefined();
-      expect(serialized.stripe_customer_id).toBe('cus_123abc');
     });
   });
 
@@ -76,21 +74,6 @@ describe('UserEntity', () => {
       expect(entity.email).toBe('test@example.com');
       expect(entity.displayName).toBe('Test User');
       expect(entity.avatar).toBe('https://example.com/avatar.jpg');
-    });
-
-    it('should handle optional Stripe customer ID', async () => {
-      const databaseRecord = {
-        id: 'user-123',
-        email: 'test@example.com',
-        displayName: 'Test User',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-02T12:00:00.000Z',
-        stripeCustomerId: 'cus_abc123',
-      };
-
-      const entity = fromDatabase(UserEntity, databaseRecord);
-
-      expect(entity.stripeCustomerId).toBe('cus_abc123');
     });
 
     it('should apply email transformation (lowercase)', async () => {
@@ -198,22 +181,6 @@ describe('UserEntity', () => {
       ).resolves.not.toThrow();
     });
 
-    it('should validate Stripe customer ID format', async () => {
-      await expect(
-        UserEntity.validate({
-          email: 'test@example.com',
-          stripeCustomerId: 'invalid_format',
-        })
-      ).rejects.toThrow();
-
-      await expect(
-        UserEntity.validate({
-          email: 'test@example.com',
-          stripeCustomerId: 'cus_abc123',
-        })
-      ).resolves.not.toThrow();
-    });
-
     it('should allow partial validation for update operations', async () => {
       const updateData = {
         displayName: 'Updated Name',
@@ -244,15 +211,6 @@ describe('UserEntity', () => {
         user.email = undefined;
         user.displayName = 'Test User';
         expect(user.hasCompleteProfile()).toBe(false);
-      });
-
-      it('should check if user has Stripe integration', () => {
-        const user = new UserEntity();
-
-        expect(user.hasStripeIntegration()).toBe(false);
-
-        user.stripeCustomerId = 'cus_123';
-        expect(user.hasStripeIntegration()).toBe(true);
       });
     });
 
@@ -440,7 +398,6 @@ describe('UserEntity', () => {
         displayName: 'Test User',
         avatar: 'https://example.com/avatar.jpg',
         password: 'hashedpassword123',
-        stripeCustomerId: 'cus_abc123',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -452,7 +409,6 @@ describe('UserEntity', () => {
       const entity = results[0].entity as UserEntity;
       expect(entity.email).toBe('test@example.com');
       expect(entity.displayName).toBe('Test User');
-      expect(entity.stripeCustomerId).toBe('cus_abc123');
     });
 
     it('should handle round-trip with minimal data', async () => {
@@ -545,22 +501,6 @@ describe('UserEntity', () => {
 
         const entity = fromDatabase(UserEntity, record);
         expect(entity.avatar).toBe(avatar.trim());
-      }
-    });
-
-    it('should handle various Stripe customer ID formats', async () => {
-      const stripeIds = ['cus_abc123', 'cus_ABC123', 'cus_123ABC', 'cus_aB1cD2'];
-
-      for (const stripeCustomerId of stripeIds) {
-        const record = {
-          id: 'user-123',
-          email: 'test@example.com',
-          stripeCustomerId,
-          createdAt: '2024-01-01T00:00:00.000Z',
-        };
-
-        const entity = fromDatabase(UserEntity, record);
-        expect(entity.stripeCustomerId).toBe(stripeCustomerId);
       }
     });
 

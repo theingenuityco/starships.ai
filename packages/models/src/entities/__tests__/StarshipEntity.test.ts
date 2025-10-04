@@ -44,30 +44,6 @@ describe('StarshipEntity', () => {
         updated_at: '2024-01-02T12:00:00.000Z',
       });
     });
-
-    it('should handle optional Stripe fields', async () => {
-      const starship = new StarshipEntity();
-      starship.id = 'starship-123';
-      starship.slug = 'test-starship';
-      starship.ownerId = 'user-456';
-      starship.class = 'cruiser';
-      starship.name = 'Test Starship';
-      starship.maxAgents = 5;
-      starship.status = 'active';
-      starship.createdAt = '2024-01-01T00:00:00.000Z';
-      starship.updatedAt = '2024-01-02T12:00:00.000Z';
-      starship.subscriptionId = 'sub_123';
-      starship.plan = 'cruiser';
-      starship.billingPeriod = 'monthly';
-      starship.stripeCustomerId = 'cus_123';
-
-      const serialized = toDatabase(starship);
-
-      expect(serialized.subscription_id).toBe('sub_123');
-      expect(serialized.plan).toBe('cruiser');
-      expect(serialized.billing_period).toBe('monthly');
-      expect(serialized.stripe_customer_id).toBe('cus_123');
-    });
   });
 
   describe('Deserialization', () => {
@@ -92,31 +68,6 @@ describe('StarshipEntity', () => {
       expect(entity.class).toBe('scout');
       expect(entity.status).toBe('active');
       expect(entity.maxAgents).toBe(3);
-    });
-
-    it('should handle optional Stripe integration fields', async () => {
-      const databaseRecord = {
-        id: 'starship-123',
-        slug: 'premium-starship',
-        ownerId: 'user-456',
-        class: 'draught',
-        name: 'Premium Starship',
-        maxAgents: 10,
-        status: 'active',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-02T12:00:00.000Z',
-        subscriptionId: 'sub_123',
-        plan: 'draught',
-        billingPeriod: 'yearly',
-        stripeCustomerId: 'cus_123',
-      };
-
-      const entity = fromDatabase(StarshipEntity, databaseRecord);
-
-      expect(entity.subscriptionId).toBe('sub_123');
-      expect(entity.plan).toBe('draught');
-      expect(entity.billingPeriod).toBe('yearly');
-      expect(entity.stripeCustomerId).toBe('cus_123');
     });
 
     it('should deserialize array of database records', async () => {
@@ -304,44 +255,6 @@ describe('StarshipEntity', () => {
       ).resolves.not.toThrow();
     });
 
-    it('should validate billingPeriod enum when provided', async () => {
-      await expect(
-        StarshipEntity.validate({
-          slug: 'test-starship',
-          ownerId: 'user-456',
-          class: 'scout',
-          name: 'Test Starship',
-          maxAgents: 3,
-          status: 'active',
-          billingPeriod: 'invalid-period',
-        })
-      ).rejects.toThrow();
-
-      await expect(
-        StarshipEntity.validate({
-          slug: 'test-starship',
-          ownerId: 'user-456',
-          class: 'scout',
-          name: 'Test Starship',
-          maxAgents: 3,
-          status: 'active',
-          billingPeriod: 'monthly',
-        })
-      ).resolves.not.toThrow();
-
-      await expect(
-        StarshipEntity.validate({
-          slug: 'test-starship',
-          ownerId: 'user-456',
-          class: 'scout',
-          name: 'Test Starship',
-          maxAgents: 3,
-          status: 'active',
-          billingPeriod: 'yearly',
-        })
-      ).resolves.not.toThrow();
-    });
-
     it('should allow partial validation for update operations', async () => {
       const updateData = {
         name: 'Updated Starship Name',
@@ -451,51 +364,6 @@ describe('StarshipEntity', () => {
       });
     });
 
-    describe('Stripe integration helpers', () => {
-      it('should check if starship has Stripe integration', () => {
-        const starship = new StarshipEntity();
-
-        expect(starship.hasStripeIntegration()).toBe(false);
-
-        starship.subscriptionId = 'sub_123';
-        expect(starship.hasStripeIntegration()).toBe(true);
-
-        starship.subscriptionId = undefined;
-        starship.stripeCustomerId = 'cus_123';
-        expect(starship.hasStripeIntegration()).toBe(true);
-      });
-
-      it('should check if starship is on paid plan', () => {
-        const starship = new StarshipEntity();
-
-        starship.class = 'scout';
-        expect(starship.isPaidPlan()).toBe(false);
-
-        starship.subscriptionId = 'sub_123';
-        expect(starship.isPaidPlan()).toBe(true);
-
-        starship.subscriptionId = undefined;
-        starship.class = 'cruiser';
-        expect(starship.isPaidPlan()).toBe(true);
-
-        starship.class = 'draught';
-        expect(starship.isPaidPlan()).toBe(true);
-      });
-
-      it('should get billing info', () => {
-        const starship = new StarshipEntity();
-        starship.class = 'cruiser';
-        starship.plan = 'cruiser';
-        starship.billingPeriod = 'monthly';
-        starship.status = 'active';
-
-        const billingInfo = starship.getBillingInfo();
-        expect(billingInfo.plan).toBe('Cruiser Class');
-        expect(billingInfo.period).toBe('Monthly');
-        expect(billingInfo.status).toBe('Active');
-      });
-    });
-
     describe('Agent capacity helpers', () => {
       it('should get available agent slots', () => {
         const starship = new StarshipEntity();
@@ -571,10 +439,6 @@ describe('StarshipEntity', () => {
         name: 'Premium Starship',
         maxAgents: 10,
         status: 'active',
-        subscriptionId: 'sub_123',
-        plan: 'draught',
-        billingPeriod: 'yearly',
-        stripeCustomerId: 'cus_123',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -582,12 +446,6 @@ describe('StarshipEntity', () => {
       const results = await testHelper.testRoundTrip([{ data: originalData, description: 'complete starship data' }]);
 
       expect(results[0].success).toBe(true);
-
-      const entity = results[0].entity as StarshipEntity;
-      expect(entity.slug).toBe('premium-starship');
-      expect(entity.class).toBe('draught');
-      expect(entity.maxAgents).toBe(10);
-      expect(entity.subscriptionId).toBe('sub_123');
     });
 
     it('should handle round-trip with minimal data', async () => {
@@ -606,11 +464,6 @@ describe('StarshipEntity', () => {
       const results = await testHelper.testRoundTrip([{ data: minimalData, description: 'minimal starship data' }]);
 
       expect(results[0].success).toBe(true);
-
-      const entity = results[0].entity as StarshipEntity;
-      expect(entity.subscriptionId).toBeUndefined();
-      expect(entity.plan).toBeUndefined();
-      expect(entity.billingPeriod).toBeUndefined();
     });
   });
 

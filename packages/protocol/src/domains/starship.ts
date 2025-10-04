@@ -42,12 +42,6 @@ export interface StarshipModel {
   status: StarshipStatus;
   createdAt: string;
   updatedAt: string;
-
-  // Stripe integration
-  subscriptionId?: string; // Stripe subscription ID
-  plan?: StarshipClass; // Separate from class for billing
-  billingPeriod?: BillingPeriod; // Billing period
-  stripeCustomerId?: string; // Links to Stripe Customer for portal access
 }
 
 // ============================================================================

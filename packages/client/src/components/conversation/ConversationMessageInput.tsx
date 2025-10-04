@@ -327,19 +327,61 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               />
             </div>
 
-            {/* Minimal mode: Send button inline */}
+            {/* Minimal mode: Action buttons inline */}
             {minimal && (
-              <Button
-                onClick={handleSubmit}
-                disabled={!canSend}
-                size="icon"
-                className={cn(
-                  'h-8 w-8 rounded-full shrink-0 transition-all ml-2',
-                  canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+              <div className="flex items-center gap-2 ml-2 shrink-0">
+                {/* Create Tool Button */}
+                {onToggleToolForm && (
+                  <Tooltip delayDuration={300}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onToggleToolForm}
+                        className={cn(
+                          'h-8 w-8 rounded-full shrink-0 transition-colors',
+                          isToolFormOpen ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+                        )}
+                        disabled={disabled || isStreamingEffective}
+                      >
+                        <Wrench className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
+                      {isToolFormOpen ? 'Close Tool Form' : 'Create Tool'}
+                    </TooltipContent>
+                  </Tooltip>
                 )}
-              >
-                {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+
+                {/* File Attachment */}
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled || isStreamingEffective}>
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+
+                {/* Voice Recording */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleVoiceToggle}
+                  className={cn('h-8 w-8 rounded-full shrink-0 transition-colors', isRecording ? 'text-red-500 hover:text-red-600 bg-red-500/10' : 'text-muted-foreground hover:text-foreground')}
+                  disabled={disabled || isStreamingEffective}
+                >
+                  {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+
+                {/* Send Button */}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!canSend}
+                  size="icon"
+                  className={cn(
+                    'h-8 w-8 rounded-full shrink-0 transition-all',
+                    canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  )}
+                >
+                  {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
             )}
           </div>
 

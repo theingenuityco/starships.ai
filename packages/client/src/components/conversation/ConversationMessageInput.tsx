@@ -370,8 +370,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           {!minimal && (
             <div className="border-t border-border/20 bg-muted/10 px-4 py-3">
               <div className="flex items-center justify-between">
-                {/* Left Side - Tool Button and Selectors */}
+                {/* Left Side - Selectors and Tool Button */}
                 <div className="flex items-center gap-3">
+                  {children}
                   {/* Create Tool Button */}
                   {onToggleToolForm && (
                     <Tooltip delayDuration={300}>
@@ -394,7 +395,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       </TooltipContent>
                     </Tooltip>
                   )}
-                  {children}
                 </div>
 
                 {/* Right Side - Send Button */}

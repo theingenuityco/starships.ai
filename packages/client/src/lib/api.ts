@@ -776,18 +776,6 @@ export const starshipAPI = {
     const data = extractResponseData<Starship[]>(response)
     return data
   },
-
-  // Create billing portal session
-  createBillingPortal: async (starshipId: string): Promise<{ url: string }> => {
-    const response = await api.post(`/api/v1/starships/${starshipId}/billing-portal`)
-    return response.data
-  },
-
-  // Retry payment for starship
-  retryPayment: async (starshipId: string): Promise<{ checkoutUrl: string; message: string }> => {
-    const response = await api.post(`/api/v1/starships/${starshipId}/retry-payment`)
-    return response.data
-  },
 }
 
 export default api

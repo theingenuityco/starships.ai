@@ -311,8 +311,9 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     if (shouldScroll() || displayMessages.length > lastMessageCountRef.current) {
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
-        container.scrollTo({
-          top: container.scrollHeight,
+        if (!scrollContainerRef.current) return
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
           behavior: displayMessages.length === lastMessageCountRef.current ? 'smooth' : 'auto',
         })
       })
@@ -327,8 +328,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     if (!scrollContainerRef.current) return
     if (shouldShowGapLoader) {
       requestAnimationFrame(() => {
-        const container = scrollContainerRef.current!
-        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+        if (!scrollContainerRef.current) return
+        scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' })
       })
     }
   }, [shouldShowGapLoader])

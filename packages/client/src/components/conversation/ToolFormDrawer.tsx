@@ -10,7 +10,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
@@ -67,6 +68,7 @@ const INITIAL_FORM_DATA: ToolFormData = {
 export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>(({ open, onOpenChange, onSave, starshipId }, ref) => {
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -248,9 +250,17 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
 
                   {/* Blueprint Visualization */}
                   <div className="space-y-2">
-                    <Label htmlFor="tool-blueprint" className="text-foreground">
-                      Blueprint
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="tool-blueprint" className="text-foreground">
+                        Blueprint
+                      </Label>
+                      {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => setIsFullScreenOpen(true)} className="h-7 px-2 text-xs">
+                          <Maximize2 className="w-3 h-3 mr-1" />
+                          Full Screen
+                        </Button>
+                      )}
+                    </div>
                     {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
                       <div className="border border-border/60 rounded-lg overflow-hidden">
                         <BlueprintVisualization blueprint={parsedBlueprint} className="h-[400px]" />
@@ -338,6 +348,27 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
           </div>
         </ScrollArea>
       </SheetContent>
+
+      {/* Full Screen Blueprint Dialog */}
+      <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b border-border/60">
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-primary" />
+              Blueprint Visualization - {formData.name || 'Tool'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 p-4 overflow-hidden">
+            {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
+              <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" />
+            ) : (
+              <div className="h-full flex items-center justify-center bg-muted/10">
+                <p className="text-muted-foreground">No blueprint defined yet</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   )
 })

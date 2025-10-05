@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X } from 'lucide-react'
-import { motion } from 'motion/react'
 import type { ToolTemplateCategory } from '@starships/protocol'
 
 interface ToolFormData {
@@ -174,13 +173,11 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
             <SheetTitle className="sr-only">Tool Form</SheetTitle>
 
             {/* Header */}
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="border-b border-border/40 pb-4 space-y-3">
+            <div className="border-b border-border/40 pb-4 space-y-3">
               <div className="flex items-center gap-3">
-                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1, duration: 0.3 }} className="flex-shrink-0">
-                  <div className="h-[46px] w-[46px] rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center">
-                    <Wrench className="w-6 h-6 text-primary" />
-                  </div>
-                </motion.div>
+                <div className="h-[46px] w-[46px] rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
+                  <Wrench className="w-6 h-6 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <Input
                     id="tool-name-header"
@@ -203,7 +200,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                 />
                 {errors.description && <p className="text-xs text-destructive mt-1.5">{errors.description}</p>}
               </div>
-            </motion.div>
+            </div>
 
             {/* Form Sections */}
             <div className="space-y-6 pt-2">

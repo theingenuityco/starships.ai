@@ -15,13 +15,7 @@ export function ExpandableMessageOverlay({ isExpanded, conversationId, starshipI
   if (!conversationId) return null
 
   return (
-    <div
-      className={cn(
-        'transition-all duration-300 ease-out overflow-hidden bg-background/95 backdrop-blur-sm',
-        'border-t border-border/40 rounded-t-2xl shadow-2xl mb-2',
-        isExpanded ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0'
-      )}
-    >
+    <div className={cn('transition-all duration-300 ease-out overflow-hidden', 'border-b border-border/20', isExpanded ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0')}>
       {/* Context Bar */}
       {budgetTokens !== undefined && <ConversationContextBar conversationId={conversationId} budgetTokens={budgetTokens} />}
 

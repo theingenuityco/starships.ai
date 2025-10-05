@@ -4,7 +4,6 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ToolFormView, ToolFormViewRef } from '@/components/conversation/ToolFormView'
-import { ExpandableMessageOverlay } from '@/components/conversation/ExpandableMessageOverlay'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -443,31 +442,26 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             bottom: viewMode === 'tool-form' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
           }}
         >
-          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
-            {/* Expandable Message Overlay - Natural extension above input */}
-            {viewMode === 'tool-form' && currentConversationId && (
-              <ExpandableMessageOverlay isExpanded={isMessageOverlayExpanded} conversationId={currentConversationId} starshipId={starshipId} budgetTokens={budgetTokens} />
-            )}
-
-            {/* Message Input */}
-            <div data-message-input>
-              <ConversationMessageInput
-                ref={messageInputRef}
-                selectedAgent={selectedAgent}
-                starshipId={starshipId}
-                conversationId={currentConversationId}
-                onConversationStart={handleConversationStart}
-                onToggleToolForm={() => setViewMode(prev => (prev === 'tool-form' ? 'conversation' : 'tool-form'))}
-                isToolFormOpen={viewMode === 'tool-form'}
-                disabled={!selectedAgent}
-                minimal={viewMode === 'tool-form' || showMessagesArea}
-                onFocus={() => viewMode === 'tool-form' && setIsMessageOverlayExpanded(true)}
-                onBlur={() => setIsMessageOverlayExpanded(false)}
-              >
-                {/* Footer Content - Agent Selector */}
-                <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
-              </ConversationMessageInput>
-            </div>
+          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
+            <ConversationMessageInput
+              ref={messageInputRef}
+              selectedAgent={selectedAgent}
+              starshipId={starshipId}
+              conversationId={currentConversationId}
+              onConversationStart={handleConversationStart}
+              onToggleToolForm={() => setViewMode(prev => (prev === 'tool-form' ? 'conversation' : 'tool-form'))}
+              isToolFormOpen={viewMode === 'tool-form'}
+              disabled={!selectedAgent}
+              minimal={viewMode === 'tool-form' || showMessagesArea}
+              onFocus={() => viewMode === 'tool-form' && setIsMessageOverlayExpanded(true)}
+              onBlur={() => setIsMessageOverlayExpanded(false)}
+              showExpandableOverlay={viewMode === 'tool-form'}
+              isOverlayExpanded={isMessageOverlayExpanded}
+              budgetTokens={budgetTokens}
+            >
+              {/* Footer Content - Agent Selector */}
+              <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
+            </ConversationMessageInput>
           </div>
         </div>
       </div>

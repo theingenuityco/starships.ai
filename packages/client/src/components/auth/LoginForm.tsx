@@ -13,6 +13,7 @@ import { Eye, EyeOff, LogIn, UserPlus, Github, Chrome } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 
 /**
  * OAuth button component
@@ -81,6 +82,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  */
 export function LoginForm() {
   const { login, register, isLoading, error } = useAuth()
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
 
   const [loginData, setLoginData] = useState({
@@ -111,9 +113,10 @@ export function LoginForm() {
     const oauthWaitlist = searchParams?.get('oauth_waitlist');
 
     if (oauthToken) {
-      // Store the token and redirect to app
+      // Store the token and invalidate queries to refetch with new auth context
       localStorage.setItem('starships_auth_token', oauthToken);
-      window.location.href = '/ship'; // Redirect to app
+      queryClient.invalidateQueries(); // Refetch all queries with new auth context
+      window.location.href = '/'; // Redirect to main app
     } else if (oauthError) {
       setFormError(getOAuthErrorMessage(oauthError));
     } else if (oauthWaitlist) {

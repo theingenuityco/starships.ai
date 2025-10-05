@@ -58,7 +58,8 @@ const setStoredToken = (token: string | null) => {
 // Validate token and get user info
 const validateToken = async (token: string): Promise<AuthUser | null> => {
   try {
-    const response = await fetch('/api/v1/auth/me', {
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    const response = await fetch(`${baseURL}/api/v1/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -110,7 +111,8 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const response = await fetch('/api/v1/auth/login', {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+      const response = await fetch(`${baseURL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +178,8 @@ export function useRegister() {
 
   return useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
-      const response = await fetch('/api/v1/auth/register', {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+      const response = await fetch(`${baseURL}/api/v1/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -245,7 +248,8 @@ export function useLogout() {
 
       try {
         // Call logout endpoint (optional since JWT is stateless)
-        await fetch('/api/v1/auth/logout', {
+        const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+        await fetch(`${baseURL}/api/v1/auth/logout`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,

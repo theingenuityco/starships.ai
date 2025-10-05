@@ -25,6 +25,7 @@ interface RequestConfig extends RequestInit {
 class FetchClient {
   private timeout: number
   private baseHeaders: Record<string, string>
+  private baseURL: string
   private requestInterceptors: RequestInterceptor[] = []
   private responseInterceptors: ResponseInterceptor[] = []
   private errorInterceptors: ErrorInterceptor[] = []
@@ -44,9 +45,10 @@ class FetchClient {
     },
   }
 
-  constructor(config: { timeout?: number; headers?: Record<string, string> } = {}) {
+  constructor(config: { timeout?: number; headers?: Record<string, string>; baseURL?: string } = {}) {
     this.timeout = config.timeout || 120000 // 120s (2 minutes)
     this.baseHeaders = config.headers || { 'Content-Type': 'application/json' }
+    this.baseURL = config.baseURL || ''
   }
 
   async request<T = any>(url: string, options: RequestInit = {}): Promise<FetchResponse<T>> {
@@ -69,7 +71,8 @@ class FetchClient {
         config = await interceptor(config)
       }
 
-      const response = await fetch(config.url || url, config)
+      const fullUrl = this.baseURL + (config.url || url)
+      const response = await fetch(fullUrl, config)
 
       clearTimeout(timeoutId)
 
@@ -187,6 +190,7 @@ const api = new FetchClient({
   headers: {
     'Content-Type': 'application/json',
   },
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
 })
 
 // Simple helper to extract data from ApiResponse<T> - enforces response contract

@@ -471,6 +471,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     logger.error('[AUTH] OAuth callback error:', {
       provider: req.params.provider,
       error: error.message,
+      stack: error.stack,
       hasCode: !!req.query.code,
       hasState: !!req.query.state,
     });

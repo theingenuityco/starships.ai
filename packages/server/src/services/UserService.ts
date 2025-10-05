@@ -13,6 +13,7 @@ import { WaitlistRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
+import { StarshipService } from '@/services/StarshipService';
 
 export interface UserOptions {
   includePassword?: boolean;
@@ -338,10 +339,12 @@ export class UserService {
 
     // Check if user exists by email (for account linking)
     let user = await this.getUserByEmail(profile.email);
+    let isNewUser = false;
 
     if (!user) {
       // ✅ FIXED: Use proper service method - NO REPOSITORY JUMPING
       user = await this.createUserFromOAuthProfile(profile);
+      isNewUser = true;
     } else {
       // Update email verification for existing users
       await this.updateUserProfile(user.id, { emailVerified: true });
@@ -349,6 +352,26 @@ export class UserService {
 
     // Link OAuth account using business logic
     await this.linkOAuthAccount(user.id, profile);
+
+    // Create default starship for new OAuth users (same as email/password registration)
+    if (isNewUser) {
+      try {
+        const defaultStarship = await StarshipService.createDefaultStarship(user.id);
+        
+        // Create default agent for the starship
+        if (defaultStarship) {
+          try {
+            await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
+          } catch (agentError) {
+            console.error(`[OAUTH] Failed to create default agent for user ${user.id}:`, agentError);
+            // Continue even if agent creation fails
+          }
+        }
+      } catch (starshipError) {
+        console.error(`[OAUTH] Failed to create default starship for user ${user.id}:`, starshipError);
+        // Continue even if starship creation fails - user can create one later
+      }
+    }
 
     return { user };
   }
@@ -444,11 +467,13 @@ export class UserService {
     const env = getEnvConfig();
     
     try {
+      const redirectUri = `${process.env.NODE_ENV === 'production' ? env.SERVER_URL : 'http://localhost:4000'}/api/v1/auth/google/callback`;
+      
       // Create OAuth2 client
       const oauth2Client = new google.auth.OAuth2(
         env.GOOGLE_CLIENT_ID,
         env.GOOGLE_CLIENT_SECRET,
-        `${process.env.NODE_ENV === 'production' ? env.SERVER_URL : 'http://localhost:4000'}/api/v1/auth/google/callback`
+        redirectUri
       );
 
       // Exchange authorization code for tokens
@@ -471,12 +496,11 @@ export class UserService {
         name: data.name,
         avatar: data.picture || undefined,
       };
-    } catch (error) {
-      console.error('[OAUTH] Google profile fetch error:', error);
+    } catch (error: any) {
       if (error instanceof ValidationError) {
         throw error;
       }
-      throw new ValidationError('Failed to fetch Google profile', 'oauth');
+      throw new ValidationError(`Failed to fetch Google profile: ${error.message}`, 'oauth');
     }
   }
 

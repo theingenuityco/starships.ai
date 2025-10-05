@@ -122,6 +122,7 @@ export class OAuthAccountEntity implements OAuthAccountModel {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         userId: dataRecord.userId,
         provider: dataRecord.provider,
         providerUserId: dataRecord.providerUserId,

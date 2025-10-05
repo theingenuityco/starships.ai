@@ -18,9 +18,6 @@ export interface UserModel {
   avatar?: string;
   password?: string; // For local authentication
   createdAt: string;
-
-  // Stripe integration
-  stripeCustomerId?: string;
 }
 
 // ============================================================================
@@ -35,7 +32,6 @@ export interface CreateUserRequest {
   displayName?: string;
   avatar?: string;
   password?: string;
-  stripeCustomerId?: string;
 }
 
 /**
@@ -45,7 +41,6 @@ export interface UpdateUserRequest {
   email?: string;
   displayName?: string;
   avatar?: string;
-  stripeCustomerId?: string;
 }
 
 /**

@@ -17,7 +17,6 @@ erDiagram
         string display_name
         string avatar
         string password
-        string stripe_customer_id UK
         timestamp created_at
         timestamp updated_at
     }
@@ -26,14 +25,9 @@ erDiagram
         string id PK
         string slug UK "Unique per owner"
         string owner_id FK
-        string class "scout|cruiser|draught"
         string name
         int max_agents "Class-based limits"
-        string status "active|inactive|restricted|disabled|pending_payment"
-        string subscription_id UK
-        string plan "scout|cruiser|draught"
-        string billing_period "monthly|yearly"
-        string stripe_customer_id
+        string status "active|inactive"
         timestamp created_at
         timestamp updated_at
     }
@@ -163,13 +157,6 @@ erDiagram
         timestamp created_at
     }
 
-    %% Payment Integration
-    stripe_events {
-        string event_id PK
-        string event_type
-        timestamp processed_at
-        jsonb data
-    }
 
     %% Junction Tables for Many-to-Many Relationships
     agent_tools {
@@ -249,8 +236,7 @@ graph TD
     AT --> ATTT[AgentTemplateToolTemplates]
     TT --> ATTT
 
-    %% Payment Integration
-    SE[StripeEvent] -.-> S
+    %% Waitlist System
     WL[Waitlist] -.-> U
 
     %% Styling
@@ -258,20 +244,19 @@ graph TD
     classDef secondary fill:#f3e5f5
     classDef system fill:#e8f5e8
     classDef junction fill:#fff9c4
-    classDef integration fill:#fff3e0
 
     class U,S primary
     class A,T,C secondary
     class AT,TT system
     class AGT,ATTT,CA junction
-    class SE,WL integration
+    class WL primary
 ```
 
 ## Key Relationships and Constraints
 
 ### Core Business Logic
 
-- **Starship Classes**: Scout (3 agents), Cruiser (5 agents), Draught (10 agents)
+- **Starship Management**: Configurable AI platforms with agent deployment limits
 - **Agent Deployment**: Agents are deployed to specific starships with `starship_id` FK
 - **Tool Deployment**: Tools are deployed to specific starships and linked to agents via junction table
 - **Template System**: Both agents and tools use templates for rapid deployment
@@ -295,7 +280,7 @@ graph TD
 - **PostgreSQL Relationships**: Repository code uses foreign keys and JOIN operations for relationships
 - **Agent State Management**: Agent runtime state stored as JSONB for flexible state tracking
 - **Tool Configuration**: Tools support flexible configuration via JSONB blueprint field
-- **Usage Tracking**: Comprehensive token usage tracking for billing and analytics
+- **Usage Tracking**: Comprehensive token usage tracking for analytics
 - **Full-text Search**: GIN indexes on concatenated text fields for efficient search across all major entities
 - **Junction Tables**: Proper many-to-many relationships via `agent_tools`, `agent_template_tool_templates`, and `conversation_agents`
 

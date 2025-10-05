@@ -4,8 +4,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
-import { SubscriptionService } from '@/services/SubscriptionService';
-import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -15,40 +14,6 @@ const router: Router = Router();
 
 // Zod schemas for validation
 const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
-
-const StarshipClassSchema = z.enum(['scout', 'cruiser', 'draught']);
-const StarshipStatusSchema = z.enum(['active', 'inactive', 'pending_payment', 'restricted', 'disabled']);
-const PlanSchema = z.enum(['scout', 'cruiser', 'draught']);
-const BillingPeriodSchema = z.enum(['monthly', 'yearly']);
-
-const CreateStarshipSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  class: StarshipClassSchema,
-  plan: PlanSchema.optional(),
-  billingPeriod: BillingPeriodSchema.optional(),
-});
-
-const CreatePaidStarshipSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  plan: z.enum(['cruiser', 'draught']),
-  billingPeriod: BillingPeriodSchema,
-});
-
-const UpdateStarshipSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  status: StarshipStatusSchema.optional(),
-  class: StarshipClassSchema.optional(),
-});
-
-const CreateCheckoutSessionSchema = z.object({
-  starshipName: z.string().min(1, 'Starship name is required').max(255, 'Starship name must be less than 255 characters'),
-  plan: z.enum(['cruiser', 'draught']),
-  billingPeriod: BillingPeriodSchema,
-});
 
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
@@ -85,71 +50,19 @@ const checkAuth = (req: Request, res: Response): boolean => {
   return true;
 };
 
-// POST /starships/create-paid - Create paid starship with pending payment status (OpenAPI pattern)
-router.post('/starships/create-paid', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
-    // Validate request body
-    const bodyValidation = validateData(CreatePaidStarshipSchema, req.body, res, 'paid starship creation data');
-    if (!bodyValidation) return;
-
-    const userId = (req as any).user!.id;
-    const { name, plan, billingPeriod } = bodyValidation;
-
-    console.log('[STARSHIP-CREATE-PAID] Starting paid starship creation for user:', userId);
-
-    console.log('[STARSHIP-CREATE-PAID] Creating paid starship...');
-
-    const starshipService = new StarshipService();
-    const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
-    const starship = await starshipService.createPaidStarship({
-      ownerId: userId,
-      name: name.trim(),
-      class: plan,
-      slug,
-      plan,
-      billingPeriod,
-    });
-
-    // Create Stripe checkout session
-    const subscriptionService = new SubscriptionService();
-    const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
-      userId,
-      starshipId: starship.id,
-      starshipSlug: starship.slug,
-      plan,
-      billingPeriod,
-    });
-
-    sendSuccess(
-      res,
-      {
-        starship,
-        checkoutUrl,
-        message: 'Starship created. Redirect to checkout to complete payment.',
-      },
-      201
-    );
-  } catch (error) {
-    handleError(error, res, 'creating paid starship');
-  }
-});
-
 // POST /starships - Create new starship (OpenAPI pattern)
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
-    const { name, class: starshipClass, plan, billingPeriod } = req.body;
+    const { name, maxAgents = 3 } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 
     // Validate required fields
-    if (!name || !starshipClass) {
+    if (!name) {
       sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
-        required_fields: ['name', 'class'],
-        provided: { name: !!name, class: !!starshipClass },
+        required_fields: ['name'],
+        provided: { name: !!name },
       });
       return;
     }
@@ -161,92 +74,7 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       return;
     }
 
-    // Validate starship class
-    if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid starship class', 400, {
-        field: 'class',
-        allowed_values: ['scout', 'cruiser', 'draught'],
-        provided: starshipClass,
-      });
-      return;
-    }
-
-    // Handle paid plans - if plan/billingPeriod provided, create paid starship
-    if (plan && billingPeriod) {
-      // Validate paid plan only
-      if (!['cruiser', 'draught'].includes(plan)) {
-        sendError(res, 'INVALID_INPUT', 'Invalid paid plan', 400, {
-          field: 'plan',
-          allowed_values: ['cruiser', 'draught'],
-          provided: plan,
-        });
-        return;
-      }
-
-      // Validate billing period
-      if (!['monthly', 'yearly'].includes(billingPeriod)) {
-        sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
-          field: 'billingPeriod',
-          allowed_values: ['monthly', 'yearly'],
-          provided: billingPeriod,
-        });
-        return;
-      }
-
-      console.log('[STARSHIP-CREATE-PAID] Creating paid starship...');
-
-      const starshipService = new StarshipService();
-      const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
-      const starship = await starshipService.createPaidStarship({
-        ownerId: userId,
-        name: name.trim(),
-        class: plan,
-        slug,
-        plan,
-        billingPeriod,
-      });
-
-      // Create Stripe checkout session
-      const subscriptionService = new SubscriptionService();
-      const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
-        userId,
-        starshipId: starship.id,
-        starshipSlug: starship.slug,
-        plan,
-        billingPeriod,
-      });
-
-      sendSuccess(
-        res,
-        {
-          starship,
-          checkoutUrl,
-          message: 'Starship created. Redirect to checkout to complete payment.',
-        },
-        201
-      );
-      return;
-    }
-
     const starshipService = new StarshipService();
-
-    // Check Scout plan limit (max 3 starships per user)
-    if (starshipClass === 'scout') {
-      console.log('[STARSHIP-CREATE] Checking Scout plan limit...');
-      const canCreate = await starshipService.canCreateScoutStarship(userId);
-
-      if (!canCreate) {
-        console.log('[STARSHIP-CREATE] Scout limit reached.');
-        sendError(res, 'QUOTA_EXCEEDED', 'Scout plan limit reached', 403, {
-          message: 'Scout plan allows a maximum of 3 starships. Please upgrade to Cruiser or Draught plan for more starships.',
-          current_count: 3,
-          limit: 3,
-          upgrade_options: ['cruiser', 'draught'],
-        });
-        return;
-      }
-      console.log('[STARSHIP-CREATE] Scout limit check passed.');
-    }
 
     console.log('[STARSHIP-CREATE] Generating unique slug...');
     const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
@@ -256,7 +84,7 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
-      class: starshipClass,
+      maxAgents,
       slug,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
@@ -414,12 +242,12 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
   }
 });
 
-// PUT /starships/:id - Update starship (name, status, class) (OpenAPI pattern)
+// PUT /starships/:id - Update starship (name, status, maxAgents) (OpenAPI pattern)
 router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
-    const { name, status, class: starshipClass } = req.body;
+    const { name, status, maxAgents } = req.body;
 
     // Validate starship ID
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
@@ -467,37 +295,32 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
       allowedUpdates.status = status;
     }
 
-    if (starshipClass !== undefined) {
-      if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
-        sendError(res, 'INVALID_INPUT', 'Invalid starship class', 400, {
-          field: 'class',
-          allowed_values: ['scout', 'cruiser', 'draught'],
-          provided: starshipClass,
+    if (maxAgents !== undefined) {
+      if (typeof maxAgents !== 'number' || maxAgents < 1 || maxAgents > 50) {
+        sendError(res, 'VALIDATION_ERROR', 'maxAgents must be a number between 1 and 50', 400, {
+          field: 'maxAgents',
         });
         return;
       }
 
-      // Check if there are deployed agents that exceed new class limits
-      if (starshipClass === 'scout') {
-        const deployedAgents = await starshipService.getDeployedAgents(starshipId);
-        if (deployedAgents.length > 3) {
-          sendError(res, 'OPERATION_NOT_ALLOWED', 'Cannot change to scout class: too many deployed agents', 400, {
-            message: 'Scout class allows maximum 3 deployed agents',
-            current_deployed: deployedAgents.length,
-            max_allowed: 3,
-          });
-          return;
-        }
+      // Check if there are deployed agents that exceed new maxAgents limits
+      const deployedAgents = await starshipService.getDeployedAgents(starshipId);
+      if (deployedAgents.length > maxAgents) {
+        sendError(res, 'OPERATION_NOT_ALLOWED', 'Cannot reduce maxAgents below current deployed agent count', 400, {
+          message: 'Current deployed agents exceed the new maxAgents limit',
+          current_deployed: deployedAgents.length,
+          new_max_agents: maxAgents,
+        });
+        return;
       }
 
-      allowedUpdates.class = starshipClass;
-      allowedUpdates.maxAgents = starshipClass === 'scout' ? 3 : 6;
+      allowedUpdates.maxAgents = maxAgents;
     }
 
     if (Object.keys(allowedUpdates).length === 0) {
       sendError(res, 'VALIDATION_ERROR', 'No valid updates provided', 400, {
         message: 'At least one valid field must be provided for update',
-        allowed_fields: ['name', 'status', 'class'],
+        allowed_fields: ['name', 'status', 'maxAgents'],
       });
       return;
     }
@@ -543,59 +366,21 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
       return;
     }
 
-    // STEP 1: Cancel subscription FIRST (if it exists)
-    let subscriptionCancelled = true; // Default to true for free plans
-
-    if (starship.subscriptionId && starship.plan !== 'scout') {
-      console.log(`[STARSHIPS] Attempting to cancel subscription ${starship.subscriptionId} for starship ${starshipId}`);
-      console.log(`[STARSHIPS] Starship plan: ${starship.plan}, billing: ${starship.billingPeriod}`);
-
-      const subscriptionService = new SubscriptionService();
-      subscriptionCancelled = await subscriptionService.cancelSubscription(starship.subscriptionId);
-
-      if (!subscriptionCancelled) {
-        // Subscription cancellation failed with a real error - DO NOT delete the starship
-        console.error(`[STARSHIPS] Failed to cancel subscription ${starship.subscriptionId} - aborting starship deletion`);
-        sendError(res, 'SERVICE_UNAVAILABLE', 'Could not cancel subscription', 400, {
-          message:
-            'There was an error cancelling your subscription. To prevent continued charges, we cannot delete the starship at this time.',
-          subscriptionId: starship.subscriptionId,
-          action: 'Please contact support or try again later.',
-        });
-        return;
-      }
-
-      console.log(`[STARSHIPS] Subscription ${starship.subscriptionId} handled successfully (cancelled or already cancelled)`);
-    } else if (!starship.subscriptionId && starship.plan !== 'scout') {
-      console.log(`[STARSHIPS] Warning: Paid starship ${starshipId} has no subscription ID`);
-    }
-
-    // STEP 2: Only delete starship if subscription was cancelled (or doesn't exist)
-    console.log(`[STARSHIPS] Proceeding to delete starship ${starshipId} after successful subscription handling`);
+    // Delete starship directly - no subscription logic needed
+    console.log(`[STARSHIPS] Deleting starship ${starshipId}`);
     const deleted = await starshipService.deleteStarship(starshipId);
 
     if (!deleted) {
-      // Starship deletion failed but subscription was already cancelled
-      console.error(`[STARSHIPS] Critical: Subscription cancelled but starship deletion failed for ${starshipId}`);
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Starship deletion failed after subscription cancellation', 500, {
-        message: 'Subscription was cancelled but starship deletion failed. Please contact support.',
-        warning: 'Your subscription has been cancelled and you will not be charged further.',
-        subscriptionCancelled: true,
-      });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete starship', 500);
       return;
     }
 
     console.log(`[STARSHIPS] Successfully deleted starship ${starshipId}`);
 
-    // Return success with additional info (not 204 due to metadata)
+    // Return success
     sendSuccess(res, {
       message: 'Starship deleted successfully',
       starshipId,
-      subscriptionCancelled,
-      refundInfo:
-        starship.subscriptionId && starship.plan !== 'scout'
-          ? 'Subscription cancelled immediately. No refund will be issued for the remaining billing period.'
-          : null,
     });
   } catch (error) {
     handleError(error, res, 'deleting starship');
@@ -636,7 +421,6 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
     sendSuccess(res, {
       starshipId,
       starshipName: starship.name,
-      starshipClass: starship.class,
       maxAgents: starship.maxAgents,
       deployedAgents,
       availableSlots,
@@ -644,177 +428,6 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
     });
   } catch (error) {
     handleError(error, res, 'fetching starship agents');
-  }
-});
-
-// Move these routes to separate endpoints following OpenAPI pattern
-
-// GET /starships/pricing - Get pricing data (OpenAPI pattern)
-router.get('/starships/pricing', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const subscriptionService = new SubscriptionService();
-    const pricing = await subscriptionService.getPricingData();
-    sendSuccess(res, pricing);
-  } catch (error) {
-    handleError(error, res, 'fetching pricing');
-  }
-});
-
-// POST /starships/checkout-sessions - Create checkout session (OpenAPI pattern)
-router.post('/starships/checkout-sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { starshipName, plan, billingPeriod } = req.body;
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'Authentication required', 401);
-      return;
-    }
-
-    // Validate required fields
-    if (!starshipName || !plan || !billingPeriod) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
-        required_fields: ['starshipName', 'plan', 'billingPeriod'],
-        provided: { starshipName: !!starshipName, plan: !!plan, billingPeriod: !!billingPeriod },
-      });
-      return;
-    }
-
-    // Validate plan
-    if (!['cruiser', 'draught'].includes(plan)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid plan', 400, {
-        field: 'plan',
-        allowed_values: ['cruiser', 'draught'],
-        provided: plan,
-      });
-      return;
-    }
-
-    // Validate billing period
-    if (!['monthly', 'yearly'].includes(billingPeriod)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
-        field: 'billingPeriod',
-        allowed_values: ['monthly', 'yearly'],
-        provided: billingPeriod,
-      });
-      return;
-    }
-
-    const subscriptionService = new SubscriptionService();
-    const checkoutUrl = await subscriptionService.createCheckoutSession({
-      userId,
-      starshipName,
-      plan,
-      billingPeriod,
-    });
-
-    sendSuccess(res, { url: checkoutUrl }, 201);
-  } catch (error) {
-    handleError(error, res, 'creating checkout session');
-  }
-});
-
-// POST /starships/:id/billing-portal - Create billing portal session (OpenAPI pattern)
-router.post('/starships/:id/billing-portal', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const starshipId = req.params.id;
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'Authentication required', 401);
-      return;
-    }
-
-    // Validate starship ID
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
-    if (!paramValidation) return;
-
-    const subscriptionService = new SubscriptionService();
-    const portalUrl = await subscriptionService.createPortalSession(starshipId, userId);
-
-    sendSuccess(res, { url: portalUrl }, 201);
-  } catch (error) {
-    handleError(error, res, 'creating billing portal');
-  }
-});
-
-// POST /starships/:id/retry-payment - Retry payment for pending starship (OpenAPI pattern)
-router.post('/starships/:id/retry-payment', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const starshipId = req.params.id;
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'Authentication required', 401);
-      return;
-    }
-
-    // Validate starship ID
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
-    if (!paramValidation) return;
-
-    const starshipService = new StarshipService();
-
-    // Get starship and verify ownership
-    const starship = await starshipService.getStarship(starshipId);
-
-    if (!starship) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
-        resource: 'starship',
-        id: starshipId,
-      });
-      return;
-    }
-
-    if (starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Only allow retry for pending_payment status
-    if (starship.status !== 'pending_payment') {
-      sendError(res, 'OPERATION_NOT_ALLOWED', 'Invalid status for payment retry', 400, {
-        message: 'Can only retry payment for starships with pending_payment status',
-        currentStatus: starship.status,
-        allowedStatus: 'pending_payment',
-      });
-      return;
-    }
-
-    // Verify starship has plan and billing period
-    if (!starship.plan || !starship.billingPeriod) {
-      sendError(res, 'VALIDATION_ERROR', 'Invalid starship configuration', 400, {
-        message: 'Starship is missing plan or billing period',
-        missing: {
-          plan: !starship.plan,
-          billingPeriod: !starship.billingPeriod,
-        },
-      });
-      return;
-    }
-
-    console.log('[RETRY-PAYMENT] Creating new checkout session for starship:', starshipId);
-
-    // Create new checkout session
-    const subscriptionService = new SubscriptionService();
-    const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
-      userId,
-      starshipId: starship.id,
-      starshipSlug: starship.slug,
-      plan: starship.plan as 'cruiser' | 'draught',
-      billingPeriod: starship.billingPeriod as 'monthly' | 'yearly',
-    });
-
-    sendSuccess(
-      res,
-      {
-        checkoutUrl,
-        message: 'New checkout session created. Redirect to complete payment.',
-      },
-      201
-    );
-  } catch (error) {
-    handleError(error, res, 'creating checkout session for retry');
   }
 });
 

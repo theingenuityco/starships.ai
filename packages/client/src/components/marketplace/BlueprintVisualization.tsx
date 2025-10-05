@@ -681,7 +681,16 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
 
   return (
     <div
-      className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
+      className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
+      style={
+        !transparent
+          ? {
+              backgroundImage: `radial-gradient(circle, #9ca3af 1.2px, transparent 1.2px)`,
+              backgroundSize: '24px 24px',
+              backgroundPosition: '0 0',
+            }
+          : undefined
+      }
     >
       <ReactFlow
         nodes={nodes}
@@ -708,7 +717,6 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
         proOptions={{ hideAttribution: true }}
         defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
       >
-        <Background color="#9ca3af" gap={24} size={1.2} className="opacity-20 dark:opacity-10" variant={BackgroundVariant.Dots} />
         {title && (
           <Panel position="top-left" className="m-4">
             <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">

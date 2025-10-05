@@ -234,6 +234,23 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                       ))}
                     </div>
                   </div>
+
+                  {/* Blueprint */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tool-blueprint" className="text-foreground">
+                      Blueprint (JSON)
+                    </Label>
+                    <Textarea
+                      id="tool-blueprint"
+                      placeholder='{"nodes": [], "edges": []}'
+                      value={formData.blueprint}
+                      onChange={e => handleFieldChange('blueprint', e.target.value)}
+                      className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      rows={8}
+                    />
+                    {errors.blueprint && <p className="text-sm text-destructive">{errors.blueprint}</p>}
+                    <p className="text-xs text-muted-foreground">Define the workflow blueprint for this tool</p>
+                  </div>
                 </div>
               </div>
 
@@ -290,23 +307,6 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                     />
                     {errors.parameters && <p className="text-sm text-destructive">{errors.parameters}</p>}
                     <p className="text-xs text-muted-foreground">Define the input parameters for this tool in JSON format</p>
-                  </div>
-
-                  {/* Blueprint */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tool-blueprint" className="text-foreground">
-                      Blueprint (JSON)
-                    </Label>
-                    <Textarea
-                      id="tool-blueprint"
-                      placeholder='{"nodes": [], "edges": []}'
-                      value={formData.blueprint}
-                      onChange={e => handleFieldChange('blueprint', e.target.value)}
-                      className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                      rows={8}
-                    />
-                    {errors.blueprint && <p className="text-sm text-destructive">{errors.blueprint}</p>}
-                    <p className="text-xs text-muted-foreground">Define the workflow blueprint for this tool</p>
                   </div>
                 </div>
               </div>

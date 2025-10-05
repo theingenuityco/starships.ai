@@ -3,7 +3,8 @@
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import { ToolFormDrawer, ToolFormDrawerRef } from '@/components/conversation/ToolFormDrawer'
+import { ToolFormView, ToolFormViewRef } from '@/components/conversation/ToolFormView'
+import { ExpandableMessageOverlay } from '@/components/conversation/ExpandableMessageOverlay'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -34,11 +35,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
-  const toolFormDrawerRef = useRef<ToolFormDrawerRef>(null)
+  const toolFormViewRef = useRef<ToolFormViewRef>(null)
   const lastUIActionKeyRef = useRef<string | null>(null)
 
-  // Tool form drawer state
-  const [toolFormDrawerOpen, setToolFormDrawerOpen] = useState(false)
+  // View mode state: 'conversation' or 'tool-form'
+  const [viewMode, setViewMode] = useState<'conversation' | 'tool-form'>('conversation')
+
+  // Expanded overlay state for message history when in tool-form mode
+  const [isMessageOverlayExpanded, setIsMessageOverlayExpanded] = useState(false)
 
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId)
@@ -160,8 +164,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toast.success('Tool created successfully!', {
       description: `${data.name} has been created and is ready to use.`,
     })
-    setToolFormDrawerOpen(false)
-    toolFormDrawerRef.current?.resetForm()
+    setViewMode('conversation')
+    toolFormViewRef.current?.resetForm()
+  }, [])
+
+  // Handle tool form cancel
+  const handleToolFormCancel = useCallback(() => {
+    setViewMode('conversation')
+    toolFormViewRef.current?.resetForm()
   }, [])
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
@@ -178,9 +188,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         const ensureOpenThen = (fn: () => void) => {
           setTimeout(() => {
             if (action === 'open_tool_form') {
-              toolFormDrawerRef.current?.resetForm()
+              toolFormViewRef.current?.resetForm()
             }
-            setToolFormDrawerOpen(true)
+            setViewMode('tool-form')
             setTimeout(() => fn(), 150)
           }, 100)
         }
@@ -194,9 +204,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             // Open form for tool_create
             if (toolName === 'tool_create') {
-              console.log('📂 Opening tool form drawer for tool_create')
-              toolFormDrawerRef.current?.resetForm()
-              setToolFormDrawerOpen(true)
+              console.log('📂 Opening tool form view for tool_create')
+              toolFormViewRef.current?.resetForm()
+              setViewMode('tool-form')
             }
             break
           }
@@ -204,9 +214,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           case 'open_tool_form': {
             const form = (payload as any).formData || (payload as any).data || {}
             ensureOpenThen(() => {
-              if (toolFormDrawerRef.current && form && typeof form === 'object') {
+              if (toolFormViewRef.current && form && typeof form === 'object') {
                 Object.entries(form).forEach(([field, value]) => {
-                  toolFormDrawerRef.current?.updateField(field as any, value as any)
+                  toolFormViewRef.current?.updateField(field as any, value as any)
                 })
               }
             })
@@ -215,18 +225,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
           case 'update_tool_form': {
             const patch = (payload as any).patch || (payload as any).formData || (payload as any).data || {}
-            if (!toolFormDrawerRef.current) {
+            if (viewMode !== 'tool-form') {
               ensureOpenThen(() => {
-                if (toolFormDrawerRef.current && patch && typeof patch === 'object') {
+                if (toolFormViewRef.current && patch && typeof patch === 'object') {
                   Object.entries(patch).forEach(([field, value]) => {
-                    toolFormDrawerRef.current?.updateField(field as any, value as any)
+                    toolFormViewRef.current?.updateField(field as any, value as any)
                   })
                 }
               })
             } else {
               if (patch && typeof patch === 'object') {
                 Object.entries(patch).forEach(([field, value]) => {
-                  toolFormDrawerRef.current?.updateField(field as any, value as any)
+                  toolFormViewRef.current?.updateField(field as any, value as any)
                 })
               }
             }
@@ -235,12 +245,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
           case 'submit_tool_form': {
             const submit = () => {
-              const formData = toolFormDrawerRef.current?.getFormData()
+              const formData = toolFormViewRef.current?.getFormData()
               if (formData) {
                 handleToolFormSave(formData)
               }
             }
-            if (!toolFormDrawerRef.current) {
+            if (viewMode !== 'tool-form') {
               ensureOpenThen(submit)
             } else {
               submit()
@@ -249,7 +259,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           case 'close_tool_form': {
-            setToolFormDrawerOpen(false)
+            setViewMode('conversation')
             break
           }
 
@@ -290,11 +300,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Stream tool arguments into form as they arrive
   useEffect(() => {
-    if (!currentConversationId || !liveMessages.length || !toolFormDrawerOpen) return
+    if (!currentConversationId || !liveMessages.length || viewMode !== 'tool-form') return
 
     // Find the last assistant message with toolCalls (reverse iteration)
     // Look for both streaming and completed messages to handle cases where
-    // the drawer opens after streaming has finished
+    // the view opens after streaming has finished
     let lastAssistant: any = null
     for (let i = liveMessages.length - 1; i >= 0; i--) {
       const m = liveMessages[i]
@@ -318,31 +328,31 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
 
       // Update form fields as they become available
-      if (args.name && toolFormDrawerRef.current) {
-        toolFormDrawerRef.current.updateField('name', args.name)
+      if (args.name && toolFormViewRef.current) {
+        toolFormViewRef.current.updateField('name', args.name)
       }
-      if (args.description && toolFormDrawerRef.current) {
-        toolFormDrawerRef.current.updateField('description', args.description)
+      if (args.description && toolFormViewRef.current) {
+        toolFormViewRef.current.updateField('description', args.description)
       }
-      if (args.category && toolFormDrawerRef.current) {
-        toolFormDrawerRef.current.updateField('category', args.category)
+      if (args.category && toolFormViewRef.current) {
+        toolFormViewRef.current.updateField('category', args.category)
       }
-      if (args.exampleUsage && toolFormDrawerRef.current) {
-        toolFormDrawerRef.current.updateField('exampleUsage', args.exampleUsage)
+      if (args.exampleUsage && toolFormViewRef.current) {
+        toolFormViewRef.current.updateField('exampleUsage', args.exampleUsage)
       }
-      if (args.requiresApiKey !== undefined && toolFormDrawerRef.current) {
-        toolFormDrawerRef.current.updateField('requiresApiKey', args.requiresApiKey)
+      if (args.requiresApiKey !== undefined && toolFormViewRef.current) {
+        toolFormViewRef.current.updateField('requiresApiKey', args.requiresApiKey)
       }
-      if (args.parameters && toolFormDrawerRef.current) {
+      if (args.parameters && toolFormViewRef.current) {
         const paramsStr = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
-        toolFormDrawerRef.current.updateField('parameters', paramsStr)
+        toolFormViewRef.current.updateField('parameters', paramsStr)
       }
-      if (args.blueprint && toolFormDrawerRef.current) {
+      if (args.blueprint && toolFormViewRef.current) {
         const blueprintStr = typeof args.blueprint === 'string' ? args.blueprint : JSON.stringify(args.blueprint, null, 2)
-        toolFormDrawerRef.current.updateField('blueprint', blueprintStr)
+        toolFormViewRef.current.updateField('blueprint', blueprintStr)
       }
     }
-  }, [currentConversationId, liveMessages, toolFormDrawerOpen])
+  }, [currentConversationId, liveMessages, viewMode])
 
   // Show loading state
   if (isLoading) {
@@ -377,67 +387,75 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       className="relative flex flex-col h-screen transition-all duration-500 ease-in-out overflow-hidden"
       style={{
         marginLeft: '5.5rem', // Account for fixed navigation (left-6 + w-16 = 1.5rem + 4rem)
-        marginRight: toolFormDrawerOpen ? 'calc(min(42rem, 100vw - 3rem) + 1.5rem)' : '0',
       }}
     >
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
-        {/* Messages Area or Welcome Screen */}
-        {showMessagesArea ? (
-          <>
-            <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
-            <div className="flex-1 min-h-0">
-              <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
-            </div>
-          </>
+        {/* Main Content Area - Switches between Conversation and Tool Form */}
+        {viewMode === 'tool-form' ? (
+          <ToolFormView ref={toolFormViewRef} onSave={handleToolFormSave} onCancel={handleToolFormCancel} starshipId={starshipId} />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
-            {/* Welcome Section */}
-            <div className="text-center mb-8 max-w-2xl opacity-100">
-              <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-              <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-            </div>
+          <>
+            {/* Messages Area or Welcome Screen */}
+            {showMessagesArea ? (
+              <>
+                <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
+                <div className="flex-1 min-h-0">
+                  <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
+                {/* Welcome Section */}
+                <div className="text-center mb-8 max-w-2xl opacity-100">
+                  <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                  <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+                </div>
 
-            {/* Spacer for floating input */}
-            <div className="h-32 mb-8"></div>
+                {/* Spacer for floating input */}
+                <div className="h-32 mb-8"></div>
 
-            {/* Suggestions */}
-            <div className="space-y-3 max-w-2xl w-full opacity-100">
-              {AGENT_SUGGESTIONS.map((suggestion, index) => (
-                <button
-                  key={suggestion}
-                  className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                >
-                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                    <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
-                  </div>
-                  <span className="flex-1">{suggestion}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+                {/* Suggestions */}
+                <div className="space-y-3 max-w-2xl w-full opacity-100">
+                  {AGENT_SUGGESTIONS.map((suggestion, index) => (
+                    <button
+                      key={suggestion}
+                      className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                        <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                      </div>
+                      <span className="flex-1">{suggestion}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Floating Input - Position changes based on state */}
+        {/* Floating Input - Always visible, position changes based on state */}
         <div
           ref={inputContainerRef}
-          className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out"
+          className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
           style={{
-            bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)',
+            bottom: viewMode === 'tool-form' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
           }}
         >
-          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
+          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
             <ConversationMessageInput
               ref={messageInputRef}
               selectedAgent={selectedAgent}
               starshipId={starshipId}
               conversationId={currentConversationId}
               onConversationStart={handleConversationStart}
-              onToggleToolForm={() => setToolFormDrawerOpen(prev => !prev)}
-              isToolFormOpen={toolFormDrawerOpen}
+              onToggleToolForm={() => setViewMode(prev => (prev === 'tool-form' ? 'conversation' : 'tool-form'))}
+              isToolFormOpen={viewMode === 'tool-form'}
               disabled={!selectedAgent}
-              minimal={showMessagesArea}
+              minimal={viewMode === 'tool-form' || showMessagesArea}
+              onFocus={() => viewMode === 'tool-form' && setIsMessageOverlayExpanded(true)}
+              onBlur={() => setIsMessageOverlayExpanded(false)}
             >
               {/* Footer Content - Agent Selector */}
               <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
@@ -445,8 +463,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           </div>
         </div>
 
-        {/* Tool Form Drawer */}
-        <ToolFormDrawer ref={toolFormDrawerRef} open={toolFormDrawerOpen} onOpenChange={setToolFormDrawerOpen} onSave={handleToolFormSave} starshipId={starshipId} />
+        {/* Expandable Message Overlay - Shows conversation history when in tool-form mode */}
+        {viewMode === 'tool-form' && currentConversationId && (
+          <ExpandableMessageOverlay
+            isExpanded={isMessageOverlayExpanded}
+            onCollapse={() => setIsMessageOverlayExpanded(false)}
+            conversationId={currentConversationId}
+            starshipId={starshipId}
+            budgetTokens={budgetTokens}
+            inputHeight={inputHeight}
+          />
+        )}
       </div>
     </div>
   )

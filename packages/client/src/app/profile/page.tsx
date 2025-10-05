@@ -15,8 +15,15 @@ export default function ProfilePage(): React.JSX.Element {
   const router = useRouter()
 
   const handleLogout = async () => {
-    await logout()
-    router.push('/')
+    try {
+      await logout()
+      router.push('/')
+    } catch (error) {
+      // Show toast/error message for logout failure
+      console.error('Logout failed:', error)
+      // You could also show a toast notification here
+      // toast.error('Logout failed', { description: 'Please try again.' })
+    }
   }
 
   return (

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z, ZodError } from 'zod';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UsageService } from '@/services/UsageService';
+import { StarshipService } from '@/services/StarshipService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 
 const router: Router = Router();
@@ -82,6 +83,13 @@ router.get('/starships/:starshipId/usage/totals', jwtAuthMiddleware, async (req:
     if (!paramValidation) return;
     const { starshipId } = paramValidation;
 
+    // Authorization: Check if user has access to this starship
+    const starshipService = new StarshipService();
+    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+      sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
+      return;
+    }
+
     const usageService = new UsageService();
     const totals = await usageService.getTotalsByStarship(starshipId);
 
@@ -100,6 +108,13 @@ router.get('/starships/:starshipId/usage/totals-with-count', jwtAuthMiddleware, 
     const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
     const { starshipId } = paramValidation;
+
+    // Authorization: Check if user has access to this starship
+    const starshipService = new StarshipService();
+    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+      sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
+      return;
+    }
 
     const usageService = new UsageService();
     const totalsWithCount = await usageService.getTotalsByStarshipWithCount(starshipId);
@@ -120,6 +135,13 @@ router.get('/starships/:starshipId/usage', jwtAuthMiddleware, async (req: Reques
     const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
     const { starshipId } = paramValidation;
+
+    // Authorization: Check if user has access to this starship
+    const starshipService = new StarshipService();
+    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+      sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
+      return;
+    }
 
     const queryValidation = validateData(UsageListQuerySchema, req.query, res, 'pagination/filter parameters');
     if (!queryValidation) return;
@@ -160,6 +182,13 @@ router.get('/starships/:starshipId/usage/daily', jwtAuthMiddleware, async (req: 
     if (!paramValidation) return;
     const { starshipId } = paramValidation;
 
+    // Authorization: Check if user has access to this starship
+    const starshipService = new StarshipService();
+    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+      sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
+      return;
+    }
+
     const queryValidation = validateData(DailyListQuerySchema, req.query, res, 'pagination parameters');
     if (!queryValidation) return;
     const { page, limit, order } = queryValidation;
@@ -191,6 +220,13 @@ router.get('/starships/:starshipId/usage/daily-model', jwtAuthMiddleware, async 
     const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
     const { starshipId } = paramValidation;
+
+    // Authorization: Check if user has access to this starship
+    const starshipService = new StarshipService();
+    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+      sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
+      return;
+    }
 
     const queryValidation = validateData(DailyListQuerySchema, req.query, res, 'pagination parameters');
     if (!queryValidation) return;

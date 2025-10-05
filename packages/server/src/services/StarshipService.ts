@@ -217,6 +217,48 @@ export class StarshipService {
     return this.starshipRepository.removeConversation(starshipId, conversationId);
   }
 
+  /**
+   * Check if user has access to starship (owner or member)
+   */
+  async hasAccess(userId: string, starshipId: string): Promise<boolean> {
+    try {
+      const starship = await this.starshipRepository.findById(starshipId);
+      if (!starship) {
+        return false;
+      }
+
+      // Check if user is the owner
+      if (starship.ownerId === userId) {
+        return true;
+      }
+
+      // TODO: Add team membership checks when team functionality is implemented
+      // For now, only owners have access
+
+      return false;
+    } catch (error) {
+      console.error('[STARSHIP-SERVICE] Error checking starship access:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get starship by ID with access verification
+   */
+  async getStarshipWithAccess(userId: string, starshipId: string): Promise<StarshipModel | null> {
+    const starship = await this.starshipRepository.findById(starshipId);
+    if (!starship) {
+      return null;
+    }
+
+    // Check if user has access
+    if (starship.ownerId !== userId) {
+      return null;
+    }
+
+    return starship;
+  }
+
   // ============================================================================
   // STATIC UTILITY METHODS (keeping existing functionality)
   // ============================================================================

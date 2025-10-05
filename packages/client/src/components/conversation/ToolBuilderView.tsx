@@ -187,7 +187,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           }}
         >
           {/* Floating Tool Info Panel - Top Left */}
-          <div className="absolute top-6 left-6 z-10">
+          <div className="absolute top-6 left-[7rem] z-10">
             <div className="frosted-glass-card rounded-2xl shadow-frosted-xl p-4 min-w-[320px] max-w-[400px]">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">

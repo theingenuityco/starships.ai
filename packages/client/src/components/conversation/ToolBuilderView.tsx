@@ -65,6 +65,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -175,6 +176,15 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
   const categories: ToolTemplateCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']
 
+  // Auto-resize description textarea on mount and when description changes
+  React.useEffect(() => {
+    const textarea = descriptionTextareaRef.current
+    if (textarea && formData.description) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+  }, [formData.description])
+
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Main Blueprint Canvas - Full Height */}
@@ -188,7 +198,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
         >
           {/* Floating Tool Info Panel - Top Left */}
           <div className="absolute top-6 left-[7rem] z-10">
-            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-3 min-w-[320px] max-w-[400px]">
+            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 min-w-[320px] max-w-[400px]">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
                   <Wrench className="w-5 h-5 text-primary" />
@@ -201,6 +211,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                     className={`text-base font-semibold h-auto py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
                   />
                   <Textarea
+                    ref={descriptionTextareaRef}
                     placeholder="Brief description..."
                     value={formData.description}
                     onChange={e => {

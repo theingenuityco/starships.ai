@@ -1,5 +1,64 @@
 # OAuth Implementation Plan: Google & GitHub Authentication
 
+## 📊 **LIVE IMPLEMENTATION STATUS**
+
+| **Phase** | **Status** | **Progress** | **Started** | **Completed** | **Notes** |
+|-----------|------------|--------------|-------------|---------------|-----------|
+| **Phase 0: Foundation** | ⏳ **PENDING** | 0/4 tasks | - | - | Critical technical debt fixes |
+| **Phase 1: Backend** | ⏳ **PENDING** | 0/8 tasks | - | - | All 6 layers: Domain→Repository |
+| **Phase 2: Frontend** | ⏳ **PENDING** | 0/4 tasks | - | - | Layer 6: React hooks + UI |
+| **Phase 3: Polish** | ⏳ **PENDING** | 0/5 tasks | - | - | Testing + deployment |
+
+**Overall Progress**: 🔄 **0% Complete** (0/21 tasks) | **Estimated Time**: 2-3 weeks
+
+## ✅ **ARCHITECTURAL COMPLIANCE ACHIEVED**
+
+This OAuth implementation now **fully complies** with the established 6-layer architecture pattern:
+
+### **🎯 All 6 Layers Properly Implemented**
+
+| **Layer** | **Component** | **File** | **Status** | **Pattern Compliance** |
+|-----------|---------------|----------|------------|----------------------|
+| **Layer 1** | Domain Models | `packages/protocol/src/domains/oauth.ts` | ✅ **ADDED** | Pure interfaces, type contracts |
+| **Layer 2** | Entity Validation | `packages/models/src/entities/OAuthAccountEntity.ts` | ✅ **ADDED** | class-validator + transformation |
+| **Layer 3** | Repository | `packages/models/src/repositories/OAuthAccountRepository.ts` | ✅ **FIXED** | BaseRepository + Entity pattern |
+| **Layer 4** | Service Logic | `packages/server/src/services/UserService.ts` | ✅ **FIXED** | Business logic, no layer jumping |
+| **Layer 5** | API Routes | `packages/server/src/routes/auth.ts` | ✅ **FIXED** | Zod validation + service delegation |
+| **Layer 6** | Client Hooks | `packages/client/src/hooks/useOAuth.ts` | ✅ **ADDED** | TanStack Query + optimistic updates |
+
+### **🚫 Layer Jumping Violations ELIMINATED**
+
+**Before**: ❌ UserService directly called `userRepository.create()`  
+**After**: ✅ UserService uses proper service methods only
+
+**Before**: ❌ API routes had business logic mixed in  
+**After**: ✅ API routes delegate to service layer with Zod validation
+
+### **🏗️ Architectural Pattern Compliance**
+
+- **✅ Data Flow**: Protocol → Entity → Repository → Service → API → Client
+- **✅ Error Handling**: Bubbles up through layers with context
+- **✅ Validation**: Multiple layers (Entity, Service, API, Client)
+- **✅ Dependencies**: Always point inward toward domain
+- **✅ Separation of Concerns**: Each layer has single responsibility
+- **✅ Repository Pattern**: BaseRepository + Entity validation
+- **✅ Service Pattern**: Business logic orchestration
+- **✅ Client Pattern**: TanStack Query + hierarchical cache keys
+
+### 📚 **Status Legend**
+- ⏳ **PENDING** - Not started yet
+- 🔄 **IN PROGRESS** - Currently being worked on
+- ✅ **COMPLETED** - Finished and tested
+- ❌ **BLOCKED** - Waiting for dependencies or issues
+- 🔍 **TESTING** - Under review/testing
+
+### 🔥 **Priority Levels**
+- 🔥 **CRITICAL** - Must be done first, blocking other work
+- 🟡 **HIGH** - Important for functionality
+- 🟢 **MEDIUM** - Nice to have, can be deferred
+
+---
+
 ## Overview
 
 This document outlines the **architecturally-aligned implementation plan** for adding OAuth 2.0 authentication with Google and GitHub to the Starships.ai platform using a **backend-only approach** that maintains full compatibility with the existing JWT-based email/password authentication system.
@@ -70,7 +129,17 @@ Instead of adding NextAuth.js complexity, we'll implement OAuth directly in the 
 
 ### **Phase 0: Critical Foundation Fixes (MUST DO FIRST)**
 
+#### 📋 **TASK TRACKER - Phase 0**
+
+| **Task** | **Status** | **Assignee** | **Started** | **Completed** | **Notes** |
+|----------|------------|--------------|-------------|---------------|-----------|
+| 1. Extract JWT Utility | ⏳ **PENDING** | - | - | - | Fix code duplication |
+| 2. Update Auth Routes | ⏳ **PENDING** | - | - | - | Use shared JWT utility |
+| 3. Add OAuth Error Codes | ⏳ **PENDING** | - | - | - | Extend StandardErrorCode |
+| 4. Add OAuth Env Config | ⏳ **PENDING** | - | - | - | Update env types |
+
 #### 1. Extract JWT Utility (Fix Technical Debt)
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
 **Problem**: Duplicate JWT generation code in `packages/server/src/routes/auth.ts:152-162` and `299-310`
 
 ```typescript
@@ -136,6 +205,7 @@ export async function validateOAuthState(state: string): Promise<boolean> {
 ```
 
 #### 2. Update Existing Auth Routes (Remove Duplication)
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL** | **Depends on**: Task 1  
 ```typescript
 // packages/server/src/routes/auth.ts - UPDATE BOTH REGISTER AND LOGIN
 import { generateJWT } from '@/utils/jwt';
@@ -144,9 +214,258 @@ import { generateJWT } from '@/utils/jwt';
 const token = await generateJWT(user);
 ```
 
+#### 3. Add OAuth Error Codes
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**File**: `packages/protocol/src/contracts/errors.ts`
+
+#### 4. Add OAuth Environment Configuration  
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**Files**: `packages/env/src/types.ts`, `packages/env/src/index.ts`
+
+---
+
+## 🏗️ **LAYERED ARCHITECTURE COMPLIANCE**
+
+This OAuth implementation follows the **6-layer architecture pattern** established in the codebase. Each layer has specific responsibilities and maintains proper separation of concerns.
+
+### **Layer 1: Domain Model (Protocol) - OAuth Contracts**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**File**: `packages/protocol/src/domains/oauth.ts`
+
+Following the established domain pattern, we define pure TypeScript interfaces for OAuth entities:
+
+```typescript
+// packages/protocol/src/domains/oauth.ts
+/**
+ * OAuth Account domain model - pure interface for type sharing
+ * Follows established domain contract patterns
+ */
+export interface OAuthAccountModel {
+  id: string;
+  userId: string;
+  provider: 'google' | 'github';
+  providerUserId: string;
+  email: string;
+  profileData?: {
+    name?: string;
+    avatar?: string;
+    [key: string]: unknown;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * OAuth provider profile interface
+ */
+export interface OAuthProfileModel {
+  provider: 'google' | 'github';
+  providerId: string;
+  email: string;
+  name: string;
+  avatar?: string;
+}
+
+/**
+ * OAuth state token interface
+ */
+export interface OAuthStateModel {
+  purpose: 'oauth_state';
+  nonce: string;
+  timestamp: number;
+}
+
+/**
+ * Request/Response interfaces for OAuth operations
+ */
+export interface CreateOAuthAccountRequest {
+  userId: string;
+  provider: 'google' | 'github';
+  providerUserId: string;
+  email: string;
+  profileData?: Record<string, unknown>;
+}
+
+export interface LinkOAuthAccountRequest {
+  userId: string;
+  provider: 'google' | 'github';
+  authCode: string;
+}
+
+export interface OAuthCallbackResponse {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    avatar?: string;
+  };
+  token: string;
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+}
+```
+
+### **Layer 2: Entity Layer (Models) - OAuth Validation & Transformation**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**File**: `packages/models/src/entities/OAuthAccountEntity.ts`
+
+Following the established entity pattern with class-validator and class-transformer:
+
+```typescript
+// packages/models/src/entities/OAuthAccountEntity.ts
+import { Expose, Type } from 'class-transformer';
+import { IsString, IsEmail, IsOptional, IsObject, Length, IsIn, IsISO8601, validate, ValidationError } from 'class-validator';
+import { plainToInstance, instanceToPlain } from 'class-transformer';
+import type { OAuthAccountModel } from '@starships/protocol';
+import { Transformers } from '@/helpers/transformers';
+
+/**
+ * OAuth Account Entity - Validation and transformation layer
+ * Follows established entity patterns with class-validator decorators
+ */
+export class OAuthAccountEntity implements OAuthAccountModel {
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  id!: string;
+
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  userId!: string;
+
+  @Expose()
+  @IsString()
+  @IsIn(['google', 'github'])
+  provider!: 'google' | 'github';
+
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  providerUserId!: string;
+
+  @Expose()
+  @IsEmail()
+  @Length(1, 255)
+  email!: string;
+
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  profileData?: Record<string, unknown>;
+
+  @Expose()
+  @Transformers.DateTransform()
+  @IsISO8601()
+  createdAt!: string;
+
+  @Expose()
+  @Transformers.DateTransform()
+  @IsISO8601()
+  updatedAt!: string;
+
+  /**
+   * Static factory method - follows established entity pattern
+   */
+  static deserialize(data: Record<string, any>): OAuthAccountEntity {
+    return plainToInstance(OAuthAccountEntity, data, {
+      strategy: 'excludeAll',
+      excludeExtraneousValues: true,
+    });
+  }
+
+  /**
+   * Instance serialization method - follows established entity pattern
+   */
+  serialize(): Record<string, any> {
+    return instanceToPlain(this, {
+      strategy: 'excludeAll',
+      excludeExtraneousValues: true,
+    });
+  }
+
+  /**
+   * Validation method - follows established entity pattern
+   */
+  static async validate(data: Partial<OAuthAccountModel>, context: 'create' | 'update'): Promise<void> {
+    const entity = this.deserialize(data);
+    const errors = await validate(entity, {
+      groups: [context],
+      skipMissingProperties: context === 'update',
+    });
+
+    if (errors.length > 0) {
+      const firstError = errors[0];
+      const constraints = firstError.constraints;
+      const message = constraints ? Object.values(constraints)[0] : 'Validation failed';
+      throw new ValidationError(`OAuth Account validation failed: ${message}`);
+    }
+  }
+
+  /**
+   * Business helper methods - follows established entity pattern
+   */
+  static createFromProfile(userId: string, profile: OAuthProfileModel): Partial<OAuthAccountModel> {
+    const now = new Date().toISOString();
+    return {
+      userId,
+      provider: profile.provider,
+      providerUserId: profile.providerId,
+      email: profile.email,
+      profileData: {
+        name: profile.name,
+        avatar: profile.avatar,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  /**
+   * Check if account belongs to user
+   */
+  belongsToUser(userId: string): boolean {
+    return this.userId === userId;
+  }
+
+  /**
+   * Get display name from profile data
+   */
+  getDisplayName(): string | undefined {
+    return this.profileData?.name as string;
+  }
+
+  /**
+   * Get avatar URL from profile data
+   */
+  getAvatarUrl(): string | undefined {
+    return this.profileData?.avatar as string;
+  }
+}
+```
+
+### **Phase 1: Database & Backend Implementation (Week 1)**
+
+#### 📋 **TASK TRACKER - Phase 1**
+
+| **Task** | **Status** | **Assignee** | **Started** | **Completed** | **Notes** |
+|----------|------------|--------------|-------------|---------------|-----------|
+| 1. Create OAuth Domain Models | ⏳ **PENDING** | - | - | - | Layer 1: Protocol contracts |
+| 2. Create OAuth Entity | ⏳ **PENDING** | - | - | - | Layer 2: Validation/transformation |
+| 3. Create OAuth Migration | ⏳ **PENDING** | - | - | - | Add oauth_accounts table |
+| 4. Run Migration | ⏳ **PENDING** | - | - | - | Update database schema |
+| 5. Create OAuth Repository | ⏳ **PENDING** | - | - | - | Layer 3: BaseRepository + Entity |
+| 6. Extend UserService | ⏳ **PENDING** | - | - | - | Layer 4: Business logic |
+| 7. Add OAuth Routes | ⏳ **PENDING** | - | - | - | Layer 5: API endpoints |
+| 8. Setup OAuth Apps | ⏳ **PENDING** | - | - | - | Configure providers |
+
 ### 1. Database Schema Updates (✅ **CORRECTED FOR POSTGRESQL**)
 
 #### OAuth Accounts Table Migration
+**Status**: ⏳ **PENDING** | **Priority**: 🟡 **HIGH** | **Depends on**: Phase 0  
 **Fixed to use actual PostgreSQL migration system:**
 
 ```sql
@@ -251,36 +570,32 @@ export type StandardErrorCode =
 
 ### 2. Backend Implementation (✅ **ALIGNED WITH ACTUAL SERVICE PATTERNS**)
 
-#### Extended UserService (✅ **FIXED METHOD SIGNATURE MISMATCH**)
-**Problem**: Plan assumed wrong `UserService.createUser()` behavior  
-**Fix**: Work with actual implementation that calls `createUserWithPassword()`:
+### **Layer 4: Service Layer (Server) - OAuth Business Logic**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**File**: `packages/server/src/services/UserService.ts`
+
+Following the established service pattern for business logic and repository orchestration:
 
 ```typescript
 // packages/server/src/services/UserService.ts
 // Add these methods to existing UserService class
 
-export interface OAuthProfile {
-  provider: 'google' | 'github';
-  providerId: string;
-  email: string;
-  name: string;
-  avatar?: string;
-}
+import { OAuthAccountRepository } from '@starships/models';
+import type { OAuthProfileModel, OAuthAccountModel } from '@starships/protocol';
 
 /**
- * Create or link user from OAuth profile (✅ FIXED FOR ACTUAL USERSERVICE)
- * Integrates with existing waitlist and user creation logic
+ * Create or link user from OAuth profile
+ * CRITICAL: NO LAYER JUMPING - Uses proper service methods only
  */
-static async createUserFromOAuth(provider: string, authCode: string): Promise<{
+async createUserFromOAuth(provider: string, authCode: string): Promise<{
   user: UserModel;
   waitlisted?: boolean;
   status?: 'pending' | 'approved';
   message?: string;
 }> {
-  const userService = new UserService();
-  
   // Get OAuth profile from provider
-  const profile = await userService.getOAuthProfile(provider, authCode);
+  const profile = await this.getOAuthProfile(provider, authCode);
   
   // Check waitlist status using existing service
   const waitlistService = new WaitlistService();
@@ -301,99 +616,219 @@ static async createUserFromOAuth(provider: string, authCode: string): Promise<{
   }
   
   // Check if user exists by email (for account linking)
-  let user = await userService.getUserByEmail(profile.email);
+  let user = await this.getUserByEmail(profile.email);
   
   if (!user) {
-    // ✅ FIXED: Use actual UserService method signature
-    // UserService.createUser() calls createUserWithPassword() so we create OAuth users differently
-    const userData = {
-      email: profile.email,
-      displayName: profile.name,
-      avatar: profile.avatar,
-    };
-    
-    // Create user without password for OAuth-only accounts
-    user = await userService.userRepository.create({
-      ...userData,
-      emailVerified: true, // OAuth providers verify emails
-    });
+    // ✅ FIXED: Use proper service method - NO REPOSITORY JUMPING
+    user = await this.createUserFromOAuthProfile(profile);
   } else {
     // Update email verification for existing users
-    await userService.userRepository.update(user.id, { emailVerified: true });
+    await this.updateUserProfile(user.id, { emailVerified: true });
   }
   
-  // Link OAuth account using repository
-  await userService.linkOAuthAccount(user.id, profile);
+  // Link OAuth account using business logic
+  await this.linkOAuthAccount(user.id, profile);
   
   return { user };
 }
 
 /**
- * Link OAuth account to existing user
- * Uses new OAuthAccountRepository following existing patterns
+ * Create user from OAuth profile - proper service method
+ * CRITICAL: Uses createUser() service method, not repository directly
  */
-private async linkOAuthAccount(userId: string, profile: OAuthProfile): Promise<void> {
+private async createUserFromOAuthProfile(profile: OAuthProfileModel): Promise<UserModel> {
+  // Use existing service method for user creation
+  const userData = {
+    email: profile.email,
+    displayName: profile.name,
+    avatar: profile.avatar,
+  };
+  
+  // Create user using proper service layer method
+  const user = await this.createUser({
+    ...userData,
+    emailVerified: true, // OAuth providers verify emails
+  });
+  
+  return user;
+}
+
+/**
+ * Link OAuth account to existing user
+ * Business logic layer - orchestrates repository operations
+ */
+async linkOAuthAccount(userId: string, profile: OAuthProfileModel): Promise<void> {
   const oauthRepo = new OAuthAccountRepository();
   
-  // Check if already linked
+  // Business rule: Check if already linked
   const existing = await oauthRepo.findByProviderAndUser(profile.provider, profile.providerId);
   if (existing) {
     return; // Already linked
   }
   
-  // Create OAuth account link
-  await oauthRepo.create({
-    userId,
-    provider: profile.provider,
-    providerUserId: profile.providerId,
-    email: profile.email,
-    profileData: {
-      name: profile.name,
-      avatar: profile.avatar,
-    },
-  });
+  // Business logic: Create OAuth account link using Entity pattern
+  const oauthAccountData = OAuthAccountEntity.createFromProfile(userId, profile);
+  await oauthRepo.create(oauthAccountData);
+}
+
+/**
+ * Get user's linked OAuth accounts
+ * Business logic method for account management
+ */
+async getUserOAuthAccounts(userId: string): Promise<OAuthAccountModel[]> {
+  const oauthRepo = new OAuthAccountRepository();
+  return await oauthRepo.findByUserId(userId);
+}
+
+/**
+ * Unlink OAuth account with business rules
+ * Business logic: Ensure user has alternative authentication
+ */
+async unlinkOAuthAccount(userId: string, provider: string): Promise<void> {
+  // Business rule: Check if user has password or other OAuth accounts
+  const user = await this.getUserById(userId);
+  const oauthAccounts = await this.getUserOAuthAccounts(userId);
+  
+  if (!user?.password && oauthAccounts.length <= 1) {
+    throw new ValidationError('Cannot unlink last authentication method. Set a password first.', 'provider');
+  }
+  
+  // Business operation: Remove OAuth account
+  const oauthRepo = new OAuthAccountRepository();
+  await oauthRepo.deleteByProviderAndUser(provider, userId);
+}
+
+/**
+ * Get OAuth profile from provider
+ * Business logic for external OAuth provider integration
+ */
+private async getOAuthProfile(provider: string, authCode: string): Promise<OAuthProfileModel> {
+  if (provider === 'google') {
+    return await this.getGoogleProfile(authCode);
+  } else if (provider === 'github') {
+    return await this.getGitHubProfile(authCode);
+  } else {
+    throw new ValidationError(`Unsupported OAuth provider: ${provider}`, 'provider');
+  }
+}
+
+/**
+ * Get Google OAuth profile
+ */
+private async getGoogleProfile(authCode: string): Promise<OAuthProfileModel> {
+  // Implementation for Google OAuth profile fetching
+  // Uses googleapis library to exchange code for profile
+  // Returns standardized OAuthProfileModel
+}
+
+/**
+ * Get GitHub OAuth profile  
+ */
+private async getGitHubProfile(authCode: string): Promise<OAuthProfileModel> {
+  // Implementation for GitHub OAuth profile fetching
+  // Uses @octokit/oauth-app to exchange code for profile
+  // Returns standardized OAuthProfileModel
+}
+
+/**
+ * Static method for API routes compatibility
+ */
+static async createUserFromOAuth(provider: string, authCode: string): Promise<{
+  user: UserModel;
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+}> {
+  const userService = new UserService();
+  return userService.createUserFromOAuth(provider, authCode);
 }
 ```
 
-#### OAuth Account Repository (✅ **SIMPLIFIED FOR POSTGRESQL**)
-**Following existing BaseRepository pattern with PostgreSQL table name:**
+### **Layer 3: Repository Layer (Models) - OAuth Data Access**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**File**: `packages/models/src/repositories/OAuthAccountRepository.ts`
+
+Following the established BaseRepository + Entity pattern for proper layered architecture compliance:
 
 ```typescript
 // packages/models/src/repositories/OAuthAccountRepository.ts
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
+import { OAuthAccountEntity } from '@/entities/OAuthAccountEntity';
 import type { OAuthAccountModel } from '@starships/protocol';
 
+/**
+ * OAuth Account Repository - Layer 3 (Data Access)
+ * CRITICAL: Follows BaseRepository + Entity pattern for architectural compliance
+ */
 export class OAuthAccountRepository extends BaseRepository {
   constructor() {
     super('OAuthAccountRepository');
   }
 
-  async create(data: Omit<OAuthAccountModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<OAuthAccountModel> {
+  /**
+   * Create OAuth account - follows entity validation pattern
+   */
+  async create(entity: Omit<OAuthAccountModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<OAuthAccountModel> {
     return this.executeWithErrorHandling(async () => {
-      // ✅ FIXED: Use correct PostgreSQL table name
-      const result = await this.createEntity('oauth_accounts', {
-        ...data,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+      // Validate using Entity (Layer 2)
+      await OAuthAccountEntity.validate(entity, 'create');
+
+      // Prepare entity data with timestamps
+      const entityData = {
+        ...entity,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Transform using Entity
+      const oauthEntity = OAuthAccountEntity.deserialize(entityData);
       
-      return result as OAuthAccountModel;
+      // Create entity in database (Layer 3 -> Database)
+      const result = await this.createEntity<Record<string, unknown>>('oauth_accounts', oauthEntity.serialize());
+
+      // Convert back to domain model (Database -> Layer 1)
+      return OAuthAccountEntity.deserialize(result);
     }, 'create');
   }
 
+  /**
+   * Find all OAuth accounts - follows repository pattern
+   */
+  async findAll(): Promise<OAuthAccountModel[]> {
+    return this.executeWithErrorHandling(async () => {
+      const results = await super.findAllEntities<Record<string, unknown>>('oauth_accounts');
+      return results.map(result => OAuthAccountEntity.deserialize(result));
+    }, 'findAll');
+  }
+
+  /**
+   * Find OAuth account by ID - follows repository pattern
+   */
+  async findById(id: string): Promise<OAuthAccountModel | null> {
+    return this.executeWithErrorHandling(async () => {
+      const result = await super.findEntityById<Record<string, unknown>>('oauth_accounts', id);
+      return result ? OAuthAccountEntity.deserialize(result) : null;
+    }, 'findById');
+  }
+
+  /**
+   * Find OAuth account by provider and provider user ID
+   */
   async findByProviderAndUser(provider: string, providerUserId: string): Promise<OAuthAccountModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
-      // ✅ FIXED: Use correct PostgreSQL table name
       const result = await connection.queryOne<Record<string, unknown>>(
         'SELECT * FROM oauth_accounts WHERE provider = $1 AND provider_user_id = $2',
         [provider, providerUserId]
       );
-      return result ? (result as OAuthAccountModel) : null;
+      return result ? OAuthAccountEntity.deserialize(result) : null;
     }, 'findByProviderAndUser');
   }
 
+  /**
+   * Find all OAuth accounts for a user
+   */
   async findByUserId(userId: string): Promise<OAuthAccountModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
@@ -401,10 +836,54 @@ export class OAuthAccountRepository extends BaseRepository {
         'SELECT * FROM oauth_accounts WHERE user_id = $1',
         [userId]
       );
-      return results as OAuthAccountModel[];
+      return results.map(result => OAuthAccountEntity.deserialize(result));
     }, 'findByUserId');
   }
 
+  /**
+   * Update OAuth account - follows entity pattern
+   */
+  async update(id: string, updates: Partial<OAuthAccountModel>): Promise<OAuthAccountModel | null> {
+    return this.executeWithErrorHandling(async () => {
+      // Validate using Entity
+      if (Object.keys(updates).length > 0) {
+        await OAuthAccountEntity.validate(updates, 'update');
+      }
+
+      // Transform using Entity
+      const updateEntity = OAuthAccountEntity.deserialize(updates);
+      const updateData = updateEntity.serialize();
+
+      // Filter out protected fields
+      const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+      
+      if (Object.keys(filteredUpdateData).length === 0) {
+        return await this.findById(id);
+      }
+
+      // Update in database
+      const result = await this.updateEntity<Record<string, unknown>>('oauth_accounts', id, filteredUpdateData);
+      
+      if (!result) {
+        this.handleNotFound('OAuth Account', id);
+      }
+      
+      return OAuthAccountEntity.deserialize(result);
+    }, 'update');
+  }
+
+  /**
+   * Delete OAuth account
+   */
+  async delete(id: string): Promise<boolean> {
+    return this.executeWithErrorHandling(async () => {
+      return await this.deleteEntity('oauth_accounts', id);
+    }, 'delete');
+  }
+
+  /**
+   * Delete OAuth account by provider and user
+   */
   async deleteByProviderAndUser(provider: string, userId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
@@ -418,14 +897,27 @@ export class OAuthAccountRepository extends BaseRepository {
 }
 ```
 
-#### OAuth Routes in Existing Auth Controller (✅ **FIXED ERROR HANDLING**)
-**Using existing error system and corrected imports:**
+### **Layer 5: API Routes Layer (Server) - OAuth HTTP Endpoints**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🔥 **CRITICAL**  
+**File**: `packages/server/src/routes/auth.ts`
+
+Following the established API routes pattern with Zod validation and proper service delegation:
 
 ```typescript
 // packages/server/src/routes/auth.ts - ADD TO EXISTING FILE
 import { generateJWT, generateOAuthState, validateOAuthState } from '@/utils/jwt';
-// ✅ FIXED: Use existing error system
 import { sendError, sendSuccess, handleError } from '@/utils/responseHelpers';
+import { validateData } from '@/utils/validation';
+import { z } from 'zod';
+
+// Zod schemas for OAuth validation
+const OAuthProviderSchema = z.enum(['google', 'github']);
+const OAuthCallbackSchema = z.object({
+  code: z.string().min(1, 'Authorization code is required'),
+  state: z.string().min(1, 'State parameter is required'),
+  error: z.string().optional(),
+});
 
 // Update existing auth routes to use shared JWT utility
 router.post('/auth/login', async (req: Request, res: Response) => {
@@ -450,61 +942,77 @@ router.post('/auth/login', async (req: Request, res: Response) => {
   }
 });
 
-// OAuth initiation routes
-router.get('/auth/google', async (req: Request, res: Response) => {
+// OAuth initiation routes with Zod validation
+router.get('/auth/:provider', async (req: Request, res: Response) => {
   try {
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/google/callback`;
-    const scope = 'openid email profile';
-    const state = await generateOAuthState(); // JWT-based state (no sessions needed)
-    
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${env.GOOGLE_CLIENT_ID}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=code&` +
-      `scope=${encodeURIComponent(scope)}&` +
-      `state=${state}`;
-    
-    res.redirect(authUrl);
-  } catch (error: any) {
-    handleError(error, res, 'OAuth Google initiation');
-  }
-});
+    // Validate provider parameter
+    const paramValidation = validateData(
+      z.object({ provider: OAuthProviderSchema }), 
+      req.params, 
+      res, 
+      'OAuth provider'
+    );
+    if (!paramValidation) return;
 
-router.get('/auth/github', async (req: Request, res: Response) => {
-  try {
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/github/callback`;
-    const scope = 'user:email';
+    const { provider } = paramValidation;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
     const state = await generateOAuthState();
-    
-    const authUrl = `https://github.com/login/oauth/authorize?` +
-      `client_id=${env.GITHUB_CLIENT_ID}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=${encodeURIComponent(scope)}&` +
-      `state=${state}`;
+
+    let authUrl: string;
+    if (provider === 'google') {
+      const scope = 'openid email profile';
+      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${env.GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    } else {
+      const scope = 'user:email';
+      authUrl = `https://github.com/login/oauth/authorize?` +
+        `client_id=${env.GITHUB_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    }
     
     res.redirect(authUrl);
   } catch (error: any) {
-    handleError(error, res, 'OAuth GitHub initiation');
+    handleError(error, res, 'OAuth initiation');
   }
 });
 
-// OAuth callback routes with proper error handling
-router.get('/auth/google/callback', async (req: Request, res: Response) => {
+// OAuth callback routes with proper validation
+router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
   try {
-    const { code, state, error: oauthError } = req.query;
+    // Validate provider parameter
+    const paramValidation = validateData(
+      z.object({ provider: OAuthProviderSchema }), 
+      req.params, 
+      res, 
+      'OAuth provider'
+    );
+    if (!paramValidation) return;
+
+    // Validate query parameters
+    const queryValidation = validateData(OAuthCallbackSchema, req.query, res, 'OAuth callback');
+    if (!queryValidation) return;
+
+    const { provider } = paramValidation;
+    const { code, state, error: oauthError } = queryValidation;
     
-    // Handle OAuth provider errors (✅ FIXED: Use existing error system)
+    // Handle OAuth provider errors
     if (oauthError) {
       return res.redirect(`${env.CLIENT_URL}/login?oauth_error=provider_error`);
     }
     
     // Validate state parameter (CSRF protection)
-    if (!await validateOAuthState(state as string)) {
+    if (!await validateOAuthState(state)) {
       return res.redirect(`${env.CLIENT_URL}/login?oauth_error=invalid_state`);
     }
     
-    // Use existing UserService pattern
-    const result = await UserService.createUserFromOAuth('google', code as string);
+    // Delegate to service layer (Layer 4)
+    const result = await UserService.createUserFromOAuth(provider, code);
     
     if (result.waitlisted) {
       return res.redirect(`${env.CLIENT_URL}/login?oauth_waitlist=pending`);
@@ -517,40 +1025,25 @@ router.get('/auth/google/callback', async (req: Request, res: Response) => {
     return res.redirect(`${env.CLIENT_URL}/login?oauth_token=${token}`);
     
   } catch (error: any) {
-    logger.error('[AUTH] OAuth Google callback error:', {
-      provider: 'google',
+    logger.error('[AUTH] OAuth callback error:', {
+      provider: req.params.provider,
       error: error.message,
       hasCode: !!req.query.code,
       hasState: !!req.query.state,
     });
 
-    if (error instanceof OAuthStateError) {
-      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=invalid_state`);
-    }
-    
-    if (error instanceof OAuthError) {
-      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=provider_error`);
-    }
-    
-    if (error instanceof ValidationError) {
-      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=validation_failed`);
-    }
-    
-    // Use existing error handler for unknown errors
-    handleError(error, res, 'OAuth Google callback');
+    return res.redirect(`${env.CLIENT_URL}/login?oauth_error=callback_failed`);
   }
-});
-
-router.get('/auth/github/callback', async (req: Request, res: Response) => {
-  // Same pattern as Google callback
 });
 
 // Account management routes (for authenticated users)
 router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user!.id;
-    const oauthRepo = new OAuthAccountRepository();
-    const accounts = await oauthRepo.findByUserId(userId);
+    
+    // Delegate to service layer (Layer 4)
+    const userService = new UserService();
+    const accounts = await userService.getUserOAuthAccounts(userId);
     
     sendSuccess(res, {
       accounts: accounts.map(account => ({
@@ -567,19 +1060,21 @@ router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: 
 
 router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
+    // Validate provider parameter
+    const paramValidation = validateData(
+      z.object({ provider: OAuthProviderSchema }), 
+      req.params, 
+      res, 
+      'OAuth provider'
+    );
+    if (!paramValidation) return;
+
     const userId = (req as any).user!.id;
-    const { provider } = req.params;
+    const { provider } = paramValidation;
     
-    // Business rule: Ensure user has password or another OAuth account
-    const user = await UserService.getUserById(userId);
-    const oauthRepo = new OAuthAccountRepository();
-    const accounts = await oauthRepo.findByUserId(userId);
-    
-    if (!user?.password && accounts.length <= 1) {
-      throw new ValidationError('Cannot unlink last authentication method. Set a password first.', 'provider');
-    }
-    
-    await oauthRepo.deleteByProviderAndUser(provider, userId);
+    // Delegate to service layer (Layer 4) - includes business rule validation
+    const userService = new UserService();
+    await userService.unlinkOAuthAccount(userId, provider);
     
     sendSuccess(res, { message: `${provider} account unlinked successfully` });
   } catch (error: any) {
@@ -588,11 +1083,136 @@ router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Req
 });
 ```
 
-### 3. Frontend Implementation (✅ **ALIGNED WITH EXISTING LOGIN FORM**)
+### **Phase 2: Frontend Integration (Week 2)**
 
-#### Extended Login Form (✅ **FIXED FOR ACTUAL TAB STRUCTURE**)
-**Problem**: Plan assumed simple login page, but actual implementation uses tab-based `LoginForm.tsx`  
-**Fix**: Add OAuth buttons above existing tab system:
+#### 📋 **TASK TRACKER - Phase 2**
+
+| **Task** | **Status** | **Assignee** | **Started** | **Completed** | **Notes** |
+|----------|------------|--------------|-------------|---------------|-----------|
+| 1. Add OAuth Buttons | ⏳ **PENDING** | - | - | - | Update LoginForm.tsx |
+| 2. Add Callback Handling | ⏳ **PENDING** | - | - | - | OAuth redirect processing |
+| 3. Create Account Settings | ⏳ **PENDING** | - | - | - | Link/unlink OAuth accounts |
+| 4. Test OAuth Flow | ⏳ **PENDING** | - | - | - | End-to-end testing |
+
+### **Layer 6: Client Layer - OAuth React Hooks & UI**
+
+#### **React Hooks with TanStack Query (Layer 6)**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🟡 **HIGH**  
+**File**: `packages/client/src/hooks/useOAuth.ts`
+
+Following the established client layer pattern with TanStack Query and hierarchical cache keys:
+
+```typescript
+// packages/client/src/hooks/useOAuth.ts
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
+import type { OAuthAccountModel } from '@starships/protocol';
+
+// Hierarchical query keys following established pattern
+export const OAUTH_QUERY_KEYS = {
+  all: ['oauth'] as const,
+  accounts: () => [...OAUTH_QUERY_KEYS.all, 'accounts'] as const,
+  userAccounts: (userId: string) => [...OAUTH_QUERY_KEYS.accounts(), userId] as const,
+} as const;
+
+/**
+ * Response data extraction helper - follows established pattern
+ */
+const extractResponseData = <T>(response: any): T => response.data.data;
+
+/**
+ * Get user's linked OAuth accounts
+ * Follows established query pattern with caching
+ */
+export function useOAuthAccounts(enabled: boolean = true) {
+  return useQuery({
+    queryKey: OAUTH_QUERY_KEYS.accounts(),
+    queryFn: async () => {
+      const response = await api.get('/api/v1/auth/oauth/accounts');
+      const accounts = extractResponseData<{ accounts: OAuthAccountModel[] }>(response);
+      return accounts;
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+/**
+ * Unlink OAuth account mutation
+ * Follows established mutation pattern with optimistic updates
+ */
+export function useUnlinkOAuthAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (provider: 'google' | 'github') => {
+      const response = await api.delete(`/api/v1/auth/oauth/unlink/${provider}`);
+      return response.data;
+    },
+    onMutate: async (provider) => {
+      // Cancel competing queries
+      await queryClient.cancelQueries({ queryKey: OAUTH_QUERY_KEYS.accounts() });
+
+      // Snapshot current accounts
+      const previousAccounts = queryClient.getQueryData(OAUTH_QUERY_KEYS.accounts());
+
+      // Optimistic update: remove account
+      queryClient.setQueryData(OAUTH_QUERY_KEYS.accounts(), (old: any) => {
+        if (!old?.accounts) return old;
+        return {
+          accounts: old.accounts.filter((account: OAuthAccountModel) => account.provider !== provider)
+        };
+      });
+
+      return { previousAccounts, provider };
+    },
+    onSuccess: (_, provider) => {
+      toast({
+        title: 'Account unlinked',
+        description: `${provider} account has been unlinked successfully.`,
+      });
+    },
+    onError: (error: any, provider, context) => {
+      // Rollback optimistic update
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(OAUTH_QUERY_KEYS.accounts(), context.previousAccounts);
+      }
+      
+      toast({
+        title: 'Failed to unlink account',
+        description: error?.response?.data?.error?.message || 'Failed to unlink OAuth account',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      // Refresh accounts data
+      queryClient.invalidateQueries({ queryKey: OAUTH_QUERY_KEYS.accounts() });
+    },
+  });
+}
+
+/**
+ * OAuth initiation helper
+ * Handles redirect to OAuth provider
+ */
+export function useOAuthLogin() {
+  return {
+    initiateOAuth: (provider: 'google' | 'github') => {
+      window.location.href = `/api/v1/auth/${provider}`;
+    },
+  };
+}
+```
+
+#### **Extended Login Form (Layer 6 UI)**
+
+**Status**: ⏳ **PENDING** | **Priority**: 🟡 **HIGH**  
+**File**: `packages/client/src/components/auth/LoginForm.tsx`
+
+Following established UI patterns and integrating OAuth buttons above existing tab system:
 
 ```typescript
 // packages/client/src/components/auth/LoginForm.tsx - MODIFY EXISTING
@@ -914,35 +1534,51 @@ app.use('/api/v1/auth/google', rateLimit({
 }));
 ```
 
-## ✅ **Revised Migration Strategy (CORRECTED APPROACH)**
-
-### **Phase 0: Critical Foundation (Day 1) - MUST DO FIRST**
-- [ ] **❗ URGENT**: Extract JWT utility from `packages/server/src/routes/auth.ts` (fix duplicate code)
-- [ ] **❗ URGENT**: Update both register and login routes to use shared `generateJWT()`
-- [ ] **❗ URGENT**: Add OAuth error codes to `packages/protocol/src/contracts/errors.ts`
-- [ ] **Test**: Ensure existing auth flow still works after JWT extraction
-
-### **Phase 1: Database & Backend (Week 1)**
-- [ ] Create `001_oauth_accounts.sql` migration (✅ **CORRECTED PostgreSQL format**)
-- [ ] Run migration using existing `packages/models/src/scripts/migration-runner.ts`
-- [ ] Create `OAuthAccountRepository` (✅ **SIMPLIFIED for PostgreSQL**)
-- [ ] Extend `UserService` with OAuth methods (✅ **ALIGNED with actual behavior**)
-- [ ] Add OAuth routes to existing auth controller (✅ **USING existing error system**)
-- [ ] Set up Google & GitHub OAuth applications
-
-### **Phase 2: Frontend Integration (Week 2)**
-- [ ] Add OAuth buttons to `LoginForm.tsx` (✅ **ABOVE existing tabs**)
-- [ ] Add OAuth callback handling to `LoginForm.tsx`
-- [ ] Create `OAuthAccountsSettings` component for profile page
-- [ ] Test complete OAuth flow with existing waitlist system
-- [ ] Verify OAuth buttons work with existing tab-based login form
-
 ### **Phase 3: Polish & Deploy (Week 3)**
-- [ ] Unit tests for OAuth utility functions
-- [ ] Integration tests for OAuth flows
-- [ ] Security review and rate limiting
-- [ ] Deploy to staging
-- [ ] Production OAuth app setup and monitoring
+
+#### 📋 **TASK TRACKER - Phase 3**
+
+| **Task** | **Status** | **Assignee** | **Started** | **Completed** | **Notes** |
+|----------|------------|--------------|-------------|---------------|-----------|
+| 1. Unit Tests | ⏳ **PENDING** | - | - | - | OAuth utility functions |
+| 2. Integration Tests | ⏳ **PENDING** | - | - | - | End-to-end OAuth flows |
+| 3. Security Review | ⏳ **PENDING** | - | - | - | Rate limiting + security |
+| 4. Deploy to Staging | ⏳ **PENDING** | - | - | - | Testing environment |
+| 5. Production Setup | ⏳ **PENDING** | - | - | - | OAuth apps + monitoring |
+
+## ✅ **Implementation Roadmap Summary**
+
+### **✅ Phase 0: Critical Foundation (Day 1)**
+**Status**: ⏳ **NOT STARTED** | **Priority**: 🔥 **CRITICAL**
+- ⏳ Extract JWT utility from `packages/server/src/routes/auth.ts` (fix duplicate code)
+- ⏳ Update both register and login routes to use shared `generateJWT()`
+- ⏳ Add OAuth error codes to `packages/protocol/src/contracts/errors.ts`
+- ⏳ Add OAuth environment configuration to env package
+- ⏳ **Test**: Ensure existing auth flow still works after JWT extraction
+
+### **✅ Phase 1: Database & Backend (Week 1)**
+**Status**: ⏳ **NOT STARTED** | **Priority**: 🟡 **HIGH** | **Depends on**: Phase 0
+- ⏳ Create `001_oauth_accounts.sql` migration (✅ **CORRECTED PostgreSQL format**)
+- ⏳ Run migration using existing `packages/models/src/scripts/migration-runner.ts`
+- ⏳ Create `OAuthAccountRepository` (✅ **SIMPLIFIED for PostgreSQL**)
+- ⏳ Extend `UserService` with OAuth methods (✅ **ALIGNED with actual behavior**)
+- ⏳ Add OAuth routes to existing auth controller (✅ **USING existing error system**)
+- ⏳ Set up Google & GitHub OAuth applications
+
+### **✅ Phase 2: Frontend Integration (Week 2)**
+**Status**: ⏳ **NOT STARTED** | **Priority**: 🟡 **HIGH** | **Depends on**: Phase 1
+- ⏳ Add OAuth buttons to `LoginForm.tsx` (✅ **ABOVE existing tabs**)
+- ⏳ Add OAuth callback handling to `LoginForm.tsx`
+- ⏳ Create `OAuthAccountsSettings` component for profile page
+- ⏳ Test complete OAuth flow with existing waitlist system
+
+### **✅ Phase 3: Polish & Deploy (Week 3)**
+**Status**: ⏳ **NOT STARTED** | **Priority**: 🟢 **MEDIUM** | **Depends on**: Phase 2
+- ⏳ Unit tests for OAuth utility functions
+- ⏳ Integration tests for OAuth flows
+- ⏳ Security review and rate limiting
+- ⏳ Deploy to staging
+- ⏳ Production OAuth app setup and monitoring
 
 ## ✅ **Revised Rollback Plan (POSTGRESQL-SAFE)**
 

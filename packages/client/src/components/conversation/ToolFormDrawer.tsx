@@ -221,10 +221,10 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                       {categories.map(cat => (
                         <Badge
                           key={cat}
-                          variant={formData.category === cat ? 'default' : 'outline'}
+                          variant="outline"
                           className={cn(
-                            'cursor-pointer transition-all hover:scale-105 gap-1.5 px-3 py-1.5 rounded-full [&>svg]:w-3.5 [&>svg]:h-3.5',
-                            formData.category === cat && getCategoryColor(cat)
+                            'cursor-pointer transition-all duration-200 gap-1.5 px-3 py-1.5 rounded-full [&>svg]:w-3.5 [&>svg]:h-3.5',
+                            formData.category === cat ? cn('shadow-sm hover:shadow-md hover:brightness-110', getCategoryColor(cat)) : 'hover:bg-muted/50 hover:border-primary/40'
                           )}
                           onClick={() => handleFieldChange('category', cat)}
                         >

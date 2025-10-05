@@ -78,7 +78,7 @@ export class StarshipRepository extends BaseRepository {
         const starshipData = {
           ...entity,
           slug,
-          maxAgents: entity.maxAgents || 3, // Default to 3 agents
+          maxAgents: entity.maxAgents ?? 3, // Default to 3 agents
           status: entity.status || 'active', // Default to active
           createdAt: now,
           updatedAt: now,

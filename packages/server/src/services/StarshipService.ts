@@ -40,7 +40,7 @@ export class StarshipService {
       ownerId: data.ownerId,
       name: data.name,
       slug: data.slug,
-      maxAgents: data.maxAgents || 3,
+      maxAgents: data.maxAgents ?? 3,
       status: 'active',
     });
 

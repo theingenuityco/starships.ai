@@ -203,9 +203,14 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                   <Textarea
                     placeholder="Brief description..."
                     value={formData.description}
-                    onChange={e => handleFieldChange('description', e.target.value)}
-                    className={`text-xs h-auto py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''}`}
-                    rows={2}
+                    onChange={e => {
+                      handleFieldChange('description', e.target.value)
+                      // Auto-resize textarea
+                      e.target.style.height = 'auto'
+                      e.target.style.height = `${e.target.scrollHeight}px`
+                    }}
+                    className={`text-xs min-h-[32px] max-h-[120px] py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''}`}
+                    rows={1}
                   />
                 </div>
               </div>

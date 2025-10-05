@@ -4,9 +4,11 @@ import { AgentRepository, getConnection, StarshipRepository, ToolRepository } fr
 import { CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 
-export interface CreateStarshipData extends Omit<CreateStarshipRequest, 'slug'> {
+export interface CreateStarshipData {
   ownerId: string;
+  name: string;
   slug?: string;
+  maxAgents?: number;
 }
 
 export interface StarshipWithDetails extends StarshipModel {
@@ -37,31 +39,9 @@ export class StarshipService {
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
-      class: data.class,
       slug: data.slug,
+      maxAgents: data.maxAgents ?? 3,
       status: 'active',
-    });
-
-    return starship;
-  }
-
-  /**
-   * Create a paid starship with pending payment status
-   */
-  async createPaidStarship(
-    data: CreateStarshipData & {
-      plan: 'cruiser' | 'draught';
-      billingPeriod: 'monthly' | 'yearly';
-    }
-  ): Promise<StarshipModel> {
-    const starship = await this.starshipRepository.create({
-      ownerId: data.ownerId,
-      name: data.name,
-      class: data.class,
-      slug: data.slug,
-      status: 'pending_payment',
-      plan: data.plan,
-      billingPeriod: data.billingPeriod,
     });
 
     return starship;
@@ -169,61 +149,6 @@ export class StarshipService {
   }
 
   /**
-   * Update starship payment status
-   */
-  async updatePaymentStatus(
-    starshipId: string,
-    status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
-    additionalFields?: Partial<StarshipModel>
-  ): Promise<void> {
-    return this.starshipRepository.updatePaymentStatus(starshipId, status, additionalFields);
-  }
-
-  /**
-   * Update subscription details
-   */
-  async updateSubscription(
-    starshipId: string,
-    updates: {
-      subscriptionId?: string;
-      status?: 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
-      plan?: 'scout' | 'cruiser' | 'draught';
-      billingPeriod?: 'monthly' | 'yearly';
-    }
-  ): Promise<void> {
-    return this.starshipRepository.updateSubscription(starshipId, updates);
-  }
-
-  /**
-   * Find starship by subscription ID
-   */
-  async getStarshipBySubscriptionId(subscriptionId: string): Promise<StarshipModel | null> {
-    return this.starshipRepository.findBySubscriptionId(subscriptionId);
-  }
-
-  /**
-   * Find starship by Stripe customer ID
-   */
-  async getStarshipByStripeCustomerId(customerId: string): Promise<StarshipModel | null> {
-    return this.starshipRepository.findByStripeCustomerId(customerId);
-  }
-
-  /**
-   * Count free starships for user
-   */
-  async countFreeStarships(userId: string): Promise<number> {
-    return this.starshipRepository.countFreeStarships(userId);
-  }
-
-  /**
-   * Check if user can create more scout starships
-   */
-  async canCreateScoutStarship(userId: string): Promise<boolean> {
-    const scoutCount = await this.countFreeStarships(userId);
-    return scoutCount < 3; // Scout limit is 3
-  }
-
-  /**
    * Generate unique slug for starship
    */
   async generateUniqueSlug(name: string, ownerId: string): Promise<string> {
@@ -305,11 +230,11 @@ export class StarshipService {
     // Generate a random name for the starship
     const starshipName = getRandomStarshipName();
 
-    // Create the starship with scout class (free tier)
+    // Create the starship with default settings
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
-      class: 'scout',
+      maxAgents: 3,
     });
 
     return starship;

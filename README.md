@@ -9,7 +9,7 @@ A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workf
 - **Vision Chamber**: AI-powered vision refinement with quality metrics and intelligent suggestions
 - **Autopilot Workflow Engine**: DAG-based workflow execution with conditional routing and AI model integration
 - **Multi-Agent Coordination**: Complex agent management with intelligent coordination
-- **Starship Management**: Enhanced starship creation with vision integration and subscription tiers
+- **Starship Management**: Enhanced starship creation with vision integration
 - **Production-Ready**: Docker containerization, Kubernetes deployment, SSL certificates, and comprehensive monitoring
 
 ## 📚 Documentation
@@ -49,7 +49,6 @@ cp .env.example .env
 - **Database Schema**: Apply schema: `PGPASSWORD=password psql -h localhost -U postgres -d starships -f packages/models/migrations/000_postgresql_schema.sql`
 - **JWT Authentication**: Built-in JWT token-based authentication system
 - **OpenAI/Anthropic**: Add your API keys
-- **Stripe**: Configure for payments (optional for development)
 
 ### PostgreSQL Database Setup
 
@@ -83,7 +82,7 @@ pnpm lint         # Run ESLint
 | Package                                                          | Description                                                                                          |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | [`@starships/client`](./packages/client/README.md)               | Next.js 15 frontend with starship management, agent control, and conversation interfaces             |
-| [`@starships/server`](./packages/server/README.md)               | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints           |
+| [`@starships/server`](./packages/server/README.md)               | Express.js API server with JWT authentication and comprehensive endpoints                            |
 | [`@starships/autopilot`](./packages/autopilot/README.md)         | Workflow execution engine with DAG-based flows, agent system, AI model integration, and tool calling |
 | [`@starships/models`](./packages/models/README.md)               | PostgreSQL database models, repositories, migration system, and comprehensive data access layer      |
 | [`@starships/reverse-proxy`](./packages/reverse-proxy/README.md) | Development reverse proxy for unified local development routing                                      |
@@ -113,7 +112,6 @@ pnpm lint         # Run ESLint
 - **API**: Express.js 5+ with comprehensive middleware
 - **Database**: PostgreSQL 18 relational database with connection pooling
 - **Authentication**: Kinde OAuth with JWT
-- **Payments**: Stripe with webhook idempotency
 
 ### AI & Workflow
 
@@ -156,9 +154,7 @@ graph TD
 **Starship Management**
 
 - Complete starship lifecycle (create, update, delete)
-- Subscription-based class system (Scout, Cruiser, Draught)
 - Agent deployment and slot management
-- Billing integration with automatic status updates
 
 **Agent System**
 
@@ -188,13 +184,6 @@ graph TD
 - AI agent state management and conversation persistence
 - JSON-based workflow definitions with validation
 
-**Payment & Billing System**
-
-- Stripe subscription management with webhook handling
-- Multiple pricing tiers (Scout free, Cruiser/Draught paid)
-- Billing portal integration and payment retry flows
-- Idempotent webhook processing with comprehensive error handling
-
 **Database & Data Management**
 
 - PostgreSQL 18 relational database with automated migrations
@@ -211,8 +200,7 @@ curl -X POST http://localhost:4000/api/v1/starships \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Enterprise",
-    "class": "cruiser"
+    "name": "Enterprise"
   }'
 ```
 
@@ -388,12 +376,11 @@ Simple and efficient debug configurations for development:
 
 - ✅ JWT authentication with secure token validation
 - ✅ Waitlist system with controlled early access
-- ✅ Comprehensive starship management with billing
+- ✅ Comprehensive starship management
 - ✅ Agent orchestration with AI-powered coordination
 - ✅ Agent marketplace with templates and custom agents
 - ✅ Conversation system with structured chat interfaces
 - ✅ Autopilot workflow execution engine with advanced memory
-- ✅ Stripe subscription management with webhook handling
 - ✅ PostgreSQL database with automated migrations
 - ✅ Production-ready error handling and monitoring
 - ✅ Docker containerization and health checks

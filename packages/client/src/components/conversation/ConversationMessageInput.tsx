@@ -8,17 +8,11 @@ import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
-<<<<<<< HEAD
-import { extractErrorCode } from '@/lib/error-utils'
-import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
-import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { CreditLimitBanner } from './CreditLimitBanner'
-import { useCreditBalance } from '@/hooks/useCreditBalance'
-=======
 import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
->>>>>>> 42077393fdbe4b883f3830e8dfbf41b66878d60c
+import { extractErrorCode } from '@/lib/error-utils'
+import { CreditLimitBanner } from './CreditLimitBanner'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {

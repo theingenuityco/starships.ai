@@ -625,18 +625,32 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     height: 50, // Node height + padding
   }))
 
-  // Create edges with intelligent routing around nodes
+  // Build incoming edges map to detect convergence
+  const incomingEdgesMap = new Map<string, BlueprintEdge[]>()
+  blueprintEdges.forEach(edge => {
+    if (!incomingEdgesMap.has(edge.to)) {
+      incomingEdgesMap.set(edge.to, [])
+    }
+    incomingEdgesMap.get(edge.to)!.push(edge)
+  })
+
+  // Create edges with intelligent routing only when needed
   const intelligentEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const targetNode = blueprint.nodes.find(n => n.ref === edge.to)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+
+    // Check if this edge needs intelligent routing (multiple branches or convergence)
+    const hasMultipleOutgoing = (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+    const hasMultipleIncoming = (incomingEdgesMap.get(edge.to)?.length || 0) > 1
+    const needsIntelligentRouting = hasMultipleOutgoing || hasMultipleIncoming
 
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
-      type: 'intelligent', // Use custom intelligent edge for obstacle avoidance
+      type: needsIntelligentRouting ? 'intelligent' : 'default', // Use intelligent edge only when needed
       animated: false,
       style: {
         stroke: '#64748b',
@@ -649,9 +663,11 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
         height: 16,
       },
       label: edge.label,
-      data: {
-        obstacles: obstacles,
-      },
+      data: needsIntelligentRouting
+        ? {
+            obstacles: obstacles,
+          }
+        : undefined,
     }
   })
 

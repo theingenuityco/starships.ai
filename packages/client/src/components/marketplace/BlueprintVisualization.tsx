@@ -335,16 +335,16 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
           <div className="flex mt-1">
             {edges.map((edge, index) => (
               <div
-                key={edge.ref}
+                key={edge?.ref || `edge-${index}`}
                 className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-b-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mr-1 last:mr-0"
                 style={{ minWidth: '60px' }}
               >
-                <div className="truncate text-center">{edge.label || `Branch ${index + 1}`}</div>
+                <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
                 {/* Individual output handle for this branch */}
                 <Handle
                   type="source"
                   position={Position.Bottom}
-                  id={edge.ref}
+                  id={edge?.ref}
                   className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
                   style={{
                     bottom: -5,

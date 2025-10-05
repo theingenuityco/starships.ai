@@ -173,7 +173,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
             <SheetTitle className="sr-only">Tool Form</SheetTitle>
 
             {/* Header */}
-            <div className="border-b border-border/40 pb-4 space-y-3">
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="h-[46px] w-[46px] rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
                   <Wrench className="w-6 h-6 text-primary" />
@@ -203,7 +203,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
             </div>
 
             {/* Form Sections */}
-            <div className="space-y-6 pt-2">
+            <div className="space-y-6">
               {/* Basic Information */}
               <div className="px-1">
                 <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">

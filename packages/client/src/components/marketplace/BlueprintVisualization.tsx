@@ -426,8 +426,16 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
   const startNode = blueprint.nodes.find(node => node.type === 'start')
   const endNodes = blueprint.nodes.filter(node => node.type === 'end')
 
+  // Handle incomplete blueprints during streaming - no start node yet
   if (!startNode) {
-    throw new Error('No start node found')
+    // Return simple layout without execution order
+    return {
+      nodes: nodes.map((node, index) => ({
+        ...node,
+        position: { x: 600, y: index * 200 + 120 },
+      })),
+      edges,
+    }
   }
 
   // Build edge maps for navigation

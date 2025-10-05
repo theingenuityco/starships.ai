@@ -383,9 +383,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   return (
     <div
-      className="relative flex flex-col h-screen transition-all duration-500 ease-in-out overflow-hidden"
+      className="relative flex flex-col h-screen transition-all duration-500 ease-in-out"
       style={{
-        marginLeft: viewMode === 'tool-builder' ? '0' : '5.5rem', // Full width for tool-builder, account for navigation otherwise
+        marginLeft: '5.5rem', // Consistent offset for both modes to prevent content shift
+        overflow: viewMode === 'tool-builder' ? 'visible' : 'hidden',
       }}
     >
       {/* Content container */}

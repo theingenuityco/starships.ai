@@ -190,14 +190,18 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
       {/* Main Blueprint Canvas - Full Height */}
       <div className="flex-1 relative">
         <div
-          className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
+          className="absolute bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
           style={{
             backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.4) 1px, transparent 1px)',
             backgroundSize: '24px 24px',
+            top: 0,
+            bottom: 0,
+            left: '-5.5rem', // Extend background behind navigation
+            right: 0,
           }}
         >
           {/* Floating Tool Info Panel - Top Left */}
-          <div className="absolute top-6 left-[7rem] z-10">
+          <div className="absolute top-6 left-[5.5rem] z-10">
             <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 min-w-[320px] max-w-[400px]">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">

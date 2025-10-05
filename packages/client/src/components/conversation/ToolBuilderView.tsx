@@ -234,15 +234,15 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
           {/* Floating Action Buttons - Top Right */}
           <div className="absolute top-10 right-6 z-10 flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-lg hover:bg-muted/50">
+            <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card !shadow-frosted-lg hover:bg-muted/50">
               <Settings2 className="w-4 h-4" />
               Settings
             </Button>
-            <Button size="sm" variant="outline" onClick={onCancel} className="frosted-glass-card shadow-frosted-lg hover:bg-muted/50">
+            <Button size="sm" variant="outline" onClick={onCancel} className="frosted-glass-card !shadow-frosted-lg hover:bg-muted/50">
               <X className="w-4 h-4 mr-1" />
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} className="gap-2 shadow-frosted-lg">
+            <Button size="sm" onClick={handleSave} className="gap-2 !shadow-frosted-lg">
               <Save className="w-4 h-4" />
               Save Tool
             </Button>

@@ -2,11 +2,9 @@
 
 import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
+import { User as UserIcon } from 'lucide-react'
 
 import AccountForm from '@/components/profile/AccountForm'
-import { UserUsage } from '@/components/profile/UserUsage'
 
 export default function ProfilePage(): React.JSX.Element {
   return (
@@ -19,64 +17,13 @@ export default function ProfilePage(): React.JSX.Element {
                 <UserIcon className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">My Profile</h1>
               </div>
-              <p className="text-muted-foreground">Manage your account, billing, and usage.</p>
+              <p className="text-muted-foreground">Manage your account settings and preferences.</p>
             </div>
 
-            {/* Sections using shared Tabs UI with improved alignment */}
-            <Tabs defaultValue="account" className="space-y-6">
-              <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="account" className="gap-2 rounded-xl px-4 py-2">
-                    <UserIcon className="h-4 w-4" />
-                    <span>Account</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="billing" className="gap-2 rounded-xl px-4 py-2">
-                    <CreditCard className="h-4 w-4" />
-                    <span>Billing</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="usage" className="gap-2 rounded-xl px-4 py-2">
-                    <Activity className="h-4 w-4" />
-                    <span>Usage</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="account">
-                <section aria-labelledby="account-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="account-section" className="text-lg font-semibold">
-                    Account
-                  </h3>
-                  <div className="mt-4">
-                    <AccountForm />
-                  </div>
-                </section>
-              </TabsContent>
-
-              <TabsContent value="starship">
-                <section aria-labelledby="starship-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="starship-section" className="text-lg font-semibold">
-                    Starship
-                  </h3>
-                </section>
-              </TabsContent>
-
-              <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="billing-section" className="text-lg font-semibold">
-                    Billing
-                  </h3>
-                </section>
-              </TabsContent>
-
-              <TabsContent value="usage">
-                <section aria-labelledby="usage-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="usage-section" className="sr-only">
-                    Usage
-                  </h3>
-                  <UserUsage />
-                </section>
-              </TabsContent>
-            </Tabs>
+            <div className="rounded-xl border border-border/40 bg-background p-6">
+              <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
+              <AccountForm />
+            </div>
           </div>
         </div>
       </div>

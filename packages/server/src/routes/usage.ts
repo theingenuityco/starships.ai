@@ -9,6 +9,26 @@ const router: Router = Router();
 
 const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 
+/**
+ * Query schemas for starship usage endpoints
+ */
+const UsageListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
+  day: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be in YYYY-MM-DD format')
+    .optional(),
+  model: z.string().min(1).max(255).optional(),
+  order: z.enum(['ASC', 'DESC']).optional(),
+});
+
+const DailyListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
+  order: z.enum(['ASC', 'DESC']).optional(),
+});
+
 function validateData<T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null {
   try {
     return schema.parse(data);
@@ -72,57 +92,34 @@ router.get('/starships/:starshipId/usage/totals', jwtAuthMiddleware, async (req:
 });
 
 /**
- * GET /users/:userId/usage/totals
- * Returns aggregate usage totals across all owned starships for a user
+ * GET /starships/:starshipId/usage/totals-with-count
+ * Returns aggregate usage totals for a starship including request count
  */
-router.get('/users/:userId/usage/totals', jwtAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/starships/:starshipId/usage/totals-with-count', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
-    const { userId } = paramValidation;
-
-    // Authorization: Users can only view their own usage
-    if (req.user?.id !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'You can only access your own usage', 403);
-      return;
-    }
+    const { starshipId } = paramValidation;
 
     const usageService = new UsageService();
-    const totals = await usageService.getTotalsByUser(userId);
+    const totalsWithCount = await usageService.getTotalsByStarshipWithCount(starshipId);
 
-    sendSuccess(res, totals, 200);
+    sendSuccess(res, totalsWithCount, 200);
   } catch (error) {
-    handleError(error, res, 'fetching user usage totals');
+    handleError(error, res, 'fetching starship usage totals with count');
   }
 });
 
 /**
- * GET /users/:userId/usage
- * Returns paginated usage records for a user across all owned starships
+ * GET /starships/:starshipId/usage
+ * Returns paginated usage records for a starship
  * Supports filters: by day (YYYY-MM-DD) and by model, and sort order
  */
-const UsageListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(20),
-  day: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be in YYYY-MM-DD format')
-    .optional(),
-  model: z.string().min(1).max(255).optional(),
-  order: z.enum(['ASC', 'DESC']).optional(),
-});
-
-router.get('/users/:userId/usage', jwtAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/starships/:starshipId/usage', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
-    const { userId } = paramValidation;
-
-    // Authorization: Users can only view their own usage
-    if (req.user?.id !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'You can only access your own usage', 403);
-      return;
-    }
+    const { starshipId } = paramValidation;
 
     const queryValidation = validateData(UsageListQuerySchema, req.query, res, 'pagination/filter parameters');
     if (!queryValidation) return;
@@ -132,13 +129,13 @@ router.get('/users/:userId/usage', jwtAuthMiddleware, async (req: Request, res: 
     const usageService = new UsageService();
 
     // Get total count for pagination
-    const total = await usageService.countByUser(userId, { day, model });
+    const total = await usageService.countByStarship(starshipId, { day, model });
 
     // Page to offset conversion
     const offset = (page - 1) * limit;
 
     // Fetch page of records
-    const data = await usageService.listByUser(userId, {
+    const data = await usageService.listByStarship(starshipId, {
       limit,
       offset,
       day,
@@ -149,31 +146,19 @@ router.get('/users/:userId/usage', jwtAuthMiddleware, async (req: Request, res: 
     const meta = createPaginationMeta(page, limit, total);
     sendSuccess(res, data, 200, meta);
   } catch (error) {
-    handleError(error, res, 'fetching user usage list');
+    handleError(error, res, 'fetching starship usage list');
   }
 });
 
 /**
- * GET /users/:userId/usage/daily
- * Returns daily aggregated usage for a user (paginated)
+ * GET /starships/:starshipId/usage/daily
+ * Returns daily aggregated usage for a starship (paginated)
  */
-const DailyListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(20),
-  order: z.enum(['ASC', 'DESC']).optional(),
-});
-
-router.get('/users/:userId/usage/daily', jwtAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/starships/:starshipId/usage/daily', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
-    const { userId } = paramValidation;
-
-    // Authorization: Users can only view their own usage
-    if (req.user?.id !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'You can only access your own usage', 403);
-      return;
-    }
+    const { starshipId } = paramValidation;
 
     const queryValidation = validateData(DailyListQuerySchema, req.query, res, 'pagination parameters');
     if (!queryValidation) return;
@@ -181,10 +166,10 @@ router.get('/users/:userId/usage/daily', jwtAuthMiddleware, async (req: Request,
 
     const usageService = new UsageService();
 
-    const total = await usageService.countDailyByUser(userId);
+    const total = await usageService.countDailyByStarship(starshipId);
     const offset = (page - 1) * limit;
 
-    const data = await usageService.listDailyByUser(userId, {
+    const data = await usageService.listDailyByStarship(starshipId, {
       limit,
       offset,
       order: order ?? 'DESC',
@@ -193,25 +178,19 @@ router.get('/users/:userId/usage/daily', jwtAuthMiddleware, async (req: Request,
     const meta = createPaginationMeta(page, limit, total);
     sendSuccess(res, data, 200, meta);
   } catch (error) {
-    handleError(error, res, 'fetching user daily usage list');
+    handleError(error, res, 'fetching starship daily usage list');
   }
 });
 
 /**
- * GET /users/:userId/usage/daily-model
- * Returns daily+model aggregated usage for a user (paginated)
+ * GET /starships/:starshipId/usage/daily-model
+ * Returns daily+model aggregated usage for a starship (paginated)
  */
-router.get('/users/:userId/usage/daily-model', jwtAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/starships/:starshipId/usage/daily-model', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
-    const { userId } = paramValidation;
-
-    // Authorization: Users can only view their own usage
-    if (req.user?.id !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'You can only access your own usage', 403);
-      return;
-    }
+    const { starshipId } = paramValidation;
 
     const queryValidation = validateData(DailyListQuerySchema, req.query, res, 'pagination parameters');
     if (!queryValidation) return;
@@ -219,10 +198,10 @@ router.get('/users/:userId/usage/daily-model', jwtAuthMiddleware, async (req: Re
 
     const usageService = new UsageService();
 
-    const total = await usageService.countDailyModelByUser(userId);
+    const total = await usageService.countDailyModelByStarship(starshipId);
     const offset = (page - 1) * limit;
 
-    const data = await usageService.listDailyModelByUser(userId, {
+    const data = await usageService.listDailyModelByStarship(starshipId, {
       limit,
       offset,
       order: order ?? 'DESC',
@@ -231,7 +210,7 @@ router.get('/users/:userId/usage/daily-model', jwtAuthMiddleware, async (req: Re
     const meta = createPaginationMeta(page, limit, total);
     sendSuccess(res, data, 200, meta);
   } catch (error) {
-    handleError(error, res, 'fetching user daily+model usage list');
+    handleError(error, res, 'fetching starship daily+model usage list');
   }
 });
 

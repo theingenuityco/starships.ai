@@ -21,6 +21,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
   const [showTooltip, setShowTooltip] = useState(false)
 
   const handleGoToProfile = (): void => {
+    // Navigate to the main profile page for account settings
     router.push('/profile')
   }
 

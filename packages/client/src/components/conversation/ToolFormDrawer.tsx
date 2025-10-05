@@ -10,7 +10,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X, ChevronsUpDown, Check } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
 
 interface ToolFormData {
@@ -64,6 +67,7 @@ const INITIAL_FORM_DATA: ToolFormData = {
 export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>(({ open, onOpenChange, onSave, starshipId }, ref) => {
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
+  const [categoryOpen, setCategoryOpen] = useState(false)
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -216,21 +220,48 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                     <Label htmlFor="tool-category" className="text-foreground">
                       Category
                     </Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {categories.map(cat => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => handleFieldChange('category', cat)}
-                          className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
-                            formData.category === cat ? `${getCategoryColor(cat)} border-2` : 'border-border/40 bg-muted/5 hover:bg-muted/10 hover:border-border/60'
-                          }`}
+                    <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={categoryOpen}
+                          className={cn('w-full justify-between h-auto py-3', formData.category && getCategoryColor(formData.category))}
                         >
-                          {getCategoryIcon(cat)}
-                          <span className="text-sm font-medium capitalize">{cat}</span>
-                        </button>
-                      ))}
-                    </div>
+                          <div className="flex items-center gap-2">
+                            {getCategoryIcon(formData.category)}
+                            <span className="capitalize">{formData.category}</span>
+                          </div>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0 z-[9999] frosted-glass-card" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search category..." />
+                          <CommandList>
+                            <CommandEmpty>No category found.</CommandEmpty>
+                            <CommandGroup>
+                              {categories.map(cat => (
+                                <CommandItem
+                                  key={cat}
+                                  value={cat}
+                                  onSelect={() => {
+                                    handleFieldChange('category', cat)
+                                    setCategoryOpen(false)
+                                  }}
+                                >
+                                  <Check className={cn('mr-2 h-4 w-4', formData.category === cat ? 'opacity-100' : 'opacity-0')} />
+                                  <div className="flex items-center gap-2">
+                                    {getCategoryIcon(cat)}
+                                    <span className="capitalize">{cat}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               </div>

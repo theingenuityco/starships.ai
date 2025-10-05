@@ -188,7 +188,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
         >
           {/* Floating Tool Info Panel - Top Left */}
           <div className="absolute top-6 left-[7rem] z-10">
-            <div className="frosted-glass-card rounded-2xl shadow-frosted-xl p-4 min-w-[320px] max-w-[400px]">
+            <div className="frosted-glass-card rounded-2xl shadow-lg p-4 min-w-[320px] max-w-[400px]">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
                   <Wrench className="w-5 h-5 text-primary" />
@@ -213,15 +213,15 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
           {/* Floating Action Buttons - Top Right */}
           <div className="absolute top-6 right-6 z-10 flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-xl hover:bg-muted/50">
+            <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-lg hover:bg-muted/50">
               <Settings2 className="w-4 h-4" />
               Settings
             </Button>
-            <Button size="sm" variant="outline" onClick={onCancel} className="frosted-glass-card shadow-frosted-xl hover:bg-muted/50">
+            <Button size="sm" variant="outline" onClick={onCancel} className="frosted-glass-card shadow-lg hover:bg-muted/50">
               <X className="w-4 h-4 mr-1" />
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} className="gap-2 shadow-frosted-xl">
+            <Button size="sm" onClick={handleSave} className="gap-2 shadow-lg">
               <Save className="w-4 h-4" />
               Save Tool
             </Button>
@@ -233,7 +233,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4 max-w-md px-6">
-                <div className="w-20 h-20 mx-auto rounded-full frosted-glass-card flex items-center justify-center shadow-frosted-xl">
+                <div className="w-20 h-20 mx-auto rounded-full frosted-glass-card shadow-lg flex items-center justify-center">
                   <Wrench className="w-10 h-10 text-muted-foreground/50" />
                 </div>
                 <div className="space-y-2">
@@ -242,7 +242,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                     Start building your tool by adding nodes and connections to create a workflow blueprint. Open settings to define the blueprint structure.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-xl">
+                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-lg">
                   <Settings2 className="w-4 h-4" />
                   Open Settings
                   <ChevronRight className="w-4 h-4" />

@@ -358,11 +358,17 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
               Blueprint Visualization - {formData.name || 'Tool'}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0">
+          <div
+            className="flex-1 min-h-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
+            style={{
+              backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.3) 1px, transparent 1px)',
+              backgroundSize: '24px 24px',
+            }}
+          >
             {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
               <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" />
             ) : (
-              <div className="h-full flex items-center justify-center bg-muted/10">
+              <div className="h-full flex items-center justify-center">
                 <p className="text-muted-foreground">No blueprint defined yet</p>
               </div>
             )}

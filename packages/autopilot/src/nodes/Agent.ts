@@ -52,6 +52,7 @@ export class Agent implements NodeHandler {
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
     const argsNodeRef = `args_${this.nodeCounter++}`;
     const toolNodeRef = `tool_${this.nodeCounter++}`;
+    const toolResultNodeRef = `tool_result_${this.nodeCounter++}`;
 
     // Create complete blueprint with all nodes
     this.params.blueprint = {
@@ -158,7 +159,7 @@ export class Agent implements NodeHandler {
           ref: toolNodeRef,
           type: 'tool' as const,
           name: 'Execute Tool',
-          description: 'Execute tool and add result to conversation',
+          description: 'Execute tool',
           parameters: {
             // Resolve tool definition from state using the tool name from LLM response (normalized)
             name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
@@ -166,11 +167,29 @@ export class Agent implements NodeHandler {
             parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
             blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
             toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+          },
+        },
+        // Mutate node to add tool result to state (runs after tool execution)
+        {
+          ref: toolResultNodeRef,
+          type: 'mutate' as const,
+          name: 'Add Tool Result',
+          description: 'Add tool result message to conversation state',
+          parameters: {
             mutations: [
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
-                value: `{{ { role: "tool", tool_call_id: $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "", content: JSON.stringify($lastOutputOf("${toolNodeRef}")[0]?.json ?? {}) } }}`,
+                value: `{{ (() => {
+                  const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
+                  const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+                  const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+                  return {
+                    role: "tool",
+                    tool_call_id: toolCallId,
+                    content: content
+                  };
+                })() }}`,
               },
             ],
           },
@@ -187,8 +206,10 @@ export class Agent implements NodeHandler {
         { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'call_tool' },
         // Prepare Args -> Tool
         { ref: 'edge_args_tool', from: argsNodeRef, to: toolNodeRef },
-        // Tool -> LLM (loop back)
-        { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
+        // Tool -> Tool Result (add result to state)
+        { ref: 'edge_tool_result', from: toolNodeRef, to: toolResultNodeRef },
+        // Tool Result -> LLM (loop back with result in state)
+        { ref: 'edge_result_llm', from: toolResultNodeRef, to: llmNodeRef },
         // Conditional -> End (if no tool_calls)
         { ref: 'edge_conditional_end', from: conditionalNodeRef, to: endRef, condition: 'complete' },
       ],

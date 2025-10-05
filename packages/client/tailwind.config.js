@@ -79,7 +79,7 @@ module.exports = {
           background: 'linear-gradient(135deg, hsl(var(--card) / 0.30) 0%, hsl(var(--card) / 0.20) 100%)',
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: '1px solid hsl(var(--border) / 0.2)',
+          border: 'var(--frosted-border)',
         },
       }
       addUtilities(newUtilities)

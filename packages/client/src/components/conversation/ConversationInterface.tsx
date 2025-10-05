@@ -3,7 +3,7 @@
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import { ToolFormView, ToolFormViewRef } from '@/components/conversation/ToolFormView'
+import { ToolBuilderView, ToolBuilderViewRef } from '@/components/conversation/ToolBuilderView'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -34,13 +34,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
-  const toolFormViewRef = useRef<ToolFormViewRef>(null)
+  const toolBuilderViewRef = useRef<ToolBuilderViewRef>(null)
   const lastUIActionKeyRef = useRef<string | null>(null)
 
-  // View mode state: 'conversation' or 'tool-form'
-  const [viewMode, setViewMode] = useState<'conversation' | 'tool-form'>('conversation')
+  // View mode state: 'conversation' or 'tool-builder'
+  const [viewMode, setViewMode] = useState<'conversation' | 'tool-builder'>('conversation')
 
-  // Expanded overlay state for message history when in tool-form mode
+  // Expanded overlay state for message history when in tool-builder mode
   const [isMessageOverlayExpanded, setIsMessageOverlayExpanded] = useState(false)
 
   // Track streaming state for current conversation to focus input on completion
@@ -157,20 +157,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [hasMessages, currentConversationId])
 
-  // Handle tool form save
-  const handleToolFormSave = useCallback((data: any) => {
-    console.log('Tool form data:', data)
+  // Handle tool builder save
+  const handleToolBuilderSave = useCallback((data: any) => {
+    console.log('Tool builder data:', data)
     toast.success('Tool created successfully!', {
       description: `${data.name} has been created and is ready to use.`,
     })
     setViewMode('conversation')
-    toolFormViewRef.current?.resetForm()
+    toolBuilderViewRef.current?.resetForm()
   }, [])
 
-  // Handle tool form cancel
-  const handleToolFormCancel = useCallback(() => {
+  // Handle tool builder cancel
+  const handleToolBuilderCancel = useCallback(() => {
     setViewMode('conversation')
-    toolFormViewRef.current?.resetForm()
+    toolBuilderViewRef.current?.resetForm()
   }, [])
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
@@ -187,9 +187,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         const ensureOpenThen = (fn: () => void) => {
           setTimeout(() => {
             if (action === 'open_tool_form') {
-              toolFormViewRef.current?.resetForm()
+              toolBuilderViewRef.current?.resetForm()
             }
-            setViewMode('tool-form')
+            setViewMode('tool-builder')
             setTimeout(() => fn(), 150)
           }, 100)
         }
@@ -201,11 +201,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
-            // Open form for tool_create
+            // Open builder for tool_create
             if (toolName === 'tool_create') {
-              console.log('📂 Opening tool form view for tool_create')
-              toolFormViewRef.current?.resetForm()
-              setViewMode('tool-form')
+              console.log('📂 Opening tool builder view for tool_create')
+              toolBuilderViewRef.current?.resetForm()
+              setViewMode('tool-builder')
             }
             break
           }
@@ -213,9 +213,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           case 'open_tool_form': {
             const form = (payload as any).formData || (payload as any).data || {}
             ensureOpenThen(() => {
-              if (toolFormViewRef.current && form && typeof form === 'object') {
+              if (toolBuilderViewRef.current && form && typeof form === 'object') {
                 Object.entries(form).forEach(([field, value]) => {
-                  toolFormViewRef.current?.updateField(field as any, value as any)
+                  toolBuilderViewRef.current?.updateField(field as any, value as any)
                 })
               }
             })
@@ -224,18 +224,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
           case 'update_tool_form': {
             const patch = (payload as any).patch || (payload as any).formData || (payload as any).data || {}
-            if (viewMode !== 'tool-form') {
+            if (viewMode !== 'tool-builder') {
               ensureOpenThen(() => {
-                if (toolFormViewRef.current && patch && typeof patch === 'object') {
+                if (toolBuilderViewRef.current && patch && typeof patch === 'object') {
                   Object.entries(patch).forEach(([field, value]) => {
-                    toolFormViewRef.current?.updateField(field as any, value as any)
+                    toolBuilderViewRef.current?.updateField(field as any, value as any)
                   })
                 }
               })
             } else {
               if (patch && typeof patch === 'object') {
                 Object.entries(patch).forEach(([field, value]) => {
-                  toolFormViewRef.current?.updateField(field as any, value as any)
+                  toolBuilderViewRef.current?.updateField(field as any, value as any)
                 })
               }
             }
@@ -244,12 +244,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
           case 'submit_tool_form': {
             const submit = () => {
-              const formData = toolFormViewRef.current?.getFormData()
+              const formData = toolBuilderViewRef.current?.getFormData()
               if (formData) {
-                handleToolFormSave(formData)
+                handleToolBuilderSave(formData)
               }
             }
-            if (viewMode !== 'tool-form') {
+            if (viewMode !== 'tool-builder') {
               ensureOpenThen(submit)
             } else {
               submit()
@@ -269,7 +269,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // ignore
       }
     },
-    [handleToolFormSave]
+    [handleToolBuilderSave]
   )
 
   // Detect special UI action responses from assistant messages (back-compat path)
@@ -297,9 +297,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, lastUIAction, handleUIPayload])
 
-  // Stream tool arguments into form as they arrive
+  // Stream tool arguments into builder as they arrive
   useEffect(() => {
-    if (!currentConversationId || !liveMessages.length || viewMode !== 'tool-form') return
+    if (!currentConversationId || !liveMessages.length || viewMode !== 'tool-builder') return
 
     // Find the last assistant message with toolCalls (reverse iteration)
     // Look for both streaming and completed messages to handle cases where
@@ -326,29 +326,29 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         return // Arguments not yet available
       }
 
-      // Update form fields as they become available
-      if (args.name && toolFormViewRef.current) {
-        toolFormViewRef.current.updateField('name', args.name)
+      // Update builder fields as they become available
+      if (args.name && toolBuilderViewRef.current) {
+        toolBuilderViewRef.current.updateField('name', args.name)
       }
-      if (args.description && toolFormViewRef.current) {
-        toolFormViewRef.current.updateField('description', args.description)
+      if (args.description && toolBuilderViewRef.current) {
+        toolBuilderViewRef.current.updateField('description', args.description)
       }
-      if (args.category && toolFormViewRef.current) {
-        toolFormViewRef.current.updateField('category', args.category)
+      if (args.category && toolBuilderViewRef.current) {
+        toolBuilderViewRef.current.updateField('category', args.category)
       }
-      if (args.exampleUsage && toolFormViewRef.current) {
-        toolFormViewRef.current.updateField('exampleUsage', args.exampleUsage)
+      if (args.exampleUsage && toolBuilderViewRef.current) {
+        toolBuilderViewRef.current.updateField('exampleUsage', args.exampleUsage)
       }
-      if (args.requiresApiKey !== undefined && toolFormViewRef.current) {
-        toolFormViewRef.current.updateField('requiresApiKey', args.requiresApiKey)
+      if (args.requiresApiKey !== undefined && toolBuilderViewRef.current) {
+        toolBuilderViewRef.current.updateField('requiresApiKey', args.requiresApiKey)
       }
-      if (args.parameters && toolFormViewRef.current) {
+      if (args.parameters && toolBuilderViewRef.current) {
         const paramsStr = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
-        toolFormViewRef.current.updateField('parameters', paramsStr)
+        toolBuilderViewRef.current.updateField('parameters', paramsStr)
       }
-      if (args.blueprint && toolFormViewRef.current) {
+      if (args.blueprint && toolBuilderViewRef.current) {
         const blueprintStr = typeof args.blueprint === 'string' ? args.blueprint : JSON.stringify(args.blueprint, null, 2)
-        toolFormViewRef.current.updateField('blueprint', blueprintStr)
+        toolBuilderViewRef.current.updateField('blueprint', blueprintStr)
       }
     }
   }, [currentConversationId, liveMessages, viewMode])
@@ -390,9 +390,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     >
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
-        {/* Main Content Area - Switches between Conversation and Tool Form */}
-        {viewMode === 'tool-form' ? (
-          <ToolFormView ref={toolFormViewRef} onSave={handleToolFormSave} onCancel={handleToolFormCancel} starshipId={starshipId} />
+        {/* Main Content Area - Switches between Conversation and Tool Builder */}
+        {viewMode === 'tool-builder' ? (
+          <ToolBuilderView ref={toolBuilderViewRef} onSave={handleToolBuilderSave} onCancel={handleToolBuilderCancel} starshipId={starshipId} />
         ) : (
           <>
             {/* Messages Area or Welcome Screen */}
@@ -439,7 +439,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           ref={inputContainerRef}
           className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
           style={{
-            bottom: viewMode === 'tool-form' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
+            bottom: viewMode === 'tool-builder' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
           }}
         >
           <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
@@ -449,13 +449,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               starshipId={starshipId}
               conversationId={currentConversationId}
               onConversationStart={handleConversationStart}
-              onToggleToolForm={() => setViewMode(prev => (prev === 'tool-form' ? 'conversation' : 'tool-form'))}
-              isToolFormOpen={viewMode === 'tool-form'}
+              onToggleToolForm={() => setViewMode(prev => (prev === 'tool-builder' ? 'conversation' : 'tool-builder'))}
+              isToolFormOpen={viewMode === 'tool-builder'}
               disabled={!selectedAgent}
-              minimal={viewMode === 'tool-form' || showMessagesArea}
-              onFocus={() => viewMode === 'tool-form' && setIsMessageOverlayExpanded(true)}
+              minimal={viewMode === 'tool-builder' || showMessagesArea}
+              onFocus={() => viewMode === 'tool-builder' && setIsMessageOverlayExpanded(true)}
               onBlur={() => setIsMessageOverlayExpanded(false)}
-              showExpandableOverlay={viewMode === 'tool-form'}
+              showExpandableOverlay={viewMode === 'tool-builder'}
               isOverlayExpanded={isMessageOverlayExpanded}
               budgetTokens={budgetTokens}
             >

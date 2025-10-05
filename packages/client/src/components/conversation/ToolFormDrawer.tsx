@@ -1,6 +1,6 @@
 'use client'
 
-import React, { forwardRef, useImperativeHandle, useState } from 'react'
+import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
+import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import type { Blueprint } from '@starships/autopilot'
 
 interface ToolFormData {
   name: string
@@ -65,6 +67,15 @@ const INITIAL_FORM_DATA: ToolFormData = {
 export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>(({ open, onOpenChange, onSave, starshipId }, ref) => {
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
+
+  // Parse blueprint for visualization
+  const parsedBlueprint = useMemo<Blueprint | null>(() => {
+    try {
+      return JSON.parse(formData.blueprint)
+    } catch {
+      return null
+    }
+  }, [formData.blueprint])
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -235,21 +246,22 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                     </div>
                   </div>
 
-                  {/* Blueprint */}
+                  {/* Blueprint Visualization */}
                   <div className="space-y-2">
                     <Label htmlFor="tool-blueprint" className="text-foreground">
-                      Blueprint (JSON)
+                      Blueprint
                     </Label>
-                    <Textarea
-                      id="tool-blueprint"
-                      placeholder='{"nodes": [], "edges": []}'
-                      value={formData.blueprint}
-                      onChange={e => handleFieldChange('blueprint', e.target.value)}
-                      className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                      rows={8}
-                    />
-                    {errors.blueprint && <p className="text-sm text-destructive">{errors.blueprint}</p>}
-                    <p className="text-xs text-muted-foreground">Define the workflow blueprint for this tool</p>
+                    {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
+                      <div className="border border-border/60 rounded-lg overflow-hidden">
+                        <BlueprintVisualization blueprint={parsedBlueprint} className="h-[400px]" />
+                      </div>
+                    ) : (
+                      <div className="h-[200px] flex items-center justify-center border border-border/60 rounded-lg bg-muted/10">
+                        <p className="text-muted-foreground text-sm">No blueprint defined yet</p>
+                      </div>
+                    )}
+                    {errors.blueprint && <p className="text-sm text-destructive mt-2">{errors.blueprint}</p>}
+                    <p className="text-xs text-muted-foreground">Workflow blueprint visualization for this tool</p>
                   </div>
                 </div>
               </div>

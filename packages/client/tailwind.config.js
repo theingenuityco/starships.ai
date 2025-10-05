@@ -67,7 +67,6 @@ module.exports = {
       },
       boxShadow: {
         'frosted-lg': 'var(--shadow-frosted-lg)',
-        'frosted-xl': 'var(--shadow-frosted-xl)',
       },
     },
   },

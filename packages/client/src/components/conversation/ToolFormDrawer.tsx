@@ -169,43 +169,44 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent className="w-full sm:max-w-2xl !inset-y-6 !right-6 !h-[calc(100vh-3rem)] !rounded-2xl !p-0" hideOverlay onInteractOutside={e => e.preventDefault()}>
-        <ScrollArea className="h-full p-6">
-          <div className="space-y-6">
-            <SheetHeader className="space-y-4 overflow-visible">
-              <SheetTitle className="sr-only">Tool Form</SheetTitle>
-              {/* Main Header with Icon and Editable Title */}
-              <div className="flex items-start gap-4 overflow-visible">
-                <div className="flex-shrink-0 p-4 rounded-xl bg-primary/10 border border-primary/20 transition-all hover:bg-primary/20 hover:border-primary/30 mt-1.5">
-                  <Wrench className="w-8 h-8 text-primary" />
-                </div>
-                <div className="flex-1 space-y-2 overflow-visible">
-                  <div className="px-1.5 pt-1.5">
-                    <Input
-                      id="tool-name-header"
-                      placeholder="Enter tool name..."
-                      value={formData.name}
-                      onChange={e => handleFieldChange('name', e.target.value)}
-                      className={`text-2xl font-bold h-auto py-2 px-3 ${errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name}</p>}
+        <ScrollArea className="h-full">
+          <div className="p-6 space-y-6">
+            <SheetTitle className="sr-only">Tool Form</SheetTitle>
+
+            {/* Header */}
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="border-b border-border/40 pb-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1, duration: 0.3 }} className="flex-shrink-0">
+                  <div className="h-[46px] w-[46px] rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center">
+                    <Wrench className="w-6 h-6 text-primary" />
                   </div>
-                  <div className="px-1.5 pb-1.5">
-                    <Textarea
-                      id="tool-description-header"
-                      placeholder="Describe what this tool does..."
-                      value={formData.description}
-                      onChange={e => handleFieldChange('description', e.target.value)}
-                      className={`text-base resize-none ${errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                      rows={2}
-                    />
-                    {errors.description && <p className="text-sm text-destructive mt-1">{errors.description}</p>}
-                  </div>
+                </motion.div>
+                <div className="flex-1 min-w-0">
+                  <Input
+                    id="tool-name-header"
+                    placeholder="Enter tool name..."
+                    value={formData.name}
+                    onChange={e => handleFieldChange('name', e.target.value)}
+                    className={`text-xl font-semibold h-auto py-2 px-3 bg-background/50 border-border/60 focus-visible:border-primary/50 ${errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  />
+                  {errors.name && <p className="text-xs text-destructive mt-1.5">{errors.name}</p>}
                 </div>
               </div>
-            </SheetHeader>
+              <div>
+                <Textarea
+                  id="tool-description-header"
+                  placeholder="Describe what this tool does..."
+                  value={formData.description}
+                  onChange={e => handleFieldChange('description', e.target.value)}
+                  className={`text-sm resize-none bg-background/50 border-border/60 focus-visible:border-primary/50 ${errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  rows={2}
+                />
+                {errors.description && <p className="text-xs text-destructive mt-1.5">{errors.description}</p>}
+              </div>
+            </motion.div>
 
             {/* Form Sections */}
-            <div className="space-y-6 border-t border-border/40 pt-6">
+            <div className="space-y-6 pt-2">
               {/* Basic Information */}
               <div className="px-1">
                 <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">

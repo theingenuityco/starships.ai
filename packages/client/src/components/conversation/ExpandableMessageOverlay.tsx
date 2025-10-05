@@ -16,14 +16,19 @@ export function ExpandableMessageOverlay({ isExpanded, conversationId, starshipI
 
   return (
     <div
-      className={cn('transition-all duration-300 ease-out', isExpanded ? 'max-h-[60vh] opacity-100 pointer-events-auto border-b border-border/20 pb-4' : 'max-h-0 opacity-0 pointer-events-none')}
+      className={cn('transition-all duration-300 ease-out overflow-hidden', isExpanded ? 'border-b border-border/20 pb-4' : '')}
+      style={{
+        maxHeight: isExpanded ? '60vh' : '0',
+        opacity: isExpanded ? 1 : 0,
+        pointerEvents: isExpanded ? 'auto' : 'none',
+      }}
       onMouseDown={e => {
         // Prevent blur event from firing when clicking in overlay
         e.preventDefault()
       }}
     >
       {/* Message List - Scrollable */}
-      <div className="overflow-y-auto overflow-x-hidden" style={{ height: isExpanded ? '60vh' : '0' }}>
+      <div className="overflow-y-auto overflow-x-hidden transition-all duration-300 ease-out" style={{ height: isExpanded ? '60vh' : '0' }}>
         <ConversationMessageList conversationId={conversationId} starshipId={starshipId} bottomPaddingPx={80} />
       </div>
     </div>

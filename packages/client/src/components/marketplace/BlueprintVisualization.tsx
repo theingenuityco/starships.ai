@@ -15,43 +15,44 @@ interface ReactFlowNode extends Node {
     label: string
     type: string
     description?: string
-    icon: React.ReactNode
+    nodeType: string // Store node type instead of icon element
     outgoingEdges?: BlueprintEdge[]
   }
 }
 
-// Get icon for node type with updated mapping
-const getNodeIcon = (nodeType: string) => {
+// Get icon component for node type
+const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
+  const className = 'w-4 h-4'
   switch (nodeType) {
     case 'start':
-      return <Play className="w-4 h-4" />
+      return <Play className={className} />
     case 'end':
-      return <CheckCircle2 className="w-4 h-4" />
+      return <CheckCircle2 className={className} />
     case 'agent':
-      return <Zap className="w-4 h-4" />
+      return <Zap className={className} />
     case 'user_prompt':
-      return <User className="w-4 h-4" />
+      return <User className={className} />
     case 'conditional':
-      return <AlertTriangle className="w-4 h-4" />
+      return <AlertTriangle className={className} />
     case 'output':
-      return <Eye className="w-4 h-4" />
+      return <Eye className={className} />
     case 'llm':
-      return <Zap className="w-4 h-4" />
+      return <Zap className={className} />
     case 'http_request':
-      return <Globe className="w-4 h-4" />
+      return <Globe className={className} />
     case 'code':
-      return <Code className="w-4 h-4" />
+      return <Code className={className} />
     case 'tool':
-      return <Settings className="w-4 h-4" />
+      return <Settings className={className} />
     case 'workflow':
-      return <GitBranch className="w-4 h-4" />
+      return <GitBranch className={className} />
     case 'transform':
     case 'mutate':
-      return <Database className="w-4 h-4" />
+      return <Database className={className} />
     default:
-      return <Clock className="w-4 h-4" />
+      return <Clock className={className} />
   }
-}
+})
 
 // Get color scheme for node type
 const getNodeColors = (nodeType: string) => {
@@ -315,7 +316,9 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               border: `2px solid ${colors.handle}30`,
             }}
           >
-            <div className="w-5 h-5">{data.icon}</div>
+            <div className="w-5 h-5">
+              <NodeIcon nodeType={data.nodeType} />
+            </div>
           </div>
 
           {/* Node content */}
@@ -395,7 +398,9 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
             border: `2px solid ${colors.handle}30`,
           }}
         >
-          <div className="w-5 h-5">{data.icon}</div>
+          <div className="w-5 h-5">
+            <NodeIcon nodeType={data.nodeType} />
+          </div>
         </div>
 
         {/* Node content with better typography */}
@@ -427,7 +432,10 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
   const edgeMap = new Map<string, BlueprintEdge[]>()
   const incomingEdgeMap = new Map<string, BlueprintEdge[]>()
 
-  blueprint.edges.forEach(edge => {
+  // Safely handle edges - may be undefined during streaming
+  const blueprintEdges = blueprint.edges || []
+
+  blueprintEdges.forEach(edge => {
     // Outgoing edges
     if (!edgeMap.has(edge.from)) {
       edgeMap.set(edge.from, [])
@@ -574,9 +582,12 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     return { nodes: [], edges: [] }
   }
 
+  // Safely handle edges - may be undefined during streaming
+  const blueprintEdges = blueprint.edges || []
+
   // Build outgoing edges map for conditional nodes
   const outgoingEdgesMap = new Map<string, BlueprintEdge[]>()
-  blueprint.edges.forEach(edge => {
+  blueprintEdges.forEach(edge => {
     if (!outgoingEdgesMap.has(edge.from)) {
       outgoingEdgesMap.set(edge.from, [])
     }
@@ -592,7 +603,7 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
       label: node.name,
       type: node.type,
       description: node.description,
-      icon: getNodeIcon(node.type),
+      nodeType: node.type, // Store node type instead of icon element
       outgoingEdges: outgoingEdgesMap.get(node.ref) || [],
     },
     style: {
@@ -613,7 +624,7 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
   }))
 
   // Create edges with intelligent routing around nodes
-  const intelligentEdges: Edge[] = blueprint.edges.map((edge: BlueprintEdge) => {
+  const intelligentEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const targetNode = blueprint.nodes.find(n => n.ref === edge.to)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1

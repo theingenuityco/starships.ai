@@ -2,11 +2,23 @@
 
 import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { User as UserIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { User as UserIcon, LogOut } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 
 import AccountForm from '@/components/profile/AccountForm'
 
 export default function ProfilePage(): React.JSX.Element {
+  const { logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await logout()
+    router.push('/')
+  }
+
   return (
     <PageLayout>
       <div className="bg-background">
@@ -24,6 +36,22 @@ export default function ProfilePage(): React.JSX.Element {
               <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
               <AccountForm />
             </div>
+
+            {/* Logout Section */}
+            <Card className="shadow-sm border-border/50 bg-background/80">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-destructive">Sign Out</h3>
+                    <p className="text-sm text-muted-foreground">End your current session</p>
+                  </div>
+                  <Button variant="destructive" onClick={handleLogout} className="gap-2">
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
           </div>
         </div>
       </div>

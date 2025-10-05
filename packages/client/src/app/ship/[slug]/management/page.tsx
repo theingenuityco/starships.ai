@@ -23,7 +23,7 @@ export default function ShipProfilePage(): React.JSX.Element {
                 <Rocket className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Ship Management</h1>
               </div>
-              <p className="text-muted-foreground">Monitor your starship's usage, performance metrics, and manage billing.</p>
+              <p className="text-muted-foreground">Monitor your starship&lsquo;s usage, performance metrics, and manage billing.</p>
             </div>
 
             {/* Sections using shared Tabs UI with improved alignment */}

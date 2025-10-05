@@ -297,7 +297,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
   return (
     <>
       {/* Input handle */}
-      <Handle type="target" position={Position.Top} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ top: -6 }} />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
 
       <div className="relative">
         {/* Main node body */}
@@ -330,26 +330,26 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
           </div>
         </div>
 
-        {/* Horizontal conditional sections at the bottom */}
+        {/* Vertical conditional sections on the right */}
         {edges.length > 1 && (
-          <div className="flex mt-1">
+          <div className="flex flex-col ml-1">
             {edges.map((edge, index) => (
               <div
                 key={edge?.ref || `edge-${index}`}
-                className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-b-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mr-1 last:mr-0"
-                style={{ minWidth: '60px' }}
+                className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-r-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 last:mb-0"
+                style={{ minHeight: '30px' }}
               >
                 <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
                 {/* Individual output handle for this branch */}
                 <Handle
                   type="source"
-                  position={Position.Bottom}
+                  position={Position.Right}
                   id={edge?.ref}
                   className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
                   style={{
-                    bottom: -5,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
+                    right: -5,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
                     position: 'absolute',
                   }}
                 />
@@ -360,7 +360,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
         {/* Single output handle for nodes with only one output */}
         {edges.length <= 1 && (
-          <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ bottom: -6 }} />
+          <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
         )}
       </div>
     </>
@@ -378,9 +378,9 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 
   return (
     <>
-      {/* Input handle - all nodes except start (vertical layout: top) */}
+      {/* Input handle - all nodes except start (horizontal layout: left) */}
       {data.type !== 'start' && (
-        <Handle type="target" position={Position.Top} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ top: -6 }} />
+        <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
       )}
 
       <div
@@ -412,15 +412,15 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
         </div>
       </div>
 
-      {/* Output handle - all nodes except end (vertical layout: bottom) */}
+      {/* Output handle - all nodes except end (horizontal layout: right) */}
       {data.type !== 'end' && (
-        <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ bottom: -6 }} />
+        <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
       )}
     </>
   )
 }
 
-// Create execution-order based layout (vertical workflow)
+// Create execution-order based layout (horizontal workflow)
 const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprint: Blueprint) => {
   // Find start and end nodes
   const startNode = blueprint.nodes.find(node => node.type === 'start')
@@ -432,7 +432,7 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     return {
       nodes: nodes.map((node, index) => ({
         ...node,
-        position: { x: 600, y: index * 200 + 120 },
+        position: { x: index * 200 + 120, y: 600 },
       })),
       edges,
     }
@@ -567,14 +567,14 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     const indexAtLevel = sortedNodes.findIndex(n => n.ref === node.id)
     const totalAtLevel = sortedNodes.length
 
-    // Vertical positioning with more spacing
-    const y = level * 350 + 120
+    // Horizontal positioning with more spacing
+    const x = level * 350 + 120
 
-    // Horizontal distribution - extra wide to allow curves
-    let x = 600 // Center position
+    // Vertical distribution - extra wide to allow curves
+    let y = 600 // Center position
     if (totalAtLevel > 1) {
       const spacing = Math.max(600, 1400 / totalAtLevel) // Very wide spacing
-      x = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 600
+      y = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 600
     }
 
     return {

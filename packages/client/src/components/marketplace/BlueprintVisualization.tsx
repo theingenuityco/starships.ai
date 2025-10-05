@@ -1,13 +1,15 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge } from '@xyflow/react'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database } from 'lucide-react'
+import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge, Panel } from '@xyflow/react'
+import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
   className?: string
+  transparent?: boolean
+  title?: string
 }
 
 interface ReactFlowNode extends Node {
@@ -666,11 +668,13 @@ const edgeTypes = {
   intelligent: IntelligentEdge,
 }
 
-function BlueprintFlow({ blueprint }: { blueprint: Blueprint }) {
+function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint; transparent?: boolean; title?: string }) {
   const { nodes, edges } = useMemo(() => convertBlueprintToFlow(blueprint), [blueprint])
 
   return (
-    <div className="h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div
+      className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -697,12 +701,20 @@ function BlueprintFlow({ blueprint }: { blueprint: Blueprint }) {
         defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
       >
         <Background color="#9ca3af" gap={24} size={1.2} className="opacity-20 dark:opacity-10" variant={BackgroundVariant.Dots} />
+        {title && (
+          <Panel position="top-left" className="m-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
+              <Wrench className="w-5 h-5 text-primary" />
+              <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{title}</span>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   )
 }
 
-export function BlueprintVisualization({ blueprint, className = '' }: BlueprintVisualizationProps) {
+export function BlueprintVisualization({ blueprint, className = '', transparent = false, title }: BlueprintVisualizationProps) {
   if (!blueprint?.nodes || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
@@ -714,7 +726,7 @@ export function BlueprintVisualization({ blueprint, className = '' }: BlueprintV
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <BlueprintFlow blueprint={blueprint} />
+        <BlueprintFlow blueprint={blueprint} transparent={transparent} title={title} />
       </div>
     </ReactFlowProvider>
   )

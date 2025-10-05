@@ -351,22 +351,16 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
 
       {/* Full Screen Blueprint Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
-        <DialogContent className="max-w-[calc(100vw-3rem)] w-[calc(100vw-3rem)] h-[calc(100vh-3rem)] p-0 gap-0 flex flex-col">
-          <DialogHeader className="px-6 py-4 border-b border-border/60 flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Wrench className="w-5 h-5 text-primary" />
-              Blueprint Visualization - {formData.name || 'Tool'}
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-3rem)] w-[calc(100vw-3rem)] h-[calc(100vh-3rem)] p-0 gap-0">
           <div
-            className="flex-1 min-h-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
+            className="h-full w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
             style={{
-              backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.3) 1px, transparent 1px)',
+              backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.4) 1px, transparent 1px)',
               backgroundSize: '24px 24px',
             }}
           >
             {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
-              <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" />
+              <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent title={formData.name || 'Tool Blueprint'} />
             ) : (
               <div className="h-full flex items-center justify-center">
                 <p className="text-muted-foreground">No blueprint defined yet</p>

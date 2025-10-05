@@ -5,7 +5,7 @@
 
 import { toolCreateTool, toolCreateToolTemplate } from '../tool-create';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
 // Helper to create a realistic Fetch Response-like object for our HttpRequest node
 function createMockResponse(
@@ -78,12 +78,10 @@ describe('Tool Create Tool', () => {
       }
 
       const edges = bp.edges;
-      const hasCorrectFlow = [
-        edges.some((e: Edge) => e.from === 'start_1' && e.to === 'prepare'),
-        edges.some((e: Edge) => e.from === 'prepare' && e.to === 'http_create'),
-        edges.some((e: Edge) => e.from === 'http_create' && e.to === 'end_1'),
-      ];
-      expect(hasCorrectFlow.every(Boolean)).toBe(true);
+      expect(edges).toHaveLength(3);
+      expect(edges).toContainEqual({ ref: 'e1', from: 'start_1', to: 'prepare' });
+      expect(edges).toContainEqual({ ref: 'e2', from: 'prepare', to: 'http_create' });
+      expect(edges).toContainEqual({ ref: 'e3', from: 'http_create', to: 'end_1' });
     });
   });
 

@@ -370,11 +370,21 @@ export function ConversationMessageContent({
                   const rawArgs = (tc as any)?.function?.arguments ?? ''
                   let prettyArgs = ''
                   try {
-                    prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
+                    // Handle case where arguments might already be an object
+                    if (typeof rawArgs === 'object' && rawArgs !== null) {
+                      prettyArgs = JSON.stringify(rawArgs, null, 2)
+                    } else {
+                      prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
+                    }
                   } catch {
                     prettyArgs = String(rawArgs)
                   }
                   const hasArgs = (() => {
+                    // Handle case where arguments might already be an object
+                    if (typeof rawArgs === 'object' && rawArgs !== null) {
+                      return Array.isArray(rawArgs) ? rawArgs.length > 0 : Object.keys(rawArgs).length > 0
+                    }
+
                     const raw = typeof rawArgs === 'string' ? rawArgs.trim() : ''
                     if (!raw) return false
                     try {

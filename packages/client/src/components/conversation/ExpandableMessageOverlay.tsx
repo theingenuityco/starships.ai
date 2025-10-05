@@ -15,13 +15,13 @@ export function ExpandableMessageOverlay({ isExpanded, conversationId, starshipI
   if (!conversationId) return null
 
   return (
-    <div className={cn('transition-all duration-300 ease-out overflow-hidden', 'border-b border-border/20', isExpanded ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0')}>
+    <div className={cn('transition-all duration-300 ease-out', 'border-b border-border/20', isExpanded ? 'max-h-[60vh] opacity-100 pointer-events-auto' : 'max-h-0 opacity-0 pointer-events-none')}>
       {/* Context Bar */}
       {budgetTokens !== undefined && <ConversationContextBar conversationId={conversationId} budgetTokens={budgetTokens} />}
 
-      {/* Message List */}
-      <div className="overflow-hidden" style={{ height: isExpanded ? '60vh' : '0' }}>
-        <ConversationMessageList conversationId={conversationId} starshipId={starshipId} bottomPaddingPx={24} />
+      {/* Message List - Scrollable */}
+      <div className="overflow-y-auto overflow-x-hidden mb-4" style={{ height: isExpanded ? '55vh' : '0' }}>
+        <ConversationMessageList conversationId={conversationId} starshipId={starshipId} bottomPaddingPx={80} />
       </div>
     </div>
   )

@@ -11,6 +11,7 @@ import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -35,6 +36,10 @@ interface ConversationMessageInputProps {
   children?: React.ReactNode // For footer content
   onFocus?: () => void // Callback when input is focused
   onBlur?: () => void // Callback when input loses focus
+  // Props for expandable overlay (when in tool-form mode)
+  showExpandableOverlay?: boolean
+  isOverlayExpanded?: boolean
+  budgetTokens?: number
 }
 
 export interface ConversationMessageInputRef {
@@ -43,7 +48,26 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onToggleToolForm, isToolFormOpen = false, disabled = false, minimal = false, children, onFocus, onBlur }, ref) => {
+  (
+    {
+      selectedAgent,
+      starshipId,
+      conversationId,
+      onConversationStart,
+      onMessageSent,
+      onToggleToolForm,
+      isToolFormOpen = false,
+      disabled = false,
+      minimal = false,
+      children,
+      onFocus,
+      onBlur,
+      showExpandableOverlay = false,
+      isOverlayExpanded = false,
+      budgetTokens,
+    },
+    ref
+  ) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -295,10 +319,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
-        {/* Input Container */}
+        {/* Input Container with Expandable Overlay */}
         <div
           className={cn(
-            'relative transition-all',
+            'relative transition-all overflow-hidden',
             minimal
               ? 'frosted-glass-card rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
               : 'frosted-glass-card rounded-2xl shadow-frosted-xl focus-within:ring-2 focus-within:ring-primary/20',
@@ -306,6 +330,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             disabled && 'opacity-50'
           )}
         >
+          {/* Expandable Message Overlay - Inside the input container */}
+          {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
           {/* Main Input Section - Only Text Input */}
           <div className={cn('flex items-end', minimal ? 'p-3' : 'p-4')}>
             {/* Minimal mode: Tool button on left */}

@@ -351,14 +351,14 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
 
       {/* Full Screen Blueprint Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
-        <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 gap-0">
-          <DialogHeader className="px-6 py-4 border-b border-border/60">
+        <DialogContent className="max-w-[calc(100vw-3rem)] w-[calc(100vw-3rem)] h-[calc(100vh-3rem)] p-0 gap-0 flex flex-col">
+          <DialogHeader className="px-6 py-4 border-b border-border/60 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Wrench className="w-5 h-5 text-primary" />
               Blueprint Visualization - {formData.name || 'Tool'}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 p-4 overflow-hidden">
+          <div className="flex-1 min-h-0">
             {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
               <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" />
             ) : (

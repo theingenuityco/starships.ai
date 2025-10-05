@@ -352,6 +352,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
       {/* Full Screen Blueprint Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
         <DialogContent className="max-w-[calc(100vw-3rem)] w-[calc(100vw-3rem)] h-[calc(100vh-3rem)] p-0 gap-0">
+          <DialogTitle className="sr-only">Blueprint Visualization - {formData.name || 'Tool'}</DialogTitle>
           <div
             className="h-full w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
             style={{

@@ -188,23 +188,24 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
         >
           {/* Floating Tool Info Panel - Top Left */}
           <div className="absolute top-6 left-[7rem] z-10">
-            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 min-w-[320px] max-w-[400px]">
-              <div className="flex items-center gap-3">
+            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-3 min-w-[320px] max-w-[400px]">
+              <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
                   <Wrench className="w-5 h-5 text-primary" />
                 </div>
-                <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex-1 min-w-0 space-y-1">
                   <Input
                     placeholder="Tool name..."
                     value={formData.name}
                     onChange={e => handleFieldChange('name', e.target.value)}
                     className={`text-base font-semibold h-auto py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
                   />
-                  <Input
+                  <Textarea
                     placeholder="Brief description..."
                     value={formData.description}
                     onChange={e => handleFieldChange('description', e.target.value)}
-                    className={`text-xs h-auto py-0.5 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground ${errors.description ? 'text-destructive' : ''}`}
+                    className={`text-xs h-auto py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''}`}
+                    rows={2}
                   />
                 </div>
               </div>

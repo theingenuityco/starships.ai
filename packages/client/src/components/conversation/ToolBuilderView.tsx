@@ -201,7 +201,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           }}
         >
           {/* Floating Tool Info Panel - Top Left */}
-          <div className="absolute top-6 left-[5.5rem] z-10">
+          <div className="absolute top-6 left-28 z-10">
             <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 min-w-[320px] max-w-[400px]">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
@@ -233,7 +233,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           </div>
 
           {/* Floating Action Buttons - Top Right */}
-          <div className="absolute top-6 right-6 z-10 flex items-center gap-2">
+          <div className="absolute top-10 right-6 z-10 flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-lg hover:bg-muted/50">
               <Settings2 className="w-4 h-4" />
               Settings

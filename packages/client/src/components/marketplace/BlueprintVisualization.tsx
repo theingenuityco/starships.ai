@@ -513,12 +513,6 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     }
   })
 
-  // Special handling for end nodes - ensure they're at the bottom
-  const maxLevel = Math.max(...Array.from(executionLevels.values()))
-  endNodes.forEach(endNode => {
-    executionLevels.set(endNode.ref, maxLevel + 1)
-  })
-
   // Group nodes by execution level
   const nodesByLevel = new Map<number, BlueprintNode[]>()
   blueprint.nodes.forEach(node => {
@@ -567,15 +561,13 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     const indexAtLevel = sortedNodes.findIndex(n => n.ref === node.id)
     const totalAtLevel = sortedNodes.length
 
-    // Horizontal positioning with more spacing
-    const x = level * 350 + 120
+    // Fixed horizontal spacing between execution levels
+    const horizontalSpacing = 350
+    const x = level * horizontalSpacing + 120
 
-    // Vertical distribution - extra wide to allow curves
-    let y = 600 // Center position
-    if (totalAtLevel > 1) {
-      const spacing = Math.max(600, 1400 / totalAtLevel) // Very wide spacing
-      y = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 600
-    }
+    // Fixed vertical spacing between parallel nodes
+    const verticalSpacing = 200
+    const y = (indexAtLevel - (totalAtLevel - 1) / 2) * verticalSpacing + 600
 
     return {
       ...node,

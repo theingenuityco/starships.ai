@@ -3,14 +3,12 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X, Maximize2 } from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X, Settings2, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
@@ -26,13 +24,13 @@ interface ToolFormData {
   blueprint: string // JSON string for the blueprint
 }
 
-interface ToolFormViewProps {
+interface ToolBuilderViewProps {
   onSave?: (data: ToolFormData) => void
   onCancel?: () => void
   starshipId?: string
 }
 
-export interface ToolFormViewRef {
+export interface ToolBuilderViewRef {
   updateField: (field: keyof ToolFormData, value: string | boolean) => void
   getFormData: () => ToolFormData
   resetForm: () => void
@@ -63,10 +61,10 @@ const INITIAL_FORM_DATA: ToolFormData = {
   ),
 }
 
-export const ToolFormView = forwardRef<ToolFormViewRef, ToolFormViewProps>(({ onSave, onCancel, starshipId }, ref) => {
+export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, onCancel, starshipId }, ref) => {
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
-  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -179,52 +177,135 @@ export const ToolFormView = forwardRef<ToolFormViewRef, ToolFormViewProps>(({ on
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <ScrollArea className="flex-1">
-        <div className="p-6 space-y-6 max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-[46px] w-[46px] rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
+      {/* Top Bar with Tool Info */}
+      <div className="flex-shrink-0 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
                 <Wrench className="w-6 h-6 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <Input
-                  id="tool-name-header"
-                  placeholder="Enter tool name..."
+                  placeholder="Tool name..."
                   value={formData.name}
                   onChange={e => handleFieldChange('name', e.target.value)}
-                  className={`text-xl font-semibold h-auto py-2 px-3 bg-background/50 border-border/60 focus-visible:border-primary/50 ${errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  className={`text-lg font-semibold h-auto py-1.5 px-3 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
                 />
-                {errors.name && <p className="text-xs text-destructive mt-1.5">{errors.name}</p>}
+                <Input
+                  placeholder="Brief description..."
+                  value={formData.description}
+                  onChange={e => handleFieldChange('description', e.target.value)}
+                  className={`text-sm h-auto py-0.5 px-3 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground ${errors.description ? 'text-destructive' : ''}`}
+                />
               </div>
             </div>
-            <div>
-              <Textarea
-                id="tool-description-header"
-                placeholder="Describe what this tool does..."
-                value={formData.description}
-                onChange={e => handleFieldChange('description', e.target.value)}
-                className={`text-sm resize-none bg-background/50 border-border/60 focus-visible:border-primary/50 ${errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                rows={2}
-              />
-              {errors.description && <p className="text-xs text-destructive mt-1.5">{errors.description}</p>}
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2">
+                <Settings2 className="w-4 h-4" />
+                Settings
+              </Button>
+              <Button size="sm" variant="outline" onClick={onCancel}>
+                <X className="w-4 h-4 mr-1" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave} className="gap-2">
+                <Save className="w-4 h-4" />
+                Save Tool
+              </Button>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Form Sections */}
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="px-1">
-              <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
-                <Sparkles className="w-5 h-5 text-primary" />
-                Basic Information
-              </h3>
+      {/* Main Blueprint Canvas */}
+      <div className="flex-1 relative">
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.4) 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        >
+          {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
+            <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent title={formData.name || 'Tool Blueprint'} />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center space-y-4 max-w-md px-6">
+                <div className="w-20 h-20 mx-auto rounded-full bg-muted/50 flex items-center justify-center">
+                  <Wrench className="w-10 h-10 text-muted-foreground/50" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-foreground">No Blueprint Yet</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Start building your tool by adding nodes and connections to create a workflow blueprint. Open settings to define the blueprint structure.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="gap-2">
+                  <Settings2 className="w-4 h-4" />
+                  Open Settings
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Settings Drawer */}
+      <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Tool Settings</SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-full">
+            <div className="p-6 space-y-6">
+              {/* Settings Header */}
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Settings2 className="w-5 h-5 text-primary" />
+                  Tool Settings
+                </h2>
+                <p className="text-sm text-muted-foreground">Configure your tool's properties and behavior</p>
+              </div>
+
+              {/* Basic Information */}
               <div className="space-y-4">
+                <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Basic Information
+                </h3>
+
+                {/* Tool Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="tool-name">Tool Name</Label>
+                  <Input
+                    id="tool-name"
+                    placeholder="Enter tool name..."
+                    value={formData.name}
+                    onChange={e => handleFieldChange('name', e.target.value)}
+                    className={errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="tool-description">Description</Label>
+                  <Textarea
+                    id="tool-description"
+                    placeholder="Describe what this tool does..."
+                    value={formData.description}
+                    onChange={e => handleFieldChange('description', e.target.value)}
+                    className={errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    rows={3}
+                  />
+                  {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
+                </div>
+
                 {/* Category */}
                 <div className="space-y-2">
-                  <Label htmlFor="tool-category" className="text-foreground">
-                    Category
-                  </Label>
+                  <Label>Category</Label>
                   <div className="flex flex-wrap gap-2">
                     {categories.map(cat => (
                       <Badge
@@ -242,47 +323,18 @@ export const ToolFormView = forwardRef<ToolFormViewRef, ToolFormViewProps>(({ on
                     ))}
                   </div>
                 </div>
-
-                {/* Blueprint Visualization */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="tool-blueprint" className="text-foreground">
-                      Blueprint
-                    </Label>
-                    {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => setIsFullScreenOpen(true)} className="h-7 px-2 text-xs">
-                        <Maximize2 className="w-3 h-3 mr-1" />
-                        Full Screen
-                      </Button>
-                    )}
-                  </div>
-                  {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
-                    <div className="border border-border/60 rounded-lg overflow-hidden">
-                      <BlueprintVisualization blueprint={parsedBlueprint} className="h-[400px]" />
-                    </div>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center border border-border/60 rounded-lg bg-muted/10">
-                      <p className="text-muted-foreground text-sm">No blueprint defined yet</p>
-                    </div>
-                  )}
-                  {errors.blueprint && <p className="text-sm text-destructive mt-2">{errors.blueprint}</p>}
-                  <p className="text-xs text-muted-foreground">Workflow blueprint visualization for this tool</p>
-                </div>
               </div>
-            </div>
 
-            {/* Configuration */}
-            <div className="px-1">
-              <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
-                <Package className="w-5 h-5 text-primary" />
-                Configuration
-              </h3>
+              {/* Configuration */}
               <div className="space-y-4">
+                <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
+                  <Package className="w-5 h-5 text-primary" />
+                  Configuration
+                </h3>
+
                 {/* Example Usage */}
                 <div className="space-y-2">
-                  <Label htmlFor="tool-example" className="text-foreground">
-                    Example Usage
-                  </Label>
+                  <Label htmlFor="tool-example">Example Usage</Label>
                   <Textarea id="tool-example" placeholder="Show how to use this tool..." value={formData.exampleUsage} onChange={e => handleFieldChange('exampleUsage', e.target.value)} rows={3} />
                 </div>
 
@@ -300,20 +352,17 @@ export const ToolFormView = forwardRef<ToolFormViewRef, ToolFormViewProps>(({ on
                   </Label>
                 </div>
               </div>
-            </div>
 
-            {/* Technical Details */}
-            <div className="px-1">
-              <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
-                <Bot className="w-5 h-5 text-primary" />
-                Technical Details
-              </h3>
+              {/* Technical Details */}
               <div className="space-y-4">
+                <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
+                  <Bot className="w-5 h-5 text-primary" />
+                  Technical Details
+                </h3>
+
                 {/* Parameters Schema */}
                 <div className="space-y-2">
-                  <Label htmlFor="tool-parameters" className="text-foreground">
-                    Parameters Schema (JSON)
-                  </Label>
+                  <Label htmlFor="tool-parameters">Parameters Schema (JSON)</Label>
                   <Textarea
                     id="tool-parameters"
                     placeholder='{"type": "object", "properties": {...}}'
@@ -325,47 +374,28 @@ export const ToolFormView = forwardRef<ToolFormViewRef, ToolFormViewProps>(({ on
                   {errors.parameters && <p className="text-sm text-destructive">{errors.parameters}</p>}
                   <p className="text-xs text-muted-foreground">Define the input parameters for this tool in JSON format</p>
                 </div>
+
+                {/* Blueprint JSON */}
+                <div className="space-y-2">
+                  <Label htmlFor="tool-blueprint">Blueprint Structure (JSON)</Label>
+                  <Textarea
+                    id="tool-blueprint"
+                    placeholder='{"nodes": [...], "edges": [...]}'
+                    value={formData.blueprint}
+                    onChange={e => handleFieldChange('blueprint', e.target.value)}
+                    className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    rows={12}
+                  />
+                  {errors.blueprint && <p className="text-sm text-destructive">{errors.blueprint}</p>}
+                  <p className="text-xs text-muted-foreground">Define the workflow blueprint structure in JSON format</p>
+                </div>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-border/40 sticky bottom-0 bg-background pb-4">
-              <Button size="lg" className="flex-1 shadow-lg hover:shadow-xl" onClick={handleSave}>
-                <Save className="w-4 h-4 mr-2" />
-                Save Tool
-              </Button>
-              <Button size="lg" variant="outline" className="hover:bg-muted/50" onClick={onCancel}>
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      </ScrollArea>
-
-      {/* Full Screen Blueprint Dialog */}
-      <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
-        <DialogContent className="max-w-[calc(100vw-3rem)] w-[calc(100vw-3rem)] h-[calc(100vh-3rem)] p-0 gap-0">
-          <DialogTitle className="sr-only">Blueprint Visualization - {formData.name || 'Tool'}</DialogTitle>
-          <div
-            className="h-full w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
-            style={{
-              backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.4) 1px, transparent 1px)',
-              backgroundSize: '24px 24px',
-            }}
-          >
-            {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
-              <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent title={formData.name || 'Tool Blueprint'} />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-muted-foreground">No blueprint defined yet</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 })
 
-ToolFormView.displayName = 'ToolFormView'
+ToolBuilderView.displayName = 'ToolBuilderView'

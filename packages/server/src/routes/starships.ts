@@ -54,15 +54,15 @@ const checkAuth = (req: Request, res: Response): boolean => {
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
-    const { name, class: starshipClass } = req.body;
+    const { name, maxAgents = 3 } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 
     // Validate required fields
-    if (!name || !starshipClass) {
+    if (!name) {
       sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
-        required_fields: ['name', 'class'],
-        provided: { name: !!name, class: !!starshipClass },
+        required_fields: ['name'],
+        provided: { name: !!name },
       });
       return;
     }
@@ -74,25 +74,7 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       return;
     }
 
-    // Validate starship class
-    if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid starship class', 400, {
-        field: 'class',
-        allowed_values: ['scout', 'cruiser', 'draught'],
-        provided: starshipClass,
-      });
-      return;
-    }
-
-    // All starships are now free - no paid plan logic needed
-
     const starshipService = new StarshipService();
-
-    // Check Scout plan limit (max 3 starships per user)
-    if (starshipClass === 'scout') {
-      console.log('[STARSHIP-CREATE] Checking Scout plan limit...');
-      console.log('[STARSHIP-CREATE] Scout limit check passed.');
-    }
 
     console.log('[STARSHIP-CREATE] Generating unique slug...');
     const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
@@ -102,7 +84,7 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
-      class: starshipClass,
+      maxAgents,
       slug,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
@@ -260,12 +242,12 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
   }
 });
 
-// PUT /starships/:id - Update starship (name, status, class) (OpenAPI pattern)
+// PUT /starships/:id - Update starship (name, status, maxAgents) (OpenAPI pattern)
 router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
-    const { name, status, class: starshipClass } = req.body;
+    const { name, status, maxAgents } = req.body;
 
     // Validate starship ID
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
@@ -313,37 +295,32 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
       allowedUpdates.status = status;
     }
 
-    if (starshipClass !== undefined) {
-      if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
-        sendError(res, 'INVALID_INPUT', 'Invalid starship class', 400, {
-          field: 'class',
-          allowed_values: ['scout', 'cruiser', 'draught'],
-          provided: starshipClass,
+    if (maxAgents !== undefined) {
+      if (typeof maxAgents !== 'number' || maxAgents < 1 || maxAgents > 50) {
+        sendError(res, 'VALIDATION_ERROR', 'maxAgents must be a number between 1 and 50', 400, {
+          field: 'maxAgents',
         });
         return;
       }
 
-      // Check if there are deployed agents that exceed new class limits
-      if (starshipClass === 'scout') {
-        const deployedAgents = await starshipService.getDeployedAgents(starshipId);
-        if (deployedAgents.length > 3) {
-          sendError(res, 'OPERATION_NOT_ALLOWED', 'Cannot change to scout class: too many deployed agents', 400, {
-            message: 'Scout class allows maximum 3 deployed agents',
-            current_deployed: deployedAgents.length,
-            max_allowed: 3,
-          });
-          return;
-        }
+      // Check if there are deployed agents that exceed new maxAgents limits
+      const deployedAgents = await starshipService.getDeployedAgents(starshipId);
+      if (deployedAgents.length > maxAgents) {
+        sendError(res, 'OPERATION_NOT_ALLOWED', 'Cannot reduce maxAgents below current deployed agent count', 400, {
+          message: 'Current deployed agents exceed the new maxAgents limit',
+          current_deployed: deployedAgents.length,
+          new_max_agents: maxAgents,
+        });
+        return;
       }
 
-      allowedUpdates.class = starshipClass;
-      allowedUpdates.maxAgents = starshipClass === 'scout' ? 3 : 6;
+      allowedUpdates.maxAgents = maxAgents;
     }
 
     if (Object.keys(allowedUpdates).length === 0) {
       sendError(res, 'VALIDATION_ERROR', 'No valid updates provided', 400, {
         message: 'At least one valid field must be provided for update',
-        allowed_fields: ['name', 'status', 'class'],
+        allowed_fields: ['name', 'status', 'maxAgents'],
       });
       return;
     }
@@ -444,7 +421,6 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
     sendSuccess(res, {
       starshipId,
       starshipName: starship.name,
-      starshipClass: starship.class,
       maxAgents: starship.maxAgents,
       deployedAgents,
       availableSlots,

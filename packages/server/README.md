@@ -47,7 +47,7 @@ src/
 │   ├── health.ts              # Health monitoring and metrics
 │   ├── memory.ts              # Memory management endpoints
 │   ├── native-api-keys.ts     # Encrypted API key management
-│   ├── starships.ts           # Starship CRUD and billing operations
+│   ├── starships.ts           # Starship CRUD operations
 │   ├── users.ts               # User management endpoints
 │   ├── waitlist.ts            # Waitlist management endpoints
 ├── services/
@@ -115,8 +115,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "name": "Enterprise",
-  "class": "cruiser"
+  "name": "Enterprise"
 }
 ```
 
@@ -128,7 +127,6 @@ Content-Type: application/json
     "id": "starship-123",
     "slug": "enterprise",
     "ownerId": "user-456",
-    "class": "cruiser",
     "name": "Enterprise",
     "maxActiveExpeditions": 5,
     "maxAgents": 6,

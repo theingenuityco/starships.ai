@@ -305,8 +305,8 @@ interface PostgresConfig {
 ### **Common Issues & Solutions**
 
 1. **Field Name Conversion** ✅ **SOLVED**:
-   - ~~Neo4j uses camelCase: `stripeCustomerId`~~
-   - ~~PostgreSQL uses snake_case: `stripe_customer_id`~~
+   - ~~Neo4j uses camelCase: `customerId`~~
+   - ~~PostgreSQL uses snake_case: `customer_id`~~
    - ✅ **Automatic conversion**: Enhanced serialization helpers handle this automatically
 
 2. **Method Naming Conflicts** ✅ **SOLVED**:

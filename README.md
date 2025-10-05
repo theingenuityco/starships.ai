@@ -200,8 +200,7 @@ curl -X POST http://localhost:4000/api/v1/starships \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Enterprise",
-    "class": "cruiser"
+    "name": "Enterprise"
   }'
 ```
 
@@ -377,7 +376,7 @@ Simple and efficient debug configurations for development:
 
 - ✅ JWT authentication with secure token validation
 - ✅ Waitlist system with controlled early access
-- ✅ Comprehensive starship management with billing
+- ✅ Comprehensive starship management
 - ✅ Agent orchestration with AI-powered coordination
 - ✅ Agent marketplace with templates and custom agents
 - ✅ Conversation system with structured chat interfaces

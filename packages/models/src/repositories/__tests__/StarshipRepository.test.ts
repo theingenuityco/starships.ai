@@ -46,7 +46,6 @@ describe('StarshipRepository', () => {
           name: 'Starship 1',
           slug: 'starship-1',
           owner_id: 'user-123',
-          class: 'scout',
           max_agents: 3,
           status: 'active',
           created_at: '2024-01-01T00:00:00.000Z',
@@ -57,7 +56,6 @@ describe('StarshipRepository', () => {
           name: 'Starship 2',
           slug: 'starship-2',
           owner_id: 'user-123',
-          class: 'cruiser',
           max_agents: 5,
           status: 'active',
           created_at: '2024-01-02T00:00:00.000Z',
@@ -96,7 +94,6 @@ describe('StarshipRepository', () => {
         name: 'Test Starship',
         slug: 'test-starship',
         owner_id: 'user-123',
-        class: 'scout',
         max_agents: 3,
         status: 'active',
         created_at: '2024-01-01T00:00:00.000Z',
@@ -128,7 +125,6 @@ describe('StarshipRepository', () => {
         name: 'Test Starship',
         slug: 'test-starship',
         owner_id: 'user-123',
-        class: 'scout',
         max_agents: 3,
         status: 'active',
         created_at: '2024-01-01T00:00:00.000Z',
@@ -164,7 +160,6 @@ describe('StarshipRepository', () => {
           name: 'Starship 1',
           slug: 'starship-1',
           owner_id: 'user-123',
-          class: 'scout',
           max_agents: 3,
           status: 'active',
           created_at: '2024-01-01T00:00:00.000Z',
@@ -184,96 +179,13 @@ describe('StarshipRepository', () => {
   });
 
   describe('create', () => {
-    it('should create starship with scout class (3 agents)', async () => {
-      const createData = {
-        name: 'Test Starship',
-        ownerId: 'user-123',
-        class: 'scout' as const,
-        status: 'active' as const,
-      };
-
-      const mockCreatedStarship = {
-        id: 'test-starship-id-123',
-        name: 'Test Starship',
-        slug: 'test-starship',
-        owner_id: 'user-123',
-        class: 'scout',
-        max_agents: 3,
-        status: 'active',
-        created_at: '2024-01-01T00:00:00.000Z',
-        updated_at: '2024-01-01T00:00:00.000Z',
-      };
-
-      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
-
-      const result = await repository.create(createData);
-
-      expect(StarshipEntity.validate).toHaveBeenCalled();
-      expect(result.name).toBe('Test Starship');
-      expect(result.maxAgents).toBe(3);
-    });
-
-    it('should create starship with cruiser class (5 agents)', async () => {
-      const createData = {
-        name: 'Cruiser Ship',
-        ownerId: 'user-123',
-        class: 'cruiser' as const,
-        status: 'active' as const,
-      };
-
-      const mockCreatedStarship = {
-        id: 'test-starship-id-123',
-        name: 'Cruiser Ship',
-        slug: 'cruiser-ship',
-        owner_id: 'user-123',
-        class: 'cruiser',
-        max_agents: 5,
-        status: 'active',
-        created_at: '2024-01-01T00:00:00.000Z',
-        updated_at: '2024-01-01T00:00:00.000Z',
-      };
-
-      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
-
-      const result = await repository.create(createData);
-
-      expect(result.maxAgents).toBe(5);
-    });
-
-    it('should create starship with draught class (10 agents)', async () => {
-      const createData = {
-        name: 'Draught Ship',
-        ownerId: 'user-123',
-        class: 'draught' as const,
-        status: 'active' as const,
-      };
-
-      const mockCreatedStarship = {
-        id: 'test-starship-id-123',
-        name: 'Draught Ship',
-        slug: 'draught-ship',
-        owner_id: 'user-123',
-        class: 'draught',
-        max_agents: 10,
-        status: 'active',
-        created_at: '2024-01-01T00:00:00.000Z',
-        updated_at: '2024-01-01T00:00:00.000Z',
-      };
-
-      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
-
-      const result = await repository.create(createData);
-
-      expect(result.maxAgents).toBe(10);
-    });
-
     it('should use provided slug if given', async () => {
       const createData = {
         name: 'Test Starship',
         slug: 'custom-slug',
         ownerId: 'user-123',
-        class: 'scout' as const,
         status: 'active' as const,
+        maxAgents: 3,
       };
 
       const mockCreatedStarship = {
@@ -281,7 +193,6 @@ describe('StarshipRepository', () => {
         name: 'Test Starship',
         slug: 'custom-slug',
         owner_id: 'user-123',
-        class: 'scout',
         max_agents: 3,
         status: 'active',
         created_at: '2024-01-01T00:00:00.000Z',
@@ -304,7 +215,6 @@ describe('StarshipRepository', () => {
         name: 'Updated Name',
         slug: 'updated-name',
         owner_id: 'user-123',
-        class: 'scout',
         max_agents: 3,
         status: 'active',
         created_at: '2024-01-01T00:00:00.000Z',

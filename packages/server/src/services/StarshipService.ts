@@ -4,9 +4,11 @@ import { AgentRepository, getConnection, StarshipRepository, ToolRepository } fr
 import { CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 
-export interface CreateStarshipData extends Omit<CreateStarshipRequest, 'slug'> {
+export interface CreateStarshipData {
   ownerId: string;
+  name: string;
   slug?: string;
+  maxAgents?: number;
 }
 
 export interface StarshipWithDetails extends StarshipModel {
@@ -37,8 +39,8 @@ export class StarshipService {
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
-      class: data.class,
       slug: data.slug,
+      maxAgents: data.maxAgents || 3,
       status: 'active',
     });
 
@@ -228,11 +230,11 @@ export class StarshipService {
     // Generate a random name for the starship
     const starshipName = getRandomStarshipName();
 
-    // Create the starship with scout class (free tier)
+    // Create the starship with default settings
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
-      class: 'scout',
+      maxAgents: 3,
     });
 
     return starship;

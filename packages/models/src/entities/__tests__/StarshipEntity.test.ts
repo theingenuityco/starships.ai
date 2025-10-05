@@ -23,7 +23,6 @@ describe('StarshipEntity', () => {
       starship.id = 'starship-123';
       starship.slug = 'test-starship';
       starship.ownerId = 'user-456';
-      starship.class = 'scout';
       starship.name = 'Test Starship';
       starship.maxAgents = 3;
       starship.status = 'active';
@@ -36,7 +35,7 @@ describe('StarshipEntity', () => {
         id: 'starship-123',
         slug: 'test-starship',
         owner_id: 'user-456',
-        class: 'scout',
+
         name: 'Test Starship',
         max_agents: 3,
         status: 'active',
@@ -52,7 +51,7 @@ describe('StarshipEntity', () => {
         id: 'starship-123',
         slug: 'test-starship',
         ownerId: 'user-456',
-        class: 'scout',
+
         name: 'Test Starship',
         maxAgents: 3,
         status: 'active',
@@ -65,7 +64,7 @@ describe('StarshipEntity', () => {
       expect(entity).toBeInstanceOf(StarshipEntity);
       expect(entity.id).toBe('starship-123');
       expect(entity.slug).toBe('test-starship');
-      expect(entity.class).toBe('scout');
+      // Class property removed - no longer needed
       expect(entity.status).toBe('active');
       expect(entity.maxAgents).toBe(3);
     });
@@ -76,7 +75,7 @@ describe('StarshipEntity', () => {
           id: 'starship-1',
           slug: 'starship-1',
           ownerId: 'user-456',
-          class: 'scout',
+
           name: 'Starship 1',
           maxAgents: 3,
           status: 'active',
@@ -87,7 +86,7 @@ describe('StarshipEntity', () => {
           id: 'starship-2',
           slug: 'starship-2',
           ownerId: 'user-789',
-          class: 'cruiser',
+
           name: 'Starship 2',
           maxAgents: 5,
           status: 'inactive',
@@ -101,8 +100,7 @@ describe('StarshipEntity', () => {
       expect(entities).toHaveLength(2);
       expect(entities[0]).toBeInstanceOf(StarshipEntity);
       expect(entities[1]).toBeInstanceOf(StarshipEntity);
-      expect(entities[0].class).toBe('scout');
-      expect(entities[1].class).toBe('cruiser');
+      // Class property removed - no longer needed
     });
   });
 
@@ -111,7 +109,7 @@ describe('StarshipEntity', () => {
       const validData = {
         slug: 'test-starship',
         ownerId: 'user-456',
-        class: 'scout',
+
         name: 'Test Starship',
         maxAgents: 3,
         status: 'active',
@@ -124,38 +122,11 @@ describe('StarshipEntity', () => {
       const invalidData = {
         slug: 'test-starship',
         // ownerId is missing
-        class: 'scout',
+
         name: 'Test Starship',
       };
 
       await expect(StarshipEntity.validate(invalidData, 'create')).rejects.toThrow('Validation failed');
-    });
-
-    it('should validate class enum constraints', async () => {
-      await expect(
-        StarshipEntity.validate({
-          slug: 'test-starship',
-          ownerId: 'user-456',
-          class: 'invalid-class',
-          name: 'Test Starship',
-          maxAgents: 3,
-          status: 'active',
-        })
-      ).rejects.toThrow();
-
-      const validClasses = ['scout', 'cruiser', 'draught'];
-      for (const starshipClass of validClasses) {
-        await expect(
-          StarshipEntity.validate({
-            slug: 'test-starship',
-            ownerId: 'user-456',
-            class: starshipClass,
-            name: 'Test Starship',
-            maxAgents: 3,
-            status: 'active',
-          })
-        ).resolves.not.toThrow();
-      }
     });
 
     it('should validate status enum constraints', async () => {
@@ -163,20 +134,20 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: 'test-starship',
           ownerId: 'user-456',
-          class: 'scout',
+
           name: 'Test Starship',
           maxAgents: 3,
           status: 'invalid-status',
         })
       ).rejects.toThrow();
 
-      const validStatuses = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
+      const validStatuses = ['active', 'inactive'];
       for (const status of validStatuses) {
         await expect(
           StarshipEntity.validate({
             slug: 'test-starship',
             ownerId: 'user-456',
-            class: 'scout',
+
             name: 'Test Starship',
             maxAgents: 3,
             status,
@@ -190,7 +161,7 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: 'test-starship',
           ownerId: 'user-456',
-          class: 'scout',
+
           name: 'Test Starship',
           maxAgents: 0,
           status: 'active',
@@ -201,7 +172,6 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: 'test-starship',
           ownerId: 'user-456',
-          class: 'scout',
           name: 'Test Starship',
           maxAgents: 51,
           status: 'active',
@@ -212,7 +182,6 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: 'test-starship',
           ownerId: 'user-456',
-          class: 'scout',
           name: 'Test Starship',
           maxAgents: 5,
           status: 'active',
@@ -225,7 +194,6 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: '',
           ownerId: 'user-456',
-          class: 'scout',
           name: 'Test Starship',
           maxAgents: 3,
           status: 'active',
@@ -236,7 +204,6 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: 'a'.repeat(101),
           ownerId: 'user-456',
-          class: 'scout',
           name: 'Test Starship',
           maxAgents: 3,
           status: 'active',
@@ -247,7 +214,6 @@ describe('StarshipEntity', () => {
         StarshipEntity.validate({
           slug: 'valid-slug',
           ownerId: 'user-456',
-          class: 'scout',
           name: 'Test Starship',
           maxAgents: 3,
           status: 'active',
@@ -281,27 +247,9 @@ describe('StarshipEntity', () => {
         expect(starship.isActive()).toBe(false);
       });
 
-      it('should check if starship is restricted', () => {
-        const starship = new StarshipEntity();
-        starship.status = 'restricted';
-        expect(starship.isRestricted()).toBe(true);
-
-        starship.status = 'active';
-        expect(starship.isRestricted()).toBe(false);
-      });
-
-      it('should check if starship has pending payment', () => {
-        const starship = new StarshipEntity();
-        starship.status = 'pending_payment';
-        expect(starship.hasPendingPayment()).toBe(true);
-
-        starship.status = 'active';
-        expect(starship.hasPendingPayment()).toBe(false);
-      });
-
       it('should check if starship is disabled', () => {
         const starship = new StarshipEntity();
-        starship.status = 'disabled';
+        starship.status = 'inactive';
         expect(starship.isDisabled()).toBe(true);
 
         starship.status = 'active';
@@ -310,18 +258,7 @@ describe('StarshipEntity', () => {
     });
 
     describe('Display name helpers', () => {
-      it('should get class display name', () => {
-        const starship = new StarshipEntity();
-
-        starship.class = 'scout';
-        expect(starship.getClassDisplayName()).toBe('Scout Class');
-
-        starship.class = 'cruiser';
-        expect(starship.getClassDisplayName()).toBe('Cruiser Class');
-
-        starship.class = 'draught';
-        expect(starship.getClassDisplayName()).toBe('Draught Class');
-      });
+      // Class-related tests removed - class property no longer exists
 
       it('should get status display name', () => {
         const starship = new StarshipEntity();
@@ -332,14 +269,7 @@ describe('StarshipEntity', () => {
         starship.status = 'inactive';
         expect(starship.getStatusDisplayName()).toBe('Inactive');
 
-        starship.status = 'restricted';
-        expect(starship.getStatusDisplayName()).toBe('Restricted');
-
-        starship.status = 'disabled';
-        expect(starship.getStatusDisplayName()).toBe('Disabled');
-
-        starship.status = 'pending_payment';
-        expect(starship.getStatusDisplayName()).toBe('Payment Pending');
+        // Payment-related statuses removed
       });
     });
 
@@ -410,14 +340,7 @@ describe('StarshipEntity', () => {
         starship.status = 'active';
         expect(starship.needsAttention()).toBe(false);
 
-        starship.status = 'pending_payment';
-        expect(starship.needsAttention()).toBe(true);
-
-        starship.status = 'restricted';
-        expect(starship.needsAttention()).toBe(true);
-
-        starship.status = 'disabled';
-        expect(starship.needsAttention()).toBe(true);
+        // Payment-related statuses removed
 
         starship.status = 'inactive';
         starship.createdAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
@@ -435,7 +358,7 @@ describe('StarshipEntity', () => {
         id: 'starship-123',
         slug: 'premium-starship',
         ownerId: 'user-456',
-        class: 'draught',
+
         name: 'Premium Starship',
         maxAgents: 10,
         status: 'active',
@@ -453,7 +376,7 @@ describe('StarshipEntity', () => {
         id: 'starship-123',
         slug: 'basic-starship',
         ownerId: 'user-456',
-        class: 'scout',
+
         name: 'Basic Starship',
         maxAgents: 3,
         status: 'active',
@@ -484,36 +407,16 @@ describe('StarshipEntity', () => {
   });
 
   describe('Edge cases', () => {
-    it('should handle all valid classes', async () => {
-      const classes = ['scout', 'cruiser', 'draught'];
-
-      for (const starshipClass of classes) {
-        const record = {
-          id: 'starship-123',
-          slug: `starship-${starshipClass}`,
-          ownerId: 'user-456',
-          class: starshipClass,
-          name: `Starship ${starshipClass}`,
-          maxAgents: 3,
-          status: 'active',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-02T12:00:00.000Z',
-        };
-
-        const entity = fromDatabase(StarshipEntity, record);
-        expect(entity.class).toBe(starshipClass);
-      }
-    });
+    // Class-related tests removed - class property no longer exists
 
     it('should handle all valid statuses', async () => {
-      const statuses = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
+      const statuses = ['active', 'inactive'];
 
       for (const status of statuses) {
         const record = {
           id: 'starship-123',
           slug: 'test-starship',
           ownerId: 'user-456',
-          class: 'scout',
           name: 'Test Starship',
           maxAgents: 3,
           status,
@@ -538,7 +441,7 @@ describe('StarshipEntity', () => {
           id: 'starship-123',
           slug: StarshipEntity.generateSlugFromName(name),
           ownerId: 'user-456',
-          class: 'scout',
+
           name,
           maxAgents: 3,
           status: 'active',

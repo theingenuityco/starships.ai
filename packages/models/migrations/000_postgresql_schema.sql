@@ -35,13 +35,12 @@ CREATE TABLE starships (
     id VARCHAR(255) PRIMARY KEY,
     slug VARCHAR(100) NOT NULL,
     owner_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    class VARCHAR(50) NOT NULL CHECK (class IN ('scout', 'cruiser', 'draught')),
     name VARCHAR(100) NOT NULL,
     max_agents INTEGER NOT NULL DEFAULT 3,
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'restricted', 'disabled', 'pending_payment')),
+    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    
+
     UNIQUE(owner_id, slug)
 );
 

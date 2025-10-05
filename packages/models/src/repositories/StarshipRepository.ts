@@ -66,14 +66,11 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> & { slug?: string; maxAgents?: number }
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
-
-        // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
-        const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
 
         // Generate unique slug if not provided
         const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
@@ -81,7 +78,7 @@ export class StarshipRepository extends BaseRepository {
         const starshipData = {
           ...entity,
           slug,
-          maxAgents,
+          maxAgents: entity.maxAgents || 3, // Default to 3 agents
           status: entity.status || 'active', // Default to active
           createdAt: now,
           updatedAt: now,
@@ -374,64 +371,6 @@ export class StarshipRepository extends BaseRepository {
       .replace(/\s+/g, '-') // Replace spaces with hyphens
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-  }
-
-  // Cleanup and maintenance methods
-  async findAbandonedPendingStarships(hours: number = 24): Promise<StarshipModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-
-        const result = await connection.query<Record<string, unknown>>(
-          `SELECT * FROM starships
-         WHERE status = 'pending_payment'
-         AND created_at < $1
-         ORDER BY created_at DESC`,
-          [cutoffTime]
-        );
-
-        return fromDatabaseArray(StarshipEntity, result);
-      },
-      'findAbandonedPendingStarships',
-      'Starship'
-    );
-  }
-
-  async cleanupAbandonedStarship(starshipId: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        await this.deleteEntity('starships', starshipId);
-      },
-      'cleanupAbandonedStarship',
-      'Starship',
-      starshipId
-    );
-  }
-
-  async updatePaymentStatus(
-    starshipId: string,
-    status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
-    additionalFields?: Partial<StarshipModel>
-  ): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const updates = {
-          status,
-          ...additionalFields,
-          updatedAt: new Date().toISOString(),
-        };
-
-        const updateData = toDatabase(toEntityInstance(StarshipEntity, updates));
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
-
-        await this.updateEntity('starships', starshipId, filteredUpdateData);
-      },
-      'updatePaymentStatus',
-      'Starship',
-      starshipId
-    );
   }
 
   // Conversation methods (relationships converted to foreign keys)

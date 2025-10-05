@@ -6,6 +6,7 @@ import AccountTopBar from './AccountTopBar'
 import ProfileOverviewCard from './ProfileOverviewCard'
 import AccountDetailsCard from './AccountDetailsCard'
 import SecurityCard from './SecurityCard'
+import { OAuthAccountsSettings } from './OAuthAccountsSettings'
 import DangerZoneCard from './DangerZoneCard'
 import ConfirmUpdateDialog from './ConfirmUpdateDialog'
 import ConfirmDeleteDialog from './ConfirmDeleteDialog'
@@ -69,6 +70,8 @@ export default function AccountForm() {
             cancelPasswordEdit={cancelPasswordEdit}
             currentPasswordRef={currentPasswordRef}
           />
+
+          <OAuthAccountsSettings />
 
           <DangerZoneCard deleting={deleting} onDelete={onDelete} />
         </div>

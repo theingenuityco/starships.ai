@@ -8,6 +8,7 @@ export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
 export { EnvironmentEntity } from './entities/EnvironmentEntity';
 export { MessageEntity } from './entities/MessageEntity';
+export { OAuthAccountEntity } from './entities/OAuthAccountEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
 export { ToolEntity } from './entities/ToolEntity';
 export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
@@ -20,6 +21,7 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EnvironmentRepository } from './repositories/EnvironmentRepository';
 export { MessageRepository } from './repositories/MessageRepository';
+export { OAuthAccountRepository } from './repositories/OAuthAccountRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { ToolRepository } from './repositories/ToolRepository';
 export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';

@@ -6,8 +6,12 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { UserRepository } from '@starships/models';
-import type { CreateUserRequest, UpdateUserRequest, UserModel } from '@starships/protocol';
+import { OAuthAccountRepository, UserRepository } from '@starships/models';
+import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel } from '@starships/protocol';
+import { WaitlistService } from '@/services/WaitlistService';
+import { WaitlistRepository } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
+import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
 
 export interface UserOptions {
@@ -39,9 +43,11 @@ export interface UpdateUserProfileRequest extends UpdateUserRequest {
  */
 export class UserService {
   private userRepository: UserRepository;
+  private oauthRepository: OAuthAccountRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
+    this.oauthRepository = new OAuthAccountRepository();
   }
 
   // ============================================================================
@@ -295,6 +301,194 @@ export class UserService {
   }
 
   // ============================================================================
+  // OAUTH BUSINESS LOGIC
+  // ============================================================================
+
+  /**
+   * Create or link user from OAuth profile
+   * CRITICAL: NO LAYER JUMPING - Uses proper service methods only
+   */
+  async createUserFromOAuth(provider: string, authCode: string): Promise<{
+    user: UserModel;
+    waitlisted?: boolean;
+    status?: 'pending' | 'approved';
+    message?: string;
+  }> {
+    // Get OAuth profile from provider
+    const profile = await this.getOAuthProfile(provider, authCode);
+
+    // Check waitlist status using existing service
+    const waitlistRepository = new WaitlistRepository();
+    const waitlistService = new WaitlistService(waitlistRepository);
+    const waitlistStatus = await waitlistService.getDetailedStatus(profile.email);
+
+    // Handle waitlist logic (EXISTING PATTERN)
+    if (!waitlistStatus.exists) {
+      await waitlistService.addToPendingWaitlist(profile.email);
+    }
+
+    if (waitlistStatus.status === 'pending') {
+      return {
+        user: { email: profile.email } as UserModel,
+        waitlisted: true,
+        status: 'pending',
+        message: 'Thanks for signing up! Please wait for approval to access the app.',
+      };
+    }
+
+    // Check if user exists by email (for account linking)
+    let user = await this.getUserByEmail(profile.email);
+
+    if (!user) {
+      // ✅ FIXED: Use proper service method - NO REPOSITORY JUMPING
+      user = await this.createUserFromOAuthProfile(profile);
+    } else {
+      // Update email verification for existing users
+      await this.updateUserProfile(user.id, { emailVerified: true });
+    }
+
+    // Link OAuth account using business logic
+    await this.linkOAuthAccount(user.id, profile);
+
+    return { user };
+  }
+
+  /**
+   * Create user from OAuth profile - proper service method
+   * CRITICAL: Uses createUser() service method, not repository directly
+   */
+  private async createUserFromOAuthProfile(profile: OAuthProfileModel): Promise<UserModel> {
+    // Use existing service method for user creation
+    const userData: CreateUserRequest = {
+      email: profile.email,
+      displayName: profile.name,
+      avatar: profile.avatar,
+      emailVerified: true, // OAuth providers verify emails
+    };
+
+    // Create user using proper service layer method
+    const user = await this.createUser(userData);
+    return user;
+  }
+
+  /**
+   * Link OAuth account to existing user
+   * Business logic layer - orchestrates repository operations
+   */
+  async linkOAuthAccount(userId: string, profile: OAuthProfileModel): Promise<void> {
+    const oauthRepo = this.oauthRepository;
+
+    // Business rule: Check if already linked
+    const existing = await oauthRepo.findByProviderAndUser(profile.provider, profile.providerId);
+    if (existing) {
+      return; // Already linked
+    }
+
+    // Business logic: Create OAuth account link using Entity pattern
+    const oauthAccountData = {
+      userId,
+      provider: profile.provider as 'google' | 'github',
+      providerUserId: profile.providerId,
+      email: profile.email,
+      profileData: {
+        name: profile.name,
+        avatar: profile.avatar,
+      },
+    };
+    await oauthRepo.create(oauthAccountData);
+  }
+
+  /**
+   * Get user's linked OAuth accounts
+   * Business logic method for account management
+   */
+  async getUserOAuthAccounts(userId: string): Promise<OAuthAccountModel[]> {
+    return await this.oauthRepository.findByUserId(userId);
+  }
+
+  /**
+   * Unlink OAuth account with business rules
+   * Business logic: Ensure user has alternative authentication
+   */
+  async unlinkOAuthAccount(userId: string, provider: string): Promise<void> {
+    // Business rule: Check if user has password or other OAuth accounts
+    const user = await this.getUserById(userId);
+    const oauthAccounts = await this.getUserOAuthAccounts(userId);
+
+    if (!user?.password && oauthAccounts.length <= 1) {
+      throw new ValidationError('Cannot unlink last authentication method. Set a password first.', 'provider');
+    }
+
+    // Business operation: Remove OAuth account
+    await this.oauthRepository.deleteByProviderAndUser(provider, userId);
+  }
+
+  /**
+   * Get OAuth profile from provider
+   * Business logic for external OAuth provider integration
+   */
+  private async getOAuthProfile(provider: string, authCode: string): Promise<OAuthProfileModel> {
+    if (provider === 'google') {
+      return await this.getGoogleProfile(authCode);
+    } else if (provider === 'github') {
+      return await this.getGitHubProfile(authCode);
+    } else {
+      throw new ValidationError(`Unsupported OAuth provider: ${provider}`, 'provider');
+    }
+  }
+
+  /**
+   * Get Google OAuth profile
+   */
+  private async getGoogleProfile(authCode: string): Promise<OAuthProfileModel> {
+    const env = getEnvConfig();
+    
+    try {
+      // Create OAuth2 client
+      const oauth2Client = new google.auth.OAuth2(
+        env.GOOGLE_CLIENT_ID,
+        env.GOOGLE_CLIENT_SECRET,
+        `${process.env.NODE_ENV === 'production' ? env.SERVER_URL : 'http://localhost:4000'}/api/v1/auth/google/callback`
+      );
+
+      // Exchange authorization code for tokens
+      const { tokens } = await oauth2Client.getToken(authCode);
+      oauth2Client.setCredentials(tokens);
+
+      // Get user profile information
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const { data } = await oauth2.userinfo.get();
+
+      if (!data.email || !data.id || !data.name) {
+        throw new ValidationError('Incomplete profile data from Google', 'profile');
+      }
+
+      // Return standardized profile
+      return {
+        provider: 'google',
+        providerId: data.id,
+        email: data.email,
+        name: data.name,
+        avatar: data.picture || undefined,
+      };
+    } catch (error) {
+      console.error('[OAUTH] Google profile fetch error:', error);
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError('Failed to fetch Google profile', 'oauth');
+    }
+  }
+
+  /**
+   * Get GitHub OAuth profile
+   */
+  private async getGitHubProfile(authCode: string): Promise<OAuthProfileModel> {
+    // GitHub OAuth implementation coming soon
+    throw new ValidationError('GitHub authentication is not available yet. Please use Google or email login.', 'provider');
+  }
+
+  // ============================================================================
   // STATIC HELPER METHODS
   // ============================================================================
 
@@ -350,5 +544,18 @@ export class UserService {
   static async createUser(userData: CreateUserWithPasswordRequest): Promise<UserModel> {
     const userService = new UserService();
     return userService.createUserWithPassword(userData);
+  }
+
+  /**
+   * Static method for API routes compatibility
+   */
+  static async createUserFromOAuth(provider: string, authCode: string): Promise<{
+    user: UserModel;
+    waitlisted?: boolean;
+    status?: 'pending' | 'approved';
+    message?: string;
+  }> {
+    const userService = new UserService();
+    return userService.createUserFromOAuth(provider, authCode);
   }
 }

@@ -17,6 +17,7 @@ export interface UserModel {
   displayName?: string;
   avatar?: string;
   password?: string; // For local authentication
+  emailVerified?: boolean; // OAuth email verification
   createdAt: string;
 
   // Stripe integration
@@ -35,6 +36,7 @@ export interface CreateUserRequest {
   displayName?: string;
   avatar?: string;
   password?: string;
+  emailVerified?: boolean;
   stripeCustomerId?: string;
 }
 
@@ -45,6 +47,7 @@ export interface UpdateUserRequest {
   email?: string;
   displayName?: string;
   avatar?: string;
+  emailVerified?: boolean;
   stripeCustomerId?: string;
 }
 

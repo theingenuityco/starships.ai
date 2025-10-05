@@ -54,6 +54,15 @@ export function getEnvConfig(): EnvironmentConfig {
     // JWT Authentication Configuration
     JWT_SECRET: process.env.JWT_SECRET || '',
 
+    // OAuth Provider Configuration
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+
+    // OAuth Configuration
+    OAUTH_REDIRECT_BASE_URL: process.env.OAUTH_REDIRECT_BASE_URL || `http://localhost:${DEFAULT_CLIENT_PORT}`,
+
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
 

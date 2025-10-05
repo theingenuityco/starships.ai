@@ -3,6 +3,7 @@ export { AgentTemplateRepository } from './AgentTemplateRepository';
 export { ConversationRepository } from './ConversationRepository';
 export { EnvironmentRepository } from './EnvironmentRepository';
 export { MessageRepository } from './MessageRepository';
+export { OAuthAccountRepository } from './OAuthAccountRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { ToolRepository } from './ToolRepository';
 export { ToolTemplateRepository } from './ToolTemplateRepository';

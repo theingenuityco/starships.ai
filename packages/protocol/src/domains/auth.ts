@@ -124,3 +124,76 @@ export interface AuthErrorResponse {
   message: string;
   field?: string;
 }
+
+// ============================================================================
+// OAUTH DOMAIN MODELS
+// ============================================================================
+
+/**
+ * OAuth Account domain model - pure interface for type sharing
+ * Follows established domain contract patterns
+ */
+export interface OAuthAccountModel {
+  id: string;
+  userId: string;
+  provider: 'google' | 'github';
+  providerUserId: string;
+  email: string;
+  profileData?: {
+    name?: string;
+    avatar?: string;
+    [key: string]: unknown;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * OAuth provider profile interface
+ */
+export interface OAuthProfileModel {
+  provider: 'google' | 'github';
+  providerId: string;
+  email: string;
+  name: string;
+  avatar?: string;
+}
+
+/**
+ * OAuth state token interface
+ */
+export interface OAuthStateModel {
+  purpose: 'oauth_state';
+  nonce: string;
+  timestamp: number;
+}
+
+/**
+ * Request/Response interfaces for OAuth operations
+ */
+export interface CreateOAuthAccountRequest {
+  userId: string;
+  provider: 'google' | 'github';
+  providerUserId: string;
+  email: string;
+  profileData?: Record<string, unknown>;
+}
+
+export interface LinkOAuthAccountRequest {
+  userId: string;
+  provider: 'google' | 'github';
+  authCode: string;
+}
+
+export interface OAuthCallbackResponse {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    avatar?: string;
+  };
+  token: string;
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+}

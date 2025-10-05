@@ -8,15 +8,80 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
+import { useOAuthLogin } from '@/hooks/useOAuth'
+import { Eye, EyeOff, LogIn, UserPlus, Github, Chrome } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+
+/**
+ * OAuth button component
+ */
+const OAuthButtons = ({ disabled }: { disabled: boolean }) => {
+  const { initiateOAuth } = useOAuthLogin();
+
+  return (
+    <div className="space-y-3 mb-6">
+      <div className="grid grid-cols-2 gap-3">
+        <Button
+          variant="outline"
+          onClick={() => initiateOAuth('google')}
+          disabled={disabled}
+          className="w-full"
+        >
+          <Chrome className="h-4 w-4 mr-2" />
+          Google
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={() => initiateOAuth('github')}
+          disabled={disabled}
+          className="w-full"
+        >
+          <Github className="h-4 w-4 mr-2" />
+          GitHub
+        </Button>
+      </div>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or continue with email
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * OAuth error handling helper
+ */
+function getOAuthErrorMessage(errorCode: string): string {
+  switch (errorCode) {
+    case 'invalid_state':
+      return 'Security validation failed. Please try again.';
+    case 'provider_error':
+      return 'Authentication provider error. Please try again.';
+    case 'validation_failed':
+      return 'Account validation failed. Please contact support.';
+    case 'callback_failed':
+      return 'Authentication failed. Please try again.';
+    default:
+      return 'Login failed. Please try again.';
+  }
+}
 
 /**
  * JWT-based login and registration form
  */
 export function LoginForm() {
   const { login, register, isLoading, error } = useAuth()
+  const searchParams = useSearchParams()
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -38,6 +103,26 @@ export function LoginForm() {
     isWaitlisted: boolean
     message: string
   } | null>(null)
+
+  // OAuth callback handling
+  useEffect(() => {
+    const oauthToken = searchParams?.get('oauth_token');
+    const oauthError = searchParams?.get('oauth_error');
+    const oauthWaitlist = searchParams?.get('oauth_waitlist');
+
+    if (oauthToken) {
+      // Store the token and redirect to app
+      localStorage.setItem('starships_auth_token', oauthToken);
+      window.location.href = '/ship'; // Redirect to app
+    } else if (oauthError) {
+      setFormError(getOAuthErrorMessage(oauthError));
+    } else if (oauthWaitlist) {
+      setWaitlistStatus({
+        isWaitlisted: true,
+        message: 'Thanks for signing up! Please wait for approval to access the app.'
+      });
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,6 +197,9 @@ export function LoginForm() {
         </CardHeader>
 
         <CardContent>
+          {/* OAuth buttons ABOVE existing tabs */}
+          <OAuthButtons disabled={isLoading || !!waitlistStatus} />
+
           {waitlistStatus && (
             <div className="mb-4">
               <WaitlistMessage

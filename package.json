@@ -69,5 +69,8 @@
       "ssh2",
       "unrs-resolver"
     ]
+  },
+  "dependencies": {
+    "googleapis": "^161.0.0"
   }
 }

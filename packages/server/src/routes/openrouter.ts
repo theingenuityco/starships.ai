@@ -8,8 +8,8 @@ const router: Router = Router();
 
 /**
  * GET /openrouter/models
- * Proxies OpenRouter models filtered by the account's Provider Preferences.
- * Calls https://openrouter.ai/api/v1/models/user
+ * Proxies OpenRouter models (unfiltered to get ALL available models).
+ * Calls https://openrouter.ai/api/v1/models
  */
 router.get('/openrouter/models', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -20,7 +20,8 @@ router.get('/openrouter/models', jwtAuthMiddleware, async (req: Request, res: Re
       return;
     }
 
-    const endpoint = 'https://openrouter.ai/api/v1/models/user';
+    // Use unfiltered endpoint to get ALL models, not just filtered by provider preferences
+    const endpoint = 'https://openrouter.ai/api/v1/models';
 
     const resp = await fetch(endpoint, {
       method: 'GET',

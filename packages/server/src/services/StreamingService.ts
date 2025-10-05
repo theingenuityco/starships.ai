@@ -161,6 +161,24 @@ export class StreamingService {
   }
 
   /**
+   * Broadcast UI action payload to a specific stream
+   */
+  async broadcastUIAction(streamId: string, payload: any): Promise<void> {
+    const connection = this.connections.get(streamId);
+    if (connection && !connection.res.destroyed) {
+      this.sendEventToStream(streamId, connection.res, 'ui_action', payload);
+    }
+  }
+
+  /**
+   * Broadcast UI action payload to all active streams
+   */
+  async broadcastUIActionToAll(payload: any): Promise<void> {
+    const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastUIAction(streamId, payload));
+    await Promise.all(broadcastPromises);
+  }
+
+  /**
    * Normalize a JSON-Patch operation to use concrete numeric indexes for the messages array
    * based on per-connection synchronization context.
    */

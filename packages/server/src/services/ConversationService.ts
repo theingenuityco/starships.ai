@@ -9,6 +9,7 @@ import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
+import { parse as parsePartialJson } from 'partial-json';
 
 /**
  * Autopilot child process configuration
@@ -266,14 +267,39 @@ export class ConversationService {
         secureEnv,
       });
 
-      // Convert database messages to LLM format, preserving toolCalls and tool results
-      const llmMessages = messages.map((msg) => ({
-        role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-        content: msg.content,
-        ...(msg.reasoning && { reasoning: msg.reasoning }),
-        ...(msg.toolCalls && { toolCalls: msg.toolCalls }),
-        ...(msg.toolCallId && { toolCallId: msg.toolCallId }),
-      }));
+      // Convert database messages to OpenRouter format
+      // OpenRouter standardizes format and translates to provider-specific formats automatically
+      const llmMessages = messages.map((msg) => {
+        const baseMessage: any = {
+          role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+          content: msg.content,
+        };
+
+        // Add reasoning if present
+        if (msg.reasoning) {
+          baseMessage.reasoning = msg.reasoning;
+        }
+
+        // For assistant messages with tool calls, use OpenRouter snake_case format
+        if (msg.role === 'assistant' && msg.toolCalls && Array.isArray(msg.toolCalls)) {
+          baseMessage.tool_calls = msg.toolCalls.map((tc: any) => ({
+            id: tc.id,
+            type: tc.type || 'function',
+            function: {
+              name: tc.function?.name,
+              arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
+            },
+          }));
+        }
+
+        // For tool result messages, use OpenRouter snake_case format
+        // OpenRouter translates tool_call_id to provider-specific format (e.g., tool_use_id for Anthropic)
+        if (msg.role === 'tool' && msg.toolCallId) {
+          baseMessage.tool_call_id = msg.toolCallId;
+        }
+
+        return baseMessage;
+      });
 
       // Prepare input for agent execution - Agent will handle memory state and ordering internally
       const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
@@ -560,7 +586,7 @@ export class ConversationService {
 
                 this.streamingToolCalls.set(conversationId, acc);
 
-                // Parse accumulated arguments strings into objects for broadcasting
+                // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
                 const toolCallsValue = acc
                   .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
                   .map((tc) => {
@@ -568,9 +594,16 @@ export class ConversationService {
                     const argsStr = tc.function?.arguments;
                     if (typeof argsStr === 'string' && argsStr) {
                       try {
+                        // Try full JSON.parse first for complete JSON
                         argsObj = JSON.parse(argsStr);
                       } catch {
-                        argsObj = {}; // If parsing fails, use empty object
+                        try {
+                          // Use partial-json for incomplete JSON during streaming
+                          argsObj = parsePartialJson(argsStr);
+                        } catch {
+                          // If both fail, use empty object
+                          argsObj = {};
+                        }
                       }
                     }
                     return {
@@ -578,7 +611,7 @@ export class ConversationService {
                       type: tc.type,
                       function: {
                         name: tc.function.name,
-                        arguments: argsObj, // Now it's a parsed object
+                        arguments: argsObj, // Parsed object (may be partial)
                       },
                     };
                   });
@@ -590,7 +623,7 @@ export class ConversationService {
                 });
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot toolCalls from message node (no incremental indices)
-                // Parse arguments immediately into objects
+                // Parse arguments using partial-json for robustness
                 const normalized = toolCallsFromMessage.map((tc: any) => {
                   const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
                   let argsObj: unknown = {};
@@ -598,7 +631,11 @@ export class ConversationService {
                     try {
                       argsObj = JSON.parse(argsStr);
                     } catch {
-                      argsObj = {};
+                      try {
+                        argsObj = parsePartialJson(argsStr);
+                      } catch {
+                        argsObj = {};
+                      }
                     }
                   }
                   return {
@@ -796,8 +833,55 @@ export class ConversationService {
 
       case 'node_completed': {
         // Handle tool node completion - persist tool result messages
-        // Note: Due to type constraints, we'll handle tool result persistence differently
-        console.log('[STREAMING] Node completed event received');
+        // Also detect UI actions emitted by code/end nodes and forward them to the client via SSE
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: any = execEvent?.data?.execution;
+          const results: any[] = Array.isArray(execution?.results) ? execution.results : [];
+
+          // Walk results from the end to find a JSON payload that declares a UI action
+          let uiPayload: any = null;
+          for (let i = results.length - 1; i >= 0 && !uiPayload; i--) {
+            const items = Array.isArray(results[i]?.items) ? results[i].items : [];
+            for (let j = items.length - 1; j >= 0 && !uiPayload; j--) {
+              const json = items[j]?.json && typeof items[j].json === 'object' ? items[j].json : null;
+              if (!json) continue;
+              if (json && (json as any).__ui_action) {
+                uiPayload = json;
+                break;
+              }
+              const maybeResult = (json as any)?.result;
+              if (maybeResult && typeof maybeResult === 'object' && (maybeResult as any).__ui_action) {
+                uiPayload = maybeResult;
+                break;
+              }
+            }
+          }
+
+          if (uiPayload && typeof uiPayload.__ui_action === 'string') {
+            // New SSE event: send as 'ui_action' for clean separation
+            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
+
+            // Back-compat: also emit a lightweight assistant message containing the UI instruction payload.
+            const now = new Date().toISOString();
+            const uiMessage = {
+              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              role: 'assistant',
+              content: JSON.stringify(uiPayload),
+              messageType: 'agent_response',
+              createdAt: now,
+              updatedAt: now,
+            };
+            await this.streamingService.broadcastDelta(conversationId, {
+              op: 'add',
+              path: '/messages/-',
+              value: uiMessage,
+            });
+          }
+        } catch (e) {
+          console.warn('[STREAMING] UI action detection failed on node_completed:', e);
+        }
+
         // Other persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
         break;
       }
@@ -857,6 +941,38 @@ export class ConversationService {
           value: errorMessage,
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
+        break;
+      }
+
+      case 'tool_call_detected': {
+        // Drop nested tool call detections (only emit from top-level LLM)
+        if ((event.executionDepth ?? 0) > 0) {
+          console.log('[STREAMING] Skipping nested tool_call_detected at depth', event.executionDepth);
+          break;
+        }
+
+        const toolEvt = event as ToolEvent;
+        console.log('[STREAMING] 🎯 Tool call detected at depth 0:', {
+          toolName: toolEvt.data?.toolName,
+          toolCallId: toolEvt.data?.toolCallId,
+          conversationId,
+          isActive: this.streamingService?.isActive(conversationId),
+        });
+
+        // Broadcast tool_call_detected via ui_action event channel
+        // This triggers UI form opening for specific tools like tool_create
+        if (this.streamingService && this.streamingService.isActive(conversationId)) {
+          const payload = {
+            __ui_action: 'tool_call_detected',
+            toolCallId: toolEvt.data?.toolCallId,
+            toolName: toolEvt.data?.toolName,
+          };
+          console.log('[STREAMING] 📤 Broadcasting ui_action:', payload);
+          await this.streamingService.broadcastUIAction(conversationId, payload);
+          console.log('[STREAMING] ✅ ui_action broadcast complete');
+        } else {
+          console.warn('[STREAMING] ⚠️  StreamingService not active, cannot broadcast tool_call_detected');
+        }
         break;
       }
 

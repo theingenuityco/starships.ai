@@ -75,6 +75,9 @@ importers:
       nanoid:
         specifier: ^5.1.5
         version: 5.1.5
+      openai:
+        specifier: ^6.1.0
+        version: 6.1.0(ws@8.18.3)(zod@4.1.5)
     devDependencies:
       '@types/jest':
         specifier: ^30.0.0
@@ -499,6 +502,12 @@ importers:
       openai:
         specifier: ^5.8.4
         version: 5.10.1(ws@8.18.3)(zod@4.1.5)
+      partial-json:
+        specifier: ^0.1.7
+        version: 0.1.7
+      stripe:
+        specifier: ^19.1.0
+        version: 19.1.0(@types/node@22.16.0)
       ws:
         specifier: ^8.18.3
         version: 8.18.3
@@ -4702,6 +4711,18 @@ packages:
       zod:
         optional: true
 
+  openai@6.1.0:
+    resolution: {integrity: sha512-5sqb1wK67HoVgGlsPwcH2bUbkg66nnoIYKoyV9zi5pZPqh7EWlmSrSDjAh4O5jaIg/0rIlcDKBtWvZBuacmGZg==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -4823,6 +4844,9 @@ packages:
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
+
+  partial-json@0.1.7:
+    resolution: {integrity: sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==}
 
   path-exists@3.0.0:
     resolution: {integrity: sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ==}
@@ -5518,6 +5542,15 @@ packages:
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
+
+  stripe@19.1.0:
+    resolution: {integrity: sha512-FjgIiE98dMMTNssfdjMvFdD4eZyEzdWAOwPYqzhPRNZeg9ggFWlPXmX1iJKD5pPIwZBaPlC3SayQQkwsPo6/YQ==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      '@types/node': '>=16'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   style-to-js@1.1.17:
     resolution: {integrity: sha512-xQcBGDxJb6jjFCTzvQtfiPn6YvvP2O8U1MDIPNfJQlWMYfktPy+iGsHE7cssjs7y84d9fQaK4UF3RIJaAHSoYA==}
@@ -10985,6 +11018,11 @@ snapshots:
       ws: 8.18.3
       zod: 4.1.5
 
+  openai@6.1.0(ws@8.18.3)(zod@4.1.5):
+    optionalDependencies:
+      ws: 8.18.3
+      zod: 4.1.5
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -11112,6 +11150,8 @@ snapshots:
   parse5@6.0.1: {}
 
   parseurl@1.3.3: {}
+
+  partial-json@0.1.7: {}
 
   path-exists@3.0.0: {}
 
@@ -11917,6 +11957,12 @@ snapshots:
   strip-json-comments@2.0.1: {}
 
   strip-json-comments@3.1.1: {}
+
+  stripe@19.1.0(@types/node@22.16.0):
+    dependencies:
+      qs: 6.14.0
+    optionalDependencies:
+      '@types/node': 22.16.0
 
   style-to-js@1.1.17:
     dependencies:

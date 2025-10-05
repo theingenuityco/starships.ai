@@ -29,7 +29,7 @@ export interface LLMEvent extends BaseEvent {
 }
 
 export interface ToolEvent extends BaseEvent {
-  type: 'tool_started' | 'tool_complete';
+  type: 'tool_started' | 'tool_complete' | 'tool_call_detected';
   data?: {
     toolName?: string;
     toolCallId?: string;

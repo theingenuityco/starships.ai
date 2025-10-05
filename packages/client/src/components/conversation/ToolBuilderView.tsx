@@ -177,48 +177,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Top Bar with Tool Info */}
-      <div className="flex-shrink-0 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
-                <Wrench className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <Input
-                  placeholder="Tool name..."
-                  value={formData.name}
-                  onChange={e => handleFieldChange('name', e.target.value)}
-                  className={`text-lg font-semibold h-auto py-1.5 px-3 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
-                />
-                <Input
-                  placeholder="Brief description..."
-                  value={formData.description}
-                  onChange={e => handleFieldChange('description', e.target.value)}
-                  className={`text-sm h-auto py-0.5 px-3 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground ${errors.description ? 'text-destructive' : ''}`}
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2">
-                <Settings2 className="w-4 h-4" />
-                Settings
-              </Button>
-              <Button size="sm" variant="outline" onClick={onCancel}>
-                <X className="w-4 h-4 mr-1" />
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleSave} className="gap-2">
-                <Save className="w-4 h-4" />
-                Save Tool
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Blueprint Canvas */}
+      {/* Main Blueprint Canvas - Full Height */}
       <div className="flex-1 relative">
         <div
           className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
@@ -227,12 +186,54 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
             backgroundSize: '24px 24px',
           }}
         >
+          {/* Floating Tool Info Panel - Top Left */}
+          <div className="absolute top-6 left-6 z-10">
+            <div className="frosted-glass-card rounded-2xl shadow-frosted-xl p-4 min-w-[320px] max-w-[400px]">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
+                  <Wrench className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <Input
+                    placeholder="Tool name..."
+                    value={formData.name}
+                    onChange={e => handleFieldChange('name', e.target.value)}
+                    className={`text-base font-semibold h-auto py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
+                  />
+                  <Input
+                    placeholder="Brief description..."
+                    value={formData.description}
+                    onChange={e => handleFieldChange('description', e.target.value)}
+                    className={`text-xs h-auto py-0.5 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground ${errors.description ? 'text-destructive' : ''}`}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Action Buttons - Top Right */}
+          <div className="absolute top-6 right-6 z-10 flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-xl hover:bg-muted/50">
+              <Settings2 className="w-4 h-4" />
+              Settings
+            </Button>
+            <Button size="sm" variant="outline" onClick={onCancel} className="frosted-glass-card shadow-frosted-xl hover:bg-muted/50">
+              <X className="w-4 h-4 mr-1" />
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} className="gap-2 shadow-frosted-xl">
+              <Save className="w-4 h-4" />
+              Save Tool
+            </Button>
+          </div>
+
+          {/* Blueprint or Empty State */}
           {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
-            <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent title={formData.name || 'Tool Blueprint'} />
+            <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent />
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4 max-w-md px-6">
-                <div className="w-20 h-20 mx-auto rounded-full bg-muted/50 flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto rounded-full frosted-glass-card flex items-center justify-center shadow-frosted-xl">
                   <Wrench className="w-10 h-10 text-muted-foreground/50" />
                 </div>
                 <div className="space-y-2">
@@ -241,7 +242,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                     Start building your tool by adding nodes and connections to create a workflow blueprint. Open settings to define the blueprint structure.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-xl">
                   <Settings2 className="w-4 h-4" />
                   Open Settings
                   <ChevronRight className="w-4 h-4" />

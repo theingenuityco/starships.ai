@@ -235,7 +235,7 @@ export const ToolFormDrawer = forwardRef<ToolFormDrawerRef, ToolFormDrawerProps>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0 z-[9999] frosted-glass-card shadow-frosted-xl" align="start">
+                      <PopoverContent className="w-full p-0 z-[1004]" align="start">
                         <Command>
                           <CommandInput placeholder="Search category..." />
                           <CommandList>

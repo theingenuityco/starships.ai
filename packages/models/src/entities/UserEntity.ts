@@ -7,7 +7,7 @@
 
 import type { UserModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
+import { IsBoolean, IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the UserEntity
@@ -130,6 +130,11 @@ export class UserEntity implements UserModel {
   @IsString()
   @Length(6, 255) // Minimum password length for security
   password?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  emailVerified?: boolean;
 
   // Stripe integration
   @Expose()

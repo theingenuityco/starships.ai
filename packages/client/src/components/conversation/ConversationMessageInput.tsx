@@ -33,6 +33,8 @@ interface ConversationMessageInputProps {
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
+  onFocus?: () => void // Callback when input is focused
+  onBlur?: () => void // Callback when input loses focus
 }
 
 export interface ConversationMessageInputRef {
@@ -41,7 +43,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onToggleToolForm, isToolFormOpen = false, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onToggleToolForm, isToolFormOpen = false, disabled = false, minimal = false, children, onFocus, onBlur }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -336,6 +338,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 value={message}
                 onChange={handleTextareaChange}
                 onKeyPress={handleKeyPress}
+                onFocus={onFocus}
+                onBlur={onBlur}
                 placeholder={getPlaceholder()}
                 disabled={disabled || sending || isStreamingEffective}
                 className={cn(

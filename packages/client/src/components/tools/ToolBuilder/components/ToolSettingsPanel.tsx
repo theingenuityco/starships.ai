@@ -17,7 +17,7 @@ interface ToolSettingsPanelProps {
   parameters: Parameter[]
   onFieldChange: (field: keyof ToolFormData, value: string | boolean) => void
   onAddParameter: (path?: number[]) => void
-  onUpdateParameter: (path: number[], field: keyof Parameter, value: any) => void
+  onUpdateParameter: (path: number[], field: keyof Parameter, value: unknown) => void
   onRemoveParameter: (path: number[]) => void
   onToggleExpanded: (path: number[]) => void
 }

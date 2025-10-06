@@ -1,5 +1,4 @@
 import type { ToolTemplateCategory } from '@starships/protocol'
-import type { Blueprint } from '@starships/autopilot'
 
 export interface Parameter {
   name: string

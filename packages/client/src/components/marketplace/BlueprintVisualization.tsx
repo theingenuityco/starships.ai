@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge, Panel } from '@xyflow/react'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench } from 'lucide-react'
+import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 
 interface BlueprintVisualizationProps {
@@ -24,7 +24,7 @@ interface ReactFlowNode extends Node {
 
 // Get icon component for node type
 const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
-  const className = 'w-4 h-4'
+  const className = 'w-5 h-5'
   switch (nodeType) {
     case 'start':
       return <Play className={className} />
@@ -49,6 +49,7 @@ const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
     case 'workflow':
       return <GitBranch className={className} />
     case 'transform':
+      return <Cog className={className} />
     case 'mutate':
       return <Database className={className} />
     default:
@@ -318,9 +319,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               border: `2px solid ${colors.handle}30`,
             }}
           >
-            <div className="w-5 h-5">
-              <NodeIcon nodeType={data.nodeType} />
-            </div>
+            <NodeIcon nodeType={data.nodeType} />
           </div>
 
           {/* Node content */}
@@ -400,9 +399,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
             border: `2px solid ${colors.handle}30`,
           }}
         >
-          <div className="w-5 h-5">
-            <NodeIcon nodeType={data.nodeType} />
-          </div>
+          <NodeIcon nodeType={data.nodeType} />
         </div>
 
         {/* Node content with better typography */}

@@ -382,9 +382,9 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label className="text-xs font-medium">Parameters</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addParameter} className="h-6 text-xs gap-1">
+                            <Button type="button" variant="outline" size="sm" onClick={addParameter} className="h-6 text-xs gap-1 hover:bg-primary/10 hover:border-primary/40">
                               <Plus className="w-3 h-3" />
-                              Add
+                              Add Parameter
                             </Button>
                           </div>
                           <div className="space-y-2">
@@ -395,42 +395,60 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                               </div>
                             ) : (
                               parameters.map((param, index) => (
-                                <div key={index} className="p-2 border rounded-lg space-y-2 bg-muted/5">
-                                  <div className="flex items-start gap-2">
-                                    <div className="flex-1 space-y-2">
-                                      <Input placeholder="Parameter name" value={param.name} onChange={e => updateParameter(index, 'name', e.target.value)} className="h-7 text-xs" />
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <Select value={param.type} onValueChange={value => updateParameter(index, 'type', value)}>
-                                          <SelectTrigger className="h-7 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="string">String</SelectItem>
-                                            <SelectItem value="number">Number</SelectItem>
-                                            <SelectItem value="boolean">Boolean</SelectItem>
-                                            <SelectItem value="object">Object</SelectItem>
-                                            <SelectItem value="array">Array</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                        <div className="flex items-center gap-1.5 px-2 border rounded-md h-7">
-                                          <input
-                                            type="checkbox"
-                                            id={`param-required-${index}`}
-                                            checked={param.required}
-                                            onChange={e => updateParameter(index, 'required', e.target.checked)}
-                                            className="w-3 h-3 rounded border-input"
-                                          />
-                                          <Label htmlFor={`param-required-${index}`} className="text-xs cursor-pointer">
-                                            Required
-                                          </Label>
-                                        </div>
-                                      </div>
-                                      <Input placeholder="Description" value={param.description} onChange={e => updateParameter(index, 'description', e.target.value)} className="h-7 text-xs" />
-                                    </div>
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeParameter(index)} className="h-7 w-7 text-destructive hover:text-destructive">
+                                <div key={index} className="p-2 border rounded-md bg-background hover:border-primary/30 transition-all group space-y-1.5">
+                                  {/* Main Row */}
+                                  <div className="flex items-center gap-1.5">
+                                    {/* Name */}
+                                    <Input
+                                      placeholder="param_name"
+                                      value={param.name}
+                                      onChange={e => updateParameter(index, 'name', e.target.value)}
+                                      className="h-6 flex-1 text-xs font-mono border-none bg-transparent focus-visible:ring-1 px-2"
+                                    />
+
+                                    {/* Type Selector */}
+                                    <Select value={param.type} onValueChange={value => updateParameter(index, 'type', value)}>
+                                      <SelectTrigger className="h-6 w-[75px] text-[10px] border-none bg-muted/40">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="string">String</SelectItem>
+                                        <SelectItem value="number">Number</SelectItem>
+                                        <SelectItem value="boolean">Boolean</SelectItem>
+                                        <SelectItem value="object">Object</SelectItem>
+                                        <SelectItem value="array">Array</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+
+                                    {/* Required Toggle */}
+                                    <input
+                                      type="checkbox"
+                                      id={`param-required-${index}`}
+                                      checked={param.required}
+                                      onChange={e => updateParameter(index, 'required', e.target.checked)}
+                                      className="w-3.5 h-3.5 rounded border-input cursor-pointer"
+                                      title={param.required ? 'Required' : 'Optional'}
+                                    />
+
+                                    {/* Delete */}
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removeParameter(index)}
+                                      className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
+                                    >
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
                                   </div>
+
+                                  {/* Description Row */}
+                                  <Input
+                                    placeholder="Description (optional)"
+                                    value={param.description}
+                                    onChange={e => updateParameter(index, 'description', e.target.value)}
+                                    className="h-5 text-[10px] border-none bg-muted/20 focus-visible:ring-1 px-2"
+                                  />
                                 </div>
                               ))
                             )}

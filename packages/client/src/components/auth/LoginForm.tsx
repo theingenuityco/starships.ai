@@ -9,54 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
 import { useOAuthLogin } from '@/hooks/useOAuth'
-import { Eye, EyeOff, LogIn, UserPlus, Github, Chrome } from 'lucide-react'
+import { OAuthButtons } from '@/components/auth/OAuthButton'
+import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-
-/**
- * OAuth button component
- */
-const OAuthButtons = ({ disabled }: { disabled: boolean }) => {
-  const { initiateOAuth } = useOAuthLogin();
-
-  return (
-    <div className="space-y-3 mb-6">
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          variant="outline"
-          onClick={() => initiateOAuth('google')}
-          disabled={disabled}
-          className="w-full"
-        >
-          <Chrome className="h-4 w-4 mr-2" />
-          Google
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() => initiateOAuth('github')}
-          disabled={disabled}
-          className="w-full"
-        >
-          <Github className="h-4 w-4 mr-2" />
-          GitHub
-        </Button>
-      </div>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">
-            Or continue with email
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /**
  * OAuth error handling helper
@@ -64,15 +21,15 @@ const OAuthButtons = ({ disabled }: { disabled: boolean }) => {
 function getOAuthErrorMessage(errorCode: string): string {
   switch (errorCode) {
     case 'invalid_state':
-      return 'Security validation failed. Please try again.';
+      return 'Security validation failed. Please try again.'
     case 'provider_error':
-      return 'Authentication provider error. Please try again.';
+      return 'Authentication provider error. Please try again.'
     case 'validation_failed':
-      return 'Account validation failed. Please contact support.';
+      return 'Account validation failed. Please contact support.'
     case 'callback_failed':
-      return 'Authentication failed. Please try again.';
+      return 'Authentication failed. Please try again.'
     default:
-      return 'Login failed. Please try again.';
+      return 'Login failed. Please try again.'
   }
 }
 
@@ -81,6 +38,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  */
 export function LoginForm() {
   const { login, register, oauthLogin, isLoading, error } = useAuth()
+  const { initiateOAuth } = useOAuthLogin()
   const searchParams = useSearchParams()
 
   const [loginData, setLoginData] = useState({
@@ -105,33 +63,33 @@ export function LoginForm() {
   } | null>(null)
 
   // Track if OAuth has been handled to prevent duplicate calls
-  const [oauthHandled, setOauthHandled] = useState(false);
+  const [oauthHandled, setOauthHandled] = useState(false)
 
   // OAuth callback handling
   useEffect(() => {
-    const oauthToken = searchParams?.get('oauth_token');
-    const oauthError = searchParams?.get('oauth_error');
-    const oauthWaitlist = searchParams?.get('oauth_waitlist');
+    const oauthToken = searchParams?.get('oauth_token')
+    const oauthError = searchParams?.get('oauth_error')
+    const oauthWaitlist = searchParams?.get('oauth_waitlist')
 
     // Prevent duplicate handling
     if (oauthHandled) {
-      console.log('[OAuth] Already handled, skipping');
-      return;
+      console.log('[OAuth] Already handled, skipping')
+      return
     }
 
     if (oauthToken) {
-      setOauthHandled(true);
+      setOauthHandled(true)
       // Use the elegant OAuth mutation (same pattern as regular login)
-      oauthLogin(oauthToken);
+      oauthLogin(oauthToken)
     } else if (oauthError) {
-      setFormError(getOAuthErrorMessage(oauthError));
+      setFormError(getOAuthErrorMessage(oauthError))
     } else if (oauthWaitlist) {
       setWaitlistStatus({
         isWaitlisted: true,
-        message: 'Thanks for signing up! Please wait for approval to access the app.'
-      });
+        message: 'Thanks for signing up! Please wait for approval to access the app.',
+      })
     }
-  }, [searchParams, oauthHandled]);
+  }, [searchParams, oauthHandled])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,16 +102,16 @@ export function LoginForm() {
     }
 
     const result = await login(loginData.email, loginData.password)
-    
+
     // Check if waitlisted response
     if (result.waitlisted) {
       setWaitlistStatus({
         isWaitlisted: true,
-        message: result.message || 'You are on our waitlist. Stay tuned!'
+        message: result.message || 'You are on our waitlist. Stay tuned!',
       })
       return
     }
-    
+
     if (!result.success) {
       setFormError(result.error || 'Login failed')
     }
@@ -180,18 +138,18 @@ export function LoginForm() {
     }
 
     const result = await register(registerData.email, registerData.password, registerData.name)
-    
+
     // Check if waitlisted response
     if (result.waitlisted) {
       setWaitlistStatus({
         isWaitlisted: true,
-        message: result.message || 'You have been added to the waitlist!'
+        message: result.message || 'You have been added to the waitlist!',
       })
       // Optionally clear form
       setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
       return
     }
-    
+
     if (!result.success) {
       setFormError(result.error || 'Registration failed')
     }
@@ -207,17 +165,14 @@ export function LoginForm() {
 
         <CardContent>
           {/* OAuth buttons ABOVE existing tabs */}
-          <OAuthButtons disabled={isLoading || !!waitlistStatus} />
+          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading || !!waitlistStatus} />
 
           {waitlistStatus && (
             <div className="mb-4">
-              <WaitlistMessage
-                message={waitlistStatus.message}
-                onClose={() => setWaitlistStatus(null)}
-              />
+              <WaitlistMessage message={waitlistStatus.message} onClose={() => setWaitlistStatus(null)} />
             </div>
           )}
-          
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>

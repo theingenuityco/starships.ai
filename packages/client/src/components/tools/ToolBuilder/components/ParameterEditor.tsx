@@ -454,7 +454,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         'editor.selectionBackground': '#2e3541', // hsl(220 15% 20%) - matches --border
         'editor.inactiveSelectionBackground': '#171a20',
         'editorCursor.foreground': '#3b82f6', // matches primary color
-        'editor.lineHighlightBackground': '#171a20', // hsl(220 15% 10%) - matches --card
+        'editor.lineHighlightBackground': '#ffffff08', // Subtle tint for active line
         'editorWidget.background': '#171a20',
         'editorSuggestWidget.background': '#171a20',
         'editorHoverWidget.background': '#171a20',
@@ -483,7 +483,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         'editor.selectionBackground': '#add6ff',
         'editor.inactiveSelectionBackground': '#e5ebf1',
         'editorCursor.foreground': '#3b82f6', // matches primary color
-        'editor.lineHighlightBackground': '#ffffff',
+        'editor.lineHighlightBackground': '#00000008', // Subtle tint for active line
         'editorWidget.background': '#ffffff',
         'editorSuggestWidget.background': '#ffffff',
         'editorHoverWidget.background': '#ffffff',
@@ -537,7 +537,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     <div className="space-y-2">
       {/* Monaco Editor */}
       <div className="relative rounded-b-xl overflow-hidden">
-        <div className="pr-4 frosted-glass-card !border-none">
+        <div className="pr-4 frosted-glass-card">
           <Editor
             height="300px"
             defaultLanguage="json"

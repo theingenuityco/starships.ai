@@ -857,6 +857,7 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
         proOptions={{ hideAttribution: true }}
         defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
       >
+        <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="rgba(156, 163, 175, 0.4)" />
         {title && (
           <Panel position="top-left" className="m-4">
             <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">

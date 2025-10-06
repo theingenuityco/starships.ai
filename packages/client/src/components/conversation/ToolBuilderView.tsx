@@ -7,8 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Save, X, Settings2, ChevronRight } from 'lucide-react'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Settings2, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
@@ -64,7 +64,6 @@ const INITIAL_FORM_DATA: ToolFormData = {
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, onCancel, starshipId }, ref) => {
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   // Parse blueprint for visualization
@@ -200,9 +199,10 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
             right: 0,
           }}
         >
-          {/* Floating Tool Info Panel - Top Left */}
-          <div className="absolute top-6 left-28 z-10">
-            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 min-w-[320px] max-w-[400px]">
+          {/* Floating Panels - Top Left */}
+          <div className="absolute top-6 left-28 z-10 w-[460px] space-y-3">
+            {/* Tool Info Panel */}
+            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 w-full">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
                   <Wrench className="w-5 h-5 text-primary" />
@@ -230,22 +230,110 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Floating Action Buttons - Top Right */}
-          <div className="absolute top-10 right-6 z-10 flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card !shadow-frosted-lg hover:bg-muted/50">
-              <Settings2 className="w-4 h-4" />
-              Settings
-            </Button>
-            <Button size="sm" variant="outline" onClick={onCancel} className="frosted-glass-card !shadow-frosted-lg hover:bg-muted/50">
-              <X className="w-4 h-4 mr-1" />
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSave} className="gap-2 !shadow-frosted-lg">
-              <Save className="w-4 h-4" />
-              Save Tool
-            </Button>
+            {/* Settings Panel */}
+            <Collapsible defaultOpen={true}>
+              <div className="frosted-glass-card rounded-2xl shadow-frosted-lg overflow-hidden w-full">
+                <CollapsibleTrigger className="w-full p-4 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-semibold">Tool Settings</span>
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <div className="border-t border-border/40">
+                    <ScrollArea className="max-h-[60vh]">
+                      <div className="p-4 space-y-4">
+                        {/* Category */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold">Category</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {categories.map(cat => (
+                              <Badge
+                                key={cat}
+                                variant="outline"
+                                className={cn(
+                                  'cursor-pointer transition-all duration-200 gap-1.5 px-2 py-1 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3',
+                                  formData.category === cat ? cn('shadow-sm hover:shadow-md hover:brightness-110', getCategoryColor(cat)) : 'hover:bg-muted/50 hover:border-primary/40'
+                                )}
+                                onClick={() => handleFieldChange('category', cat)}
+                              >
+                                {getCategoryIcon(cat)}
+                                <span className="capitalize">{cat}</span>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Example Usage */}
+                        <div className="space-y-2">
+                          <Label htmlFor="tool-example" className="text-xs font-semibold">
+                            Example Usage
+                          </Label>
+                          <Textarea
+                            id="tool-example"
+                            placeholder="Show how to use this tool..."
+                            value={formData.exampleUsage}
+                            onChange={e => handleFieldChange('exampleUsage', e.target.value)}
+                            rows={2}
+                            className="text-xs"
+                          />
+                        </div>
+
+                        {/* Requires API Key */}
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/10 border border-border/40">
+                          <input
+                            type="checkbox"
+                            id="tool-requires-api-key"
+                            checked={formData.requiresApiKey}
+                            onChange={e => handleFieldChange('requiresApiKey', e.target.checked)}
+                            className="w-3 h-3 rounded border-input text-primary focus:ring-primary focus:ring-offset-background"
+                          />
+                          <Label htmlFor="tool-requires-api-key" className="cursor-pointer flex-1 text-xs">
+                            Requires API Key
+                          </Label>
+                        </div>
+
+                        {/* Parameters Schema */}
+                        <div className="space-y-2">
+                          <Label htmlFor="tool-parameters" className="text-xs font-semibold">
+                            Parameters Schema (JSON)
+                          </Label>
+                          <Textarea
+                            id="tool-parameters"
+                            placeholder='{"type": "object", "properties": {...}}'
+                            value={formData.parameters}
+                            onChange={e => handleFieldChange('parameters', e.target.value)}
+                            className={`font-mono text-xs ${errors.parameters ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                            rows={6}
+                          />
+                          {errors.parameters && <p className="text-xs text-destructive">{errors.parameters}</p>}
+                        </div>
+
+                        {/* Blueprint JSON */}
+                        <div className="space-y-2">
+                          <Label htmlFor="tool-blueprint" className="text-xs font-semibold">
+                            Blueprint Structure (JSON)
+                          </Label>
+                          <Textarea
+                            id="tool-blueprint"
+                            placeholder='{"nodes": [...], "edges": [...]}'
+                            value={formData.blueprint}
+                            onChange={e => handleFieldChange('blueprint', e.target.value)}
+                            className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                            rows={8}
+                          />
+                          {errors.blueprint && <p className="text-xs text-destructive">{errors.blueprint}</p>}
+                        </div>
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           </div>
 
           {/* Blueprint or Empty State */}
@@ -259,163 +347,13 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-foreground">No Blueprint Yet</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Start building your tool by adding nodes and connections to create a workflow blueprint. Open settings to define the blueprint structure.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Start building your tool by adding nodes and connections to create a workflow blueprint. Configure tool settings above.</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="gap-2 frosted-glass-card shadow-frosted-lg">
-                  <Settings2 className="w-4 h-4" />
-                  Open Settings
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Settings Drawer */}
-      <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Tool Settings</SheetTitle>
-          </SheetHeader>
-          <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
-              {/* Settings Header */}
-              <div className="space-y-1">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-primary" />
-                  Tool Settings
-                </h2>
-                <p className="text-sm text-muted-foreground">Configure your tool&apos;s properties and behavior</p>
-              </div>
-
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  Basic Information
-                </h3>
-
-                {/* Tool Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="tool-name">Tool Name</Label>
-                  <Input
-                    id="tool-name"
-                    placeholder="Enter tool name..."
-                    value={formData.name}
-                    onChange={e => handleFieldChange('name', e.target.value)}
-                    className={errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
-                  />
-                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="tool-description">Description</Label>
-                  <Textarea
-                    id="tool-description"
-                    placeholder="Describe what this tool does..."
-                    value={formData.description}
-                    onChange={e => handleFieldChange('description', e.target.value)}
-                    className={errors.description ? 'border-destructive focus-visible:ring-destructive' : ''}
-                    rows={3}
-                  />
-                  {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
-                </div>
-
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map(cat => (
-                      <Badge
-                        key={cat}
-                        variant="outline"
-                        className={cn(
-                          'cursor-pointer transition-all duration-200 gap-1.5 px-3 py-1.5 rounded-full [&>svg]:w-3.5 [&>svg]:h-3.5',
-                          formData.category === cat ? cn('shadow-sm hover:shadow-md hover:brightness-110', getCategoryColor(cat)) : 'hover:bg-muted/50 hover:border-primary/40'
-                        )}
-                        onClick={() => handleFieldChange('category', cat)}
-                      >
-                        {getCategoryIcon(cat)}
-                        <span className="capitalize">{cat}</span>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Configuration */}
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
-                  <Package className="w-5 h-5 text-primary" />
-                  Configuration
-                </h3>
-
-                {/* Example Usage */}
-                <div className="space-y-2">
-                  <Label htmlFor="tool-example">Example Usage</Label>
-                  <Textarea id="tool-example" placeholder="Show how to use this tool..." value={formData.exampleUsage} onChange={e => handleFieldChange('exampleUsage', e.target.value)} rows={3} />
-                </div>
-
-                {/* Requires API Key */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/10 border border-border/40">
-                  <input
-                    type="checkbox"
-                    id="tool-requires-api-key"
-                    checked={formData.requiresApiKey}
-                    onChange={e => handleFieldChange('requiresApiKey', e.target.checked)}
-                    className="w-4 h-4 rounded border-input text-primary focus:ring-primary focus:ring-offset-background"
-                  />
-                  <Label htmlFor="tool-requires-api-key" className="cursor-pointer flex-1 text-foreground">
-                    Requires API Key
-                  </Label>
-                </div>
-              </div>
-
-              {/* Technical Details */}
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
-                  <Bot className="w-5 h-5 text-primary" />
-                  Technical Details
-                </h3>
-
-                {/* Parameters Schema */}
-                <div className="space-y-2">
-                  <Label htmlFor="tool-parameters">Parameters Schema (JSON)</Label>
-                  <Textarea
-                    id="tool-parameters"
-                    placeholder='{"type": "object", "properties": {...}}'
-                    value={formData.parameters}
-                    onChange={e => handleFieldChange('parameters', e.target.value)}
-                    className={`font-mono text-xs ${errors.parameters ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    rows={8}
-                  />
-                  {errors.parameters && <p className="text-sm text-destructive">{errors.parameters}</p>}
-                  <p className="text-xs text-muted-foreground">Define the input parameters for this tool in JSON format</p>
-                </div>
-
-                {/* Blueprint JSON */}
-                <div className="space-y-2">
-                  <Label htmlFor="tool-blueprint">Blueprint Structure (JSON)</Label>
-                  <Textarea
-                    id="tool-blueprint"
-                    placeholder='{"nodes": [...], "edges": [...]}'
-                    value={formData.blueprint}
-                    onChange={e => handleFieldChange('blueprint', e.target.value)}
-                    className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    rows={12}
-                  />
-                  {errors.blueprint && <p className="text-sm text-destructive">{errors.blueprint}</p>}
-                  <p className="text-xs text-muted-foreground">Define the workflow blueprint structure in JSON format</p>
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
     </div>
   )
 })

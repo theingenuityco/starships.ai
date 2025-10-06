@@ -20,7 +20,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
       try {
         JSON.parse(newValue)
         setValidationError(null)
-      } catch (e) {
+      } catch {
         setValidationError('Invalid JSON syntax')
       }
     } else {

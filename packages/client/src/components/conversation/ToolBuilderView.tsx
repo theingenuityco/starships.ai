@@ -8,11 +8,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Settings2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Settings2, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import type { Blueprint } from '@starships/autopilot'
+
+interface Parameter {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array'
+  description: string
+  required: boolean
+}
 
 interface ToolFormData {
   name: string
@@ -64,7 +72,80 @@ const INITIAL_FORM_DATA: ToolFormData = {
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, onCancel, starshipId }, ref) => {
   const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Partial<Record<keyof ToolFormData, string>>>({})
+  const [parameters, setParameters] = useState<Parameter[]>([])
   const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null)
+
+  // Parse parameters from JSON on mount and when formData.parameters changes
+  React.useEffect(() => {
+    try {
+      const parsed = JSON.parse(formData.parameters)
+      if (parsed.properties) {
+        const params: Parameter[] = Object.entries(parsed.properties).map(([name, prop]: [string, any]) => ({
+          name,
+          type: prop.type || 'string',
+          description: prop.description || '',
+          required: parsed.required?.includes(name) || false,
+        }))
+        setParameters(params)
+      } else {
+        setParameters([])
+      }
+    } catch {
+      // Invalid JSON, keep empty parameters
+      setParameters([])
+    }
+  }, [formData.parameters])
+
+  // Convert parameters to JSON schema
+  const parametersToJSON = React.useCallback((params: Parameter[]) => {
+    const properties: Record<string, any> = {}
+    const required: string[] = []
+
+    params.forEach(param => {
+      properties[param.name] = {
+        type: param.type,
+        description: param.description,
+      }
+      if (param.required) {
+        required.push(param.name)
+      }
+    })
+
+    return JSON.stringify(
+      {
+        type: 'object',
+        properties,
+        required,
+      },
+      null,
+      2
+    )
+  }, [])
+
+  // Add new parameter
+  const addParameter = () => {
+    const newParams = [...parameters, { name: '', type: 'string' as const, description: '', required: false }]
+    setParameters(newParams)
+    const json = parametersToJSON(newParams)
+    handleFieldChange('parameters', json)
+  }
+
+  // Update parameter
+  const updateParameter = (index: number, field: keyof Parameter, value: any) => {
+    const newParams = [...parameters]
+    newParams[index] = { ...newParams[index], [field]: value }
+    setParameters(newParams)
+    const json = parametersToJSON(newParams)
+    handleFieldChange('parameters', json)
+  }
+
+  // Remove parameter
+  const removeParameter = (index: number) => {
+    const newParams = parameters.filter((_, i) => i !== index)
+    setParameters(newParams)
+    const json = parametersToJSON(newParams)
+    handleFieldChange('parameters', json)
+  }
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -297,19 +378,63 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                           </Label>
                         </div>
 
-                        {/* Parameters Schema */}
+                        {/* Parameters */}
                         <div className="space-y-1.5">
-                          <Label htmlFor="tool-parameters" className="text-xs font-medium">
-                            Parameters Schema (JSON)
-                          </Label>
-                          <Textarea
-                            id="tool-parameters"
-                            placeholder='{"type": "object", "properties": {...}}'
-                            value={formData.parameters}
-                            onChange={e => handleFieldChange('parameters', e.target.value)}
-                            className={`font-mono text-xs ${errors.parameters ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                            rows={5}
-                          />
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-medium">Parameters</Label>
+                            <Button type="button" variant="outline" size="sm" onClick={addParameter} className="h-6 text-xs gap-1">
+                              <Plus className="w-3 h-3" />
+                              Add
+                            </Button>
+                          </div>
+                          <div className="space-y-2">
+                            {parameters.length === 0 ? (
+                              <div className="text-xs text-muted-foreground text-center py-6 border-2 border-dashed rounded-lg bg-muted/5">
+                                <p className="font-medium mb-1">No parameters defined</p>
+                                <p className="text-[10px]">Click "Add Parameter" to create tool inputs</p>
+                              </div>
+                            ) : (
+                              parameters.map((param, index) => (
+                                <div key={index} className="p-2 border rounded-lg space-y-2 bg-muted/5">
+                                  <div className="flex items-start gap-2">
+                                    <div className="flex-1 space-y-2">
+                                      <Input placeholder="Parameter name" value={param.name} onChange={e => updateParameter(index, 'name', e.target.value)} className="h-7 text-xs" />
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <Select value={param.type} onValueChange={value => updateParameter(index, 'type', value)}>
+                                          <SelectTrigger className="h-7 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="string">String</SelectItem>
+                                            <SelectItem value="number">Number</SelectItem>
+                                            <SelectItem value="boolean">Boolean</SelectItem>
+                                            <SelectItem value="object">Object</SelectItem>
+                                            <SelectItem value="array">Array</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <div className="flex items-center gap-1.5 px-2 border rounded-md h-7">
+                                          <input
+                                            type="checkbox"
+                                            id={`param-required-${index}`}
+                                            checked={param.required}
+                                            onChange={e => updateParameter(index, 'required', e.target.checked)}
+                                            className="w-3 h-3 rounded border-input"
+                                          />
+                                          <Label htmlFor={`param-required-${index}`} className="text-xs cursor-pointer">
+                                            Required
+                                          </Label>
+                                        </div>
+                                      </div>
+                                      <Input placeholder="Description" value={param.description} onChange={e => updateParameter(index, 'description', e.target.value)} className="h-7 text-xs" />
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeParameter(index)} className="h-7 w-7 text-destructive hover:text-destructive">
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
                           {errors.parameters && <p className="text-xs text-destructive">{errors.parameters}</p>}
                         </div>
                       </div>

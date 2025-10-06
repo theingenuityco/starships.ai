@@ -431,14 +431,16 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                                     </Select>
 
                                     {/* Required Toggle */}
-                                    <input
-                                      type="checkbox"
-                                      id={`param-required-${index}`}
-                                      checked={param.required}
-                                      onChange={e => updateParameter(index, 'required', e.target.checked)}
-                                      className="w-3.5 h-3.5 rounded border-input cursor-pointer"
-                                      title={param.required ? 'Required' : 'Optional'}
-                                    />
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        'h-6 w-[60px] px-2 text-[10px] cursor-pointer transition-all flex-shrink-0 justify-center',
+                                        param.required ? 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/40' : 'bg-muted/10 text-muted-foreground border-border/30 hover:bg-muted/20'
+                                      )}
+                                      onClick={() => updateParameter(index, 'required', !param.required)}
+                                    >
+                                      {param.required ? 'Required' : 'Optional'}
+                                    </Badge>
 
                                     {/* Delete */}
                                     <Button

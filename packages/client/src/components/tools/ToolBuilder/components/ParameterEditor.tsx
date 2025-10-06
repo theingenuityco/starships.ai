@@ -529,14 +529,6 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
 
   return (
     <div className="space-y-2">
-      {/* Validation Status */}
-      {isValid && (
-        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-          <Check className="h-3 w-3" />
-          <span className="text-[10px] font-medium">Valid Schema</span>
-        </div>
-      )}
-
       {/* Monaco Editor */}
       <div className="relative rounded-md border border-input overflow-hidden">
         <div className="pr-4 bg-[#fafafa] dark:bg-[#13161b]">

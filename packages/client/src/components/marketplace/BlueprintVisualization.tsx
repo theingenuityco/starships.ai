@@ -17,6 +17,8 @@ import {
   OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
+  EdgeProps,
+  getBezierPath,
 } from '@xyflow/react'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
@@ -168,6 +170,74 @@ const getNodeColors = (nodeType: string) => {
     },
   }
   return colorSchemes[nodeType as keyof typeof colorSchemes] || colorSchemes.default
+}
+
+// Custom edge for loop backs with pronounced curve
+const LoopBackEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd, label }) => {
+  // Create a pronounced curved path for loop backs
+  const dx = targetX - sourceX
+  const dy = targetY - sourceY
+
+  // For loop backs, create an arc that goes outward
+  const curveOffset = 100 // How far the curve extends outward
+  const controlPoint1X = sourceX + dx * 0.25
+  const controlPoint1Y = sourceY - curveOffset
+  const controlPoint2X = targetX - dx * 0.25
+  const controlPoint2Y = targetY - curveOffset
+
+  const path = `M ${sourceX},${sourceY} C ${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${targetX},${targetY}`
+
+  // Calculate label position at the curve peak
+  const labelX = (sourceX + targetX) / 2
+  const labelY = Math.min(sourceY, targetY) - curveOffset
+
+  return (
+    <>
+      <path
+        id={id}
+        d={path}
+        style={{
+          ...style,
+          fill: 'none',
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+        }}
+        className="react-flow__edge-path"
+        markerEnd={markerEnd}
+      />
+      {label && (
+        <text
+          x={labelX}
+          y={labelY}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="react-flow__edge-text"
+          style={{
+            fontSize: '11px',
+            fontWeight: 500,
+            fill: '#475569',
+            pointerEvents: 'none',
+          }}
+        >
+          <tspan
+            x={labelX}
+            y={labelY}
+            style={{
+              fill: 'rgba(255, 255, 255, 0.95)',
+              stroke: 'rgba(255, 255, 255, 0.95)',
+              strokeWidth: 3,
+              paintOrder: 'stroke',
+            }}
+          >
+            {label}
+          </tspan>
+          <tspan x={labelX} y={labelY}>
+            {label}
+          </tspan>
+        </text>
+      )}
+    </>
+  )
 }
 
 // Custom conditional node component with horizontal sections for each output
@@ -502,16 +572,30 @@ const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = 
   // First apply layout to get node positions
   const layoutResult = getExecutionOrderLayout(initialNodes, [], blueprint)
 
-  // Create edges with default rendering
+  // Build execution levels map for loop back detection
+  const executionLevels = new Map<string, number>()
+  layoutResult.nodes.forEach(node => {
+    // Calculate execution level from x position
+    const level = Math.round(node.position.x / 350)
+    executionLevels.set(node.id, level)
+  })
+
+  // Create edges with loop back detection
   const flowEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+
+    // Detect loop back: target level <= source level (backward flow)
+    const sourceLevel = executionLevels.get(edge.from) ?? 0
+    const targetLevel = executionLevels.get(edge.to) ?? 0
+    const isLoopBack = targetLevel <= sourceLevel
 
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
+      type: isLoopBack ? 'loopback' : 'default',
       animated: false,
       style: {
         stroke: '#64748b',
@@ -531,9 +615,13 @@ const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = 
   return { nodes: layoutResult.nodes, edges: flowEdges }
 }
 
-// Node types for React Flow
+// Node and edge types for React Flow
 const nodeTypes = {
   custom: CustomBlueprintNode,
+}
+
+const edgeTypes = {
+  loopback: LoopBackEdge,
 }
 
 // Node details panel component
@@ -683,6 +771,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}

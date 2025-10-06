@@ -243,6 +243,19 @@
   background: rgba(59, 130, 246, 0.8) !important;
 }
 
+/* Monaco Editor - Prevent scrollbar overlap */
+.monaco-editor .view-lines {
+  padding-right: 20px !important;
+}
+
+.monaco-editor .view-line {
+  padding-right: 20px !important;
+}
+
+.monaco-editor .lines-content {
+  padding-right: 20px !important;
+}
+
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

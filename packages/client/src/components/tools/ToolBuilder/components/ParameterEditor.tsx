@@ -408,41 +408,49 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
 
       {/* Monaco Editor */}
       <div className="relative rounded-md border border-input overflow-hidden">
-        <Editor
-          height="300px"
-          defaultLanguage="json"
-          value={value}
-          onChange={handleChange}
-          onMount={handleEditorDidMount}
-          theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 12,
-            lineNumbers: 'off',
-            glyphMargin: true,
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            wrappingIndent: 'indent',
-            automaticLayout: true,
-            tabSize: 2,
-            insertSpaces: true,
-            formatOnPaste: true,
-            formatOnType: true,
-            quickSuggestions: true,
-            suggestOnTriggerCharacters: true,
-            acceptSuggestionOnEnter: 'on',
-            folding: false,
-            overviewRulerLanes: 0,
-            hideCursorInOverviewRuler: true,
-            overviewRulerBorder: false,
-            padding: { top: 12, bottom: 12 },
-            guides: {
-              bracketPairs: false,
-              bracketPairsHorizontal: false,
-              highlightActiveBracketPair: false,
-            },
-          }}
-        />
+        <div className="pr-4 bg-[#fafafa] dark:bg-[#13161b]">
+          <Editor
+            height="300px"
+            defaultLanguage="json"
+            value={value}
+            onChange={handleChange}
+            onMount={handleEditorDidMount}
+            theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 12,
+              lineNumbers: 'off',
+              glyphMargin: true,
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              wrappingIndent: 'indent',
+              automaticLayout: true,
+              tabSize: 2,
+              insertSpaces: true,
+              formatOnPaste: true,
+              formatOnType: true,
+              quickSuggestions: true,
+              suggestOnTriggerCharacters: true,
+              acceptSuggestionOnEnter: 'on',
+              folding: false,
+              overviewRulerLanes: 0,
+              hideCursorInOverviewRuler: true,
+              overviewRulerBorder: false,
+              padding: { top: 12, bottom: 12 },
+              scrollbar: {
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10,
+                useShadows: false,
+                alwaysConsumeMouseWheel: false,
+              },
+              guides: {
+                bracketPairs: false,
+                bracketPairsHorizontal: false,
+                highlightActiveBracketPair: false,
+              },
+            }}
+          />
+        </div>
       </div>
 
       {/* Validation Messages */}

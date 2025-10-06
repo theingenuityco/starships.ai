@@ -300,7 +300,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     const container = document.createElement('div')
     container.className = 'parameter-metadata-zone'
     container.style.cssText = `
-      padding: 4px 12px;
+      padding: 4px 0;
       font-size: 10px;
       font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
       color: ${theme === 'dark' ? '#64748b' : '#94a3b8'};

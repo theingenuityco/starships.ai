@@ -190,11 +190,14 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
         <div
           className={`
             relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
-            bg-white dark:bg-gray-800 border-2
-            ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
-            rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
-            text-gray-900 dark:text-gray-100 cursor-move hover:border-gray-300
+            backdrop-blur-[20px] backdrop-saturate-[180%] border-2
+            ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-border/40'}
+            rounded-xl shadow-frosted-lg transition-all duration-300
+            text-foreground cursor-move hover:border-border/60
           `}
+          style={{
+            background: `linear-gradient(135deg, ${colors.handle}15 0%, ${colors.handle}08 100%)`,
+          }}
         >
           {/* Circular icon container */}
           <div
@@ -210,8 +213,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
           {/* Node content */}
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate leading-tight">{data.label}</div>
-            {data.type && <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
+            <div className="font-semibold text-sm text-foreground truncate leading-tight">{data.label}</div>
+            {data.type && <div className="text-xs text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
           </div>
         </div>
 
@@ -223,8 +226,11 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               return (
                 <div
                   key={uniqueKey}
-                  className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-r-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 last:mb-0"
-                  style={{ minHeight: '30px' }}
+                  className="relative backdrop-blur-[15px] backdrop-saturate-[160%] border border-border/40 rounded-r-md px-2 py-1 text-xs font-medium text-muted-foreground mb-1 last:mb-0"
+                  style={{
+                    minHeight: '30px',
+                    background: `linear-gradient(135deg, ${colors.handle}10 0%, ${colors.handle}05 100%)`,
+                  }}
                 >
                   <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
                   {/* Individual output handle for this branch */}
@@ -275,11 +281,14 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
       <div
         className={`
           relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
-          bg-white dark:bg-gray-800 border-2
-          ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
-          rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
-          text-gray-900 dark:text-gray-100 cursor-move hover:border-gray-300
+          backdrop-blur-[20px] backdrop-saturate-[180%] border-2
+          ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-border/40'}
+          rounded-xl shadow-frosted-lg transition-all duration-300
+          text-foreground cursor-move hover:border-border/60
         `}
+        style={{
+          background: `linear-gradient(135deg, ${colors.handle}15 0%, ${colors.handle}08 100%)`,
+        }}
       >
         {/* Circular icon container with better styling */}
         <div
@@ -295,8 +304,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 
         {/* Node content with better typography */}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate leading-tight">{data.label}</div>
-          {data.type && <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
+          <div className="font-semibold text-sm text-foreground truncate leading-tight">{data.label}</div>
+          {data.type && <div className="text-xs text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
         </div>
       </div>
 

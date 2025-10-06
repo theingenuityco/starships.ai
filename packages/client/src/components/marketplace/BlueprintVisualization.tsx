@@ -11,8 +11,6 @@ import {
   Position,
   Handle,
   BackgroundVariant,
-  EdgeProps,
-  BaseEdge,
   Panel,
   NodeProps,
   OnNodesChange,
@@ -170,148 +168,6 @@ const getNodeColors = (nodeType: string) => {
     },
   }
   return colorSchemes[nodeType as keyof typeof colorSchemes] || colorSchemes.default
-}
-
-// Intelligent edge routing with obstacle avoidance
-interface Point {
-  x: number
-  y: number
-}
-
-interface Rectangle {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-// Check if a point is inside or near a rectangle
-const isPointNearRectangle = (point: Point, rect: Rectangle, padding: number = 30): boolean => {
-  return point.x >= rect.x - padding && point.x <= rect.x + rect.width + padding && point.y >= rect.y - padding && point.y <= rect.y + rect.height + padding
-}
-
-// Calculate intelligent control points for bezier curve that avoids obstacles
-const calculateIntelligentBezierPath = (sourceX: number, sourceY: number, targetX: number, targetY: number, obstacles: Rectangle[]): string => {
-  const dx = targetX - sourceX
-  const dy = targetY - sourceY
-  const distance = Math.sqrt(dx * dx + dy * dy)
-
-  // Default control points for straight bezier
-  let cp1x = sourceX + dx * 0.5
-  let cp1y = sourceY + dy * 0.2
-  let cp2x = targetX - dx * 0.5
-  let cp2y = targetY - dy * 0.2
-
-  // Find obstacles that intersect with our path
-  const pathBounds = {
-    minX: Math.min(sourceX, targetX) - 50,
-    maxX: Math.max(sourceX, targetX) + 50,
-    minY: Math.min(sourceY, targetY) - 50,
-    maxY: Math.max(sourceY, targetY) + 50,
-  }
-
-  const relevantObstacles = obstacles.filter(obstacle => {
-    const obstacleRight = obstacle.x + obstacle.width
-    const obstacleBottom = obstacle.y + obstacle.height
-
-    return !(obstacleRight < pathBounds.minX || obstacle.x > pathBounds.maxX || obstacleBottom < pathBounds.minY || obstacle.y > pathBounds.maxY)
-  })
-
-  // For each relevant obstacle, adjust control points to route around it
-  for (const obstacle of relevantObstacles) {
-    const obstacleCenterX = obstacle.x + obstacle.width / 2
-    const obstacleCenterY = obstacle.y + obstacle.height / 2
-
-    // Vector from source to obstacle center
-    const toObstacleX = obstacleCenterX - sourceX
-    const toObstacleY = obstacleCenterY - sourceY
-
-    // Cross product to determine which side of the path the obstacle is on
-    const crossProduct = dx * toObstacleY - dy * toObstacleX
-
-    // Determine offset direction (perpendicular to path direction)
-    const perpX = -dy / distance
-    const perpY = dx / distance
-
-    // Calculate offset amount based on obstacle size and distance
-    const obstacleSize = Math.max(obstacle.width, obstacle.height)
-    const offsetAmount = crossProduct > 0 ? -(obstacleSize + 60) : obstacleSize + 60
-
-    // Check if our default control points are too close to the obstacle
-    const cp1Near = isPointNearRectangle({ x: cp1x, y: cp1y }, obstacle, 40)
-    const cp2Near = isPointNearRectangle({ x: cp2x, y: cp2y }, obstacle, 40)
-
-    if (cp1Near || cp2Near) {
-      // Adjust control points to curve around the obstacle
-      cp1x = sourceX + dx * 0.3 + perpX * offsetAmount * 0.7
-      cp1y = sourceY + dy * 0.3 + perpY * offsetAmount * 0.7
-      cp2x = targetX - dx * 0.3 + perpX * offsetAmount * 0.7
-      cp2y = targetY - dy * 0.3 + perpY * offsetAmount * 0.7
-    }
-  }
-
-  // Generate smooth cubic bezier path
-  return `M ${sourceX} ${sourceY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetX} ${targetY}`
-}
-
-// Custom intelligent edge component
-const IntelligentEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, style = {}, markerEnd, label, data }) => {
-  const obstacles: Rectangle[] = (data?.obstacles as Rectangle[]) || []
-
-  // Calculate intelligent path that routes around obstacles
-  const pathData = calculateIntelligentBezierPath(sourceX, sourceY, targetX, targetY, obstacles)
-
-  // Calculate label position (approximate midpoint of bezier curve)
-  const labelX = (sourceX + targetX) / 2
-  const labelY = (sourceY + targetY) / 2
-
-  return (
-    <>
-      <path
-        id={id}
-        d={pathData}
-        style={{
-          ...style,
-          fill: 'none',
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-        }}
-        className="react-flow__edge-path"
-        markerEnd={markerEnd}
-      />
-      {label && (
-        <text
-          x={labelX}
-          y={labelY}
-          textAnchor="middle"
-          dominantBaseline="central"
-          className="react-flow__edge-text"
-          style={{
-            fontSize: '11px',
-            fontWeight: 500,
-            fill: '#475569',
-            pointerEvents: 'none',
-          }}
-        >
-          <tspan
-            x={labelX}
-            y={labelY}
-            style={{
-              fill: 'rgba(255, 255, 255, 0.95)',
-              stroke: 'rgba(255, 255, 255, 0.95)',
-              strokeWidth: 3,
-              paintOrder: 'stroke',
-            }}
-          >
-            {label}
-          </tspan>
-          <tspan x={labelX} y={labelY}>
-            {label}
-          </tspan>
-        </text>
-      )}
-    </>
-  )
 }
 
 // Custom conditional node component with horizontal sections for each output
@@ -646,40 +502,16 @@ const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = 
   // First apply layout to get node positions
   const layoutResult = getExecutionOrderLayout(initialNodes, [], blueprint)
 
-  // Create obstacles array from positioned nodes
-  const obstacles: Rectangle[] = layoutResult.nodes.map(node => ({
-    x: node.position.x - 110, // Node width/2 + padding
-    y: node.position.y - 25, // Node height/2 + padding
-    width: 220, // Node width + padding
-    height: 50, // Node height + padding
-  }))
-
-  // Build incoming edges map to detect convergence
-  const incomingEdgesMap = new Map<string, BlueprintEdge[]>()
-  blueprintEdges.forEach(edge => {
-    if (!incomingEdgesMap.has(edge.to)) {
-      incomingEdgesMap.set(edge.to, [])
-    }
-    incomingEdgesMap.get(edge.to)!.push(edge)
-  })
-
-  // Create edges with intelligent routing only when needed
-  const intelligentEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
+  // Create edges with default rendering
+  const flowEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
-    const targetNode = blueprint.nodes.find(n => n.ref === edge.to)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
-
-    // Check if this edge needs intelligent routing (multiple branches or convergence)
-    const hasMultipleOutgoing = (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
-    const hasMultipleIncoming = (incomingEdgesMap.get(edge.to)?.length || 0) > 1
-    const needsIntelligentRouting = hasMultipleOutgoing || hasMultipleIncoming
 
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
-      type: needsIntelligentRouting ? 'intelligent' : 'default', // Use intelligent edge only when needed
       animated: false,
       style: {
         stroke: '#64748b',
@@ -692,25 +524,16 @@ const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = 
         height: 16,
       },
       label: edge.label,
-      data: needsIntelligentRouting
-        ? {
-            obstacles: obstacles,
-          }
-        : undefined,
     }
   })
 
-  // Return layout with intelligent edges
-  return { nodes: layoutResult.nodes, edges: intelligentEdges }
+  // Return layout with edges
+  return { nodes: layoutResult.nodes, edges: flowEdges }
 }
 
-// Node and edge types for React Flow
+// Node types for React Flow
 const nodeTypes = {
   custom: CustomBlueprintNode,
-}
-
-const edgeTypes = {
-  intelligent: IntelligentEdge,
 }
 
 // Node details panel component
@@ -860,7 +683,6 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}

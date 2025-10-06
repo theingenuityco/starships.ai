@@ -322,9 +322,9 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
       'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST', // Minimal cycle intervention
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
 
-      // Optimized spacing for cycle routing
-      'elk.spacing.nodeNode': '180', // More vertical space between nodes at same level
-      'elk.layered.spacing.nodeNodeBetweenLayers': '200', // Horizontal layer spacing
+      // Adjusted spacing: tighter horizontal, much more vertical room for loopback routing
+      'elk.spacing.nodeNode': '350', // Much more vertical space between nodes at same level
+      'elk.layered.spacing.nodeNodeBetweenLayers': '150', // Decreased horizontal layer spacing
       'elk.spacing.edgeNode': '80', // Sufficient edge routing space
       'elk.spacing.edgeEdge': '30', // Space between edges
       'elk.padding': '[top=40,left=40,bottom=40,right=40]', // Reasonable padding
@@ -462,7 +462,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
     return {
       ...edge,
       type: 'smooth', // Use custom smooth edge for all edges
-      zIndex: isBackEdge ? 1000 : 1, // Back edges render on top of nodes
+      zIndex: -1, // All edges render behind nodes
       style: {
         ...edge.style,
         strokeWidth: 2, // Consistent width for all edges

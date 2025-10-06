@@ -167,9 +167,35 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     }
   }
 
-  // Function to find property ranges in the JSON schema
-  const findPropertyRanges = (jsonString: string): Array<{ startLine: number; endLine: number; propertyName: string }> => {
-    const ranges: Array<{ startLine: number; endLine: number; propertyName: string }> = []
+  // Function to find property ranges in the JSON schema with metadata
+  const findPropertyRanges = (
+    jsonString: string
+  ): Array<{
+    startLine: number
+    endLine: number
+    propertyName: string
+    indentation: number
+    metadata: {
+      type: string
+      description?: string
+      required: boolean
+      enum?: unknown[]
+      default?: unknown
+    }
+  }> => {
+    const ranges: Array<{
+      startLine: number
+      endLine: number
+      propertyName: string
+      indentation: number
+      metadata: {
+        type: string
+        description?: string
+        required: boolean
+        enum?: unknown[]
+        default?: unknown
+      }
+    }> = []
 
     try {
       const parsed = JSON.parse(jsonString)
@@ -179,6 +205,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
 
       const lines = jsonString.split('\n')
       const propertyNames = Object.keys(parsed.properties)
+      const requiredFields = Array.isArray(parsed.required) ? parsed.required : []
 
       // Find the "properties" line
       let propertiesLineIndex = -1
@@ -197,6 +224,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         let propEndLine = -1
         let depth = 0
         let foundProp = false
+        let indentation = 0
 
         for (let i = propertiesLineIndex + 1; i < lines.length; i++) {
           const line = lines[i]
@@ -205,6 +233,10 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
           if (!foundProp && line.includes(`"${propName}"`) && line.includes(':')) {
             propStartLine = i
             foundProp = true
+
+            // Calculate indentation (number of spaces at the start of the line)
+            const match = line.match(/^(\s*)/)
+            indentation = match ? match[1].length : 0
 
             // Check if the property object starts on the same line
             if (line.includes('{')) {
@@ -222,10 +254,23 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             // When depth returns to 0, we've found the end of this property
             if (depth === 0) {
               propEndLine = i
+
+              // Extract metadata for this property
+              const propDef = parsed.properties[propName] as Record<string, unknown>
+              const metadata = {
+                type: String(propDef.type || 'unknown'),
+                description: propDef.description ? String(propDef.description) : undefined,
+                required: requiredFields.includes(propName),
+                enum: propDef.enum as unknown[] | undefined,
+                default: propDef.default,
+              }
+
               ranges.push({
                 startLine: propStartLine,
                 endLine: propEndLine,
                 propertyName: propName,
+                indentation,
+                metadata,
               })
               break
             }
@@ -238,6 +283,44 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     }
 
     return ranges
+  }
+
+  // Function to create metadata DOM node for view zone
+  const createMetadataNode = (
+    metadata: {
+      type: string
+      description?: string
+      required: boolean
+      enum?: unknown[]
+      default?: unknown
+    },
+    propertyName: string,
+    indentation: number
+  ): HTMLDivElement => {
+    const container = document.createElement('div')
+    container.className = 'parameter-metadata-zone'
+    container.style.cssText = `
+      padding: 4px 12px;
+      font-size: 10px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+      color: ${theme === 'dark' ? '#64748b' : '#94a3b8'};
+      opacity: 0.6;
+      display: flex;
+      align-items: center;
+      user-select: none;
+      pointer-events: none;
+    `
+
+    // Parameter name and type
+    const text = document.createElement('span')
+    text.style.cssText = `
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    `
+    text.textContent = `${propertyName}: ${metadata.type}`
+    container.appendChild(text)
+
+    return container
   }
 
   // Function to apply property decorations
@@ -261,14 +344,24 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         const model = editorRef.current!.getModel()
         if (!model) return
 
-        // Add spacing zone before each property (except the first)
+        // Add metadata view zone above each property
+        const metadataNode = createMetadataNode(range.metadata, range.propertyName, range.indentation)
+        const metadataZoneId = changeAccessor.addZone({
+          afterLineNumber: range.startLine,
+          heightInLines: 1,
+          domNode: metadataNode,
+        })
+        viewZonesRef.current.push(metadataZoneId)
+
+        // Add small spacing zone after metadata (except for the first property)
         if (index > 0) {
-          const zoneId = changeAccessor.addZone({
+          const spacingDiv = document.createElement('div')
+          const spacingZoneId = changeAccessor.addZone({
             afterLineNumber: range.startLine,
-            heightInLines: 0.5,
-            domNode: document.createElement('div'),
+            heightInLines: 0.3,
+            domNode: spacingDiv,
           })
-          viewZonesRef.current.push(zoneId)
+          viewZonesRef.current.push(spacingZoneId)
         }
 
         const numLines = range.endLine - range.startLine + 1

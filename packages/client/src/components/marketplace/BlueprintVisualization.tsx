@@ -19,6 +19,7 @@ import {
   applyEdgeChanges,
   EdgeProps,
   getBezierPath,
+  BaseEdge,
 } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
@@ -450,7 +451,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   // Apply ELK layout
   const layoutResult = await getElkLayout(initialNodes, flowEdges)
 
-  // Detect back edges after layout and use proper bezier curves
+  // Detect back edges after layout and use custom smooth edges
   const edgesWithZIndex = layoutResult.edges.map(edge => {
     const sourceNode = layoutResult.nodes.find(n => n.id === edge.source)
     const targetNode = layoutResult.nodes.find(n => n.id === edge.target)
@@ -460,12 +461,15 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
 
     return {
       ...edge,
-      type: 'default', // Use default bezier for all edges
+      type: 'smooth', // Use custom smooth edge for all edges
       zIndex: isBackEdge ? 1000 : 1, // Back edges render on top of nodes
       style: {
         ...edge.style,
-        // Make back edges slightly more visible
-        strokeWidth: isBackEdge ? 2.5 : 2,
+        strokeWidth: 2, // Consistent width for all edges
+      },
+      data: {
+        ...edge.data,
+        isBackEdge, // Pass back edge flag to custom edge component
       },
     }
   })
@@ -474,9 +478,70 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   return { nodes: layoutResult.nodes, edges: edgesWithZIndex }
 }
 
+// Custom edge component with smooth curves for loopback edges
+const CustomSmoothEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd, data }) => {
+  // Check if this is a back edge (loopback)
+  const isBackEdge = data?.isBackEdge === true
+
+  let edgePath: string
+
+  if (isBackEdge) {
+    // For back edges, create a custom path with very smooth curves
+    // Simulate a stiff steel rope that maintains large bend radius
+
+    // Calculate distance and direction
+    const dx = targetX - sourceX
+    const dy = targetY - sourceY
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    // Create control points for smoother curves with reduced intensity
+    // Lower multiplier = gentler, wider curves
+    const controlPointOffset = Math.max(distance * 0.4, 100) // Reduced curvature for more natural flow
+
+    // Control points positioned to create smooth "C" shape
+    const controlPoint1X = sourceX + controlPointOffset
+    const controlPoint1Y = sourceY
+    const controlPoint2X = targetX - controlPointOffset
+    const controlPoint2Y = targetY
+
+    // Create cubic bezier path with custom control points
+    edgePath = `M ${sourceX},${sourceY} C ${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${targetX},${targetY}`
+  } else {
+    // For normal edges, use standard bezier with moderate curvature
+    ;[edgePath] = getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      curvature: 0.25,
+    })
+  }
+
+  return (
+    <BaseEdge
+      id={id}
+      path={edgePath}
+      markerEnd={markerEnd}
+      style={{
+        ...style,
+        // Ensure smooth rendering
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      }}
+    />
+  )
+}
+
 // Node types for React Flow
 const nodeTypes = {
   custom: CustomBlueprintNode,
+}
+
+// Edge types for React Flow
+const edgeTypes = {
+  smooth: CustomSmoothEdge,
 }
 
 // Node details panel component
@@ -621,6 +686,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}

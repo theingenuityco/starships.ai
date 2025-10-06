@@ -269,9 +269,7 @@ type StreamedChunk =
 
 // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events
 function makeSSEAsyncIterable(conversationId: string, token: string | null, signal?: AbortSignal, baselineLength?: number): AsyncIterable<StreamedChunk> {
-  // Use full server URL for SSE requests
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-  let url = `${baseURL}/api/v1/conversations/${conversationId}/messages?stream=true`
+  let url = `/api/v1/conversations/${conversationId}/messages?stream=true`
   if (typeof baselineLength === 'number' && baselineLength >= 0) {
     url += `&baselineLength=${baselineLength}`
   }

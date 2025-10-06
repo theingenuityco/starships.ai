@@ -58,8 +58,7 @@ const setStoredToken = (token: string | null) => {
 // Validate token and get user info
 const validateToken = async (token: string): Promise<AuthUser | null> => {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-    const response = await fetch(`${baseURL}/api/v1/auth/me`, {
+    const response = await fetch('/api/v1/auth/me', {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -111,8 +110,7 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-      const response = await fetch(`${baseURL}/api/v1/auth/login`, {
+      const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,8 +176,7 @@ export function useRegister() {
 
   return useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-      const response = await fetch(`${baseURL}/api/v1/auth/register`, {
+      const response = await fetch('/api/v1/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -238,6 +235,84 @@ export function useRegister() {
   })
 }
 
+// OAuth login mutation - follows the same elegant pattern
+export function useOAuthLogin() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  return useMutation({
+    mutationFn: async ({ token }: { token: string }) => {
+      // First validate the OAuth token by fetching user data
+      const userResponse = await fetch('/api/v1/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!userResponse.ok) {
+        throw new Error('OAuth token validation failed')
+      }
+
+      const userData = await userResponse.json()
+      const user = userData.data
+
+      // Get user's starships for redirect
+      const starshipResponse = await fetch(`/api/v1/users/${user.id}/starships`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      let starship = null
+      if (starshipResponse.ok) {
+        const starshipData = await starshipResponse.json()
+        starship = starshipData.data?.find((ship: any) => ship.status === 'active') || starshipData.data?.[0]
+      }
+
+      return {
+        user,
+        token,
+        starship: starship ? {
+          slug: starship.slug,
+          id: starship.id,
+          name: starship.name
+        } : null
+      } as AuthLoginResponse
+    },
+    onSuccess: data => {
+      const { user, token, starship } = data
+
+      if (!user || !token) {
+        console.error('[AUTH] OAuth successful but missing user or token')
+        return
+      }
+
+      // Store token (same as regular login)
+      setStoredToken(token)
+
+      // Update auth user cache (same as regular login)
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+
+      // Redirect to starship's conversation if available (same as regular login)
+      if (starship) {
+        router.push(`/ship/${starship.slug}/conversations`)
+      }
+
+      // Invalidate all queries to refetch with new auth context (same as regular login)
+      queryClient.invalidateQueries()
+    },
+    onError: (error: any) => {
+      console.error('[AUTH] OAuth login error:', error)
+      const errorMessage = error.message || 'OAuth login failed'
+      toast.error('OAuth login failed', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 // Logout mutation
 export function useLogout() {
   const queryClient = useQueryClient()
@@ -248,8 +323,7 @@ export function useLogout() {
 
       try {
         // Call logout endpoint (optional since JWT is stateless)
-        const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-        await fetch(`${baseURL}/api/v1/auth/logout`, {
+        await fetch('/api/v1/auth/logout', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -287,6 +361,7 @@ export function useAuth() {
   const { data: user, isLoading, error, refetch } = useAuthUser()
   const loginMutation = useLogin()
   const registerMutation = useRegister()
+  const oauthLoginMutation = useOAuthLogin()
   const logoutMutation = useLogout()
 
   // Set up token provider for API calls on mount
@@ -341,14 +416,24 @@ export function useAuth() {
     [registerMutation]
   )
 
+  // OAuth login function
+  const oauthLogin = useCallback(async (token: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await oauthLoginMutation.mutateAsync({ token })
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message || 'OAuth login failed' }
+    }
+  }, [oauthLoginMutation])
+
   // Logout function
   const logout = useCallback(async () => {
     await logoutMutation.mutateAsync()
   }, [logoutMutation])
 
   const isAuthenticated = !!user
-  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || null
-  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending
+  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || oauthLoginMutation.error?.message || null
+  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || oauthLoginMutation.isPending || logoutMutation.isPending
 
   return {
     // Auth state
@@ -361,6 +446,7 @@ export function useAuth() {
     // Auth actions
     login,
     register,
+    oauthLogin,
     logout,
     getToken: getStoredToken, // Expose token getter
 
@@ -374,6 +460,7 @@ export function useAuth() {
     refetchUser: refetch,
     loginMutation,
     registerMutation,
+    oauthLoginMutation,
     logoutMutation,
   }
 }

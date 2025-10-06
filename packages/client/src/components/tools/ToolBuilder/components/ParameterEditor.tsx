@@ -23,6 +23,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   const [isValid, setIsValid] = useState<boolean>(false)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
+  const decorationsRef = useRef<string[]>([])
   const { theme } = useTheme()
 
   // Validate JSON Schema structure
@@ -165,6 +166,140 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     }
   }
 
+  // Function to find property ranges in the JSON schema
+  const findPropertyRanges = (jsonString: string): Array<{ startLine: number; endLine: number; propertyName: string }> => {
+    const ranges: Array<{ startLine: number; endLine: number; propertyName: string }> = []
+
+    try {
+      const parsed = JSON.parse(jsonString)
+      if (!parsed.properties || typeof parsed.properties !== 'object') {
+        return ranges
+      }
+
+      const lines = jsonString.split('\n')
+      const propertyNames = Object.keys(parsed.properties)
+
+      // Find the "properties" line
+      let propertiesLineIndex = -1
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('"properties"') && lines[i].includes(':')) {
+          propertiesLineIndex = i
+          break
+        }
+      }
+
+      if (propertiesLineIndex === -1) return ranges
+
+      // For each property, find its start and end lines
+      propertyNames.forEach(propName => {
+        let propStartLine = -1
+        let propEndLine = -1
+        let depth = 0
+        let foundProp = false
+
+        for (let i = propertiesLineIndex + 1; i < lines.length; i++) {
+          const line = lines[i]
+
+          // Check if this line contains the property name
+          if (!foundProp && line.includes(`"${propName}"`) && line.includes(':')) {
+            propStartLine = i
+            foundProp = true
+
+            // Check if the property object starts on the same line
+            if (line.includes('{')) {
+              depth = 1
+            }
+            continue
+          }
+
+          if (foundProp) {
+            // Count braces to track depth
+            const openBraces = (line.match(/{/g) || []).length
+            const closeBraces = (line.match(/}/g) || []).length
+            depth += openBraces - closeBraces
+
+            // When depth returns to 0, we've found the end of this property
+            if (depth === 0) {
+              propEndLine = i
+              ranges.push({
+                startLine: propStartLine,
+                endLine: propEndLine,
+                propertyName: propName,
+              })
+              break
+            }
+          }
+        }
+      })
+    } catch (e) {
+      // Ignore parsing errors
+      console.error('Error finding property ranges:', e)
+    }
+
+    return ranges
+  }
+
+  // Function to apply property decorations
+  const applyPropertyDecorations = () => {
+    if (!editorRef.current || !monacoRef.current) return
+
+    const ranges = findPropertyRanges(value)
+    const decorations: editor.IModelDeltaDecoration[] = []
+
+    ranges.forEach(range => {
+      const model = editorRef.current!.getModel()
+      if (!model) return
+
+      const numLines = range.endLine - range.startLine + 1
+
+      // For single-line properties
+      if (numLines === 1) {
+        decorations.push({
+          range: new monacoRef.current!.Range(range.startLine + 1, 1, range.startLine + 1, model.getLineMaxColumn(range.startLine + 1)),
+          options: {
+            isWholeLine: true,
+            className: 'property-box-single',
+            glyphMarginClassName: 'property-group-glyph',
+          },
+        })
+      } else {
+        // For multi-line properties, create box effect
+        // First line (top border + sides)
+        decorations.push({
+          range: new monacoRef.current!.Range(range.startLine + 1, 1, range.startLine + 1, model.getLineMaxColumn(range.startLine + 1)),
+          options: {
+            isWholeLine: true,
+            className: 'property-box-top',
+            glyphMarginClassName: 'property-group-glyph',
+          },
+        })
+
+        // Middle lines (sides only)
+        for (let i = range.startLine + 1; i < range.endLine; i++) {
+          decorations.push({
+            range: new monacoRef.current!.Range(i + 1, 1, i + 1, model.getLineMaxColumn(i + 1)),
+            options: {
+              isWholeLine: true,
+              className: 'property-box-middle',
+            },
+          })
+        }
+
+        // Last line (bottom border + sides)
+        decorations.push({
+          range: new monacoRef.current!.Range(range.endLine + 1, 1, range.endLine + 1, model.getLineMaxColumn(range.endLine + 1)),
+          options: {
+            isWholeLine: true,
+            className: 'property-box-bottom',
+          },
+        })
+      }
+    })
+
+    // Clear old decorations and apply new ones
+    decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, decorations)
+  }
+
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
     monacoRef.current = monaco
@@ -235,6 +370,9 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
 
     // Validate initial value
     validateJsonSchema(value)
+
+    // Apply property decorations after a short delay to ensure editor is ready
+    setTimeout(() => applyPropertyDecorations(), 100)
   }
 
   // Update theme when it changes
@@ -249,6 +387,9 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     const val = newValue || ''
     onChange(val)
     validateJsonSchema(val)
+
+    // Reapply decorations when content changes
+    setTimeout(() => applyPropertyDecorations(), 50)
   }
 
   useEffect(() => {
@@ -278,6 +419,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             minimap: { enabled: false },
             fontSize: 12,
             lineNumbers: 'off',
+            glyphMargin: true,
             scrollBeyondLastLine: false,
             wordWrap: 'on',
             wrappingIndent: 'indent',

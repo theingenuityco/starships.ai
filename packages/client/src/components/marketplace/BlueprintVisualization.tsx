@@ -172,24 +172,48 @@ const getNodeColors = (nodeType: string) => {
   return colorSchemes[nodeType as keyof typeof colorSchemes] || colorSchemes.default
 }
 
-// Custom edge for loop backs with pronounced curve
+// Custom edge for loop backs with pronounced curve that avoids nodes
 const LoopBackEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd, label }) => {
-  // Create a pronounced curved path for loop backs
+  // Create a pronounced curved path for loop backs that routes around nodes
   const dx = targetX - sourceX
   const dy = targetY - sourceY
+  const distance = Math.abs(dx)
 
-  // For loop backs, create an arc that goes outward
-  const curveOffset = 100 // How far the curve extends outward
-  const controlPoint1X = sourceX + dx * 0.25
+  // Add horizontal extensions at start and end
+  const horizontalExtension = 50
+
+  // Calculate a pronounced curve that goes well above the nodes
+  // The curve should be proportional to the distance to avoid nodes in between
+  const verticalOffset = Math.max(150, distance * 0.4) // Scale with distance, minimum 150px
+
+  // Determine if we should curve upward or downward based on vertical position
+  const curveDirection = dy > 0 ? 1 : -1 // Curve in opposite direction if target is below
+  const curveOffset = verticalOffset * curveDirection
+
+  // Start and end points with horizontal extensions
+  const extendedSourceX = sourceX + horizontalExtension
+  const extendedTargetX = targetX - horizontalExtension
+
+  // Create a smooth arc with two control points for proper cubic bezier
+  // First control point: after source extension, moving up/down
+  const controlPoint1X = extendedSourceX + (extendedTargetX - extendedSourceX) * 0.25
   const controlPoint1Y = sourceY - curveOffset
-  const controlPoint2X = targetX - dx * 0.25
+
+  // Second control point: before target extension, coming down from arc
+  const controlPoint2X = extendedTargetX - (extendedTargetX - extendedSourceX) * 0.25
   const controlPoint2Y = targetY - curveOffset
 
-  const path = `M ${sourceX},${sourceY} C ${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${targetX},${targetY}`
+  // Path with horizontal extensions and smooth curve
+  const path = `
+    M ${sourceX},${sourceY}
+    L ${extendedSourceX},${sourceY}
+    C ${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${extendedTargetX},${targetY}
+    L ${targetX},${targetY}
+  `
 
   // Calculate label position at the curve peak
-  const labelX = (sourceX + targetX) / 2
-  const labelY = Math.min(sourceY, targetY) - curveOffset
+  const labelX = (extendedSourceX + extendedTargetX) / 2
+  const labelY = sourceY - curveOffset * 0.85
 
   return (
     <>

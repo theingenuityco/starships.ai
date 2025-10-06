@@ -4,14 +4,18 @@ import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
 
 import ShipManagement from '@/components/profile/ShipManagement'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 
 export default function ShipProfilePage(): React.JSX.Element {
   const { slug } = useParams<{ slug: string }>()
   const { data: starshipData } = useStarshipBySlug(slug, true)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const defaultTab = searchParams.get('tab') === 'billing' ? 'billing' : 'usage'
 
   return (
     <PageLayout>
@@ -27,7 +31,7 @@ export default function ShipProfilePage(): React.JSX.Element {
             </div>
 
             {/* Sections using shared Tabs UI with improved alignment */}
-            <Tabs defaultValue="usage" className="space-y-6">
+            <Tabs defaultValue={defaultTab} onValueChange={value => router.push(`?tab=${value}`)} className="space-y-6">
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
                   <TabsTrigger value="usage" className="gap-2 rounded-xl px-4 py-2">
@@ -49,12 +53,7 @@ export default function ShipProfilePage(): React.JSX.Element {
 
               <TabsContent value="billing">
                 <section aria-labelledby="billing-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="billing-section" className="text-lg font-semibold">
-                    Billing
-                  </h3>
-                  <div className="mt-4">
-                    <p className="text-muted-foreground">Billing functionality will be implemented here.</p>
-                  </div>
+                  <StarshipBillingSection starshipId={starshipData?.id} />
                 </section>
               </TabsContent>
             </Tabs>

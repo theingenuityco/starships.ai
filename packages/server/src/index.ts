@@ -5,16 +5,7 @@
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import {
-  AgentRepository,
-  createConnection,
-  migrationRunner,
-  seedToolTemplates,
-  seedAgentTemplates,
-  seedWaitlist,
-  StarshipRepository,
-  UserRepository,
-} from '@starships/models';
+import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates, seedWaitlist } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -29,6 +20,7 @@ import environmentRoutes from '@/routes/environment';
 import messageRoutes from '@/routes/messages';
 import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
+import walletRoutes from '@/routes/wallets';
 import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
@@ -68,8 +60,7 @@ const dbConnection = createConnection({
   database: config.POSTGRES_DATABASE,
   ssl: config.POSTGRES_SSL,
 });
-// Aether Core repositories
-const starshipRepository = new StarshipRepository();
+
 // Middleware - Order is important!
 app.use(cors());
 app.use(express.json());
@@ -91,6 +82,7 @@ app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
+app.use('/api/v1', walletRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
 

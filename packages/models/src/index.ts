@@ -13,6 +13,7 @@ export { ToolEntity } from './entities/ToolEntity';
 export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
 export { UserEntity } from './entities/UserEntity';
 export { UsageEntity } from './entities/UsageEntity';
+export { WalletEntity } from './entities/WalletEntity';
 
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
@@ -26,6 +27,7 @@ export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';
 export { UsageRepository } from './repositories/UsageRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
+export { WalletRepository } from './repositories/WalletRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

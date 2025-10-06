@@ -270,6 +270,23 @@ CREATE INDEX idx_usage_starship_created_at ON usage(starship_id, created_at);
 CREATE INDEX idx_usage_starship_model ON usage(starship_id, model);
 
 -- ============================================================================
+-- WALLETS TABLE
+-- ============================================================================
+
+CREATE TABLE wallets (
+  id VARCHAR(255) PRIMARY KEY,
+  starship_id VARCHAR(255) UNIQUE NOT NULL REFERENCES starships(id) ON DELETE CASCADE,
+  currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+  balance DECIMAL(18,6) NOT NULL DEFAULT 0.000000,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Wallets indexes
+CREATE INDEX idx_wallets_created_at ON wallets(created_at);
+CREATE INDEX idx_wallets_updated_at ON wallets(updated_at);
+CREATE INDEX idx_wallets_currency ON wallets(currency);
+
+-- ============================================================================
 -- WAITLIST TABLE
 -- ============================================================================
 
@@ -345,6 +362,7 @@ COMMENT ON TABLE conversations IS 'Chat conversations within starships';
 COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
+COMMENT ON TABLE wallets IS 'Wallets for starships with currency and balance';
 COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';

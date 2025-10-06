@@ -458,6 +458,9 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         'editorWidget.background': '#171a20',
         'editorSuggestWidget.background': '#171a20',
         'editorHoverWidget.background': '#171a20',
+        contrastBorder: '#00000000', // Remove contrast border
+        contrastActiveBorder: '#00000000', // Remove active contrast border
+        focusBorder: '#00000000', // Remove focus border
       },
     })
 
@@ -484,6 +487,9 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         'editorWidget.background': '#ffffff',
         'editorSuggestWidget.background': '#ffffff',
         'editorHoverWidget.background': '#ffffff',
+        contrastBorder: '#00000000', // Remove contrast border
+        contrastActiveBorder: '#00000000', // Remove active contrast border
+        focusBorder: '#00000000', // Remove focus border
       },
     })
 
@@ -531,7 +537,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     <div className="space-y-2">
       {/* Monaco Editor */}
       <div className="relative rounded-b-xl overflow-hidden">
-        <div className="pr-4 frosted-glass-card">
+        <div className="pr-4 frosted-glass-card !border-none">
           <Editor
             height="300px"
             defaultLanguage="json"

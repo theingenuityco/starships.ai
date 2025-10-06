@@ -19,14 +19,12 @@ CREATE TABLE users (
     display_name VARCHAR(100),
     avatar VARCHAR(500),
     password VARCHAR(255),
-    stripe_customer_id VARCHAR(255) UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- User indexes
 CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_stripe_customer_id ON users(stripe_customer_id);
 CREATE INDEX idx_users_created_at ON users(created_at);
 
 -- ============================================================================
@@ -37,17 +35,12 @@ CREATE TABLE starships (
     id VARCHAR(255) PRIMARY KEY,
     slug VARCHAR(100) NOT NULL,
     owner_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    class VARCHAR(50) NOT NULL CHECK (class IN ('scout', 'cruiser', 'draught')),
     name VARCHAR(100) NOT NULL,
     max_agents INTEGER NOT NULL DEFAULT 3,
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'restricted', 'disabled', 'pending_payment')),
-    subscription_id VARCHAR(255) UNIQUE,
-    plan VARCHAR(50) CHECK (plan IN ('scout', 'cruiser', 'draught')),
-    billing_period VARCHAR(20) CHECK (billing_period IN ('monthly', 'yearly')),
-    stripe_customer_id VARCHAR(255),
+    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    
+
     UNIQUE(owner_id, slug)
 );
 
@@ -55,7 +48,6 @@ CREATE TABLE starships (
 CREATE INDEX idx_starships_owner_id ON starships(owner_id);
 CREATE INDEX idx_starships_status ON starships(status);
 CREATE INDEX idx_starships_created_at ON starships(created_at);
-CREATE INDEX idx_starships_subscription_id ON starships(subscription_id);
 
 -- ============================================================================
 -- AGENT TEMPLATES TABLE
@@ -292,20 +284,6 @@ CREATE TABLE waitlist (
 CREATE INDEX idx_waitlist_status ON waitlist(status);
 CREATE INDEX idx_waitlist_created_at ON waitlist(created_at);
 
--- ============================================================================
--- STRIPE EVENTS TABLE
--- ============================================================================
-
-CREATE TABLE stripe_events (
-    event_id VARCHAR(255) PRIMARY KEY,
-    event_type VARCHAR(100) NOT NULL,
-    processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    data JSONB NOT NULL DEFAULT '{}'::jsonb
-);
-
--- Stripe events indexes
-CREATE INDEX idx_stripe_events_type ON stripe_events(event_type);
-CREATE INDEX idx_stripe_events_processed_at ON stripe_events(processed_at);
 
 -- ============================================================================
 -- JUNCTION TABLES FOR RELATIONSHIPS
@@ -357,8 +335,8 @@ CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('
 -- COMMENTS FOR DOCUMENTATION
 -- ============================================================================
 
-COMMENT ON TABLE users IS 'User accounts with authentication and billing information';
-COMMENT ON TABLE starships IS 'Starships owned by users with configuration and billing details';
+COMMENT ON TABLE users IS 'User accounts with authentication';
+COMMENT ON TABLE starships IS 'Starships owned by users with configuration';
 COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketplace';
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
 COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace';
@@ -368,7 +346,6 @@ COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
 COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
-COMMENT ON TABLE stripe_events IS 'Stripe webhook events for payment processing';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';
 COMMENT ON TABLE conversation_agents IS 'Many-to-many relationship between conversations and agents';

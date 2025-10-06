@@ -1,7 +1,7 @@
 import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
-import type { UsageModel, LLMUsage, UserUsageTotals, DailyUsageRow, DailyModelUsageRow } from '@starships/protocol';
+import type { UsageModel, LLMUsage, DailyUsageRow, DailyModelUsageRow } from '@starships/protocol';
 
 /**
  * UsageRepository
@@ -172,14 +172,13 @@ export class UsageRepository extends BaseRepository {
   }
 
   /**
-   * Aggregate totals for a user across all owned starships.
-   * Returns summed token/cost totals and total request count (usage records).
+   * Aggregate totals for a starship including request count
    */
-  async getTotalsByUser(userId: string): Promise<UserUsageTotals> {
+  async getTotalsByStarshipWithCount(starshipId: string): Promise<{ totals: LLMUsage; requestCount: number }> {
     return this.executeWithErrorHandling(
       async () => {
-        if (!userId?.trim()) {
-          throw new Error('userId is required');
+        if (!starshipId?.trim()) {
+          throw new Error('starshipId is required');
         }
 
         const connection = this.getConnection();
@@ -191,15 +190,14 @@ export class UsageRepository extends BaseRepository {
           request_count: string;
         }>(
           `SELECT
-            COALESCE(SUM(u.prompt_tokens), 0) AS prompt_tokens,
-            COALESCE(SUM(u.completion_tokens), 0) AS completion_tokens,
-            COALESCE(SUM(u.total_tokens), 0) AS total_tokens,
-            COALESCE(SUM(u.cost), 0) AS cost,
-            COUNT(u.id) AS request_count
-           FROM usage u
-           JOIN starships s ON u.starship_id = s.id
-           WHERE s.owner_id = $1`,
-          [userId]
+            COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cost), 0) AS cost,
+            COUNT(id) AS request_count
+           FROM usage
+           WHERE starship_id = $1`,
+          [starshipId]
         );
 
         return {
@@ -212,16 +210,17 @@ export class UsageRepository extends BaseRepository {
           requestCount: Number(result?.request_count) || 0,
         };
       },
-      'getTotalsByUser',
+      'getTotalsByStarshipWithCount',
       'Usage',
-      userId
+      starshipId
     );
   }
+
   /**
-   * List usage records across all starships owned by a user (paginated + filters)
+   * List usage records for a starship (paginated + filters)
    */
-  async listByUser(
-    userId: string,
+  async listByStarship(
+    starshipId: string,
     options: { limit?: number; offset?: number; day?: string; model?: string; order?: 'ASC' | 'DESC' } = {}
   ): Promise<UsageModel[]> {
     return this.executeWithErrorHandling(
@@ -232,54 +231,51 @@ export class UsageRepository extends BaseRepository {
 
         const conn = this.getConnection();
         const result = await conn.query<Record<string, unknown>>(
-          `SELECT u.*
-           FROM usage u
-           JOIN starships s ON u.starship_id = s.id
-           WHERE s.owner_id = $1
-             AND ($2::date IS NULL OR DATE(u.created_at) = $2::date)
-             AND ($3::text IS NULL OR u.model = $3)
-           ORDER BY u.created_at ${order}
+          `SELECT * FROM usage
+           WHERE starship_id = $1
+             AND ($2::date IS NULL OR DATE(created_at) = $2::date)
+             AND ($3::text IS NULL OR model = $3)
+           ORDER BY created_at ${order}
            LIMIT $4 OFFSET $5`,
-          [userId, options.day ?? null, options.model ?? null, limit, offset]
+          [starshipId, options.day ?? null, options.model ?? null, limit, offset]
         );
 
         return fromDatabaseArray(UsageEntity, result);
       },
-      'listByUser',
+      'listByStarship',
       'Usage',
-      userId
+      starshipId
     );
   }
 
   /**
-   * Count usage records for a user with optional filters (for pagination totals)
+   * Count usage records for a starship with optional filters (for pagination totals)
    */
-  async countByUser(userId: string, options: { day?: string; model?: string } = {}): Promise<number> {
+  async countByStarship(starshipId: string, options: { day?: string; model?: string } = {}): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
         const row = await conn.queryOne<{ total: string }>(
           `SELECT COUNT(*) AS total
-           FROM usage u
-           JOIN starships s ON u.starship_id = s.id
-           WHERE s.owner_id = $1
-             AND ($2::date IS NULL OR DATE(u.created_at) = $2::date)
-             AND ($3::text IS NULL OR u.model = $3)`,
-          [userId, options.day ?? null, options.model ?? null]
+           FROM usage
+           WHERE starship_id = $1
+             AND ($2::date IS NULL OR DATE(created_at) = $2::date)
+             AND ($3::text IS NULL OR model = $3)`,
+          [starshipId, options.day ?? null, options.model ?? null]
         );
         return Number(row?.total) || 0;
       },
-      'countByUser',
+      'countByStarship',
       'Usage',
-      userId
+      starshipId
     );
   }
 
   /**
-   * List aggregated usage per day for a user (paginated)
+   * List aggregated usage per day for a starship (paginated)
    */
-  async listDailyByUser(
-    userId: string,
+  async listDailyByStarship(
+    starshipId: string,
     options: { limit?: number; offset?: number; order?: 'ASC' | 'DESC' } = {}
   ): Promise<DailyUsageRow[]> {
     return this.executeWithErrorHandling(
@@ -298,19 +294,18 @@ export class UsageRepository extends BaseRepository {
           request_count: string;
         }>(
           `SELECT
-             to_char(DATE(u.created_at), 'YYYY-MM-DD') AS day,
-             COALESCE(SUM(u.prompt_tokens), 0) AS prompt_tokens,
-             COALESCE(SUM(u.completion_tokens), 0) AS completion_tokens,
-             COALESCE(SUM(u.total_tokens), 0) AS total_tokens,
-             COALESCE(SUM(u.cost), 0) AS cost,
-             COUNT(u.id) AS request_count
-           FROM usage u
-           JOIN starships s ON u.starship_id = s.id
-           WHERE s.owner_id = $1
+             to_char(DATE(created_at), 'YYYY-MM-DD') AS day,
+             COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+             COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+             COALESCE(SUM(total_tokens), 0) AS total_tokens,
+             COALESCE(SUM(cost), 0) AS cost,
+             COUNT(id) AS request_count
+           FROM usage
+           WHERE starship_id = $1
            GROUP BY 1
            ORDER BY day ${order}
            LIMIT $2 OFFSET $3`,
-          [userId, limit, offset]
+          [starshipId, limit, offset]
         );
 
         return (result || []).map((row) => ({
@@ -324,39 +319,38 @@ export class UsageRepository extends BaseRepository {
           requestCount: Number(row.request_count) || 0,
         }));
       },
-      'listDailyByUser',
+      'listDailyByStarship',
       'Usage',
-      userId
+      starshipId
     );
   }
 
   /**
-   * Count distinct days for a user's usage (for pagination)
+   * Count distinct days for a starship's usage (for pagination)
    */
-  async countDailyByUser(userId: string): Promise<number> {
+  async countDailyByStarship(starshipId: string): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
         const row = await conn.queryOne<{ total: string }>(
-          `SELECT COUNT(DISTINCT DATE(u.created_at)) AS total
-           FROM usage u
-           JOIN starships s ON u.starship_id = s.id
-           WHERE s.owner_id = $1`,
-          [userId]
+          `SELECT COUNT(DISTINCT DATE(created_at)) AS total
+           FROM usage
+           WHERE starship_id = $1`,
+          [starshipId]
         );
         return Number(row?.total) || 0;
       },
-      'countDailyByUser',
+      'countDailyByStarship',
       'Usage',
-      userId
+      starshipId
     );
   }
 
   /**
-   * List aggregated usage per day and model for a user (paginated)
+   * List aggregated usage per day and model for a starship (paginated)
    */
-  async listDailyModelByUser(
-    userId: string,
+  async listDailyModelByStarship(
+    starshipId: string,
     options: { limit?: number; offset?: number; order?: 'ASC' | 'DESC' } = {}
   ): Promise<DailyModelUsageRow[]> {
     return this.executeWithErrorHandling(
@@ -376,20 +370,19 @@ export class UsageRepository extends BaseRepository {
           request_count: string;
         }>(
           `SELECT
-             to_char(DATE(u.created_at), 'YYYY-MM-DD') AS day,
-             u.model AS model,
-             COALESCE(SUM(u.prompt_tokens), 0) AS prompt_tokens,
-             COALESCE(SUM(u.completion_tokens), 0) AS completion_tokens,
-             COALESCE(SUM(u.total_tokens), 0) AS total_tokens,
-             COALESCE(SUM(u.cost), 0) AS cost,
-             COUNT(u.id) AS request_count
-           FROM usage u
-           JOIN starships s ON u.starship_id = s.id
-           WHERE s.owner_id = $1
+             to_char(DATE(created_at), 'YYYY-MM-DD') AS day,
+             model,
+             COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+             COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+             COALESCE(SUM(total_tokens), 0) AS total_tokens,
+             COALESCE(SUM(cost), 0) AS cost,
+             COUNT(id) AS request_count
+           FROM usage
+           WHERE starship_id = $1
            GROUP BY 1, 2
            ORDER BY day ${order}, model ASC
            LIMIT $2 OFFSET $3`,
-          [userId, limit, offset]
+          [starshipId, limit, offset]
         );
 
         return (result || []).map((row) => ({
@@ -404,16 +397,16 @@ export class UsageRepository extends BaseRepository {
           requestCount: Number(row.request_count) || 0,
         }));
       },
-      'listDailyModelByUser',
+      'listDailyModelByStarship',
       'Usage',
-      userId
+      starshipId
     );
   }
 
   /**
-   * Count distinct (day, model) pairs for a user's usage (for pagination)
+   * Count distinct (day, model) pairs for a starship's usage (for pagination)
    */
-  async countDailyModelByUser(userId: string): Promise<number> {
+  async countDailyModelByStarship(starshipId: string): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
@@ -421,20 +414,19 @@ export class UsageRepository extends BaseRepository {
           `SELECT COUNT(*) AS total
            FROM (
              SELECT
-               DATE(u.created_at) AS day,
-               COALESCE(u.model, '') AS model_norm
-             FROM usage u
-             JOIN starships s ON u.starship_id = s.id
-             WHERE s.owner_id = $1
+               DATE(created_at) AS day,
+               COALESCE(model, '') AS model_norm
+             FROM usage
+             WHERE starship_id = $1
              GROUP BY 1, 2
            ) t`,
-          [userId]
+          [starshipId]
         );
         return Number(row?.total) || 0;
       },
-      'countDailyModelByUser',
+      'countDailyModelByStarship',
       'Usage',
-      userId
+      starshipId
     );
   }
 }

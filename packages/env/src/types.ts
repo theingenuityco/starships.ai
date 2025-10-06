@@ -42,12 +42,6 @@ export interface EnvironmentConfig {
   STRIPE_PUBLISHABLE_KEY: string;
   STRIPE_WEBHOOK_SECRET?: string;
 
-  // Stripe Price IDs
-  STRIPE_PRICE_CRUISER_MONTHLY?: string;
-  STRIPE_PRICE_CRUISER_YEARLY?: string;
-  STRIPE_PRICE_DRAUGHT_MONTHLY?: string;
-  STRIPE_PRICE_DRAUGHT_YEARLY?: string;
-
   // Google Analytics
   GA_MEASUREMENT_ID?: string;
 }

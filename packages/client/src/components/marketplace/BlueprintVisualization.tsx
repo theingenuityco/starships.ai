@@ -56,6 +56,7 @@ const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
       return <Clock className={className} />
   }
 })
+NodeIcon.displayName = 'NodeIcon'
 
 // Get color scheme for node type
 const getNodeColors = (nodeType: string) => {

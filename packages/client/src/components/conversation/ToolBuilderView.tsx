@@ -288,7 +288,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                   <Settings2 className="w-5 h-5 text-primary" />
                   Tool Settings
                 </h2>
-                <p className="text-sm text-muted-foreground">Configure your tool's properties and behavior</p>
+                <p className="text-sm text-muted-foreground">Configure your tool&apos;s properties and behavior</p>
               </div>
 
               {/* Basic Information */}

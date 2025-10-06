@@ -177,17 +177,40 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
       // Add to root level
       newParams.push({ name: '', type: 'string' as const, description: '', required: false })
     } else {
-      // Add to nested level
-      let target = newParams
-      for (let i = 0; i < path.length - 1; i++) {
-        const param = target[path[i]]
-        if (param.type === 'object') {
-          if (!param.properties) param.properties = []
-          target = param.properties
+      // Add to nested level - navigate to parent
+      let target: any = newParams
+      let parentParam: Parameter | undefined
+
+      for (let i = 0; i < path.length; i++) {
+        const index = path[i]
+
+        if (i === path.length - 1) {
+          // Last element - this is the parent we want to add to
+          if (index === -1 && target.items) {
+            parentParam = target.items
+          } else {
+            parentParam = target[index]
+          }
+        } else {
+          // Navigate deeper
+          if (index === -1) {
+            // Navigate through array items
+            if (target.items) {
+              target = target.items
+            }
+          } else {
+            const currentParam = target[index]
+            if (currentParam.type === 'object' && currentParam.properties) {
+              target = currentParam.properties
+            } else if (currentParam.type === 'array' && currentParam.items) {
+              target = currentParam
+            }
+          }
         }
       }
-      const parentParam = target[path[path.length - 1]]
-      if (parentParam.type === 'object') {
+
+      // Add new property to the parent
+      if (parentParam && parentParam.type === 'object') {
         if (!parentParam.properties) parentParam.properties = []
         parentParam.properties.push({ name: '', type: 'string' as const, description: '', required: false })
       }
@@ -297,21 +320,47 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
     handleFieldChange('parameters', json)
   }
 
-  // Toggle expand/collapse for object parameters
+  // Toggle expand/collapse for object and array parameters
   const toggleExpanded = (path: number[]) => {
     const newParams = [...parameters]
 
-    let target = newParams
-    for (let i = 0; i < path.length - 1; i++) {
-      const param = target[path[i]]
-      if (param.type === 'object' && param.properties) {
-        target = param.properties
+    let target: any = newParams
+    let param: Parameter | undefined
+
+    // Navigate to the target parameter
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i]
+
+      if (i === path.length - 1) {
+        // Last element in path - this is our target
+        if (index === -1 && target.items) {
+          // Array item schema
+          param = target.items
+        } else {
+          param = target[index]
+        }
+      } else {
+        // Navigate deeper
+        if (index === -1) {
+          // Navigate through array items
+          if (target.items) {
+            target = target.items
+          }
+        } else {
+          const currentParam = target[index]
+          if (currentParam.type === 'object' && currentParam.properties) {
+            target = currentParam.properties
+          } else if (currentParam.type === 'array' && currentParam.items) {
+            target = currentParam
+          }
+        }
       }
     }
 
-    const param = target[path[path.length - 1]]
-    param.isExpanded = !param.isExpanded
-    setParameters(newParams)
+    if (param) {
+      param.isExpanded = !param.isExpanded
+      setParameters(newParams)
+    }
   }
 
   // Parse blueprint for visualization

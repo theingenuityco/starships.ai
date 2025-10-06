@@ -34,10 +34,8 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
       {/* Main Blueprint Canvas - Full Height */}
       <div className="flex-1 relative">
         <div
-          className="absolute bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800"
+          className="absolute bg-background"
           style={{
-            backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.4) 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
             top: 0,
             bottom: 0,
             left: '-5.5rem', // Extend background behind navigation

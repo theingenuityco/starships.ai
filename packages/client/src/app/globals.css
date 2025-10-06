@@ -54,9 +54,9 @@
     --starship-accent: hsl(220 70% 50%);
     --primary-rgb: 59 130 246;
 
-    /* Shadow colors for light mode */
-    --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --shadow-frosted-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    /* Shadow colors for light mode - border moved to frosted-glass-card */
+    --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
+    --frosted-border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .dark {
@@ -84,9 +84,9 @@
     --starship-accent: hsl(220 70% 60%);
     --primary-rgb: 59 130 246;
 
-    /* Shadow colors for dark mode - much darker shadows with higher opacity for maximum visibility */
-    --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06);
-    --shadow-frosted-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    /* Shadow colors for dark mode - border moved to frosted-glass-card */
+    --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
+    --frosted-border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   /* 

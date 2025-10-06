@@ -24,6 +24,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
   const decorationsRef = useRef<string[]>([])
+  const viewZonesRef = useRef<string[]>([])
   const { theme } = useTheme()
 
   // Validate JSON Schema structure
@@ -246,54 +247,75 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     const ranges = findPropertyRanges(value)
     const decorations: editor.IModelDeltaDecoration[] = []
 
-    ranges.forEach(range => {
-      const model = editorRef.current!.getModel()
-      if (!model) return
+    // Clear old view zones
+    editorRef.current.changeViewZones(changeAccessor => {
+      viewZonesRef.current.forEach(id => {
+        changeAccessor.removeZone(id)
+      })
+      viewZonesRef.current = []
+    })
 
-      const numLines = range.endLine - range.startLine + 1
+    // Add new view zones and decorations
+    editorRef.current.changeViewZones(changeAccessor => {
+      ranges.forEach((range, index) => {
+        const model = editorRef.current!.getModel()
+        if (!model) return
 
-      // For single-line properties
-      if (numLines === 1) {
-        decorations.push({
-          range: new monacoRef.current!.Range(range.startLine + 1, 1, range.startLine + 1, model.getLineMaxColumn(range.startLine + 1)),
-          options: {
-            isWholeLine: true,
-            className: 'property-box-single',
-            glyphMarginClassName: 'property-group-glyph',
-          },
-        })
-      } else {
-        // For multi-line properties, create box effect
-        // First line (top border + sides)
-        decorations.push({
-          range: new monacoRef.current!.Range(range.startLine + 1, 1, range.startLine + 1, model.getLineMaxColumn(range.startLine + 1)),
-          options: {
-            isWholeLine: true,
-            className: 'property-box-top',
-            glyphMarginClassName: 'property-group-glyph',
-          },
-        })
+        // Add spacing zone before each property (except the first)
+        if (index > 0) {
+          const zoneId = changeAccessor.addZone({
+            afterLineNumber: range.startLine,
+            heightInLines: 0.5,
+            domNode: document.createElement('div'),
+          })
+          viewZonesRef.current.push(zoneId)
+        }
 
-        // Middle lines (sides only)
-        for (let i = range.startLine + 1; i < range.endLine; i++) {
+        const numLines = range.endLine - range.startLine + 1
+
+        // For single-line properties
+        if (numLines === 1) {
           decorations.push({
-            range: new monacoRef.current!.Range(i + 1, 1, i + 1, model.getLineMaxColumn(i + 1)),
+            range: new monacoRef.current!.Range(range.startLine + 1, 1, range.startLine + 1, model.getLineMaxColumn(range.startLine + 1)),
             options: {
               isWholeLine: true,
-              className: 'property-box-middle',
+              className: 'property-box-single',
+              glyphMarginClassName: 'property-group-glyph',
+            },
+          })
+        } else {
+          // For multi-line properties, create box effect
+          // First line (top border + sides)
+          decorations.push({
+            range: new monacoRef.current!.Range(range.startLine + 1, 1, range.startLine + 1, model.getLineMaxColumn(range.startLine + 1)),
+            options: {
+              isWholeLine: true,
+              className: 'property-box-top',
+              glyphMarginClassName: 'property-group-glyph',
+            },
+          })
+
+          // Middle lines (sides only)
+          for (let i = range.startLine + 1; i < range.endLine; i++) {
+            decorations.push({
+              range: new monacoRef.current!.Range(i + 1, 1, i + 1, model.getLineMaxColumn(i + 1)),
+              options: {
+                isWholeLine: true,
+                className: 'property-box-middle',
+              },
+            })
+          }
+
+          // Last line (bottom border + sides)
+          decorations.push({
+            range: new monacoRef.current!.Range(range.endLine + 1, 1, range.endLine + 1, model.getLineMaxColumn(range.endLine + 1)),
+            options: {
+              isWholeLine: true,
+              className: 'property-box-bottom',
             },
           })
         }
-
-        // Last line (bottom border + sides)
-        decorations.push({
-          range: new monacoRef.current!.Range(range.endLine + 1, 1, range.endLine + 1, model.getLineMaxColumn(range.endLine + 1)),
-          options: {
-            isWholeLine: true,
-            className: 'property-box-bottom',
-          },
-        })
-      }
+      })
     })
 
     // Clear old decorations and apply new ones

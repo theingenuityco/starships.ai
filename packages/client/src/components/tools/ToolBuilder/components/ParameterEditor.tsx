@@ -223,10 +223,15 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             quickSuggestions: true,
             suggestOnTriggerCharacters: true,
             acceptSuggestionOnEnter: 'on',
-            folding: true,
-            foldingStrategy: 'indentation',
-            showFoldingControls: 'always',
-            bracketPairColorization: { enabled: false },
+            folding: false,
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            overviewRulerBorder: false,
+            guides: {
+              bracketPairs: false,
+              bracketPairsHorizontal: false,
+              highlightActiveBracketPair: false,
+            },
           }}
         />
       </div>

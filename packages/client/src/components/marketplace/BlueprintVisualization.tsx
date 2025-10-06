@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react'
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import {
   ReactFlow,
@@ -660,14 +660,22 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
 
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
+  const layoutVersion = useRef(0)
 
   // Convert blueprint and apply layout (async)
+  // Use serialized blueprint to detect changes during streaming
   useEffect(() => {
+    // Increment version to track this layout request
+    const currentVersion = ++layoutVersion.current
+
     convertBlueprintToFlow(blueprint, nodesDraggable).then(flowData => {
-      setNodes(flowData.nodes)
-      setEdges(flowData.edges)
+      // Only apply if this is still the latest layout request
+      if (currentVersion === layoutVersion.current) {
+        setNodes(flowData.nodes)
+        setEdges(flowData.edges)
+      }
     })
-  }, [blueprint, nodesDraggable])
+  }, [JSON.stringify(blueprint.nodes), JSON.stringify(blueprint.edges), nodesDraggable])
 
   // Add selection state to node data
   const nodesWithSelection = useMemo(() => {

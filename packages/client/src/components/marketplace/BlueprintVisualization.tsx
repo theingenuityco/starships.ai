@@ -182,9 +182,6 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
   return (
     <>
-      {/* Input handle */}
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
-
       <div className="relative">
         {/* Main node body */}
         <div
@@ -199,6 +196,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
             background: `linear-gradient(135deg, ${colors.handle}15 0%, ${colors.handle}08 100%)`,
           }}
         >
+          {/* Input handle - positioned relative to main node body only */}
+          <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
           {/* Circular icon container */}
           <div
             className="flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 shadow-sm"
@@ -218,32 +217,30 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
           </div>
         </div>
 
-        {/* Vertical conditional sections on the right */}
+        {/* Conditional branch sections below the main node */}
         {edges.length > 1 && (
-          <div className="flex flex-col ml-1">
+          <div className="flex flex-col gap-1 mt-1">
             {edges.map((edge, index) => {
               const uniqueKey = edge?.ref ? `branch-${edge.ref}` : `edge-branch-${index}`
               return (
                 <div
                   key={uniqueKey}
-                  className="relative backdrop-blur-[15px] backdrop-saturate-[160%] border border-border/40 rounded-r-md px-2 py-1 text-xs font-medium text-muted-foreground mb-1 last:mb-0"
+                  className="relative backdrop-blur-[20px] backdrop-saturate-[180%] border-2 border-border/40 rounded-xl px-3 py-2 text-xs font-medium text-foreground shadow-frosted-lg hover:border-border/60 transition-all duration-300"
                   style={{
-                    minHeight: '30px',
                     background: `linear-gradient(135deg, ${colors.handle}10 0%, ${colors.handle}05 100%)`,
                   }}
                 >
-                  <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
+                  <div className="truncate text-center">{edge?.condition || edge?.label || `Branch ${index + 1}`}</div>
                   {/* Individual output handle for this branch */}
                   <Handle
                     type="source"
                     position={Position.Right}
                     id={edge?.ref}
-                    className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
+                    className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
                     style={{
-                      right: -5,
+                      right: -6,
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      position: 'absolute',
                     }}
                   />
                 </div>

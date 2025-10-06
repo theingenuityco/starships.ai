@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Textarea } from '@/components/ui/textarea'
+import React, { useState, useRef, useEffect } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Check } from 'lucide-react'
 
 interface ParameterEditorProps {
   value: string
@@ -13,26 +12,99 @@ interface ParameterEditorProps {
 
 export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChange, error }) => {
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [validationDetails, setValidationDetails] = useState<string | null>(null)
+  const [isValid, setIsValid] = useState<boolean>(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Validate JSON Schema structure
+  const validateJsonSchema = (jsonString: string) => {
+    if (!jsonString.trim()) {
+      setValidationError(null)
+      setValidationDetails(null)
+      setIsValid(false)
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(jsonString)
+
+      // Check if it's a valid JSON Schema for parameters
+      if (parsed.type !== 'object') {
+        setValidationError('Schema must have type: "object"')
+        setValidationDetails('The root schema must be an object type to define parameters')
+        setIsValid(false)
+        return
+      }
+
+      if (!parsed.properties || typeof parsed.properties !== 'object') {
+        setValidationError('Schema must have a "properties" field')
+        setValidationDetails('Define parameter properties using the "properties" field')
+        setIsValid(false)
+        return
+      }
+
+      if (Object.keys(parsed.properties).length === 0) {
+        setValidationError('At least one parameter must be defined')
+        setValidationDetails('Add properties to define the parameters for your tool')
+        setIsValid(false)
+        return
+      }
+
+      // Validate each property
+      for (const [key, prop] of Object.entries(parsed.properties)) {
+        if (typeof prop !== 'object' || prop === null) {
+          setValidationError(`Invalid property definition: ${key}`)
+          setValidationDetails('Each property must be an object with at least a "type" field')
+          setIsValid(false)
+          return
+        }
+
+        const propObj = prop as Record<string, unknown>
+        if (!propObj.type) {
+          setValidationError(`Missing "type" for property: ${key}`)
+          setValidationDetails('Each property must specify a type (string, number, boolean, object, array)')
+          setIsValid(false)
+          return
+        }
+      }
+
+      setValidationError(null)
+      setValidationDetails(null)
+      setIsValid(true)
+    } catch (e) {
+      const error = e as Error
+      setValidationError('Invalid JSON syntax')
+      setValidationDetails(error.message)
+      setIsValid(false)
+    }
+  }
 
   const handleChange = (newValue: string) => {
-    // Try to validate JSON on change
-    if (newValue.trim()) {
-      try {
-        JSON.parse(newValue)
-        setValidationError(null)
-      } catch {
-        setValidationError('Invalid JSON syntax')
-      }
-    } else {
-      setValidationError(null)
-    }
     onChange(newValue)
+    validateJsonSchema(newValue)
   }
+
+  useEffect(() => {
+    validateJsonSchema(value)
+  }, [])
 
   return (
     <div className="space-y-2">
-      <Textarea
-        placeholder={`{
+      {/* Validation Status */}
+      {isValid && (
+        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+          <Check className="h-3 w-3" />
+          <span className="text-[10px] font-medium">Valid Schema</span>
+        </div>
+      )}
+
+      {/* Editor */}
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={e => handleChange(e.target.value)}
+          placeholder={`{
   "type": "object",
   "properties": {
     "param_name": {
@@ -42,15 +114,20 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   },
   "required": ["param_name"]
 }`}
-        value={value}
-        onChange={e => handleChange(e.target.value)}
-        rows={12}
-        className="text-xs font-mono resize-none"
-      />
+          rows={12}
+          className="w-full px-3 py-2 text-xs font-mono rounded-md border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          spellCheck={false}
+        />
+      </div>
+
+      {/* Validation Messages */}
       {validationError && (
         <Alert variant="destructive" className="py-2">
           <AlertCircle className="h-3 w-3" />
-          <AlertDescription className="text-xs">{validationError}</AlertDescription>
+          <AlertDescription className="text-xs">
+            <p className="font-medium">{validationError}</p>
+            {validationDetails && <p className="text-[10px] mt-1 opacity-90">{validationDetails}</p>}
+          </AlertDescription>
         </Alert>
       )}
       {error && (

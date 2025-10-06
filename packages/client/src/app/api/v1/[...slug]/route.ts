@@ -9,24 +9,29 @@ import { NextRequest } from 'next/server'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
-export async function GET(request: NextRequest, { params }: { params: { slug: string[] } }) {
-  return proxyRequest(request, params.slug, 'GET')
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params
+  return proxyRequest(request, slug, 'GET')
 }
 
-export async function POST(request: NextRequest, { params }: { params: { slug: string[] } }) {
-  return proxyRequest(request, params.slug, 'POST')
+export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params
+  return proxyRequest(request, slug, 'POST')
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { slug: string[] } }) {
-  return proxyRequest(request, params.slug, 'PUT')
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params
+  return proxyRequest(request, slug, 'PUT')
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { slug: string[] } }) {
-  return proxyRequest(request, params.slug, 'PATCH')
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params
+  return proxyRequest(request, slug, 'PATCH')
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { slug: string[] } }) {
-  return proxyRequest(request, params.slug, 'DELETE')
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params
+  return proxyRequest(request, slug, 'DELETE')
 }
 
 async function proxyRequest(request: NextRequest, slug: string[], method: string) {

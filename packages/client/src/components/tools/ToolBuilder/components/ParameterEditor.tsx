@@ -1,11 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Check } from 'lucide-react'
-import Editor from 'react-simple-code-editor'
-import Prism from 'prismjs'
-import 'prismjs/components/prism-json'
+import Editor, { OnMount } from '@monaco-editor/react'
+import type { editor } from 'monaco-editor'
 
 interface ParameterEditorProps {
   value: string
@@ -13,17 +12,23 @@ interface ParameterEditorProps {
   error?: string
 }
 
+interface ValidationError {
+  message: string
+  details: string | null
+}
+
 export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChange, error }) => {
-  const [validationError, setValidationError] = useState<string | null>(null)
-  const [validationDetails, setValidationDetails] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<ValidationError | null>(null)
   const [isValid, setIsValid] = useState<boolean>(false)
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
 
   // Validate JSON Schema structure
   const validateJsonSchema = (jsonString: string) => {
     if (!jsonString.trim()) {
       setValidationError(null)
-      setValidationDetails(null)
       setIsValid(false)
+      updateEditorMarkers([])
       return
     }
 
@@ -32,62 +37,152 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
 
       // Check if it's a valid JSON Schema for parameters
       if (parsed.type !== 'object') {
-        setValidationError('Schema must have type: "object"')
-        setValidationDetails('The root schema must be an object type to define parameters')
+        const error = {
+          message: 'Schema must have type: "object"',
+          details: 'The root schema must be an object type to define parameters',
+        }
+        setValidationError(error)
         setIsValid(false)
+        updateEditorMarkers([
+          {
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: 1,
+            endColumn: 100,
+            message: error.message,
+            severity: 8, // Error
+          },
+        ])
         return
       }
 
       if (!parsed.properties || typeof parsed.properties !== 'object') {
-        setValidationError('Schema must have a "properties" field')
-        setValidationDetails('Define parameter properties using the "properties" field')
+        const error = {
+          message: 'Schema must have a "properties" field',
+          details: 'Define parameter properties using the "properties" field',
+        }
+        setValidationError(error)
         setIsValid(false)
+        updateEditorMarkers([
+          {
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: 1,
+            endColumn: 100,
+            message: error.message,
+            severity: 8,
+          },
+        ])
         return
       }
 
       if (Object.keys(parsed.properties).length === 0) {
-        setValidationError('At least one parameter must be defined')
-        setValidationDetails('Add properties to define the parameters for your tool')
+        const error = {
+          message: 'At least one parameter must be defined',
+          details: 'Add properties to define the parameters for your tool',
+        }
+        setValidationError(error)
         setIsValid(false)
+        updateEditorMarkers([
+          {
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: 1,
+            endColumn: 100,
+            message: error.message,
+            severity: 8,
+          },
+        ])
         return
       }
 
       // Validate each property
       for (const [key, prop] of Object.entries(parsed.properties)) {
         if (typeof prop !== 'object' || prop === null) {
-          setValidationError(`Invalid property definition: ${key}`)
-          setValidationDetails('Each property must be an object with at least a "type" field')
+          const error = {
+            message: `Invalid property definition: ${key}`,
+            details: 'Each property must be an object with at least a "type" field',
+          }
+          setValidationError(error)
           setIsValid(false)
+          updateEditorMarkers([
+            {
+              startLineNumber: 1,
+              startColumn: 1,
+              endLineNumber: 1,
+              endColumn: 100,
+              message: error.message,
+              severity: 8,
+            },
+          ])
           return
         }
 
         const propObj = prop as Record<string, unknown>
         if (!propObj.type) {
-          setValidationError(`Missing "type" for property: ${key}`)
-          setValidationDetails('Each property must specify a type (string, number, boolean, object, array)')
+          const error = {
+            message: `Missing "type" for property: ${key}`,
+            details: 'Each property must specify a type (string, number, boolean, object, array)',
+          }
+          setValidationError(error)
           setIsValid(false)
+          updateEditorMarkers([
+            {
+              startLineNumber: 1,
+              startColumn: 1,
+              endLineNumber: 1,
+              endColumn: 100,
+              message: error.message,
+              severity: 8,
+            },
+          ])
           return
         }
       }
 
       setValidationError(null)
-      setValidationDetails(null)
       setIsValid(true)
+      updateEditorMarkers([])
     } catch (e) {
-      const error = e as Error
-      setValidationError('Invalid JSON syntax')
-      setValidationDetails(error.message)
+      const err = e as Error
+      setValidationError({
+        message: 'Invalid JSON syntax',
+        details: err.message,
+      })
       setIsValid(false)
+      // Monaco will show JSON syntax errors automatically
     }
   }
 
-  const handleChange = (newValue: string) => {
-    onChange(newValue)
-    validateJsonSchema(newValue)
+  const updateEditorMarkers = (markers: editor.IMarkerData[]) => {
+    if (editorRef.current && monacoRef.current) {
+      const model = editorRef.current.getModel()
+      if (model) {
+        monacoRef.current.editor.setModelMarkers(model, 'json-schema-validation', markers)
+      }
+    }
   }
 
-  const highlightCode = (code: string) => {
-    return Prism.highlight(code, Prism.languages.json, 'json')
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor
+    monacoRef.current = monaco
+
+    // Configure JSON language options
+    monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+      validate: true,
+      allowComments: false,
+      schemas: [],
+      enableSchemaRequest: false,
+    })
+
+    // Validate initial value
+    validateJsonSchema(value)
+  }
+
+  const handleChange = (newValue: string | undefined) => {
+    const val = newValue || ''
+    onChange(val)
+    validateJsonSchema(val)
   }
 
   useEffect(() => {
@@ -104,30 +199,35 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         </div>
       )}
 
-      {/* Editor with Syntax Highlighting */}
-      <div className="relative rounded-md border border-input bg-background overflow-hidden">
+      {/* Monaco Editor */}
+      <div className="relative rounded-md border border-input overflow-hidden">
         <Editor
+          height="300px"
+          defaultLanguage="json"
           value={value}
-          onValueChange={handleChange}
-          highlight={highlightCode}
-          padding={12}
-          placeholder={`{
-  "type": "object",
-  "properties": {
-    "param_name": {
-      "type": "string",
-      "description": "Parameter description"
-    }
-  },
-  "required": ["param_name"]
-}`}
-          style={{
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-            fontSize: '12px',
-            minHeight: '300px',
-            outline: 'none',
+          onChange={handleChange}
+          onMount={handleEditorDidMount}
+          theme="vs-dark"
+          options={{
+            minimap: { enabled: false },
+            fontSize: 12,
+            lineNumbers: 'off',
+            scrollBeyondLastLine: false,
+            wordWrap: 'on',
+            wrappingIndent: 'indent',
+            automaticLayout: true,
+            tabSize: 2,
+            insertSpaces: true,
+            formatOnPaste: true,
+            formatOnType: true,
+            quickSuggestions: true,
+            suggestOnTriggerCharacters: true,
+            acceptSuggestionOnEnter: 'on',
+            folding: true,
+            foldingStrategy: 'indentation',
+            showFoldingControls: 'always',
+            bracketPairColorization: { enabled: false },
           }}
-          textareaClassName="focus-visible:outline-none"
         />
       </div>
 
@@ -136,8 +236,8 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         <Alert variant="destructive" className="py-2">
           <AlertCircle className="h-3 w-3" />
           <AlertDescription className="text-xs">
-            <p className="font-medium">{validationError}</p>
-            {validationDetails && <p className="text-[10px] mt-1 opacity-90">{validationDetails}</p>}
+            <p className="font-medium">{validationError.message}</p>
+            {validationError.details && <p className="text-[10px] mt-1 opacity-90">{validationError.details}</p>}
           </AlertDescription>
         </Alert>
       )}

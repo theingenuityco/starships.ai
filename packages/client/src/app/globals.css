@@ -138,6 +138,42 @@
   color: #000000;
 }
 
+/* Syntax error markers - squiggly underlines like VSCode */
+.json-error-line {
+  display: inline-block;
+  text-decoration: wavy underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+  text-decoration-skip-ink: none;
+}
+
+.dark .json-error-line {
+  text-decoration-color: #f48771;
+}
+
+:root:not(.dark) .json-error-line {
+  text-decoration-color: #e51400;
+}
+
+/* Fallback for browsers that don't support wavy underline */
+@supports not (text-decoration: wavy underline) {
+  .json-error-line {
+    background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, currentColor 3px, currentColor 4px);
+    background-size: 6px 2px;
+    background-position: 0 100%;
+    background-repeat: repeat-x;
+    padding-bottom: 2px;
+  }
+
+  .dark .json-error-line {
+    color: #f48771;
+  }
+
+  :root:not(.dark) .json-error-line {
+    color: #e51400;
+  }
+}
+
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

@@ -300,13 +300,14 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     const container = document.createElement('div')
     container.className = 'parameter-metadata-zone'
     container.style.cssText = `
-      padding: 4px 0;
+      padding: 0 0 2px 0;
       font-size: 10px;
       font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
       color: ${theme === 'dark' ? '#64748b' : '#94a3b8'};
       opacity: 0.6;
       display: flex;
-      align-items: center;
+      align-items: flex-end;
+      height: 100%;
       user-select: none;
       pointer-events: none;
     `

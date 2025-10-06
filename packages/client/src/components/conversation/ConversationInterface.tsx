@@ -3,7 +3,7 @@
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import { ToolBuilderView, ToolBuilderViewRef } from '@/components/conversation/ToolBuilderView'
+import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'

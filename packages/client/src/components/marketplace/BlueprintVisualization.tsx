@@ -1,9 +1,29 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge, Panel } from '@xyflow/react'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog } from 'lucide-react'
+import React, { useMemo, useState, useCallback } from 'react'
+import {
+  ReactFlow,
+  Node,
+  Edge,
+  Background,
+  ReactFlowProvider,
+  MarkerType,
+  Position,
+  Handle,
+  BackgroundVariant,
+  EdgeProps,
+  BaseEdge,
+  Panel,
+  NodeProps,
+  OnNodesChange,
+  OnEdgesChange,
+} from '@xyflow/react'
+import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
@@ -292,9 +312,10 @@ const IntelligentEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, t
 }
 
 // Custom conditional node component with horizontal sections for each output
-const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[] } }> = ({ data }) => {
+const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const colors = getNodeColors(data.type)
   const edges = data.outgoingEdges || []
+  const isSelected = data.isSelected
 
   return (
     <>
@@ -306,7 +327,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
         <div
           className={`
             relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
-            bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600
+            bg-white dark:bg-gray-800 border-2
+            ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
             rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
             text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
           `}
@@ -371,8 +393,9 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 }
 
 // Custom node component with professional design
-const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[] } }> = ({ data }) => {
+const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const colors = getNodeColors(data.type)
+  const isSelected = data.isSelected
 
   // Use conditional node for nodes with multiple outputs
   if (data.type === 'conditional' && data.outgoingEdges && data.outgoingEdges.length > 1) {
@@ -389,7 +412,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
       <div
         className={`
           relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
-          bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600
+          bg-white dark:bg-gray-800 border-2
+          ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
           rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
           text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
         `}
@@ -685,8 +709,113 @@ const edgeTypes = {
   intelligent: IntelligentEdge,
 }
 
+// Node details panel component
+const NodeDetailsPanel: React.FC<{
+  node: BlueprintNode
+  onClose: () => void
+}> = ({ node, onClose }) => {
+  const colors = getNodeColors(node.type)
+
+  return (
+    <Card className="absolute top-4 right-4 w-[420px] max-h-[calc(100vh-8rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
+      <div className="flex items-center justify-between p-3 border-b border-border/40">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center justify-center w-8 h-8 rounded-lg"
+            style={{
+              backgroundColor: colors.handle + '15',
+              color: colors.handle,
+              border: `2px solid ${colors.handle}30`,
+            }}
+          >
+            <NodeIcon nodeType={node.type} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm">{node.name}</h3>
+            <Badge variant="outline" className="text-xs capitalize mt-0.5">
+              {node.type.replace('_', ' ')}
+            </Badge>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      <ScrollArea className="max-h-[calc(100vh-14rem)]">
+        <div className="p-3 space-y-3">
+          {/* Description */}
+          {node.description && (
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Description</h4>
+              <p className="text-sm text-foreground">{node.description}</p>
+            </div>
+          )}
+
+          {/* Reference */}
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase">Reference</h4>
+            <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{node.ref}</code>
+          </div>
+
+          {/* Parameters */}
+          {node.parameters && Object.keys(node.parameters).length > 0 && (
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Parameters</h4>
+              <div className="space-y-1.5">
+                {Object.entries(node.parameters).map(([key, value]) => (
+                  <div key={key} className="space-y-1">
+                    <div className="text-xs font-medium text-foreground">{key}</div>
+                    <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Metadata */}
+          {node.metadata && Object.keys(node.metadata).length > 0 && (
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Metadata</h4>
+              <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{JSON.stringify(node.metadata, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </Card>
+  )
+}
+
 function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint; transparent?: boolean; title?: string }) {
-  const { nodes, edges } = useMemo(() => convertBlueprintToFlow(blueprint), [blueprint])
+  const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
+
+  // Convert blueprint and add selection state to nodes
+  const { nodes, edges } = useMemo(() => {
+    const flowData = convertBlueprintToFlow(blueprint)
+    // Add selected state to node data
+    const nodesWithSelection = flowData.nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        isSelected: selectedNode?.ref === node.id,
+      },
+    }))
+    return { nodes: nodesWithSelection, edges: flowData.edges }
+  }, [blueprint, selectedNode])
+
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      const blueprintNode = blueprint.nodes.find(n => n.ref === node.id)
+      if (blueprintNode) {
+        setSelectedNode(blueprintNode)
+      }
+    },
+    [blueprint.nodes]
+  )
+
+  const handlePaneClick = useCallback(() => {
+    setSelectedNode(null)
+  }, [])
 
   return (
     <div
@@ -706,6 +835,8 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         fitView
         fitViewOptions={{
           padding: 0.2,
@@ -735,6 +866,9 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
           </Panel>
         )}
       </ReactFlow>
+
+      {/* Node Details Panel */}
+      {selectedNode && <NodeDetailsPanel node={selectedNode} onClose={() => setSelectedNode(null)} />}
     </div>
   )
 }

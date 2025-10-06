@@ -5,6 +5,254 @@
 /* ReactFlow styles - Required for proper functionality */
 @import '@xyflow/react/dist/style.css';
 
+/* Prism.js Syntax Highlighting - VS Code Dark Inspired */
+/* Blue and white theme matching VS Code's aesthetic */
+
+/* Dark mode - VS Code Dark+ theme colors (default) */
+.dark .token.comment,
+.dark .token.prolog,
+.dark .token.doctype,
+.dark .token.cdata {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.dark .token.punctuation {
+  color: #d4d4d4;
+}
+
+/* Property names - Light blue (VS Code style) */
+.dark .token.property,
+.dark .token.tag {
+  color: #9cdcfe;
+}
+
+/* Strings - Peach/orange */
+.dark .token.selector,
+.dark .token.attr-name,
+.dark .token.string,
+.dark .token.char,
+.dark .token.builtin,
+.dark .token.inserted {
+  color: #ce9178;
+}
+
+/* Numbers, booleans - Light green */
+.dark .token.boolean,
+.dark .token.number,
+.dark .token.constant,
+.dark .token.symbol {
+  color: #b5cea8;
+}
+
+/* Keywords - Blue */
+.dark .token.atrule,
+.dark .token.attr-value,
+.dark .token.keyword {
+  color: #569cd6;
+}
+
+/* Functions - Yellow */
+.dark .token.function,
+.dark .token.class-name {
+  color: #dcdcaa;
+}
+
+/* Operators */
+.dark .token.operator,
+.dark .token.entity,
+.dark .token.url {
+  color: #d4d4d4;
+}
+
+/* Variables - Light blue */
+.dark .token.regex,
+.dark .token.variable {
+  color: #9cdcfe;
+}
+
+/* Deleted - Red */
+.dark .token.deleted {
+  color: #f48771;
+}
+
+.dark .token.important {
+  color: #f48771;
+  font-weight: bold;
+}
+
+.dark .token.bold {
+  font-weight: bold;
+}
+
+.dark .token.italic {
+  font-style: italic;
+}
+
+/* Light mode - use softer colors */
+:root:not(.dark) .token.comment,
+:root:not(.dark) .token.prolog,
+:root:not(.dark) .token.doctype,
+:root:not(.dark) .token.cdata {
+  color: #008000;
+}
+
+:root:not(.dark) .token.property,
+:root:not(.dark) .token.tag,
+:root:not(.dark) .token.variable,
+:root:not(.dark) .token.regex {
+  color: #0070c1;
+}
+
+:root:not(.dark) .token.string,
+:root:not(.dark) .token.selector,
+:root:not(.dark) .token.attr-name,
+:root:not(.dark) .token.char,
+:root:not(.dark) .token.builtin,
+:root:not(.dark) .token.inserted {
+  color: #a31515;
+}
+
+:root:not(.dark) .token.number,
+:root:not(.dark) .token.boolean,
+:root:not(.dark) .token.constant,
+:root:not(.dark) .token.symbol {
+  color: #098658;
+}
+
+:root:not(.dark) .token.keyword,
+:root:not(.dark) .token.atrule,
+:root:not(.dark) .token.attr-value {
+  color: #0000ff;
+}
+
+:root:not(.dark) .token.function,
+:root:not(.dark) .token.class-name {
+  color: #795e26;
+}
+
+:root:not(.dark) .token.operator,
+:root:not(.dark) .token.entity,
+:root:not(.dark) .token.url,
+:root:not(.dark) .token.punctuation {
+  color: #000000;
+}
+
+/* Syntax error markers - squiggly underlines like VSCode */
+.json-error-line {
+  display: inline-block;
+  text-decoration: wavy underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+  text-decoration-skip-ink: none;
+}
+
+.dark .json-error-line {
+  text-decoration-color: #f48771;
+}
+
+:root:not(.dark) .json-error-line {
+  text-decoration-color: #e51400;
+}
+
+/* Fallback for browsers that don't support wavy underline */
+@supports not (text-decoration: wavy underline) {
+  .json-error-line {
+    background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, currentColor 3px, currentColor 4px);
+    background-size: 6px 2px;
+    background-position: 0 100%;
+    background-repeat: repeat-x;
+    padding-bottom: 2px;
+  }
+
+  .dark .json-error-line {
+    color: #f48771;
+  }
+
+  :root:not(.dark) .json-error-line {
+    color: #e51400;
+  }
+}
+
+/* Monaco Editor Property Group Decorations - Box Effect */
+
+/* Single-line property */
+.property-box-single {
+  border: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-radius: 6px !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Top line of multi-line property */
+.property-box-top {
+  border-top: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-left: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-right: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-top-left-radius: 6px !important;
+  border-top-right-radius: 6px !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Middle lines of multi-line property */
+.property-box-middle {
+  border-left: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-right: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Bottom line of multi-line property */
+.property-box-bottom {
+  border-bottom: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-left: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-right: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-bottom-left-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Dark mode adjustments */
+.dark .property-box-single,
+.dark .property-box-top,
+.dark .property-box-middle,
+.dark .property-box-bottom {
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  background: rgba(59, 130, 246, 0.12) !important;
+}
+
+/* Light mode adjustments */
+:root:not(.dark) .property-box-single,
+:root:not(.dark) .property-box-top,
+:root:not(.dark) .property-box-middle,
+:root:not(.dark) .property-box-bottom {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  background: rgba(59, 130, 246, 0.06) !important;
+}
+
+/* Glyph margin indicator */
+.property-group-glyph {
+  width: 3px !important;
+  background: rgba(59, 130, 246, 0.7) !important;
+  border-radius: 2px !important;
+  margin-left: 2px !important;
+}
+
+.dark .property-group-glyph {
+  background: rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Monaco Editor - Prevent scrollbar overlap */
+.monaco-editor .view-lines {
+  padding-right: 20px !important;
+}
+
+.monaco-editor .view-line {
+  padding-right: 20px !important;
+}
+
+.monaco-editor .lines-content {
+  padding-right: 20px !important;
+}
+
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

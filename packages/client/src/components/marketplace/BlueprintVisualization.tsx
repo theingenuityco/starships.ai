@@ -332,28 +332,31 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
         {/* Vertical conditional sections on the right */}
         {edges.length > 1 && (
           <div className="flex flex-col ml-1">
-            {edges.map((edge, index) => (
-              <div
-                key={edge?.ref || `edge-${index}`}
-                className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-r-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 last:mb-0"
-                style={{ minHeight: '30px' }}
-              >
-                <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
-                {/* Individual output handle for this branch */}
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={edge?.ref}
-                  className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
-                  style={{
-                    right: -5,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    position: 'absolute',
-                  }}
-                />
-              </div>
-            ))}
+            {edges.map((edge, index) => {
+              const uniqueKey = edge?.ref ? `branch-${edge.ref}` : `edge-branch-${index}`
+              return (
+                <div
+                  key={uniqueKey}
+                  className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-r-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 last:mb-0"
+                  style={{ minHeight: '30px' }}
+                >
+                  <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
+                  {/* Individual output handle for this branch */}
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={edge?.ref}
+                    className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
+                    style={{
+                      right: -5,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      position: 'absolute',
+                    }}
+                  />
+                </div>
+              )
+            })}
           </div>
         )}
 

@@ -360,17 +360,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             )}
 
             {/* Text Input */}
-            <div
-              className="flex-1 min-w-0"
-              onClick={e => {
-                // When input is disabled (streaming), allow clicking to toggle overlay
-                if ((disabled || sending || isStreamingEffective) && onToggleOverlay) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onToggleOverlay()
-                }
-              }}
-            >
+            <div className="flex-1 min-w-0">
               <textarea
                 ref={textareaRef}
                 value={message}
@@ -378,6 +368,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 onKeyPress={handleKeyPress}
                 onFocus={onFocus}
                 onBlur={onBlur}
+                onClick={e => {
+                  // When input is disabled (streaming), allow clicking to toggle overlay
+                  if ((disabled || sending || isStreamingEffective) && onToggleOverlay) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onToggleOverlay()
+                  }
+                }}
                 placeholder={getPlaceholder()}
                 disabled={disabled || sending || isStreamingEffective}
                 className={cn(
@@ -388,7 +386,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
                   minimal && 'text-sm',
                   // Add cursor pointer when disabled and overlay toggle is available
-                  (disabled || sending || isStreamingEffective) && onToggleOverlay && 'cursor-pointer'
+                  (disabled || sending || isStreamingEffective) && onToggleOverlay && 'cursor-pointer pointer-events-auto'
                 )}
                 rows={1}
               />

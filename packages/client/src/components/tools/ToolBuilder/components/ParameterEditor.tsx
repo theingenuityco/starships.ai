@@ -328,6 +328,21 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   const applyPropertyDecorations = () => {
     if (!editorRef.current || !monacoRef.current) return
 
+    // Only apply decorations if we have valid JSON
+    try {
+      JSON.parse(value)
+    } catch (e) {
+      // Clear existing view zones and decorations if JSON is invalid
+      editorRef.current.changeViewZones(changeAccessor => {
+        viewZonesRef.current.forEach(id => {
+          changeAccessor.removeZone(id)
+        })
+        viewZonesRef.current = []
+      })
+      decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, [])
+      return
+    }
+
     const ranges = findPropertyRanges(value)
     const decorations: editor.IModelDeltaDecoration[] = []
 
@@ -433,16 +448,19 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         { token: 'delimiter', foreground: 'd4d4d4' },
       ],
       colors: {
-        'editor.background': '#13161b', // hsl(220 15% 8%) - matches --background
+        'editor.background': '#00000000', // Transparent to show frosted-glass background
         'editor.foreground': '#f2f2f2', // hsl(0 0% 95%) - matches --foreground
         'editorLineNumber.foreground': '#4a5568',
         'editor.selectionBackground': '#2e3541', // hsl(220 15% 20%) - matches --border
         'editor.inactiveSelectionBackground': '#171a20',
         'editorCursor.foreground': '#3b82f6', // matches primary color
-        'editor.lineHighlightBackground': '#171a20', // hsl(220 15% 10%) - matches --card
+        'editor.lineHighlightBackground': '#ffffff08', // Subtle tint for active line
         'editorWidget.background': '#171a20',
         'editorSuggestWidget.background': '#171a20',
         'editorHoverWidget.background': '#171a20',
+        contrastBorder: '#00000000', // Remove contrast border
+        contrastActiveBorder: '#00000000', // Remove active contrast border
+        focusBorder: '#00000000', // Remove focus border
       },
     })
 
@@ -459,16 +477,19 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         { token: 'delimiter', foreground: '000000' },
       ],
       colors: {
-        'editor.background': '#fafafa', // hsl(0 0% 98%) - matches --background
+        'editor.background': '#00000000', // Transparent to show frosted-glass background
         'editor.foreground': '#141414', // hsl(0 0% 8%) - matches --foreground
         'editorLineNumber.foreground': '#999999',
         'editor.selectionBackground': '#add6ff',
         'editor.inactiveSelectionBackground': '#e5ebf1',
         'editorCursor.foreground': '#3b82f6', // matches primary color
-        'editor.lineHighlightBackground': '#ffffff',
+        'editor.lineHighlightBackground': '#00000008', // Subtle tint for active line
         'editorWidget.background': '#ffffff',
         'editorSuggestWidget.background': '#ffffff',
         'editorHoverWidget.background': '#ffffff',
+        contrastBorder: '#00000000', // Remove contrast border
+        contrastActiveBorder: '#00000000', // Remove active contrast border
+        focusBorder: '#00000000', // Remove focus border
       },
     })
 
@@ -514,17 +535,9 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
 
   return (
     <div className="space-y-2">
-      {/* Validation Status */}
-      {isValid && (
-        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-          <Check className="h-3 w-3" />
-          <span className="text-[10px] font-medium">Valid Schema</span>
-        </div>
-      )}
-
       {/* Monaco Editor */}
-      <div className="relative rounded-md border border-input overflow-hidden">
-        <div className="pr-4 bg-[#fafafa] dark:bg-[#13161b]">
+      <div className="relative rounded-b-xl overflow-hidden">
+        <div className="pr-4 frosted-glass-card">
           <Editor
             height="300px"
             defaultLanguage="json"

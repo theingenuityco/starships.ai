@@ -22,7 +22,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, erro
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Braces className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-semibold">Parameters (JSON Schema)</span>
+              <span className="text-xs font-semibold">Tool Inputs</span>
             </div>
           </div>
         </CollapsibleTrigger>
@@ -30,12 +30,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, erro
         <CollapsibleContent>
           <div className="border-t border-border/40">
             <ScrollArea className="max-h-[calc(100vh-14rem)]">
-              <div className="p-3 space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">JSON Schema Definition</Label>
-                  <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
-                </div>
-              </div>
+              <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
             </ScrollArea>
           </div>
         </CollapsibleContent>

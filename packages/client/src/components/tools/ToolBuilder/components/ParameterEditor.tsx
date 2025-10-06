@@ -552,6 +552,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
               overviewRulerLanes: 0,
               hideCursorInOverviewRuler: true,
               overviewRulerBorder: false,
+              stickyScroll: { enabled: false },
               padding: { top: 12, bottom: 12 },
               scrollbar: {
                 verticalScrollbarSize: 10,

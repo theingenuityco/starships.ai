@@ -408,15 +408,25 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
                                     {/* Type Selector */}
                                     <Select value={param.type} onValueChange={value => updateParameter(index, 'type', value)}>
-                                      <SelectTrigger className="h-6 w-[75px] text-[10px] border-none bg-muted/40">
+                                      <SelectTrigger className="h-6 w-20 text-[10px] border-none bg-muted/40">
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="string">String</SelectItem>
-                                        <SelectItem value="number">Number</SelectItem>
-                                        <SelectItem value="boolean">Boolean</SelectItem>
-                                        <SelectItem value="object">Object</SelectItem>
-                                        <SelectItem value="array">Array</SelectItem>
+                                      <SelectContent className="w-20 min-w-0">
+                                        <SelectItem value="string" className="text-[10px]">
+                                          String
+                                        </SelectItem>
+                                        <SelectItem value="number" className="text-[10px]">
+                                          Number
+                                        </SelectItem>
+                                        <SelectItem value="boolean" className="text-[10px]">
+                                          Boolean
+                                        </SelectItem>
+                                        <SelectItem value="object" className="text-[10px]">
+                                          Object
+                                        </SelectItem>
+                                        <SelectItem value="array" className="text-[10px]">
+                                          Array
+                                        </SelectItem>
                                       </SelectContent>
                                     </Select>
 

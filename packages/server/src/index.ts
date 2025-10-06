@@ -21,6 +21,7 @@ import messageRoutes from '@/routes/messages';
 import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
 import walletRoutes from '@/routes/wallets';
+import topupRoutes from '@/routes/topups';
 import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
@@ -83,6 +84,7 @@ app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
 app.use('/api/v1', walletRoutes);
+app.use('/api/v1', topupRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
 

@@ -287,6 +287,26 @@ CREATE INDEX idx_wallets_updated_at ON wallets(updated_at);
 CREATE INDEX idx_wallets_currency ON wallets(currency);
 
 -- ============================================================================
+-- TOPUPS TABLE
+-- ============================================================================
+
+CREATE TABLE topups (
+  id VARCHAR(255) PRIMARY KEY,
+  wallet_id VARCHAR(255) NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  amount_usd DECIMAL(18,4) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
+  stripe_session_id VARCHAR(255),
+  idempotency_key VARCHAR(255),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Topups indexes
+CREATE INDEX idx_topups_wallet_id ON topups(wallet_id);
+CREATE INDEX idx_topups_status ON topups(status);
+CREATE INDEX idx_topups_created_at ON topups(created_at);
+CREATE INDEX idx_topups_stripe_session_id ON topups(stripe_session_id);
+
+-- ============================================================================
 -- WAITLIST TABLE
 -- ============================================================================
 
@@ -363,6 +383,7 @@ COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
 COMMENT ON TABLE wallets IS 'Wallets for starships with currency and balance';
+COMMENT ON TABLE topups IS 'Payment topup records for wallet funding via Stripe';
 COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';

@@ -46,13 +46,13 @@ export default function ShipProfilePage(): React.JSX.Element {
               </div>
 
               <TabsContent value="usage">
-                <section aria-labelledby="usage-section" className="rounded-xl border border-border/40 bg-background p-6">
+                <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
                   {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
                 </section>
               </TabsContent>
 
               <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="rounded-xl border border-border/40 bg-background p-6">
+                <section aria-labelledby="billing-section" className="rounded-xl border border-border/80 bg-background p-6">
                   <StarshipBillingSection starshipId={starshipData?.id} />
                 </section>
               </TabsContent>

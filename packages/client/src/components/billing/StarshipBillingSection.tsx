@@ -2,6 +2,7 @@
 
 import React from 'react'
 import BillingOverviewCard from '@/components/billing/BillingOverviewCard'
+import AmountSelector from '@/components/billing/AmountSelector'
 import { useWallet } from '@/hooks/useWallet'
 
 export interface StarshipBillingSectionProps {
@@ -13,13 +14,13 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
   const { data: wallet, isLoading, error } = useWallet(starshipId || '', enabled)
 
   return (
-    <>
-      <h3 id="billing-section" className="text-lg font-semibold">
-        Billing
-      </h3>
-      <div className="mt-4 space-y-4">
-        <BillingOverviewCard wallet={wallet} isLoading={isLoading} error={error} />
-      </div>
-    </>
+    <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <BillingOverviewCard wallet={wallet} isLoading={isLoading} error={error} />
+      {starshipId && (
+        <div className="space-y-2">
+          <AmountSelector starshipId={starshipId} />
+        </div>
+      )}
+    </div>
   )
 }

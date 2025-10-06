@@ -200,19 +200,19 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           }}
         >
           {/* Floating Panels - Top Left */}
-          <div className="absolute top-6 left-28 z-10 w-[460px] space-y-3">
+          <div className="absolute top-4 left-28 z-10 w-[420px] space-y-2">
             {/* Tool Info Panel */}
-            <div className="frosted-glass-card rounded-2xl shadow-frosted-lg p-4 w-full">
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
-                  <Wrench className="w-5 h-5 text-primary" />
+            <div className="frosted-glass-card rounded-xl shadow-frosted-lg p-3 w-full">
+              <div className="flex items-start gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
+                  <Wrench className="w-4 h-4 text-primary" />
                 </div>
-                <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex-1 min-w-0 space-y-0.5">
                   <Input
                     placeholder="Tool name..."
                     value={formData.name}
                     onChange={e => handleFieldChange('name', e.target.value)}
-                    className={`text-base font-semibold h-auto py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
+                    className={`text-sm font-semibold h-auto py-0.5 px-1.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
                   />
                   <Textarea
                     ref={descriptionTextareaRef}
@@ -224,7 +224,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                       e.target.style.height = 'auto'
                       e.target.style.height = `${e.target.scrollHeight}px`
                     }}
-                    className={`text-xs min-h-[32px] max-h-[120px] py-1 px-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''}`}
+                    className={`text-xs min-h-[28px] max-h-[100px] py-0.5 px-1.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''}`}
                     rows={1}
                   />
                 </div>
@@ -233,30 +233,30 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
             {/* Settings Panel */}
             <Collapsible defaultOpen={false}>
-              <div className="frosted-glass-card rounded-2xl shadow-frosted-lg overflow-hidden w-full">
-                <CollapsibleTrigger className="w-full p-4 hover:bg-muted/50 transition-colors">
+              <div className="frosted-glass-card rounded-xl shadow-frosted-lg overflow-hidden w-full">
+                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Settings2 className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-semibold">Tool Settings</span>
+                      <Settings2 className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs font-semibold">Tool Settings</span>
                     </div>
                   </div>
                 </CollapsibleTrigger>
 
                 <CollapsibleContent>
                   <div className="border-t border-border/40">
-                    <ScrollArea className="max-h-[calc(100vh-16rem)]">
-                      <div className="p-4 space-y-4">
+                    <ScrollArea className="max-h-[calc(100vh-14rem)]">
+                      <div className="p-3 space-y-3">
                         {/* Category */}
-                        <div className="space-y-2">
-                          <Label className="text-xs font-semibold">Category</Label>
-                          <div className="flex flex-wrap gap-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium">Category</Label>
+                          <div className="flex flex-wrap gap-1.5">
                             {categories.map(cat => (
                               <Badge
                                 key={cat}
                                 variant="outline"
                                 className={cn(
-                                  'cursor-pointer transition-all duration-200 gap-1.5 px-2 py-1 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3',
+                                  'cursor-pointer transition-all duration-200 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3',
                                   formData.category === cat ? cn('shadow-sm hover:shadow-md hover:brightness-110', getCategoryColor(cat)) : 'hover:bg-muted/50 hover:border-primary/40'
                                 )}
                                 onClick={() => handleFieldChange('category', cat)}
@@ -269,8 +269,8 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                         </div>
 
                         {/* Example Usage */}
-                        <div className="space-y-2">
-                          <Label htmlFor="tool-example" className="text-xs font-semibold">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="tool-example" className="text-xs font-medium">
                             Example Usage
                           </Label>
                           <Textarea
@@ -284,7 +284,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                         </div>
 
                         {/* Requires API Key */}
-                        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/10 border border-border/40">
+                        <div className="flex items-center gap-2 p-1.5 rounded-lg bg-muted/10 border border-border/40">
                           <input
                             type="checkbox"
                             id="tool-requires-api-key"
@@ -298,8 +298,8 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                         </div>
 
                         {/* Parameters Schema */}
-                        <div className="space-y-2">
-                          <Label htmlFor="tool-parameters" className="text-xs font-semibold">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="tool-parameters" className="text-xs font-medium">
                             Parameters Schema (JSON)
                           </Label>
                           <Textarea
@@ -308,7 +308,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                             value={formData.parameters}
                             onChange={e => handleFieldChange('parameters', e.target.value)}
                             className={`font-mono text-xs ${errors.parameters ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                            rows={6}
+                            rows={5}
                           />
                           {errors.parameters && <p className="text-xs text-destructive">{errors.parameters}</p>}
                         </div>

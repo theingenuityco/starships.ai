@@ -502,7 +502,7 @@ const CustomSmoothEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, 
 
     // Create control points for smoother curves with reduced intensity
     // Lower multiplier = gentler, wider curves
-    const controlPointOffset = Math.max(distance * 0.4, 100) // Reduced curvature for more natural flow
+    const controlPointOffset = Math.max(distance * 0.3, 80) // Reduced curvature for more natural flow
 
     // Control points positioned to create smooth "C" shape
     const controlPoint1X = sourceX + controlPointOffset

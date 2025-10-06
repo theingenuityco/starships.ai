@@ -56,7 +56,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
           {/* Blueprint or Empty State */}
           {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
-            <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent />
+            <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent nodesDraggable />
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4 max-w-md px-6">

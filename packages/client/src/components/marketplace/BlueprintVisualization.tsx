@@ -30,6 +30,7 @@ interface BlueprintVisualizationProps {
   className?: string
   transparent?: boolean
   title?: string
+  nodesDraggable?: boolean
 }
 
 interface ReactFlowNode extends Node {
@@ -786,7 +787,7 @@ const NodeDetailsPanel: React.FC<{
   )
 }
 
-function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint; transparent?: boolean; title?: string }) {
+function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }: { blueprint: Blueprint; transparent?: boolean; title?: string; nodesDraggable?: boolean }) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
   // Convert blueprint and add selection state to nodes
@@ -844,7 +845,7 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
           maxZoom: 1.0,
           includeHiddenNodes: true,
         }}
-        nodesDraggable={false}
+        nodesDraggable={nodesDraggable}
         nodesConnectable={false}
         elementsSelectable={true}
         selectNodesOnDrag={false}
@@ -874,7 +875,7 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
   )
 }
 
-export function BlueprintVisualization({ blueprint, className = '', transparent = false, title }: BlueprintVisualizationProps) {
+export function BlueprintVisualization({ blueprint, className = '', transparent = false, title, nodesDraggable = false }: BlueprintVisualizationProps) {
   if (!blueprint?.nodes || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
@@ -886,7 +887,7 @@ export function BlueprintVisualization({ blueprint, className = '', transparent 
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <BlueprintFlow blueprint={blueprint} transparent={transparent} title={title} />
+        <BlueprintFlow blueprint={blueprint} transparent={transparent} title={title} nodesDraggable={nodesDraggable} />
       </div>
     </ReactFlowProvider>
   )

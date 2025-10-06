@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useMemo, useState, useCallback } from 'react'
+import { useTheme } from 'next-themes'
 import {
   ReactFlow,
   Node,
@@ -117,10 +118,10 @@ const getNodeColors = (nodeType: string) => {
       handle: '#f59e0b',
     },
     conditional: {
-      bg: 'bg-yellow-50 dark:bg-yellow-950/30',
-      border: 'border-yellow-300 dark:border-yellow-700',
-      text: 'text-yellow-700 dark:text-yellow-300',
-      handle: '#eab308',
+      bg: 'bg-amber-50 dark:bg-amber-950/30',
+      border: 'border-amber-300 dark:border-amber-700',
+      text: 'text-amber-700 dark:text-amber-300',
+      handle: '#f59e0b',
     },
     output: {
       bg: 'bg-indigo-50 dark:bg-indigo-950/30',
@@ -176,9 +177,16 @@ const getNodeColors = (nodeType: string) => {
 
 // Custom conditional node component with horizontal sections for each output
 const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
+  const { theme } = useTheme()
   const colors = getNodeColors(data.type)
   const edges = data.outgoingEdges || []
   const isSelected = data.isSelected
+
+  // Adjust opacity based on theme - darker in light mode for better visibility
+  const primaryOpacity = theme === 'light' ? '15' : '15'
+  const secondaryOpacity = theme === 'light' ? '08' : '08'
+  const branchPrimaryOpacity = theme === 'light' ? '10' : '10'
+  const branchSecondaryOpacity = theme === 'light' ? '05' : '05'
 
   return (
     <>
@@ -193,7 +201,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
             text-foreground cursor-move hover:border-border/60
           `}
           style={{
-            background: `linear-gradient(135deg, ${colors.handle}15 0%, ${colors.handle}08 100%)`,
+            background: `linear-gradient(135deg, ${colors.handle}${primaryOpacity} 0%, ${colors.handle}${secondaryOpacity} 100%)`,
           }}
         >
           {/* Input handle - positioned relative to main node body only */}
@@ -227,7 +235,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                   key={uniqueKey}
                   className="relative backdrop-blur-[20px] backdrop-saturate-[180%] border-2 border-border/40 rounded-xl px-3 py-2 text-xs font-medium text-foreground shadow-frosted-lg hover:border-border/60 transition-all duration-300"
                   style={{
-                    background: `linear-gradient(135deg, ${colors.handle}10 0%, ${colors.handle}05 100%)`,
+                    background: `linear-gradient(135deg, ${colors.handle}${branchPrimaryOpacity} 0%, ${colors.handle}${branchSecondaryOpacity} 100%)`,
                   }}
                 >
                   <div className="truncate text-center">{edge?.condition || edge?.label || `Branch ${index + 1}`}</div>
@@ -260,8 +268,13 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
 // Custom node component with professional design
 const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
+  const { theme } = useTheme()
   const colors = getNodeColors(data.type)
   const isSelected = data.isSelected
+
+  // Adjust opacity based on theme - darker in light mode for better visibility
+  const primaryOpacity = theme === 'light' ? '15' : '15'
+  const secondaryOpacity = theme === 'light' ? '08' : '08'
 
   // Use conditional node for nodes with multiple outputs
   if (data.type === 'conditional' && data.outgoingEdges && data.outgoingEdges.length > 1) {
@@ -284,7 +297,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
           text-foreground cursor-move hover:border-border/60
         `}
         style={{
-          background: `linear-gradient(135deg, ${colors.handle}15 0%, ${colors.handle}08 100%)`,
+          background: `linear-gradient(135deg, ${colors.handle}${primaryOpacity} 0%, ${colors.handle}${secondaryOpacity} 100%)`,
         }}
       >
         {/* Circular icon container with better styling */}

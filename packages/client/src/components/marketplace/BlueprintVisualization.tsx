@@ -452,12 +452,12 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       type: 'simplebezier', // Simple bezier combines smoothstep-style routing with bezier curves
       animated: false,
       style: {
-        stroke: '#64748b',
+        stroke: '#94a3b8',
         strokeWidth: 2,
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: '#64748b',
+        color: '#94a3b8',
         width: 16,
         height: 16,
       },

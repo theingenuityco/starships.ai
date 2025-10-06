@@ -108,6 +108,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [])
 
+  // Handle overlay toggle when clicking disabled input
+  const handleToggleOverlay = useCallback(() => {
+    setIsMessageOverlayExpanded(prev => !prev)
+  }, [])
+
   // Reset conversation when external conversation ID changes
   useEffect(() => {
     if (externalConversationId === undefined) return
@@ -323,6 +328,31 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [viewMode])
 
+  // Handle click outside to collapse overlay
+  useEffect(() => {
+    if (viewMode !== 'tool-builder' || !isMessageOverlayExpanded) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const inputContainer = inputContainerRef.current
+
+      // Check if click is outside the input container
+      if (inputContainer && !inputContainer.contains(target)) {
+        setIsMessageOverlayExpanded(false)
+      }
+    }
+
+    // Add listener after a small delay to avoid immediate collapse on the same click that opened it
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 100)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [viewMode, isMessageOverlayExpanded])
+
   // Stream tool arguments into builder as they arrive
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length || viewMode !== 'tool-builder') return
@@ -480,8 +510,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               isToolFormOpen={viewMode === 'tool-builder'}
               disabled={!selectedAgent}
               minimal={viewMode === 'tool-builder' || showMessagesArea}
-              onFocus={() => viewMode === 'tool-builder' && setIsMessageOverlayExpanded(true)}
+              onFocus={() => viewMode === 'tool-builder' && !uiStreaming && setIsMessageOverlayExpanded(true)}
               onBlur={() => setIsMessageOverlayExpanded(false)}
+              onToggleOverlay={handleToggleOverlay}
               showExpandableOverlay={viewMode === 'tool-builder'}
               isOverlayExpanded={isMessageOverlayExpanded}
               budgetTokens={budgetTokens}

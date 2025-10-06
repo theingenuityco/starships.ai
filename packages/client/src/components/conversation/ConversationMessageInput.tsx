@@ -36,6 +36,7 @@ interface ConversationMessageInputProps {
   children?: React.ReactNode // For footer content
   onFocus?: () => void // Callback when input is focused
   onBlur?: () => void // Callback when input loses focus
+  onToggleOverlay?: () => void // Callback to toggle overlay expansion (used when input is disabled)
   // Props for expandable overlay (when in tool-form mode)
   showExpandableOverlay?: boolean
   isOverlayExpanded?: boolean
@@ -62,6 +63,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       children,
       onFocus,
       onBlur,
+      onToggleOverlay,
       showExpandableOverlay = false,
       isOverlayExpanded = false,
       budgetTokens,
@@ -358,7 +360,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             )}
 
             {/* Text Input */}
-            <div className="flex-1 min-w-0">
+            <div
+              className="flex-1 min-w-0"
+              onClick={e => {
+                // When input is disabled (streaming), allow clicking to toggle overlay
+                if ((disabled || sending || isStreamingEffective) && onToggleOverlay) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onToggleOverlay()
+                }
+              }}
+            >
               <textarea
                 ref={textareaRef}
                 value={message}
@@ -374,7 +386,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   'text-foreground placeholder-muted-foreground',
                   'border-0 outline-none focus:ring-0',
                   'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
-                  minimal && 'text-sm'
+                  minimal && 'text-sm',
+                  // Add cursor pointer when disabled and overlay toggle is available
+                  (disabled || sending || isStreamingEffective) && onToggleOverlay && 'cursor-pointer'
                 )}
                 rows={1}
               />

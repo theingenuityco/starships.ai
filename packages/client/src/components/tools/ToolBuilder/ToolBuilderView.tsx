@@ -6,17 +6,11 @@ import type { Blueprint } from '@starships/autopilot'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'
 import { useToolForm } from './hooks/useToolForm'
-import { useParameterManagement } from './hooks/useParameterManagement'
 import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
 
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave }, ref) => {
   const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })
-
-  const { parameters, addParameter, updateParameter, removeParameter, toggleExpanded } = useParameterManagement({
-    parametersJSON: formData.parameters,
-    onParametersChange: json => handleFieldChange('parameters', json),
-  })
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -55,16 +49,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
             <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
 
             {/* Settings Panel */}
-            <ToolSettingsPanel
-              formData={formData}
-              errors={errors}
-              parameters={parameters}
-              onFieldChange={handleFieldChange}
-              onAddParameter={addParameter}
-              onUpdateParameter={updateParameter}
-              onRemoveParameter={removeParameter}
-              onToggleExpanded={toggleExpanded}
-            />
+            <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
           </div>
 
           {/* Blueprint or Empty State */}

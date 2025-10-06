@@ -5,6 +5,138 @@
 /* ReactFlow styles - Required for proper functionality */
 @import '@xyflow/react/dist/style.css';
 
+/* Prism.js Syntax Highlighting - VS Code Dark Inspired */
+/* Blue and white theme matching VS Code's aesthetic */
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #d4d4d4;
+}
+
+/* Property names - Light blue (VS Code style) */
+.token.property,
+.token.tag {
+  color: #9cdcfe;
+}
+
+/* Strings - Peach/orange */
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #ce9178;
+}
+
+/* Numbers, booleans - Light green */
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol {
+  color: #b5cea8;
+}
+
+/* Keywords - Blue */
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #569cd6;
+}
+
+/* Functions - Yellow */
+.token.function,
+.token.class-name {
+  color: #dcdcaa;
+}
+
+/* Operators */
+.token.operator,
+.token.entity,
+.token.url {
+  color: #d4d4d4;
+}
+
+/* Variables - Light blue */
+.token.regex,
+.token.variable {
+  color: #9cdcfe;
+}
+
+/* Deleted - Red */
+.token.deleted {
+  color: #f48771;
+}
+
+.token.important {
+  color: #f48771;
+  font-weight: bold;
+}
+
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+/* Light mode - use softer colors */
+:root .token.comment,
+:root .token.prolog,
+:root .token.doctype,
+:root .token.cdata {
+  color: #008000;
+}
+
+:root .token.property,
+:root .token.tag,
+:root .token.variable,
+:root .token.regex {
+  color: #0070c1;
+}
+
+:root .token.string,
+:root .token.selector,
+:root .token.attr-name,
+:root .token.char,
+:root .token.builtin,
+:root .token.inserted {
+  color: #a31515;
+}
+
+:root .token.number,
+:root .token.boolean,
+:root .token.constant,
+:root .token.symbol {
+  color: #098658;
+}
+
+:root .token.keyword,
+:root .token.atrule,
+:root .token.attr-value {
+  color: #0000ff;
+}
+
+:root .token.function,
+:root .token.class-name {
+  color: #795e26;
+}
+
+:root .token.operator,
+:root .token.entity,
+:root .token.url,
+:root .token.punctuation {
+  color: #000000;
+}
+
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

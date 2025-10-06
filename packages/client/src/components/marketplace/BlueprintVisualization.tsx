@@ -713,11 +713,11 @@ const NodeDetailsPanel: React.FC<{
   const colors = getNodeColors(node.type)
 
   return (
-    <Card className="absolute top-4 right-4 w-80 max-h-[calc(100vh-8rem)] z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-2 shadow-2xl">
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <div className="flex items-center gap-3">
+    <Card className="absolute top-4 right-4 w-[420px] max-h-[calc(100vh-8rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
+      <div className="flex items-center justify-between p-3 border-b border-border/40">
+        <div className="flex items-center gap-2.5">
           <div
-            className="flex items-center justify-center w-10 h-10 rounded-full"
+            className="flex items-center justify-center w-8 h-8 rounded-lg"
             style={{
               backgroundColor: colors.handle + '15',
               color: colors.handle,
@@ -728,37 +728,37 @@ const NodeDetailsPanel: React.FC<{
           </div>
           <div>
             <h3 className="font-semibold text-sm">{node.name}</h3>
-            <Badge variant="outline" className="text-xs capitalize mt-1">
+            <Badge variant="outline" className="text-xs capitalize mt-0.5">
               {node.type.replace('_', ' ')}
             </Badge>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-          <X className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+          <X className="h-3.5 w-3.5" />
         </Button>
       </div>
 
       <ScrollArea className="max-h-[calc(100vh-14rem)]">
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-3">
           {/* Description */}
           {node.description && (
-            <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Description</h4>
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Description</h4>
               <p className="text-sm text-foreground">{node.description}</p>
             </div>
           )}
 
           {/* Reference */}
-          <div>
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Reference</h4>
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase">Reference</h4>
             <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{node.ref}</code>
           </div>
 
           {/* Parameters */}
           {node.parameters && Object.keys(node.parameters).length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Parameters</h4>
-              <div className="space-y-2">
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Parameters</h4>
+              <div className="space-y-1.5">
                 {Object.entries(node.parameters).map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <div className="text-xs font-medium text-foreground">{key}</div>
@@ -771,8 +771,8 @@ const NodeDetailsPanel: React.FC<{
 
           {/* Metadata */}
           {node.metadata && Object.keys(node.metadata).length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Metadata</h4>
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Metadata</h4>
               <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{JSON.stringify(node.metadata, null, 2)}</pre>
             </div>
           )}

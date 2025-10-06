@@ -12,7 +12,7 @@ import { useOAuthLogin } from '@/hooks/useOAuth'
 import { Eye, EyeOff, LogIn, UserPlus, Github, Chrome } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
 /**
@@ -84,6 +84,7 @@ export function LoginForm() {
   const { login, register, isLoading, error } = useAuth()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -106,17 +107,117 @@ export function LoginForm() {
     message: string
   } | null>(null)
 
+  // Handle OAuth login - consistent with regular login flow
+  const handleOAuthLogin = async (token: string) => {
+    console.log('[OAuth] Starting OAuth login handling with token');
+    
+    // Store the token (same as regular login onSuccess)
+    localStorage.setItem('starships_auth_token', token);
+    console.log('[OAuth] Token stored in localStorage');
+    
+    // Fetch user data to get starship info (same as regular login)
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      console.log('[OAuth] Fetching user data from /auth/me');
+      const response = await fetch(`${baseURL}/api/v1/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        const user = userData.data;
+        console.log('[OAuth] User data fetched:', user.email);
+        
+        // Update auth user cache (same as regular login onSuccess)
+        queryClient.setQueryData(['auth', 'user', 'me'], user);
+        console.log('[OAuth] User cache updated');
+        
+        // Get user's starship for navigation
+        console.log('[OAuth] Fetching user starships for user ID:', user.id);
+        let starshipResponse;
+        try {
+          starshipResponse = await fetch(`${baseURL}/api/v1/users/${user.id}/starships`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          console.log('[OAuth] Starship fetch response received:', starshipResponse.status);
+        } catch (fetchError) {
+          console.error('[OAuth] Error fetching starships:', fetchError);
+          // Redirect to home on fetch error
+          console.log('[OAuth] Redirecting to home due to fetch error');
+          window.location.href = '/';
+          return;
+        }
+
+        if (starshipResponse && starshipResponse.ok) {
+          const starshipData = await starshipResponse.json();
+          console.log('[OAuth] Starship response:', starshipData);
+          const firstStarship = starshipData.data?.find((ship: any) => ship.status === 'active') || starshipData.data?.[0];
+          console.log('[OAuth] First starship found:', firstStarship);
+          
+          // Redirect to starship's conversation if available (same as regular login onSuccess)
+          if (firstStarship?.slug) {
+            const redirectPath = `/ship/${firstStarship.slug}/conversations`;
+            console.log('[OAuth] Redirecting to:', redirectPath);
+            console.log('[OAuth] Using window.location.href for immediate navigation');
+            window.location.href = redirectPath;
+          } else {
+            // No starship found, redirect to home
+            console.log('[OAuth] No starship found, redirecting to home');
+            window.location.href = '/';
+          }
+        } else {
+          // Failed to get starship
+          console.error('[OAuth] Failed to fetch starships:', starshipResponse.status, starshipResponse.statusText);
+          const errorText = await starshipResponse.text();
+          console.error('[OAuth] Error response:', errorText);
+          
+          // Still redirect to home page
+          console.log('[OAuth] Redirecting to home after starship fetch failure');
+          window.location.href = '/';
+        }
+        
+        // Skip query invalidation for OAuth since we're doing a hard redirect
+        // The queries will be refetched on the new page anyway
+        console.log('[OAuth] OAuth login complete');
+      } else {
+        // Token validation failed
+        setFormError('Authentication failed. Please try logging in again.');
+        localStorage.removeItem('starships_auth_token');
+      }
+    } catch (error) {
+      console.error('[AUTH] OAuth login handling error:', error);
+      router.push('/');
+      // Still invalidate queries on error
+      queryClient.invalidateQueries();
+    }
+  };
+
+  // Track if OAuth has been handled to prevent duplicate calls
+  const [oauthHandled, setOauthHandled] = useState(false);
+
   // OAuth callback handling
   useEffect(() => {
     const oauthToken = searchParams?.get('oauth_token');
     const oauthError = searchParams?.get('oauth_error');
     const oauthWaitlist = searchParams?.get('oauth_waitlist');
 
+    // Prevent duplicate handling
+    if (oauthHandled) {
+      console.log('[OAuth] Already handled, skipping');
+      return;
+    }
+
     if (oauthToken) {
-      // Store the token and invalidate queries to refetch with new auth context
-      localStorage.setItem('starships_auth_token', oauthToken);
-      queryClient.invalidateQueries(); // Refetch all queries with new auth context
-      window.location.href = '/'; // Redirect to main app
+      console.log('[OAuth] Token found in URL, handling OAuth login');
+      setOauthHandled(true);
+      // Handle OAuth login the same way as regular login
+      handleOAuthLogin(oauthToken);
     } else if (oauthError) {
       setFormError(getOAuthErrorMessage(oauthError));
     } else if (oauthWaitlist) {
@@ -125,7 +226,7 @@ export function LoginForm() {
         message: 'Thanks for signing up! Please wait for approval to access the app.'
       });
     }
-  }, [searchParams]);
+  }, [searchParams, oauthHandled]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

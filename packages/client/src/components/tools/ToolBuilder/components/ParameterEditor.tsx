@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Check } from 'lucide-react'
 import Editor, { OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
+import { useTheme } from 'next-themes'
 
 interface ParameterEditorProps {
   value: string
@@ -22,6 +23,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   const [isValid, setIsValid] = useState<boolean>(false)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
+  const { theme } = useTheme()
 
   // Validate JSON Schema structure
   const validateJsonSchema = (jsonString: string) => {
@@ -167,6 +169,62 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     editorRef.current = editor
     monacoRef.current = monaco
 
+    // Define custom dark theme matching the app's dark theme
+    monaco.editor.defineTheme('starships-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'string.key.json', foreground: '9cdcfe' },
+        { token: 'string.value.json', foreground: 'ce9178' },
+        { token: 'number', foreground: 'b5cea8' },
+        { token: 'keyword', foreground: '569cd6' },
+        { token: 'comment', foreground: '6a9955' },
+        { token: 'delimiter', foreground: 'd4d4d4' },
+      ],
+      colors: {
+        'editor.background': '#13161b', // hsl(220 15% 8%) - matches --background
+        'editor.foreground': '#f2f2f2', // hsl(0 0% 95%) - matches --foreground
+        'editorLineNumber.foreground': '#4a5568',
+        'editor.selectionBackground': '#2e3541', // hsl(220 15% 20%) - matches --border
+        'editor.inactiveSelectionBackground': '#171a20',
+        'editorCursor.foreground': '#3b82f6', // matches primary color
+        'editor.lineHighlightBackground': '#171a20', // hsl(220 15% 10%) - matches --card
+        'editorWidget.background': '#171a20',
+        'editorSuggestWidget.background': '#171a20',
+        'editorHoverWidget.background': '#171a20',
+      },
+    })
+
+    // Define custom light theme matching the app's light theme
+    monaco.editor.defineTheme('starships-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'string.key.json', foreground: '0070c1' },
+        { token: 'string.value.json', foreground: 'a31515' },
+        { token: 'number', foreground: '098658' },
+        { token: 'keyword', foreground: '0000ff' },
+        { token: 'comment', foreground: '008000' },
+        { token: 'delimiter', foreground: '000000' },
+      ],
+      colors: {
+        'editor.background': '#fafafa', // hsl(0 0% 98%) - matches --background
+        'editor.foreground': '#141414', // hsl(0 0% 8%) - matches --foreground
+        'editorLineNumber.foreground': '#999999',
+        'editor.selectionBackground': '#add6ff',
+        'editor.inactiveSelectionBackground': '#e5ebf1',
+        'editorCursor.foreground': '#3b82f6', // matches primary color
+        'editor.lineHighlightBackground': '#ffffff',
+        'editorWidget.background': '#ffffff',
+        'editorSuggestWidget.background': '#ffffff',
+        'editorHoverWidget.background': '#ffffff',
+      },
+    })
+
+    // Apply the theme based on current mode
+    const currentTheme = theme === 'dark' ? 'starships-dark' : 'starships-light'
+    monaco.editor.setTheme(currentTheme)
+
     // Configure JSON language options
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
       validate: true,
@@ -178,6 +236,14 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     // Validate initial value
     validateJsonSchema(value)
   }
+
+  // Update theme when it changes
+  useEffect(() => {
+    if (monacoRef.current && editorRef.current) {
+      const currentTheme = theme === 'dark' ? 'starships-dark' : 'starships-light'
+      monacoRef.current.editor.setTheme(currentTheme)
+    }
+  }, [theme])
 
   const handleChange = (newValue: string | undefined) => {
     const val = newValue || ''
@@ -207,7 +273,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
           value={value}
           onChange={handleChange}
           onMount={handleEditorDidMount}
-          theme="vs-dark"
+          theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
           options={{
             minimap: { enabled: false },
             fontSize: 12,

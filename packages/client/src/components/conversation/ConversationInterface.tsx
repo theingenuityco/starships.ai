@@ -43,6 +43,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Expanded overlay state for message history when in tool-builder mode
   const [isMessageOverlayExpanded, setIsMessageOverlayExpanded] = useState(false)
 
+  // Track if the tool-builder was opened via streaming UI action
+  const wasOpenedByStreamingRef = useRef(false)
+
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId)
   const prevStreamingRef = useRef(false)
@@ -164,12 +167,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       description: `${data.name} has been created and is ready to use.`,
     })
     setViewMode('conversation')
+    setIsMessageOverlayExpanded(false)
+    wasOpenedByStreamingRef.current = false
     toolBuilderViewRef.current?.resetForm()
   }, [])
 
   // Handle tool builder cancel
   const handleToolBuilderCancel = useCallback(() => {
     setViewMode('conversation')
+    setIsMessageOverlayExpanded(false)
+    wasOpenedByStreamingRef.current = false
     toolBuilderViewRef.current?.resetForm()
   }, [])
 
@@ -189,6 +196,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             if (action === 'open_tool_form') {
               toolBuilderViewRef.current?.resetForm()
             }
+            // Mark that this transition was triggered by streaming
+            wasOpenedByStreamingRef.current = true
             setViewMode('tool-builder')
             setTimeout(() => fn(), 150)
           }, 100)
@@ -205,6 +214,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             if (toolName === 'tool_create') {
               console.log('📂 Opening tool builder view for tool_create')
               toolBuilderViewRef.current?.resetForm()
+              // Mark that this transition was triggered by streaming
+              wasOpenedByStreamingRef.current = true
               setViewMode('tool-builder')
             }
             break
@@ -225,6 +236,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           case 'update_tool_form': {
             const patch = (payload as any).patch || (payload as any).formData || (payload as any).data || {}
             if (viewMode !== 'tool-builder') {
+              // Mark that this transition was triggered by streaming
+              wasOpenedByStreamingRef.current = true
               ensureOpenThen(() => {
                 if (toolBuilderViewRef.current && patch && typeof patch === 'object') {
                   Object.entries(patch).forEach(([field, value]) => {
@@ -296,6 +309,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // ignore
     }
   }, [currentConversationId, lastUIAction, handleUIPayload])
+
+  // Auto-expand overlay when transitioning to tool-builder via streaming
+  useEffect(() => {
+    if (viewMode === 'tool-builder' && wasOpenedByStreamingRef.current) {
+      // Auto-expand the message overlay
+      setIsMessageOverlayExpanded(true)
+      // Reset the flag after a short delay
+      const timer = setTimeout(() => {
+        wasOpenedByStreamingRef.current = false
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [viewMode])
 
   // Stream tool arguments into builder as they arrive
   useEffect(() => {

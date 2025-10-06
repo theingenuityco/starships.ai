@@ -22,7 +22,7 @@ import {
   BaseEdge,
 } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
+import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X, Edit3, Split } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -60,7 +60,7 @@ const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
     case 'user_prompt':
       return <User className={className} />
     case 'conditional':
-      return <AlertTriangle className={className} />
+      return <Split className={className} />
     case 'output':
       return <Eye className={className} />
     case 'llm':
@@ -76,7 +76,7 @@ const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
     case 'transform':
       return <Cog className={className} />
     case 'mutate':
-      return <Database className={className} />
+      return <Edit3 className={className} />
     default:
       return <Clock className={className} />
   }
@@ -117,10 +117,10 @@ const getNodeColors = (nodeType: string) => {
       handle: '#f59e0b',
     },
     conditional: {
-      bg: 'bg-orange-50 dark:bg-orange-950/30',
-      border: 'border-orange-300 dark:border-orange-700',
-      text: 'text-orange-700 dark:text-orange-300',
-      handle: '#f97316',
+      bg: 'bg-yellow-50 dark:bg-yellow-950/30',
+      border: 'border-yellow-300 dark:border-yellow-700',
+      text: 'text-yellow-700 dark:text-yellow-300',
+      handle: '#eab308',
     },
     output: {
       bg: 'bg-indigo-50 dark:bg-indigo-950/30',
@@ -159,10 +159,10 @@ const getNodeColors = (nodeType: string) => {
       handle: '#14b8a6',
     },
     mutate: {
-      bg: 'bg-teal-50 dark:bg-teal-950/30',
-      border: 'border-teal-300 dark:border-teal-700',
-      text: 'text-teal-700 dark:text-teal-300',
-      handle: '#14b8a6',
+      bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/30',
+      border: 'border-fuchsia-300 dark:border-fuchsia-700',
+      text: 'text-fuchsia-700 dark:text-fuchsia-300',
+      handle: '#d946ef',
     },
     default: {
       bg: 'bg-gray-50 dark:bg-gray-950/30',

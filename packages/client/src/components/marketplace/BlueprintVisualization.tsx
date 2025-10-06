@@ -408,14 +408,23 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
     return { nodes: [], edges: [] }
   }
 
+  // Filter out nodes with null/undefined refs during streaming
+  const validNodes = blueprint.nodes.filter(node => node.ref != null && node.ref !== '')
+
+  if (validNodes.length === 0) {
+    return { nodes: [], edges: [] }
+  }
+
   // Safely handle edges - may be undefined during streaming
   const blueprintEdges = blueprint.edges || []
 
   // Create a set of valid node IDs for quick lookup
-  const validNodeIds = new Set(blueprint.nodes.map(node => node.ref))
+  const validNodeIds = new Set(validNodes.map(node => node.ref))
 
-  // Filter edges to only include those with both nodes present (important for streaming)
-  const validEdges = blueprintEdges.filter(edge => validNodeIds.has(edge.from) && validNodeIds.has(edge.to))
+  // Filter edges to only include those with valid IDs and both nodes present (important for streaming)
+  const validEdges = blueprintEdges.filter(
+    edge => edge.ref != null && edge.ref !== '' && edge.from != null && edge.from !== '' && edge.to != null && edge.to !== '' && validNodeIds.has(edge.from) && validNodeIds.has(edge.to)
+  )
 
   // Build outgoing edges map for conditional nodes
   const outgoingEdgesMap = new Map<string, BlueprintEdge[]>()
@@ -427,7 +436,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   })
 
   // Create initial nodes without positioning
-  const initialNodes: ReactFlowNode[] = blueprint.nodes.map((node: BlueprintNode) => ({
+  const initialNodes: ReactFlowNode[] = validNodes.map((node: BlueprintNode) => ({
     id: node.ref,
     type: 'custom',
     position: { x: 0, y: 0 }, // Will be overridden by layout

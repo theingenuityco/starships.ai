@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 import {
   ReactFlow,
@@ -411,9 +411,15 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   // Safely handle edges - may be undefined during streaming
   const blueprintEdges = blueprint.edges || []
 
+  // Create a set of valid node IDs for quick lookup
+  const validNodeIds = new Set(blueprint.nodes.map(node => node.ref))
+
+  // Filter edges to only include those with both nodes present (important for streaming)
+  const validEdges = blueprintEdges.filter(edge => validNodeIds.has(edge.from) && validNodeIds.has(edge.to))
+
   // Build outgoing edges map for conditional nodes
   const outgoingEdgesMap = new Map<string, BlueprintEdge[]>()
-  blueprintEdges.forEach(edge => {
+  validEdges.forEach(edge => {
     if (!outgoingEdgesMap.has(edge.from)) {
       outgoingEdgesMap.set(edge.from, [])
     }
@@ -440,7 +446,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   }))
 
   // Create edges with simple bezier - combines smoothstep routing with bezier curves
-  const flowEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
+  const flowEdges: Edge[] = validEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
 
@@ -647,7 +653,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
   const [edges, setEdges] = useState<Edge[]>([])
 
   // Convert blueprint and apply layout (async)
-  useMemo(() => {
+  useEffect(() => {
     convertBlueprintToFlow(blueprint, nodesDraggable).then(flowData => {
       setNodes(flowData.nodes)
       setEdges(flowData.edges)

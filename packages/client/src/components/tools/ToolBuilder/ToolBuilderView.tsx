@@ -10,8 +10,8 @@ import { useParameterManagement } from './hooks/useParameterManagement'
 import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
 
-export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, onCancel, starshipId }, ref) => {
-  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useToolForm({ onSave })
+export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave }, ref) => {
+  const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })
 
   const { parameters, addParameter, updateParameter, removeParameter, toggleExpanded } = useParameterManagement({
     parametersJSON: formData.parameters,

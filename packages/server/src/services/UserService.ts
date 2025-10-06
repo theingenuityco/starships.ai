@@ -506,10 +506,101 @@ export class UserService {
 
   /**
    * Get GitHub OAuth profile
+   * Follows the same pattern as getGoogleProfile() for consistency
    */
   private async getGitHubProfile(authCode: string): Promise<OAuthProfileModel> {
-    // GitHub OAuth implementation coming soon
-    throw new ValidationError('GitHub authentication is not available yet. Please use Google or email login.', 'provider');
+    const env = getEnvConfig();
+    
+    try {
+      // Step 1: Construct redirect URI (same pattern as Google)
+      const redirectUri = `${process.env.NODE_ENV === 'production' ? env.SERVER_URL : 'http://localhost:4000'}/api/v1/auth/github/callback`;
+      
+      // Step 2: Exchange authorization code for access token
+      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'starships.ai/1.0',  // Required by GitHub API
+        },
+        body: JSON.stringify({
+          client_id: env.GITHUB_CLIENT_ID,
+          client_secret: env.GITHUB_CLIENT_SECRET,
+          code: authCode,
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new ValidationError(`GitHub token exchange failed: ${tokenResponse.status}`, 'oauth');
+      }
+
+      const tokenData = await tokenResponse.json() as any;
+      
+      if (tokenData.error) {
+        throw new ValidationError(`GitHub OAuth error: ${tokenData.error_description || tokenData.error}`, 'oauth');
+      }
+
+      if (!tokenData.access_token) {
+        throw new ValidationError('GitHub did not return an access token', 'oauth');
+      }
+
+      const accessToken = tokenData.access_token;
+
+      // Step 3: Get user profile information
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,  // GitHub supports Bearer tokens
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'starships.ai/1.0',
+        },
+      });
+
+      if (!userResponse.ok) {
+        throw new ValidationError(`GitHub profile fetch failed: ${userResponse.status}`, 'oauth');
+      }
+
+      const userData = await userResponse.json() as any;
+
+      // Step 4: Get user email (might be private, requiring separate API call)
+      let primaryEmail = userData.email;
+      
+      if (!primaryEmail) {
+        const emailResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'starships.ai/1.0',
+          },
+        });
+
+        if (emailResponse.ok) {
+          const emails = await emailResponse.json() as any[];
+          const primaryEmailObj = emails.find((email: any) => email.primary && email.verified);
+          primaryEmail = primaryEmailObj?.email;
+        }
+      }
+
+      // Step 5: Validate required data (same validation as Google)
+      if (!primaryEmail || !userData.id || !userData.login) {
+        throw new ValidationError('Incomplete profile data from GitHub', 'profile');
+      }
+
+      // Step 6: Return standardized profile (same interface as Google)
+      return {
+        provider: 'github',
+        providerId: userData.id.toString(),
+        email: primaryEmail,
+        name: userData.name || userData.login,  // Fallback to username if name is null
+        avatar: userData.avatar_url || undefined,
+      };
+    } catch (error: any) {
+      // Same error handling pattern as Google implementation
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(`Failed to fetch GitHub profile: ${error.message}`, 'oauth');
+    }
   }
 
   // ============================================================================

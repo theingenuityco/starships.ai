@@ -303,47 +303,6 @@ describe('UserRepository', () => {
     });
   });
 
-  describe('findByStripeCustomerId', () => {
-    it('should return user by Stripe customer ID', async () => {
-      const mockUser = global.createMockUser({ stripeCustomerId: 'cus_123' });
-      testHelper.mockConnection.queryOne.mockResolvedValue(mockUser);
-
-      const result = await repository.findByStripeCustomerId('cus_123');
-
-      expect(testHelper.mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM users WHERE stripe_customer_id = $1', ['cus_123']);
-      expect(result).toBeInstanceOf(UserEntity);
-      expect(result).not.toBeNull();
-      expect(result!.id).toBe(mockUser.id);
-      expect(result!.stripeCustomerId).toBe(mockUser.stripeCustomerId);
-    });
-
-    it('should return null when Stripe customer ID not found', async () => {
-      testHelper.mockConnection.queryOne.mockResolvedValue(null);
-
-      const result = await repository.findByStripeCustomerId('cus_nonexistent');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('updateStripeCustomerId', () => {
-    it('should update user with Stripe customer ID', async () => {
-      testHelper.mockConnection.query.mockResolvedValue([]);
-
-      await repository.updateStripeCustomerId('user-123', 'cus_123');
-
-      expect(testHelper.mockConnection.query).toHaveBeenCalledWith(
-        'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
-        ['cus_123', 'user-123']
-      );
-    });
-
-    it('should validate required parameters', async () => {
-      await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(DatabaseError);
-      await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(DatabaseError);
-    });
-  });
-
   describe('error handling', () => {
     it('should handle database errors', async () => {
       testHelper.mockConnection.query.mockRejectedValue(new Error('Database error'));

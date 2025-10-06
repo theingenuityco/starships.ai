@@ -41,7 +41,7 @@ import {
 
 - [`Agent`](src/domains/agent.ts) - AI agent configurations and deployment management
 - [`AgentTemplate`](src/domains/agent-template.ts) - Reusable agent configurations
-- [`Starship`](src/domains/starship.ts) - Starship management with billing integration
+- [`Starship`](src/domains/starship.ts) - Starship management
 - [`User`](src/domains/user.ts) - User management and authentication
 - [`Workflow`](src/domains/workflow.ts) - Workflow execution definitions
 - [`Blueprint`](src/domains/blueprint.ts) - Workflow blueprint specifications
@@ -75,7 +75,6 @@ const starship: Starship = {
   slug: 'enterprise',
   ownerId: 'user-456',
   name: 'Enterprise',
-  class: 'cruiser',
   status: 'active',
   maxAgents: 6,
   createdAt: '2024-01-01T00:00:00Z',

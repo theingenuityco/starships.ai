@@ -12,14 +12,12 @@ import bcrypt from 'bcrypt';
 
 export interface UserOptions {
   includePassword?: boolean;
-  includeStripeData?: boolean;
 }
 
 export interface UserStats {
   totalUsers: number;
   newUsersLast30Days: number;
   activeUsers: number;
-  usersWithStripe: number;
 }
 
 export interface CreateUserWithPasswordRequest {
@@ -204,45 +202,6 @@ export class UserService {
   }
 
   // ============================================================================
-  // STRIPE INTEGRATION BUSINESS LOGIC
-  // ============================================================================
-
-  /**
-   * Link user to Stripe customer
-   */
-  async linkStripeCustomer(userId: string, stripeCustomerId: string): Promise<void> {
-    // Business validation: User exists
-    const user = await this.userRepository.findById(userId);
-    if (!user) {
-      throw new NotFoundError('User', userId);
-    }
-
-    // Business validation: Stripe customer ID format
-    if (!stripeCustomerId.startsWith('cus_')) {
-      throw new ValidationError('Invalid Stripe Customer ID format', 'stripeCustomerId');
-    }
-
-    // Business validation: Stripe customer ID uniqueness
-    const existingUserWithStripe = await this.userRepository.findByStripeCustomerId(stripeCustomerId);
-    if (existingUserWithStripe && existingUserWithStripe.id !== userId) {
-      throw new ValidationError('Stripe Customer ID is already linked to another user', 'stripeCustomerId');
-    }
-
-    await this.userRepository.updateStripeCustomerId(userId, stripeCustomerId);
-  }
-
-  /**
-   * Get user by Stripe customer ID
-   */
-  async getUserByStripeCustomerId(stripeCustomerId: string, options: UserOptions = {}): Promise<UserModel | null> {
-    const user = await this.userRepository.findByStripeCustomerId(stripeCustomerId);
-    if (!user) {
-      return null;
-    }
-    return this.transformUserForResponse(user, options);
-  }
-
-  // ============================================================================
   // BUSINESS ANALYTICS AND STATISTICS
   // ============================================================================
 
@@ -257,8 +216,6 @@ export class UserService {
 
     const newUsersLast30Days = allUsers.filter((user) => new Date(user.createdAt) >= thirtyDaysAgo).length;
 
-    const usersWithStripe = allUsers.filter((user) => user.stripeCustomerId).length;
-
     // Active users = users who have logged in or created content recently
     // For now, we'll count all users as active since we don't track login timestamps
     const activeUsers = allUsers.length;
@@ -267,7 +224,6 @@ export class UserService {
       totalUsers: allUsers.length,
       newUsersLast30Days,
       activeUsers,
-      usersWithStripe,
     };
   }
 
@@ -284,11 +240,6 @@ export class UserService {
     // Remove password unless explicitly requested
     if (!options.includePassword) {
       delete result.password;
-    }
-
-    // Remove Stripe data unless explicitly requested
-    if (!options.includeStripeData) {
-      delete result.stripeCustomerId;
     }
 
     return result;

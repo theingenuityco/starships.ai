@@ -40,7 +40,7 @@ const starships = await starshipRepo.findAll();
 
 ### Core Domain Model
 
-- **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`) and subscription billing
+- **Starships**: Configurable AI platforms with agent deployment management
 - **Agents**: AI entities with deployment management and template system
 - **Tools**: Executable utilities deployed to starships with flexible blueprint configuration
 - **Users**: Authentication and authorization management
@@ -49,7 +49,7 @@ const starships = await starshipRepo.findAll();
 - **Conversations**: Communication logs with agent relationships and structured metadata
 - **Messages**: Individual message storage with role-based threading
 - **Environments**: Encrypted environment variable management scoped to starships
-- **Usage**: Token usage tracking for billing and analytics
+- **Usage**: Token usage tracking for analytics
 
 ### Direct Repository Usage
 
@@ -96,7 +96,7 @@ try {
 | **ConversationRepository**  | Chat history, agent relationships, and communication logs |
 | **MessageRepository**       | Individual message storage and retrieval                  |
 | **EnvironmentRepository**   | Environment variable management with encryption           |
-| **UsageRepository**         | Token usage tracking for billing and analytics            |
+| **UsageRepository**         | Token usage tracking for analytics                        |
 | **WaitlistRepository**      | Early access user onboarding queue                        |
 
 > **Note:** `WorkflowRepository`, `BlueprintRepository`, `ExecutionRepository`, `NodeRepository`, and `EdgeRepository` have been removed as no implementations exist. Blueprint data is stored as JSONB within agent and tool entities.
@@ -171,7 +171,6 @@ const starshipRepo = new StarshipRepository();
 // Create a new starship
 const starship = await starshipRepo.create({
   name: 'Discovery One',
-  class: 'cruiser',
   ownerId: 'user-123',
 });
 

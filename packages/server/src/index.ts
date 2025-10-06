@@ -33,7 +33,6 @@ import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
 // import expeditionRoutes from '@/routes/expeditions';
-import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
 
 // Import new error handling and health check routes
 import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
@@ -73,7 +72,6 @@ const dbConnection = createConnection({
 const starshipRepository = new StarshipRepository();
 // Middleware - Order is important!
 app.use(cors());
-app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -81,24 +79,6 @@ app.use(cookieParser());
 app.use(requestIdMiddleware);
 
 // Starship routes are now self-contained with internal service instantiation
-
-// Initialize webhook routes with dependencies
-initializeWebhookRoutes({
-  starshipRepository,
-});
-
-// Public pricing endpoint - must be before auth-protected routes
-app.get('/api/v1/starships/pricing', async (req, res) => {
-  try {
-    const { SubscriptionService } = await import('./services/SubscriptionService');
-    const subscriptionService = new SubscriptionService();
-    const pricing = await subscriptionService.getPricingData();
-    res.json(pricing);
-  } catch (error) {
-    console.error('Failed to fetch pricing:', error);
-    res.status(500).json({ error: 'Failed to fetch pricing' });
-  }
-});
 
 // API Routes
 app.use('/api/v1', authRoutes); // Authentication routes (public)

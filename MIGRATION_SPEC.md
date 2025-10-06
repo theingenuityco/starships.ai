@@ -235,7 +235,7 @@ interface PostgresConfig {
 
 - No redundant conversion code in repositories
 - Consistent field naming across database and entities
-- Handles complex field mappings: `stripe_customer_id` ↔ `stripeCustomerId`, `display_name` ↔ `displayName`
+- Handles complex field mappings: `display_name` ↔ `displayName`
 
 ---
 
@@ -305,8 +305,8 @@ interface PostgresConfig {
 ### **Common Issues & Solutions**
 
 1. **Field Name Conversion** ✅ **SOLVED**:
-   - ~~Neo4j uses camelCase: `stripeCustomerId`~~
-   - ~~PostgreSQL uses snake_case: `stripe_customer_id`~~
+   - ~~Neo4j uses camelCase: `customerId`~~
+   - ~~PostgreSQL uses snake_case: `customer_id`~~
    - ✅ **Automatic conversion**: Enhanced serialization helpers handle this automatically
 
 2. **Method Naming Conflicts** ✅ **SOLVED**:
@@ -353,7 +353,7 @@ interface PostgresConfig {
 
 ### **PostgreSQL Schema Summary**
 
-- **17 Tables**: users, starships, agents, agent_templates, tools, tool_templates, workflows, blueprints, nodes, edges, conversations, messages, executions, environments, usage, waitlist, stripe_events
+- **17 Tables**: users, starships, agents, agent_templates, tools, tool_templates, workflows, blueprints, nodes, edges, conversations, messages, executions, environments, usage, waitlist
 - **3 Junction Tables**: agent_tools, agent_template_tool_templates, conversation_agents
 - **35+ Indexes**: Including full-text search and performance indexes
 - **Auto-triggers**: For updated_at timestamps

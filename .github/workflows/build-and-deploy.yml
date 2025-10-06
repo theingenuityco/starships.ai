@@ -270,10 +270,6 @@ jobs:
             --from-literal=LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
             --from-literal=DEFAULT_LLM_PROVIDER="${{ vars.DEFAULT_LLM_PROVIDER }}" \
             --from-literal=DEFAULT_CHAT_MODEL="${{ vars.DEFAULT_CHAT_MODEL }}" \
-            --from-literal=STRIPE_PRICE_CRUISER_MONTHLY="${{ vars.STRIPE_PRICE_CRUISER_MONTHLY }}" \
-            --from-literal=STRIPE_PRICE_CRUISER_YEARLY="${{ vars.STRIPE_PRICE_CRUISER_YEARLY }}" \
-            --from-literal=STRIPE_PRICE_DRAUGHT_MONTHLY="${{ vars.STRIPE_PRICE_DRAUGHT_MONTHLY }}" \
-            --from-literal=STRIPE_PRICE_DRAUGHT_YEARLY="${{ vars.STRIPE_PRICE_DRAUGHT_YEARLY }}" \
             --from-literal=GA_MEASUREMENT_ID="${{ vars.GA_MEASUREMENT_ID }}" \
             -n starships-dev
 

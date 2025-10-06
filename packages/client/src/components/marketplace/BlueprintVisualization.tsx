@@ -17,6 +17,8 @@ import {
   OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
+  EdgeProps,
+  getBezierPath,
 } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
@@ -448,7 +450,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   // Apply ELK layout
   const layoutResult = await getElkLayout(initialNodes, flowEdges)
 
-  // Detect back edges after layout and use smoothstep for sharp U-turns
+  // Detect back edges after layout and use proper bezier curves
   const edgesWithZIndex = layoutResult.edges.map(edge => {
     const sourceNode = layoutResult.nodes.find(n => n.id === edge.source)
     const targetNode = layoutResult.nodes.find(n => n.id === edge.target)
@@ -458,7 +460,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
 
     return {
       ...edge,
-      type: isBackEdge ? 'smoothstep' : 'simplebezier', // Smoothstep for sharp U-turn on back edges
+      type: 'default', // Use default bezier for all edges
       zIndex: isBackEdge ? 1000 : 1, // Back edges render on top of nodes
       style: {
         ...edge.style,

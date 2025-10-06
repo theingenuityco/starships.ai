@@ -530,7 +530,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   return (
     <div className="space-y-2">
       {/* Monaco Editor */}
-      <div className="relative rounded-md border border-input overflow-hidden">
+      <div className="relative rounded-b-xl overflow-hidden">
         <div className="pr-4 bg-[#fafafa] dark:bg-[#13161b]">
           <Editor
             height="300px"

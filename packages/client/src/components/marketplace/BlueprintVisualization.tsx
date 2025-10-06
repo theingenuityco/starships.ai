@@ -312,27 +312,45 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
   const graph = {
     id: 'root',
     layoutOptions: {
-      'elk.algorithm': 'layered', // Layered algorithm with SCC support
+      'elk.algorithm': 'layered', // Layered algorithm
       'elk.direction': 'RIGHT', // Left to right layout
 
-      // SCC Condensation Settings
-      'elk.layered.cycleBreaking.strategy': 'INTERACTIVE', // Handle cycles intelligently
-      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES', // Respect graph structure
+      // DO NOT BREAK CYCLES - Preserve them completely
+      'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST', // Minimal cycle intervention
+      'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
 
-      // Spacing and Layout
-      'elk.spacing.nodeNode': '100', // Space between nodes at same level
-      'elk.layered.spacing.nodeNodeBetweenLayers': '200', // Space between layers
-      'elk.spacing.edgeNode': '50', // Space for edges
-      'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', // Better node placement
+      // Optimized spacing for cycle routing
+      'elk.spacing.nodeNode': '180', // More vertical space between nodes at same level
+      'elk.layered.spacing.nodeNodeBetweenLayers': '200', // Horizontal layer spacing
+      'elk.spacing.edgeNode': '80', // Sufficient edge routing space
+      'elk.spacing.edgeEdge': '30', // Space between edges
+      'elk.padding': '[top=40,left=40,bottom=40,right=40]', // Reasonable padding
 
-      // Edge Routing for Cycles
-      'elk.edgeRouting': 'SPLINES', // Smooth spline routing for better cycle visualization
-      'elk.layered.unnecessaryBendpoints': 'false', // Remove unnecessary bends
-      'elk.layered.wrapping.strategy': 'OFF', // Don't wrap the graph
+      // Node Placement - Optimized for cycles
+      'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
+      'elk.layered.layering.strategy': 'MIN_WIDTH', // Minimize width, allow cycles
 
-      // Layout quality
-      'elk.layered.thoroughness': '100', // Maximum thoroughness for better results
-      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP', // Minimize edge crossings
+      // SPLINES routing - Better for cycles than orthogonal
+      'elk.edgeRouting': 'SPLINES', // Smooth curves that route around
+      'elk.layered.unnecessaryBendpoints': 'false',
+      'elk.layered.wrapping.strategy': 'OFF',
+
+      // Allow back edges to route naturally
+      'elk.layered.allowNonFlowPortsToSwitchSides': 'true', // Flexible port routing
+      'elk.layered.feedbackEdges': 'true', // Track but don't break back edges
+
+      // Port flexibility for better cycle routing
+      'elk.portConstraints': 'FREE', // Allow flexible port positioning
+
+      // Quality settings
+      'elk.layered.thoroughness': '100',
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'elk.layered.crossingMinimization.greedySwitch': 'TWO_SIDED',
+
+      // Compaction settings - Prevent edge overlap
+      'elk.layered.compaction.postCompaction.strategy': 'EDGE_LENGTH',
+      'elk.layered.compaction.connectedComponents': 'false', // Don't compact SCCs
     },
     children: nodes.map(node => ({
       id: node.id,
@@ -399,7 +417,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
     },
   }))
 
-  // Create edges with default bezier curves (community recommended for ELK layouts)
+  // Create edges with simple bezier - combines smoothstep routing with bezier curves
   const flowEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
@@ -409,7 +427,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
-      type: 'default', // Default bezier curves work best with ELK's computed positions
+      type: 'simplebezier', // Simple bezier combines smoothstep-style routing with bezier curves
       animated: false,
       style: {
         stroke: '#64748b',
@@ -422,14 +440,36 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
         height: 16,
       },
       label: edge.label,
+      // Higher z-index for back edges will be set after layout
+      data: {},
     }
   })
 
   // Apply ELK layout
   const layoutResult = await getElkLayout(initialNodes, flowEdges)
 
-  // Return layout with edges
-  return layoutResult
+  // Detect back edges after layout and use smoothstep for sharp U-turns
+  const edgesWithZIndex = layoutResult.edges.map(edge => {
+    const sourceNode = layoutResult.nodes.find(n => n.id === edge.source)
+    const targetNode = layoutResult.nodes.find(n => n.id === edge.target)
+
+    // Back edge: target is to the left of source (going backwards)
+    const isBackEdge = sourceNode && targetNode && targetNode.position.x < sourceNode.position.x
+
+    return {
+      ...edge,
+      type: isBackEdge ? 'smoothstep' : 'simplebezier', // Smoothstep for sharp U-turn on back edges
+      zIndex: isBackEdge ? 1000 : 1, // Back edges render on top of nodes
+      style: {
+        ...edge.style,
+        // Make back edges slightly more visible
+        strokeWidth: isBackEdge ? 2.5 : 2,
+      },
+    }
+  })
+
+  // Return layout with properly configured edges
+  return { nodes: layoutResult.nodes, edges: edgesWithZIndex }
 }
 
 // Node types for React Flow

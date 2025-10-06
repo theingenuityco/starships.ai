@@ -11,6 +11,7 @@ import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -33,6 +34,13 @@ interface ConversationMessageInputProps {
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
+  onFocus?: () => void // Callback when input is focused
+  onBlur?: () => void // Callback when input loses focus
+  onToggleOverlay?: () => void // Callback to toggle overlay expansion (used when input is disabled)
+  // Props for expandable overlay (when in tool-form mode)
+  showExpandableOverlay?: boolean
+  isOverlayExpanded?: boolean
+  budgetTokens?: number
 }
 
 export interface ConversationMessageInputRef {
@@ -41,7 +49,27 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onToggleToolForm, isToolFormOpen = false, disabled = false, minimal = false, children }, ref) => {
+  (
+    {
+      selectedAgent,
+      starshipId,
+      conversationId,
+      onConversationStart,
+      onMessageSent,
+      onToggleToolForm,
+      isToolFormOpen = false,
+      disabled = false,
+      minimal = false,
+      children,
+      onFocus,
+      onBlur,
+      onToggleOverlay,
+      showExpandableOverlay = false,
+      isOverlayExpanded = false,
+      budgetTokens,
+    },
+    ref
+  ) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -293,17 +321,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
-        {/* Input Container */}
+        {/* Input Container with Expandable Overlay */}
         <div
           className={cn(
-            'relative transition-all',
+            'relative transition-all overflow-hidden',
             minimal
-              ? 'frosted-glass-card rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
-              : 'frosted-glass-card rounded-2xl shadow-frosted-xl focus-within:ring-2 focus-within:ring-primary/20',
+              ? 'frosted-glass-card rounded-xl shadow-frosted-lg focus-within:ring-1 focus-within:ring-primary/15'
+              : 'frosted-glass-card rounded-2xl shadow-frosted-lg focus-within:ring-2 focus-within:ring-primary/20',
             'focus-within:border-primary/40',
             disabled && 'opacity-50'
           )}
         >
+          {/* Expandable Message Overlay - Inside the input container */}
+          {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
           {/* Main Input Section - Only Text Input */}
           <div className={cn('flex items-end', minimal ? 'p-3' : 'p-4')}>
             {/* Minimal mode: Tool button on left */}
@@ -336,6 +366,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 value={message}
                 onChange={handleTextareaChange}
                 onKeyPress={handleKeyPress}
+                onFocus={onFocus}
+                onBlur={onBlur}
+                onClick={e => {
+                  // When input is disabled (streaming), allow clicking to toggle overlay
+                  if ((disabled || sending || isStreamingEffective) && onToggleOverlay) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onToggleOverlay()
+                  }
+                }}
                 placeholder={getPlaceholder()}
                 disabled={disabled || sending || isStreamingEffective}
                 className={cn(
@@ -344,7 +384,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   'text-foreground placeholder-muted-foreground',
                   'border-0 outline-none focus:ring-0',
                   'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
-                  minimal && 'text-sm'
+                  minimal && 'text-sm',
+                  // Add cursor pointer when disabled and overlay toggle is available
+                  (disabled || sending || isStreamingEffective) && onToggleOverlay && 'cursor-pointer pointer-events-auto'
                 )}
                 rows={1}
               />

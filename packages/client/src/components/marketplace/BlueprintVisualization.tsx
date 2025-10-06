@@ -1,13 +1,15 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge } from '@xyflow/react'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database } from 'lucide-react'
+import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge, Panel } from '@xyflow/react'
+import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
   className?: string
+  transparent?: boolean
+  title?: string
 }
 
 interface ReactFlowNode extends Node {
@@ -15,43 +17,46 @@ interface ReactFlowNode extends Node {
     label: string
     type: string
     description?: string
-    icon: React.ReactNode
+    nodeType: string // Store node type instead of icon element
     outgoingEdges?: BlueprintEdge[]
   }
 }
 
-// Get icon for node type with updated mapping
-const getNodeIcon = (nodeType: string) => {
+// Get icon component for node type
+const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
+  const className = 'w-5 h-5'
   switch (nodeType) {
     case 'start':
-      return <Play className="w-4 h-4" />
+      return <Play className={className} />
     case 'end':
-      return <CheckCircle2 className="w-4 h-4" />
+      return <CheckCircle2 className={className} />
     case 'agent':
-      return <Zap className="w-4 h-4" />
+      return <Zap className={className} />
     case 'user_prompt':
-      return <User className="w-4 h-4" />
+      return <User className={className} />
     case 'conditional':
-      return <AlertTriangle className="w-4 h-4" />
+      return <AlertTriangle className={className} />
     case 'output':
-      return <Eye className="w-4 h-4" />
+      return <Eye className={className} />
     case 'llm':
-      return <Zap className="w-4 h-4" />
+      return <Zap className={className} />
     case 'http_request':
-      return <Globe className="w-4 h-4" />
+      return <Globe className={className} />
     case 'code':
-      return <Code className="w-4 h-4" />
+      return <Code className={className} />
     case 'tool':
-      return <Settings className="w-4 h-4" />
+      return <Settings className={className} />
     case 'workflow':
-      return <GitBranch className="w-4 h-4" />
+      return <GitBranch className={className} />
     case 'transform':
+      return <Cog className={className} />
     case 'mutate':
-      return <Database className="w-4 h-4" />
+      return <Database className={className} />
     default:
-      return <Clock className="w-4 h-4" />
+      return <Clock className={className} />
   }
-}
+})
+NodeIcon.displayName = 'NodeIcon'
 
 // Get color scheme for node type
 const getNodeColors = (nodeType: string) => {
@@ -294,7 +299,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
   return (
     <>
       {/* Input handle */}
-      <Handle type="target" position={Position.Top} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ top: -6 }} />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
 
       <div className="relative">
         {/* Main node body */}
@@ -315,47 +320,50 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               border: `2px solid ${colors.handle}30`,
             }}
           >
-            <div className="w-5 h-5">{data.icon}</div>
+            <NodeIcon nodeType={data.nodeType} />
           </div>
 
           {/* Node content */}
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate leading-tight">{data.label}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>
+            {data.type && <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
           </div>
         </div>
 
-        {/* Horizontal conditional sections at the bottom */}
+        {/* Vertical conditional sections on the right */}
         {edges.length > 1 && (
-          <div className="flex mt-1">
-            {edges.map((edge, index) => (
-              <div
-                key={edge.ref}
-                className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-b-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mr-1 last:mr-0"
-                style={{ minWidth: '60px' }}
-              >
-                <div className="truncate text-center">{edge.label || `Branch ${index + 1}`}</div>
-                {/* Individual output handle for this branch */}
-                <Handle
-                  type="source"
-                  position={Position.Bottom}
-                  id={edge.ref}
-                  className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
-                  style={{
-                    bottom: -5,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    position: 'absolute',
-                  }}
-                />
-              </div>
-            ))}
+          <div className="flex flex-col ml-1">
+            {edges.map((edge, index) => {
+              const uniqueKey = edge?.ref ? `branch-${edge.ref}` : `edge-branch-${index}`
+              return (
+                <div
+                  key={uniqueKey}
+                  className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-r-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 last:mb-0"
+                  style={{ minHeight: '30px' }}
+                >
+                  <div className="truncate text-center">{edge?.label || `Branch ${index + 1}`}</div>
+                  {/* Individual output handle for this branch */}
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={edge?.ref}
+                    className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
+                    style={{
+                      right: -5,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      position: 'absolute',
+                    }}
+                  />
+                </div>
+              )
+            })}
           </div>
         )}
 
         {/* Single output handle for nodes with only one output */}
         {edges.length <= 1 && (
-          <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ bottom: -6 }} />
+          <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
         )}
       </div>
     </>
@@ -373,9 +381,9 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 
   return (
     <>
-      {/* Input handle - all nodes except start (vertical layout: top) */}
+      {/* Input handle - all nodes except start (horizontal layout: left) */}
       {data.type !== 'start' && (
-        <Handle type="target" position={Position.Top} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ top: -6 }} />
+        <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
       )}
 
       <div
@@ -395,39 +403,50 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
             border: `2px solid ${colors.handle}30`,
           }}
         >
-          <div className="w-5 h-5">{data.icon}</div>
+          <NodeIcon nodeType={data.nodeType} />
         </div>
 
         {/* Node content with better typography */}
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate leading-tight">{data.label}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>
+          {data.type && <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
         </div>
       </div>
 
-      {/* Output handle - all nodes except end (vertical layout: bottom) */}
+      {/* Output handle - all nodes except end (horizontal layout: right) */}
       {data.type !== 'end' && (
-        <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ bottom: -6 }} />
+        <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
       )}
     </>
   )
 }
 
-// Create execution-order based layout (vertical workflow)
+// Create execution-order based layout (horizontal workflow)
 const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprint: Blueprint) => {
   // Find start and end nodes
   const startNode = blueprint.nodes.find(node => node.type === 'start')
   const endNodes = blueprint.nodes.filter(node => node.type === 'end')
 
+  // Handle incomplete blueprints during streaming - no start node yet
   if (!startNode) {
-    throw new Error('No start node found')
+    // Return simple layout without execution order
+    return {
+      nodes: nodes.map((node, index) => ({
+        ...node,
+        position: { x: index * 200 + 120, y: 600 },
+      })),
+      edges,
+    }
   }
 
   // Build edge maps for navigation
   const edgeMap = new Map<string, BlueprintEdge[]>()
   const incomingEdgeMap = new Map<string, BlueprintEdge[]>()
 
-  blueprint.edges.forEach(edge => {
+  // Safely handle edges - may be undefined during streaming
+  const blueprintEdges = blueprint.edges || []
+
+  blueprintEdges.forEach(edge => {
     // Outgoing edges
     if (!edgeMap.has(edge.from)) {
       edgeMap.set(edge.from, [])
@@ -495,12 +514,6 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     }
   })
 
-  // Special handling for end nodes - ensure they're at the bottom
-  const maxLevel = Math.max(...Array.from(executionLevels.values()))
-  endNodes.forEach(endNode => {
-    executionLevels.set(endNode.ref, maxLevel + 1)
-  })
-
   // Group nodes by execution level
   const nodesByLevel = new Map<number, BlueprintNode[]>()
   blueprint.nodes.forEach(node => {
@@ -549,15 +562,13 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     const indexAtLevel = sortedNodes.findIndex(n => n.ref === node.id)
     const totalAtLevel = sortedNodes.length
 
-    // Vertical positioning with more spacing
-    const y = level * 350 + 120
+    // Fixed horizontal spacing between execution levels
+    const horizontalSpacing = 350
+    const x = level * horizontalSpacing + 120
 
-    // Horizontal distribution - extra wide to allow curves
-    let x = 600 // Center position
-    if (totalAtLevel > 1) {
-      const spacing = Math.max(600, 1400 / totalAtLevel) // Very wide spacing
-      x = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 600
-    }
+    // Fixed vertical spacing between parallel nodes
+    const verticalSpacing = 200
+    const y = (indexAtLevel - (totalAtLevel - 1) / 2) * verticalSpacing + 600
 
     return {
       ...node,
@@ -574,9 +585,12 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     return { nodes: [], edges: [] }
   }
 
+  // Safely handle edges - may be undefined during streaming
+  const blueprintEdges = blueprint.edges || []
+
   // Build outgoing edges map for conditional nodes
   const outgoingEdgesMap = new Map<string, BlueprintEdge[]>()
-  blueprint.edges.forEach(edge => {
+  blueprintEdges.forEach(edge => {
     if (!outgoingEdgesMap.has(edge.from)) {
       outgoingEdgesMap.set(edge.from, [])
     }
@@ -592,7 +606,7 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
       label: node.name,
       type: node.type,
       description: node.description,
-      icon: getNodeIcon(node.type),
+      nodeType: node.type, // Store node type instead of icon element
       outgoingEdges: outgoingEdgesMap.get(node.ref) || [],
     },
     style: {
@@ -612,18 +626,32 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     height: 50, // Node height + padding
   }))
 
-  // Create edges with intelligent routing around nodes
-  const intelligentEdges: Edge[] = blueprint.edges.map((edge: BlueprintEdge) => {
+  // Build incoming edges map to detect convergence
+  const incomingEdgesMap = new Map<string, BlueprintEdge[]>()
+  blueprintEdges.forEach(edge => {
+    if (!incomingEdgesMap.has(edge.to)) {
+      incomingEdgesMap.set(edge.to, [])
+    }
+    incomingEdgesMap.get(edge.to)!.push(edge)
+  })
+
+  // Create edges with intelligent routing only when needed
+  const intelligentEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const targetNode = blueprint.nodes.find(n => n.ref === edge.to)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+
+    // Check if this edge needs intelligent routing (multiple branches or convergence)
+    const hasMultipleOutgoing = (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+    const hasMultipleIncoming = (incomingEdgesMap.get(edge.to)?.length || 0) > 1
+    const needsIntelligentRouting = hasMultipleOutgoing || hasMultipleIncoming
 
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
-      type: 'intelligent', // Use custom intelligent edge for obstacle avoidance
+      type: needsIntelligentRouting ? 'intelligent' : 'default', // Use intelligent edge only when needed
       animated: false,
       style: {
         stroke: '#64748b',
@@ -636,9 +664,11 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
         height: 16,
       },
       label: edge.label,
-      data: {
-        obstacles: obstacles,
-      },
+      data: needsIntelligentRouting
+        ? {
+            obstacles: obstacles,
+          }
+        : undefined,
     }
   })
 
@@ -655,11 +685,22 @@ const edgeTypes = {
   intelligent: IntelligentEdge,
 }
 
-function BlueprintFlow({ blueprint }: { blueprint: Blueprint }) {
+function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint; transparent?: boolean; title?: string }) {
   const { nodes, edges } = useMemo(() => convertBlueprintToFlow(blueprint), [blueprint])
 
   return (
-    <div className="h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div
+      className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
+      style={
+        !transparent
+          ? {
+              backgroundImage: `radial-gradient(circle, #9ca3af 1.2px, transparent 1.2px)`,
+              backgroundSize: '24px 24px',
+              backgroundPosition: '0 0',
+            }
+          : undefined
+      }
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -685,13 +726,20 @@ function BlueprintFlow({ blueprint }: { blueprint: Blueprint }) {
         proOptions={{ hideAttribution: true }}
         defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
       >
-        <Background color="#9ca3af" gap={24} size={1.2} className="opacity-20 dark:opacity-10" variant={BackgroundVariant.Dots} />
+        {title && (
+          <Panel position="top-left" className="m-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
+              <Wrench className="w-5 h-5 text-primary" />
+              <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{title}</span>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   )
 }
 
-export function BlueprintVisualization({ blueprint, className = '' }: BlueprintVisualizationProps) {
+export function BlueprintVisualization({ blueprint, className = '', transparent = false, title }: BlueprintVisualizationProps) {
   if (!blueprint?.nodes || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
@@ -703,7 +751,7 @@ export function BlueprintVisualization({ blueprint, className = '' }: BlueprintV
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <BlueprintFlow blueprint={blueprint} />
+        <BlueprintFlow blueprint={blueprint} transparent={transparent} title={title} />
       </div>
     </ReactFlowProvider>
   )

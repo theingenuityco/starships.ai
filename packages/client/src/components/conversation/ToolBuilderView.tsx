@@ -443,13 +443,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                                     </Badge>
 
                                     {/* Delete */}
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removeParameter(index)}
-                                      className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
-                                    >
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeParameter(index)} className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive">
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
                                   </div>

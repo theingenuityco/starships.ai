@@ -17,9 +17,8 @@ import {
   OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
-  EdgeProps,
-  getBezierPath,
 } from '@xyflow/react'
+import ELK from 'elkjs/lib/elk.bundled.js'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 import { Card } from '@/components/ui/card'
@@ -172,98 +171,6 @@ const getNodeColors = (nodeType: string) => {
   return colorSchemes[nodeType as keyof typeof colorSchemes] || colorSchemes.default
 }
 
-// Custom edge for loop backs with pronounced curve that avoids nodes
-const LoopBackEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd, label }) => {
-  // Create a pronounced curved path for loop backs that routes around nodes
-  const dx = targetX - sourceX
-  const dy = targetY - sourceY
-  const distance = Math.abs(dx)
-
-  // Add horizontal extensions at start and end
-  const horizontalExtension = 50
-
-  // Calculate a pronounced curve that goes well above the nodes
-  // The curve should be proportional to the distance to avoid nodes in between
-  const verticalOffset = Math.max(150, distance * 0.4) // Scale with distance, minimum 150px
-
-  // Determine if we should curve upward or downward based on vertical position
-  const curveDirection = dy > 0 ? 1 : -1 // Curve in opposite direction if target is below
-  const curveOffset = verticalOffset * curveDirection
-
-  // Start and end points with horizontal extensions
-  const extendedSourceX = sourceX + horizontalExtension
-  const extendedTargetX = targetX - horizontalExtension
-
-  // Create a smooth arc with two control points for proper cubic bezier
-  // First control point: after source extension, moving up/down
-  const controlPoint1X = extendedSourceX + (extendedTargetX - extendedSourceX) * 0.25
-  const controlPoint1Y = sourceY - curveOffset
-
-  // Second control point: before target extension, coming down from arc
-  const controlPoint2X = extendedTargetX - (extendedTargetX - extendedSourceX) * 0.25
-  const controlPoint2Y = targetY - curveOffset
-
-  // Path with horizontal extensions and smooth curve
-  const path = `
-    M ${sourceX},${sourceY}
-    L ${extendedSourceX},${sourceY}
-    C ${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${extendedTargetX},${targetY}
-    L ${targetX},${targetY}
-  `
-
-  // Calculate label position at the curve peak
-  const labelX = (extendedSourceX + extendedTargetX) / 2
-  const labelY = sourceY - curveOffset * 0.85
-
-  return (
-    <>
-      <path
-        id={id}
-        d={path}
-        style={{
-          ...style,
-          fill: 'none',
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-        }}
-        className="react-flow__edge-path"
-        markerEnd={markerEnd}
-      />
-      {label && (
-        <text
-          x={labelX}
-          y={labelY}
-          textAnchor="middle"
-          dominantBaseline="central"
-          className="react-flow__edge-text"
-          style={{
-            fontSize: '11px',
-            fontWeight: 500,
-            fill: '#475569',
-            pointerEvents: 'none',
-          }}
-        >
-          <tspan
-            x={labelX}
-            y={labelY}
-            style={{
-              fill: 'rgba(255, 255, 255, 0.95)',
-              stroke: 'rgba(255, 255, 255, 0.95)',
-              strokeWidth: 3,
-              paintOrder: 'stroke',
-            }}
-          >
-            {label}
-          </tspan>
-          <tspan x={labelX} y={labelY}>
-            {label}
-          </tspan>
-        </text>
-      )}
-    </>
-  )
-}
-
 // Custom conditional node component with horizontal sections for each output
 const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const colors = getNodeColors(data.type)
@@ -398,166 +305,65 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
   )
 }
 
-// Create execution-order based layout (horizontal workflow)
-const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprint: Blueprint) => {
-  // Find start and end nodes
-  const startNode = blueprint.nodes.find(node => node.type === 'start')
-  const endNodes = blueprint.nodes.filter(node => node.type === 'end')
+// Use ELK (Eclipse Layout Kernel) with SCC condensation
+const elk = new ELK()
 
-  // Handle incomplete blueprints during streaming - no start node yet
-  if (!startNode) {
-    // Return simple layout without execution order
-    return {
-      nodes: nodes.map((node, index) => ({
-        ...node,
-        position: { x: index * 200 + 120, y: 600 },
-      })),
-      edges,
-    }
+const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
+  const graph = {
+    id: 'root',
+    layoutOptions: {
+      'elk.algorithm': 'layered', // Layered algorithm with SCC support
+      'elk.direction': 'RIGHT', // Left to right layout
+
+      // SCC Condensation Settings
+      'elk.layered.cycleBreaking.strategy': 'INTERACTIVE', // Handle cycles intelligently
+      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES', // Respect graph structure
+
+      // Spacing and Layout
+      'elk.spacing.nodeNode': '100', // Space between nodes at same level
+      'elk.layered.spacing.nodeNodeBetweenLayers': '200', // Space between layers
+      'elk.spacing.edgeNode': '50', // Space for edges
+      'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', // Better node placement
+
+      // Edge Routing for Cycles
+      'elk.edgeRouting': 'SPLINES', // Smooth spline routing for better cycle visualization
+      'elk.layered.unnecessaryBendpoints': 'false', // Remove unnecessary bends
+      'elk.layered.wrapping.strategy': 'OFF', // Don't wrap the graph
+
+      // Layout quality
+      'elk.layered.thoroughness': '100', // Maximum thoroughness for better results
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP', // Minimize edge crossings
+    },
+    children: nodes.map(node => ({
+      id: node.id,
+      width: 220,
+      height: 80,
+    })),
+    edges: edges.map(edge => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target],
+    })),
   }
 
-  // Build edge maps for navigation
-  const edgeMap = new Map<string, BlueprintEdge[]>()
-  const incomingEdgeMap = new Map<string, BlueprintEdge[]>()
+  const layoutedGraph = await elk.layout(graph)
 
-  // Safely handle edges - may be undefined during streaming
-  const blueprintEdges = blueprint.edges || []
-
-  blueprintEdges.forEach(edge => {
-    // Outgoing edges
-    if (!edgeMap.has(edge.from)) {
-      edgeMap.set(edge.from, [])
-    }
-    edgeMap.get(edge.from)!.push(edge)
-
-    // Incoming edges
-    if (!incomingEdgeMap.has(edge.to)) {
-      incomingEdgeMap.set(edge.to, [])
-    }
-    incomingEdgeMap.get(edge.to)!.push(edge)
-  })
-
-  // Calculate execution levels with proper cycle and end node handling
-  const executionLevels = new Map<string, number>()
-  const processing = new Set<string>()
-  const processed = new Set<string>()
-
-  // Modified DFS that handles cycles and ensures end nodes are positioned last
-  const calculateExecutionLevel = (nodeRef: string, currentLevel: number = 0): number => {
-    // If already processed, return the stored level
-    if (processed.has(nodeRef)) {
-      return executionLevels.get(nodeRef) ?? currentLevel
-    }
-
-    // If currently processing (cycle detected), don't recurse further
-    if (processing.has(nodeRef)) {
-      return currentLevel
-    }
-
-    processing.add(nodeRef)
-
-    // Set initial level
-    let maxLevel = currentLevel
-    executionLevels.set(nodeRef, maxLevel)
-
-    // Process all outgoing edges
-    const outgoingEdges = edgeMap.get(nodeRef) || []
-    for (const edge of outgoingEdges) {
-      const childLevel = calculateExecutionLevel(edge.to, maxLevel + 1)
-      // Update our level if child requires higher level
-      if (childLevel > maxLevel) {
-        maxLevel = Math.max(maxLevel, childLevel - 1)
-      }
-    }
-
-    // Update the level if it changed
-    if (maxLevel > currentLevel) {
-      executionLevels.set(nodeRef, maxLevel)
-    }
-
-    processing.delete(nodeRef)
-    processed.add(nodeRef)
-
-    return executionLevels.get(nodeRef) ?? currentLevel
-  }
-
-  // Start traversal from start node
-  calculateExecutionLevel(startNode.ref, 0)
-
-  // Ensure all nodes are processed (handle disconnected components)
-  blueprint.nodes.forEach(node => {
-    if (!processed.has(node.ref)) {
-      calculateExecutionLevel(node.ref, 0)
-    }
-  })
-
-  // Group nodes by execution level
-  const nodesByLevel = new Map<number, BlueprintNode[]>()
-  blueprint.nodes.forEach(node => {
-    const level = executionLevels.get(node.ref) ?? 0
-    if (!nodesByLevel.has(level)) {
-      nodesByLevel.set(level, [])
-    }
-    nodesByLevel.get(level)!.push(node)
-  })
-
-  // Position nodes to minimize edge crossings with extra wide spacing
   const layoutedNodes = nodes.map(node => {
-    const level = executionLevels.get(node.id) ?? 0
-    const nodesAtLevel = nodesByLevel.get(level) || []
-
-    // Sort nodes at same level to minimize crossings
-    const sortedNodes = [...nodesAtLevel].sort((a, b) => {
-      // Prioritize nodes with incoming edges from left side
-      const aIncoming = incomingEdgeMap.get(a.ref) || []
-      const bIncoming = incomingEdgeMap.get(b.ref) || []
-
-      if (aIncoming.length !== bIncoming.length) {
-        return aIncoming.length - bIncoming.length
-      }
-
-      // Secondary sort by node type priority
-      const typePriority = {
-        start: 0,
-        llm: 1,
-        agent: 1,
-        conditional: 2,
-        code: 3,
-        tool: 3,
-        http_request: 3,
-        transform: 4,
-        mutate: 4,
-        end: 5,
-      }
-
-      const aPriority = typePriority[a.type as keyof typeof typePriority] ?? 6
-      const bPriority = typePriority[b.type as keyof typeof typePriority] ?? 6
-
-      return aPriority - bPriority
-    })
-
-    const indexAtLevel = sortedNodes.findIndex(n => n.ref === node.id)
-    const totalAtLevel = sortedNodes.length
-
-    // Fixed horizontal spacing between execution levels
-    const horizontalSpacing = 350
-    const x = level * horizontalSpacing + 120
-
-    // Fixed vertical spacing between parallel nodes
-    const verticalSpacing = 200
-    const y = (indexAtLevel - (totalAtLevel - 1) / 2) * verticalSpacing + 600
-
+    const layoutedNode = layoutedGraph.children?.find(n => n.id === node.id)
     return {
       ...node,
-      position: { x, y },
+      position: {
+        x: layoutedNode?.x ?? 0,
+        y: layoutedNode?.y ?? 0,
+      },
     }
   })
 
   return { nodes: layoutedNodes, edges }
 }
 
-// Convert blueprint to React Flow format with execution-aware layout
-const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = false) => {
+// Convert blueprint to React Flow format with ELK layout
+const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: boolean = false) => {
   if (!blueprint.nodes || blueprint.nodes.length === 0) {
     return { nodes: [], edges: [] }
   }
@@ -593,33 +399,17 @@ const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = 
     },
   }))
 
-  // First apply layout to get node positions
-  const layoutResult = getExecutionOrderLayout(initialNodes, [], blueprint)
-
-  // Build execution levels map for loop back detection
-  const executionLevels = new Map<string, number>()
-  layoutResult.nodes.forEach(node => {
-    // Calculate execution level from x position
-    const level = Math.round(node.position.x / 350)
-    executionLevels.set(node.id, level)
-  })
-
-  // Create edges with loop back detection
+  // Create edges with default bezier curves (community recommended for ELK layouts)
   const flowEdges: Edge[] = blueprintEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
-
-    // Detect loop back: target level <= source level (backward flow)
-    const sourceLevel = executionLevels.get(edge.from) ?? 0
-    const targetLevel = executionLevels.get(edge.to) ?? 0
-    const isLoopBack = targetLevel <= sourceLevel
 
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
-      type: isLoopBack ? 'loopback' : 'default',
+      type: 'default', // Default bezier curves work best with ELK's computed positions
       animated: false,
       style: {
         stroke: '#64748b',
@@ -635,17 +425,16 @@ const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = 
     }
   })
 
+  // Apply ELK layout
+  const layoutResult = await getElkLayout(initialNodes, flowEdges)
+
   // Return layout with edges
-  return { nodes: layoutResult.nodes, edges: flowEdges }
+  return layoutResult
 }
 
-// Node and edge types for React Flow
+// Node types for React Flow
 const nodeTypes = {
   custom: CustomBlueprintNode,
-}
-
-const edgeTypes = {
-  loopback: LoopBackEdge,
 }
 
 // Node details panel component
@@ -728,20 +517,15 @@ const NodeDetailsPanel: React.FC<{
 function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }: { blueprint: Blueprint; transparent?: boolean; title?: string; nodesDraggable?: boolean }) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
-  // Convert blueprint and add selection state to nodes
-  const initialFlow = useMemo(() => {
-    const flowData = convertBlueprintToFlow(blueprint, nodesDraggable)
-    return flowData
-  }, [blueprint, nodesDraggable])
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
 
-  const [nodes, setNodes] = useState<Node[]>(initialFlow.nodes)
-  const [edges, setEdges] = useState<Edge[]>(initialFlow.edges)
-
-  // Update nodes when blueprint or nodesDraggable changes
+  // Convert blueprint and apply layout (async)
   useMemo(() => {
-    const flowData = convertBlueprintToFlow(blueprint, nodesDraggable)
-    setNodes(flowData.nodes)
-    setEdges(flowData.edges)
+    convertBlueprintToFlow(blueprint, nodesDraggable).then(flowData => {
+      setNodes(flowData.nodes)
+      setEdges(flowData.edges)
+    })
   }, [blueprint, nodesDraggable])
 
   // Add selection state to node data
@@ -795,7 +579,6 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}

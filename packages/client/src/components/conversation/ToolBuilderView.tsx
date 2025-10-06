@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Settings2, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { Wrench, Package, Bot, BarChart2, Users, Sparkles, Settings2, ChevronDown, ChevronRight, Plus, Trash2, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolTemplateCategory } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
@@ -20,6 +20,9 @@ interface Parameter {
   type: 'string' | 'number' | 'boolean' | 'object' | 'array'
   description: string
   required: boolean
+  properties?: Parameter[] // For object type
+  items?: Parameter // For array type - the schema for array items
+  isExpanded?: boolean // UI state for collapsible nested parameters
 }
 
 interface ToolFormData {
@@ -96,16 +99,42 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
     }
   }, [formData.parameters])
 
-  // Convert parameters to JSON schema
+  // Convert parameters to JSON schema (with nested support)
   const parametersToJSON = React.useCallback((params: Parameter[]) => {
     const properties: Record<string, any> = {}
     const required: string[] = []
 
-    params.forEach(param => {
-      properties[param.name] = {
+    const paramToSchema = (param: Parameter): any => {
+      const schema: any = {
         type: param.type,
         description: param.description,
       }
+
+      // Handle nested object properties
+      if (param.type === 'object' && param.properties && param.properties.length > 0) {
+        schema.properties = {}
+        schema.required = []
+        param.properties.forEach(prop => {
+          schema.properties[prop.name] = paramToSchema(prop)
+          if (prop.required) {
+            schema.required.push(prop.name)
+          }
+        })
+        if (schema.required.length === 0) {
+          delete schema.required
+        }
+      }
+
+      // Handle array items
+      if (param.type === 'array' && param.items) {
+        schema.items = paramToSchema(param.items)
+      }
+
+      return schema
+    }
+
+    params.forEach(param => {
+      properties[param.name] = paramToSchema(param)
       if (param.required) {
         required.push(param.name)
       }
@@ -122,29 +151,120 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
     )
   }, [])
 
-  // Add new parameter
-  const addParameter = () => {
-    const newParams = [...parameters, { name: '', type: 'string' as const, description: '', required: false }]
-    setParameters(newParams)
-    const json = parametersToJSON(newParams)
-    handleFieldChange('parameters', json)
-  }
-
-  // Update parameter
-  const updateParameter = (index: number, field: keyof Parameter, value: any) => {
+  // Add new parameter (with path support for nested parameters)
+  const addParameter = (path: number[] = []) => {
     const newParams = [...parameters]
-    newParams[index] = { ...newParams[index], [field]: value }
+
+    if (path.length === 0) {
+      // Add to root level
+      newParams.push({ name: '', type: 'string' as const, description: '', required: false })
+    } else {
+      // Add to nested level
+      let target = newParams
+      for (let i = 0; i < path.length - 1; i++) {
+        const param = target[path[i]]
+        if (param.type === 'object') {
+          if (!param.properties) param.properties = []
+          target = param.properties
+        }
+      }
+      const parentParam = target[path[path.length - 1]]
+      if (parentParam.type === 'object') {
+        if (!parentParam.properties) parentParam.properties = []
+        parentParam.properties.push({ name: '', type: 'string' as const, description: '', required: false })
+      }
+    }
+
     setParameters(newParams)
     const json = parametersToJSON(newParams)
     handleFieldChange('parameters', json)
   }
 
-  // Remove parameter
-  const removeParameter = (index: number) => {
-    const newParams = parameters.filter((_, i) => i !== index)
+  // Update parameter (with path support for nested parameters)
+  const updateParameter = (path: number[], field: keyof Parameter, value: any) => {
+    const newParams = [...parameters]
+
+    let target = newParams
+    for (let i = 0; i < path.length - 1; i++) {
+      const param = target[path[i]]
+      if (param.type === 'object' && param.properties) {
+        target = param.properties
+      }
+    }
+
+    const param = target[path[path.length - 1]]
+    const oldType = param.type
+
+    // Type-safe update
+    if (field === 'name' || field === 'description') {
+      param[field] = value as string
+    } else if (field === 'type') {
+      param[field] = value as Parameter['type']
+    } else if (field === 'required') {
+      param[field] = value as boolean
+    } else if (field === 'isExpanded') {
+      param[field] = value as boolean
+    }
+
+    // Initialize nested structures when type changes
+    if (field === 'type') {
+      if (value === 'object' && oldType !== 'object') {
+        param.properties = []
+        param.isExpanded = false
+      } else if (value === 'array' && oldType !== 'array') {
+        param.items = { name: 'item', type: 'string', description: '', required: false }
+      } else if (value !== 'object') {
+        delete param.properties
+        delete param.isExpanded
+      } else if (value !== 'array') {
+        delete param.items
+      }
+    }
+
     setParameters(newParams)
     const json = parametersToJSON(newParams)
     handleFieldChange('parameters', json)
+  }
+
+  // Remove parameter (with path support for nested parameters)
+  const removeParameter = (path: number[]) => {
+    const newParams = [...parameters]
+
+    if (path.length === 1) {
+      // Remove from root level
+      newParams.splice(path[0], 1)
+    } else {
+      // Remove from nested level
+      let target = newParams
+      for (let i = 0; i < path.length - 1; i++) {
+        const param = target[path[i]]
+        if (param.type === 'object' && param.properties) {
+          target = param.properties
+        }
+      }
+      target.splice(path[path.length - 1], 1)
+    }
+
+    setParameters(newParams)
+    const json = parametersToJSON(newParams)
+    handleFieldChange('parameters', json)
+  }
+
+  // Toggle expand/collapse for object parameters
+  const toggleExpanded = (path: number[]) => {
+    const newParams = [...parameters]
+
+    let target = newParams
+    for (let i = 0; i < path.length - 1; i++) {
+      const param = target[path[i]]
+      if (param.type === 'object' && param.properties) {
+        target = param.properties
+      }
+    }
+
+    const param = target[path[path.length - 1]]
+    param.isExpanded = !param.isExpanded
+    setParameters(newParams)
   }
 
   // Parse blueprint for visualization
@@ -252,6 +372,109 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
       delete newErrors[field]
       return newErrors
     })
+  }
+
+  // Recursive component to render parameters
+  const renderParameter = (param: Parameter, path: number[], level: number = 0): React.ReactNode => {
+    const indentClass = level > 0 ? 'ml-4 border-l-2 border-primary/20 pl-2' : ''
+
+    return (
+      <div key={path.join('-')} className={cn('space-y-2', indentClass)}>
+        <div className="p-2 border rounded-md bg-background hover:border-primary/30 transition-all group space-y-1.5">
+          {/* Main Row */}
+          <div className="flex items-center gap-1.5">
+            {/* Expand/Collapse for objects */}
+            {param.type === 'object' ? (
+              <Button type="button" variant="ghost" size="icon" onClick={() => toggleExpanded(path)} className="h-6 w-6 hover:bg-muted flex-shrink-0">
+                {param.isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              </Button>
+            ) : null}
+
+            {/* Name */}
+            <Input
+              placeholder="param_name"
+              value={param.name}
+              onChange={e => updateParameter(path, 'name', e.target.value)}
+              className="h-6 flex-1 text-xs font-mono border-none bg-transparent focus-visible:ring-1 px-2"
+            />
+
+            {/* Type Selector */}
+            <Select value={param.type} onValueChange={value => updateParameter(path, 'type', value)}>
+              <SelectTrigger className="h-6 w-20 text-[10px] border-none bg-muted/40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="w-20 min-w-0">
+                <SelectItem value="string" className="text-[10px]">
+                  String
+                </SelectItem>
+                <SelectItem value="number" className="text-[10px]">
+                  Number
+                </SelectItem>
+                <SelectItem value="boolean" className="text-[10px]">
+                  Boolean
+                </SelectItem>
+                <SelectItem value="object" className="text-[10px]">
+                  Object
+                </SelectItem>
+                <SelectItem value="array" className="text-[10px]">
+                  Array
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Required Toggle */}
+            <Badge
+              variant="outline"
+              className={cn(
+                'h-6 w-[60px] px-2 text-[10px] cursor-pointer transition-all flex-shrink-0 justify-center',
+                param.required ? 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/40' : 'bg-muted/10 text-muted-foreground border-border/30 hover:bg-muted/20'
+              )}
+              onClick={() => updateParameter(path, 'required', !param.required)}
+            >
+              {param.required ? 'Required' : 'Optional'}
+            </Badge>
+
+            {/* Delete */}
+            <Button type="button" variant="ghost" size="icon" onClick={() => removeParameter(path)} className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive">
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
+
+          {/* Description Row */}
+          <Input
+            placeholder="Description (optional)"
+            value={param.description}
+            onChange={e => updateParameter(path, 'description', e.target.value)}
+            className="h-5 text-[10px] border-none bg-muted/20 focus-visible:ring-1 px-2"
+          />
+        </div>
+
+        {/* Nested properties for objects */}
+        {param.type === 'object' && param.isExpanded && (
+          <div className="space-y-2">
+            {param.properties && param.properties.length > 0 ? (
+              param.properties.map((prop, index) => renderParameter(prop, [...path, index], level + 1))
+            ) : (
+              <div className="ml-4 text-xs text-muted-foreground text-center py-2 border border-dashed rounded-lg bg-muted/5">No properties defined</div>
+            )}
+            <div className="ml-4">
+              <Button type="button" variant="outline" size="sm" onClick={() => addParameter([...path])} className="h-6 text-xs gap-1 hover:bg-primary/10 hover:border-primary/40 w-full">
+                <Plus className="w-3 h-3" />
+                Add Property
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Array items schema */}
+        {param.type === 'array' && param.items && (
+          <div className="ml-4 space-y-1.5">
+            <Label className="text-[10px] text-muted-foreground">Array Items Schema:</Label>
+            {renderParameter(param.items, [...path, -1], level + 1)}
+          </div>
+        )}
+      </div>
+    )
   }
 
   const categories: ToolTemplateCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']
@@ -382,7 +605,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label className="text-xs font-medium">Parameters</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addParameter} className="h-6 text-xs gap-1 hover:bg-primary/10 hover:border-primary/40">
+                            <Button type="button" variant="outline" size="sm" onClick={() => addParameter()} className="h-6 text-xs gap-1 hover:bg-primary/10 hover:border-primary/40">
                               <Plus className="w-3 h-3" />
                               Add Parameter
                             </Button>
@@ -394,69 +617,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                                 <p className="text-[10px]">Click "Add Parameter" to create tool inputs</p>
                               </div>
                             ) : (
-                              parameters.map((param, index) => (
-                                <div key={index} className="p-2 border rounded-md bg-background hover:border-primary/30 transition-all group space-y-1.5">
-                                  {/* Main Row */}
-                                  <div className="flex items-center gap-1.5">
-                                    {/* Name */}
-                                    <Input
-                                      placeholder="param_name"
-                                      value={param.name}
-                                      onChange={e => updateParameter(index, 'name', e.target.value)}
-                                      className="h-6 flex-1 text-xs font-mono border-none bg-transparent focus-visible:ring-1 px-2"
-                                    />
-
-                                    {/* Type Selector */}
-                                    <Select value={param.type} onValueChange={value => updateParameter(index, 'type', value)}>
-                                      <SelectTrigger className="h-6 w-20 text-[10px] border-none bg-muted/40">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent className="w-20 min-w-0">
-                                        <SelectItem value="string" className="text-[10px]">
-                                          String
-                                        </SelectItem>
-                                        <SelectItem value="number" className="text-[10px]">
-                                          Number
-                                        </SelectItem>
-                                        <SelectItem value="boolean" className="text-[10px]">
-                                          Boolean
-                                        </SelectItem>
-                                        <SelectItem value="object" className="text-[10px]">
-                                          Object
-                                        </SelectItem>
-                                        <SelectItem value="array" className="text-[10px]">
-                                          Array
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-
-                                    {/* Required Toggle */}
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        'h-6 w-[60px] px-2 text-[10px] cursor-pointer transition-all flex-shrink-0 justify-center',
-                                        param.required ? 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/40' : 'bg-muted/10 text-muted-foreground border-border/30 hover:bg-muted/20'
-                                      )}
-                                      onClick={() => updateParameter(index, 'required', !param.required)}
-                                    >
-                                      {param.required ? 'Required' : 'Optional'}
-                                    </Badge>
-
-                                    {/* Delete */}
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeParameter(index)} className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive">
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-
-                                  {/* Description Row */}
-                                  <Input
-                                    placeholder="Description (optional)"
-                                    value={param.description}
-                                    onChange={e => updateParameter(index, 'description', e.target.value)}
-                                    className="h-5 text-[10px] border-none bg-muted/20 focus-visible:ring-1 px-2"
-                                  />
-                                </div>
-                              ))
+                              parameters.map((param, index) => renderParameter(param, [index]))
                             )}
                           </div>
                           {errors.parameters && <p className="text-xs text-destructive">{errors.parameters}</p>}

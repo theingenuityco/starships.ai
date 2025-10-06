@@ -61,7 +61,7 @@ export function getEnvConfig(): EnvironmentConfig {
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
 
     // OAuth Configuration
-    OAUTH_REDIRECT_BASE_URL: process.env.OAUTH_REDIRECT_BASE_URL || `http://localhost:${DEFAULT_CLIENT_PORT}`,
+    OAUTH_REDIRECT_BASE_URL: process.env.OAUTH_REDIRECT_BASE_URL || `http://localhost:${DEFAULT_PROXY_PORT}`,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,

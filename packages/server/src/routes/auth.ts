@@ -458,6 +458,15 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_waitlist=pending`);
     }
 
+    // ADD THIS SECURITY FIX:
+    // Re-check waitlist status immediately before token generation
+    const waitlistService = initWaitlistService();
+    const currentStatus = await waitlistService.getDetailedStatus(result.user.email!);
+
+    if (currentStatus.status === 'pending') {
+      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_waitlist=pending`);
+    }
+
     // Generate JWT using shared utility
     const token = await generateJWT({
       id: result.user.id,

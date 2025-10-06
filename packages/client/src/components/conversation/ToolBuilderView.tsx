@@ -232,7 +232,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
             </div>
 
             {/* Settings Panel */}
-            <Collapsible defaultOpen={true}>
+            <Collapsible defaultOpen={false}>
               <div className="frosted-glass-card rounded-2xl shadow-frosted-lg overflow-hidden w-full">
                 <CollapsibleTrigger className="w-full p-4 hover:bg-muted/50 transition-colors">
                   <div className="flex items-center justify-between">

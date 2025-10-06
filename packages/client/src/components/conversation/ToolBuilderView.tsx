@@ -245,7 +245,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
                 <CollapsibleContent>
                   <div className="border-t border-border/40">
-                    <ScrollArea className="max-h-[60vh]">
+                    <ScrollArea className="max-h-[calc(100vh-16rem)]">
                       <div className="p-4 space-y-4">
                         {/* Category */}
                         <div className="space-y-2">
@@ -311,22 +311,6 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
                             rows={6}
                           />
                           {errors.parameters && <p className="text-xs text-destructive">{errors.parameters}</p>}
-                        </div>
-
-                        {/* Blueprint JSON */}
-                        <div className="space-y-2">
-                          <Label htmlFor="tool-blueprint" className="text-xs font-semibold">
-                            Blueprint Structure (JSON)
-                          </Label>
-                          <Textarea
-                            id="tool-blueprint"
-                            placeholder='{"nodes": [...], "edges": [...]}'
-                            value={formData.blueprint}
-                            onChange={e => handleFieldChange('blueprint', e.target.value)}
-                            className={`font-mono text-xs ${errors.blueprint ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                            rows={8}
-                          />
-                          {errors.blueprint && <p className="text-xs text-destructive">{errors.blueprint}</p>}
                         </div>
                       </div>
                     </ScrollArea>

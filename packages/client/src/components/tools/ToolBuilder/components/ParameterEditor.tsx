@@ -328,6 +328,21 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   const applyPropertyDecorations = () => {
     if (!editorRef.current || !monacoRef.current) return
 
+    // Only apply decorations if we have valid JSON
+    try {
+      JSON.parse(value)
+    } catch (e) {
+      // Clear existing view zones and decorations if JSON is invalid
+      editorRef.current.changeViewZones(changeAccessor => {
+        viewZonesRef.current.forEach(id => {
+          changeAccessor.removeZone(id)
+        })
+        viewZonesRef.current = []
+      })
+      decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, [])
+      return
+    }
+
     const ranges = findPropertyRanges(value)
     const decorations: editor.IModelDeltaDecoration[] = []
 

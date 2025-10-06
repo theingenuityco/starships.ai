@@ -293,6 +293,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             overviewRulerLanes: 0,
             hideCursorInOverviewRuler: true,
             overviewRulerBorder: false,
+            padding: { top: 12, bottom: 12 },
             guides: {
               bracketPairs: false,
               bracketPairsHorizontal: false,

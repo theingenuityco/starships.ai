@@ -448,7 +448,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         { token: 'delimiter', foreground: 'd4d4d4' },
       ],
       colors: {
-        'editor.background': '#13161b', // hsl(220 15% 8%) - matches --background
+        'editor.background': '#00000000', // Transparent to show frosted-glass background
         'editor.foreground': '#f2f2f2', // hsl(0 0% 95%) - matches --foreground
         'editorLineNumber.foreground': '#4a5568',
         'editor.selectionBackground': '#2e3541', // hsl(220 15% 20%) - matches --border
@@ -474,7 +474,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         { token: 'delimiter', foreground: '000000' },
       ],
       colors: {
-        'editor.background': '#fafafa', // hsl(0 0% 98%) - matches --background
+        'editor.background': '#00000000', // Transparent to show frosted-glass background
         'editor.foreground': '#141414', // hsl(0 0% 8%) - matches --foreground
         'editorLineNumber.foreground': '#999999',
         'editor.selectionBackground': '#add6ff',
@@ -531,7 +531,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     <div className="space-y-2">
       {/* Monaco Editor */}
       <div className="relative rounded-b-xl overflow-hidden">
-        <div className="pr-4 bg-[#fafafa] dark:bg-[#13161b]">
+        <div className="pr-4 frosted-glass-card">
           <Editor
             height="300px"
             defaultLanguage="json"

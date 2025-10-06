@@ -312,9 +312,10 @@ const IntelligentEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, t
 }
 
 // Custom conditional node component with horizontal sections for each output
-const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[] } }> = ({ data }) => {
+const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const colors = getNodeColors(data.type)
   const edges = data.outgoingEdges || []
+  const isSelected = data.isSelected
 
   return (
     <>
@@ -326,7 +327,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
         <div
           className={`
             relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
-            bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600
+            bg-white dark:bg-gray-800 border-2
+            ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
             rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
             text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
           `}
@@ -391,8 +393,9 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 }
 
 // Custom node component with professional design
-const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[] } }> = ({ data }) => {
+const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const colors = getNodeColors(data.type)
+  const isSelected = data.isSelected
 
   // Use conditional node for nodes with multiple outputs
   if (data.type === 'conditional' && data.outgoingEdges && data.outgoingEdges.length > 1) {
@@ -409,7 +412,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
       <div
         className={`
           relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
-          bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600
+          bg-white dark:bg-gray-800 border-2
+          ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
           rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
           text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
         `}
@@ -783,8 +787,21 @@ const NodeDetailsPanel: React.FC<{
 }
 
 function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint; transparent?: boolean; title?: string }) {
-  const { nodes, edges } = useMemo(() => convertBlueprintToFlow(blueprint), [blueprint])
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
+
+  // Convert blueprint and add selection state to nodes
+  const { nodes, edges } = useMemo(() => {
+    const flowData = convertBlueprintToFlow(blueprint)
+    // Add selected state to node data
+    const nodesWithSelection = flowData.nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        isSelected: selectedNode?.ref === node.id,
+      },
+    }))
+    return { nodes: nodesWithSelection, edges: flowData.edges }
+  }, [blueprint, selectedNode])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {

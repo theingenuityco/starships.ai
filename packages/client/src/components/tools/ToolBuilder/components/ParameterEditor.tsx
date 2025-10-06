@@ -1,8 +1,11 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Check } from 'lucide-react'
+import Editor from 'react-simple-code-editor'
+import Prism from 'prismjs'
+import 'prismjs/components/prism-json'
 
 interface ParameterEditorProps {
   value: string
@@ -14,7 +17,6 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   const [validationError, setValidationError] = useState<string | null>(null)
   const [validationDetails, setValidationDetails] = useState<string | null>(null)
   const [isValid, setIsValid] = useState<boolean>(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Validate JSON Schema structure
   const validateJsonSchema = (jsonString: string) => {
@@ -84,6 +86,10 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
     validateJsonSchema(newValue)
   }
 
+  const highlightCode = (code: string) => {
+    return Prism.highlight(code, Prism.languages.json, 'json')
+  }
+
   useEffect(() => {
     validateJsonSchema(value)
   }, [])
@@ -98,12 +104,13 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
         </div>
       )}
 
-      {/* Editor */}
-      <div className="relative">
-        <textarea
-          ref={textareaRef}
+      {/* Editor with Syntax Highlighting */}
+      <div className="relative rounded-md border border-input bg-background overflow-hidden">
+        <Editor
           value={value}
-          onChange={e => handleChange(e.target.value)}
+          onValueChange={handleChange}
+          highlight={highlightCode}
+          padding={12}
           placeholder={`{
   "type": "object",
   "properties": {
@@ -114,9 +121,13 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   },
   "required": ["param_name"]
 }`}
-          rows={12}
-          className="w-full px-3 py-2 text-xs font-mono rounded-md border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          spellCheck={false}
+          style={{
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '12px',
+            minHeight: '300px',
+            outline: 'none',
+          }}
+          textareaClassName="focus-visible:outline-none"
         />
       </div>
 

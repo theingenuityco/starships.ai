@@ -331,7 +331,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
             bg-white dark:bg-gray-800 border-2
             ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
             rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
-            text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
+            text-gray-900 dark:text-gray-100 cursor-move hover:border-gray-300
           `}
         >
           {/* Circular icon container */}
@@ -416,7 +416,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
           bg-white dark:bg-gray-800 border-2
           ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-gray-200 dark:border-gray-600'}
           rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
-          text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
+          text-gray-900 dark:text-gray-100 cursor-move hover:border-gray-300
         `}
       >
         {/* Circular icon container with better styling */}
@@ -605,7 +605,7 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
 }
 
 // Convert blueprint to React Flow format with execution-aware layout
-const convertBlueprintToFlow = (blueprint: Blueprint) => {
+const convertBlueprintToFlow = (blueprint: Blueprint, nodesDraggable: boolean = false) => {
   if (!blueprint.nodes || blueprint.nodes.length === 0) {
     return { nodes: [], edges: [] }
   }
@@ -627,6 +627,7 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     id: node.ref,
     type: 'custom',
     position: { x: 0, y: 0 }, // Will be overridden by layout
+    draggable: nodesDraggable,
     data: {
       label: node.name,
       type: node.type,
@@ -792,7 +793,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
 
   // Convert blueprint and add selection state to nodes
   const { nodes, edges } = useMemo(() => {
-    const flowData = convertBlueprintToFlow(blueprint)
+    const flowData = convertBlueprintToFlow(blueprint, nodesDraggable)
     // Add selected state to node data
     const nodesWithSelection = flowData.nodes.map(node => ({
       ...node,
@@ -802,7 +803,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
       },
     }))
     return { nodes: nodesWithSelection, edges: flowData.edges }
-  }, [blueprint, selectedNode])
+  }, [blueprint, selectedNode, nodesDraggable])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -848,7 +849,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         nodesDraggable={nodesDraggable}
         nodesConnectable={false}
         elementsSelectable={true}
-        selectNodesOnDrag={false}
+        selectNodesOnDrag={true}
         zoomOnScroll={true}
         zoomOnPinch={true}
         panOnScroll={true}

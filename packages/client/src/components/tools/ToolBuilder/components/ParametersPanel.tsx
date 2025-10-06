@@ -30,9 +30,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, erro
         <CollapsibleContent>
           <div className="border-t border-border/40">
             <ScrollArea className="max-h-[calc(100vh-14rem)]">
-              <div className="p-3 space-y-3">
-                <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
-              </div>
+              <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
             </ScrollArea>
           </div>
         </CollapsibleContent>

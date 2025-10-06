@@ -8,7 +8,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Settings2 } from 'lucide-react'
 import type { ToolFormData, FormErrors } from '../types'
 import { CategorySelector } from './CategorySelector'
-import { ParameterEditor } from './ParameterEditor'
 
 interface ToolSettingsPanelProps {
   formData: ToolFormData
@@ -63,12 +62,6 @@ export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, 
                   <Label htmlFor="tool-requires-api-key" className="cursor-pointer flex-1 text-xs">
                     Requires API Key
                   </Label>
-                </div>
-
-                {/* Parameters JSON Schema */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Parameters (JSON Schema)</Label>
-                  <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
                 </div>
               </div>
             </ScrollArea>

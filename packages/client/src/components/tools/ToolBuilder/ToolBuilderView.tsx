@@ -7,6 +7,7 @@ import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisual
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'
 import { useToolForm } from './hooks/useToolForm'
 import { ToolInfoPanel } from './components/ToolInfoPanel'
+import { ParametersPanel } from './components/ParametersPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
 
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave }, ref) => {
@@ -47,6 +48,9 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           <div className="absolute top-4 left-28 z-10 w-[420px] space-y-2">
             {/* Tool Info Panel */}
             <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
+
+            {/* Parameters Panel */}
+            <ParametersPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
 
             {/* Settings Panel */}
             <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />

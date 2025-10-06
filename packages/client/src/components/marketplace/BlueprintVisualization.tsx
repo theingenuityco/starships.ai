@@ -1,9 +1,29 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { ReactFlow, Node, Edge, Background, ReactFlowProvider, MarkerType, Position, Handle, BackgroundVariant, EdgeProps, BaseEdge, Panel } from '@xyflow/react'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog } from 'lucide-react'
+import React, { useMemo, useState, useCallback } from 'react'
+import {
+  ReactFlow,
+  Node,
+  Edge,
+  Background,
+  ReactFlowProvider,
+  MarkerType,
+  Position,
+  Handle,
+  BackgroundVariant,
+  EdgeProps,
+  BaseEdge,
+  Panel,
+  NodeProps,
+  OnNodesChange,
+  OnEdgesChange,
+} from '@xyflow/react'
+import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
@@ -685,8 +705,100 @@ const edgeTypes = {
   intelligent: IntelligentEdge,
 }
 
+// Node details panel component
+const NodeDetailsPanel: React.FC<{
+  node: BlueprintNode
+  onClose: () => void
+}> = ({ node, onClose }) => {
+  const colors = getNodeColors(node.type)
+
+  return (
+    <Card className="absolute top-4 right-4 w-80 max-h-[calc(100vh-8rem)] z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-2 shadow-2xl">
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center w-10 h-10 rounded-full"
+            style={{
+              backgroundColor: colors.handle + '15',
+              color: colors.handle,
+              border: `2px solid ${colors.handle}30`,
+            }}
+          >
+            <NodeIcon nodeType={node.type} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm">{node.name}</h3>
+            <Badge variant="outline" className="text-xs capitalize mt-1">
+              {node.type.replace('_', ' ')}
+            </Badge>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <ScrollArea className="max-h-[calc(100vh-14rem)]">
+        <div className="p-4 space-y-4">
+          {/* Description */}
+          {node.description && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Description</h4>
+              <p className="text-sm text-foreground">{node.description}</p>
+            </div>
+          )}
+
+          {/* Reference */}
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Reference</h4>
+            <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{node.ref}</code>
+          </div>
+
+          {/* Parameters */}
+          {node.parameters && Object.keys(node.parameters).length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Parameters</h4>
+              <div className="space-y-2">
+                {Object.entries(node.parameters).map(([key, value]) => (
+                  <div key={key} className="space-y-1">
+                    <div className="text-xs font-medium text-foreground">{key}</div>
+                    <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Metadata */}
+          {node.metadata && Object.keys(node.metadata).length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Metadata</h4>
+              <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{JSON.stringify(node.metadata, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </Card>
+  )
+}
+
 function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint; transparent?: boolean; title?: string }) {
   const { nodes, edges } = useMemo(() => convertBlueprintToFlow(blueprint), [blueprint])
+  const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
+
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      const blueprintNode = blueprint.nodes.find(n => n.ref === node.id)
+      if (blueprintNode) {
+        setSelectedNode(blueprintNode)
+      }
+    },
+    [blueprint.nodes]
+  )
+
+  const handlePaneClick = useCallback(() => {
+    setSelectedNode(null)
+  }, [])
 
   return (
     <div
@@ -706,6 +818,8 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         fitView
         fitViewOptions={{
           padding: 0.2,
@@ -735,6 +849,9 @@ function BlueprintFlow({ blueprint, transparent, title }: { blueprint: Blueprint
           </Panel>
         )}
       </ReactFlow>
+
+      {/* Node Details Panel */}
+      {selectedNode && <NodeDetailsPanel node={selectedNode} onClose={() => setSelectedNode(null)} />}
     </div>
   )
 }

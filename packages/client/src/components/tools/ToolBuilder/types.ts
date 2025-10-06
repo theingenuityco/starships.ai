@@ -1,15 +1,5 @@
 import type { ToolTemplateCategory } from '@starships/protocol'
 
-export interface Parameter {
-  name: string
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array'
-  description: string
-  required: boolean
-  properties?: Parameter[] // For object type
-  items?: Parameter // For array type - the schema for array items
-  isExpanded?: boolean // UI state for collapsible nested parameters
-}
-
 export interface ToolFormData {
   name: string
   description: string

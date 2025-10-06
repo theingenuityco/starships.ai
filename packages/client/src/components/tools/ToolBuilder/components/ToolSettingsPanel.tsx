@@ -1,28 +1,22 @@
 'use client'
 
 import React from 'react'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Settings2, Plus } from 'lucide-react'
-import type { ToolFormData, FormErrors, Parameter } from '../types'
+import { Settings2 } from 'lucide-react'
+import type { ToolFormData, FormErrors } from '../types'
 import { CategorySelector } from './CategorySelector'
 import { ParameterEditor } from './ParameterEditor'
 
 interface ToolSettingsPanelProps {
   formData: ToolFormData
   errors: FormErrors
-  parameters: Parameter[]
   onFieldChange: (field: keyof ToolFormData, value: string | boolean) => void
-  onAddParameter: (path?: number[]) => void
-  onUpdateParameter: (path: number[], field: keyof Parameter, value: unknown) => void
-  onRemoveParameter: (path: number[]) => void
-  onToggleExpanded: (path: number[]) => void
 }
 
-export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, errors, parameters, onFieldChange, onAddParameter, onUpdateParameter, onRemoveParameter, onToggleExpanded }) => {
+export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, errors, onFieldChange }) => {
   return (
     <Collapsible defaultOpen={false}>
       <div className="frosted-glass-card rounded-xl shadow-frosted-lg overflow-hidden w-full">
@@ -71,17 +65,10 @@ export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, 
                   </Label>
                 </div>
 
-                {/* Parameters */}
+                {/* Parameters JSON Schema */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium">Parameters</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => onAddParameter()} className="h-6 text-xs gap-1 hover:bg-primary/10 hover:border-primary/40">
-                      <Plus className="w-3 h-3" />
-                      Add Parameter
-                    </Button>
-                  </div>
-                  <ParameterEditor parameters={parameters} onAdd={onAddParameter} onUpdate={onUpdateParameter} onRemove={onRemoveParameter} onToggleExpanded={onToggleExpanded} />
-                  {errors.parameters && <p className="text-xs text-destructive">{errors.parameters}</p>}
+                  <Label className="text-xs font-medium">Parameters (JSON Schema)</Label>
+                  <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
                 </div>
               </div>
             </ScrollArea>

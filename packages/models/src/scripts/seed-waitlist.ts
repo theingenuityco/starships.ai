@@ -11,7 +11,7 @@ const APPROVED_EMAILS = [
   { email: 'dewang@theingenuity.co', notes: 'Founder - Primary tester' },
   { email: 'rudra@theingenuity.co', notes: 'Team member - Alpha tester' },
   { email: 'prashant@theingenuity.co', notes: 'Team member - Alpha tester' },
-  { email: 'dewangsolanki3@gmail.com', notes: 'Personal - Testing account' },
+  { email: 'dewangsolanki8@gmail.com', notes: 'Founder - Personal email access' },
   // Add new approved emails here as needed
 ];
 

@@ -17,6 +17,8 @@ import {
   NodeProps,
   OnNodesChange,
   OnEdgesChange,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from '@xyflow/react'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X } from 'lucide-react'
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
@@ -792,18 +794,40 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
   // Convert blueprint and add selection state to nodes
-  const { nodes, edges } = useMemo(() => {
+  const initialFlow = useMemo(() => {
     const flowData = convertBlueprintToFlow(blueprint, nodesDraggable)
-    // Add selected state to node data
-    const nodesWithSelection = flowData.nodes.map(node => ({
+    return flowData
+  }, [blueprint, nodesDraggable])
+
+  const [nodes, setNodes] = useState<Node[]>(initialFlow.nodes)
+  const [edges, setEdges] = useState<Edge[]>(initialFlow.edges)
+
+  // Update nodes when blueprint or nodesDraggable changes
+  useMemo(() => {
+    const flowData = convertBlueprintToFlow(blueprint, nodesDraggable)
+    setNodes(flowData.nodes)
+    setEdges(flowData.edges)
+  }, [blueprint, nodesDraggable])
+
+  // Add selection state to node data
+  const nodesWithSelection = useMemo(() => {
+    return nodes.map(node => ({
       ...node,
       data: {
         ...node.data,
         isSelected: selectedNode?.ref === node.id,
       },
     }))
-    return { nodes: nodesWithSelection, edges: flowData.edges }
-  }, [blueprint, selectedNode, nodesDraggable])
+  }, [nodes, selectedNode])
+
+  // Handle node position changes for dragging
+  const onNodesChange: OnNodesChange = useCallback(changes => {
+    setNodes(nds => applyNodeChanges(changes, nds))
+  }, [])
+
+  const onEdgesChange: OnEdgesChange = useCallback(changes => {
+    setEdges(eds => applyEdgeChanges(changes, eds))
+  }, [])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -833,10 +857,12 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
       }
     >
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         fitView

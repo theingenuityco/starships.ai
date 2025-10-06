@@ -82,13 +82,31 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
   React.useEffect(() => {
     try {
       const parsed = JSON.parse(formData.parameters)
-      if (parsed.properties) {
-        const params: Parameter[] = Object.entries(parsed.properties).map(([name, prop]: [string, any]) => ({
+
+      // Recursive function to convert JSON schema to Parameter
+      const jsonToParam = (name: string, schema: any, isRequired: boolean): Parameter => {
+        const param: Parameter = {
           name,
-          type: prop.type || 'string',
-          description: prop.description || '',
-          required: parsed.required?.includes(name) || false,
-        }))
+          type: schema.type || 'string',
+          description: schema.description || '',
+          required: isRequired,
+        }
+
+        // Parse nested object properties
+        if (schema.type === 'object' && schema.properties) {
+          param.properties = Object.entries(schema.properties).map(([propName, propSchema]: [string, any]) => jsonToParam(propName, propSchema, schema.required?.includes(propName) || false))
+        }
+
+        // Parse array items
+        if (schema.type === 'array' && schema.items) {
+          param.items = jsonToParam('item', schema.items, false)
+        }
+
+        return param
+      }
+
+      if (parsed.properties) {
+        const params: Parameter[] = Object.entries(parsed.properties).map(([name, prop]: [string, any]) => jsonToParam(name, prop, parsed.required?.includes(name) || false))
         setParameters(params)
       } else {
         setParameters([])
@@ -184,15 +202,40 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
   const updateParameter = (path: number[], field: keyof Parameter, value: any) => {
     const newParams = [...parameters]
 
-    let target = newParams
-    for (let i = 0; i < path.length - 1; i++) {
-      const param = target[path[i]]
-      if (param.type === 'object' && param.properties) {
-        target = param.properties
+    let target: any = newParams
+    let param: Parameter
+
+    // Navigate to the target parameter
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i]
+
+      if (i === path.length - 1) {
+        // Last element in path - this is our target
+        if (index === -1 && target.items) {
+          // Array item schema
+          param = target.items
+        } else {
+          param = target[index]
+        }
+      } else {
+        // Navigate deeper
+        if (index === -1) {
+          // Navigate through array items
+          if (target.items) {
+            target = target.items
+          }
+        } else {
+          const currentParam = target[index]
+          if (currentParam.type === 'object' && currentParam.properties) {
+            target = currentParam.properties
+          } else if (currentParam.type === 'array' && currentParam.items) {
+            target = currentParam
+          }
+        }
       }
     }
 
-    const param = target[path[path.length - 1]]
+    param = param!
     const oldType = param.type
 
     // Type-safe update
@@ -213,11 +256,15 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
         param.isExpanded = false
       } else if (value === 'array' && oldType !== 'array') {
         param.items = { name: 'item', type: 'string', description: '', required: false }
-      } else if (value !== 'object') {
+        param.isExpanded = false
+      } else if (value !== 'object' && value !== 'array') {
         delete param.properties
-        delete param.isExpanded
-      } else if (value !== 'array') {
         delete param.items
+        delete param.isExpanded
+      } else if (value === 'object' && oldType === 'array') {
+        delete param.items
+      } else if (value === 'array' && oldType === 'object') {
+        delete param.properties
       }
     }
 
@@ -383,8 +430,8 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
         <div className="p-2 border rounded-md bg-background hover:border-primary/30 transition-all group space-y-1.5">
           {/* Main Row */}
           <div className="flex items-center gap-1.5">
-            {/* Expand/Collapse for objects */}
-            {param.type === 'object' ? (
+            {/* Expand/Collapse for objects and arrays */}
+            {param.type === 'object' || param.type === 'array' ? (
               <Button type="button" variant="ghost" size="icon" onClick={() => toggleExpanded(path)} className="h-6 w-6 hover:bg-muted flex-shrink-0">
                 {param.isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               </Button>
@@ -467,10 +514,12 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
         )}
 
         {/* Array items schema */}
-        {param.type === 'array' && param.items && (
-          <div className="ml-4 space-y-1.5">
-            <Label className="text-[10px] text-muted-foreground">Array Items Schema:</Label>
-            {renderParameter(param.items, [...path, -1], level + 1)}
+        {param.type === 'array' && param.isExpanded && param.items && (
+          <div className="space-y-2">
+            <div className="ml-4 space-y-1.5">
+              <Label className="text-[10px] font-medium text-muted-foreground">Array Items Schema:</Label>
+              {renderParameter(param.items, [...path, -1], level + 1)}
+            </div>
           </div>
         )}
       </div>

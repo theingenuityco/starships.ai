@@ -6,7 +6,7 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentParams, AgentState, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmMessage } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -19,7 +19,6 @@ export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
-  private state: AgentState;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
@@ -28,11 +27,13 @@ export class Agent implements NodeHandler {
     // Create options
     this.options = options;
 
-    // Initialize state from params.state first
-    this.state = {
-      messages: params.state?.messages || [],
-      tools: params.state?.tools || [],
-    };
+    // Initialize state if not provided
+    if (!this.params.state) {
+      this.params.state = {
+        messages: [],
+        tools: [],
+      };
+    }
 
     // Runner selection deferred to execute() based on execution.depth to avoid nested runners
 
@@ -217,8 +218,8 @@ export class Agent implements NodeHandler {
       const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
 
       // Merge agent state fields into execution.state so tools can read context (e.g., starshipId)
-      if (this.state && typeof this.state === 'object') {
-        Object.assign(execution.state, this.state);
+      if (this.params.state && typeof this.params.state === 'object') {
+        Object.assign(execution.state, this.params.state);
       }
       const orderedMessages: LlmMessage[] = [];
 
@@ -228,8 +229,8 @@ export class Agent implements NodeHandler {
       }
 
       // Add state messages
-      if (this.state.messages?.length) {
-        orderedMessages.push(...this.state.messages);
+      if (this.params.state?.messages?.length) {
+        orderedMessages.push(...this.params.state.messages);
       }
 
       // Type guard to detect LlmMessage[]
@@ -256,7 +257,7 @@ export class Agent implements NodeHandler {
       // Commit ordered messages to execution state
       (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
       // Store tools in state so LLM nodes can reference them via {{ state.tools }}
-      (execution.state as Record<string, unknown>)['tools'] = this.state.tools || [];
+      (execution.state as Record<string, unknown>)['tools'] = this.params.state?.tools || [];
 
       // Prepare engine config with event callback
       const engineConfig: EngineConfig = {

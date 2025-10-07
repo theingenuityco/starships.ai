@@ -191,6 +191,7 @@ export class ConversationService {
         .filter((tool) => tool.status !== 'draft' && tool.parameters && tool.blueprint)
         .map((tool) => ({
           name: tool.name,
+          slug: tool.slug,
           description: tool.description,
           parameters: tool.parameters!,
           blueprint: tool.blueprint!,

@@ -7,7 +7,7 @@
 
 import type { ConversationModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsIn, IsISO8601, IsOptional, IsString, IsObject, Length, validate, ValidationError } from 'class-validator';
 
 /**
  * Conversation Entity with validation and serialization
@@ -43,6 +43,11 @@ export class ConversationEntity implements ConversationModel {
   @Transform(({ value }) => value || 'active')
   @IsIn(['active', 'paused', 'completed', 'archived'])
   status!: 'active' | 'paused' | 'completed' | 'archived';
+
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  state?: Record<string, unknown>;
 
   /**
    * Simple validation function using class-validator

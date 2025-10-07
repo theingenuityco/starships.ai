@@ -29,6 +29,7 @@ export { ExecutionItemUtils } from './utils/ExecutionItemUtils';
 
 // Types
 export * from './types';
+export type { Execution, ExecutionState, ExecutionStatus, ExecutionItem, ExecutionError, ExecutionErrorCode } from './types/execution';
 
 // Configuration
 export { config } from './constants';

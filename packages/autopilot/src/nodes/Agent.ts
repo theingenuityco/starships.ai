@@ -240,6 +240,7 @@ export class Agent implements NodeHandler {
       // Create execution with ordered messages in state (system -> memory -> conversation)
       const parentExecution = this.options?.execution;
       const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
+
       // Merge agent state fields into execution.state so tools can read context (e.g., starshipId)
       if (this.state && typeof this.state === 'object') {
         Object.assign(execution.state, this.state);

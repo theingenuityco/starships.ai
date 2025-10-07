@@ -16,6 +16,7 @@ export type ConversationStatus = 'active' | 'paused' | 'completed' | 'archived';
 export interface Conversation {
   title: string;
   status: ConversationStatus;
+  state?: Record<string, unknown>;
 }
 
 /**

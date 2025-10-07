@@ -154,9 +154,49 @@ function createDaedalusBlueprint(): Blueprint {
     },
   });
 
+  // Conditional node to check if focusedTool exists
+  const checkFocusedToolRef = builder.addNode({
+    type: 'conditional',
+    name: 'Check Focused Tool',
+    description: 'Check if a focusedTool exists to add context',
+    parameters: {
+      condition: '{{ state.focusedTool && Object.keys(state.focusedTool).length > 0 ? "add_context" : "no_context" }}',
+    },
+  });
+
+  // Mutate node to add focused tool context (only executed when focusedTool exists)
+  const focusedToolContextRef = builder.addNode({
+    type: 'mutate',
+    name: 'Add Focused Tool Context',
+    description: 'Add focused tool as system message',
+    parameters: {
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/state/messages/-',
+          value: `{{ {
+            role: 'system',
+            content: \`<focused-tool>
+name: \${state.focusedTool.name}
+slug: \${state.focusedTool.slug}
+description: \${state.focusedTool.description}
+</focused-tool>
+
+<instructions>
+You have just created the tool above using "Open New Tool". This tool is currently in draft status and needs to be completed and activated using tool_update. Focus on completing this tool before proceeding with other tasks.
+</instructions>\`
+          } }}`,
+        },
+      ],
+    },
+  });
+
   // Connect all nodes
   return builder
-    .addEdge(startRef, llmNodeRef)
+    .addEdge(startRef, checkFocusedToolRef)
+    .addEdge(checkFocusedToolRef, focusedToolContextRef, 'add_context')
+    .addEdge(focusedToolContextRef, llmNodeRef)
+    .addEdge(checkFocusedToolRef, llmNodeRef, 'no_context')
     .addEdge(llmNodeRef, conditionalNodeRef)
     .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
     .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
@@ -174,7 +214,7 @@ function createDaedalusBlueprint(): Blueprint {
 function createDaedalusConfig(): { systemPrompt: string; state: AgentState } {
   return {
     systemPrompt: `<character name="Daedalus">
-Master Toolwright at Starships.ai. Purpose: design and scaffold production‑ready Tool instances for the current starship.
+Master Toolwright at Starships.ai. Purpose: design and scaffold production-ready Tool instances for the current starship.
 </character>
 
 <mission>

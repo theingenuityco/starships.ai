@@ -1,18 +1,154 @@
-import { AgentState, Blueprint, Agent } from '@starships/autopilot';
+import { AgentState, Blueprint, BlueprintBuilder } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 
 /**
- * Create Daedalus tool creator blueprint using Agent class
+ * Create Daedalus tool creator blueprint
+ * Blueprint structure matches the default agent blueprint with tool execution support
  */
 function createDaedalusBlueprint(): Blueprint {
-  const agent = new Agent({
-    name: 'Daedalus Toolwright',
-    model: 'anthropic/claude-sonnet-4.5',
-    // Using system defaults for temperature and maxTokens
+  const builder = new BlueprintBuilder();
+
+  // Define refs upfront for nodes used in template strings
+  const llmNodeRef = 'ai_assistant';
+  const toolNodeRef = 'execute_tool';
+
+  // Add nodes and capture their refs
+  const startRef = builder.addNode({
+    type: 'start',
+    name: 'Start',
+    description: 'Start node',
+    parameters: {},
   });
 
-  // Use the single default LLM chain created by Agent constructor
-  return agent.getCurrentBlueprint();
+  const endRef = builder.addNode({
+    type: 'end',
+    name: 'End',
+    description: 'End node',
+    parameters: {},
+  });
+
+  // LLM node with state-driven tools - use predefined ref
+  builder.addNode({
+    type: 'llm',
+    name: 'AI Assistant',
+    description: 'AI model with state-driven tool support',
+    ref: llmNodeRef,
+    parameters: {
+      model: 'anthropic/claude-sonnet-4.5',
+      messages: '{{ state.messages }}',
+      tools: '{{ state.tools }}',
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/state/messages/-',
+          value: `{{ (() => {
+            const msg = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
+            const content = typeof msg.content === "string" ? msg.content : "";
+            const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+            if (calls.length > 0) {
+              const tool_calls = calls.map(tc => ({
+                id: tc?.id ?? "",
+                type: "function",
+                function: {
+                  name: tc?.function?.name ?? "",
+                  arguments: (() => {
+                    try {
+                      const a = tc?.function?.arguments;
+                      if (typeof a === "string") return a;
+                      return JSON.stringify(a ?? {});
+                    } catch { return "{}"; }
+                  })()
+                }
+              }));
+              return { role: "assistant", content, tool_calls };
+            }
+            return { role: "assistant", content };
+          })() }}`,
+        },
+      ],
+    },
+  });
+
+  // Conditional node for tool call detection
+  const conditionalNodeRef = builder.addNode({
+    type: 'conditional',
+    name: 'Check Tool Calls',
+    description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
+    parameters: {
+      condition:
+        '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+    },
+  });
+
+  // Prepare arguments for Tool - capture ref for edge connections
+  const argsNodeRef = builder.addNode({
+    type: 'code',
+    name: 'Prepare Tool Args',
+    description: 'Materialize arguments into a plain object for Tool input',
+    parameters: {
+      code: `
+        const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
+        let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+        if (typeof j === 'string') { try { j = JSON.parse(j); } catch {} }
+        if (j && typeof j === 'object') { return j; }
+        throw new Error('Missing toolCall function.arguments');
+      `,
+      timeout: 3000,
+    },
+  });
+
+  // Tool execution node - use predefined ref
+  builder.addNode({
+    type: 'tool',
+    name: 'Execute Tool',
+    description: 'Execute tool',
+    ref: toolNodeRef,
+    parameters: {
+      name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
+      description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
+      parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+      blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
+      toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+    },
+  });
+
+  // Mutate node to add tool result to state
+  const toolResultNodeRef = builder.addNode({
+    type: 'mutate',
+    name: 'Add Tool Result',
+    description: 'Add tool result message to conversation state',
+    parameters: {
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/state/messages/-',
+          value: `{{ (() => {
+            const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
+            const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+            const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+            return {
+              role: "tool",
+              tool_call_id: toolCallId,
+              content: content
+            };
+          })() }}`,
+        },
+      ],
+    },
+  });
+
+  // Connect all nodes
+  return builder
+    .addEdge(startRef, llmNodeRef)
+    .addEdge(llmNodeRef, conditionalNodeRef)
+    .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
+    .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
+    .addEdge(argsNodeRef, toolNodeRef)
+    .addEdge(toolNodeRef, toolResultNodeRef)
+    .addEdge(toolResultNodeRef, llmNodeRef)
+    .addEdge(conditionalNodeRef, endRef, 'complete')
+    .setMetadata('generatedBy', 'Daedalus seeder')
+    .build();
 }
 
 /**

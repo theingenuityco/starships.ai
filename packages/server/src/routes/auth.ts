@@ -483,9 +483,30 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
         return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=invalid_state`);
       }
       
-      // TODO: Implement actual account linking logic
-      // For now, just redirect back to profile with success message
-      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=success&provider=${provider}`);
+      // Implement actual account linking logic
+      try {
+        // Get OAuth profile from provider using the authorization code
+        const userService = new UserService();
+        const profile = await userService.getOAuthProfile(provider, code);
+        
+        // Link the OAuth account to the existing authenticated user
+        await userService.linkOAuthAccount(userId, profile);
+        
+        logger.info('[OAUTH-LINKING] Successfully linked account', { 
+          userId, 
+          provider
+        });
+        
+        return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=success&provider=${provider}`);
+      } catch (error: any) {
+        logger.error('[OAUTH-LINKING] Failed to link account', { 
+          userId, 
+          provider,
+          errorType: error.constructor.name
+        });
+        
+        return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=linking_failed`);
+      }
     }
 
     // Regular OAuth flow for new user registration
@@ -632,11 +653,11 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     }
     
     // Validate and consume the authorization code (one-time use)
-    logger.info('[OAUTH-EXCHANGE] Attempting to validate auth code', { authCode: authCode.substring(0, 8) + '...' });
+    logger.info('[OAUTH-EXCHANGE] Attempting to validate auth code');
     const codeData = await validateAndConsumeAuthCode(authCode);
     
     if (!codeData) {
-      logger.error('[OAUTH-EXCHANGE] Auth code validation failed - likely already consumed or expired', { authCode: authCode.substring(0, 8) + '...' });
+      logger.error('[OAUTH-EXCHANGE] Auth code validation failed - likely already consumed or expired');
       return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code. Please try logging in again.', 400);
     }
     

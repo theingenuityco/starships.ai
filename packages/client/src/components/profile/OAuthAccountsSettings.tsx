@@ -1,6 +1,7 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -92,10 +93,26 @@ const ProviderName = ({ provider }: { provider: 'google' | 'github' }) => {
 }
 
 export function OAuthAccountsSettings() {
-  const { data: accountsData, isLoading, error } = useOAuthAccounts()
+  const { data: accountsData, isLoading, error, refetch } = useOAuthAccounts()
   const unlinkMutation = useUnlinkOAuthAccount()
+  const searchParams = useSearchParams()
 
   const accounts = accountsData?.accounts || []
+
+  // Handle OAuth linking success/error
+  useEffect(() => {
+    const oauthLink = searchParams?.get('oauth_link')
+    const provider = searchParams?.get('provider')
+    
+    if (oauthLink === 'success' && provider) {
+      toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account linked successfully!`)
+      // Refetch accounts data to show the newly linked account
+      refetch()
+    } else if (oauthLink === 'error') {
+      const message = searchParams?.get('message')
+      toast.error(`Failed to link account: ${message || 'Unknown error'}`)
+    }
+  }, [searchParams, refetch])
 
   // OAuth initiation function - uses secure authenticated endpoint
   const handleLinkAccount = async (provider: 'google' | 'github') => {

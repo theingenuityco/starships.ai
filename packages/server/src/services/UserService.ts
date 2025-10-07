@@ -424,10 +424,18 @@ export class UserService {
   async linkOAuthAccount(userId: string, profile: OAuthProfileModel): Promise<void> {
     const oauthRepo = this.oauthRepository;
 
-    // Business rule: Check if already linked
+    // SECURITY: Check if OAuth account already linked to ANY user (prevent account takeover)
     const existing = await oauthRepo.findByProviderAndUser(profile.provider, profile.providerId);
     if (existing) {
-      return; // Already linked
+      if (existing.userId === userId) {
+        return; // Already linked to this user - OK
+      } else {
+        // CRITICAL SECURITY: OAuth account belongs to different user
+        throw new ValidationError(
+          'This social media account is already linked to another user account. Please use a different account or contact support.',
+          'provider'
+        );
+      }
     }
 
     // Business logic: Create OAuth account link using Entity pattern

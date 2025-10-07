@@ -156,6 +156,7 @@ CREATE TABLE tools (
     condition TEXT,
     configuration JSONB DEFAULT '{}'::jsonb,
     is_enabled BOOLEAN NOT NULL DEFAULT true,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active')),
     starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE CASCADE,
     template_id VARCHAR(255) REFERENCES tool_templates(id) ON DELETE SET NULL,
     deployed_at TIMESTAMP WITH TIME ZONE,
@@ -171,6 +172,7 @@ CREATE INDEX idx_tools_template_id ON tools(template_id);
 CREATE INDEX idx_tools_name ON tools(name);
 CREATE INDEX idx_tools_slug ON tools(slug);
 CREATE INDEX idx_tools_enabled ON tools(is_enabled);
+CREATE INDEX idx_tools_status ON tools(status);
 
 -- ============================================================================
 -- NOTE: WORKFLOWS, BLUEPRINTS, AND EXECUTIONS TABLES REMOVED

@@ -91,6 +91,11 @@ export class ToolRepository extends BaseRepository {
           sqlParams.push(params.isEnabled);
         }
 
+        if (params.status !== undefined) {
+          query += ` AND status = $${paramIndex++}`;
+          sqlParams.push(params.status);
+        }
+
         if (params.query) {
           query += ` AND (LOWER(name) LIKE LOWER($${paramIndex++}) OR LOWER(description) LIKE LOWER($${paramIndex++}))`;
           sqlParams.push(`%${params.query}%`);
@@ -127,6 +132,7 @@ export class ToolRepository extends BaseRepository {
           slug: data.slug,
           configuration: data.configuration,
           isEnabled: data.isEnabled ?? true,
+          status: data.status || 'active',
 
           // Relationship field
           starshipId: starshipId,

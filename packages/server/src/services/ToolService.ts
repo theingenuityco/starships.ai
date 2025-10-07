@@ -82,6 +82,11 @@ export class ToolService {
           continue; // Skip disabled tools
         }
 
+        // Skip draft tools (they don't have complete parameters/blueprint)
+        if (dbTool.status === 'draft' || !dbTool.parameters || !dbTool.blueprint) {
+          continue;
+        }
+
         const agentTool = await this.createAgentToolFromDatabase(dbTool, {});
         if (agentTool) {
           tools.push(agentTool);
@@ -154,7 +159,7 @@ export class ToolService {
       return {
         name: dbTool.name,
         description: dbTool.description,
-        parameters: dbTool.parameters,
+        parameters: dbTool.parameters!,
         execute: async (input: string): Promise<string> => {
           try {
             // Parse input arguments
@@ -176,7 +181,7 @@ export class ToolService {
             const initialItems = ExecutionItemUtils.wrapSingle(executionContext);
             execution.results.push({ nodeRef: '__initial__', items: initialItems });
 
-            const resultItems = await engine.executeBlueprint(dbTool.blueprint, execution);
+            const resultItems = await engine.executeBlueprint(dbTool.blueprint!, execution);
             const result = ExecutionItemUtils.unwrapSingle(resultItems);
 
             // Return the result as a string

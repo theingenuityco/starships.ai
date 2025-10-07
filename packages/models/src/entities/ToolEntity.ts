@@ -54,16 +54,18 @@ export class ToolEntity implements ToolModel {
   description!: string;
 
   @Expose()
+  @IsOptional()
   @IsObject()
-  parameters!: {
+  parameters?: {
     type: 'object';
     properties: Record<string, ToolParameterSchema>;
     required?: string[];
   };
 
   @Expose()
+  @IsOptional()
   @IsObject()
-  blueprint!: Blueprint;
+  blueprint?: Blueprint;
 
   // BaseParams fields
   @Expose()
@@ -92,6 +94,11 @@ export class ToolEntity implements ToolModel {
   @IsBoolean()
   isEnabled?: boolean;
 
+  @Expose()
+  @IsOptional()
+  @IsString()
+  status?: 'draft' | 'active';
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -114,13 +121,14 @@ export class ToolEntity implements ToolModel {
         templateId: dataRecord.templateId,
         name: dataRecord.name || '',
         description: dataRecord.description || '',
-        parameters: dataRecord.parameters || { type: 'object', properties: {} },
-        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        parameters: dataRecord.parameters,
+        blueprint: dataRecord.blueprint,
         transforms: dataRecord.transforms,
         mutations: dataRecord.mutations,
         condition: dataRecord.condition,
         configuration: dataRecord.configuration || {},
         isEnabled: dataRecord.isEnabled ?? true,
+        status: dataRecord.status || 'active',
         ...dataRecord,
       });
     } else {

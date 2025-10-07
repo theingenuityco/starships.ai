@@ -186,15 +186,18 @@ export class ConversationService {
       }
 
       // Convert ToolModel instances to ToolParams with their actual blueprints
-      const toolParams: ToolParams[] = deployedTools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-        blueprint: tool.blueprint, // Use the actual blueprint from the deployed instance
-        ...(tool.transforms && { transforms: tool.transforms }),
-        ...(tool.mutations && { mutations: tool.mutations }),
-        ...(tool.condition && { condition: tool.condition }),
-      }));
+      // Filter out draft tools (status='draft') as they don't have complete parameters/blueprint
+      const toolParams: ToolParams[] = deployedTools
+        .filter((tool) => tool.status !== 'draft' && tool.parameters && tool.blueprint)
+        .map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters!,
+          blueprint: tool.blueprint!,
+          ...(tool.transforms && { transforms: tool.transforms }),
+          ...(tool.mutations && { mutations: tool.mutations }),
+          ...(tool.condition && { condition: tool.condition }),
+        }));
 
       console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} tools via Agent→Tool relationships for agent ${agentId}`);
       return toolParams;

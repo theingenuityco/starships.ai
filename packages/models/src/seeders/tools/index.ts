@@ -10,7 +10,6 @@ export { wikipediaToolTemplate } from './wikipedia';
 export { duckduckgoToolTemplate } from './duckduckgo';
 export { toolListToolTemplate } from './tool-list';
 export { toolGetToolTemplate } from './tool-get';
-export { toolCreateToolTemplate } from './tool-create';
 export { toolOpenNewToolTemplate } from './tool-open-new';
 export { toolUpdateToolTemplate } from './tool-update';
 export { blueprintLintToolTemplate } from './blueprint-lint';
@@ -26,7 +25,6 @@ import { wikipediaToolTemplate } from './wikipedia';
 import { duckduckgoToolTemplate } from './duckduckgo';
 import { toolListToolTemplate } from './tool-list';
 import { toolGetToolTemplate } from './tool-get';
-import { toolCreateToolTemplate } from './tool-create';
 import { toolOpenNewToolTemplate } from './tool-open-new';
 import { toolUpdateToolTemplate } from './tool-update';
 import { blueprintLintToolTemplate } from './blueprint-lint';
@@ -42,7 +40,6 @@ export const ALL_TOOL_TEMPLATES = [
   duckduckgoToolTemplate,
   toolListToolTemplate,
   toolGetToolTemplate,
-  toolCreateToolTemplate,
   toolOpenNewToolTemplate,
   toolUpdateToolTemplate,
   blueprintLintToolTemplate,

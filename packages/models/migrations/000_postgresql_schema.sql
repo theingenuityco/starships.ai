@@ -20,6 +20,10 @@ CREATE TABLE users (
     avatar VARCHAR(500),
     password VARCHAR(255),
     stripe_customer_id VARCHAR(255) UNIQUE,
+    email_verified BOOLEAN NOT NULL DEFAULT false,
+    has_password BOOLEAN NOT NULL DEFAULT false,
+    auth_methods TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+    primary_auth_method VARCHAR(10) NOT NULL DEFAULT 'password' CHECK (primary_auth_method IN ('password', 'oauth')),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -27,7 +31,34 @@ CREATE TABLE users (
 -- User indexes
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_stripe_customer_id ON users(stripe_customer_id);
+CREATE INDEX idx_users_email_verified ON users(email_verified);
+CREATE INDEX idx_users_has_password ON users(has_password);
+CREATE INDEX idx_users_auth_methods ON users USING GIN(auth_methods);
+CREATE INDEX idx_users_primary_auth_method ON users(primary_auth_method);
 CREATE INDEX idx_users_created_at ON users(created_at);
+
+-- ============================================================================
+-- OAUTH ACCOUNTS TABLE
+-- ============================================================================
+
+CREATE TABLE oauth_accounts (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL CHECK (provider IN ('google', 'github')),
+    provider_user_id VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    profile_data JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    
+    -- Prevent duplicate provider accounts
+    UNIQUE(provider, provider_user_id)
+);
+
+-- OAuth accounts indexes
+CREATE INDEX idx_oauth_accounts_user_id ON oauth_accounts(user_id);
+CREATE INDEX idx_oauth_accounts_provider ON oauth_accounts(provider);
+CREATE INDEX idx_oauth_accounts_email ON oauth_accounts(email);
 
 -- ============================================================================
 -- STARSHIPS TABLE
@@ -358,6 +389,7 @@ CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('
 -- ============================================================================
 
 COMMENT ON TABLE users IS 'User accounts with authentication and billing information';
+COMMENT ON TABLE oauth_accounts IS 'OAuth account links - supports multiple providers per user';
 COMMENT ON TABLE starships IS 'Starships owned by users with configuration and billing details';
 COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketplace';
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';

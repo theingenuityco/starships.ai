@@ -1,6 +1,6 @@
-# OAuth Security UI Migration Guide
+# OAuth Security UI Setup Guide
 
-This guide covers the implementation of the adaptive OAuth security UI feature.
+This guide covers the implementation of the adaptive OAuth security UI feature - now with simplified database setup!
 
 ## Overview
 
@@ -11,35 +11,50 @@ This feature transforms the user security settings to be OAuth-aware, providing 
 - **Hybrid users**: See both password management and OAuth accounts
 - **All users**: Get session management capabilities
 
-## Database Migration
+## Database Setup - Development Mode
 
-### Run the Migration
+🚀 **Super Simple!** Everything is now consolidated into the base schema for development!
+
+### Drop and Recreate (Recommended for Dev)
+
+Since you're in development, just purge and recreate:
 
 ```bash
 # Navigate to the models package
 cd packages/models
 
-# Run the migration SQL
-psql -d starships -f migrations/002_add_user_auth_methods.sql
+# Drop the existing database (⚠️ DATA LOSS!)
+dropdb starships
+
+# Create fresh database  
+createdb starships
+
+# Run the complete schema (includes ALL OAuth features)
+psql -d starships -f migrations/000_postgresql_schema.sql
 ```
 
-### Verify Migration
+### What's Included in Base Schema
+
+The `000_postgresql_schema.sql` now includes EVERYTHING:
+- ✅ **Users table** with auth method tracking
+- ✅ **OAuth accounts table** for provider links  
+- ✅ **All indexes** for performance
+- ✅ **Proper constraints** and validation
+
+### Verify Complete Setup
 
 ```sql
--- Check that new columns exist
+-- Check users table has all auth columns
 \d users;
 
--- Should show:
--- has_password | boolean | not null | default false
--- auth_methods | text[]  | not null | default '{}'::text[]
+-- Check oauth_accounts table exists  
+\d oauth_accounts;
+
+-- Should show these new columns in users:
+-- email_verified | boolean | not null | default false
+-- has_password | boolean | not null | default false  
+-- auth_methods | text[] | not null | default '{}'::text[]
 -- primary_auth_method | varchar(10) | not null | default 'password'::character varying
-```
-
-### Rollback (if needed)
-
-```bash
-# If you need to rollback the migration
-psql -d starships -f migrations/002_rollback_user_auth_methods.sql
 ```
 
 ## API Endpoints Added
@@ -109,10 +124,10 @@ psql -d starships -f migrations/002_rollback_user_auth_methods.sql
 
 ## Troubleshooting
 
-### Migration Issues
-- Ensure database connection is working
-- Check that all existing users have proper auth methods set
-- Verify constraints are properly applied
+### Database Issues
+- Ensure PostgreSQL is running and accessible
+- Verify database was dropped/recreated cleanly
+- Check that base schema ran without errors
 
 ### Frontend Issues  
 - Clear browser cache and restart dev server
@@ -120,6 +135,6 @@ psql -d starships -f migrations/002_rollback_user_auth_methods.sql
 - Verify API endpoints are responding correctly
 
 ### Backend Issues
-- Restart server after migration
-- Check server logs for any validation errors
+- Restart server after database recreation
+- Check server logs for any validation errors  
 - Verify JWT tokens include new auth fields

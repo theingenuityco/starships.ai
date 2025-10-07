@@ -1,0 +1,108 @@
+name: Deploy to Development (AWS EKS)
+
+on:
+  workflow_run:
+    workflows: ['Build and Push Image']
+    types:
+      - completed
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: theingenuityco/starships.ai
+  AWS_REGION: ap-south-1
+  EKS_CLUSTER: starships-dev
+  NAMESPACE: starships-dev
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: Deploy Image to EKS (Dev)
+    runs-on: ubuntu-latest
+    environment: dev
+
+    # Only run if previous workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get Image Tag from Build
+        id: get-image
+        run: |
+          echo "Fetching latest semantic release version..."
+          VERSION=$(gh release view --json tagName -q '.tagName' || echo "latest")
+          echo "Detected version: $VERSION"
+          echo "image_tag=$VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_EKS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      - name: Validate manifests
+        run: |
+          kubectl apply --dry-run=client -f k8s/dev/
+          echo "✅ Kubernetes manifests validated successfully."
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/dev/00-namespace.yaml
+          kubectl apply -f k8s/dev/03-deployment.yaml
+          kubectl apply -f k8s/dev/04-service.yaml
+          kubectl apply -f k8s/dev/05-ingress.yaml
+          echo "✅ Applied manifests to dev cluster."
+
+      - name: Update secrets
+        run: |
+          kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
+          kubectl create secret generic starships-secrets \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --from-literal=OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --from-literal=POSTGRES_HOST="${{ secrets.POSTGRES_HOST }}" \
+            --from-literal=POSTGRES_PORT="${{ secrets.POSTGRES_PORT }}" \
+            --from-literal=POSTGRES_USER="${{ secrets.POSTGRES_USER }}" \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+            --from-literal=POSTGRES_DATABASE="${{ secrets.POSTGRES_DATABASE }}" \
+            --from-literal=POSTGRES_SSL="${{ secrets.POSTGRES_SSL }}" \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
+            --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \
+            --from-literal=PUBLIC_URL="${{ vars.PUBLIC_URL }}" \
+            -n ${{ env.NAMESPACE }}
+
+          kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.repository_owner }} \
+            --docker-password="${{ secrets.GHCR_PULL_TOKEN }}" \
+            -n ${{ env.NAMESPACE }}
+          echo "✅ Secrets updated successfully."
+
+      - name: Deploy new image
+        run: |
+          echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
+          kubectl set image deployment/starships-app \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
+            -n ${{ env.NAMESPACE }}
+          kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=300s
+          echo "✅ Deployment rolled out successfully."
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          kubectl logs -n ${{ env.NAMESPACE }} deployment/starships-app --tail=30 || true
+          echo "✅ Verification complete."

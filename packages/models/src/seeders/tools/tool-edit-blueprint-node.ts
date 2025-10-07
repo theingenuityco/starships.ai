@@ -213,7 +213,7 @@ Returns updated tool with node modifications, or validation errors if update fai
           url: '{{ $lastOutputOf("validate")[0].json.toolData.id ? $lastOutputOf("prepare")[0].json.baseUrl + "/tools/" + $lastOutputOf("validate")[0].json.toolData.id : "" }}',
           method: 'PUT',
           headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ (() => { const result = $lastOutputOf("validate")[0].json; if (result.success) { return { ...result.toolData, blueprint: result.updatedBlueprint }; } else { return result.toolData; } })() }}',
+          body: '{{ (() => { const result = $lastOutputOf("validate")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}',
           timeout: 10000,
         },
       },

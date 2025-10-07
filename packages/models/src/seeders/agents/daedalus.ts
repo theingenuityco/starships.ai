@@ -139,14 +139,23 @@ function createDaedalusBlueprint(): Blueprint {
           value: `{{ (() => {
             const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
             const toolSlug = calls?.[0]?.function?.name;
-            if (toolSlug === 'tool-open-new' || toolSlug === 'tool-open') {
+            if (toolSlug === 'tool-open-new' || toolSlug === 'tool-open' || toolSlug === 'tool-edit') {
               const httpResponse = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
               const toolData = httpResponse.body?.data || httpResponse.body;
               if (!toolData || !toolData.name) return null;
+              // Store complete tool details to minimize repetitive tool calls
               return {
+                id: toolData.id,
                 name: toolData.name,
                 slug: toolData.slug,
-                description: toolData.description || ''
+                description: toolData.description || '',
+                parameters: toolData.parameters || null,
+                blueprint: toolData.blueprint || null,
+                status: toolData.status || 'draft',
+                starshipId: toolData.starshipId,
+                templateId: toolData.templateId || null,
+                createdAt: toolData.createdAt,
+                updatedAt: toolData.updatedAt
               };
             }
             return null;
@@ -179,13 +188,17 @@ function createDaedalusBlueprint(): Blueprint {
           value: `{{ {
             role: 'system',
             content: \`<focused-tool>
+id: \${state.focusedTool.id || 'N/A'}
 name: \${state.focusedTool.name}
 slug: \${state.focusedTool.slug}
 description: \${state.focusedTool.description}
+status: \${state.focusedTool.status || 'draft'}
+parameters: \${state.focusedTool.parameters ? 'defined' : 'null'}
+blueprint: \${state.focusedTool.blueprint ? 'defined' : 'null'}
 </focused-tool>
 
 <instructions>
-You have just created the tool above using "Open New Tool". This tool is currently in draft status and needs to be completed and activated using tool_update. Focus on completing this tool before proceeding with other tasks.
+The complete tool details are now available in state.focusedTool. All tool properties (id, parameters, blueprint, etc.) are accessible without additional API calls. The tool responses only confirm success - use state.focusedTool for actual data. Focus on completing this tool before proceeding with other tasks.
 </instructions>\`
           } }}`,
         },
@@ -244,7 +257,7 @@ Alternative Workflow for Existing Tools:
 4. Use "Edit Tool" to apply the final blueprint updates
 5. Use tool_test to validate changes
 
-The "Open New Tool" command creates a draft tool (status='draft') that can be completed and activated with "Edit Tool". Draft tools are automatically tracked in your state but excluded from agent execution until activated.
+The "Open New Tool" and "Open Tool" commands automatically store complete tool details in state.focusedTool. Tool call responses are minimal confirmations - access complete tool data (id, parameters, blueprint, configuration, etc.) directly from state.focusedTool without additional API calls. The "Edit Tool" command also updates state.focusedTool with the latest data. Draft tools (status='draft') are excluded from agent execution until activated.
 
 Function names use their display name (e.g., "Open New Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open-new, tool-edit, tool-add-blueprint-node).
 </protocol>

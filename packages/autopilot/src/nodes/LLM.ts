@@ -88,12 +88,14 @@ export class LLM extends BaseNode<LlmParams> {
         requestOptions.tool_choice = 'auto';
       }
 
+      console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
       // Stream with OpenAI SDK (handles all accumulation reliably)
       const stream = await client.chat.completions.create(requestOptions);
       const llmResponse = await this.processOpenAIStream(stream);
 
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
+      console.error(error);
       throw this.handleExecutionError(error, 'LLM execution failed');
     }
   }
@@ -122,12 +124,13 @@ export class LLM extends BaseNode<LlmParams> {
 
   /**
    * Convert ToolParams to OpenAI function calling format
+   * Uses tool.slug as the function name for consistent kebab-case format
    */
   private convertToOpenAITools(tools: ToolParams[]): OpenAI.Chat.ChatCompletionTool[] {
     return tools.map((tool) => ({
       type: 'function' as const,
       function: {
-        name: tool.name,
+        name: tool.slug,
         description: tool.description,
         parameters: tool.parameters as Record<string, unknown>,
       },

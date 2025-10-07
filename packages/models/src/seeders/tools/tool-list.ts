@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolListTool: ToolParams = {
   name: 'tool_list',
+  slug: 'tool-list',
   description: `List all tools on the current starship via the Starships API.
 
 When to use:

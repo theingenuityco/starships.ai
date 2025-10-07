@@ -170,7 +170,7 @@ export function OAuthAccountsSettings() {
           Connected Accounts
         </CardTitle>
         <CardDescription>
-          Link your accounts to sign in with multiple methods and enhance security
+          Link accounts for authentication only - we don't access your account data or perform actions on your behalf
         </CardDescription>
       </CardHeader>
       
@@ -246,7 +246,7 @@ export function OAuthAccountsSettings() {
           <Alert>
             <Shield className="h-4 w-4" />
             <AlertDescription>
-              You can use any connected account to sign in. For security, ensure you have at least one authentication method available.
+              You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.
             </AlertDescription>
           </Alert>
         )}

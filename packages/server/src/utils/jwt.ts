@@ -8,14 +8,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { getEnvConfig } from '@starships/env';
 import crypto from 'crypto';
-
-// In-memory storage for authorization codes (use Redis in production)
-const authCodeStorage = new Map<string, {
-  userId: string;
-  email: string;
-  createdAt: number;
-  consumed: boolean;
-}>();
+import { OAuthAuthCodeRepository } from '@starships/models';
 
 const env = getEnvConfig();
 const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET);
@@ -82,79 +75,26 @@ export async function verifyJWT(token: string) {
   });
 }
 
+// Initialize repository for OAuth auth codes
+const oauthCodeRepo = new OAuthAuthCodeRepository();
+
 /**
  * Generate secure authorization code for OAuth token exchange
- * This replaces the vulnerable JWT-in-URL pattern
+ * Database-backed, production-ready implementation
  */
 export async function generateAuthCode(userId: string, email: string): Promise<string> {
-  // Generate cryptographically secure random code
-  const authCode = crypto.randomBytes(32).toString('hex');
-  
-  // Store with metadata and expiration
-  authCodeStorage.set(authCode, {
-    userId,
-    email,
-    createdAt: Date.now(),
-    consumed: false,
-  });
-  
-  // Auto-cleanup after 5 minutes
-  setTimeout(() => {
-    authCodeStorage.delete(authCode);
-  }, 5 * 60 * 1000);
-  
-  return authCode;
+  return await oauthCodeRepo.generateCode(userId, email);
 }
 
 /**
  * Validate and consume authorization code (one-time use)
- * Returns user data if valid, null if invalid/expired/consumed
+ * Atomic database operation prevents race conditions
  */
 export async function validateAndConsumeAuthCode(authCode: string): Promise<{
   userId: string;
   email: string;
 } | null> {
-  const codeData = authCodeStorage.get(authCode);
-  
-  if (!codeData) {
-    return null; // Code doesn't exist
-  }
-  
-  // Check if already consumed
-  if (codeData.consumed) {
-    return null; // Code already used
-  }
-  
-  // Check expiration (5 minutes)
-  if (Date.now() - codeData.createdAt > 5 * 60 * 1000) {
-    authCodeStorage.delete(authCode);
-    return null; // Code expired
-  }
-  
-  // Mark as consumed (one-time use)
-  codeData.consumed = true;
-  
-  // Return user data
-  return {
-    userId: codeData.userId,
-    email: codeData.email,
-  };
+  return await oauthCodeRepo.validateAndConsumeCode(authCode);
 }
 
-/**
- * Clean up expired auth codes (maintenance function)
- */
-export function cleanupExpiredAuthCodes(): number {
-  let cleanedCount = 0;
-  const now = Date.now();
-  const expiration = 5 * 60 * 1000; // 5 minutes
-  
-  for (const [code, data] of authCodeStorage.entries()) {
-    if (now - data.createdAt > expiration) {
-      authCodeStorage.delete(code);
-      cleanedCount++;
-    }
-  }
-  
-  return cleanedCount;
-}
+// Database automatically handles cleanup via expires_at constraint - no manual cleanup needed

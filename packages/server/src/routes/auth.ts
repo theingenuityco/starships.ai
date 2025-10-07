@@ -556,7 +556,7 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     if (!validation) return;
 
     const userId = (req as any).user!.id;
-    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'User not authenticated');
+    if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
     const userService = new UserService();
@@ -575,13 +575,13 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
 router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user!.id;
-    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'User not authenticated');
+    if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
     const userService = new UserService();
     const user = await userService.getUserById(userId);
 
-    if (!user) return sendError(res, 404, 'USER_NOT_FOUND', 'User not found');
+    if (!user) return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
 
     sendSuccess(res, {
       hasPassword: user.hasPassword || false,
@@ -609,13 +609,13 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     const codeData = await validateAndConsumeAuthCode(authCode);
     
     if (!codeData) {
-      return sendError(res, 'INVALID_CODE', 'Invalid or expired authorization code', 400);
+      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code', 400);
     }
     
     // Get full user data
     const user = await UserService.getUserById(codeData.userId);
     if (!user) {
-      return sendError(res, 'USER_NOT_FOUND', 'User not found', 404);
+      return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
     }
     
     // Re-check waitlist status for security (prevent timing attacks)
@@ -623,7 +623,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     const currentStatus = await waitlistService.getDetailedStatus(user.email!);
     
     if (currentStatus.status === 'pending') {
-      return sendError(res, 'WAITLISTED', 'User is still on waitlist', 403);
+      return sendError(res, 'ACCESS_DENIED', 'User is still on waitlist', 403);
     }
     
     // Generate JWT token (returned in response body, NOT URL)
@@ -667,7 +667,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       stack: error.stack,
     });
     
-    return sendError(res, 'EXCHANGE_FAILED', 'Token exchange failed', 500);
+    return sendError(res, 'INTERNAL_SERVER_ERROR', 'Token exchange failed', 500);
   }
 });
 
@@ -678,7 +678,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
 router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user!.id;
-    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'User not authenticated');
+    if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
     const userService = new UserService();

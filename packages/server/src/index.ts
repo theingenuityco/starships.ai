@@ -171,6 +171,7 @@ httpServer.listen(PORT, async () => {
       console.error('⚠️ Failed to seed waitlist:', error);
       // Continue - seeding is not critical for startup
     }
+
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

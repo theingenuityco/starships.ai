@@ -61,6 +61,27 @@ CREATE INDEX idx_oauth_accounts_provider ON oauth_accounts(provider);
 CREATE INDEX idx_oauth_accounts_email ON oauth_accounts(email);
 
 -- ============================================================================
+-- OAUTH AUTHORIZATION CODES TABLE (for secure token exchange)
+-- ============================================================================
+
+CREATE TABLE oauth_auth_codes (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    code VARCHAR(64) UNIQUE NOT NULL,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    consumed BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (NOW() + INTERVAL '5 minutes')
+);
+
+-- OAuth authorization codes indexes
+CREATE INDEX idx_oauth_auth_codes_code ON oauth_auth_codes(code) WHERE NOT consumed;
+CREATE INDEX idx_oauth_auth_codes_expires_at ON oauth_auth_codes(expires_at);
+CREATE INDEX idx_oauth_auth_codes_user_id ON oauth_auth_codes(user_id);
+
+-- Note: OAuth cleanup is handled by OAuthAuthCodeRepository.cleanupExpiredCodes()
+
+-- ============================================================================
 -- STARSHIPS TABLE
 -- ============================================================================
 

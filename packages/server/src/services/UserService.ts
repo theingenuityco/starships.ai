@@ -7,7 +7,7 @@
 
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { OAuthAccountRepository, UserRepository } from '@starships/models';
-import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest } from '@starships/protocol';
+import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest, AuthMethod } from '@starships/protocol';
 import { WaitlistService } from '@/services/WaitlistService';
 import { WaitlistRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
@@ -67,7 +67,20 @@ export class UserService {
       }
     }
 
-    const user = await this.userRepository.create(request);
+    // Transform CreateUserRequest to UserModel format with required fields
+    const userData: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'> = {
+      email: request.email,
+      displayName: request.displayName,
+      avatar: request.avatar,
+      password: request.password,
+      emailVerified: request.emailVerified || false,
+      stripeCustomerId: request.stripeCustomerId,
+      hasPassword: !!request.password,
+      authMethods: request.password ? ['password' as AuthMethod] : [],
+      primaryAuthMethod: request.password ? 'password' : 'oauth'
+    };
+
+    const user = await this.userRepository.create(userData);
     return user;
   }
 
@@ -386,15 +399,22 @@ export class UserService {
       email: profile.email,
       displayName: profile.name,
       avatar: profile.avatar,
-      emailVerified: true, // OAuth providers verify emails
-      hasPassword: false, // OAuth users start without password
-      authMethods: [profile.provider as 'google' | 'github'],
-      primaryAuthMethod: 'oauth'
+      emailVerified: true // OAuth providers verify emails
     };
 
     // Create user using proper service layer method
     const user = await this.createUser(userData);
-    return user;
+    
+    // After creating user, update additional OAuth-specific fields that aren't in CreateUserRequest
+    await this.userRepository.update(user.id, {
+      hasPassword: false, // OAuth users start without password
+      authMethods: [profile.provider as AuthMethod],
+      primaryAuthMethod: 'oauth'
+    });
+    
+    // Return updated user
+    const updatedUser = await this.getUserById(user.id);
+    return updatedUser!;
   }
 
   /**
@@ -726,7 +746,7 @@ export class UserService {
 
     const updatedUser = await this.userRepository.update(userId, {
       hasPassword,
-      authMethods,
+      authMethods: authMethods as AuthMethod[],
       primaryAuthMethod
     });
 

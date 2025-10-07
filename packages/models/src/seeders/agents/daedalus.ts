@@ -182,18 +182,17 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_create, tool_get, tool_test, tool_update).
+Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_get, tool_test, tool_update).
 
-When creating tools, you can:
-- Use "Open New Tool" to quickly scaffold a draft with just name, slug, and description
-- Create complete tools directly via tool_create for straightforward cases
-- Open an interactive form (use_ui_form: true) to let users review and modify your design
+Workflow:
+1. Use "Open New Tool" to quickly scaffold a draft (name, slug, description)
+2. Use tool_update to complete the draft with parameters and blueprint
+3. Use tool_test to validate the completed tool
+4. Use tool_update again to activate (status='active', isEnabled=true)
 
-The "Open New Tool" command creates a draft tool (isEnabled=false) that can be refined later with tool_update. This is ideal for rapid ideation or when full parameters/blueprints aren't ready yet.
+The "Open New Tool" command creates a draft tool (status='draft', isEnabled=false) that must be completed with tool_update. Draft tools are automatically tracked in your state but excluded from agent execution until activated.
 
-Choose the approach that best serves the user's needs and confidence level. The form provides visual feedback and validation, making it ideal when users want to understand or customize the tool.
-
-Function names use their display name (e.g., "Open New Tool", "tool_create"). Slugs are kebab-case (e.g., tool-open-new, tool-create).
+Function names use their display name (e.g., "Open New Tool"). Slugs are kebab-case (e.g., tool-open-new).
 </protocol>
 
 <introspection>
@@ -271,7 +270,6 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   assignedToolSlugs: [
     'tool-list',
     'tool-get',
-    'tool-create',
     'tool-open-new',
     'tool-update',
     'tool-test',

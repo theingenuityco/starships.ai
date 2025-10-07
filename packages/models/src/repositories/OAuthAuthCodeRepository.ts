@@ -8,7 +8,6 @@
 import { OAuthAuthCodeEntity, OAuthAuthCodeModel } from '@/entities/OAuthAuthCodeEntity';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { ConflictError, NotFoundError, ValidationError } from '@starships/errors';
 import { nanoid } from 'nanoid';
 import crypto from 'crypto';
 
@@ -47,8 +46,8 @@ export class OAuthAuthCodeRepository extends BaseRepository {
         );
         
         return code;
-      } catch (error: any) {
-        if (error.code === '23505') { // PostgreSQL unique constraint violation
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === '23505') { // PostgreSQL unique constraint violation
           // Extremely rare - retry with new code
           return this.generateCode(userId, email);
         }

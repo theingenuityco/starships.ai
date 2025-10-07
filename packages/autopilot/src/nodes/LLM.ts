@@ -127,16 +127,14 @@ export class LLM extends BaseNode<LlmParams> {
    * Uses tool.slug as the function name for consistent kebab-case format
    */
   private convertToOpenAITools(tools: ToolParams[]): OpenAI.Chat.ChatCompletionTool[] {
-    return tools
-      .filter((tool) => tool && typeof tool === 'object' && tool.slug && tool.name)
-      .map((tool) => ({
-        type: 'function' as const,
-        function: {
-          name: tool.slug,
-          description: tool.description,
-          parameters: tool.parameters as Record<string, unknown>,
-        },
-      }));
+    return tools.map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.slug,
+        description: tool.description,
+        parameters: tool.parameters as Record<string, unknown>,
+      },
+    }));
   }
 
   /**

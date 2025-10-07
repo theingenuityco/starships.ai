@@ -112,6 +112,14 @@ export class ToolEntity implements ToolModel {
 
     // For create operations, validate all required fields
     if (operation === 'create') {
+      const status = dataRecord.status || 'active';
+
+      // For draft tools, parameters and blueprint are optional
+      // For active tools, they are required
+      if (status === 'active' && (!dataRecord.parameters || !dataRecord.blueprint)) {
+        throw new Error('Active tools must have parameters and blueprint defined');
+      }
+
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         slug: dataRecord.slug || '',
@@ -128,7 +136,7 @@ export class ToolEntity implements ToolModel {
         condition: dataRecord.condition,
         configuration: dataRecord.configuration || {},
         isEnabled: dataRecord.isEnabled ?? true,
-        status: dataRecord.status || 'active',
+        status: status,
         ...dataRecord,
       });
     } else {

@@ -70,27 +70,11 @@ Automatically inferred from agent state (do not pass manually):
               throw new Error('name and slug are required');
             }
 
-            // Create minimal tool structure with empty parameters and blueprint
+            // Create minimal draft tool with only essential fields
             const body = {
               name: input.name,
               slug: input.slug,
               description: input.description || '',
-              parameters: {
-                type: 'object',
-                properties: {},
-                required: []
-              },
-              blueprint: {
-                nodes: [
-                  { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-                  { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} }
-                ],
-                edges: [
-                  { ref: 'e1', from: 'start_1', to: 'end_1' }
-                ],
-                metadata: { draft: true }
-              },
-              configuration: {},
               isEnabled: false,
               status: 'draft'
             };

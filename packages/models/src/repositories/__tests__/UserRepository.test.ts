@@ -135,6 +135,9 @@ describe('UserRepository', () => {
         email: 'test@example.com',
         displayName: 'Test User',
         avatar: 'avatar-url',
+        hasPassword: false,
+        authMethods: ['google' as const],
+        primaryAuthMethod: 'oauth' as const
       };
 
       const mockTimestamp = new Date().toISOString();
@@ -164,6 +167,9 @@ describe('UserRepository', () => {
       const userData = {
         email: 'updated@example.com',
         displayName: 'Updated Name',
+        hasPassword: true,
+        authMethods: ['password' as const],
+        primaryAuthMethod: 'password' as const
       };
 
       const existingUser = global.createMockUser({
@@ -358,6 +364,9 @@ describe('UserRepository', () => {
 
       const duplicateUser = {
         email: 'existing@example.com',
+        hasPassword: false,
+        authMethods: ['google' as const],
+        primaryAuthMethod: 'oauth' as const
       };
 
       await expect(repository.create(duplicateUser)).rejects.toThrow(ConflictError);
@@ -378,6 +387,9 @@ describe('UserRepository', () => {
       const userData = {
         email: 'new@example.com',
         displayName: 'New User',
+        hasPassword: true,
+        authMethods: ['password' as const],
+        primaryAuthMethod: 'password' as const
       };
 
       // Mock findByEmail to return null (user doesn't exist)

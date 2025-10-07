@@ -5,9 +5,9 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
-import type { UserModel } from '@starships/protocol';
+import type { UserModel, AuthMethod } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
+import { IsBoolean, IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError, IsArray, IsEnum } from 'class-validator';
 
 /**
  * Custom transformers for the UserEntity
@@ -146,6 +146,20 @@ export class UserEntity implements UserModel {
   })
   stripeCustomerId?: string;
 
+  // Authentication method tracking
+  @Expose()
+  @IsBoolean()
+  hasPassword!: boolean;
+
+  @Expose()
+  @IsArray()
+  @IsEnum(['password', 'google', 'github'], { each: true })
+  authMethods!: AuthMethod[];
+
+  @Expose()
+  @IsEnum(['password', 'oauth'])
+  primaryAuthMethod!: 'password' | 'oauth';
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -191,6 +205,34 @@ export class UserEntity implements UserModel {
    */
   hasCompleteProfile(): boolean {
     return !!(this.email && this.displayName);
+  }
+
+  /**
+   * Helper method to check if user has specific auth method
+   */
+  hasAuthMethod(method: AuthMethod): boolean {
+    return this.authMethods.includes(method);
+  }
+
+  /**
+   * Helper method to check if user is OAuth-only
+   */
+  isOAuthOnly(): boolean {
+    return !this.hasPassword && this.authMethods.some(m => m !== 'password');
+  }
+
+  /**
+   * Helper method to check if user can set password (OAuth-only users)
+   */
+  canSetPassword(): boolean {
+    return !this.hasPassword && this.authMethods.length > 0;
+  }
+
+  /**
+   * Helper method to check if user has hybrid authentication (password + OAuth)
+   */
+  isHybridAuth(): boolean {
+    return this.hasPassword && this.authMethods.some(m => m !== 'password');
   }
 
   /**

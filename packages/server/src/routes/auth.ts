@@ -47,6 +47,15 @@ const OAuthCallbackSchema = z.object({
   error: z.string().optional(),
 });
 
+// Zod schema for setting password
+const SetPasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
   try {
@@ -353,6 +362,9 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
       avatar: user.avatar,
+      hasPassword: user.hasPassword || false,
+      authMethods: user.authMethods || [],
+      primaryAuthMethod: user.primaryAuthMethod || 'password'
     });
   } catch (error: any) {
     console.error('[AUTH] Me endpoint error:', error);
@@ -534,6 +546,76 @@ router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Req
     sendSuccess(res, { message: `${provider} account unlinked successfully` });
   } catch (error: any) {
     handleError(error, res, 'unlink OAuth account');
+  }
+});
+
+/**
+ * Set password for OAuth-only users
+ * POST /auth/set-password
+ */
+router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    // Validate request body
+    const validation = validateData(SetPasswordSchema, req.body, res, 'set password');
+    if (!validation) return;
+
+    const userId = (req as any).user!.id;
+    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'User not authenticated');
+
+    // Delegate to service layer
+    const userService = new UserService();
+    const user = await userService.setPasswordForOAuthUser(userId, validation);
+
+    sendSuccess(res, { user, message: 'Password set successfully' });
+  } catch (error: any) {
+    handleError(res, error, 'Setting password failed');
+  }
+});
+
+/**
+ * Get user authentication methods
+ * GET /auth/methods
+ */
+router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user!.id;
+    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'User not authenticated');
+
+    // Delegate to service layer
+    const userService = new UserService();
+    const user = await userService.getUserById(userId);
+
+    if (!user) return sendError(res, 404, 'USER_NOT_FOUND', 'User not found');
+
+    sendSuccess(res, {
+      hasPassword: user.hasPassword || false,
+      authMethods: user.authMethods || [],
+      primaryAuthMethod: user.primaryAuthMethod || 'password'
+    });
+  } catch (error: any) {
+    handleError(res, error, 'Getting auth methods failed');
+  }
+});
+
+/**
+ * Initialize auth methods for existing users (migration helper)
+ * POST /auth/init-methods
+ */
+router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user!.id;
+    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'User not authenticated');
+
+    // Delegate to service layer
+    const userService = new UserService();
+    const user = await userService.initializeUserAuthMethods(userId);
+
+    sendSuccess(res, { 
+      user,
+      message: 'Authentication methods initialized successfully'
+    });
+  } catch (error: any) {
+    handleError(res, error, 'Initializing auth methods failed');
   }
 });
 

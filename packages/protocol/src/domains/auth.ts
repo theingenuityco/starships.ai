@@ -9,6 +9,8 @@
 // AUTH USER TYPES
 // ============================================================================
 
+import type { AuthMethod } from './user';
+
 /**
  * Authenticated user information
  */
@@ -18,6 +20,11 @@ export interface AuthUser {
   name?: string;
   avatar?: string;
   displayName?: string;
+
+  // Authentication context
+  hasPassword: boolean;
+  authMethods: AuthMethod[];
+  primaryAuthMethod: 'password' | 'oauth';
 }
 
 // ============================================================================

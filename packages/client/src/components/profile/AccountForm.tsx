@@ -2,17 +2,23 @@
 
 import React from 'react'
 import { useAccountForm } from '@/hooks/useAccountForm'
+import { useAuth } from '@/hooks/useAuth'
+import { useState } from 'react'
 import AccountTopBar from './AccountTopBar'
 import ProfileOverviewCard from './ProfileOverviewCard'
 import AccountDetailsCard from './AccountDetailsCard'
 import SecurityCard from './SecurityCard'
 import { OAuthAccountsSettings } from './OAuthAccountsSettings'
+import { SetPasswordDialog } from './SetPasswordDialog'
 import DangerZoneCard from './DangerZoneCard'
 import ConfirmUpdateDialog from './ConfirmUpdateDialog'
 import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import AccountFormSkeleton from './AccountFormSkeleton'
 
 export default function AccountForm() {
+  const { hasPassword, authMethods, isOAuthOnly } = useAuth()
+  const [showSetPassword, setShowSetPassword] = useState(false)
+  
   const {
     currentUser,
     loadingUser,
@@ -40,6 +46,16 @@ export default function AccountForm() {
     currentPasswordRef,
   } = useAccountForm()
 
+  const handleConnectOAuth = (provider: 'google' | 'github') => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
+  }
+
+  const handleManageSessions = () => {
+    // TODO: Implement session management
+    console.log('Manage sessions clicked')
+  }
+
   if (loadingUser && !currentUser) {
     return <AccountFormSkeleton />
   }
@@ -61,6 +77,9 @@ export default function AccountForm() {
           <AccountDetailsCard form={form} setForm={setForm} saving={saving} />
 
           <SecurityCard
+            hasPassword={hasPassword}
+            authMethods={authMethods}
+            isOAuthOnly={isOAuthOnly}
             showPassword={showPassword}
             setShowPassword={setShowPassword}
             form={form}
@@ -69,6 +88,9 @@ export default function AccountForm() {
             saving={saving}
             cancelPasswordEdit={cancelPasswordEdit}
             currentPasswordRef={currentPasswordRef}
+            onSetPassword={() => setShowSetPassword(true)}
+            onConnectOAuth={handleConnectOAuth}
+            onManageSessions={handleManageSessions}
           />
 
           <OAuthAccountsSettings />
@@ -92,6 +114,11 @@ export default function AccountForm() {
         deleting={deleting}
         onCancel={() => setShowConfirmDelete(false)}
         onConfirmDelete={confirmDelete}
+      />
+
+      <SetPasswordDialog 
+        open={showSetPassword}
+        onOpenChange={setShowSetPassword}
       />
     </>
   )

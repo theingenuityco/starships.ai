@@ -4,11 +4,16 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 
+export type AuthMethod = 'password' | 'google' | 'github';
+
 export interface AuthUser {
   id: string
   email: string
   name: string
   avatar?: string
+  hasPassword: boolean
+  authMethods: AuthMethod[]
+  primaryAuthMethod: 'password' | 'oauth'
 }
 
 interface AuthLoginResponse {
@@ -429,6 +434,37 @@ export function useAuth() {
     await logoutMutation.mutateAsync()
   }, [logoutMutation])
 
+  // Set password function for OAuth-only users
+  const setPassword = useCallback(
+    async (newPassword: string, confirmPassword: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const token = getStoredToken()
+        if (!token) throw new Error('Not authenticated')
+
+        const response = await fetch('/api/v1/auth/set-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ newPassword, confirmPassword })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error?.message || 'Failed to set password')
+        }
+
+        // Refresh user data to get updated auth info
+        await refetch()
+        return { success: true }
+      } catch (error: any) {
+        return { success: false, error: error.message }
+      }
+    },
+    [refetch]
+  )
+
   const isAuthenticated = !!user
   const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || oauthLoginMutation.error?.message || null
   const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || oauthLoginMutation.isPending || logoutMutation.isPending
@@ -446,7 +482,14 @@ export function useAuth() {
     register,
     oauthLogin,
     logout,
+    setPassword,
     getToken: getStoredToken, // Expose token getter
+
+    // Authentication method info
+    hasPassword: user?.hasPassword || false,
+    authMethods: user?.authMethods || [],
+    primaryAuthMethod: user?.primaryAuthMethod || 'password',
+    isOAuthOnly: user?.hasPassword === false && user?.authMethods?.some(m => ['google', 'github'].includes(m)),
 
     // Compatibility properties for existing components
     userId: syncedUser?.id || user?.id,

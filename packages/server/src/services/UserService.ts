@@ -7,7 +7,7 @@
 
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { OAuthAccountRepository, UserRepository } from '@starships/models';
-import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel } from '@starships/protocol';
+import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest } from '@starships/protocol';
 import { WaitlistService } from '@/services/WaitlistService';
 import { WaitlistRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
@@ -387,6 +387,9 @@ export class UserService {
       displayName: profile.name,
       avatar: profile.avatar,
       emailVerified: true, // OAuth providers verify emails
+      hasPassword: false, // OAuth users start without password
+      authMethods: [profile.provider as 'google' | 'github'],
+      primaryAuthMethod: 'oauth'
     };
 
     // Create user using proper service layer method
@@ -419,6 +422,9 @@ export class UserService {
       },
     };
     await oauthRepo.create(oauthAccountData);
+
+    // Update user's auth methods to include this OAuth provider
+    await this.updateUserAuthMethods(userId, profile.provider as 'google' | 'github');
   }
 
   /**
@@ -601,6 +607,134 @@ export class UserService {
       }
       throw new ValidationError(`Failed to fetch GitHub profile: ${error.message}`, 'oauth');
     }
+  }
+
+  // ============================================================================
+  // ENHANCED AUTH METHOD MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Set password for OAuth-only users
+   */
+  async setPasswordForOAuthUser(userId: string, request: SetPasswordRequest): Promise<UserModel> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Business rule: User must not already have a password
+    if (user.hasPassword) {
+      throw new ValidationError('User already has a password set', 'password');
+    }
+
+    // Business rule: User must have OAuth authentication
+    if (!user.authMethods || !user.authMethods.some(method => ['google', 'github'].includes(method))) {
+      throw new ValidationError('User must have OAuth authentication to set password', 'auth');
+    }
+
+    // Business validation: Password confirmation
+    if (request.newPassword !== request.confirmPassword) {
+      throw new ValidationError('Passwords do not match', 'confirmPassword');
+    }
+
+    // Business validation: Password strength
+    if (request.newPassword.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long', 'newPassword');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(request.newPassword, 10);
+
+    // Update user with password and auth methods
+    const updatedUser = await this.userRepository.update(userId, {
+      password: hashedPassword,
+      hasPassword: true,
+      authMethods: [...user.authMethods, 'password'],
+      primaryAuthMethod: 'password' // User chose to set password, make it primary
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User not found after update', 'userId');
+    }
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
+   * Update user authentication methods when linking OAuth accounts
+   */
+  async updateUserAuthMethods(userId: string, provider: 'google' | 'github'): Promise<UserModel> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Add OAuth method if not already present
+    const authMethods = user.authMethods || [];
+    if (!authMethods.includes(provider)) {
+      authMethods.push(provider);
+    }
+
+    // Update primary auth method if user doesn't have password
+    const primaryAuthMethod = user.hasPassword ? user.primaryAuthMethod : 'oauth';
+
+    const updatedUser = await this.userRepository.update(userId, {
+      authMethods,
+      primaryAuthMethod
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User not found after update', 'userId');
+    }
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
+   * Initialize auth methods for existing users (migration helper)
+   */
+  async initializeUserAuthMethods(userId: string): Promise<UserModel> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Skip if already initialized
+    if (user.authMethods && user.authMethods.length > 0) {
+      return this.transformUserForResponse(user, { includePassword: false });
+    }
+
+    // Get user's OAuth accounts
+    const oauthAccounts = await this.getUserOAuthAccounts(userId);
+    
+    // Build auth methods array
+    const authMethods: string[] = [];
+    
+    if (user.password) {
+      authMethods.push('password');
+    }
+    
+    oauthAccounts.forEach(account => {
+      if (!authMethods.includes(account.provider)) {
+        authMethods.push(account.provider);
+      }
+    });
+
+    // Determine primary auth method
+    const hasPassword = !!user.password;
+    const primaryAuthMethod = hasPassword ? 'password' : 'oauth';
+
+    const updatedUser = await this.userRepository.update(userId, {
+      hasPassword,
+      authMethods,
+      primaryAuthMethod
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User not found after update', 'userId');
+    }
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
   }
 
   // ============================================================================

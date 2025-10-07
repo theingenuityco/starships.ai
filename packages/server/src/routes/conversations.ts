@@ -5,6 +5,7 @@ import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/uti
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
+import { WalletService } from '@/services/WalletService';
 
 const router: Router = Router();
 
@@ -169,8 +170,43 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { conversationId } = paramValidation;
     const { content } = bodyValidation;
 
-    // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
+    // Preflight billing gate: block when wallet balance is <= 0
     const conversationService = new ConversationService();
+
+    // Verify conversation exists
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+
+    // Resolve starship and wallet, then enforce non-zero balance
+    const starship = await conversationService.getConversationStarship(conversationId);
+    if (!starship) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found for conversation', 404, {
+        resource: 'starship',
+        conversationId,
+      });
+      return;
+    }
+
+    const walletService = new WalletService();
+    const wallet = await walletService.getByStarshipId(starship.id);
+    const balanceStr = wallet?.balance ?? '0.000000';
+    const balanceNum = Number(balanceStr);
+
+    if (!wallet || Number.isNaN(balanceNum) || balanceNum <= 0) {
+      sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient wallet balance', 402, {
+        starshipId: starship.id,
+        balance: balanceStr,
+      });
+      return;
+    }
+
+    // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
     conversationService
       .addConversationMessage(
         {

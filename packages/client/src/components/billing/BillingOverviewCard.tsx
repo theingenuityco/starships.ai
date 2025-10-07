@@ -2,14 +2,16 @@
 
 import { WalletModel } from '@starships/protocol'
 import React from 'react'
+import { Button } from '@/components/ui/button'
 
 interface BillingOverviewCardProps {
   wallet?: WalletModel | null
   isLoading?: boolean
   error?: unknown
+  onRetry?: () => void
 }
 
-export default function BillingOverviewCard({ wallet, isLoading, error }: BillingOverviewCardProps): React.JSX.Element {
+export default function BillingOverviewCard({ wallet, isLoading, error, onRetry }: BillingOverviewCardProps): React.JSX.Element {
   const hasError = !!error
   const displayAmount = Number(wallet?.balance ?? 0).toFixed(2)
 
@@ -25,9 +27,9 @@ export default function BillingOverviewCard({ wallet, isLoading, error }: Billin
             <span className="text-slate-600 dark:text-slate-400 font-medium">Loading balance...</span>
           </div>
         ) : hasError ? (
-          <div className="text-center p-6 bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/20 dark:to-red-900/20 border border-red-200 dark:border-red-800/30 rounded-2xl">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center p-8 bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/10 dark:to-red-900/10 border border-red-200/40 dark:border-red-800/20 rounded-3xl backdrop-blur-sm">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100/80 dark:bg-red-900/20 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -36,8 +38,21 @@ export default function BillingOverviewCard({ wallet, isLoading, error }: Billin
                 />
               </svg>
             </div>
-            <p className="text-red-700 dark:text-red-300 font-semibold">Failed to load wallet</p>
-            <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1 font-medium">Please refresh and try again</p>
+            <p className="text-red-800 dark:text-red-200 font-semibold text-lg mb-2">Unable to Load Balance</p>
+            <p className="text-xs text-red-600/80 dark:text-red-400/80 mb-6 font-medium leading-relaxed">There was an issue retrieving your wallet information. This is usually temporary.</p>
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRetry || (() => window.location.reload())}
+                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Retry
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

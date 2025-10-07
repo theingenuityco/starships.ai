@@ -256,7 +256,9 @@ CREATE TABLE usage (
     completion_tokens INTEGER NOT NULL DEFAULT 0,
     total_tokens INTEGER NOT NULL DEFAULT 0,
     model VARCHAR(100),
-    cost DECIMAL(10,6) DEFAULT 0,
+    cost DECIMAL(18,6) NOT NULL DEFAULT 0.000000,
+    billed_at TIMESTAMP WITH TIME ZONE NULL,
+    billed_ledger_id VARCHAR(255) NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
@@ -268,6 +270,9 @@ CREATE INDEX idx_usage_model ON usage(model);
 -- Composite indexes for owner-scoped queries and filters
 CREATE INDEX idx_usage_starship_created_at ON usage(starship_id, created_at);
 CREATE INDEX idx_usage_starship_model ON usage(starship_id, model);
+-- Billing reconciliation indexes
+CREATE INDEX idx_usage_billed_at ON usage(billed_at);
+CREATE UNIQUE INDEX idx_usage_billed_ledger_unique ON usage(billed_ledger_id) WHERE billed_ledger_id IS NOT NULL;
 
 -- ============================================================================
 -- WALLETS TABLE
@@ -326,6 +331,22 @@ CREATE TABLE ledger_entries (
 );
 
 CREATE INDEX idx_ledger_wallet_created_at ON ledger_entries (wallet_id, created_at DESC);
+
+-- Idempotency: One USAGE ledger per (wallet, usageId)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_usage_wallet_unique
+ON ledger_entries (wallet_id, (meta->>'usageId'))
+WHERE type = 'USAGE';
+
+-- Helper index to accelerate scans by wallet+type
+CREATE INDEX IF NOT EXISTS idx_ledger_wallet_type_created
+ON ledger_entries (wallet_id, type, created_at DESC);
+
+-- Link usage billed_ledger_id to ledger_entries (nullable)
+ALTER TABLE usage
+  ADD CONSTRAINT fk_usage_billed_ledger
+  FOREIGN KEY (billed_ledger_id)
+  REFERENCES ledger_entries(id)
+  ON DELETE SET NULL;
 
 -- ============================================================================
 -- WAITLIST TABLE

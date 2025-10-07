@@ -116,6 +116,35 @@ export class WalletRepository extends BaseRepository {
     );
     return { balance: res.rows[0].balance };
   }
+  /**
+   * Decrement wallet balance atomically and return new balance within the same transaction.
+   * Guard against overdraft with WHERE balance >= amount.
+   * Throws 'INSUFFICIENT_FUNDS' when balance is not enough.
+   */
+  async decrementBalanceReturningWithClient(client: PoolClient, walletId: string, amountUsd: string): Promise<{ balance: string }> {
+    if (!walletId?.trim()) throw new Error('walletId is required');
+    if (!amountUsd?.trim()) throw new Error('amountUsd is required');
+
+    const res = await client.query<{ balance: string }>(
+      `
+      UPDATE wallets
+      SET balance = (balance - $1::decimal),
+          updated_at = NOW()
+      WHERE id = $2
+        AND balance >= $1::decimal
+      RETURNING balance
+      `,
+      [amountUsd, walletId]
+    );
+
+    if (res.rows.length === 0) {
+      const err: Error & { code?: string } = new Error('INSUFFICIENT_FUNDS');
+      err.code = 'INSUFFICIENT_FUNDS';
+      throw err;
+    }
+
+    return { balance: res.rows[0].balance };
+  }
 }
 
 export default WalletRepository;

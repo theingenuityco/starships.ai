@@ -10,6 +10,7 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
 import { parse as parsePartialJson } from 'partial-json';
+import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 
 /**
  * Autopilot child process configuration
@@ -30,6 +31,7 @@ export class ConversationService {
   private streamingService: StreamingService;
   private environmentService: EnvironmentService;
   private usageService: UsageService;
+  private billingService: BillingService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated toolCalls during streaming per conversation
@@ -53,6 +55,7 @@ export class ConversationService {
     this.streamingService = new StreamingService();
     this.environmentService = new EnvironmentService();
     this.usageService = new UsageService();
+    this.billingService = new BillingService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
   }
@@ -707,7 +710,7 @@ export class ConversationService {
           try {
             const starship = await this.getConversationStarship(conversationId);
             if (starship) {
-              await this.usageService.createUsageForTurn({
+              const usageRow = await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
                 promptTokens: usagePayload.promptTokens,
@@ -716,6 +719,63 @@ export class ConversationService {
                 cost: usagePayload.cost,
                 model: usagePayload.model,
               });
+
+              try {
+                await this.billingService.debitUsage(usageRow);
+              } catch (e) {
+                // Prepaid policy: decline and log; do not break streaming UX
+                if (e instanceof InsufficientFundsError || (e as any)?.code === 'INSUFFICIENT_FUNDS') {
+                  console.warn('[BILLING] Insufficient funds for usage debit', {
+                    starshipId: starship.id,
+                    conversationId,
+                    usageId: usageRow.id,
+                    cost: usageRow.cost,
+                  });
+                  // Emit an inline system message so the user sees a clear CTA inside the chat
+                  try {
+                    const sys = await this.messageService.createMessage({
+                      conversationId,
+                      role: 'system',
+                      content: 'Insufficient balance. Add credits from Billing to continue.',
+                      messageType: 'error',
+                    });
+                    if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                      await this.streamingService.broadcastDelta(conversationId, {
+                        op: 'add',
+                        path: '/messages/-',
+                        value: sys,
+                      });
+                    }
+                  } catch (emitErr) {
+                    console.error('[BILLING] Failed to emit insufficient funds system message:', emitErr);
+                  }
+                } else {
+                  console.error('[BILLING] Debit failed', {
+                    error: e instanceof Error ? e.message : String(e),
+                    starshipId: starship.id,
+                    conversationId,
+                    usageId: usageRow.id,
+                  });
+                  // Emit a generic billing failure system message to inform the user
+                  try {
+                    const sys = await this.messageService.createMessage({
+                      conversationId,
+                      role: 'system',
+                      content: 'Billing error detected while processing usage. Please try again or check Billing.',
+                      messageType: 'error',
+                    });
+                    if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                      await this.streamingService.broadcastDelta(conversationId, {
+                        op: 'add',
+                        path: '/messages/-',
+                        value: sys,
+                      });
+                    }
+                  } catch (emitErr) {
+                    console.error('[BILLING] Failed to emit billing error system message:', emitErr);
+                  }
+                }
+              }
             }
           } catch (e) {
             console.error('[STREAMING] Failed to persist usage record:', e);

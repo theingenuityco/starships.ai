@@ -59,7 +59,6 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
         throw new Error('No checkout URL received')
       }
     } catch (error) {
-      console.error('Topup failed:', error)
       toast({
         title: 'Topup Failed',
         description: error instanceof Error ? error.message : 'Failed to initiate topup. Please try again.',

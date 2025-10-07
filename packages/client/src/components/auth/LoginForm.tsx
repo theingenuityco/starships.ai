@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 /**
@@ -66,8 +66,8 @@ export function LoginForm() {
     message: string
   } | null>(null)
 
-  // Track if OAuth has been handled to prevent duplicate calls
-  const [oauthHandled, setOauthHandled] = useState(false)
+  // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
+  const oauthHandledRef = useRef(false)
 
   // OAuth callback handling - SECURE authorization code exchange
   useEffect(() => {
@@ -75,14 +75,14 @@ export function LoginForm() {
     const oauthError = searchParams?.get('oauth_error')
     const oauthWaitlist = searchParams?.get('oauth_waitlist')
 
-    // Prevent duplicate handling
-    if (oauthHandled) {
+    // Prevent duplicate handling (synchronous check with ref)
+    if (oauthHandledRef.current) {
       console.log('[OAuth] Already handled, skipping')
       return
     }
 
     if (authCode) {
-      setOauthHandled(true)
+      oauthHandledRef.current = true
       console.log('[OAuth] Exchanging authorization code for JWT token (secure)')
       // ✅ SECURE: Exchange authorization code for JWT via POST request
       oauthLogin(authCode)
@@ -94,7 +94,7 @@ export function LoginForm() {
         message: 'Thanks for signing up! Please wait for approval to access the app.',
       })
     }
-  }, [searchParams, oauthHandled, oauthLogin])
+  }, [searchParams, oauthLogin])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

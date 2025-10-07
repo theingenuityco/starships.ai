@@ -97,10 +97,18 @@ export function OAuthAccountsSettings() {
 
   const accounts = accountsData?.accounts || []
 
-  // OAuth initiation function - connects directly to backend
-  const handleLinkAccount = (provider: 'google' | 'github') => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-    window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
+  // OAuth initiation function - uses secure authenticated endpoint
+  const handleLinkAccount = async (provider: 'google' | 'github') => {
+    try {
+      const response = await api.post(`/api/v1/auth/oauth/link/${provider}`)
+      const { authUrl } = extractResponseData<{ authUrl: string }>(response)
+      
+      // Redirect to OAuth provider with secure state
+      window.location.href = authUrl
+    } catch (error: any) {
+      console.error('Failed to initiate OAuth linking:', error)
+      toast.error('Failed to start account linking process')
+    }
   }
 
   const handleUnlinkAccount = async (provider: 'google' | 'github') => {

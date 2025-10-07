@@ -41,11 +41,19 @@ export async function generateJWT(user: JWTUser): Promise<string> {
 /**
  * Generate OAuth state token for CSRF protection
  */
-export async function generateOAuthState(): Promise<string> {
-  return await new SignJWT({
+export async function generateOAuthState(isLinking: boolean = false, userId?: string): Promise<string> {
+  const payload: any = {
     purpose: 'oauth_state',
     nonce: crypto.randomBytes(16).toString('hex'),
-  })
+    isLinking,
+  };
+  
+  // If linking, include the authenticated user ID for security
+  if (isLinking && userId) {
+    payload.userId = userId;
+  }
+  
+  return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(JWT_ISSUER)
     .setExpirationTime('10m')
@@ -56,12 +64,19 @@ export async function generateOAuthState(): Promise<string> {
 /**
  * Validate OAuth state token
  */
-export async function validateOAuthState(state: string): Promise<boolean> {
+export async function validateOAuthState(state: string): Promise<{ valid: boolean; isLinking?: boolean; userId?: string }> {
   try {
     const { payload } = await jwtVerify(state, JWT_SECRET, { issuer: JWT_ISSUER });
-    return payload.purpose === 'oauth_state';
+    if (payload.purpose === 'oauth_state') {
+      return { 
+        valid: true, 
+        isLinking: payload.isLinking as boolean,
+        userId: payload.userId as string | undefined
+      };
+    }
+    return { valid: false };
   } catch {
-    return false;
+    return { valid: false };
   }
 }
 

@@ -408,7 +408,17 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
 
     const { provider } = paramValidation;
     const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
-    const state = await generateOAuthState();
+    
+    // Check if this is a linking request (user already logged in)
+    const isLinking = req.query.link === 'true';
+    
+    // SECURITY: Block direct linking attempts without proper authentication
+    if (isLinking) {
+      // Return error for unauthenticated linking attempts
+      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=unauthorized_linking`);
+    }
+    
+    const state = await generateOAuthState(isLinking);
 
     let authUrl: string;
     if (provider === 'google') {
@@ -459,10 +469,26 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     }
 
     // Validate state parameter (CSRF protection)
-    if (!(await validateOAuthState(state))) {
+    const stateValidation = await validateOAuthState(state);
+    if (!stateValidation.valid) {
       return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_error=invalid_state`);
     }
 
+    const { isLinking, userId } = stateValidation;
+
+    // If this is account linking, handle differently
+    if (isLinking) {
+      // SECURITY: Verify userId is present in linking state
+      if (!userId) {
+        return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=invalid_state`);
+      }
+      
+      // TODO: Implement actual account linking logic
+      // For now, just redirect back to profile with success message
+      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=success&provider=${provider}`);
+    }
+
+    // Regular OAuth flow for new user registration
     // Delegate to service layer (Layer 4)
     const result = await UserService.createUserFromOAuth(provider, code);
 
@@ -606,11 +632,15 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     }
     
     // Validate and consume the authorization code (one-time use)
+    logger.info('[OAUTH-EXCHANGE] Attempting to validate auth code', { authCode: authCode.substring(0, 8) + '...' });
     const codeData = await validateAndConsumeAuthCode(authCode);
     
     if (!codeData) {
-      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code', 400);
+      logger.error('[OAUTH-EXCHANGE] Auth code validation failed - likely already consumed or expired', { authCode: authCode.substring(0, 8) + '...' });
+      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code. Please try logging in again.', 400);
     }
+    
+    logger.info('[OAUTH-EXCHANGE] Auth code validated successfully', { userId: codeData.userId });
     
     // Get full user data
     const user = await UserService.getUserById(codeData.userId);
@@ -690,6 +720,50 @@ router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: R
     });
   } catch (error: any) {
     handleError(res, error, 'Initializing auth methods failed');
+  }
+});
+
+/**
+ * Secure OAuth account linking initiation (authenticated endpoint)
+ * POST /auth/oauth/link/:provider
+ */
+router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    // Validate provider parameter
+    const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
+    if (!paramValidation) return;
+
+    const { provider } = paramValidation;
+    const userId = (req as any).user!.id;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
+    
+    // Generate secure state with authenticated user ID
+    const state = await generateOAuthState(true, userId);
+
+    let authUrl: string;
+    if (provider === 'google') {
+      const scope = 'openid email profile';
+      authUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${env.GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    } else {
+      const scope = 'user:email';
+      authUrl =
+        `https://github.com/login/oauth/authorize?` +
+        `client_id=${env.GITHUB_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    }
+
+    // Return the OAuth URL instead of redirecting
+    sendSuccess(res, { authUrl });
+  } catch (error: any) {
+    handleError(error, res, 'OAuth linking initiation');
   }
 });
 

@@ -159,13 +159,13 @@ export class ConversationService {
     }
 
     const persistable: Record<string, unknown> = {};
+    const blacklist = new Set(['messages', 'tools']);
 
-    // Whitelist: Only persist conversation-scoped fields
-    if (executionState.focusedTool) {
-      persistable.focusedTool = executionState.focusedTool;
-    }
-    if (executionState.sessionContext) {
-      persistable.sessionContext = executionState.sessionContext;
+    // Blacklist: Store everything except messages and tools
+    for (const [key, value] of Object.entries(executionState)) {
+      if (!blacklist.has(key)) {
+        persistable[key] = value;
+      }
     }
 
     return Object.keys(persistable).length > 0 ? persistable : null;

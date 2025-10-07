@@ -11,6 +11,8 @@ export { duckduckgoToolTemplate } from './duckduckgo';
 export { toolListToolTemplate } from './tool-list';
 export { toolGetToolTemplate } from './tool-get';
 export { toolOpenNewToolTemplate } from './tool-open-new';
+export { toolOpenToolTemplate } from './tool-open';
+export { toolEditToolTemplate } from './tool-edit';
 export { toolUpdateToolTemplate } from './tool-update';
 export { blueprintLintToolTemplate } from './blueprint-lint';
 export { toolTestToolTemplate } from './tool-test';
@@ -26,6 +28,8 @@ import { duckduckgoToolTemplate } from './duckduckgo';
 import { toolListToolTemplate } from './tool-list';
 import { toolGetToolTemplate } from './tool-get';
 import { toolOpenNewToolTemplate } from './tool-open-new';
+import { toolOpenToolTemplate } from './tool-open';
+import { toolEditToolTemplate } from './tool-edit';
 import { toolUpdateToolTemplate } from './tool-update';
 import { blueprintLintToolTemplate } from './blueprint-lint';
 import { toolTestToolTemplate } from './tool-test';
@@ -41,6 +45,8 @@ export const ALL_TOOL_TEMPLATES = [
   toolListToolTemplate,
   toolGetToolTemplate,
   toolOpenNewToolTemplate,
+  toolOpenToolTemplate,
+  toolEditToolTemplate,
   toolUpdateToolTemplate,
   blueprintLintToolTemplate,
   toolTestToolTemplate,

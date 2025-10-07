@@ -294,6 +294,8 @@ export class StarshipService {
         'tool-list',
         'tool-get',
         'tool-open-new',
+        'tool-open',
+        'tool-edit',
         'tool-update',
         'tool-test',
         'blueprint-lint',

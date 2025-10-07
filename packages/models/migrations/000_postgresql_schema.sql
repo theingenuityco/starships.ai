@@ -187,6 +187,7 @@ CREATE TABLE conversations (
     id VARCHAR(255) PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
+    state JSONB DEFAULT '{}'::jsonb,
     starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -196,6 +197,7 @@ CREATE TABLE conversations (
 CREATE INDEX idx_conversations_starship_id ON conversations(starship_id);
 CREATE INDEX idx_conversations_status ON conversations(status);
 CREATE INDEX idx_conversations_created_at ON conversations(created_at);
+CREATE INDEX idx_conversations_state ON conversations USING GIN(state);
 
 -- ============================================================================
 -- MESSAGES TABLE
@@ -341,7 +343,7 @@ COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketpla
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
 COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace';
 COMMENT ON TABLE tools IS 'Deployed tool instances associated with starships';
-COMMENT ON TABLE conversations IS 'Chat conversations within starships';
+COMMENT ON TABLE conversations IS 'Chat conversations within starships with runtime state management';
 COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';

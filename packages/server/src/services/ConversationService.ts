@@ -3,7 +3,7 @@ import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent, Execution } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -151,6 +151,27 @@ export class ConversationService {
   }
 
   /**
+   * Extract persistable state fields from execution state
+   */
+  private extractPersistableState(executionState: Record<string, unknown> | undefined): Record<string, unknown> | null {
+    if (!executionState || typeof executionState !== 'object') {
+      return null;
+    }
+
+    const persistable: Record<string, unknown> = {};
+
+    // Whitelist: Only persist conversation-scoped fields
+    if (executionState.focusedTool) {
+      persistable.focusedTool = executionState.focusedTool;
+    }
+    if (executionState.sessionContext) {
+      persistable.sessionContext = executionState.sessionContext;
+    }
+
+    return Object.keys(persistable).length > 0 ? persistable : null;
+  }
+
+  /**
    * Get deployed tool instances with their actual blueprints for the agent
    * Uses relationship-based tool resolution for accurate results
    */
@@ -217,6 +238,9 @@ export class ConversationService {
     // Get conversation messages from database
     const messages = await this.getConversationMessages(data.conversationId);
 
+    // Load conversation state for context
+    const conversationState = conversation.state || {};
+
     try {
       // Get starship for context
       const starship = await this.getConversationStarship(data.conversationId);
@@ -255,6 +279,7 @@ export class ConversationService {
         ...agentModel,
         state: {
           ...baseState,
+          ...conversationState, // ← Merge conversation state (takes precedence)
           tools: resolvedTools,
           // Do not inject secrets into state
           starshipId: starship.id,
@@ -836,8 +861,8 @@ export class ConversationService {
         // Also detect UI actions emitted by code/end nodes and forward them to the client via SSE
         try {
           const execEvent = event as ExecutionEvent;
-          const execution: any = execEvent?.data?.execution;
-          const results: any[] = Array.isArray(execution?.results) ? execution.results : [];
+          const execution: Execution | undefined = execEvent?.data?.execution;
+          const results = Array.isArray(execution?.results) ? execution.results : [];
 
           // Walk results from the end to find a JSON payload that declares a UI action
           let uiPayload: any = null;
@@ -880,6 +905,23 @@ export class ConversationService {
           }
         } catch (e) {
           console.warn('[STREAMING] UI action detection failed on node_completed:', e);
+        }
+
+        // Persist evolved state back to conversation when node completes
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: Execution | undefined = execEvent?.data?.execution;
+          if (execution?.state) {
+            const evolvedState = this.extractPersistableState(execution.state);
+            if (evolvedState) {
+              await this.conversationRepository.update(conversationId, {
+                state: evolvedState,
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[STREAMING] State persistence failed on node_completed:', e);
         }
 
         // Other persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.

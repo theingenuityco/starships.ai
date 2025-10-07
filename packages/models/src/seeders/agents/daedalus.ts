@@ -224,21 +224,21 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_get, tool_test, tool_update, tool_open, tool_edit).
+Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_get, tool_test, tool_open, tool_edit).
 
 Workflow:
 1. Use "Open New Tool" to quickly scaffold a draft (name, slug, description)
-2. Use tool_update to complete the draft with parameters and blueprint
+2. Use "Edit Tool" to complete the draft with parameters and blueprint
 3. Use tool_test to validate the completed tool
-4. Use tool_update again to activate (status='active', isEnabled=true)
+4. Use "Edit Tool" again to activate (isEnabled=true)
 
 Alternative Workflow for Existing Tools:
 1. Use "Open Tool" to fetch and focus on an existing tool by slug
 2. Use "Edit Tool" to make partial updates to the focused tool
 3. Use tool_test to validate changes
-4. Use tool_update to activate if needed
+4. Use "Edit Tool" to activate if needed
 
-The "Open New Tool" command creates a draft tool (status='draft', isEnabled=false) that must be completed with tool_update. Draft tools are automatically tracked in your state but excluded from agent execution until activated.
+The "Open New Tool" command creates a draft tool (status='draft', isEnabled=false) that can be completed and activated with "Edit Tool". Draft tools are automatically tracked in your state but excluded from agent execution until activated.
 
 Function names use their display name (e.g., "Open New Tool", "Edit Tool"). Slugs are kebab-case (e.g., tool-open-new, tool-edit).
 </protocol>
@@ -321,7 +321,6 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'tool-open-new',
     'tool-open',
     'tool-edit',
-    'tool-update',
     'tool-test',
     'blueprint-lint',
     'node-schema',

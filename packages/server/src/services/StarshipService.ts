@@ -296,7 +296,6 @@ export class StarshipService {
         'tool-open-new',
         'tool-open',
         'tool-edit',
-        'tool-update',
         'tool-test',
         'blueprint-lint',
         'node-schema',

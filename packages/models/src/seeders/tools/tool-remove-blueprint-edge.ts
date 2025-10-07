@@ -8,40 +8,95 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const blueprintRemoveEdgeTool: ToolParams = {
   name: 'Remove Blueprint Edge',
   slug: 'blueprint-remove-edge',
-  description: `Removes an edge from a blueprint while maintaining node integrity.
+  description: `Removes an edge from a tool's blueprint while maintaining node integrity.
 
 ## Purpose
 Clean up unnecessary or incorrect edge connections in blueprint workflows.
 
 ## Required Parameters
-- **blueprint**: Current blueprint object { nodes, edges }
+- **toolSlug**: Slug of the tool to modify
 - **edgeRef**: Reference of the edge to remove
 
+## Workflow
+1. Fetches current tool by slug
+2. Validates target edge exists before removal
+3. Removes the specified edge
+4. Updates tool with modified blueprint
+
 ## Safety Features
+- Verifies tool exists and is accessible
 - Validates target edge exists before removal
 - Only removes the specified edge
 - Preserves all nodes and other edges
 - Maintains blueprint structural integrity
 
 ## Response
-Returns updated blueprint with edge removed, or error if edge not found`,
+Returns updated tool with edge removed, or error if edge not found`,
   parameters: {
     type: 'object',
     properties: {
-      blueprint: {
-        type: 'object',
-        description: 'Current blueprint { nodes: [], edges: [] }',
+      toolSlug: {
+        type: 'string',
+        description: 'Slug of the tool to modify',
       },
       edgeRef: {
         type: 'string',
         description: 'Reference of the edge to remove',
       },
     },
-    required: ['blueprint', 'edgeRef'],
+    required: ['toolSlug', 'edgeRef'],
   },
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      {
+        ref: 'prepare',
+        type: 'code',
+        name: 'Prepare Request',
+        description: 'Build URL, headers and validate inputs',
+        parameters: {
+          code: `
+            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
+            if (!baseUrl) throw new Error('baseUrl is required');
+            const authToken = env('AUTH_TOKEN');
+            const starshipId = env('STARSHIP_ID');
+            if (!authToken) throw new Error('authToken is required');
+            if (!starshipId) throw new Error('starshipId is required');
+
+            if (!input.toolSlug) {
+              throw new Error('toolSlug is required');
+            }
+
+            if (!input.edgeRef || typeof input.edgeRef !== 'string') {
+              throw new Error('edgeRef is required and must be a string');
+            }
+
+            return {
+              baseUrl,
+              starshipId,
+              toolSlug: input.toolSlug,
+              edgeRef: input.edgeRef,
+              headers: {
+                'Authorization': \`Bearer \${authToken}\`,
+                'Content-Type': 'application/json'
+              }
+            };
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'fetch_tool',
+        type: 'http_request',
+        name: 'Fetch Current Tool',
+        description: 'GET /starships/:starshipId/tools/:toolSlug',
+        parameters: {
+          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
+          method: 'GET',
+          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          timeout: 5000,
+        },
+      },
       {
         ref: 'validate',
         type: 'code',
@@ -49,24 +104,25 @@ Returns updated blueprint with edge removed, or error if edge not found`,
         description: 'Remove edge from blueprint',
         parameters: {
           code: `
-            if (!input.blueprint || typeof input.blueprint !== 'object') {
-              throw new Error('Invalid blueprint: must be an object');
+            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
+            const toolData = fetchResponse.body?.data || fetchResponse.body;
+
+            if (!toolData || !toolData.blueprint) {
+              throw new Error('Tool not found or missing blueprint');
             }
 
-            if (!input.edgeRef || typeof input.edgeRef !== 'string') {
-              throw new Error('Invalid edgeRef: must be a string');
-            }
-
-            const blueprint = JSON.parse(JSON.stringify(input.blueprint));
+            const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
             if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
             if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
 
-            const edgeIndex = blueprint.edges.findIndex(e => e?.ref === input.edgeRef);
+            const edgeRef = $lastOutputOf('prepare')[0].json.edgeRef;
+
+            const edgeIndex = blueprint.edges.findIndex(e => e?.ref === edgeRef);
             if (edgeIndex === -1) {
               return {
                 success: false,
-                error: \`Edge not found: \${input.edgeRef}\`,
-                blueprint
+                error: \`Edge not found: \${edgeRef}\`,
+                toolData
               };
             }
 
@@ -77,9 +133,10 @@ Returns updated blueprint with edge removed, or error if edge not found`,
 
             return {
               success: true,
-              blueprint,
+              toolData,
+              updatedBlueprint: blueprint,
               removedEdge,
-              edgeRef: input.edgeRef,
+              edgeRef,
               remainingEdges: blueprint.edges.length
             };
           `,
@@ -87,18 +144,34 @@ Returns updated blueprint with edge removed, or error if edge not found`,
         },
       },
       {
+        ref: 'update_tool',
+        type: 'http_request',
+        name: 'Update Tool with Modified Blueprint',
+        description: 'PUT /tools/:id with updated blueprint',
+        parameters: {
+          url: '{{ $lastOutputOf("validate")[0].json.toolData.id ? $lastOutputOf("prepare")[0].json.baseUrl + "/tools/" + $lastOutputOf("validate")[0].json.toolData.id : "" }}',
+          method: 'PUT',
+          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          body: '{{ (() => { const result = $lastOutputOf("validate")[0].json; if (result.success) { return { ...result.toolData, blueprint: result.updatedBlueprint }; } else { return result.toolData; } })() }}',
+          timeout: 10000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated blueprint or validation errors',
+        description: 'Return updated tool or validation errors',
         parameters: {
-          output: '{{ $lastOutputOf("validate")[0].json }}',
+          output: '{{ $lastOutputOf("update_tool")[0].json }}',
         },
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'validate' },
-      { ref: 'e2', from: 'validate', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'prepare' },
+      { ref: 'e2', from: 'prepare', to: 'fetch_tool' },
+      { ref: 'e3', from: 'fetch_tool', to: 'validate' },
+      { ref: 'e4', from: 'validate', to: 'update_tool' },
+      { ref: 'e5', from: 'update_tool', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -115,8 +188,7 @@ export const toolRemoveBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' |
 
   slug: 'blueprint-remove-edge',
   category: 'automation',
-  exampleUsage:
-    '{ "blueprint": { "nodes": [{"ref": "start", "type": "start"}], "edges": [{"ref": "old_edge", "from": "start", "to": "end"}] }, "edgeRef": "old_edge" }',
+  exampleUsage: '{ "toolSlug": "my-tool", "edgeRef": "old_edge" }',
   requiresApiKey: false,
   configurationFields: [],
 };

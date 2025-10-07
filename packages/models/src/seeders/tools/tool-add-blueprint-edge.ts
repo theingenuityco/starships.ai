@@ -8,13 +8,13 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolAddBlueprintEdgeTool: ToolParams = {
   name: 'Add Tool Blueprint Edge',
   slug: 'tool-add-blueprint-edge',
-  description: `Adds a new edge between existing nodes in a blueprint with automatic validation and connectivity checks.
+  description: `Adds a new edge between existing nodes in a tool's blueprint with automatic validation and connectivity checks.
 
 ## Purpose
 Incrementally build blueprint connectivity by adding edges one at a time, ensuring proper workflow flow.
 
 ## Required Parameters
-- **blueprint**: Current blueprint object { nodes, edges }
+- **toolSlug**: Slug of the tool to modify
 - **edge**: New edge to add with from, to, ref, and optional condition
 
 ## Edge Requirements
@@ -23,20 +23,28 @@ Incrementally build blueprint connectivity by adding edges one at a time, ensuri
 - **to**: Target node ref (must exist in blueprint)
 - **condition**: Optional JavaScript expression for conditional routing
 
+## Workflow
+1. Fetches current tool by slug
+2. Validates new edge structure and uniqueness
+3. Verifies source and target nodes exist
+4. Adds edge to tool's blueprint
+5. Updates tool with modified blueprint
+
 ## Validation
+- Verifies tool exists and is accessible
 - Verifies source and target nodes exist in blueprint
 - Checks for ref uniqueness within blueprint
 - Ensures edge creates valid workflow paths
 - Validates condition expressions when provided
 
 ## Response
-Returns updated blueprint with new edge added, or validation errors if addition fails`,
+Returns updated tool with new edge added, or validation errors if addition fails`,
   parameters: {
     type: 'object',
     properties: {
-      blueprint: {
-        type: 'object',
-        description: 'Current blueprint { nodes: [], edges: [] }',
+      toolSlug: {
+        type: 'string',
+        description: 'Slug of the tool to modify',
       },
       edge: {
         type: 'object',
@@ -49,11 +57,59 @@ Returns updated blueprint with new edge added, or validation errors if addition 
         },
       },
     },
-    required: ['blueprint', 'edge'],
+    required: ['toolSlug', 'edge'],
   },
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      {
+        ref: 'prepare',
+        type: 'code',
+        name: 'Prepare Request',
+        description: 'Build URL, headers and validate inputs',
+        parameters: {
+          code: `
+            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
+            if (!baseUrl) throw new Error('baseUrl is required');
+            const authToken = env('AUTH_TOKEN');
+            const starshipId = env('STARSHIP_ID');
+            if (!authToken) throw new Error('authToken is required');
+            if (!starshipId) throw new Error('starshipId is required');
+
+            if (!input.toolSlug) {
+              throw new Error('toolSlug is required');
+            }
+
+            if (!input.edge || typeof input.edge !== 'object') {
+              throw new Error('edge is required and must be an object');
+            }
+
+            return {
+              baseUrl,
+              starshipId,
+              toolSlug: input.toolSlug,
+              edge: input.edge,
+              headers: {
+                'Authorization': \`Bearer \${authToken}\`,
+                'Content-Type': 'application/json'
+              }
+            };
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'fetch_tool',
+        type: 'http_request',
+        name: 'Fetch Current Tool',
+        description: 'GET /starships/:starshipId/tools/:toolSlug',
+        parameters: {
+          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
+          method: 'GET',
+          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          timeout: 5000,
+        },
+      },
       {
         ref: 'validate',
         type: 'code',
@@ -61,19 +117,18 @@ Returns updated blueprint with new edge added, or validation errors if addition 
         description: 'Add edge to blueprint with validation',
         parameters: {
           code: `
-            if (!input.blueprint || typeof input.blueprint !== 'object') {
-              throw new Error('Invalid blueprint: must be an object');
+            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
+            const toolData = fetchResponse.body?.data || fetchResponse.body;
+
+            if (!toolData || !toolData.blueprint) {
+              throw new Error('Tool not found or missing blueprint');
             }
 
-            if (!input.edge || typeof input.edge !== 'object') {
-              throw new Error('Invalid edge: must be an object');
-            }
-
-            const blueprint = { ...input.blueprint };
+            const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
             if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
             if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
 
-            const newEdge = input.edge;
+            const newEdge = $lastOutputOf('prepare')[0].json.edge;
             const errors = [];
 
             // Validate edge structure
@@ -115,7 +170,7 @@ Returns updated blueprint with new edge added, or validation errors if addition 
               return {
                 success: false,
                 errors,
-                blueprint: blueprint
+                toolData
               };
             }
 
@@ -124,7 +179,8 @@ Returns updated blueprint with new edge added, or validation errors if addition 
 
             return {
               success: true,
-              blueprint,
+              toolData,
+              updatedBlueprint: blueprint,
               addedEdge: newEdge,
               edgeCount: blueprint.edges.length
             };
@@ -133,18 +189,34 @@ Returns updated blueprint with new edge added, or validation errors if addition 
         },
       },
       {
+        ref: 'update_tool',
+        type: 'http_request',
+        name: 'Update Tool with New Blueprint',
+        description: 'PUT /tools/:id with updated blueprint',
+        parameters: {
+          url: '{{ $lastOutputOf("validate")[0].json.toolData.id ? $lastOutputOf("prepare")[0].json.baseUrl + "/tools/" + $lastOutputOf("validate")[0].json.toolData.id : "" }}',
+          method: 'PUT',
+          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          body: '{{ (() => { const result = $lastOutputOf("validate")[0].json; if (result.success) { return { ...result.toolData, blueprint: result.updatedBlueprint }; } else { return result.toolData; } })() }}',
+          timeout: 10000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated blueprint or validation errors',
+        description: 'Return updated tool or validation errors',
         parameters: {
-          output: '{{ $lastOutputOf("validate")[0].json }}',
+          output: '{{ $lastOutputOf("update_tool")[0].json }}',
         },
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'validate' },
-      { ref: 'e2', from: 'validate', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'prepare' },
+      { ref: 'e2', from: 'prepare', to: 'fetch_tool' },
+      { ref: 'e3', from: 'fetch_tool', to: 'validate' },
+      { ref: 'e4', from: 'validate', to: 'update_tool' },
+      { ref: 'e5', from: 'update_tool', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -161,8 +233,7 @@ export const toolAddBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' | 'c
 
   slug: 'tool-add-blueprint-edge',
   category: 'automation',
-  exampleUsage:
-    '{ "blueprint": { "nodes": [{"ref": "start", "type": "start", "name": "Start"}], "edges": [] }, "edge": { "ref": "to_process", "from": "start", "to": "process" } }',
+  exampleUsage: '{ "toolSlug": "my-tool", "edge": { "ref": "to_process", "from": "start", "to": "process" } }',
   requiresApiKey: false,
   configurationFields: [],
 };

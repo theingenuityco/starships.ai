@@ -81,7 +81,7 @@ Automatically inferred from agent state (do not pass manually):
             }
 
             // Build partial update body with only provided fields
-            const body: Record<string, unknown> = {};
+            const body = {};
             if (input.name !== undefined) body.name = input.name;
             if (input.description !== undefined) body.description = input.description;
             if (input.parameters !== undefined) body.parameters = input.parameters;

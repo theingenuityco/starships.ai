@@ -202,7 +202,7 @@ You have just created the tool above using "Open New Tool". This tool is current
     .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
     .addEdge(argsNodeRef, toolNodeRef)
     .addEdge(toolNodeRef, toolResultNodeRef)
-    .addEdge(toolResultNodeRef, llmNodeRef)
+    .addEdge(toolResultNodeRef, checkFocusedToolRef) // Loop back to check for focusedTool after tool execution
     .addEdge(conditionalNodeRef, endRef, 'complete')
     .setMetadata('generatedBy', 'Daedalus seeder')
     .build();

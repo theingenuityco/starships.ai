@@ -138,11 +138,12 @@ export interface WorkflowParams extends BaseParams {
 
 /**
  * Agent state containing runtime data (messages and tools)
+ * Generic type that can be extended with additional properties
  */
-export interface AgentState {
+export type AgentState<T = Record<string, unknown>> = {
   messages?: LlmMessage[]; // Message history
   tools?: ToolParams[]; // Available tools
-}
+} & T;
 
 /**
  * Agent-specific node parameters

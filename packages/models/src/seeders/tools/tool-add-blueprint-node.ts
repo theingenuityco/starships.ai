@@ -22,7 +22,7 @@ Incrementally build tool blueprints by adding nodes one at a time, ensuring each
 - **type**: Valid node type (start, end, llm, code, http_request, conditional, transform, mutate, tool, workflow, user_prompt)
 - **name**: Human-readable name
 - **description**: Optional description
-- **parameters**: Node-specific parameters object
+- **parameters**: Node-specific parameters object. Use node-schema tool to get the exact structure for each node type.
 
 ## Workflow
 1. Fetches current tool by slug
@@ -54,7 +54,10 @@ Returns updated tool with new node in blueprint, or validation errors if additio
           type: { type: 'string', description: 'Node type' },
           name: { type: 'string', description: 'Node name' },
           description: { type: 'string', description: 'Node description' },
-          parameters: { type: 'object', description: 'Node parameters' },
+          parameters: {
+            type: 'object',
+            description: 'Node-specific parameters object. Structure varies by node type. Use node-schema tool for exact requirements.',
+          },
         },
       },
     },
@@ -193,7 +196,7 @@ Returns updated tool with new node in blueprint, or validation errors if additio
           url: '{{ $lastOutputOf("validate_node")[0].json.toolData.id ? $lastOutputOf("prepare")[0].json.baseUrl + "/tools/" + $lastOutputOf("validate_node")[0].json.toolData.id : "" }}',
           method: 'PUT',
           headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ (() => { const result = $lastOutputOf("validate_node")[0].json; if (result.success) { return { ...result.toolData, blueprint: result.updatedBlueprint }; } else { return result.toolData; } })() }}',
+          body: '{{ (() => { const result = $lastOutputOf("validate_node")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}',
           timeout: 10000,
         },
       },

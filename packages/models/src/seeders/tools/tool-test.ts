@@ -8,6 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolTestTool: ToolParams = {
   name: 'tool_test',
+  slug: 'tool-test',
   description: `Execute another tool by slug and report pass/fail with timing.
 
   Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.

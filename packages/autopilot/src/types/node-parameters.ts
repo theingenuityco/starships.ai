@@ -83,6 +83,7 @@ export interface ToolParameterSchema {
  */
 export interface ToolParams extends BaseParams {
   name: string;
+  slug: string;
   description: string;
   parameters: {
     type: 'object';

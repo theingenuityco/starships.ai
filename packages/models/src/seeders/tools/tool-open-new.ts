@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolOpenNewTool: ToolParams = {
   name: 'Open New Tool',
+  slug: 'tool-open-new',
   description: `Opens a new draft tool with basic details (name, slug, and optional description). Creates a minimal tool structure that can be further developed later.
 
 ## Purpose

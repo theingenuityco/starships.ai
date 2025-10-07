@@ -7,29 +7,30 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const duckduckgoTool: ToolParams = {
   name: 'duckduckgo_instant',
+  slug: 'duckduckgo-instant',
   description: 'Get instant answers, definitions, calculations, and quick facts from DuckDuckGo',
   parameters: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'Search query for instant answers, facts, or calculations'
+        description: 'Search query for instant answers, facts, or calculations',
       },
       skipDisambiguation: {
         type: 'boolean',
-        description: 'Skip disambiguation pages for more direct results (defaults to true)'
-      }
+        description: 'Skip disambiguation pages for more direct results (defaults to true)',
+      },
     },
-    required: ['query']
+    required: ['query'],
   },
   blueprint: {
     nodes: [
-      { 
-        ref: 'start_1', 
-        type: 'start', 
-        name: 'Start', 
-        description: 'Receive DuckDuckGo query parameters', 
-        parameters: {} 
+      {
+        ref: 'start_1',
+        type: 'start',
+        name: 'Start',
+        description: 'Receive DuckDuckGo query parameters',
+        parameters: {},
       },
       {
         ref: 'prepare_request',
@@ -90,10 +91,10 @@ export const duckduckgoTool: ToolParams = {
             {
               operation: 'add',
               path: '/state/duckduckgo_metadata',
-              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}'
-            }
-          ]
-        }
+              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}',
+            },
+          ],
+        },
       },
       {
         ref: 'fetch_duckduckgo',
@@ -104,8 +105,8 @@ export const duckduckgoTool: ToolParams = {
           url: '{{ $lastOutputOf("prepare_request")[0].json.request.url }}',
           method: '{{ $lastOutputOf("prepare_request")[0].json.request.method }}',
           headers: '{{ $lastOutputOf("prepare_request")[0].json.request.headers }}',
-          timeout: 30000
-        }
+          timeout: 30000,
+        },
       },
       {
         ref: 'combine_data',
@@ -140,8 +141,8 @@ export const duckduckgoTool: ToolParams = {
               metadata: metadata
             };
           `,
-          timeout: 5000
-        }
+          timeout: 5000,
+        },
       },
       {
         ref: 'process_response',
@@ -310,33 +311,33 @@ export const duckduckgoTool: ToolParams = {
             };
           }
           `,
-          timeout: 5000
-        }
+          timeout: 5000,
+        },
       },
-      { 
-        ref: 'end_1', 
-        type: 'end', 
-        name: 'End', 
-        description: 'Return DuckDuckGo instant answer results', 
-        parameters: { 
-          output: '{{ $input() }}'
-        } 
-      }
+      {
+        ref: 'end_1',
+        type: 'end',
+        name: 'End',
+        description: 'Return DuckDuckGo instant answer results',
+        parameters: {
+          output: '{{ $input() }}',
+        },
+      },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare_request' },
       { ref: 'e2', from: 'prepare_request', to: 'fetch_duckduckgo' },
       { ref: 'e3', from: 'fetch_duckduckgo', to: 'combine_data' },
       { ref: 'e4', from: 'combine_data', to: 'process_response' },
-      { ref: 'e5', from: 'process_response', to: 'end_1' }
+      { ref: 'e5', from: 'process_response', to: 'end_1' },
     ],
     metadata: {
       version: '1.0.0',
       author: 'Starships.ai',
       requiresApiKey: false,
-      rateLimit: 'No official rate limit, but be respectful'
-    }
-  }
+      rateLimit: 'No official rate limit, but be respectful',
+    },
+  },
 };
 
 /**
@@ -352,12 +353,16 @@ export const duckduckgoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   // Template metadata
   slug: 'duckduckgo-instant',
   category: 'data',
-  exampleUsage: JSON.stringify({
-    calculation: { name: 'duckduckgo_instant', arguments: { query: '15% of 250' } },
-    definition: { name: 'duckduckgo_instant', arguments: { query: 'define quantum computing' } },
-    fact: { name: 'duckduckgo_instant', arguments: { query: 'population of Tokyo' } },
-    conversion: { name: 'duckduckgo_instant', arguments: { query: '100 USD to EUR' } }
-  }, null, 2),
+  exampleUsage: JSON.stringify(
+    {
+      calculation: { name: 'duckduckgo_instant', arguments: { query: '15% of 250' } },
+      definition: { name: 'duckduckgo_instant', arguments: { query: 'define quantum computing' } },
+      fact: { name: 'duckduckgo_instant', arguments: { query: 'population of Tokyo' } },
+      conversion: { name: 'duckduckgo_instant', arguments: { query: '100 USD to EUR' } },
+    },
+    null,
+    2
+  ),
   requiresApiKey: false,
-  configurationFields: []
+  configurationFields: [],
 };

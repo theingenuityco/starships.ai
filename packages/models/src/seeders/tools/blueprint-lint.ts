@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintLintTool: ToolParams = {
   name: 'blueprint_lint',
+  slug: 'blueprint-lint',
   description: `Validates Autopilot blueprint structure and connectivity with comprehensive error reporting.
 
 ## Purpose

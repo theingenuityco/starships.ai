@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolGetTool: ToolParams = {
   name: 'tool_get',
+  slug: 'tool-get',
   description: `Get full details for a tool on the current starship by slug.
 
 Inputs:

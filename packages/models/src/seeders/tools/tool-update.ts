@@ -8,6 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolUpdateTool: ToolParams = {
   name: 'tool_update',
+  slug: 'tool-update',
   description: `Update an existing Tool instance on the current starship.
 
 Identify target:

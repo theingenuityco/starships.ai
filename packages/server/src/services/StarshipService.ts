@@ -293,7 +293,7 @@ export class StarshipService {
       const defaultToolSlugs = [
         'tool-list',
         'tool-get',
-        'tool-create',
+        'tool-open-new',
         'tool-update',
         'tool-test',
         'blueprint-lint',

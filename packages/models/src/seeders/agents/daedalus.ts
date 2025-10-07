@@ -139,10 +139,17 @@ function createDaedalusBlueprint(): Blueprint {
           value: `{{ (() => {
             const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
             const toolSlug = calls?.[0]?.function?.name;
-            if (toolSlug === 'tool-open-new' || toolSlug === 'tool-open' || toolSlug === 'tool-edit') {
+            // Update focusedTool for any tool that modifies tool state
+            const updateTools = [
+              'tool-open-new', 'tool-open', 'tool-edit',
+              'tool-add-blueprint-node', 'tool-add-blueprint-edge',
+              'blueprint-edit-node', 'blueprint-remove-node',
+              'blueprint-edit-edge', 'blueprint-remove-edge'
+            ];
+            if (updateTools.includes(toolSlug)) {
               const httpResponse = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
               const toolData = httpResponse.body?.data || httpResponse.body;
-              if (!toolData || !toolData.name) return null;
+              if (!toolData || !toolData.name) return state.focusedTool || null;
               // Store complete tool details to minimize repetitive tool calls
               return {
                 id: toolData.id,
@@ -257,7 +264,7 @@ Alternative Workflow for Existing Tools:
 4. Use "Edit Tool" to apply the final blueprint updates
 5. Use tool_test to validate changes
 
-The "Open New Tool" and "Open Tool" commands automatically store complete tool details in state.focusedTool. Tool call responses are minimal confirmations - access complete tool data (id, parameters, blueprint, configuration, etc.) directly from state.focusedTool without additional API calls. The "Edit Tool" command also updates state.focusedTool with the latest data. Draft tools (status='draft') are excluded from agent execution until activated.
+All tool manipulation commands (Open New Tool, Open Tool, Edit Tool, and all blueprint CRUD operations) automatically update state.focusedTool with complete tool details. Tool call responses are minimal confirmations - always access complete tool data (id, parameters, blueprint, etc.) directly from state.focusedTool without additional API calls. The focused tool stays synchronized as you modify it. Draft tools (status='draft') are excluded from agent execution until activated.
 
 Function names use their display name (e.g., "Open New Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open-new, tool-edit, tool-add-blueprint-node).
 </protocol>

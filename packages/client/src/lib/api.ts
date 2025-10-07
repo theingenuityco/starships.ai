@@ -25,7 +25,6 @@ interface RequestConfig extends RequestInit {
 class FetchClient {
   private timeout: number
   private baseHeaders: Record<string, string>
-  private baseURL: string
   private requestInterceptors: RequestInterceptor[] = []
   private responseInterceptors: ResponseInterceptor[] = []
   private errorInterceptors: ErrorInterceptor[] = []
@@ -45,10 +44,9 @@ class FetchClient {
     },
   }
 
-  constructor(config: { timeout?: number; headers?: Record<string, string>; baseURL?: string } = {}) {
+  constructor(config: { timeout?: number; headers?: Record<string, string> } = {}) {
     this.timeout = config.timeout || 120000 // 120s (2 minutes)
     this.baseHeaders = config.headers || { 'Content-Type': 'application/json' }
-    this.baseURL = config.baseURL || ''
   }
 
   async request<T = any>(url: string, options: RequestInit = {}): Promise<FetchResponse<T>> {
@@ -71,8 +69,7 @@ class FetchClient {
         config = await interceptor(config)
       }
 
-      const fullUrl = this.baseURL + (config.url || url)
-      const response = await fetch(fullUrl, config)
+      const response = await fetch(config.url || url, config)
 
       clearTimeout(timeoutId)
 
@@ -190,7 +187,6 @@ const api = new FetchClient({
   headers: {
     'Content-Type': 'application/json',
   },
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
 })
 
 // Simple helper to extract data from ApiResponse<T> - enforces response contract
@@ -614,25 +610,6 @@ export const templateAPI = {
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
 
-// MCP Server API response types
-interface MCPServersResponse {
-  mcpServers: MCPServerOption[]
-}
-
-interface StarshipConnectorsResponse {
-  starshipId: string
-  connectedConnectors: MCPServerOption[]
-}
-
-// NEW: Connector Instance API response types
-interface ConnectorInstancesResponse {
-  starshipId: string
-  connectorInstances: MCPServerConnector[]
-}
-
-interface CreateConnectorInstanceResponse {
-  connectorInstance: MCPServerConnector
-}
 
 // Deprecated: MCP Server API functionality has been removed
 export const mcpServerAPI = {
@@ -673,7 +650,7 @@ export const mcpServerAPI = {
   },
 
   // Create connector instance - DEPRECATED
-  createConnectorInstance: async (starshipId: string, templateId: string, env?: string): Promise<MCPServerConnector> => {
+  createConnectorInstance: async (starshipId: string, templateId: string, _env?: string): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Connector instance creation has been removed:', {
       starshipId,
       templateId,
@@ -691,7 +668,7 @@ export const mcpServerAPI = {
   },
 
   // Update connector configuration - DEPRECATED
-  updateConnectorConfig: async (starshipId: string, connectorId: string, config: ConnectorInstanceConfig): Promise<MCPServerConnector> => {
+  updateConnectorConfig: async (starshipId: string, connectorId: string, _config: ConnectorInstanceConfig): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Connector configuration update has been removed:', {
       starshipId,
       connectorId,
@@ -760,10 +737,6 @@ export const userAPI = {
   getById: (id: string): Promise<SyncedUser> => api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
 
-// Utility function for generating client-side IDs
-function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36)
-}
 
 // Starship API functions for compatibility
 export const starshipAPI = {

@@ -5,9 +5,80 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { useOAuthAccounts, useUnlinkOAuthAccount, useOAuthLogin } from '@/hooks/useOAuth'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import api from '@/lib/api'
+import { toast } from 'sonner'
+import type { OAuthAccountModel } from '@starships/protocol'
 import { Github, Chrome, ExternalLink, Unlink, Shield, CheckCircle } from 'lucide-react'
 import { motion } from 'motion/react'
+
+// OAuth query keys following established pattern
+const OAUTH_QUERY_KEYS = {
+  all: ['oauth'] as const,
+  accounts: () => [...OAUTH_QUERY_KEYS.all, 'accounts'] as const,
+} as const
+
+// Response data extraction helper
+const extractResponseData = <T = any>(response: any): T => response.data.data
+
+// OAuth accounts hook
+function useOAuthAccounts(enabled: boolean = true) {
+  return useQuery({
+    queryKey: OAUTH_QUERY_KEYS.accounts(),
+    queryFn: async () => {
+      const response = await api.get('/api/v1/auth/oauth/accounts')
+      const accounts = extractResponseData<{ accounts: OAuthAccountModel[] }>(response)
+      return accounts
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  })
+}
+
+// Unlink OAuth account mutation
+function useUnlinkOAuthAccount() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (provider: 'google' | 'github') => {
+      const response = await api.delete(`/api/v1/auth/oauth/unlink/${provider}`)
+      return response.data
+    },
+    onMutate: async (provider) => {
+      // Cancel competing queries
+      await queryClient.cancelQueries({ queryKey: OAUTH_QUERY_KEYS.accounts() })
+
+      // Snapshot current accounts
+      const previousAccounts = queryClient.getQueryData(OAUTH_QUERY_KEYS.accounts())
+
+      // Optimistic update: remove account
+      queryClient.setQueryData(OAUTH_QUERY_KEYS.accounts(), (old: any) => {
+        if (!old?.accounts) return old
+        return {
+          accounts: old.accounts.filter((account: OAuthAccountModel) => account.provider !== provider),
+        }
+      })
+
+      return { previousAccounts, provider }
+    },
+    onSuccess: (_, provider) => {
+      toast.success(`${provider} account has been unlinked successfully.`)
+    },
+    onError: (error: any, provider, context) => {
+      // Rollback optimistic update
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(OAUTH_QUERY_KEYS.accounts(), context.previousAccounts)
+      }
+
+      toast.error(error?.response?.data?.error?.message || 'Failed to unlink OAuth account')
+    },
+    onSettled: () => {
+      // Refresh accounts data
+      queryClient.invalidateQueries({ queryKey: OAUTH_QUERY_KEYS.accounts() })
+    },
+  })
+}
 
 const ProviderIcon = ({ provider }: { provider: 'google' | 'github' }) => {
   if (provider === 'google') {
@@ -23,12 +94,13 @@ const ProviderName = ({ provider }: { provider: 'google' | 'github' }) => {
 export function OAuthAccountsSettings() {
   const { data: accountsData, isLoading, error } = useOAuthAccounts()
   const unlinkMutation = useUnlinkOAuthAccount()
-  const { initiateOAuth } = useOAuthLogin()
 
   const accounts = accountsData?.accounts || []
 
+  // OAuth initiation function - connects directly to backend
   const handleLinkAccount = (provider: 'google' | 'github') => {
-    initiateOAuth(provider)
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
   }
 
   const handleUnlinkAccount = async (provider: 'google' | 'github') => {

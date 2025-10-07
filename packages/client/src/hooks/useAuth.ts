@@ -275,10 +275,8 @@ export function useOAuthLogin() {
         user,
         token,
         starship: starship ? {
-          slug: starship.slug,
-          id: starship.id,
-          name: starship.name
-        } : null
+          slug: starship.slug
+        } : undefined
       } as AuthLoginResponse
     },
     onSuccess: data => {

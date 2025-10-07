@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
-import { useOAuthLogin } from '@/hooks/useOAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -38,8 +37,13 @@ function getOAuthErrorMessage(errorCode: string): string {
  */
 export function LoginForm() {
   const { login, register, oauthLogin, isLoading, error } = useAuth()
-  const { initiateOAuth } = useOAuthLogin()
   const searchParams = useSearchParams()
+
+  // OAuth initiation function - connects directly to backend
+  const initiateOAuth = (provider: 'google' | 'github') => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
+  }
 
   const [loginData, setLoginData] = useState({
     email: '',

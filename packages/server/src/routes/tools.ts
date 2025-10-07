@@ -19,22 +19,42 @@ const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
-const CreateToolSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  description: z.string().min(1, 'Description is required').max(4000, 'Description must be less than 4000 characters'),
-  slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters'),
-  parameters: z.object({
-    type: z.literal('object'),
-    properties: z.record(z.string(), z.unknown()),
-    required: z.array(z.string()).optional(),
-  }),
-  blueprint: z.object({
-    nodes: z.array(z.unknown()),
-    edges: z.array(z.unknown()),
-  }),
-  configuration: z.record(z.string(), z.unknown()).optional(),
-  isEnabled: z.boolean().optional().default(true),
-});
+const CreateToolSchema = z
+  .object({
+    name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+    description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional().default(''),
+    slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters'),
+    parameters: z
+      .object({
+        type: z.literal('object'),
+        properties: z.record(z.string(), z.unknown()),
+        required: z.array(z.string()).optional(),
+      })
+      .optional(),
+    blueprint: z
+      .object({
+        nodes: z.array(z.unknown()),
+        edges: z.array(z.unknown()),
+      })
+      .optional(),
+    configuration: z.record(z.string(), z.unknown()).optional(),
+    isEnabled: z.boolean().optional().default(true),
+    status: z.enum(['draft', 'active']).optional().default('active'),
+  })
+  .refine(
+    (data) => {
+      // For active tools, parameters and blueprint are required
+      if (data.status === 'active' || !data.status) {
+        return !!data.parameters && !!data.blueprint;
+      }
+      // For draft tools, they are optional
+      return true;
+    },
+    {
+      message: 'Active tools must have parameters and blueprint defined',
+      path: ['parameters'],
+    }
+  );
 
 const CreateToolTemplateSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),

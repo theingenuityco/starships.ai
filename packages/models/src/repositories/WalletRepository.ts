@@ -77,6 +77,45 @@ export class WalletRepository extends BaseRepository {
       [amountUsd, walletId]
     );
   }
+
+  /**
+   * Find wallet by id
+   */
+  async findById(id: string): Promise<WalletModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!id?.trim()) {
+          throw new Error('id is required');
+        }
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>('SELECT * FROM wallets WHERE id = $1', [id]);
+        return row ? fromDatabase(WalletEntity, row) : null;
+      },
+      'findById',
+      'Wallet',
+      id
+    );
+  }
+
+  /**
+   * Increment wallet balance and return new balance within the same transaction
+   */
+  async incrementBalanceReturningWithClient(client: PoolClient, walletId: string, amountUsd: string): Promise<{ balance: string }> {
+    if (!walletId?.trim()) throw new Error('walletId is required');
+    if (!amountUsd?.trim()) throw new Error('amountUsd is required');
+
+    const res = await client.query<{ balance: string }>(
+      `
+      UPDATE wallets
+      SET balance = (balance + $1::decimal),
+          updated_at = NOW()
+      WHERE id = $2
+      RETURNING balance
+      `,
+      [amountUsd, walletId]
+    );
+    return { balance: res.rows[0].balance };
+  }
 }
 
 export default WalletRepository;

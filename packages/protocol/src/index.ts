@@ -33,6 +33,7 @@ export * from './domains/waitlist';
 export * from './domains/usage';
 export * from './domains/wallet';
 export * from './domains/topup';
+export * from './domains/ledger';
 export * from './domains/openrouter';
 
 // Export API contracts

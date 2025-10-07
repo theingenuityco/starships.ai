@@ -15,6 +15,7 @@ export { UserEntity } from './entities/UserEntity';
 export { UsageEntity } from './entities/UsageEntity';
 export { WalletEntity } from './entities/WalletEntity';
 export { TopupEntity } from './entities/TopupEntity';
+export { LedgerEntryEntity } from './entities/LedgerEntryEntity';
 
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
@@ -30,6 +31,7 @@ export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
 export { WalletRepository } from './repositories/WalletRepository';
 export { TopupRepository } from './repositories/TopupRepository';
+export { LedgerRepository } from './repositories/LedgerRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

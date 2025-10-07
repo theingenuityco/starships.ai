@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react'
 import BillingOverviewCard from '@/components/billing/BillingOverviewCard'
 import AmountSelector from '@/components/billing/AmountSelector'
+import LedgerHistoryTable from '@/components/billing/LedgerHistoryTable'
 import { useWallet, WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
@@ -31,6 +32,11 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
       {starshipId && (
         <div className="space-y-2">
           <AmountSelector starshipId={starshipId} />
+        </div>
+      )}
+      {wallet?.id && (
+        <div className="lg:col-span-2">
+          <LedgerHistoryTable walletId={wallet.id} />
         </div>
       )}
     </div>

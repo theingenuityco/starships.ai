@@ -26,6 +26,7 @@ import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
 import webhooksRoutes from '@/routes/webhooks';
+import ledgerRoutes from '@/routes/ledger';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -90,6 +91,7 @@ app.use('/api/v1', walletRoutes);
 app.use('/api/v1', topupRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
+app.use('/api/v1', ledgerRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

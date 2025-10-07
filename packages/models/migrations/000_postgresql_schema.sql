@@ -312,6 +312,22 @@ CREATE INDEX idx_topups_stripe_payment_intent ON topups(stripe_payment_intent);
 CREATE INDEX idx_topups_stripe_charge_id ON topups(stripe_charge_id);
 
 -- ============================================================================
+-- LEDGER ENTRIES TABLE
+-- ============================================================================
+
+CREATE TABLE ledger_entries (
+  id VARCHAR(255) PRIMARY KEY,
+  wallet_id VARCHAR(255) NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  type VARCHAR(30) NOT NULL CHECK (type IN ('TOPUP','USAGE','REFUND','ADJUSTMENT')),
+  amount DECIMAL(18,6) NOT NULL,
+  balance_after DECIMAL(18,6) NOT NULL,
+  meta JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ledger_wallet_created_at ON ledger_entries (wallet_id, created_at DESC);
+
+-- ============================================================================
 -- WAITLIST TABLE
 -- ============================================================================
 
@@ -381,6 +397,7 @@ COMMENT ON TABLE users IS 'User accounts with authentication';
 COMMENT ON TABLE starships IS 'Starships owned by users with configuration';
 COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketplace';
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
+COMMENT ON TABLE ledger_entries IS 'Immutable ledger of wallet mutations for auditing and balance tracking';
 COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace';
 COMMENT ON TABLE tools IS 'Deployed tool instances associated with starships';
 COMMENT ON TABLE conversations IS 'Chat conversations within starships';

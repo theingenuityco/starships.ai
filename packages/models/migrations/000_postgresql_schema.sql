@@ -296,6 +296,8 @@ CREATE TABLE topups (
   amount_usd DECIMAL(18,4) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
   stripe_session_id VARCHAR(255),
+  stripe_payment_intent VARCHAR(255),
+  stripe_charge_id VARCHAR(255),
   idempotency_key VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -305,6 +307,9 @@ CREATE INDEX idx_topups_wallet_id ON topups(wallet_id);
 CREATE INDEX idx_topups_status ON topups(status);
 CREATE INDEX idx_topups_created_at ON topups(created_at);
 CREATE INDEX idx_topups_stripe_session_id ON topups(stripe_session_id);
+CREATE UNIQUE INDEX idx_topups_idempotency_key_unique ON topups(idempotency_key);
+CREATE INDEX idx_topups_stripe_payment_intent ON topups(stripe_payment_intent);
+CREATE INDEX idx_topups_stripe_charge_id ON topups(stripe_charge_id);
 
 -- ============================================================================
 -- WAITLIST TABLE

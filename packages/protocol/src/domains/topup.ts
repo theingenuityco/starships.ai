@@ -11,6 +11,8 @@ export interface TopupModel {
   amountUsd: string; // Use string to preserve DECIMAL precision
   status: TopupStatus;
   stripeSessionId?: string;
+  stripePaymentIntent?: string;
+  stripeChargeId?: string;
   idempotencyKey?: string;
   createdAt: string;
   updatedAt?: string;

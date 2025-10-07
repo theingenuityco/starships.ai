@@ -79,6 +79,7 @@ export class TopupService {
           walletId,
           starshipId,
           idempotencyKey,
+          topupId: topup.id,
         });
 
         // Update topup with Stripe session ID

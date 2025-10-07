@@ -25,6 +25,7 @@ import topupRoutes from '@/routes/topups';
 import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
+import webhooksRoutes from '@/routes/webhooks';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -64,11 +65,13 @@ const dbConnection = createConnection({
 
 // Middleware - Order is important!
 app.use(cors());
+// Add request ID early
+app.use(requestIdMiddleware);
+// Mount Stripe webhooks BEFORE JSON parser to preserve raw body for signature verification
+app.use('/api/v1', webhooksRoutes);
+// Parse JSON for all other routes
 app.use(express.json());
 app.use(cookieParser());
-
-// Add error handling middleware
-app.use(requestIdMiddleware);
 
 // Starship routes are now self-contained with internal service instantiation
 

@@ -40,6 +40,18 @@ export class TopupEntity implements TopupModel {
   @IsOptional()
   @IsString()
   @Length(1, 255)
+  stripePaymentIntent?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  stripeChargeId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
   idempotencyKey?: string;
 
   @Expose()
@@ -69,6 +81,8 @@ export class TopupEntity implements TopupModel {
         amountUsd: dataRecord.amountUsd || '0.000000',
         status: (dataRecord.status as 'pending') || 'pending',
         stripeSessionId: dataRecord.stripeSessionId,
+        stripePaymentIntent: dataRecord.stripePaymentIntent,
+        stripeChargeId: dataRecord.stripeChargeId,
         idempotencyKey: dataRecord.idempotencyKey,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt,

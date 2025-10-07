@@ -16,11 +16,13 @@ export class StripeService {
     walletId,
     starshipId,
     idempotencyKey,
+    topupId,
   }: {
     amountUsd: number;
     walletId: string;
     starshipId: string;
     idempotencyKey: string;
+    topupId: string;
   }) {
     try {
       logger.info('[STRIPE] Creating checkout session', {
@@ -58,10 +60,24 @@ export class StripeService {
               quantity: 1,
             },
           ],
+          // Useful for reconciliation in webhook handlers
+          client_reference_id: topupId,
+          // Session-level metadata (optional)
           metadata: {
             wallet_id: walletId,
             starship_id: starshipId,
             amount_usd: amountUsd.toString(),
+            topup_id: topupId,
+            idempotency_key: idempotencyKey,
+          },
+          // Ensure PaymentIntent carries metadata for charge events
+          payment_intent_data: {
+            metadata: {
+              topup_id: topupId,
+              wallet_id: walletId,
+              starship_id: starshipId,
+              idempotency_key: idempotencyKey,
+            },
           },
           success_url: `${process.env.PUBLIC_URL}/ship/${starshipId}/management?tab=billing&status=success`,
           cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipId}/management?tab=billing&status=cancelled`,

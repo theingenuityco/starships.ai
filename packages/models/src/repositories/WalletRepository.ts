@@ -2,6 +2,7 @@ import { WalletEntity } from '@/entities/WalletEntity';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { WalletModel } from '@starships/protocol';
+import type { PoolClient } from 'pg';
 
 export class WalletRepository extends BaseRepository {
   constructor() {
@@ -57,6 +58,23 @@ export class WalletRepository extends BaseRepository {
       },
       'findByStarshipId',
       'Wallet'
+    );
+  }
+  /**
+   * Increment wallet balance atomically using an existing transaction client
+   */
+  async incrementBalanceWithClient(client: PoolClient, walletId: string, amountUsd: string): Promise<void> {
+    if (!walletId?.trim()) throw new Error('walletId is required');
+    if (!amountUsd?.trim()) throw new Error('amountUsd is required');
+
+    await client.query(
+      `
+      UPDATE wallets
+      SET balance = (balance + $1::decimal),
+          updated_at = NOW()
+      WHERE id = $2
+      `,
+      [amountUsd, walletId]
     );
   }
 }

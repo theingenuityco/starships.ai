@@ -56,14 +56,6 @@ Automatically inferred from agent state (do not pass manually):
         type: 'object',
         description: 'New Autopilot blueprint { nodes, edges }',
       },
-      isEnabled: {
-        type: 'boolean',
-        description: 'Enable/disable the tool',
-      },
-      configuration: {
-        type: 'object',
-        description: 'New instance configuration',
-      },
     },
     required: ['slug'],
   },

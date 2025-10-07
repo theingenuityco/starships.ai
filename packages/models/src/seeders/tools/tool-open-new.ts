@@ -28,7 +28,7 @@ Automatically inferred from agent state (do not pass manually):
 
 ## Response & Behavior
 - **Output**: Created tool with id, name, slug, and description
-- **State**: Tool created with isEnabled=false (draft status)
+- **State**: Tool created in draft status
 - **Timeouts**: Preparation (3s), HTTP request (10s)
 - **Common failures**: Missing environment, slug collision (409 error)`,
   parameters: {
@@ -76,7 +76,6 @@ Automatically inferred from agent state (do not pass manually):
               name: input.name,
               slug: input.slug,
               description: input.description || '',
-              isEnabled: false,
               status: 'draft'
             };
 

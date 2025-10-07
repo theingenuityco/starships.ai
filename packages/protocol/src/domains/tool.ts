@@ -29,7 +29,6 @@ export type ToolTemplateCategory = TemplateCategory;
 export interface ToolTemplateModel extends ToolParams {
   // Core template fields
   id: string;
-  slug: string;
   createdAt: string;
   updatedAt: string;
 
@@ -66,7 +65,6 @@ export type ToolStatus = 'draft' | 'active';
 export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> {
   // Core database fields
   id: string;
-  slug: string; // Human-readable identifier for tool instances (copied from template)
   createdAt: string;
   updatedAt: string;
 
@@ -87,7 +85,7 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
 /**
  * Request to create a new tool template
  */
-export interface CreateToolTemplateRequest extends ToolParams {
+export interface CreateToolTemplateRequest extends Omit<ToolParams, 'slug'> {
   slug?: string; // Optional explicit slug (if not provided, will be generated from name)
   category: ToolTemplateCategory;
   exampleUsage?: string;
@@ -114,7 +112,6 @@ export type UpdateToolTemplateRequest = Partial<CreateToolTemplateRequest>;
  * For draft tools (status='draft'), only name and slug are required
  */
 export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blueprint'> {
-  slug: string; // Required for creating tool instances (copied from template)
   parameters?: ToolParams['parameters']; // Optional for draft tools
   blueprint?: ToolParams['blueprint']; // Optional for draft tools
   configuration?: Record<string, unknown>;

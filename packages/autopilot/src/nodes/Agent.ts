@@ -49,35 +49,31 @@ export class Agent implements NodeHandler {
   private createDefaultBlueprint(): void {
     const builder = new BlueprintBuilder();
 
-    // Pre-calculate node references (predictable pattern: {type}_{counter})
-    const startRef = 'start_1';
-    const endRef = 'end_2';
-    const llmNodeRef = 'llm_3';
-    const conditionalNodeRef = 'conditional_4';
-    const argsNodeRef = 'code_5';
-    const toolNodeRef = 'tool_6';
-    const toolResultNodeRef = 'mutate_7';
+    // Define refs upfront for nodes used in template strings
+    const llmNodeRef = 'ai_assistant';
+    const toolNodeRef = 'execute_tool';
 
-    // Add nodes using builder with full node objects
-    builder.addNode({
+    // Add nodes and capture their refs
+    const startRef = builder.addNode({
       type: 'start',
       name: 'Start',
       description: 'Start node',
       parameters: {},
     });
 
-    builder.addNode({
+    const endRef = builder.addNode({
       type: 'end',
       name: 'End',
       description: 'End node',
       parameters: {},
     });
 
-    // LLM node with state-driven tools
+    // LLM node with state-driven tools - use predefined ref
     builder.addNode({
       type: 'llm',
       name: 'AI Assistant',
       description: 'AI model with state-driven tool support',
+      ref: llmNodeRef,
       parameters: {
         model: this.params.model,
         messages: '{{ state.messages }}',
@@ -118,7 +114,7 @@ export class Agent implements NodeHandler {
     });
 
     // Conditional node for tool call detection
-    builder.addNode({
+    const conditionalNodeRef = builder.addNode({
       type: 'conditional',
       name: 'Check Tool Calls',
       description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
@@ -128,8 +124,8 @@ export class Agent implements NodeHandler {
       },
     });
 
-    // Prepare arguments for Tool
-    builder.addNode({
+    // Prepare arguments for Tool - capture ref for edge connections
+    const argsNodeRef = builder.addNode({
       type: 'code',
       name: 'Prepare Tool Args',
       description: 'Materialize arguments into a plain object for Tool input',
@@ -145,11 +141,12 @@ export class Agent implements NodeHandler {
       },
     });
 
-    // Tool execution node
+    // Tool execution node - use predefined ref
     builder.addNode({
       type: 'tool',
       name: 'Execute Tool',
       description: 'Execute tool',
+      ref: toolNodeRef,
       parameters: {
         name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
         description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
@@ -160,7 +157,7 @@ export class Agent implements NodeHandler {
     });
 
     // Mutate node to add tool result to state
-    builder.addNode({
+    const toolResultNodeRef = builder.addNode({
       type: 'mutate',
       name: 'Add Tool Result',
       description: 'Add tool result message to conversation state',

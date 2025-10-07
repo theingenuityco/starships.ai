@@ -55,18 +55,29 @@ export interface ToolTemplateModel extends ToolParams {
 // ============================================================================
 
 /**
- * Database Tool interface - user's configured tool instances
+ * Tool status type
  */
-export interface ToolModel extends ToolParams {
+export type ToolStatus = 'draft' | 'active';
+
+/**
+ * Database Tool interface - user's configured tool instances
+ * For draft tools, parameters and blueprint are optional and can be completed later
+ */
+export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> {
   // Core database fields
   id: string;
   slug: string; // Human-readable identifier for tool instances (copied from template)
   createdAt: string;
   updatedAt: string;
 
+  // ToolParams fields (made optional for draft support)
+  parameters?: ToolParams['parameters'];
+  blueprint?: ToolParams['blueprint'];
+
   // User configuration
   configuration?: Record<string, unknown>; // API keys, custom parameters, etc.
   isEnabled?: boolean;
+  status?: ToolStatus; // Tool status: 'draft' for incomplete tools, 'active' for ready tools
 }
 
 // ============================================================================
@@ -100,11 +111,15 @@ export type UpdateToolTemplateRequest = Partial<CreateToolTemplateRequest>;
 
 /**
  * Request to create a new tool instance
+ * For draft tools (status='draft'), only name and slug are required
  */
-export interface CreateToolRequest extends ToolParams {
+export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blueprint'> {
   slug: string; // Required for creating tool instances (copied from template)
+  parameters?: ToolParams['parameters']; // Optional for draft tools
+  blueprint?: ToolParams['blueprint']; // Optional for draft tools
   configuration?: Record<string, unknown>;
   isEnabled?: boolean;
+  status?: ToolStatus; // Tool status: 'draft' or 'active'
 }
 
 /**
@@ -130,5 +145,6 @@ export interface ToolTemplateSearchParams {
  */
 export interface ToolSearchParams {
   isEnabled?: boolean;
+  status?: ToolStatus;
   query?: string; // For text search across name/description
 }

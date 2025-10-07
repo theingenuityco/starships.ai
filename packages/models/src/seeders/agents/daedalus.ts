@@ -134,18 +134,19 @@ function createDaedalusBlueprint(): Blueprint {
           })() }}`,
         },
         {
-          operation: 'add' as const,
-          path: '/state/tools/-',
+          operation: 'replace' as const,
+          path: '/state/focusedTool',
           value: `{{ (() => {
             const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
             const toolSlug = calls?.[0]?.function?.name;
             if (toolSlug !== 'tool-open-new') return null;
-            const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
-            if (!toolResult || !toolResult.name) return null;
+            const httpResponse = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+            const toolData = httpResponse.body?.data || httpResponse.body;
+            if (!toolData || !toolData.name) return null;
             return {
-              name: toolResult.name,
-              slug: toolResult.slug,
-              description: toolResult.description || ''
+              name: toolData.name,
+              slug: toolData.slug,
+              description: toolData.description || ''
             };
           })() }}`,
         },

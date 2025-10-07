@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_build:
-        description: 'Build and run semantic versioning'
+        description: 'Skip Build and Skip Push Image'
         required: false
         default: false
         type: boolean

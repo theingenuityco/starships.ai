@@ -10,6 +10,9 @@ export type { EngineConfig } from './engine/Engine';
 export { Eval } from './engine/Eval';
 export type { EvalContext, EvalOptions } from './engine/Eval';
 
+// Blueprint Builder
+export { BlueprintBuilder } from './BlueprintBuilder';
+
 // Nodes
 export { BaseNode } from './nodes/BaseNode';
 export { Workflow } from './nodes/Workflow';

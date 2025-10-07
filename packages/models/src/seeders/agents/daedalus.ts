@@ -173,7 +173,7 @@ function createDaedalusBlueprint(): Blueprint {
       mutations: [
         {
           operation: 'add' as const,
-          path: '/state/messages/-',
+          path: '/state/messages/1',
           value: `{{ {
             role: 'system',
             content: \`<focused-tool>

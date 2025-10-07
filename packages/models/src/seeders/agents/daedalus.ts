@@ -224,23 +224,29 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_get, tool_test, tool_open, tool_edit).
+Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_get, tool_test, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-edit-blueprint-node, tool-remove-blueprint-node, tool-edit-blueprint-edge, tool-remove-blueprint-edge).
 
 Workflow:
 1. Use "Open New Tool" to quickly scaffold a draft (name, slug, description)
-2. Use "Edit Tool" to complete the draft with parameters and blueprint
-3. Use tool_test to validate the completed tool
-4. Use "Edit Tool" again to activate (isEnabled=true)
+2. Use "Add Tool Blueprint Node" to add individual nodes (start, llm, code, http_request, etc.)
+3. Use "Add Tool Blueprint Edge" to connect nodes with proper workflow flow
+4. Use "Edit Tool Blueprint Node" to refine node properties (name, parameters, etc.)
+5. Use "Edit Tool Blueprint Edge" to adjust connections and conditions
+6. Use blueprint_lint to validate the blueprint structure at any time
+7. Use "Remove Tool Blueprint Node" or "Remove Tool Blueprint Edge" to clean up as needed
+8. Use "Edit Tool" to complete the draft with final blueprint
+9. Use tool_test to validate the completed tool
 
 Alternative Workflow for Existing Tools:
 1. Use "Open Tool" to fetch and focus on an existing tool by slug
-2. Use "Edit Tool" to make partial updates to the focused tool
-3. Use tool_test to validate changes
-4. Use "Edit Tool" to activate if needed
+2. Use tool blueprint manipulation tools to modify incrementally (add/edit/remove nodes/edges)
+3. Use blueprint_lint to validate changes at each step
+4. Use "Edit Tool" to apply the final blueprint updates
+5. Use tool_test to validate changes
 
-The "Open New Tool" command creates a draft tool (status='draft', isEnabled=false) that can be completed and activated with "Edit Tool". Draft tools are automatically tracked in your state but excluded from agent execution until activated.
+The "Open New Tool" command creates a draft tool (status='draft') that can be completed and activated with "Edit Tool". Draft tools are automatically tracked in your state but excluded from agent execution until activated.
 
-Function names use their display name (e.g., "Open New Tool", "Edit Tool"). Slugs are kebab-case (e.g., tool-open-new, tool-edit).
+Function names use their display name (e.g., "Open New Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open-new, tool-edit, tool-add-blueprint-node).
 </protocol>
 
 <introspection>
@@ -325,6 +331,12 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'blueprint-lint',
     'node-schema',
     'blueprint-examples',
+    'tool-add-blueprint-node',
+    'tool-add-blueprint-edge',
+    'blueprint-edit-node',
+    'blueprint-remove-node',
+    'blueprint-edit-edge',
+    'blueprint-remove-edge',
   ],
 
   icon: '🛠️',

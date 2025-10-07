@@ -8,19 +8,19 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolEditTool: ToolParams = {
   name: 'Edit Tool',
   slug: 'tool-edit',
-  description: `Updates the currently focused tool with partial changes. Designed for incremental tool development and refinement.
+  description: `Updates an existing tool by slug with partial changes. Designed for incremental tool development and refinement.
 
 ## Purpose
-Apply partial updates to the tool currently being worked on (focusedTool). Supports updating individual fields without needing to provide complete tool data.
+Apply partial updates to any tool by providing its slug. Supports updating individual fields without needing to provide complete tool data.
 
-## Parameters (All Optional)
+## Required Parameters
+- **slug**: Tool slug to update (kebab-case identifier)
+
+## Optional Parameters
 - **name**: Update tool name
-- **slug**: Update tool slug (requires admin approval for production)
 - **description**: Update tool description
 - **parameters**: Update JSON schema for tool parameters
 - **blueprint**: Update Autopilot blueprint
-- **isEnabled**: Enable/disable the tool
-- **configuration**: Update instance configuration
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
@@ -30,19 +30,19 @@ Automatically inferred from agent state (do not pass manually):
 
 ## Response & Behavior
 - **Output**: Updated tool model
-- **State**: Tool remains as focusedTool for continued development
-- **Timeouts**: Preparation (3s), HTTP request (10s)
-- **Common failures**: Missing environment, tool not found (404 error), validation errors`,
+- **Workflow**: 1) Resolve tool by slug, 2) Apply partial updates, 3) Return updated tool
+- **Timeouts**: Preparation (3s), Fetch (5s), Update (10s)
+- **Common failures**: Missing slug, tool not found (404 error), validation errors`,
   parameters: {
     type: 'object',
     properties: {
+      slug: {
+        type: 'string',
+        description: 'Tool slug to update (kebab-case)',
+      },
       name: {
         type: 'string',
         description: 'New tool name',
-      },
-      slug: {
-        type: 'string',
-        description: 'New tool slug (kebab-case)',
       },
       description: {
         type: 'string',
@@ -65,6 +65,7 @@ Automatically inferred from agent state (do not pass manually):
         description: 'New instance configuration',
       },
     },
+    required: ['slug'],
   },
   blueprint: {
     nodes: [
@@ -83,28 +84,68 @@ Automatically inferred from agent state (do not pass manually):
             if (!authToken) throw new Error('authToken is required');
             if (!starshipId) throw new Error('starshipId is required');
 
+            if (!input.slug) {
+              throw new Error('slug is required');
+            }
+
             // Build partial update body with only provided fields
             const body: Record<string, unknown> = {};
             if (input.name !== undefined) body.name = input.name;
-            if (input.slug !== undefined) body.slug = input.slug;
             if (input.description !== undefined) body.description = input.description;
             if (input.parameters !== undefined) body.parameters = input.parameters;
             if (input.blueprint !== undefined) body.blueprint = input.blueprint;
-            if (input.isEnabled !== undefined) body.isEnabled = input.isEnabled;
-            if (input.configuration !== undefined) body.configuration = input.configuration;
 
             if (Object.keys(body).length === 0) {
               throw new Error('At least one field must be provided for update');
             }
 
             return {
-              url: \`\${baseUrl}/tools/\${body.slug || 'unknown'}\`, // Will be resolved from focusedTool
-              method: 'PUT',
+              baseUrl,
+              starshipId,
+              slug: input.slug,
+              body,
               headers: {
                 'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
-              },
-              body
+              }
+            };
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'fetch_tool',
+        type: 'http_request',
+        name: 'Fetch Tool by Slug',
+        description: 'GET /starships/:starshipId/tools/:slug to resolve tool ID',
+        parameters: {
+          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          method: 'GET',
+          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          timeout: 5000,
+        },
+      },
+      {
+        ref: 'prepare_update',
+        type: 'code',
+        name: 'Prepare Update Request',
+        description: 'Extract tool ID and prepare PUT request',
+        parameters: {
+          code: `
+            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
+            const toolData = fetchResponse.body?.data || fetchResponse.body;
+
+            if (!toolData || !toolData.id) {
+              throw new Error('Failed to resolve tool by slug');
+            }
+
+            const ctx = $lastOutputOf('prepare')[0].json;
+
+            return {
+              url: \`\${ctx.baseUrl}/tools/\${toolData.id}\`,
+              method: 'PUT',
+              headers: ctx.headers,
+              body: ctx.body
             };
           `,
           timeout: 3000,
@@ -116,10 +157,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Update Tool',
         description: 'PUT /tools/:id with partial updates',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
+          url: '{{ $lastOutputOf("prepare_update")[0].json.url }}',
+          method: '{{ $lastOutputOf("prepare_update")[0].json.method }}',
+          headers: '{{ $lastOutputOf("prepare_update")[0].json.headers }}',
+          body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
           timeout: 10000,
         },
       },
@@ -135,8 +176,10 @@ Automatically inferred from agent state (do not pass manually):
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_update' },
-      { ref: 'e3', from: 'http_update', to: 'end_1' },
+      { ref: 'e2', from: 'prepare', to: 'fetch_tool' },
+      { ref: 'e3', from: 'fetch_tool', to: 'prepare_update' },
+      { ref: 'e4', from: 'prepare_update', to: 'http_update' },
+      { ref: 'e5', from: 'http_update', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -153,7 +196,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
 
   slug: 'tool-edit',
   category: 'automation',
-  exampleUsage: '{ "description": "Updated description", "isEnabled": true } // partial updates to focused tool',
+  exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,
   configurationFields: [],
 };

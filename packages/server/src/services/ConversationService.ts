@@ -36,6 +36,8 @@ export class ConversationService {
   private streamingToolCalls: Map<string, any[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
+  // Track persisted state message count to detect new messages added via mutations
+  private persistedMessageCount: Map<string, number> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -390,6 +392,8 @@ export class ConversationService {
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
+        // Reset message tracking for new workflow
+        this.persistedMessageCount.delete(conversationId);
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -696,24 +700,17 @@ export class ConversationService {
       }
 
       case 'content_complete': {
-        // Drop nested LLM completion events (depth>0)
+        // Assistant messages are now persisted via state in node_completed
+        // Just track usage here
         if ((event.executionDepth ?? 0) > 0) {
           break;
         }
-        // Guard: if there's no active stream AND no accumulated tool calls, ignore completion
-        // (tool-only responses may not have content stream but still need persistence)
-        const hasToolCalls = this.streamingToolCalls.has(conversationId) && (this.streamingToolCalls.get(conversationId)?.length || 0) > 0;
-        if (!this.streamingContent.has(conversationId) && !hasToolCalls) {
-          break;
-        }
 
-        // Extract provider-reported usage (from LLMEvent.data.usage)
+        // Extract and persist usage
         const llmEvent = event as LLMEvent;
         const llmUsage = llmEvent.data?.usage;
         const model = llmEvent.data?.model;
 
-        // Build a strongly-typed usage payload with required numeric fields
-        // LLMUsage now uses camelCase - pass directly to UsageService
         const usagePayload = llmUsage
           ? {
               promptTokens: typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0,
@@ -723,15 +720,11 @@ export class ConversationService {
                   ? llmUsage.totalTokens
                   : (typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0) +
                     (typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0),
-              // Cost in USD (OpenRouter usage.cost). Mandatory; default to 0 if missing.
               cost: Number(llmUsage.cost) || 0,
               ...(typeof model === 'string' ? { model } : {}),
             }
           : undefined;
-        /**
-         * Persist usage at end-of-turn (no per-token streaming). This records usage in the Usage model
-         * and links it to both Starship and Conversation.
-         */
+
         if (usagePayload) {
           try {
             const starship = await this.getConversationStarship(conversationId);
@@ -751,107 +744,11 @@ export class ConversationService {
           }
         }
 
-        const finalContent = this.streamingContent.get(conversationId) || '';
-        const finalReasoning = this.streamingReasoning.get(conversationId) || '';
-        const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
+        // Clear streaming trackers
+        this.streamingContent.delete(conversationId);
+        this.streamingToolCalls.delete(conversationId);
+        this.streamingReasoning.delete(conversationId);
 
-        const validToolCalls = finalToolCallsAcc.filter(
-          (tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0
-        );
-        // Build finalization task: ensure final patches and persistence complete in order.
-        try {
-          // Content was already incrementally streamed to /messages/-1/content during chunks
-
-          // Persist and patch id/updatedAt while placeholder is still active.
-          // Persist if we have content OR at least one valid toolCall (tool-only responses).
-          if (
-            (finalContent && finalContent.trim().length > 0) ||
-            validToolCalls.length > 0 ||
-            (finalReasoning && finalReasoning.trim().length > 0)
-          ) {
-            try {
-              // Parse accumulated arguments strings into objects for database storage
-              const toolCallsForDb = validToolCalls.map((tc) => {
-                let argsObj: unknown = {};
-                const argsStr = tc.function?.arguments;
-
-                // Arguments accumulated as strings, parse them now
-                if (typeof argsStr === 'string') {
-                  if (argsStr === '' || !argsStr.trim()) {
-                    argsObj = {};
-                  } else {
-                    try {
-                      argsObj = JSON.parse(argsStr);
-                    } catch {
-                      console.warn('[DEBUG] Failed to parse tool arguments, using empty object:', argsStr);
-                      argsObj = {};
-                    }
-                  }
-                } else {
-                  argsObj = argsStr ?? {};
-                }
-
-                return {
-                  id: tc.id,
-                  type: 'function' as const,
-                  function: {
-                    name: tc.function.name,
-                    arguments: argsObj, // Parsed object for JSONB storage
-                  },
-                };
-              });
-
-              const assistantMessage = await this.messageService.createMessage({
-                conversationId,
-                role: 'assistant',
-                content: finalContent,
-                messageType: 'agent_response',
-                ...(finalReasoning && { reasoning: finalReasoning }),
-                ...(validToolCalls.length > 0 && { toolCalls: toolCallsForDb }),
-              });
-
-              await this.streamingService.broadcastDelta(conversationId, {
-                op: 'replace',
-                path: '/messages/-1/id',
-                value: assistantMessage.id,
-              });
-
-              await this.streamingService.broadcastDelta(conversationId, {
-                op: 'replace',
-                path: '/messages/-1/updatedAt',
-                value: assistantMessage.updatedAt,
-              });
-
-              // Finalize message content with one replace of the full text (clients will stop using chunks)
-              if (finalContent && finalContent.trim().length > 0) {
-                await this.streamingService.broadcastDelta(conversationId, {
-                  op: 'replace',
-                  path: '/messages/-1/content',
-                  value: finalContent,
-                });
-              }
-              // Finalize reasoning text
-              if (finalReasoning && finalReasoning.trim().length > 0) {
-                await this.streamingService.broadcastDelta(conversationId, {
-                  op: 'replace',
-                  path: '/messages/-1/reasoning',
-                  value: finalReasoning,
-                });
-              }
-            } catch (persistError) {
-              console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
-            }
-          } else {
-            console.log('[STREAMING] Skipping persistence - empty content and no valid toolCalls');
-          }
-
-          // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close
-        } finally {
-          // Always clear trackers when we are done with finalization
-          this.streamingContent.delete(conversationId);
-          this.streamingToolCalls.delete(conversationId);
-          this.streamingReasoning.delete(conversationId);
-        }
         break;
       }
 
@@ -909,6 +806,60 @@ export class ConversationService {
           }
         } catch (e) {
           console.warn('[STREAMING] UI action detection failed on node_completed:', e);
+        }
+
+        // Detect and persist new messages added to state via mutations
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: Execution | undefined = execEvent?.data?.execution;
+
+          if (execution?.state) {
+            const stateMessages = Array.isArray((execution.state as any).messages) ? (execution.state as any).messages : [];
+            const lastPersistedCount = this.persistedMessageCount.get(conversationId) || 0;
+
+            // If there are new messages in state that haven't been persisted
+            if (stateMessages.length > lastPersistedCount) {
+              const newMessages = stateMessages.slice(lastPersistedCount);
+
+              for (const msg of newMessages) {
+                // Skip system messages and messages without content
+                if (!msg || msg.role === 'system' || !msg.content) {
+                  continue;
+                }
+
+                try {
+                  // Persist the message
+                  const messageType = msg.role === 'tool' ? 'tool_result' : 'agent_response';
+                  const persistedMsg = await this.messageService.createMessage({
+                    conversationId,
+                    role: msg.role,
+                    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+                    messageType,
+                    ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
+                    ...(msg.tool_call_id ? { toolCallId: msg.tool_call_id } : {}),
+                  });
+
+                  // Broadcast via SSE if streaming is active
+                  if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                    await this.streamingService.broadcastDelta(conversationId, {
+                      op: 'add',
+                      path: '/messages/-',
+                      value: persistedMsg,
+                    });
+                  }
+
+                  console.log(`[STREAMING] Persisted state message from mutation: ${msg.role} (${persistedMsg.id})`);
+                } catch (persistError) {
+                  console.error('[STREAMING] Failed to persist state message:', persistError);
+                }
+              }
+
+              // Update the tracked count
+              this.persistedMessageCount.set(conversationId, stateMessages.length);
+            }
+          }
+        } catch (e) {
+          console.warn('[STREAMING] State message persistence failed on node_completed:', e);
         }
 
         // Persist evolved state back to conversation when node completes
@@ -1029,53 +980,10 @@ export class ConversationService {
       }
 
       case 'tool_complete': {
+        // Tool completion is now handled via state-based message persistence in node_completed
+        // No persistence needed here - messages are added to state via mutations and persisted automatically
         const toolEvt = event as ToolEvent;
         console.log('[STREAMING] Tool completed:', toolEvt.data?.toolName);
-
-        // Depth-based guard: drop nested tool executions (keep only top-level where executionDepth === 0)
-        if ((event.executionDepth ?? 0) > 0) {
-          break;
-        }
-
-        // Track persistence as an async task so workflow_completed can await before emitting "complete"
-        const persistTask = (async () => {
-          try {
-            // Persist tool_result for both success (result) and failure (error)
-            if (toolEvt.data?.toolName && (toolEvt.data?.result !== undefined || toolEvt.data?.error)) {
-              const toolContent =
-                toolEvt.data?.result !== undefined
-                  ? typeof toolEvt.data.result === 'string'
-                    ? toolEvt.data.result
-                    : JSON.stringify(toolEvt.data.result)
-                  : String(toolEvt.data?.error || 'Unknown tool error');
-
-              const toolResultMessage = await this.messageService.createMessage({
-                conversationId,
-                role: 'tool',
-                content: toolContent,
-                messageType: 'tool_result',
-                ...(toolEvt.data?.toolCallId ? { toolCallId: toolEvt.data.toolCallId } : {}),
-              });
-
-              console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);
-
-              if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                const toolResultDelta: Operation = {
-                  op: 'add',
-                  path: '/messages/-',
-                  value: toolResultMessage,
-                };
-                await this.streamingService.broadcastDelta(conversationId, toolResultDelta);
-              }
-            }
-          } catch (error) {
-            console.error('[STREAMING] Error persisting tool result message:', error);
-          }
-        })();
-
-        // Optionally await to preserve event order for this handler
-        await persistTask;
-
         break;
       }
 

@@ -124,8 +124,33 @@ function createDaedalusBlueprint(): Blueprint {
           path: '/state/messages/-',
           value: `{{ (() => {
             const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
+            const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
+            const toolSlug = calls?.[0]?.function?.name;
             const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
-            const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+            
+            // For tool-modifying operations, return minimal confirmation to reduce token bloat
+            const toolModifyOps = [
+              'tool-open-new', 'tool-open', 'tool-edit',
+              'tool-add-blueprint-node', 'tool-add-blueprint-edge',
+              'blueprint-edit-node', 'blueprint-remove-node',
+              'blueprint-edit-edge', 'blueprint-remove-edge'
+            ];
+            
+            let content;
+            if (toolModifyOps.includes(toolSlug)) {
+              // Minimal response - full data is in state.focusedTool
+              const status = toolResult.status || toolResult.body?.status || 200;
+              const success = status >= 200 && status < 300;
+              content = JSON.stringify({
+                success: success,
+                message: success ? 'Tool updated successfully' : 'Tool operation failed',
+                slug: toolResult.body?.data?.slug || toolResult.body?.slug || 'unknown'
+              });
+            } else {
+              // Full response for other tools
+              content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+            }
+            
             return {
               role: "tool",
               tool_call_id: toolCallId,

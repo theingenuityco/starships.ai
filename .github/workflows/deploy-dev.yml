@@ -69,6 +69,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
@@ -88,6 +89,7 @@ jobs:
             --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
             --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
             --from-literal=POSTGRES_HOST="$POSTGRES_HOST" \
             --from-literal=POSTGRES_PORT="$POSTGRES_PORT" \
@@ -100,7 +102,7 @@ jobs:
             --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
             -n ${{ env.NAMESPACE }}
-          
+
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \

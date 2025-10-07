@@ -32,7 +32,7 @@ spec:
 
       containers:
         - name: starships
-          image: 'PLACEHOLDER_IMAGE:latest' # CI will replace with actual tag
+          image: 'PLACEHOLDER_IMAGE:latest' # Replaced automatically by GitHub Actions
           imagePullPolicy: Always
 
           ports:
@@ -43,8 +43,9 @@ spec:
               name: backend
               protocol: TCP
 
-          # Environment variables loaded from Kubernetes secret (must be created)
+          # ✅ Environment variables (from Kubernetes secrets)
           env:
+            # Core environment
             - name: NODE_ENV
               value: 'development'
             - name: SKIP_BUILD
@@ -52,6 +53,7 @@ spec:
             - name: SKIP_INSTALL
               value: 'true'
 
+            # Server/Client configuration
             - name: SERVER_PORT
               valueFrom:
                 secretKeyRef:
@@ -68,6 +70,7 @@ spec:
                   name: starships-secrets
                   key: LOG_LEVEL
 
+            # URLs
             - name: PUBLIC_URL
               valueFrom:
                 secretKeyRef:
@@ -84,12 +87,14 @@ spec:
                   name: starships-secrets
                   key: SERVER_URL
 
+            # JWT Auth
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: JWT_SECRET
 
+            # PostgreSQL Configuration (external EC2 DB)
             - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:
@@ -121,6 +126,7 @@ spec:
                   name: starships-secrets
                   key: POSTGRES_SSL
 
+            # LLM Providers
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -147,6 +153,7 @@ spec:
                   name: starships-secrets
                   key: DEFAULT_CHAT_MODEL
 
+            # Stripe
             - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -163,13 +170,14 @@ spec:
                   name: starships-secrets
                   key: STRIPE_PUBLISHABLE_KEY
 
+            # Analytics
             - name: GA_MEASUREMENT_ID
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
 
-          # Resource requests/limits
+          # Resource limits (safe defaults for t3.small/t3.medium EKS nodes)
           resources:
             requests:
               memory: '512Mi'
@@ -177,5 +185,3 @@ spec:
             limits:
               memory: '2Gi'
               cpu: '1000m'
-
-      # NOTE: No persistentVolumeClaim volumes here because DB is external (EC2 + EBS)

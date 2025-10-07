@@ -64,31 +64,48 @@ jobs:
           echo "✅ Applied manifests to dev cluster."
 
       - name: Update secrets
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          POSTGRES_SSL: ${{ secrets.POSTGRES_SSL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SERVER_URL: ${{ vars.SERVER_URL }}
+          CLIENT_URL: ${{ vars.CLIENT_URL }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
         run: |
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
-            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
-            --from-literal=OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
-            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
-            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
-            --from-literal=POSTGRES_HOST="${{ secrets.POSTGRES_HOST }}" \
-            --from-literal=POSTGRES_PORT="${{ secrets.POSTGRES_PORT }}" \
-            --from-literal=POSTGRES_USER="${{ secrets.POSTGRES_USER }}" \
-            --from-literal=POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
-            --from-literal=POSTGRES_DATABASE="${{ secrets.POSTGRES_DATABASE }}" \
-            --from-literal=POSTGRES_SSL="${{ secrets.POSTGRES_SSL }}" \
-            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
-            --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \
-            --from-literal=PUBLIC_URL="${{ vars.PUBLIC_URL }}" \
+            --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+            --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+            --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
+            --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+            --from-literal=POSTGRES_HOST="$POSTGRES_HOST" \
+            --from-literal=POSTGRES_PORT="$POSTGRES_PORT" \
+            --from-literal=POSTGRES_USER="$POSTGRES_USER" \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --from-literal=POSTGRES_DATABASE="$POSTGRES_DATABASE" \
+            --from-literal=POSTGRES_SSL="$POSTGRES_SSL" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=SERVER_URL="$SERVER_URL" \
+            --from-literal=CLIENT_URL="$CLIENT_URL" \
+            --from-literal=PUBLIC_URL="$PUBLIC_URL" \
             -n ${{ env.NAMESPACE }}
-
+          
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
             --docker-username=${{ github.repository_owner }} \
-            --docker-password="${{ secrets.GHCR_PULL_TOKEN }}" \
+            --docker-password="$GHCR_PULL_TOKEN" \
             -n ${{ env.NAMESPACE }}
           echo "✅ Secrets updated successfully."
 

@@ -69,9 +69,9 @@ export function LoginForm() {
   // Track if OAuth has been handled to prevent duplicate calls
   const [oauthHandled, setOauthHandled] = useState(false)
 
-  // OAuth callback handling
+  // OAuth callback handling - SECURE authorization code exchange
   useEffect(() => {
-    const oauthToken = searchParams?.get('oauth_token')
+    const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
     const oauthWaitlist = searchParams?.get('oauth_waitlist')
 
@@ -81,10 +81,11 @@ export function LoginForm() {
       return
     }
 
-    if (oauthToken) {
+    if (authCode) {
       setOauthHandled(true)
-      // Use the elegant OAuth mutation (same pattern as regular login)
-      oauthLogin(oauthToken)
+      console.log('[OAuth] Exchanging authorization code for JWT token (secure)')
+      // ✅ SECURE: Exchange authorization code for JWT via POST request
+      oauthLogin(authCode)
     } else if (oauthError) {
       setFormError(getOAuthErrorMessage(oauthError))
     } else if (oauthWaitlist) {
@@ -93,7 +94,7 @@ export function LoginForm() {
         message: 'Thanks for signing up! Please wait for approval to access the app.',
       })
     }
-  }, [searchParams, oauthHandled])
+  }, [searchParams, oauthHandled, oauthLogin])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

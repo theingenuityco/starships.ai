@@ -8,7 +8,7 @@ import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { WaitlistService } from '@/services/WaitlistService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT } from '@/utils/jwt';
+import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { getEnvConfig } from '@starships/env';
 import { getConnection, StarshipRepository, WaitlistRepository } from '@starships/models';
 import bcrypt from 'bcrypt';
@@ -479,15 +479,11 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_waitlist=pending`);
     }
 
-    // Generate JWT using shared utility
-    const token = await generateJWT({
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.displayName || result.user.email?.split('@')[0],
-    });
+    // ✅ SECURITY FIX: Generate secure authorization code instead of JWT token
+    const authCode = await generateAuthCode(result.user.id, result.user.email!);
 
-    // Redirect to existing login page with token
-    return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_token=${token}`);
+    // Redirect with secure authorization code (short-lived, single-use)
+    return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?auth_code=${authCode}`);
   } catch (error: any) {
     logger.error('[AUTH] OAuth callback error:', {
       provider: req.params.provider,
@@ -594,6 +590,84 @@ router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Respons
     });
   } catch (error: any) {
     handleError(res, error, 'Getting auth methods failed');
+  }
+});
+
+/**
+ * Exchange OAuth authorization code for JWT token (SECURE)
+ * POST /auth/oauth/exchange
+ */
+router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
+  try {
+    const { authCode } = req.body;
+    
+    if (!authCode) {
+      return sendError(res, 'VALIDATION_ERROR', 'Authorization code is required', 400);
+    }
+    
+    // Validate and consume the authorization code (one-time use)
+    const codeData = await validateAndConsumeAuthCode(authCode);
+    
+    if (!codeData) {
+      return sendError(res, 'INVALID_CODE', 'Invalid or expired authorization code', 400);
+    }
+    
+    // Get full user data
+    const user = await UserService.getUserById(codeData.userId);
+    if (!user) {
+      return sendError(res, 'USER_NOT_FOUND', 'User not found', 404);
+    }
+    
+    // Re-check waitlist status for security (prevent timing attacks)
+    const waitlistService = initWaitlistService();
+    const currentStatus = await waitlistService.getDetailedStatus(user.email!);
+    
+    if (currentStatus.status === 'pending') {
+      return sendError(res, 'WAITLISTED', 'User is still on waitlist', 403);
+    }
+    
+    // Generate JWT token (returned in response body, NOT URL)
+    const token = await generateJWT({
+      id: user.id,
+      email: user.email,
+      name: user.displayName || user.email?.split('@')[0],
+    });
+    
+    // Get user's first starship for redirect
+    let firstStarship = null;
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(user.id);
+      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+    } catch (error) {
+      console.error(`[OAUTH-EXCHANGE] Failed to fetch starships for user ${user.id}:`, error);
+    }
+    
+    // Return secure response with JWT in body
+    sendSuccess(res, {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.displayName || user.email?.split('@')[0],
+        avatar: user.avatar,
+        hasPassword: user.hasPassword || false,
+        authMethods: user.authMethods || [],
+        primaryAuthMethod: user.primaryAuthMethod || 'oauth'
+      },
+      token,
+      starship: firstStarship ? {
+        id: firstStarship.id,
+        slug: firstStarship.slug,
+        name: firstStarship.name,
+      } : null,
+    });
+  } catch (error: any) {
+    logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {
+      error: error.message,
+      stack: error.stack,
+    });
+    
+    return sendError(res, 'EXCHANGE_FAILED', 'Token exchange failed', 500);
   }
 });
 

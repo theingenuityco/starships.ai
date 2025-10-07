@@ -240,49 +240,29 @@ export function useRegister() {
   })
 }
 
-// OAuth login mutation - follows the same elegant pattern
+// OAuth login mutation - SECURE authorization code exchange
 export function useOAuthLogin() {
   const queryClient = useQueryClient()
   const router = useRouter()
 
   return useMutation({
-    mutationFn: async ({ token }: { token: string }) => {
-      // First validate the OAuth token by fetching user data
-      const userResponse = await fetch('/api/v1/auth/me', {
+    mutationFn: async ({ authCode }: { authCode: string }) => {
+      // Exchange authorization code for JWT token via secure POST endpoint
+      const response = await fetch('/api/v1/auth/oauth/exchange', {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ authCode }),
       })
 
-      if (!userResponse.ok) {
-        throw new Error('OAuth token validation failed')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error?.message || 'OAuth code exchange failed')
       }
 
-      const userData = await userResponse.json()
-      const user = userData.data
-
-      // Get user's starships for redirect
-      const starshipResponse = await fetch(`/api/v1/users/${user.id}/starships`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      let starship = null
-      if (starshipResponse.ok) {
-        const starshipData = await starshipResponse.json()
-        starship = starshipData.data?.find((ship: any) => ship.status === 'active') || starshipData.data?.[0]
-      }
-
-      return {
-        user,
-        token,
-        starship: starship ? {
-          slug: starship.slug
-        } : undefined
-      } as AuthLoginResponse
+      const data = await response.json()
+      return data.data as AuthLoginResponse
     },
     onSuccess: data => {
       const { user, token, starship } = data
@@ -419,10 +399,10 @@ export function useAuth() {
     [registerMutation]
   )
 
-  // OAuth login function
-  const oauthLogin = useCallback(async (token: string): Promise<{ success: boolean; error?: string }> => {
+  // OAuth login function - SECURE code exchange
+  const oauthLogin = useCallback(async (authCode: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      await oauthLoginMutation.mutateAsync({ token })
+      await oauthLoginMutation.mutateAsync({ authCode })
       return { success: true }
     } catch (error: any) {
       return { success: false, error: error.message || 'OAuth login failed' }

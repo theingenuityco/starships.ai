@@ -88,6 +88,9 @@ export class LLM extends BaseNode<LlmParams> {
       if (params.tools && Array.isArray(params.tools) && params.tools.length > 0) {
         requestOptions.tools = this.convertToOpenAITools(params.tools);
         requestOptions.tool_choice = 'auto';
+        // Prevent multiple tool calls within a single assistant response
+        // OpenAI/compatible providers honor `parallel_tool_calls: false`
+        requestOptions.parallel_tool_calls = false;
       }
 
       console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));

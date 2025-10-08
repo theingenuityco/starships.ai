@@ -86,6 +86,11 @@ Start -> LLM -> Conditional(has toolCalls?)
 4. **Mutate Node**: Appends tool result to conversation
 5. **Loop**: Returns to LLM with tool result until no more tool calls
 
+### Single Tool Call per Assistant Response
+
+- By default, Autopilot disables parallel tool calls so the model emits at most one tool call in a single assistant message. This is configured in [`LLM.execute()`](packages/autopilot/src/nodes/LLM.ts:30) by setting the request option `parallel_tool_calls: false` when tools are provided.
+- This keeps tool usage deterministic and avoids multi-tool fan-out in one turn. The Agent loop may still issue another tool call on a subsequent LLM turn after a tool_result is appended (sequential, not parallel).
+
 ### Template Expressions
 
 The system uses JavaScript template expressions for dynamic data access:

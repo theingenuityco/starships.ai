@@ -3,6 +3,8 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { ToolRepository, ToolTemplateRepository } from '@starships/models';
+import { BalanceValidationService } from '@/services/BalanceValidationService';
+import { WalletService } from '@/services/WalletService';
 import { sendError, sendSuccess } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -85,6 +87,47 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
       sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
     }
     return null;
+  }
+};
+
+// Balance validation middleware for tool operations
+const validateToolBalance = async (req: Request, res: Response, next: any) => {
+  try {
+    const { starshipId } = req.params;
+
+    if (!starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'Starship ID is required', 400);
+      return;
+    }
+
+    const walletService = new WalletService();
+    const wallet = await walletService.getByStarshipId(starshipId);
+
+    if (!wallet) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
+        starshipId,
+      });
+      return;
+    }
+
+    // Validate balance using centralized service
+    const balanceValidation = BalanceValidationService.validateBalance({
+      id: wallet.id,
+      balance: wallet.balance,
+    });
+
+    if (!balanceValidation.isValid) {
+      const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
+      sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
+      return;
+    }
+
+    // Add wallet to request for use in route handlers
+    (req as any).wallet = wallet;
+    next();
+  } catch (error) {
+    console.error('[TOOLS] Balance validation error:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Balance validation failed', 500);
   }
 };
 
@@ -212,7 +255,7 @@ router.get('/starships/:starshipId/tools/:slug', jwtAuthMiddleware, async (req: 
 });
 
 // POST /starships/:starshipId/tools - Create tool instance for starship (OpenAPI pattern)
-router.post('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/tools', jwtAuthMiddleware, validateToolBalance, async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
@@ -241,35 +284,40 @@ router.post('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reque
 });
 
 // POST /starships/:starshipId/tools/from-template - Create tool from template (OpenAPI pattern)
-router.post('/starships/:starshipId/tools/from-template', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
-    if (!paramValidation) return;
+router.post(
+  '/starships/:starshipId/tools/from-template',
+  jwtAuthMiddleware,
+  validateToolBalance,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
+      if (!paramValidation) return;
 
-    const bodyValidation = validateData(
-      z.object({
-        templateSlug: z.string().min(1, 'Template slug is required'),
-        configuration: z.record(z.string(), z.unknown()).optional(),
-      }),
-      req.body,
-      res,
-      'template creation data'
-    );
-    if (!bodyValidation) return;
+      const bodyValidation = validateData(
+        z.object({
+          templateSlug: z.string().min(1, 'Template slug is required'),
+          configuration: z.record(z.string(), z.unknown()).optional(),
+        }),
+        req.body,
+        res,
+        'template creation data'
+      );
+      if (!bodyValidation) return;
 
-    const { starshipId } = paramValidation;
-    const { templateSlug, configuration } = bodyValidation;
+      const { starshipId } = paramValidation;
+      const { templateSlug, configuration } = bodyValidation;
 
-    const toolRepository = new ToolRepository();
-    const tool = await toolRepository.createFromTemplate(templateSlug, starshipId, configuration);
+      const toolRepository = new ToolRepository();
+      const tool = await toolRepository.createFromTemplate(templateSlug, starshipId, configuration);
 
-    console.log(`[TOOLS] Tool created from template ${templateSlug} for starship ${starshipId}: ${tool.slug}`);
-    sendSuccess(res, tool, 201);
-  } catch (error) {
-    console.error('[TOOLS] Error creating tool from template:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create tool from template');
+      console.log(`[TOOLS] Tool created from template ${templateSlug} for starship ${starshipId}: ${tool.slug}`);
+      sendSuccess(res, tool, 201);
+    } catch (error) {
+      console.error('[TOOLS] Error creating tool from template:', error);
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create tool from template');
+    }
   }
-});
+);
 
 // PUT /tools/:id - Update tool (OpenAPI pattern)
 router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

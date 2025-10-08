@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
+import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
@@ -12,16 +13,8 @@ import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
-
-// Simplified message interface for UI callbacks
-interface MessageNotification {
-  id: string
-  content: string
-  role: 'user' | 'assistant' | 'system'
-  timestamp: string
-  conversationId: string
-  agentId?: string
-}
+import TopupButton from '@/components/billing/TopupButton'
+import { toast } from 'sonner'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -76,9 +69,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [isRecording, setIsRecording] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
+    const { data: wallet } = useWallet(starshipId, !!starshipId)
+    const MINIMUM_THRESHOLD = 0.05
+    const hasFunds = Number(wallet?.balance ?? '0') >= MINIMUM_THRESHOLD
 
     // Use streamedQuery-based conversation hook
-    const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null)
+    const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null, starshipId)
     const isStreamingEffective = isResponding
 
     // Usage and context control
@@ -133,17 +129,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       // Validation for agent and starship
       if (!selectedAgent) {
-        console.error('No agent selected')
+        toast.error('Select an agent', { description: 'Please select an agent to chat.' })
         return
       }
 
       if (!starshipId) {
-        console.error('No starship selected')
+        toast.error('No starship selected', { description: 'Please select a ship before chatting.' })
         return
       }
 
       if (!userId) {
-        console.error('User not authenticated')
+        toast.error('Authentication required', { description: 'Please sign in to continue.' })
         return
       }
 
@@ -188,7 +184,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           messageType: 'user_input',
         })
           .catch(error => {
-            console.error('Failed to send message:', error)
+            toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
             // Restore message on error
             setMessage(messageToSend)
           })
@@ -199,7 +195,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Exit early to avoid hitting catch/finally paths
         return
       } catch (error) {
-        console.error('Failed to send message:', error)
+        toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
@@ -213,17 +209,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         // Validation for agent and starship
         if (!selectedAgent) {
-          console.error('No agent selected')
+          toast.error('Select an agent', { description: 'Please select an agent to chat.' })
           return
         }
 
         if (!starshipId) {
-          console.error('No starship selected')
+          toast.error('No starship selected', { description: 'Please select a ship before chatting.' })
           return
         }
 
         if (!userId) {
-          console.error('User not authenticated')
+          toast.error('Authentication required', { description: 'Please sign in to continue.' })
           return
         }
 
@@ -262,7 +258,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             messageType: 'user_input',
           })
             .catch(error => {
-              console.error('Failed to send suggestion:', error)
+              toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
             })
             .finally(() => {
               setSending(false)
@@ -270,7 +266,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
           return
         } catch (error) {
-          console.error('Failed to send suggestion:', error)
+          toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
           setSending(false)
         }
       },
@@ -305,7 +301,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
-    const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent
+    const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent && hasFunds
 
     // Expose methods to parent component via ref
     useImperativeHandle(
@@ -321,6 +317,36 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
+        {/* Professional insufficient balance indicator - Show when there is conversation ID */}
+        {!hasFunds && conversationId && (
+          <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">Insufficient Balance</p>
+                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">Your account balance is too low to continue. Please add credits to keep chatting.</p>
+              </div>
+              <div className="flex-shrink-0">
+                <TopupButton
+                  starshipId={starshipId}
+                  amount={20}
+                  variant="default"
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+                />
+              </div>
+            </div>
+          </div>
+        )}
         {/* Input Container with Expandable Overlay */}
         <div
           className={cn(

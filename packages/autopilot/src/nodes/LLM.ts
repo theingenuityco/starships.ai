@@ -225,12 +225,7 @@ export class LLM extends BaseNode<LlmParams> {
 
         // Extract usage if present
         if (chunk.usage) {
-          usage = {
-            promptTokens: chunk.usage.prompt_tokens ?? 0,
-            completionTokens: chunk.usage.completion_tokens ?? 0,
-            totalTokens: chunk.usage.total_tokens ?? 0,
-            cost: 0, // OpenRouter may provide this separately
-          };
+          usage = this.normalizeUsage(chunk.usage);
         }
 
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls

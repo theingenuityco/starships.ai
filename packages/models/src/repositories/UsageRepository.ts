@@ -2,6 +2,7 @@ import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
 import type { UsageModel, LLMUsage, DailyUsageRow, DailyModelUsageRow } from '@starships/protocol';
+import type { PoolClient } from 'pg';
 
 /**
  * UsageRepository
@@ -427,6 +428,39 @@ export class UsageRepository extends BaseRepository {
       'countDailyModelByStarship',
       'Usage',
       starshipId
+    );
+  }
+
+  /**
+   * Find a usage row by id using an existing transaction client.
+   * Optionally locks the row FOR UPDATE when forUpdate=true.
+   */
+  async findByIdWithClient(client: PoolClient, id: string, forUpdate: boolean = false): Promise<UsageModel | null> {
+    if (!id?.trim()) throw new Error('id is required');
+
+    const sql = forUpdate ? 'SELECT * FROM usage WHERE id = $1 FOR UPDATE' : 'SELECT * FROM usage WHERE id = $1';
+
+    const res = await client.query<Record<string, unknown>>(sql, [id]);
+    const row = res.rows?.[0];
+    return row ? fromDatabase(UsageEntity, row) : null;
+  }
+
+  /**
+   * Mark a usage row as billed, linking to the created ledger entry id (nullable).
+   * Executed within the caller's transaction.
+   */
+  async markBilledWithClient(client: PoolClient, usageId: string, ledgerId: string | null, billedAt: string): Promise<void> {
+    if (!usageId?.trim()) throw new Error('usageId is required');
+    const billedTs = billedAt || new Date().toISOString();
+
+    await client.query(
+      `
+      UPDATE usage
+      SET billed_at = $2,
+          billed_ledger_id = $3
+      WHERE id = $1
+      `,
+      [usageId, billedTs, ledgerId]
     );
   }
 }

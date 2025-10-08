@@ -310,7 +310,9 @@ CREATE TABLE usage (
     completion_tokens INTEGER NOT NULL DEFAULT 0,
     total_tokens INTEGER NOT NULL DEFAULT 0,
     model VARCHAR(100),
-    cost DECIMAL(10,6) DEFAULT 0,
+    cost DECIMAL(18,6) NOT NULL DEFAULT 0.000000,
+    billed_at TIMESTAMP WITH TIME ZONE NULL,
+    billed_ledger_id VARCHAR(255) NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
@@ -322,6 +324,83 @@ CREATE INDEX idx_usage_model ON usage(model);
 -- Composite indexes for owner-scoped queries and filters
 CREATE INDEX idx_usage_starship_created_at ON usage(starship_id, created_at);
 CREATE INDEX idx_usage_starship_model ON usage(starship_id, model);
+-- Billing reconciliation indexes
+CREATE INDEX idx_usage_billed_at ON usage(billed_at);
+CREATE UNIQUE INDEX idx_usage_billed_ledger_unique ON usage(billed_ledger_id) WHERE billed_ledger_id IS NOT NULL;
+
+-- ============================================================================
+-- WALLETS TABLE
+-- ============================================================================
+
+CREATE TABLE wallets (
+  id VARCHAR(255) PRIMARY KEY,
+  starship_id VARCHAR(255) UNIQUE NOT NULL REFERENCES starships(id) ON DELETE CASCADE,
+  currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+  balance DECIMAL(18,6) NOT NULL DEFAULT 0.000000,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Wallets indexes
+CREATE INDEX idx_wallets_created_at ON wallets(created_at);
+CREATE INDEX idx_wallets_updated_at ON wallets(updated_at);
+CREATE INDEX idx_wallets_currency ON wallets(currency);
+
+-- ============================================================================
+-- TOPUPS TABLE
+-- ============================================================================
+
+CREATE TABLE topups (
+  id VARCHAR(255) PRIMARY KEY,
+  wallet_id VARCHAR(255) NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  amount_usd DECIMAL(18,4) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
+  stripe_session_id VARCHAR(255),
+  stripe_payment_intent VARCHAR(255),
+  stripe_charge_id VARCHAR(255),
+  idempotency_key VARCHAR(255),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Topups indexes
+CREATE INDEX idx_topups_wallet_id ON topups(wallet_id);
+CREATE INDEX idx_topups_status ON topups(status);
+CREATE INDEX idx_topups_created_at ON topups(created_at);
+CREATE INDEX idx_topups_stripe_session_id ON topups(stripe_session_id);
+CREATE UNIQUE INDEX idx_topups_idempotency_key_unique ON topups(idempotency_key);
+CREATE INDEX idx_topups_stripe_payment_intent ON topups(stripe_payment_intent);
+CREATE INDEX idx_topups_stripe_charge_id ON topups(stripe_charge_id);
+
+-- ============================================================================
+-- LEDGER ENTRIES TABLE
+-- ============================================================================
+
+CREATE TABLE ledger_entries (
+  id VARCHAR(255) PRIMARY KEY,
+  wallet_id VARCHAR(255) NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  type VARCHAR(30) NOT NULL CHECK (type IN ('TOPUP','USAGE','REFUND','ADJUSTMENT')),
+  amount DECIMAL(18,6) NOT NULL,
+  balance_after DECIMAL(18,6) NOT NULL,
+  meta JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ledger_wallet_created_at ON ledger_entries (wallet_id, created_at DESC);
+
+-- Idempotency: One USAGE ledger per (wallet, usageId)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_usage_wallet_unique
+ON ledger_entries (wallet_id, (meta->>'usageId'))
+WHERE type = 'USAGE';
+
+-- Helper index to accelerate scans by wallet+type
+CREATE INDEX IF NOT EXISTS idx_ledger_wallet_type_created
+ON ledger_entries (wallet_id, type, created_at DESC);
+
+-- Link usage billed_ledger_id to ledger_entries (nullable)
+ALTER TABLE usage
+  ADD CONSTRAINT fk_usage_billed_ledger
+  FOREIGN KEY (billed_ledger_id)
+  REFERENCES ledger_entries(id)
+  ON DELETE SET NULL;
 
 -- ============================================================================
 -- WAITLIST TABLE
@@ -389,22 +468,20 @@ CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('
 -- COMMENTS FOR DOCUMENTATION
 -- ============================================================================
 
-<<<<<<< HEAD
-COMMENT ON TABLE users IS 'User accounts with authentication and billing information';
-COMMENT ON TABLE oauth_accounts IS 'OAuth account links - supports multiple providers per user';
-COMMENT ON TABLE starships IS 'Starships owned by users with configuration and billing details';
-=======
 COMMENT ON TABLE users IS 'User accounts with authentication';
+COMMENT ON TABLE oauth_accounts IS 'OAuth account links - supports multiple providers per user';
 COMMENT ON TABLE starships IS 'Starships owned by users with configuration';
->>>>>>> origin/main
 COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketplace';
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
+COMMENT ON TABLE ledger_entries IS 'Immutable ledger of wallet mutations for auditing and balance tracking';
 COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace';
 COMMENT ON TABLE tools IS 'Deployed tool instances associated with starships';
 COMMENT ON TABLE conversations IS 'Chat conversations within starships';
 COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
+COMMENT ON TABLE wallets IS 'Wallets for starships with currency and balance';
+COMMENT ON TABLE topups IS 'Payment topup records for wallet funding via Stripe';
 COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';

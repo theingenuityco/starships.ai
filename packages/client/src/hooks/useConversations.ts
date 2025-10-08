@@ -5,6 +5,7 @@ import { useCallback, useMemo, useEffect } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
+import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -631,7 +632,7 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
  * Pure TanStack Query streaming hook for a conversation
  * Uses experimental_streamedQuery to manage the SSE lifecycle and cache updates.
  */
-export function useConversationStreamed(conversationId: string | null) {
+export function useConversationStreamed(conversationId: string | null, starshipId?: string | null) {
   const queryClient = useQueryClient()
 
   // Compute baselineLength from cached chunks to let the server replay any missed messages on reconnect
@@ -672,9 +673,15 @@ export function useConversationStreamed(conversationId: string | null) {
     if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
     const last = chunks[chunks.length - 1]
     if (last.type === 'complete') {
+      // Refresh usage totals for this conversation
       queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
+      // Also refresh starship-level totals and wallet balance if starshipId is provided
+      if (starshipId) {
+        queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.starshipTotals(starshipId) })
+        queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+      }
     }
-  }, [chunks, conversationId, queryClient])
+  }, [chunks, conversationId, starshipId, queryClient])
 
   // Check if we've received a 'complete' event in the chunk stream
   const hasCompleteEvent = useMemo(() => {
@@ -744,7 +751,38 @@ export function useConversationStreamed(conversationId: string | null) {
       // Refetching would close the existing connection and open a new one, causing the server
       // to lose the connection while the agent is still broadcasting
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
+      const status = error?.response?.status
+      const code = error?.response?.data?.error?.code || error?.response?.data?.code
+
+      if (status === 402 || code === 'INSUFFICIENT_FUNDS') {
+        // Inject an inline system message into the streamed cache so the user sees it in chat
+        const convId = (variables as any)?.conversationId as string | undefined
+        const sid = (variables as any)?.starshipId as string | undefined
+        if (convId) {
+          const now = new Date().toISOString()
+          const sysMessage: any = {
+            id: `sys_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            role: 'system',
+            content: 'Insufficient balance. Add credits from Billing to continue.',
+            messageType: 'error',
+            createdAt: now,
+            updatedAt: now,
+          }
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any[] | undefined) => {
+            const chunks = Array.isArray(old) ? old.slice() : []
+            chunks.push({ type: 'append', message: sysMessage })
+            return chunks
+          })
+        }
+        // Also refresh wallet and starship usage so UI reflects current balance state
+        if (sid) {
+          queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(sid) })
+          queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.starshipTotals(sid) })
+        }
+        return
+      }
+
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
       toast.error('Failed to send message', { description: errorMessage })
     },

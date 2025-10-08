@@ -1,8 +1,9 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import { AgentRepository, getConnection, StarshipRepository, ToolRepository } from '@starships/models';
-import { CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
+import { StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
+import { WalletService } from './WalletService';
 
 export interface CreateStarshipData {
   ownerId: string;
@@ -43,6 +44,16 @@ export class StarshipService {
       maxAgents: data.maxAgents ?? 3,
       status: 'active',
     });
+
+    // Auto-create wallet for this starship (USD, 0.000000)
+    try {
+      const walletService = new WalletService();
+      await walletService.createForStarship(starship.id);
+      // Optional: silent success
+    } catch (err) {
+      // Log and continue - starship creation should not fail due to wallet issues
+      console.error('[STARSHIP-SERVICE] Failed to create wallet for starship:', starship.id, err);
+    }
 
     return starship;
   }

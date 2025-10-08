@@ -47,7 +47,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const wasOpenedByStreamingRef = useRef(false)
 
   // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId)
+  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
   const prevStreamingRef = useRef(false)
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer

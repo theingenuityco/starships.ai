@@ -22,6 +22,8 @@ Update edge properties and routing logic while maintaining blueprint connectivit
 - **from**: Update source node reference
 - **to**: Update target node reference
 - **condition**: Update conditional expression for routing
+- **label**: Update edge display label
+- **metadata**: Update edge metadata object
 
 ## Workflow
 1. Fetches current tool by slug
@@ -56,6 +58,8 @@ Returns updated tool with edge modifications, or validation errors if update fai
           from: { type: 'string', description: 'New source node ref' },
           to: { type: 'string', description: 'New target node ref' },
           condition: { type: 'string', description: 'New condition expression' },
+          label: { type: 'string', description: 'New display label for the edge' },
+          metadata: { type: 'object', description: 'New metadata object for the edge' },
         },
       },
     },
@@ -173,6 +177,16 @@ Returns updated tool with edge modifications, or validation errors if update fai
             if (updates.condition !== undefined && typeof updates.condition !== 'string') {
               errors.push('Edge condition must be a string expression');
             }
+            
+            // Validate label if provided
+            if (updates.label !== undefined && typeof updates.label !== 'string') {
+              errors.push('Edge label must be a string');
+            }
+            
+            // Validate metadata if provided
+            if (updates.metadata !== undefined && (typeof updates.metadata !== 'object' || Array.isArray(updates.metadata))) {
+              errors.push('Edge metadata must be an object');
+            }
 
             if (errors.length > 0) {
               return {
@@ -187,14 +201,26 @@ Returns updated tool with edge modifications, or validation errors if update fai
             if (updates.from !== undefined) updatedEdge.from = updates.from;
             if (updates.to !== undefined) updatedEdge.to = updates.to;
             if (updates.condition !== undefined) updatedEdge.condition = updates.condition;
-
-            blueprint.edges[edgeIndex] = updatedEdge;
-
+            if (updates.label !== undefined) updatedEdge.label = updates.label;
+            if (updates.metadata !== undefined) updatedEdge.metadata = updates.metadata;
+            
+            // Sanitize to allowed schema fields only
+            const sanitizedEdge = {
+              ref: updatedEdge.ref,
+              from: updatedEdge.from,
+              to: updatedEdge.to,
+              ...(updatedEdge.condition !== undefined ? { condition: updatedEdge.condition } : {}),
+              ...(updatedEdge.label !== undefined ? { label: updatedEdge.label } : {}),
+              ...(updatedEdge.metadata !== undefined ? { metadata: updatedEdge.metadata } : {}),
+            };
+            
+            blueprint.edges[edgeIndex] = sanitizedEdge;
+            
             return {
               success: true,
               toolData,
               updatedBlueprint: blueprint,
-              editedEdge: updatedEdge,
+              editedEdge: sanitizedEdge,
               edgeRef
             };
           `,

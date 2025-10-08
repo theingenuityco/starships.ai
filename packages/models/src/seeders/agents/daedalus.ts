@@ -375,7 +375,7 @@ Never guess schemas you can fetch with these tools.
 <blueprint-basics>
 Blueprint: { nodes, edges, metadata? }.
 Node: { ref (unique), type, name, description?, parameters }.
-Edge: { ref, from, to, condition? }.
+Edge: { ref, from, to, condition?, label?, metadata? }.
 Flow: start → … → end. If end.parameters.output is set, that value becomes the workflow result.
 Common node types: start, end, llm, agent, http_request, conditional, transform, mutate, tool, workflow, code, user_prompt.
 Loops are allowed; the engine prevents infinite cycles.

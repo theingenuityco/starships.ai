@@ -1,4 +1,5 @@
 import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import type { ToolParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository, ToolRepository } from '@starships/models';
 import type { ToolModel } from '@starships/protocol';
@@ -10,11 +11,7 @@ interface LLMToolDefinition {
   function: {
     name: string;
     description: string;
-    parameters: {
-      type: 'object';
-      properties: Record<string, any>;
-      required?: string[];
-    };
+    parameters: ToolParams['parameters'];
   };
 }
 
@@ -24,18 +21,7 @@ interface LLMToolDefinition {
 interface AgentTool {
   name: string;
   description: string;
-  parameters: {
-    type: 'object';
-    properties: Record<
-      string,
-      {
-        type: string;
-        description?: string;
-        enum?: string[];
-      }
-    >;
-    required?: string[];
-  };
+  parameters: ToolParams['parameters'];
   execute(input: string): Promise<string>;
 }
 

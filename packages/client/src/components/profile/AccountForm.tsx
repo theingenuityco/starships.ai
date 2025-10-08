@@ -47,11 +47,7 @@ export default function AccountForm() {
   } = useAccountForm()
 
   const handleConnectOAuth = (provider: 'google' | 'github') => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-    if (!apiBaseUrl) {
-      throw new Error('NEXT_PUBLIC_API_URL environment variable is required for OAuth')
-    }
-    window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
+    window.location.href = `/api/v1/auth/${provider}`
   }
 
   const handleManageSessions = () => {

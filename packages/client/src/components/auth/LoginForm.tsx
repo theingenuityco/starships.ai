@@ -39,13 +39,9 @@ export function LoginForm() {
   const { login, register, oauthLogin, isLoading, error } = useAuth()
   const searchParams = useSearchParams()
 
-  // OAuth initiation function - connects directly to backend
+  // OAuth initiation function - uses relative URL like regular auth
   const initiateOAuth = (provider: 'google' | 'github') => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-    if (!apiBaseUrl) {
-      throw new Error('NEXT_PUBLIC_API_URL environment variable is required for OAuth')
-    }
-    window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
+    window.location.href = `/api/v1/auth/${provider}`
   }
 
   const [loginData, setLoginData] = useState({
@@ -77,6 +73,7 @@ export function LoginForm() {
     const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
     const oauthWaitlist = searchParams?.get('oauth_waitlist')
+
 
     // Prevent duplicate handling (synchronous check with ref)
     if (oauthHandledRef.current) {

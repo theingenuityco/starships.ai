@@ -27,20 +27,12 @@ spec:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '3000'
     spec:
-      # Security Context - Temporarily disabled due to supervisor permission issues
-      # TODO: Fix Docker image to work with non-root user
-      # securityContext:
-      #   runAsUser: 1000
-      #   runAsGroup: 1000
-      #   fsGroup: 1000
-      #   runAsNonRoot: true
-
       imagePullSecrets:
         - name: ghcr-pull-secret
 
       containers:
         - name: starships
-          image: 'PLACEHOLDER_IMAGE:latest' # Updated by CI/CD via kubectl set image
+          image: 'PLACEHOLDER_IMAGE:latest' # Replaced automatically by GitHub Actions
           imagePullPolicy: Always
 
           ports:
@@ -50,13 +42,10 @@ spec:
             - containerPort: 4000
               name: backend
               protocol: TCP
-            - containerPort: 5432
-              name: postgres
-              protocol: TCP
 
-          # Development Environment Variables
+          # ✅ Environment variables (from Kubernetes secrets)
           env:
-            # Core Settings
+            # Core environment
             - name: NODE_ENV
               value: 'development'
             - name: SKIP_BUILD
@@ -64,7 +53,7 @@ spec:
             - name: SKIP_INSTALL
               value: 'true'
 
-            # Server and Client Ports
+            # Server/Client configuration
             - name: SERVER_PORT
               valueFrom:
                 secretKeyRef:
@@ -81,7 +70,7 @@ spec:
                   name: starships-secrets
                   key: LOG_LEVEL
 
-            # URLs (from secrets for flexibility)
+            # URLs
             - name: PUBLIC_URL
               valueFrom:
                 secretKeyRef:
@@ -98,14 +87,14 @@ spec:
                   name: starships-secrets
                   key: SERVER_URL
 
-            # Authentication
+            # JWT Auth
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: JWT_SECRET
 
-            # PostgreSQL Configuration
+            # PostgreSQL Configuration (external EC2 DB)
             - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:
@@ -137,7 +126,7 @@ spec:
                   name: starships-secrets
                   key: POSTGRES_SSL
 
-            # LLM Provider Configuration
+            # LLM Providers
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -164,7 +153,7 @@ spec:
                   name: starships-secrets
                   key: DEFAULT_CHAT_MODEL
 
-            # Stripe Configuration
+            # Stripe
             - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -180,6 +169,7 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: STRIPE_PUBLISHABLE_KEY
+
             # Analytics
             - name: GA_MEASUREMENT_ID
               valueFrom:
@@ -187,11 +177,7 @@ spec:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
 
-            # PostgreSQL Data Directory
-            - name: PGDATA
-              value: '/var/lib/postgresql/data/pgdata'
-
-          # Resource Limits
+          # Resource limits (safe defaults for t3.small/t3.medium EKS nodes)
           resources:
             requests:
               memory: '512Mi'
@@ -199,20 +185,3 @@ spec:
             limits:
               memory: '2Gi'
               cpu: '1000m'
-
-          # Volume Mounts
-          volumeMounts:
-            - name: postgres-data
-              mountPath: /var/lib/postgresql/data
-              subPath: data
-            - name: app-sessions
-              mountPath: /app/data/sessions
-
-      # Volumes
-      volumes:
-        - name: postgres-data
-          persistentVolumeClaim:
-            claimName: postgres-data-pvc
-        - name: app-sessions
-          persistentVolumeClaim:
-            claimName: sessions-pvc

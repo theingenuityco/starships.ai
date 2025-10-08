@@ -189,13 +189,13 @@ function createDaedalusBlueprint(): Blueprint {
           value: `{{ {
             role: 'system',
             content: \`<focused-tool>
- id: \${state.focusedTool.id || 'N/A'}
+ id: \${state.focusedTool.id}
  name: \${state.focusedTool.name}
  slug: \${state.focusedTool.slug}
  description: \${state.focusedTool.description}
- status: \${state.focusedTool.status || 'draft'}
- parameters: \${state.focusedTool.parameters ? 'defined' : 'null'}
- blueprint: \${state.focusedTool.blueprint ? 'defined' : 'null'}
+ status: \${state.focusedTool.status}
+ parameters: \${JSON.stringify(state.focusedTool.parameters ?? null)}
+ blueprint: \${JSON.stringify(state.focusedTool.blueprint ?? null)}
  </focused-tool>
 
  <instructions>
@@ -277,13 +277,13 @@ function createDaedalusBlueprint(): Blueprint {
           value: `{{ {
             role: 'system',
             content: \`<focused-tool>
- id: \${state.focusedTool.id || 'N/A'}
+ id: \${state.focusedTool.id}
  name: \${state.focusedTool.name}
  slug: \${state.focusedTool.slug}
  description: \${state.focusedTool.description}
- status: \${state.focusedTool.status || 'draft'}
- parameters: \${state.focusedTool.parameters ? 'defined' : 'null'}
- blueprint: \${state.focusedTool.blueprint ? 'defined' : 'null'}
+ status: \${state.focusedTool.status}
+ parameters: \${JSON.stringify(state.focusedTool.parameters ?? null)}
+ blueprint: \${JSON.stringify(state.focusedTool.blueprint ?? null)}
  </focused-tool>
 
  <instructions>

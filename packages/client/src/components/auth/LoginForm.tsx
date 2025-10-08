@@ -8,15 +8,41 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
+import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
+
+/**
+ * OAuth error handling helper
+ */
+function getOAuthErrorMessage(errorCode: string): string {
+  switch (errorCode) {
+    case 'invalid_state':
+      return 'Security validation failed. Please try again.'
+    case 'provider_error':
+      return 'Authentication provider error. Please try again.'
+    case 'validation_failed':
+      return 'Account validation failed. Please contact support.'
+    case 'callback_failed':
+      return 'Authentication failed. Please try again.'
+    default:
+      return 'Login failed. Please try again.'
+  }
+}
 
 /**
  * JWT-based login and registration form
  */
 export function LoginForm() {
-  const { login, register, isLoading, error } = useAuth()
+  const { login, register, oauthLogin, isLoading, error } = useAuth()
+  const searchParams = useSearchParams()
+
+  // OAuth initiation function - uses relative URL like regular auth
+  const initiateOAuth = (provider: 'google' | 'github') => {
+    window.location.href = `/api/v1/auth/${provider}`
+  }
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -38,11 +64,44 @@ export function LoginForm() {
     isWaitlisted: boolean
     message: string
   } | null>(null)
+  const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
+
+  // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
+  const oauthHandledRef = useRef(false)
+
+  // OAuth callback handling - SECURE authorization code exchange
+  useEffect(() => {
+    const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
+    const oauthError = searchParams?.get('oauth_error')
+    const oauthWaitlist = searchParams?.get('oauth_waitlist')
+
+
+    // Prevent duplicate handling (synchronous check with ref)
+    if (oauthHandledRef.current) {
+      console.log('[OAuth] Already handled, skipping')
+      return
+    }
+
+    if (authCode) {
+      oauthHandledRef.current = true
+      console.log('[OAuth] Exchanging authorization code for JWT token (secure)')
+      // ✅ SECURE: Exchange authorization code for JWT via POST request
+      oauthLogin(authCode)
+    } else if (oauthError) {
+      setFormError(getOAuthErrorMessage(oauthError))
+    } else if (oauthWaitlist) {
+      setWaitlistStatus({
+        isWaitlisted: true,
+        message: 'Thanks for signing up! Please wait for approval to access the app.',
+      })
+    }
+  }, [searchParams, oauthLogin])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
     setWaitlistStatus(null)
+    setAutoSwitchedToRegister(false)
 
     if (!loginData.email || !loginData.password) {
       setFormError('Please fill in all fields')
@@ -50,18 +109,31 @@ export function LoginForm() {
     }
 
     const result = await login(loginData.email, loginData.password)
-    
+
     // Check if waitlisted response
     if (result.waitlisted) {
       setWaitlistStatus({
         isWaitlisted: true,
-        message: result.message || 'You are on our waitlist. Stay tuned!'
+        message: result.message || 'You are on our waitlist. Stay tuned!',
       })
       return
     }
-    
+
     if (!result.success) {
-      setFormError(result.error || 'Login failed')
+      const errorMessage = result.error || 'Login failed'
+      
+      // Check if user doesn't exist - offer to switch to registration
+      if (errorMessage.includes('No account found') || errorMessage.includes('Please sign up first')) {
+        setFormError(null) // Clear error since we're handling it gracefully
+        // Pre-fill registration form with the email
+        setRegisterData(prev => ({ ...prev, email: loginData.email }))
+        // Automatically switch to registration tab
+        setActiveTab('register')
+        setAutoSwitchedToRegister(true)
+        return
+      }
+      
+      setFormError(errorMessage)
     }
   }
 
@@ -69,6 +141,7 @@ export function LoginForm() {
     e.preventDefault()
     setFormError(null)
     setWaitlistStatus(null)
+    setAutoSwitchedToRegister(false)
 
     if (!registerData.email || !registerData.password || !registerData.name) {
       setFormError('Please fill in all fields')
@@ -86,18 +159,18 @@ export function LoginForm() {
     }
 
     const result = await register(registerData.email, registerData.password, registerData.name)
-    
+
     // Check if waitlisted response
     if (result.waitlisted) {
       setWaitlistStatus({
         isWaitlisted: true,
-        message: result.message || 'You have been added to the waitlist!'
+        message: result.message || 'You have been added to the waitlist!',
       })
       // Optionally clear form
       setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
       return
     }
-    
+
     if (!result.success) {
       setFormError(result.error || 'Registration failed')
     }
@@ -112,16 +185,19 @@ export function LoginForm() {
         </CardHeader>
 
         <CardContent>
+          {/* OAuth buttons ABOVE existing tabs */}
+          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading || !!waitlistStatus} />
+
           {waitlistStatus && (
             <div className="mb-4">
-              <WaitlistMessage
-                message={waitlistStatus.message}
-                onClose={() => setWaitlistStatus(null)}
-              />
+              <WaitlistMessage message={waitlistStatus.message} onClose={() => setWaitlistStatus(null)} />
             </div>
           )}
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value)
+            setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
+          }}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Sign Up</TabsTrigger>
@@ -187,6 +263,13 @@ export function LoginForm() {
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4">
+              {autoSwitchedToRegister && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <AlertDescription className="text-blue-800">
+                    No account found with that email address. Please create a new account below.
+                  </AlertDescription>
+                </Alert>
+              )}
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>

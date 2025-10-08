@@ -21,6 +21,26 @@ export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_SERVER_PORT = 4000;
   const DEFAULT_PROXY_PORT = 8080;
 
+  // Validate critical environment variables for production safety
+  const requiredEnvVars = {
+    PUBLIC_URL: process.env.PUBLIC_URL,
+    CLIENT_URL: process.env.CLIENT_URL,
+    SERVER_URL: process.env.SERVER_URL,
+    POSTGRES_HOST: process.env.POSTGRES_HOST,
+    POSTGRES_USER: process.env.POSTGRES_USER,
+    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
+    POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
+  };
+
+  // Check for missing required environment variables
+  const missing = Object.entries(requiredEnvVars)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}. Please check your .env file.`);
+  }
+
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
@@ -29,17 +49,17 @@ export function getEnvConfig(): EnvironmentConfig {
     NODE_ENV: process.env.NODE_ENV || 'development',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 
-    // URLs
-    PUBLIC_URL: process.env.PUBLIC_URL || `http://localhost:${DEFAULT_CLIENT_PORT}`,
-    CLIENT_URL: process.env.CLIENT_URL || `http://localhost:${DEFAULT_CLIENT_PORT}`,
-    SERVER_URL: process.env.SERVER_URL || `http://localhost:${DEFAULT_SERVER_PORT}`,
+    // URLs - Required, no localhost fallbacks
+    PUBLIC_URL: requiredEnvVars.PUBLIC_URL!,
+    CLIENT_URL: requiredEnvVars.CLIENT_URL!,
+    SERVER_URL: requiredEnvVars.SERVER_URL!,
 
-    // PostgreSQL Database Configuration
-    POSTGRES_HOST: process.env.POSTGRES_HOST || 'localhost',
+    // PostgreSQL Database Configuration - Required, no localhost fallbacks
+    POSTGRES_HOST: requiredEnvVars.POSTGRES_HOST!,
     POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-    POSTGRES_USER: process.env.POSTGRES_USER || 'postgres',
-    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || 'password',
-    POSTGRES_DATABASE: process.env.POSTGRES_DATABASE || 'starships',
+    POSTGRES_USER: requiredEnvVars.POSTGRES_USER!,
+    POSTGRES_PASSWORD: requiredEnvVars.POSTGRES_PASSWORD!,
+    POSTGRES_DATABASE: requiredEnvVars.POSTGRES_DATABASE!,
     POSTGRES_SSL: process.env.POSTGRES_SSL === 'true',
 
     // LLM Provider Configuration
@@ -53,6 +73,13 @@ export function getEnvConfig(): EnvironmentConfig {
 
     // JWT Authentication Configuration
     JWT_SECRET: process.env.JWT_SECRET || '',
+
+    // OAuth Provider Configuration
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,

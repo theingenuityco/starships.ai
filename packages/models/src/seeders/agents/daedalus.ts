@@ -113,11 +113,11 @@ function createDaedalusBlueprint(): Blueprint {
     },
   });
 
-  // Mutate node to add tool result to state and update tools array if Open New Tool was called
+  // Mutate node to add tool result to state and update tools array for tool operations
   const toolResultNodeRef = builder.addNode({
     type: 'mutate',
     name: 'Add Tool Result',
-    description: 'Add tool result message to conversation state and update tools array for Open New Tool',
+    description: 'Add tool result message to conversation state and update tools array for tool operations',
     parameters: {
       mutations: [
         {
@@ -131,7 +131,7 @@ function createDaedalusBlueprint(): Blueprint {
             
             // For tool-modifying operations, return minimal confirmation to reduce token bloat
             const toolModifyOps = [
-              'tool-open-new', 'tool-open', 'tool-edit',
+              'tool-open', 'tool-edit',
               'tool-add-blueprint-node', 'tool-add-blueprint-edge',
               'blueprint-edit-node', 'blueprint-remove-node',
               'blueprint-edit-edge', 'blueprint-remove-edge'
@@ -167,7 +167,7 @@ function createDaedalusBlueprint(): Blueprint {
             const toolSlug = calls?.[0]?.function?.name;
             // Update focusedTool for any tool that modifies tool state
             const updateTools = [
-              'tool-open-new', 'tool-open', 'tool-edit',
+              'tool-open', 'tool-edit',
               'tool-add-blueprint-node', 'tool-add-blueprint-edge',
               'blueprint-edit-node', 'blueprint-remove-node',
               'blueprint-edit-edge', 'blueprint-remove-edge'
@@ -270,10 +270,10 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open New Tool, tool_get, tool_test, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-edit-blueprint-node, tool-remove-blueprint-node, tool-edit-blueprint-edge, tool-remove-blueprint-edge).
+Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open Tool, tool_get, tool_test, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-edit-blueprint-node, tool-remove-blueprint-node, tool-edit-blueprint-edge, tool-remove-blueprint-edge).
 
 Workflow:
-1. Use "Open New Tool" to quickly scaffold a draft (name, slug, description)
+1. Use "Open Tool" (with name and slug) to scaffold a draft (optional description)
 2. Use "Add Tool Blueprint Node" to add individual nodes (start, llm, code, http_request, etc.)
 3. Use "Add Tool Blueprint Edge" to connect nodes with proper workflow flow
 4. Use "Edit Tool Blueprint Node" to refine node properties (name, parameters, etc.)
@@ -290,9 +290,9 @@ Alternative Workflow for Existing Tools:
 4. Use "Edit Tool" to apply the final blueprint updates
 5. Use tool_test to validate changes
 
-All tool manipulation commands (Open New Tool, Open Tool, Edit Tool, and all blueprint CRUD operations) automatically update state.focusedTool with complete tool details. Tool call responses are minimal confirmations - always access complete tool data (id, parameters, blueprint, etc.) directly from state.focusedTool without additional API calls. The focused tool stays synchronized as you modify it. Draft tools (status='draft') are excluded from agent execution until activated.
+All tool manipulation commands (Open Tool, Edit Tool, and all blueprint CRUD operations) automatically update state.focusedTool with complete tool details. Tool call responses are minimal confirmations - always access complete tool data (id, parameters, blueprint, etc.) directly from state.focusedTool without additional API calls. The focused tool stays synchronized as you modify it. Draft tools (status='draft') are excluded from agent execution until activated.
 
-Function names use their display name (e.g., "Open New Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open-new, tool-edit, tool-add-blueprint-node).
+Function names use their display name (e.g., "Open Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open, tool-edit, tool-add-blueprint-node).
 </protocol>
 
 <introspection>
@@ -370,7 +370,6 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   assignedToolSlugs: [
     'tool-list',
     'tool-get',
-    'tool-open-new',
     'tool-open',
     'tool-edit',
     'tool-test',

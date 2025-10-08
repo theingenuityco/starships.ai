@@ -2,37 +2,44 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: Open Tool
- * Opens an existing tool by fetching its details and setting it as the focused tool for editing
+ * Tool: Open Tool (Create or Open)
+ * Creates a new draft tool when provided name + slug, or opens an existing tool by slug
  */
 export const toolOpenTool: ToolParams = {
   name: 'Open Tool',
   slug: 'tool-open',
-  description: `Opens an existing tool by slug and returns its complete details for editing or continuation.
+  description: `Creates or opens a tool on the current starship.
 
-## Purpose
-Fetch complete tool information including parameters, blueprint, and current configuration. Used to continue working on existing tools or to examine tool details before editing.
-
-## Required Parameters
-- **slug**: Unique kebab-case identifier of the tool to open (e.g., "weather-lookup", "send-email")
+## Modes
+- Create new draft: provide "name" and "slug" (optional "description")
+- Open existing: provide only "slug"
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- **BASE_URL**: API server endpoint
-- **AUTH_TOKEN**: Authentication token
-- **STARSHIP_ID**: Current starship identifier
+- BASE_URL: API server endpoint
+- AUTH_TOKEN: Authentication token
+- STARSHIP_ID: Current starship identifier
 
 ## Response & Behavior
-- **Output**: Complete tool model with id, name, slug, description, parameters, blueprint, and status
-- **State**: Tool data returned for potential use in focusedTool state
-- **Timeouts**: Preparation (3s), HTTP request (5s)
-- **Common failures**: Missing environment, tool not found (404 error), insufficient permissions`,
+- Output: Tool model (created or fetched)
+- Timeouts: Preparation (3s), HTTP (Create: 10s, Open: 5s)
+- Common failures: Missing environment, slug collision (409) when creating, not found (404) when opening`,
   parameters: {
     type: 'object',
     properties: {
+      // Open existing
       slug: {
         type: 'string',
-        description: 'Unique kebab-case identifier of the tool to open',
+        description: 'Unique kebab-case identifier of the tool to open, or to create if name is provided',
+      },
+      // Create new
+      name: {
+        type: 'string',
+        description: 'Human-readable name (required when creating a new tool)',
+      },
+      description: {
+        type: 'string',
+        description: 'Optional description (used only when creating a new tool)',
       },
     },
     required: ['slug'],
@@ -44,7 +51,7 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL, headers for tool fetch request',
+        description: 'Build URL, headers and body based on mode (create or open)',
         parameters: {
           code: `
             const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
@@ -54,48 +61,71 @@ Automatically inferred from agent state (do not pass manually):
             if (!authToken) throw new Error('authToken is required');
             if (!starshipId) throw new Error('starshipId is required');
 
-            if (!input.slug) {
-              throw new Error('slug is required');
+            const hasName = input && typeof input.name === 'string' && input.name.trim().length > 0;
+            const slug = input && input.slug;
+            if (!slug || typeof slug !== 'string') throw new Error('slug is required');
+
+            if (hasName) {
+              // Create draft
+              const body = {
+                name: input.name,
+                slug,
+                description: (input && input.description) || '',
+                status: 'draft'
+              };
+              return {
+                url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
+                method: 'POST',
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json'
+                },
+                body,
+                timeout: 10000
+              };
             }
 
+            // Open existing
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${input.slug}\`,
+              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
               method: 'GET',
               headers: {
                 'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
-              }
+              },
+              timeout: 5000
             };
           `,
           timeout: 3000,
         },
       },
       {
-        ref: 'http_get',
+        ref: 'http_exec',
         type: 'http_request',
-        name: 'Fetch Tool',
-        description: 'GET /starships/:starshipId/tools/:slug',
+        name: 'Execute',
+        description: 'Create or fetch tool',
         parameters: {
           url: '{{ $lastOutputOf("prepare")[0].json.url }}',
           method: '{{ $lastOutputOf("prepare")[0].json.method }}',
           headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 5000,
+          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
+          timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
         },
       },
       {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return complete tool details',
+        description: 'Return tool model (created or fetched)',
         parameters: {
-          output: '{{ $lastOutputOf("http_get")[0].json }}',
+          output: '{{ $lastOutputOf("http_exec")[0].json }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_get' },
-      { ref: 'e3', from: 'http_get', to: 'end_1' },
+      { ref: 'e2', from: 'prepare', to: 'http_exec' },
+      { ref: 'e3', from: 'http_exec', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -112,7 +142,8 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
 
   slug: 'tool-open',
   category: 'automation',
-  exampleUsage: '{ "slug": "weather-lookup" } // env inferred (baseUrl, authToken, starshipId)',
+  exampleUsage:
+    '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "slug": "my-tool", "description": "Does something useful" } // create draft; env inferred',
   requiresApiKey: false,
   configurationFields: [],
 };

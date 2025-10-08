@@ -195,7 +195,7 @@ export function OAuthAccountsSettings() {
           Connected Accounts
         </CardTitle>
         <CardDescription>
-          Link accounts for authentication only - we don't access your account data or perform actions on your behalf
+          Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf
         </CardDescription>
       </CardHeader>
       

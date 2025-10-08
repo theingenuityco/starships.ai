@@ -5,8 +5,8 @@
  * This provides production-ready, atomic operations for OAuth code management.
  */
 
-import { OAuthAuthCodeEntity, OAuthAuthCodeModel } from '@/entities/OAuthAuthCodeEntity';
-import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
+import { OAuthAuthCodeEntity } from '@/entities/OAuthAuthCodeEntity';
+import { toDatabase } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { nanoid } from 'nanoid';
 import crypto from 'crypto';

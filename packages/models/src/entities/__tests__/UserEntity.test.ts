@@ -121,6 +121,9 @@ describe('UserEntity', () => {
         email: 'test@example.com',
         displayName: 'Test User',
         password: 'password123',
+        hasPassword: true,
+        authMethods: ['password'],
+        primaryAuthMethod: 'password',
       };
 
       await expect(UserEntity.validate(validData, 'create')).resolves.not.toThrow();
@@ -131,6 +134,9 @@ describe('UserEntity', () => {
         UserEntity.validate({
           email: 'invalid-email',
           displayName: 'Test User',
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).rejects.toThrow();
 
@@ -138,6 +144,9 @@ describe('UserEntity', () => {
         UserEntity.validate({
           email: 'valid@example.com',
           displayName: 'Test User',
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).resolves.not.toThrow();
     });
@@ -147,13 +156,19 @@ describe('UserEntity', () => {
         UserEntity.validate({
           email: 'test@example.com',
           password: '12345',
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).rejects.toThrow();
 
       await expect(
         UserEntity.validate({
           email: 'test@example.com',
-          password: '123456',
+          password: '12345678',
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).resolves.not.toThrow();
     });
@@ -163,6 +178,9 @@ describe('UserEntity', () => {
         UserEntity.validate({
           email: 'test@example.com',
           displayName: '',
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).rejects.toThrow();
 
@@ -170,6 +188,9 @@ describe('UserEntity', () => {
         UserEntity.validate({
           email: 'test@example.com',
           displayName: 'a'.repeat(101),
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).rejects.toThrow();
 
@@ -177,6 +198,9 @@ describe('UserEntity', () => {
         UserEntity.validate({
           email: 'test@example.com',
           displayName: 'Valid Name',
+          hasPassword: true,
+          authMethods: ['password'],
+          primaryAuthMethod: 'password',
         })
       ).resolves.not.toThrow();
     });
@@ -346,7 +370,7 @@ describe('UserEntity', () => {
         expect(noSpecial.issues).toContain('Password must contain at least one special character');
 
         const tooShort = UserEntity.validatePasswordStrength('Pa1!');
-        expect(tooShort.issues).toContain('Password must be at least 6 characters long');
+        expect(tooShort.issues).toContain('Password must be at least 8 characters long');
       });
     });
   });

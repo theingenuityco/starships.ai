@@ -435,7 +435,7 @@ export class UserService {
    * Get OAuth profile from provider
    * Business logic for external OAuth provider integration
    */
-  private async getOAuthProfile(provider: string, authCode: string): Promise<OAuthProfileModel> {
+  async getOAuthProfile(provider: string, authCode: string): Promise<OAuthProfileModel> {
     if (provider === 'google') {
       return await this.getGoogleProfile(authCode);
     } else if (provider === 'github') {

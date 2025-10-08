@@ -67,7 +67,7 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
             Set up backup password
           </DialogTitle>
           <DialogDescription>
-            Add a password to your account for backup access. You'll still be able to sign in with Google or GitHub.
+            Add a password to your account for backup access. You&apos;ll still be able to sign in with Google or GitHub.
           </DialogDescription>
         </DialogHeader>
 

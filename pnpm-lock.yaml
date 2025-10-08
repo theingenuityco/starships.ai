@@ -520,6 +520,9 @@ importers:
       fast-json-patch:
         specifier: ^3.1.1
         version: 3.1.1
+      googleapis:
+        specifier: ^161.0.0
+        version: 161.0.0
       jose:
         specifier: ^6.0.11
         version: 6.0.11

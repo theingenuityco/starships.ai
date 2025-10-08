@@ -159,41 +159,6 @@ function createDaedalusBlueprint(): Blueprint {
             };
           })() }}`,
         },
-        {
-          operation: 'replace' as const,
-          path: '/state/focusedTool',
-          value: `{{ (() => {
-            const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
-            const toolSlug = calls?.[0]?.function?.name;
-            // Update focusedTool for any tool that modifies tool state
-            const updateTools = [
-              'tool-open', 'tool-edit',
-              'tool-add-blueprint-node', 'tool-add-blueprint-edge',
-              'tool-blueprint-edit-node', 'tool-blueprint-remove-node',
-              'tool-blueprint-edit-edge', 'tool-blueprint-remove-edge'
-            ];
-            if (updateTools.includes(toolSlug)) {
-              const httpResponse = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
-              const toolData = httpResponse.body?.data || httpResponse.body;
-              if (!toolData || !toolData.name) return state.focusedTool || null;
-              // Store complete tool details to minimize repetitive tool calls
-              return {
-                id: toolData.id,
-                name: toolData.name,
-                slug: toolData.slug,
-                description: toolData.description || '',
-                parameters: toolData.parameters || null,
-                blueprint: toolData.blueprint || null,
-                status: toolData.status || 'draft',
-                starshipId: toolData.starshipId,
-                templateId: toolData.templateId || null,
-                createdAt: toolData.createdAt,
-                updatedAt: toolData.updatedAt
-              };
-            }
-            return null;
-          })() }}`,
-        },
       ],
     },
   });
@@ -224,18 +189,106 @@ function createDaedalusBlueprint(): Blueprint {
           value: `{{ {
             role: 'system',
             content: \`<focused-tool>
-id: \${state.focusedTool.id || 'N/A'}
-name: \${state.focusedTool.name}
-slug: \${state.focusedTool.slug}
-description: \${state.focusedTool.description}
-status: \${state.focusedTool.status || 'draft'}
-parameters: \${state.focusedTool.parameters ? 'defined' : 'null'}
-blueprint: \${state.focusedTool.blueprint ? 'defined' : 'null'}
-</focused-tool>
+ id: \${state.focusedTool.id || 'N/A'}
+ name: \${state.focusedTool.name}
+ slug: \${state.focusedTool.slug}
+ description: \${state.focusedTool.description}
+ status: \${state.focusedTool.status || 'draft'}
+ parameters: \${state.focusedTool.parameters ? 'defined' : 'null'}
+ blueprint: \${state.focusedTool.blueprint ? 'defined' : 'null'}
+ </focused-tool>
 
-<instructions>
-The complete tool details are now available in state.focusedTool. All tool properties (id, parameters, blueprint, etc.) are accessible without additional API calls. The tool responses only confirm success - use state.focusedTool for actual data. Focus on completing this tool before proceeding with other tasks.
-</instructions>\`
+ <instructions>
+ The complete tool details are now available in state.focusedTool. All tool properties (id, parameters, blueprint, etc.) are accessible without additional API calls. The tool responses only confirm success - use state.focusedTool for actual data. Focus on completing this tool before proceeding with other tasks.
+ </instructions>\`
+          } }}`,
+        },
+      ],
+    },
+  });
+
+  // New: Update Focused Tool immediately after tool execution (before context and result append)
+  const updateFocusedToolRef = builder.addNode({
+    type: 'mutate',
+    name: 'Update Focused Tool',
+    description: 'Update focusedTool in state after tool execution',
+    parameters: {
+      mutations: [
+        {
+          operation: 'replace' as const,
+          path: '/state/focusedTool',
+          value: `{{ (() => {
+            const calls = $lastOutputOf("ai_assistant")[0]?.json?.choices?.[0]?.message?.toolCalls;
+            const toolSlug = calls?.[0]?.function?.name;
+            // Update focusedTool for any tool that modifies tool state
+            const updateTools = [
+              'tool-open', 'tool-edit',
+              'tool-add-blueprint-node', 'tool-add-blueprint-edge',
+              'tool-blueprint-edit-node', 'tool-blueprint-remove-node',
+              'tool-blueprint-edit-edge', 'tool-blueprint-remove-edge'
+            ];
+            if (updateTools.includes(toolSlug)) {
+              const httpResponse = $lastOutputOf("execute_tool")[0]?.json ?? {};
+              const toolData = httpResponse.body?.data || httpResponse.body;
+              if (!toolData || !toolData.name) return state.focusedTool || null;
+              // Store complete tool details to minimize repetitive tool calls
+              return {
+                id: toolData.id,
+                name: toolData.name,
+                slug: toolData.slug,
+                description: toolData.description || '',
+                parameters: toolData.parameters || null,
+                blueprint: toolData.blueprint || null,
+                status: toolData.status || 'draft',
+                starshipId: toolData.starshipId,
+                templateId: toolData.templateId || null,
+                createdAt: toolData.createdAt,
+                updatedAt: toolData.updatedAt
+              };
+            }
+            return null;
+          })() }}`,
+        },
+      ],
+    },
+  });
+
+  // New: Post-tool check for context insertion dedicated to tool path
+  const checkFocusedToolAfterToolRef = builder.addNode({
+    type: 'conditional',
+    name: 'Check Focused Tool (After Tool)',
+    description: 'Check if a focusedTool exists to add context before appending tool result',
+    parameters: {
+      condition:
+        '{{ (() => { try { const hasFT = !!(state.focusedTool && typeof state.focusedTool === "object" && Object.keys(state.focusedTool).length > 0); if (!hasFT) return "no_context"; const msgs = Array.isArray(state.messages) ? state.messages : []; const m1 = msgs[1]; const isCtx = m1 && m1.role === "system" && typeof m1.content === "string" && m1.content.includes("<focused-tool>"); return isCtx ? "no_context" : "add_context"; } catch { return "add_context"; } })() }}',
+    },
+  });
+
+  // New: Focused Tool Context node used in post-tool path (routes to tool result)
+  const focusedToolContextAfterToolRef = builder.addNode({
+    type: 'mutate',
+    name: 'Add Focused Tool Context (After Tool)',
+    description: 'Add focused tool context before appending tool result',
+    parameters: {
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/state/messages/1',
+          value: `{{ {
+            role: 'system',
+            content: \`<focused-tool>
+ id: \${state.focusedTool.id || 'N/A'}
+ name: \${state.focusedTool.name}
+ slug: \${state.focusedTool.slug}
+ description: \${state.focusedTool.description}
+ status: \${state.focusedTool.status || 'draft'}
+ parameters: \${state.focusedTool.parameters ? 'defined' : 'null'}
+ blueprint: \${state.focusedTool.blueprint ? 'defined' : 'null'}
+ </focused-tool>
+
+ <instructions>
+ The complete tool details are now available in state.focusedTool. All tool properties (id, parameters, blueprint, etc.) are accessible without additional API calls. The tool responses only confirm success - use state.focusedTool for actual data. Focus on completing this tool before proceeding with other tasks.
+ </instructions>\`
           } }}`,
         },
       ],
@@ -243,20 +296,33 @@ The complete tool details are now available in state.focusedTool. All tool prope
   });
 
   // Connect all nodes
-  return builder
-    .addEdge(startRef, checkFocusedToolRef)
-    .addEdge(checkFocusedToolRef, focusedToolContextRef, 'add_context')
-    .addEdge(focusedToolContextRef, llmNodeRef)
-    .addEdge(checkFocusedToolRef, llmNodeRef, 'no_context')
-    .addEdge(llmNodeRef, conditionalNodeRef)
-    .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
-    .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
-    .addEdge(argsNodeRef, toolNodeRef)
-    .addEdge(toolNodeRef, toolResultNodeRef)
-    .addEdge(toolResultNodeRef, checkFocusedToolRef) // Loop back to check for focusedTool after tool execution
-    .addEdge(conditionalNodeRef, endRef, 'complete')
-    .setMetadata('generatedBy', 'Daedalus seeder')
-    .build();
+  return (
+    builder
+      // Pre-LLM: if focused tool exists already, inject context once before first LLM
+      .addEdge(startRef, checkFocusedToolRef)
+      .addEdge(checkFocusedToolRef, focusedToolContextRef, 'add_context')
+      .addEdge(focusedToolContextRef, llmNodeRef)
+      .addEdge(checkFocusedToolRef, llmNodeRef, 'no_context')
+
+      // Normal LLM loop and tool detection
+      .addEdge(llmNodeRef, conditionalNodeRef)
+      .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
+      .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
+
+      // Tool path: update focused tool -> optionally add context -> then append tool result -> back to LLM
+      .addEdge(argsNodeRef, toolNodeRef)
+      .addEdge(toolNodeRef, updateFocusedToolRef)
+      .addEdge(updateFocusedToolRef, checkFocusedToolAfterToolRef)
+      .addEdge(checkFocusedToolAfterToolRef, focusedToolContextAfterToolRef, 'add_context')
+      .addEdge(focusedToolContextAfterToolRef, toolResultNodeRef)
+      .addEdge(checkFocusedToolAfterToolRef, toolResultNodeRef, 'no_context')
+      .addEdge(toolResultNodeRef, llmNodeRef)
+
+      // Complete
+      .addEdge(conditionalNodeRef, endRef, 'complete')
+      .setMetadata('generatedBy', 'Daedalus seeder')
+      .build()
+  );
 }
 
 /**

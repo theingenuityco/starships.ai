@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintEditEdgeTool: ToolParams = {
   name: 'Edit Blueprint Edge',
-  slug: 'blueprint-edit-edge',
+  slug: 'tool-blueprint-edit-edge',
   description: `Modifies properties of an existing edge in a tool's blueprint, including conditions and connections.
 
 ## Purpose
@@ -244,7 +244,7 @@ export const toolEditBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' | '
   parameters: blueprintEditEdgeTool.parameters,
   blueprint: blueprintEditEdgeTool.blueprint,
 
-  slug: 'blueprint-edit-edge',
+  slug: 'tool-blueprint-edit-edge',
   category: 'automation',
   exampleUsage:
     '{ "toolSlug": "my-tool", "edgeRef": "edge1", "updates": { "to": "process", "condition": "{{ state.success ? \\"success\\" : \\"error\\" }}" } }',

@@ -64,6 +64,7 @@ export function LoginForm() {
     isWaitlisted: boolean
     message: string
   } | null>(null)
+  const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
@@ -100,6 +101,7 @@ export function LoginForm() {
     e.preventDefault()
     setFormError(null)
     setWaitlistStatus(null)
+    setAutoSwitchedToRegister(false)
 
     if (!loginData.email || !loginData.password) {
       setFormError('Please fill in all fields')
@@ -118,7 +120,20 @@ export function LoginForm() {
     }
 
     if (!result.success) {
-      setFormError(result.error || 'Login failed')
+      const errorMessage = result.error || 'Login failed'
+      
+      // Check if user doesn't exist - offer to switch to registration
+      if (errorMessage.includes('No account found') || errorMessage.includes('Please sign up first')) {
+        setFormError(null) // Clear error since we're handling it gracefully
+        // Pre-fill registration form with the email
+        setRegisterData(prev => ({ ...prev, email: loginData.email }))
+        // Automatically switch to registration tab
+        setActiveTab('register')
+        setAutoSwitchedToRegister(true)
+        return
+      }
+      
+      setFormError(errorMessage)
     }
   }
 
@@ -126,6 +141,7 @@ export function LoginForm() {
     e.preventDefault()
     setFormError(null)
     setWaitlistStatus(null)
+    setAutoSwitchedToRegister(false)
 
     if (!registerData.email || !registerData.password || !registerData.name) {
       setFormError('Please fill in all fields')
@@ -178,7 +194,10 @@ export function LoginForm() {
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value)
+            setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
+          }}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Sign Up</TabsTrigger>
@@ -244,6 +263,13 @@ export function LoginForm() {
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4">
+              {autoSwitchedToRegister && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <AlertDescription className="text-blue-800">
+                    No account found with that email address. Please create a new account below.
+                  </AlertDescription>
+                </Alert>
+              )}
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>

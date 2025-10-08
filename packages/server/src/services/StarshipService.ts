@@ -293,7 +293,6 @@ export class StarshipService {
       const defaultToolSlugs = [
         'tool-list',
         'tool-get',
-        'tool-open-new',
         'tool-open',
         'tool-edit',
         'tool-test',

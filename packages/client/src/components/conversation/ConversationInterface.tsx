@@ -215,9 +215,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
-            // Open builder for tool-open-new
-            if (toolName === 'tool-open-new') {
-              console.log('📂 Opening tool builder view for tool_create')
+            // Open builder for tool-open (create or open)
+            if (toolName === 'tool-open') {
+              console.log('📂 Opening tool builder view for tool_open')
               toolBuilderViewRef.current?.resetForm()
               // Mark that this transition was triggered by streaming
               wasOpenedByStreamingRef.current = true
@@ -372,7 +372,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (!lastAssistant || !(lastAssistant as any).toolCalls) return
 
     const toolCalls = (lastAssistant as any).toolCalls || []
-    const toolCreateCall = toolCalls.find((tc: any) => tc?.function?.name === 'tool-open-new')
+    const toolCreateCall = toolCalls.find((tc: any) => tc?.function?.name === 'tool-open')
 
     if (toolCreateCall && toolCreateCall.function?.arguments) {
       const args: any = toolCreateCall.function.arguments

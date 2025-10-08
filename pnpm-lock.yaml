@@ -11,10 +11,6 @@ overrides:
 importers:
 
   .:
-    dependencies:
-      googleapis:
-        specifier: ^161.0.0
-        version: 161.0.0
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.3.1

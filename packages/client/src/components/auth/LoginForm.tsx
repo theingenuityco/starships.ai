@@ -41,7 +41,10 @@ export function LoginForm() {
 
   // OAuth initiation function - connects directly to backend
   const initiateOAuth = (provider: 'google' | 'github') => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    if (!apiBaseUrl) {
+      throw new Error('NEXT_PUBLIC_API_URL environment variable is required for OAuth')
+    }
     window.location.href = `${apiBaseUrl}/api/v1/auth/${provider}`
   }
 

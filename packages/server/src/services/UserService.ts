@@ -89,8 +89,8 @@ export class UserService {
    */
   async createUserWithPassword(request: CreateUserWithPasswordRequest): Promise<UserModel> {
     // Business validation: Password strength
-    if (request.password.length < 6) {
-      throw new ValidationError('Password must be at least 6 characters long', 'password');
+    if (request.password.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long', 'password');
     }
 
     // Business validation: Email uniqueness
@@ -501,7 +501,7 @@ export class UserService {
     const env = getEnvConfig();
     
     try {
-      const redirectUri = `${process.env.NODE_ENV === 'production' ? env.SERVER_URL : 'http://localhost:4000'}/api/v1/auth/google/callback`;
+      const redirectUri = `${env.SERVER_URL}/api/v1/auth/google/callback`;
       
       // Create OAuth2 client
       const oauth2Client = new google.auth.OAuth2(
@@ -547,7 +547,7 @@ export class UserService {
     
     try {
       // Step 1: Construct redirect URI (same pattern as Google)
-      const redirectUri = `${process.env.NODE_ENV === 'production' ? env.SERVER_URL : 'http://localhost:4000'}/api/v1/auth/github/callback`;
+      const redirectUri = `${env.SERVER_URL}/api/v1/auth/github/callback`;
       
       // Step 2: Exchange authorization code for access token
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {

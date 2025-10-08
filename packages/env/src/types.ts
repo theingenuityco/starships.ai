@@ -40,8 +40,6 @@ export interface EnvironmentConfig {
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
 
-  // OAuth Configuration
-  OAUTH_REDIRECT_BASE_URL?: string;
 
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;

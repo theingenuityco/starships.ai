@@ -59,7 +59,7 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

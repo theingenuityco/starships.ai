@@ -415,7 +415,7 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     // SECURITY: Block direct linking attempts without proper authentication
     if (isLinking) {
       // Return error for unauthenticated linking attempts
-      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=unauthorized_linking`);
+      return res.redirect(`${env.CLIENT_URL}/profile?oauth_link=error&message=unauthorized_linking`);
     }
     
     const state = await generateOAuthState(isLinking);
@@ -465,13 +465,13 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
 
     // Handle OAuth provider errors
     if (oauthError) {
-      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_error=provider_error`);
+      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=provider_error`);
     }
 
     // Validate state parameter (CSRF protection)
     const stateValidation = await validateOAuthState(state);
     if (!stateValidation.valid) {
-      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_error=invalid_state`);
+      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=invalid_state`);
     }
 
     const { isLinking, userId } = stateValidation;
@@ -480,7 +480,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     if (isLinking) {
       // SECURITY: Verify userId is present in linking state
       if (!userId) {
-        return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=invalid_state`);
+        return res.redirect(`${env.CLIENT_URL}/profile?oauth_link=error&message=invalid_state`);
       }
       
       // Implement actual account linking logic
@@ -497,7 +497,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           provider
         });
         
-        return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=success&provider=${provider}`);
+        return res.redirect(`${env.CLIENT_URL}/profile?oauth_link=success&provider=${provider}`);
       } catch (error: any) {
         logger.error('[OAUTH-LINKING] Failed to link account', { 
           userId, 
@@ -505,7 +505,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           errorType: error.constructor.name
         });
         
-        return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/profile?oauth_link=error&message=linking_failed`);
+        return res.redirect(`${env.CLIENT_URL}/profile?oauth_link=error&message=linking_failed`);
       }
     }
 
@@ -514,7 +514,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     const result = await UserService.createUserFromOAuth(provider, code);
 
     if (result.waitlisted) {
-      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_waitlist=pending`);
+      return res.redirect(`${env.CLIENT_URL}/login?oauth_waitlist=pending`);
     }
 
     // ADD THIS SECURITY FIX:
@@ -523,14 +523,14 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     const currentStatus = await waitlistService.getDetailedStatus(result.user.email!);
 
     if (currentStatus.status === 'pending') {
-      return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_waitlist=pending`);
+      return res.redirect(`${env.CLIENT_URL}/login?oauth_waitlist=pending`);
     }
 
     // ✅ SECURITY FIX: Generate secure authorization code instead of JWT token
     const authCode = await generateAuthCode(result.user.id, result.user.email!);
 
     // Redirect with secure authorization code (short-lived, single-use)
-    return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?auth_code=${authCode}`);
+    return res.redirect(`${env.CLIENT_URL}/login?auth_code=${authCode}`);
   } catch (error: any) {
     logger.error('[AUTH] OAuth callback error:', {
       provider: req.params.provider,
@@ -540,7 +540,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       hasState: !!req.query.state,
     });
 
-    return res.redirect(`${env.OAUTH_REDIRECT_BASE_URL}/login?oauth_error=callback_failed`);
+    return res.redirect(`${env.CLIENT_URL}/login?oauth_error=callback_failed`);
   }
 });
 

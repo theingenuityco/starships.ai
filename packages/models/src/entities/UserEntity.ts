@@ -128,7 +128,7 @@ export class UserEntity implements UserModel {
   @Expose()
   @IsOptional()
   @IsString()
-  @Length(6, 255) // Minimum password length for security
+  @Length(8, 255) // Minimum password length for security
   password?: string;
 
   @Expose()
@@ -322,8 +322,8 @@ export class UserEntity implements UserModel {
     const issues: string[] = [];
     let score = 0;
 
-    if (password.length < 6) {
-      issues.push('Password must be at least 6 characters long');
+    if (password.length < 8) {
+      issues.push('Password must be at least 8 characters long');
     } else if (password.length >= 8) {
       score += 2;
     } else {

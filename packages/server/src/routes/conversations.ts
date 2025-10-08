@@ -1,10 +1,12 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { ConversationService } from '@/services/ConversationService';
 import { StreamingService } from '@/services/StreamingService';
+import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
+import { WalletService } from '@/services/WalletService';
 
 const router: Router = Router();
 
@@ -169,8 +171,52 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { conversationId } = paramValidation;
     const { content } = bodyValidation;
 
-    // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
+    // Preflight billing gate: block when wallet balance is <= 0
     const conversationService = new ConversationService();
+
+    // Verify conversation exists
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+
+    // Resolve starship and wallet, then enforce non-zero balance
+    const starship = await conversationService.getConversationStarship(conversationId);
+    if (!starship) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found for conversation', 404, {
+        resource: 'starship',
+        conversationId,
+      });
+      return;
+    }
+
+    const walletService = new WalletService();
+    const wallet = await walletService.getByStarshipId(starship.id);
+
+    if (!wallet) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
+        starshipId: starship.id,
+      });
+      return;
+    }
+
+    // Use centralized balance validation service with $0.05 threshold
+    const balanceValidation = BalanceValidationService.validateBalance({
+      id: wallet.id,
+      balance: wallet.balance,
+    });
+
+    if (!balanceValidation.isValid) {
+      const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
+      sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
+      return;
+    }
+
+    // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
     conversationService
       .addConversationMessage(
         {

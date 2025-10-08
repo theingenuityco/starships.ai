@@ -5,16 +5,7 @@
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import {
-  AgentRepository,
-  createConnection,
-  migrationRunner,
-  seedToolTemplates,
-  seedAgentTemplates,
-  seedWaitlist,
-  StarshipRepository,
-  UserRepository,
-} from '@starships/models';
+import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates, seedWaitlist } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -29,9 +20,13 @@ import environmentRoutes from '@/routes/environment';
 import messageRoutes from '@/routes/messages';
 import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
+import walletRoutes from '@/routes/wallets';
+import topupRoutes from '@/routes/topups';
 import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
+import webhooksRoutes from '@/routes/webhooks';
+import ledgerRoutes from '@/routes/ledger';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -68,15 +63,16 @@ const dbConnection = createConnection({
   database: config.POSTGRES_DATABASE,
   ssl: config.POSTGRES_SSL,
 });
-// Aether Core repositories
-const starshipRepository = new StarshipRepository();
+
 // Middleware - Order is important!
 app.use(cors());
+// Add request ID early
+app.use(requestIdMiddleware);
+// Mount Stripe webhooks BEFORE JSON parser to preserve raw body for signature verification
+app.use('/api/v1', webhooksRoutes);
+// Parse JSON for all other routes
 app.use(express.json());
 app.use(cookieParser());
-
-// Add error handling middleware
-app.use(requestIdMiddleware);
 
 // Starship routes are now self-contained with internal service instantiation
 
@@ -91,8 +87,11 @@ app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
+app.use('/api/v1', walletRoutes);
+app.use('/api/v1', topupRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
+app.use('/api/v1', ledgerRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

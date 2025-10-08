@@ -133,8 +133,8 @@ function createDaedalusBlueprint(): Blueprint {
             const toolModifyOps = [
               'tool-open', 'tool-edit',
               'tool-add-blueprint-node', 'tool-add-blueprint-edge',
-              'blueprint-edit-node', 'blueprint-remove-node',
-              'blueprint-edit-edge', 'blueprint-remove-edge'
+              'tool-blueprint-edit-node', 'tool-blueprint-remove-node',
+              'tool-blueprint-edit-edge', 'tool-blueprint-remove-edge'
             ];
             
             let content;
@@ -169,8 +169,8 @@ function createDaedalusBlueprint(): Blueprint {
             const updateTools = [
               'tool-open', 'tool-edit',
               'tool-add-blueprint-node', 'tool-add-blueprint-edge',
-              'blueprint-edit-node', 'blueprint-remove-node',
-              'blueprint-edit-edge', 'blueprint-remove-edge'
+              'tool-blueprint-edit-node', 'tool-blueprint-remove-node',
+              'tool-blueprint-edit-edge', 'tool-blueprint-remove-edge'
             ];
             if (updateTools.includes(toolSlug)) {
               const httpResponse = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
@@ -270,7 +270,7 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open Tool, tool_get, tool_test, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-edit-blueprint-node, tool-remove-blueprint-node, tool-edit-blueprint-edge, tool-remove-blueprint-edge).
+Design tools collaboratively using the available toolset (tool_list, blueprint_lint, Open Tool, tool_get, tool_test, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-blueprint-edit-node, tool-blueprint-remove-node, tool-blueprint-edit-edge, tool-blueprint-remove-edge).
 
 Workflow:
 1. Use "Open Tool" (with name and slug) to scaffold a draft (optional description)
@@ -378,10 +378,10 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'blueprint-examples',
     'tool-add-blueprint-node',
     'tool-add-blueprint-edge',
-    'blueprint-edit-node',
-    'blueprint-remove-node',
-    'blueprint-edit-edge',
-    'blueprint-remove-edge',
+    'tool-blueprint-edit-node',
+    'tool-blueprint-remove-node',
+    'tool-blueprint-edit-edge',
+    'tool-blueprint-remove-edge',
   ],
 
   icon: '🛠️',

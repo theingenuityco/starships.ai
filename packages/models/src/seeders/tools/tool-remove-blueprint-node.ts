@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintRemoveNodeTool: ToolParams = {
   name: 'Remove Blueprint Node',
-  slug: 'blueprint-remove-node',
+  slug: 'tool-blueprint-remove-node',
   description: `Removes a node from a tool's blueprint and automatically cleans up all edges connected to it.
 
 ## Purpose
@@ -228,7 +228,7 @@ export const toolRemoveBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' |
   parameters: blueprintRemoveNodeTool.parameters,
   blueprint: blueprintRemoveNodeTool.blueprint,
 
-  slug: 'blueprint-remove-node',
+  slug: 'tool-blueprint-remove-node',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "nodeRef": "old_node" }',
   requiresApiKey: false,

@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintRemoveEdgeTool: ToolParams = {
   name: 'Remove Blueprint Edge',
-  slug: 'blueprint-remove-edge',
+  slug: 'tool-blueprint-remove-edge',
   description: `Removes an edge from a tool's blueprint while maintaining node integrity.
 
 ## Purpose
@@ -186,7 +186,7 @@ export const toolRemoveBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' |
   parameters: blueprintRemoveEdgeTool.parameters,
   blueprint: blueprintRemoveEdgeTool.blueprint,
 
-  slug: 'blueprint-remove-edge',
+  slug: 'tool-blueprint-remove-edge',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "edgeRef": "old_edge" }',
   requiresApiKey: false,

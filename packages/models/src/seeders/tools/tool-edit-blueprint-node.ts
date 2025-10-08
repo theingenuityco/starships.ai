@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintEditNodeTool: ToolParams = {
   name: 'Edit Blueprint Node',
-  slug: 'blueprint-edit-node',
+  slug: 'tool-blueprint-edit-node',
   description: `Modifies properties of an existing node in a tool's blueprint with validation and structural integrity checks.
 
 ## Purpose
@@ -247,7 +247,7 @@ export const toolEditBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' | '
   parameters: blueprintEditNodeTool.parameters,
   blueprint: blueprintEditNodeTool.blueprint,
 
-  slug: 'blueprint-edit-node',
+  slug: 'tool-blueprint-edit-node',
   category: 'automation',
   exampleUsage:
     '{ "toolSlug": "my-tool", "nodeRef": "process", "updates": { "name": "Process Data", "description": "Transform input data" } }',

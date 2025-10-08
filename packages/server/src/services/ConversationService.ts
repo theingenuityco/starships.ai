@@ -911,11 +911,20 @@ export class ConversationService {
 
                 // Broadcast via SSE if streaming is active
                 if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                  await this.streamingService.broadcastDelta(conversationId, {
-                    op: 'add',
-                    path: '/messages/-',
-                    value: persistedMsg,
-                  });
+                  if (role === 'assistant') {
+                    // Replace the streaming placeholder with the persisted assistant message
+                    await this.streamingService.broadcastDelta(conversationId, {
+                      op: 'replace',
+                      path: '/messages/-1',
+                      value: persistedMsg,
+                    });
+                  } else {
+                    await this.streamingService.broadcastDelta(conversationId, {
+                      op: 'add',
+                      path: '/messages/-',
+                      value: persistedMsg,
+                    });
+                  }
                 }
 
                 console.log(`[STREAMING] ✅ Persisted state message: ${role} at index ${i} (${persistedMsg.id})`);
@@ -950,9 +959,7 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
-        // console.log('Execution >>>', JSON.stringify(event.data?.execution, null, 2));
-        // Just before emitting "complete", finalize the assistant placeholder so UIs see the finished state
-        // (but not earlier to avoid client prematurely closing the SSE on streaming=false).
+        // Ensure the active assistant streaming shell is finalized before emitting 'complete'
         if (this.streamingService && this.streamingService.isActive(conversationId)) {
           try {
             await this.streamingService.broadcastDelta(conversationId, {
@@ -960,20 +967,19 @@ export class ConversationService {
               path: '/messages/-1/streaming',
               value: false,
             });
-          } catch (_) {
-            // ignore
+            // Let the streaming=false patch flush before 'complete'
+            await new Promise<void>((resolve) => {
+              if (typeof setImmediate !== 'undefined') {
+                setImmediate(resolve);
+              } else {
+                setTimeout(resolve, 0);
+              }
+            });
+          } catch {
+            // non-fatal
           }
 
-          // Yield a tick to allow the streaming=false patch to flush before emitting 'complete'
-          await new Promise<void>((resolve) => {
-            if (typeof setImmediate !== 'undefined') {
-              setImmediate(resolve);
-            } else {
-              setTimeout(resolve, 0);
-            }
-          });
-
-          // Now emit stream completion for the entire workflow (top-level only)
+          // Emit stream completion for the entire workflow (top-level only)
           await this.streamingService.broadcastComplete(conversationId, {
             source: 'agent',
             content: 'Workflow completed',

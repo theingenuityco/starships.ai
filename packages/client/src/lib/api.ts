@@ -611,25 +611,6 @@ export const templateAPI = {
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
 
-// MCP Server API response types
-interface MCPServersResponse {
-  mcpServers: MCPServerOption[]
-}
-
-interface StarshipConnectorsResponse {
-  starshipId: string
-  connectedConnectors: MCPServerOption[]
-}
-
-// NEW: Connector Instance API response types
-interface ConnectorInstancesResponse {
-  starshipId: string
-  connectorInstances: MCPServerConnector[]
-}
-
-interface CreateConnectorInstanceResponse {
-  connectorInstance: MCPServerConnector
-}
 
 // Deprecated: MCP Server API functionality has been removed
 export const mcpServerAPI = {
@@ -670,7 +651,7 @@ export const mcpServerAPI = {
   },
 
   // Create connector instance - DEPRECATED
-  createConnectorInstance: async (starshipId: string, templateId: string, env?: string): Promise<MCPServerConnector> => {
+  createConnectorInstance: async (starshipId: string, templateId: string, _env?: string): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Connector instance creation has been removed:', {
       starshipId,
       templateId,
@@ -688,7 +669,7 @@ export const mcpServerAPI = {
   },
 
   // Update connector configuration - DEPRECATED
-  updateConnectorConfig: async (starshipId: string, connectorId: string, config: ConnectorInstanceConfig): Promise<MCPServerConnector> => {
+  updateConnectorConfig: async (starshipId: string, connectorId: string, _config: ConnectorInstanceConfig): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Connector configuration update has been removed:', {
       starshipId,
       connectorId,
@@ -757,10 +738,6 @@ export const userAPI = {
   getById: (id: string): Promise<SyncedUser> => api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
 
-// Utility function for generating client-side IDs
-function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36)
-}
 
 // Starship API functions for compatibility
 export const starshipAPI = {

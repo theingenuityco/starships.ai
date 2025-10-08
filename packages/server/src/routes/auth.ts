@@ -8,22 +8,18 @@ import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { WaitlistService } from '@/services/WaitlistService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { getEnvConfig } from '@starships/env';
 import { getConnection, StarshipRepository, WaitlistRepository } from '@starships/models';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { jwtVerify, SignJWT } from 'jose';
 import { z, ZodError } from 'zod';
 import { logger } from '@/utils/logger';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 
 const router: Router = Router();
 const env = getEnvConfig();
-
-// JWT configuration
-const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET);
-const JWT_ISSUER = 'starships.ai';
-const JWT_AUDIENCE = 'starships-users';
 
 // Initialize waitlist service
 const initWaitlistService = () => {
@@ -41,6 +37,23 @@ const RegisterSchema = z.object({
 const LoginSchema = z.object({
   email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
   password: z.string().min(1, 'Password is required').max(255, 'Password must be less than 255 characters'),
+});
+
+// Zod schemas for OAuth validation
+const OAuthProviderSchema = z.enum(['google', 'github']);
+const OAuthCallbackSchema = z.object({
+  code: z.string().min(1, 'Authorization code is required'),
+  state: z.string().min(1, 'State parameter is required'),
+  error: z.string().optional(),
+});
+
+// Zod schema for setting password
+const SetPasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 // Helper function for Zod validation
@@ -149,17 +162,11 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     }
 
     // Generate JWT token only for approved users
-    const token = await new SignJWT({
-      sub: user.id,
+    const token = await generateJWT({
+      id: user.id,
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
-    })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer(JWT_ISSUER)
-      .setAudience(JWT_AUDIENCE)
-      .setExpirationTime('7d')
-      .setIssuedAt()
-      .sign(JWT_SECRET);
+    });
 
     sendSuccess(
       res,
@@ -297,17 +304,11 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     }
 
     // Generate JWT token
-    const token = await new SignJWT({
-      sub: user.id,
+    const token = await generateJWT({
+      id: user.id,
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
-    })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer(JWT_ISSUER)
-      .setAudience(JWT_AUDIENCE)
-      .setExpirationTime('7d')
-      .setIssuedAt()
-      .sign(JWT_SECRET);
+    });
 
     sendSuccess(res, {
       user: {
@@ -347,10 +348,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
     const token = authHeader.replace('Bearer ', '');
 
     // Verify JWT token
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    });
+    const { payload } = await verifyJWT(token);
 
     // Get user from database
     const user = await UserService.getUserById(payload.sub as string);
@@ -364,6 +362,9 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
       avatar: user.avatar,
+      hasPassword: user.hasPassword || false,
+      authMethods: user.authMethods || [],
+      primaryAuthMethod: user.primaryAuthMethod || 'password'
     });
   } catch (error: any) {
     console.error('[AUTH] Me endpoint error:', error);
@@ -389,6 +390,402 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
   // With JWT, logout is primarily handled client-side by removing the token
   // Server-side logout would require a token blacklist, which adds complexity
   sendSuccess(res, { message: 'Logged out successfully' });
+});
+
+// ============================================================================
+// OAUTH ROUTES
+// ============================================================================
+
+/**
+ * OAuth initiation routes with Zod validation
+ * GET /auth/:provider
+ */
+router.get('/auth/:provider', async (req: Request, res: Response) => {
+  try {
+    // Validate provider parameter
+    const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
+    if (!paramValidation) return;
+
+    const { provider } = paramValidation;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
+    
+    // Check if this is a linking request (user already logged in)
+    const isLinking = req.query.link === 'true';
+    
+    // SECURITY: Block direct linking attempts without proper authentication
+    if (isLinking) {
+      // Return error for unauthenticated linking attempts
+      return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=unauthorized_linking`);
+    }
+    
+    const state = await generateOAuthState(isLinking);
+
+    let authUrl: string;
+    if (provider === 'google') {
+      const scope = 'openid email profile';
+      authUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${env.GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    } else {
+      const scope = 'user:email';
+      authUrl =
+        `https://github.com/login/oauth/authorize?` +
+        `client_id=${env.GITHUB_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    }
+
+    res.redirect(authUrl);
+  } catch (error: any) {
+    handleError(error, res, 'OAuth initiation');
+  }
+});
+
+/**
+ * OAuth callback routes with proper validation
+ * GET /auth/:provider/callback
+ */
+router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
+  try {
+    // Validate provider parameter
+    const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
+    if (!paramValidation) return;
+
+    // Validate query parameters
+    const queryValidation = validateData(OAuthCallbackSchema, req.query, res, 'OAuth callback');
+    if (!queryValidation) return;
+
+    const { provider } = paramValidation;
+    const { code, state, error: oauthError } = queryValidation;
+
+    // Handle OAuth provider errors
+    if (oauthError) {
+      return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=provider_error`);
+    }
+
+    // Validate state parameter (CSRF protection)
+    const stateValidation = await validateOAuthState(state);
+    if (!stateValidation.valid) {
+      return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=invalid_state`);
+    }
+
+    const { isLinking, userId } = stateValidation;
+
+    // If this is account linking, handle differently
+    if (isLinking) {
+      // SECURITY: Verify userId is present in linking state
+      if (!userId) {
+        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=invalid_state`);
+      }
+      
+      // Implement actual account linking logic
+      try {
+        // Get OAuth profile from provider using the authorization code
+        const userService = new UserService();
+        const profile = await userService.getOAuthProfile(provider, code);
+        
+        // Link the OAuth account to the existing authenticated user
+        await userService.linkOAuthAccount(userId, profile);
+        
+        logger.info('[OAUTH-LINKING] Successfully linked account', { 
+          userId, 
+          provider
+        });
+        
+        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=success&provider=${provider}`);
+      } catch (error: any) {
+        logger.error('[OAUTH-LINKING] Failed to link account', { 
+          userId, 
+          provider,
+          errorType: error.constructor.name
+        });
+        
+        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=linking_failed`);
+      }
+    }
+
+    // Regular OAuth flow for new user registration
+    // Delegate to service layer (Layer 4)
+    const result = await UserService.createUserFromOAuth(provider, code);
+
+    if (result.waitlisted) {
+      return res.redirect(`${env.PUBLIC_URL}/login?oauth_waitlist=pending`);
+    }
+
+    // ADD THIS SECURITY FIX:
+    // Re-check waitlist status immediately before token generation
+    const waitlistService = initWaitlistService();
+    const currentStatus = await waitlistService.getDetailedStatus(result.user.email!);
+
+    if (currentStatus.status === 'pending') {
+      return res.redirect(`${env.PUBLIC_URL}/login?oauth_waitlist=pending`);
+    }
+
+    // ✅ SECURITY FIX: Generate secure authorization code instead of JWT token
+    const authCode = await generateAuthCode(result.user.id, result.user.email!);
+
+    // Redirect with secure authorization code (short-lived, single-use)
+    return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}`);
+  } catch (error: any) {
+    logger.error('[AUTH] OAuth callback error:', {
+      provider: req.params.provider,
+      error: error.message,
+      stack: error.stack,
+      hasCode: !!req.query.code,
+      hasState: !!req.query.state,
+    });
+
+    return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=callback_failed`);
+  }
+});
+
+/**
+ * Get user's linked OAuth accounts
+ * GET /auth/oauth/accounts
+ */
+router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user!.id;
+
+    // Delegate to service layer (Layer 4)
+    const userService = new UserService();
+    const accounts = await userService.getUserOAuthAccounts(userId);
+
+    sendSuccess(res, {
+      accounts: accounts.map((account) => ({
+        provider: account.provider,
+        email: account.email,
+        profileData: account.profileData,
+        linkedAt: account.createdAt,
+      })),
+    });
+  } catch (error: any) {
+    handleError(error, res, 'get OAuth accounts');
+  }
+});
+
+/**
+ * Unlink OAuth account
+ * DELETE /auth/oauth/unlink/:provider
+ */
+router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    // Validate provider parameter
+    const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
+    if (!paramValidation) return;
+
+    const userId = (req as any).user!.id;
+    const { provider } = paramValidation;
+
+    // Delegate to service layer (Layer 4) - includes business rule validation
+    const userService = new UserService();
+    await userService.unlinkOAuthAccount(userId, provider);
+
+    sendSuccess(res, { message: `${provider} account unlinked successfully` });
+  } catch (error: any) {
+    handleError(error, res, 'unlink OAuth account');
+  }
+});
+
+/**
+ * Set password for OAuth-only users
+ * POST /auth/set-password
+ */
+router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    // Validate request body
+    const validation = validateData(SetPasswordSchema, req.body, res, 'set password');
+    if (!validation) return;
+
+    const userId = (req as any).user!.id;
+    if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+
+    // Delegate to service layer
+    const userService = new UserService();
+    const user = await userService.setPasswordForOAuthUser(userId, validation);
+
+    sendSuccess(res, { user, message: 'Password set successfully' });
+  } catch (error: any) {
+    handleError(res, error, 'Setting password failed');
+  }
+});
+
+/**
+ * Get user authentication methods
+ * GET /auth/methods
+ */
+router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user!.id;
+    if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+
+    // Delegate to service layer
+    const userService = new UserService();
+    const user = await userService.getUserById(userId);
+
+    if (!user) return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
+
+    sendSuccess(res, {
+      hasPassword: user.hasPassword || false,
+      authMethods: user.authMethods || [],
+      primaryAuthMethod: user.primaryAuthMethod || 'password'
+    });
+  } catch (error: any) {
+    handleError(res, error, 'Getting auth methods failed');
+  }
+});
+
+/**
+ * Exchange OAuth authorization code for JWT token (SECURE)
+ * POST /auth/oauth/exchange
+ */
+router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
+  try {
+    const { authCode } = req.body;
+    
+    if (!authCode) {
+      return sendError(res, 'VALIDATION_ERROR', 'Authorization code is required', 400);
+    }
+    
+    // Validate and consume the authorization code (one-time use)
+    logger.info('[OAUTH-EXCHANGE] Attempting to validate auth code');
+    const codeData = await validateAndConsumeAuthCode(authCode);
+    
+    if (!codeData) {
+      logger.error('[OAUTH-EXCHANGE] Auth code validation failed - likely already consumed or expired');
+      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code. Please try logging in again.', 400);
+    }
+    
+    logger.info('[OAUTH-EXCHANGE] Auth code validated successfully', { userId: codeData.userId });
+    
+    // Get full user data
+    const user = await UserService.getUserById(codeData.userId);
+    if (!user) {
+      return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
+    }
+    
+    // Re-check waitlist status for security (prevent timing attacks)
+    const waitlistService = initWaitlistService();
+    const currentStatus = await waitlistService.getDetailedStatus(user.email!);
+    
+    if (currentStatus.status === 'pending') {
+      return sendError(res, 'ACCESS_DENIED', 'User is still on waitlist', 403);
+    }
+    
+    // Generate JWT token (returned in response body, NOT URL)
+    const token = await generateJWT({
+      id: user.id,
+      email: user.email,
+      name: user.displayName || user.email?.split('@')[0],
+    });
+    
+    // Get user's first starship for redirect
+    let firstStarship = null;
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(user.id);
+      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+    } catch (error) {
+      console.error(`[OAUTH-EXCHANGE] Failed to fetch starships for user ${user.id}:`, error);
+    }
+    
+    // Return secure response with JWT in body
+    sendSuccess(res, {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.displayName || user.email?.split('@')[0],
+        avatar: user.avatar,
+        hasPassword: user.hasPassword || false,
+        authMethods: user.authMethods || [],
+        primaryAuthMethod: user.primaryAuthMethod || 'oauth'
+      },
+      token,
+      starship: firstStarship ? {
+        id: firstStarship.id,
+        slug: firstStarship.slug,
+        name: firstStarship.name,
+      } : null,
+    });
+  } catch (error: any) {
+    logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {
+      error: error.message,
+      stack: error.stack,
+    });
+    
+    return sendError(res, 'INTERNAL_SERVER_ERROR', 'Token exchange failed', 500);
+  }
+});
+
+/**
+ * Initialize auth methods for existing users (migration helper)
+ * POST /auth/init-methods
+ */
+router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user!.id;
+    if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+
+    // Delegate to service layer
+    const userService = new UserService();
+    const user = await userService.initializeUserAuthMethods(userId);
+
+    sendSuccess(res, { 
+      user,
+      message: 'Authentication methods initialized successfully'
+    });
+  } catch (error: any) {
+    handleError(res, error, 'Initializing auth methods failed');
+  }
+});
+
+/**
+ * Secure OAuth account linking initiation (authenticated endpoint)
+ * POST /auth/oauth/link/:provider
+ */
+router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    // Validate provider parameter
+    const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
+    if (!paramValidation) return;
+
+    const { provider } = paramValidation;
+    const userId = (req as any).user!.id;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
+    
+    // Generate secure state with authenticated user ID
+    const state = await generateOAuthState(true, userId);
+
+    let authUrl: string;
+    if (provider === 'google') {
+      const scope = 'openid email profile';
+      authUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${env.GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    } else {
+      const scope = 'user:email';
+      authUrl =
+        `https://github.com/login/oauth/authorize?` +
+        `client_id=${env.GITHUB_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `state=${state}`;
+    }
+
+    // Return the OAuth URL instead of redirecting
+    sendSuccess(res, { authUrl });
+  } catch (error: any) {
+    handleError(error, res, 'OAuth linking initiation');
+  }
 });
 
 export default router;

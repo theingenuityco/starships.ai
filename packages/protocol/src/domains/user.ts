@@ -9,6 +9,11 @@
 // ============================================================================
 
 /**
+ * Authentication method types
+ */
+export type AuthMethod = 'password' | 'google' | 'github';
+
+/**
  * Core user entity
  */
 export interface UserModel {
@@ -17,7 +22,16 @@ export interface UserModel {
   displayName?: string;
   avatar?: string;
   password?: string; // For local authentication
+  emailVerified?: boolean; // OAuth email verification
   createdAt: string;
+
+  // Stripe integration
+  stripeCustomerId?: string;
+
+  // Authentication method tracking
+  hasPassword: boolean;           // Does user have password auth?
+  authMethods: AuthMethod[];      // List of auth methods
+  primaryAuthMethod: 'password' | 'oauth'; // Primary login method
 }
 
 // ============================================================================
@@ -32,6 +46,8 @@ export interface CreateUserRequest {
   displayName?: string;
   avatar?: string;
   password?: string;
+  emailVerified?: boolean;
+  stripeCustomerId?: string;
 }
 
 /**
@@ -41,6 +57,19 @@ export interface UpdateUserRequest {
   email?: string;
   displayName?: string;
   avatar?: string;
+  emailVerified?: boolean;
+  stripeCustomerId?: string;
+  hasPassword?: boolean;
+  authMethods?: AuthMethod[];
+  primaryAuthMethod?: 'password' | 'oauth';
+}
+
+/**
+ * Request to set password for OAuth-only users
+ */
+export interface SetPasswordRequest {
+  newPassword: string;
+  confirmPassword: string;
 }
 
 /**

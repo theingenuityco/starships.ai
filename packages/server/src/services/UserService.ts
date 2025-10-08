@@ -6,9 +6,14 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { UserRepository } from '@starships/models';
-import type { CreateUserRequest, UpdateUserRequest, UserModel } from '@starships/protocol';
+import { OAuthAccountRepository, UserRepository } from '@starships/models';
+import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest, AuthMethod } from '@starships/protocol';
+import { WaitlistService } from '@/services/WaitlistService';
+import { WaitlistRepository } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
+import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
+import { StarshipService } from '@/services/StarshipService';
 
 export interface UserOptions {
   includePassword?: boolean;
@@ -37,9 +42,11 @@ export interface UpdateUserProfileRequest extends UpdateUserRequest {
  */
 export class UserService {
   private userRepository: UserRepository;
+  private oauthRepository: OAuthAccountRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
+    this.oauthRepository = new OAuthAccountRepository();
   }
 
   // ============================================================================
@@ -58,7 +65,20 @@ export class UserService {
       }
     }
 
-    const user = await this.userRepository.create(request);
+    // Transform CreateUserRequest to UserModel format with required fields
+    const userData: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'> = {
+      email: request.email,
+      displayName: request.displayName,
+      avatar: request.avatar,
+      password: request.password,
+      emailVerified: request.emailVerified || false,
+      stripeCustomerId: request.stripeCustomerId,
+      hasPassword: !!request.password,
+      authMethods: request.password ? ['password' as AuthMethod] : [],
+      primaryAuthMethod: request.password ? 'password' : 'oauth'
+    };
+
+    const user = await this.userRepository.create(userData);
     return user;
   }
 
@@ -67,8 +87,8 @@ export class UserService {
    */
   async createUserWithPassword(request: CreateUserWithPasswordRequest): Promise<UserModel> {
     // Business validation: Password strength
-    if (request.password.length < 6) {
-      throw new ValidationError('Password must be at least 6 characters long', 'password');
+    if (request.password.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long', 'password');
     }
 
     // Business validation: Email uniqueness
@@ -246,6 +266,457 @@ export class UserService {
   }
 
   // ============================================================================
+  // OAUTH BUSINESS LOGIC
+  // ============================================================================
+
+  /**
+   * Create or link user from OAuth profile
+   * CRITICAL: NO LAYER JUMPING - Uses proper service methods only
+   */
+  async createUserFromOAuth(provider: string, authCode: string): Promise<{
+    user: UserModel;
+    waitlisted?: boolean;
+    status?: 'pending' | 'approved';
+    message?: string;
+  }> {
+    // Get OAuth profile from provider
+    const profile = await this.getOAuthProfile(provider, authCode);
+
+    // Check waitlist status using existing service
+    const waitlistRepository = new WaitlistRepository();
+    const waitlistService = new WaitlistService(waitlistRepository);
+    const waitlistStatus = await waitlistService.getDetailedStatus(profile.email);
+
+    // Handle waitlist logic (EXISTING PATTERN)
+    if (!waitlistStatus.exists) {
+      await waitlistService.addToPendingWaitlist(profile.email);
+    }
+
+    if (waitlistStatus.status === 'pending') {
+      return {
+        user: { email: profile.email } as UserModel,
+        waitlisted: true,
+        status: 'pending',
+        message: 'Thanks for signing up! Please wait for approval to access the app.',
+      };
+    }
+
+    // Check if user exists by email (for account linking)
+    let user = await this.getUserByEmail(profile.email);
+    let isNewUser = false;
+
+    if (!user) {
+      // ✅ FIXED: Use proper service method - NO REPOSITORY JUMPING
+      user = await this.createUserFromOAuthProfile(profile);
+      isNewUser = true;
+    } else {
+      // Update email verification for existing users
+      await this.updateUserProfile(user.id, { emailVerified: true });
+    }
+
+    // Link OAuth account using business logic
+    await this.linkOAuthAccount(user.id, profile);
+
+    // Create default starship for new OAuth users (same as email/password registration)
+    if (isNewUser) {
+      try {
+        const defaultStarship = await StarshipService.createDefaultStarship(user.id);
+        
+        // Create default agent for the starship
+        if (defaultStarship) {
+          try {
+            await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
+          } catch (agentError) {
+            console.error(`[OAUTH] Failed to create default agent for user ${user.id}:`, agentError);
+            // Continue even if agent creation fails
+          }
+        }
+      } catch (starshipError) {
+        console.error(`[OAUTH] Failed to create default starship for user ${user.id}:`, starshipError);
+        // Continue even if starship creation fails - user can create one later
+      }
+    }
+
+    return { user };
+  }
+
+  /**
+   * Create user from OAuth profile - proper service method
+   * CRITICAL: Uses createUser() service method, not repository directly
+   */
+  private async createUserFromOAuthProfile(profile: OAuthProfileModel): Promise<UserModel> {
+    // Use existing service method for user creation
+    const userData: CreateUserRequest = {
+      email: profile.email,
+      displayName: profile.name,
+      avatar: profile.avatar,
+      emailVerified: true // OAuth providers verify emails
+    };
+
+    // Create user using proper service layer method
+    const user = await this.createUser(userData);
+    
+    // After creating user, update additional OAuth-specific fields that aren't in CreateUserRequest
+    await this.userRepository.update(user.id, {
+      hasPassword: false, // OAuth users start without password
+      authMethods: [profile.provider as AuthMethod],
+      primaryAuthMethod: 'oauth'
+    });
+    
+    // Return updated user
+    const updatedUser = await this.getUserById(user.id);
+    return updatedUser!;
+  }
+
+  /**
+   * Link OAuth account to existing user
+   * Business logic layer - orchestrates repository operations
+   */
+  async linkOAuthAccount(userId: string, profile: OAuthProfileModel): Promise<void> {
+    const oauthRepo = this.oauthRepository;
+
+    // SECURITY: Check if OAuth account already linked to ANY user (prevent account takeover)
+    const existing = await oauthRepo.findByProviderAndUser(profile.provider, profile.providerId);
+    if (existing) {
+      if (existing.userId === userId) {
+        return; // Already linked to this user - OK
+      } else {
+        // CRITICAL SECURITY: OAuth account belongs to different user
+        throw new ValidationError(
+          'This social media account is already linked to another user account. Please use a different account or contact support.',
+          'provider'
+        );
+      }
+    }
+
+    // Business logic: Create OAuth account link using Entity pattern
+    const oauthAccountData = {
+      userId,
+      provider: profile.provider as 'google' | 'github',
+      providerUserId: profile.providerId,
+      email: profile.email,
+      profileData: {
+        name: profile.name,
+        avatar: profile.avatar,
+      },
+    };
+    await oauthRepo.create(oauthAccountData);
+
+    // Update user's auth methods to include this OAuth provider
+    await this.updateUserAuthMethods(userId, profile.provider as 'google' | 'github');
+  }
+
+  /**
+   * Get user's linked OAuth accounts
+   * Business logic method for account management
+   */
+  async getUserOAuthAccounts(userId: string): Promise<OAuthAccountModel[]> {
+    return await this.oauthRepository.findByUserId(userId);
+  }
+
+  /**
+   * Unlink OAuth account with business rules
+   * Business logic: Ensure user has alternative authentication
+   */
+  async unlinkOAuthAccount(userId: string, provider: string): Promise<void> {
+    // Business rule: Check if user has password or other OAuth accounts
+    const user = await this.getUserById(userId);
+    const oauthAccounts = await this.getUserOAuthAccounts(userId);
+
+    if (!user?.password && oauthAccounts.length <= 1) {
+      throw new ValidationError('Cannot unlink last authentication method. Set a password first.', 'provider');
+    }
+
+    // Business operation: Remove OAuth account
+    await this.oauthRepository.deleteByProviderAndUser(provider, userId);
+  }
+
+  /**
+   * Get OAuth profile from provider
+   * Business logic for external OAuth provider integration
+   */
+  async getOAuthProfile(provider: string, authCode: string): Promise<OAuthProfileModel> {
+    if (provider === 'google') {
+      return await this.getGoogleProfile(authCode);
+    } else if (provider === 'github') {
+      return await this.getGitHubProfile(authCode);
+    } else {
+      throw new ValidationError(`Unsupported OAuth provider: ${provider}`, 'provider');
+    }
+  }
+
+  /**
+   * Get Google OAuth profile
+   */
+  private async getGoogleProfile(authCode: string): Promise<OAuthProfileModel> {
+    const env = getEnvConfig();
+    
+    try {
+      const redirectUri = `${env.SERVER_URL}/api/v1/auth/google/callback`;
+      
+      // Create OAuth2 client
+      const oauth2Client = new google.auth.OAuth2(
+        env.GOOGLE_CLIENT_ID,
+        env.GOOGLE_CLIENT_SECRET,
+        redirectUri
+      );
+
+      // Exchange authorization code for tokens
+      const { tokens } = await oauth2Client.getToken(authCode);
+      oauth2Client.setCredentials(tokens);
+
+      // Get user profile information
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const { data } = await oauth2.userinfo.get();
+
+      if (!data.email || !data.id || !data.name) {
+        throw new ValidationError('Incomplete profile data from Google', 'profile');
+      }
+
+      // Return standardized profile
+      return {
+        provider: 'google',
+        providerId: data.id,
+        email: data.email,
+        name: data.name,
+        avatar: data.picture || undefined,
+      };
+    } catch (error: any) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(`Failed to fetch Google profile: ${error.message}`, 'oauth');
+    }
+  }
+
+  /**
+   * Get GitHub OAuth profile
+   * Follows the same pattern as getGoogleProfile() for consistency
+   */
+  private async getGitHubProfile(authCode: string): Promise<OAuthProfileModel> {
+    const env = getEnvConfig();
+    
+    try {
+      // Step 1: Construct redirect URI (same pattern as Google)
+      const redirectUri = `${env.SERVER_URL}/api/v1/auth/github/callback`;
+      
+      // Step 2: Exchange authorization code for access token
+      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'starships.ai/1.0',  // Required by GitHub API
+        },
+        body: JSON.stringify({
+          client_id: env.GITHUB_CLIENT_ID,
+          client_secret: env.GITHUB_CLIENT_SECRET,
+          code: authCode,
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new ValidationError(`GitHub token exchange failed: ${tokenResponse.status}`, 'oauth');
+      }
+
+      const tokenData = await tokenResponse.json() as any;
+      
+      if (tokenData.error) {
+        throw new ValidationError(`GitHub OAuth error: ${tokenData.error_description || tokenData.error}`, 'oauth');
+      }
+
+      if (!tokenData.access_token) {
+        throw new ValidationError('GitHub did not return an access token', 'oauth');
+      }
+
+      const accessToken = tokenData.access_token;
+
+      // Step 3: Get user profile information
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,  // GitHub supports Bearer tokens
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'starships.ai/1.0',
+        },
+      });
+
+      if (!userResponse.ok) {
+        throw new ValidationError(`GitHub profile fetch failed: ${userResponse.status}`, 'oauth');
+      }
+
+      const userData = await userResponse.json() as any;
+
+      // Step 4: Get user email (might be private, requiring separate API call)
+      let primaryEmail = userData.email;
+      
+      if (!primaryEmail) {
+        const emailResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'starships.ai/1.0',
+          },
+        });
+
+        if (emailResponse.ok) {
+          const emails = await emailResponse.json() as any[];
+          const primaryEmailObj = emails.find((email: any) => email.primary && email.verified);
+          primaryEmail = primaryEmailObj?.email;
+        }
+      }
+
+      // Step 5: Validate required data (same validation as Google)
+      if (!primaryEmail || !userData.id || !userData.login) {
+        throw new ValidationError('Incomplete profile data from GitHub', 'profile');
+      }
+
+      // Step 6: Return standardized profile (same interface as Google)
+      return {
+        provider: 'github',
+        providerId: userData.id.toString(),
+        email: primaryEmail,
+        name: userData.name || userData.login,  // Fallback to username if name is null
+        avatar: userData.avatar_url || undefined,
+      };
+    } catch (error: any) {
+      // Same error handling pattern as Google implementation
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(`Failed to fetch GitHub profile: ${error.message}`, 'oauth');
+    }
+  }
+
+  // ============================================================================
+  // ENHANCED AUTH METHOD MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Set password for OAuth-only users
+   */
+  async setPasswordForOAuthUser(userId: string, request: SetPasswordRequest): Promise<UserModel> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Business rule: User must not already have a password
+    if (user.hasPassword) {
+      throw new ValidationError('User already has a password set', 'password');
+    }
+
+    // Business rule: User must have OAuth authentication
+    if (!user.authMethods || !user.authMethods.some(method => ['google', 'github'].includes(method))) {
+      throw new ValidationError('User must have OAuth authentication to set password', 'auth');
+    }
+
+    // Business validation: Password confirmation
+    if (request.newPassword !== request.confirmPassword) {
+      throw new ValidationError('Passwords do not match', 'confirmPassword');
+    }
+
+    // Business validation: Password strength
+    if (request.newPassword.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long', 'newPassword');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(request.newPassword, 10);
+
+    // Update user with password and auth methods
+    const updatedUser = await this.userRepository.update(userId, {
+      password: hashedPassword,
+      hasPassword: true,
+      authMethods: [...user.authMethods, 'password'],
+      primaryAuthMethod: 'password' // User chose to set password, make it primary
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User not found after update', 'userId');
+    }
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
+   * Update user authentication methods when linking OAuth accounts
+   */
+  async updateUserAuthMethods(userId: string, provider: 'google' | 'github'): Promise<UserModel> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Add OAuth method if not already present
+    const authMethods = user.authMethods || [];
+    if (!authMethods.includes(provider)) {
+      authMethods.push(provider);
+    }
+
+    // Update primary auth method if user doesn't have password
+    const primaryAuthMethod = user.hasPassword ? user.primaryAuthMethod : 'oauth';
+
+    const updatedUser = await this.userRepository.update(userId, {
+      authMethods,
+      primaryAuthMethod
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User not found after update', 'userId');
+    }
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
+   * Initialize auth methods for existing users (migration helper)
+   */
+  async initializeUserAuthMethods(userId: string): Promise<UserModel> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Skip if already initialized
+    if (user.authMethods && user.authMethods.length > 0) {
+      return this.transformUserForResponse(user, { includePassword: false });
+    }
+
+    // Get user's OAuth accounts
+    const oauthAccounts = await this.getUserOAuthAccounts(userId);
+    
+    // Build auth methods array
+    const authMethods: string[] = [];
+    
+    if (user.password) {
+      authMethods.push('password');
+    }
+    
+    oauthAccounts.forEach(account => {
+      if (!authMethods.includes(account.provider)) {
+        authMethods.push(account.provider);
+      }
+    });
+
+    // Determine primary auth method
+    const hasPassword = !!user.password;
+    const primaryAuthMethod = hasPassword ? 'password' : 'oauth';
+
+    const updatedUser = await this.userRepository.update(userId, {
+      hasPassword,
+      authMethods: authMethods as AuthMethod[],
+      primaryAuthMethod
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User not found after update', 'userId');
+    }
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  // ============================================================================
   // STATIC HELPER METHODS
   // ============================================================================
 
@@ -301,5 +772,18 @@ export class UserService {
   static async createUser(userData: CreateUserWithPasswordRequest): Promise<UserModel> {
     const userService = new UserService();
     return userService.createUserWithPassword(userData);
+  }
+
+  /**
+   * Static method for API routes compatibility
+   */
+  static async createUserFromOAuth(provider: string, authCode: string): Promise<{
+    user: UserModel;
+    waitlisted?: boolean;
+    status?: 'pending' | 'approved';
+    message?: string;
+  }> {
+    const userService = new UserService();
+    return userService.createUserFromOAuth(provider, authCode);
   }
 }

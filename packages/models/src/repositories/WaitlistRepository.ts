@@ -292,6 +292,10 @@ export class WaitlistRepository extends BaseRepository {
         email: 'prashant@theingenuity.co',
         notes: 'Team member - Alpha tester',
       },
+      {
+        email: 'dewangsolanki8@gmail.com',
+        notes: 'Founder - Personal email access',
+      },
     ];
 
     for (const { email, notes } of initialEmails) {

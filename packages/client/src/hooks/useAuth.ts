@@ -4,11 +4,16 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 
+export type AuthMethod = 'password' | 'google' | 'github';
+
 export interface AuthUser {
   id: string
   email: string
   name: string
   avatar?: string
+  hasPassword: boolean
+  authMethods: AuthMethod[]
+  primaryAuthMethod: 'password' | 'oauth'
 }
 
 interface AuthLoginResponse {
@@ -235,6 +240,62 @@ export function useRegister() {
   })
 }
 
+// OAuth login mutation - SECURE authorization code exchange
+export function useOAuthLogin() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  return useMutation({
+    mutationFn: async ({ authCode }: { authCode: string }) => {
+      // Exchange authorization code for JWT token via secure POST endpoint
+      const response = await fetch('/api/v1/auth/oauth/exchange', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ authCode }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error?.message || 'OAuth code exchange failed')
+      }
+
+      const data = await response.json()
+      return data.data as AuthLoginResponse
+    },
+    onSuccess: data => {
+      const { user, token, starship } = data
+
+      if (!user || !token) {
+        console.error('[AUTH] OAuth successful but missing user or token')
+        return
+      }
+
+      // Store token (same as regular login)
+      setStoredToken(token)
+
+      // Update auth user cache (same as regular login)
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+
+      // Redirect to starship's conversation if available (same as regular login)
+      if (starship) {
+        router.push(`/ship/${starship.slug}/conversations`)
+      }
+
+      // Invalidate all queries to refetch with new auth context (same as regular login)
+      queryClient.invalidateQueries()
+    },
+    onError: (error: any) => {
+      console.error('[AUTH] OAuth login error:', error)
+      const errorMessage = error.message || 'OAuth login failed'
+      toast.error('OAuth login failed', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 // Logout mutation
 export function useLogout() {
   const queryClient = useQueryClient()
@@ -283,6 +344,7 @@ export function useAuth() {
   const { data: user, isLoading, error, refetch } = useAuthUser()
   const loginMutation = useLogin()
   const registerMutation = useRegister()
+  const oauthLoginMutation = useOAuthLogin()
   const logoutMutation = useLogout()
 
   // Set up token provider for API calls on mount
@@ -337,14 +399,55 @@ export function useAuth() {
     [registerMutation]
   )
 
+  // OAuth login function - SECURE code exchange
+  const oauthLogin = useCallback(async (authCode: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await oauthLoginMutation.mutateAsync({ authCode })
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message || 'OAuth login failed' }
+    }
+  }, [oauthLoginMutation])
+
   // Logout function
   const logout = useCallback(async () => {
     await logoutMutation.mutateAsync()
   }, [logoutMutation])
 
+  // Set password function for OAuth-only users
+  const setPassword = useCallback(
+    async (newPassword: string, confirmPassword: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const token = getStoredToken()
+        if (!token) throw new Error('Not authenticated')
+
+        const response = await fetch('/api/v1/auth/set-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ newPassword, confirmPassword })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error?.message || 'Failed to set password')
+        }
+
+        // Refresh user data to get updated auth info
+        await refetch()
+        return { success: true }
+      } catch (error: any) {
+        return { success: false, error: error.message }
+      }
+    },
+    [refetch]
+  )
+
   const isAuthenticated = !!user
-  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || null
-  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending
+  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || oauthLoginMutation.error?.message || null
+  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || oauthLoginMutation.isPending || logoutMutation.isPending
 
   return {
     // Auth state
@@ -357,8 +460,16 @@ export function useAuth() {
     // Auth actions
     login,
     register,
+    oauthLogin,
     logout,
+    setPassword,
     getToken: getStoredToken, // Expose token getter
+
+    // Authentication method info
+    hasPassword: user?.hasPassword || false,
+    authMethods: user?.authMethods || [],
+    primaryAuthMethod: user?.primaryAuthMethod || 'password',
+    isOAuthOnly: user?.hasPassword === false && user?.authMethods?.some(m => ['google', 'github'].includes(m)),
 
     // Compatibility properties for existing components
     userId: syncedUser?.id || user?.id,
@@ -370,6 +481,7 @@ export function useAuth() {
     refetchUser: refetch,
     loginMutation,
     registerMutation,
+    oauthLoginMutation,
     logoutMutation,
   }
 }

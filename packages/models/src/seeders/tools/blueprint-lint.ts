@@ -44,7 +44,7 @@ Returns structured validation result:
 \`\`\`
 
 ## Usage Scenarios
-- **Pre-deployment**: Validate blueprints before tool_create or tool_update operations
+- **Pre-deployment**: Validate blueprints before tool_create or tool_edit operations
 - **Development**: Catch structural issues during blueprint authoring
 - **Quality Assurance**: Verify blueprint integrity before production deployment
 - **Debugging**: Identify connectivity and reference issues in complex workflows

@@ -6,7 +6,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * Get full tool details (including blueprint) by slug for the specified starship using server REST API
  */
 export const toolGetTool: ToolParams = {
-  name: 'tool_get',
+  name: 'Get Tool',
   slug: 'tool-get',
   description: `Get full details for a tool on the current starship by slug.
 

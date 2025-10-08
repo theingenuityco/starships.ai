@@ -204,7 +204,10 @@ function createDaedalusBlueprint(): Blueprint {
     name: 'Check Focused Tool',
     description: 'Check if a focusedTool exists to add context',
     parameters: {
-      condition: '{{ state.focusedTool && Object.keys(state.focusedTool).length > 0 ? "add_context" : "no_context" }}',
+      // Guard against duplicate context insertion:
+      // - Only add when focusedTool is present AND messages[1] is not already the focused tool context.
+      condition:
+        '{{ (() => { try { const hasFT = !!(state.focusedTool && typeof state.focusedTool === "object" && Object.keys(state.focusedTool).length > 0); if (!hasFT) return "no_context"; const msgs = Array.isArray(state.messages) ? state.messages : []; const m1 = msgs[1]; const isCtx = m1 && m1.role === "system" && typeof m1.content === "string" && m1.content.includes("<focused-tool>"); return isCtx ? "no_context" : "add_context"; } catch { return "add_context"; } })() }}',
     },
   });
 

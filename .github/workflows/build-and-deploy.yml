@@ -265,6 +265,7 @@ jobs:
             --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
             --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \
             --from-literal=PUBLIC_URL="${{ vars.PUBLIC_URL }}" \
+            --from-literal=OAUTH_REDIRECT_BASE_URL="${{ vars.OAUTH_REDIRECT_BASE_URL }}" \
             --from-literal=SERVER_PORT="${{ vars.SERVER_PORT }}" \
             --from-literal=CLIENT_PORT="${{ vars.CLIENT_PORT }}" \
             --from-literal=LOG_LEVEL="${{ vars.LOG_LEVEL }}" \

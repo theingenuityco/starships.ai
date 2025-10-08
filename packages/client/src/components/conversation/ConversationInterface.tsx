@@ -39,6 +39,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // View mode state: 'conversation' or 'tool-builder'
   const [viewMode, setViewMode] = useState<'conversation' | 'tool-builder'>('conversation')
+  // Ref to avoid stale closures inside streaming handlers
+  const viewModeRef = useRef<'conversation' | 'tool-builder'>('conversation')
+  // Track applied tool call keys to accumulate across messages
+  const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
+  // Track last conversation id to reset applied set
+  const lastAppliedConversationRef = useRef<string | null>(null)
 
   // Expanded overlay state for message history when in tool-builder mode
   const [isMessageOverlayExpanded, setIsMessageOverlayExpanded] = useState(false)
@@ -144,6 +150,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData, selectedAgent])
 
+  // Keep view mode ref in sync to avoid stale closure issues
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
+
+  // Reset applied tool-calls tracker when conversation changes
+  useEffect(() => {
+    if (lastAppliedConversationRef.current !== currentConversationId) {
+      appliedToolCallKeysRef.current.clear()
+      lastAppliedConversationRef.current = currentConversationId ?? null
+    }
+  }, [currentConversationId])
+
   // Focus input when streaming transitions from true -> false
   useEffect(() => {
     const was = prevStreamingRef.current
@@ -196,14 +215,42 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
         const action = (payload as any).__ui_action as string
 
+        const updateFieldWithGuard = (field: any, value: any) => {
+          if (!toolBuilderViewRef.current) return
+          if (field === 'blueprint') {
+            const form = toolBuilderViewRef.current.getFormData?.()
+            const currentStr = form?.blueprint || ''
+            let currentBp: any = {}
+            try {
+              currentBp = JSON.parse(currentStr || '{}')
+            } catch {}
+            let incoming: any = value
+            if (typeof incoming === 'string') {
+              try {
+                incoming = JSON.parse(incoming)
+              } catch {}
+            }
+            const currentHas = (Array.isArray((currentBp as any).nodes) && (currentBp as any).nodes.length > 0) || (Array.isArray((currentBp as any).edges) && (currentBp as any).edges.length > 0)
+            const incomingHas = incoming && ((Array.isArray(incoming.nodes) && incoming.nodes.length > 0) || (Array.isArray(incoming.edges) && incoming.edges.length > 0))
+            if (!incomingHas && currentHas) {
+              return
+            }
+            const bpStr = typeof value === 'string' ? value : JSON.stringify(incoming || {}, null, 2)
+            toolBuilderViewRef.current.updateField('blueprint', bpStr)
+            return
+          }
+          toolBuilderViewRef.current.updateField(field as any, value as any)
+        }
+
         const ensureOpenThen = (fn: () => void) => {
           setTimeout(() => {
-            if (action === 'open_tool_form') {
+            const needReset = action === 'open_tool_form' && viewModeRef.current !== 'tool-builder'
+            if (needReset) {
               toolBuilderViewRef.current?.resetForm()
             }
             // Mark that this transition was triggered by streaming
             wasOpenedByStreamingRef.current = true
-            setViewMode('tool-builder')
+            if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
             setTimeout(() => fn(), 150)
           }, 100)
         }
@@ -215,13 +262,26 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
-            // Open builder for tool-open (create or open)
-            if (toolName === 'tool-open') {
-              console.log('📂 Opening tool builder view for tool_open')
-              toolBuilderViewRef.current?.resetForm()
+            // Open builder for tool actions that affect tool data or blueprint
+            const openBuilderSlugs = new Set([
+              'tool-open',
+              'tool-edit',
+              'tool-add-blueprint-node',
+              'tool-add-blueprint-edge',
+              'tool-blueprint-edit-node',
+              'tool-blueprint-remove-node',
+              'tool-blueprint-edit-edge',
+              'tool-blueprint-remove-edge',
+            ])
+            if (openBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
+              console.log('📂 Opening tool builder view for', toolName)
+              // Only reset when transitioning into the builder; preserve existing form if already open
+              if (viewModeRef.current !== 'tool-builder') {
+                toolBuilderViewRef.current?.resetForm()
+              }
               // Mark that this transition was triggered by streaming
               wasOpenedByStreamingRef.current = true
-              setViewMode('tool-builder')
+              if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
             }
             break
           }
@@ -231,7 +291,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             ensureOpenThen(() => {
               if (toolBuilderViewRef.current && form && typeof form === 'object') {
                 Object.entries(form).forEach(([field, value]) => {
-                  toolBuilderViewRef.current?.updateField(field as any, value as any)
+                  updateFieldWithGuard(field as any, value as any)
                 })
               }
             })
@@ -246,14 +306,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               ensureOpenThen(() => {
                 if (toolBuilderViewRef.current && patch && typeof patch === 'object') {
                   Object.entries(patch).forEach(([field, value]) => {
-                    toolBuilderViewRef.current?.updateField(field as any, value as any)
+                    updateFieldWithGuard(field as any, value as any)
                   })
                 }
               })
             } else {
               if (patch && typeof patch === 'object') {
                 Object.entries(patch).forEach(([field, value]) => {
-                  toolBuilderViewRef.current?.updateField(field as any, value as any)
+                  updateFieldWithGuard(field as any, value as any)
                 })
               }
             }
@@ -353,59 +413,197 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [viewMode, isMessageOverlayExpanded])
 
-  // Stream tool arguments into builder as they arrive
+  // Stream tool arguments into builder as they arrive (compose all mutations before writing)
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length || viewMode !== 'tool-builder') return
 
-    // Find the last assistant message with toolCalls (reverse iteration)
-    // Look for both streaming and completed messages to handle cases where
-    // the view opens after streaming has finished
-    let lastAssistant: any = null
-    for (let i = liveMessages.length - 1; i >= 0; i--) {
-      const m = liveMessages[i]
-      if (m.role === 'assistant' && (m as any).toolCalls && Array.isArray((m as any).toolCalls)) {
-        lastAssistant = m
-        break
+    // Eligible tool slugs that should drive the Tool Builder
+    const builderToolSlugs = new Set([
+      'tool-open',
+      'tool-edit',
+      'tool-add-blueprint-node',
+      'tool-add-blueprint-edge',
+      'tool-blueprint-edit-node',
+      'tool-blueprint-remove-node',
+      'tool-blueprint-edit-edge',
+      'tool-blueprint-remove-edge',
+    ])
+
+    const form = toolBuilderViewRef.current?.getFormData?.()
+    if (!form) return
+
+    // Initialize blueprint from form
+    let bp: any
+    try {
+      bp = JSON.parse(form.blueprint || '{}')
+    } catch {
+      bp = {}
+    }
+    if (!Array.isArray(bp.nodes)) bp.nodes = []
+    if (!Array.isArray(bp.edges)) bp.edges = []
+
+    // Helper to parse JSON-like values
+    const normalizeJson = (v: any) => {
+      if (typeof v === 'string') {
+        try {
+          return JSON.parse(v)
+        } catch {
+          return v
+        }
+      }
+      return v
+    }
+
+    // Collect only new toolCalls across all assistant messages in chronological order
+    const newCalls: { name: string; args: any }[] = []
+    for (let mi = 0; mi < liveMessages.length; mi++) {
+      const msg = liveMessages[mi]
+      if (msg.role !== 'assistant') continue
+      const calls = (msg as any).toolCalls
+      if (!Array.isArray(calls)) continue
+      for (let ci = 0; ci < calls.length; ci++) {
+        const call = calls[ci]
+        const name = call?.function?.name as string
+        if (!(builderToolSlugs.has(name) || name?.startsWith?.('tool-blueprint-'))) continue
+        let raw = call?.function?.arguments
+        const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
+        if (appliedToolCallKeysRef.current.has(key)) continue
+        // parse args after key computation to keep key stable on parse errors
+        let parsed = raw
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed)
+          } catch {
+            // keep as-is (may still be partial)
+          }
+        }
+        // skip clearly empty args to avoid wiping state
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0) {
+          continue
+        }
+        newCalls.push({ name, args: parsed })
+        appliedToolCallKeysRef.current.add(key)
       }
     }
 
-    if (!lastAssistant || !(lastAssistant as any).toolCalls) return
+    if (newCalls.length === 0) return
 
-    const toolCalls = (lastAssistant as any).toolCalls || []
-    const toolCreateCall = toolCalls.find((tc: any) => tc?.function?.name === 'tool-open')
+    // Compose pending scalar field updates
+    const compose = {
+      name: undefined as undefined | string,
+      description: undefined as undefined | string,
+      category: undefined as undefined | string,
+      exampleUsage: undefined as undefined | string,
+      requiresApiKey: undefined as undefined | boolean,
+      parameters: undefined as undefined | string,
+      blueprintChanged: false,
+    }
 
-    if (toolCreateCall && toolCreateCall.function?.arguments) {
-      const args: any = toolCreateCall.function.arguments
+    const hasContent = (b: any) => (Array.isArray(b?.nodes) && b.nodes.length > 0) || (Array.isArray(b?.edges) && b.edges.length > 0)
 
-      // Only try to populate if arguments actually exist
-      if (!args || (typeof args === 'object' && Object.keys(args).length === 0)) {
-        return // Arguments not yet available
+    // Apply each new call in order
+    for (const call of newCalls) {
+      const toolName = call.name
+      const args = call.args
+
+      if (toolName === 'tool-open' || toolName === 'tool-edit') {
+        if (args?.name !== undefined) compose.name = args.name
+        if (args?.description !== undefined) compose.description = args.description
+        if (args?.category !== undefined) compose.category = args.category
+        if (args?.exampleUsage !== undefined) compose.exampleUsage = args.exampleUsage
+        if (args?.requiresApiKey !== undefined) compose.requiresApiKey = args.requiresApiKey
+        if (args?.parameters !== undefined) {
+          compose.parameters = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
+        }
+        if (args?.blueprint !== undefined) {
+          const incoming = normalizeJson(args.blueprint) || {}
+          if (!Array.isArray(incoming.nodes)) incoming.nodes = []
+          if (!Array.isArray(incoming.edges)) incoming.edges = []
+          // Only replace blueprint if incoming has content OR current bp is empty
+          if (hasContent(incoming) || !hasContent(bp)) {
+            bp = incoming
+            compose.blueprintChanged = true
+          }
+        }
+        continue
       }
 
-      // Update builder fields as they become available
-      if (args.name && toolBuilderViewRef.current) {
-        toolBuilderViewRef.current.updateField('name', args.name)
+      switch (toolName) {
+        case 'tool-add-blueprint-node': {
+          const node = normalizeJson(args?.node)
+          if (!node || typeof node !== 'object') break
+          bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== node.ref)
+          bp.nodes.push(node)
+          compose.blueprintChanged = true
+          break
+        }
+        case 'tool-add-blueprint-edge': {
+          const edge = normalizeJson(args?.edge)
+          if (!edge || typeof edge !== 'object') break
+          bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edge.ref)
+          bp.edges.push(edge)
+          compose.blueprintChanged = true
+          break
+        }
+        case 'tool-blueprint-edit-node': {
+          const nodeRef = args?.nodeRef
+          const updates = normalizeJson(args?.updates) || {}
+          if (!nodeRef) break
+          const idx = (bp.nodes || []).findIndex((n: any) => n?.ref === nodeRef)
+          if (idx >= 0) {
+            const cur = { ...(bp.nodes[idx] || {}) }
+            if ('name' in updates) cur.name = updates.name
+            if ('description' in updates) cur.description = updates.description
+            if ('type' in updates) cur.type = updates.type
+            if ('parameters' in updates) cur.parameters = updates.parameters
+            bp.nodes[idx] = cur
+            compose.blueprintChanged = true
+          }
+          break
+        }
+        case 'tool-blueprint-edit-edge': {
+          const edgeRef = args?.edgeRef
+          const updates = normalizeJson(args?.updates) || {}
+          if (!edgeRef) break
+          const idx = (bp.edges || []).findIndex((e: any) => e?.ref === edgeRef)
+          if (idx >= 0) {
+            const cur = { ...(bp.edges[idx] || {}) }
+            if ('from' in updates) cur.from = updates.from
+            if ('to' in updates) cur.to = updates.to
+            if ('condition' in updates) cur.condition = updates.condition
+            bp.edges[idx] = cur
+            compose.blueprintChanged = true
+          }
+          break
+        }
+        case 'tool-blueprint-remove-node': {
+          const nodeRef = args?.nodeRef
+          if (!nodeRef) break
+          bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== nodeRef)
+          bp.edges = (bp.edges || []).filter((e: any) => e?.from !== nodeRef && e?.to !== nodeRef)
+          compose.blueprintChanged = true
+          break
+        }
+        case 'tool-blueprint-remove-edge': {
+          const edgeRef = args?.edgeRef
+          if (!edgeRef) break
+          bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edgeRef)
+          compose.blueprintChanged = true
+          break
+        }
       }
-      if (args.description && toolBuilderViewRef.current) {
-        toolBuilderViewRef.current.updateField('description', args.description)
-      }
-      if (args.category && toolBuilderViewRef.current) {
-        toolBuilderViewRef.current.updateField('category', args.category)
-      }
-      if (args.exampleUsage && toolBuilderViewRef.current) {
-        toolBuilderViewRef.current.updateField('exampleUsage', args.exampleUsage)
-      }
-      if (args.requiresApiKey !== undefined && toolBuilderViewRef.current) {
-        toolBuilderViewRef.current.updateField('requiresApiKey', args.requiresApiKey)
-      }
-      if (args.parameters && toolBuilderViewRef.current) {
-        const paramsStr = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
-        toolBuilderViewRef.current.updateField('parameters', paramsStr)
-      }
-      if (args.blueprint && toolBuilderViewRef.current) {
-        const blueprintStr = typeof args.blueprint === 'string' ? args.blueprint : JSON.stringify(args.blueprint, null, 2)
-        toolBuilderViewRef.current.updateField('blueprint', blueprintStr)
-      }
+    }
+
+    // Write back composed updates once
+    if (compose.name !== undefined) toolBuilderViewRef.current?.updateField('name', compose.name)
+    if (compose.description !== undefined) toolBuilderViewRef.current?.updateField('description', compose.description)
+    if (compose.category !== undefined) toolBuilderViewRef.current?.updateField('category', compose.category)
+    if (compose.exampleUsage !== undefined) toolBuilderViewRef.current?.updateField('exampleUsage', compose.exampleUsage)
+    if (compose.requiresApiKey !== undefined) toolBuilderViewRef.current?.updateField('requiresApiKey', compose.requiresApiKey)
+    if (compose.parameters !== undefined) toolBuilderViewRef.current?.updateField('parameters', compose.parameters)
+    if (compose.blueprintChanged) {
+      const bpStr = JSON.stringify(bp, null, 2)
+      toolBuilderViewRef.current?.updateField('blueprint', bpStr)
     }
   }, [currentConversationId, liveMessages, viewMode])
 

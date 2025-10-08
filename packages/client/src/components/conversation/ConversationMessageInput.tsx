@@ -16,16 +16,6 @@ import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 import TopupButton from '@/components/billing/TopupButton'
 import { toast } from 'sonner'
 
-// Simplified message interface for UI callbacks
-interface MessageNotification {
-  id: string
-  content: string
-  role: 'user' | 'assistant' | 'system'
-  timestamp: string
-  conversationId: string
-  agentId?: string
-}
-
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
   starshipId: string
@@ -80,7 +70,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
-    const hasFunds = Number(wallet?.balance ?? '0') > 0
+    const MINIMUM_THRESHOLD = 0.05
+    const hasFunds = Number(wallet?.balance ?? '0') >= MINIMUM_THRESHOLD
 
     // Use streamedQuery-based conversation hook
     const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null, starshipId)
@@ -306,7 +297,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const getPlaceholder = () => {
       if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
       if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
-      if (!hasFunds) return 'Add funds to continue'
       if (hardLimitActive && tokensUsed >= contextLimit) return selectedAgent ? `Context limit reached for ${selectedAgent.name}` : 'Context limit reached'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }

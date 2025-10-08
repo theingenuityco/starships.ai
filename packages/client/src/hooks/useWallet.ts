@@ -15,7 +15,8 @@ export function useWallet(starshipId: string, enabled: boolean = true) {
       return response.data.data
     },
     enabled: !!starshipId && enabled,
-    staleTime: 30 * 1000, // 30s
-    gcTime: 5 * 60 * 1000, // 5m
+    staleTime: 5 * 1000, // Reduced to 5s for more real-time balance checking
+    gcTime: 30 * 1000, // Reduced cache time for responsive updates
+    refetchInterval: 10 * 1000, // Poll every 10s for balance updates during active usage
   })
 }

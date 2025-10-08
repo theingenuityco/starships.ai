@@ -3,6 +3,7 @@
 import { WalletModel } from '@starships/protocol'
 import React from 'react'
 import { Button } from '@/components/ui/button'
+import BalanceStatusIndicator from './BalanceStatusIndicator'
 
 interface BillingOverviewCardProps {
   wallet?: WalletModel | null
@@ -13,7 +14,6 @@ interface BillingOverviewCardProps {
 
 export default function BillingOverviewCard({ wallet, isLoading, error, onRetry }: BillingOverviewCardProps): React.JSX.Element {
   const hasError = !!error
-  const displayAmount = Number(wallet?.balance ?? 0).toFixed(2)
 
   return (
     <div className="flex items-center justify-center p-8">
@@ -55,16 +55,16 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry 
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Large balance amount display - matches original design */}
             <div className="relative">
               <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
-                ${displayAmount}
+                ${Number(wallet?.balance ?? 0).toFixed(2)}
               </div>
             </div>
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400 font-semibold">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              Active Balance
-            </div>
+
+            {/* Status indicator */}
+            <BalanceStatusIndicator wallet={wallet} showDetails={true} />
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { ConversationService } from '@/services/ConversationService';
 import { StreamingService } from '@/services/StreamingService';
+import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -195,14 +196,23 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
 
     const walletService = new WalletService();
     const wallet = await walletService.getByStarshipId(starship.id);
-    const balanceStr = wallet?.balance ?? '0.000000';
-    const balanceNum = Number(balanceStr);
 
-    if (!wallet || Number.isNaN(balanceNum) || balanceNum <= 0) {
-      sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient wallet balance', 402, {
+    if (!wallet) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
         starshipId: starship.id,
-        balance: balanceStr,
       });
+      return;
+    }
+
+    // Use centralized balance validation service with $0.05 threshold
+    const balanceValidation = BalanceValidationService.validateBalance({
+      id: wallet.id,
+      balance: wallet.balance,
+    });
+
+    if (!balanceValidation.isValid) {
+      const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
+      sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
       return;
     }
 

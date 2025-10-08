@@ -468,14 +468,9 @@ CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('
 -- COMMENTS FOR DOCUMENTATION
 -- ============================================================================
 
-<<<<<<< HEAD
-COMMENT ON TABLE users IS 'User accounts with authentication and billing information';
-COMMENT ON TABLE oauth_accounts IS 'OAuth account links - supports multiple providers per user';
-COMMENT ON TABLE starships IS 'Starships owned by users with configuration and billing details';
-=======
 COMMENT ON TABLE users IS 'User accounts with authentication';
+COMMENT ON TABLE oauth_accounts IS 'OAuth account links - supports multiple providers per user';
 COMMENT ON TABLE starships IS 'Starships owned by users with configuration';
->>>>>>> origin/main
 COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketplace';
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
 COMMENT ON TABLE ledger_entries IS 'Immutable ledger of wallet mutations for auditing and balance tracking';

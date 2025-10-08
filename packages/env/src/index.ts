@@ -26,6 +26,7 @@ export function getEnvConfig(): EnvironmentConfig {
     PUBLIC_URL: process.env.PUBLIC_URL,
     CLIENT_URL: process.env.CLIENT_URL,
     SERVER_URL: process.env.SERVER_URL,
+    OAUTH_REDIRECT_BASE_URL: process.env.OAUTH_REDIRECT_BASE_URL,
     POSTGRES_HOST: process.env.POSTGRES_HOST,
     POSTGRES_USER: process.env.POSTGRES_USER,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
@@ -53,6 +54,7 @@ export function getEnvConfig(): EnvironmentConfig {
     PUBLIC_URL: requiredEnvVars.PUBLIC_URL!,
     CLIENT_URL: requiredEnvVars.CLIENT_URL!,
     SERVER_URL: requiredEnvVars.SERVER_URL!,
+    OAUTH_REDIRECT_BASE_URL: requiredEnvVars.OAUTH_REDIRECT_BASE_URL!,
 
     // PostgreSQL Database Configuration - Required, no localhost fallbacks
     POSTGRES_HOST: requiredEnvVars.POSTGRES_HOST!,

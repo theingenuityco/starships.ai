@@ -13,6 +13,7 @@ export interface EnvironmentConfig {
   PUBLIC_URL: string;
   CLIENT_URL: string;
   SERVER_URL: string;
+  OAUTH_REDIRECT_BASE_URL: string;
 
   // PostgreSQL Database Configuration
   POSTGRES_HOST: string;

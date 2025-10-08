@@ -85,11 +85,11 @@ export class SubscriptionService {
       throw new Error(`Price not found for ${params.plan} ${params.billingPeriod}`);
     }
 
-    // Build URLs - use CLIENT_URL for frontend redirects
-    let baseUrl = process.env.CLIENT_URL;
+    // Build URLs - use OAUTH_REDIRECT_BASE_URL for frontend redirects (goes through reverse proxy)
+    let baseUrl = process.env.OAUTH_REDIRECT_BASE_URL;
 
     if (!baseUrl) {
-      throw new Error('CLIENT_URL environment variable is required for Stripe checkout');
+      throw new Error('OAUTH_REDIRECT_BASE_URL environment variable is required for Stripe checkout');
     }
 
     // Ensure baseUrl has proper scheme and remove trailing slash
@@ -143,11 +143,11 @@ export class SubscriptionService {
       throw new Error(`Price not found for ${params.plan} ${params.billingPeriod}`);
     }
 
-    // Build URLs - use CLIENT_URL for frontend redirects
-    let baseUrl = process.env.CLIENT_URL;
+    // Build URLs - use OAUTH_REDIRECT_BASE_URL for frontend redirects (goes through reverse proxy)
+    let baseUrl = process.env.OAUTH_REDIRECT_BASE_URL;
 
     if (!baseUrl) {
-      throw new Error('CLIENT_URL environment variable is required for Stripe checkout');
+      throw new Error('OAUTH_REDIRECT_BASE_URL environment variable is required for Stripe checkout');
     }
 
     // Ensure baseUrl has proper scheme and remove trailing slash

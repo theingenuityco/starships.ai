@@ -13,15 +13,6 @@ const nextConfig: NextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
-  // Proxy API requests to Express server
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:4000/api/:path*',
-      },
-    ]
-  },
   webpack: (config, { isServer }) => {
     // Prevent Node.js modules from being bundled in the browser
     if (!isServer) {

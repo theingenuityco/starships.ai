@@ -926,8 +926,6 @@ export class ConversationService {
                     });
                   }
                 }
-
-                console.log(`[STREAMING] ✅ Persisted state message: ${role} at index ${i} (${persistedMsg.id})`);
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
               }

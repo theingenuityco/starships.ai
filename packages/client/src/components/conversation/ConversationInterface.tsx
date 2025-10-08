@@ -204,6 +204,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toolBuilderViewRef.current?.resetForm()
   }, [])
 
+  // Handle manual toggle of Tool Builder (persist and restore focused tool from conversation)
+  const handleToggleToolBuilder = useCallback(() => {
+    setViewMode(prev => {
+      const next = prev === 'tool-builder' ? 'conversation' : 'tool-builder'
+      if (next === 'tool-builder') {
+        // Manual open: ensure streaming flag is off and rebuild state from conversation tool calls
+        wasOpenedByStreamingRef.current = false
+        // Reset the builder UI before replaying state
+        toolBuilderViewRef.current?.resetForm()
+        // Clear applied tool call dedupe so we can replay from conversation messages
+        appliedToolCallKeysRef.current.clear()
+        // Allow future UI payloads to be processed again if needed
+        lastUIActionKeyRef.current = null
+      }
+      return next
+    })
+  }, [])
+
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
   const handleUIPayload = useCallback(
     (payload: any) => {
@@ -704,7 +722,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               starshipId={starshipId}
               conversationId={currentConversationId}
               onConversationStart={handleConversationStart}
-              onToggleToolForm={() => setViewMode(prev => (prev === 'tool-builder' ? 'conversation' : 'tool-builder'))}
+              onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={viewMode === 'tool-builder'}
               disabled={!selectedAgent}
               minimal={viewMode === 'tool-builder' || showMessagesArea}

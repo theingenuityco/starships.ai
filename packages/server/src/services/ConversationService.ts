@@ -36,8 +36,8 @@ export class ConversationService {
   private streamingToolCalls: Map<string, any[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
-  // Track persisted state message count to detect new messages added via mutations
-  private persistedMessageCount: Map<string, number> = new Map();
+  // Track last persisted message index to avoid re-persisting on workflow loops
+  private lastPersistedIndex: Map<string, number> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -392,8 +392,19 @@ export class ConversationService {
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
-        // Reset message tracking for new workflow
-        this.persistedMessageCount.delete(conversationId);
+        // Seed message index tracking to the current baseline so prior history isn't re-persisted
+        const execEvent = event as ExecutionEvent;
+        const execution: Execution | undefined = execEvent.data?.execution;
+        const state = execution?.state as { messages?: unknown[] } | undefined;
+        const msgs = Array.isArray(state?.messages) ? state.messages : undefined;
+
+        if (msgs) {
+          const baselineIndex = msgs.length - 1;
+          this.lastPersistedIndex.set(conversationId, baselineIndex);
+          console.log(`[STREAMING] workflow_started: baseline messages length=${msgs.length}, set lastPersistedIndex=${baselineIndex}`);
+        } else {
+          console.log('[STREAMING] workflow_started: execution.state.messages not available; baseline not set');
+        }
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -814,48 +825,74 @@ export class ConversationService {
           const execution: Execution | undefined = execEvent?.data?.execution;
 
           if (execution?.state) {
-            const stateMessages = Array.isArray((execution.state as any).messages) ? (execution.state as any).messages : [];
-            const lastPersistedCount = this.persistedMessageCount.get(conversationId) || 0;
+            const stateObj = execution.state as { messages?: unknown[] };
+            const stateMessages = Array.isArray(stateObj.messages) ? stateObj.messages : [];
 
-            // If there are new messages in state that haven't been persisted
-            if (stateMessages.length > lastPersistedCount) {
-              const newMessages = stateMessages.slice(lastPersistedCount);
+            // Get last persisted index for this conversation
+            const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
 
-              for (const msg of newMessages) {
-                // Skip system messages and messages without content
-                if (!msg || msg.role === 'system' || !msg.content) {
-                  continue;
-                }
+            console.log(`[STREAMING] node_completed: Checking messages. Last index: ${lastIndex}, Current count: ${stateMessages.length}`);
 
-                try {
-                  // Persist the message
-                  const messageType = msg.role === 'tool' ? 'tool_result' : 'agent_response';
-                  const persistedMsg = await this.messageService.createMessage({
-                    conversationId,
-                    role: msg.role,
-                    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-                    messageType,
-                    ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
-                    ...(msg.tool_call_id ? { toolCallId: msg.tool_call_id } : {}),
-                  });
+            // Type guard for state messages coming from Autopilot mutations
+            const isStateMsg = (m: unknown): m is { role: string; content: unknown; toolCallId?: string; tool_call_id?: string } => {
+              return !!m && typeof (m as any).role === 'string' && 'content' in (m as any);
+            };
 
-                  // Broadcast via SSE if streaming is active
-                  if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                    await this.streamingService.broadcastDelta(conversationId, {
-                      op: 'add',
-                      path: '/messages/-',
-                      value: persistedMsg,
-                    });
-                  }
+            // Only process messages added since last persistence
+            for (let i = lastIndex + 1; i < stateMessages.length; i++) {
+              const raw = stateMessages[i];
 
-                  console.log(`[STREAMING] Persisted state message from mutation: ${msg.role} (${persistedMsg.id})`);
-                } catch (persistError) {
-                  console.error('[STREAMING] Failed to persist state message:', persistError);
-                }
+              // Update index immediately to prevent re-processing if node_completed fires again
+              this.lastPersistedIndex.set(conversationId, i);
+
+              // Validate message shape
+              if (!isStateMsg(raw)) {
+                console.log(`[STREAMING] Skipping non-message at index ${i}`);
+                continue;
               }
 
-              // Update the tracked count
-              this.persistedMessageCount.set(conversationId, stateMessages.length);
+              const role = raw.role as 'system' | 'user' | 'assistant' | 'tool';
+
+              // Skip system messages (ephemeral, not persisted)
+              if (role === 'system') {
+                console.log(`[STREAMING] Skipping message at index ${i}: system`);
+                continue;
+              }
+
+              console.log(`[STREAMING] Processing message at index ${i}: ${role}`);
+
+              try {
+                // Normalize optional toolCallId (supports snake_case and camelCase)
+                const toolCallId =
+                  typeof (raw as any).toolCallId === 'string'
+                    ? (raw as any).toolCallId
+                    : typeof (raw as any).tool_call_id === 'string'
+                      ? (raw as any).tool_call_id
+                      : undefined;
+
+                // Persist the message
+                const messageType = role === 'tool' ? 'tool_result' : 'agent_response';
+                const persistedMsg = await this.messageService.createMessage({
+                  conversationId,
+                  role,
+                  content: typeof raw.content === 'string' ? (raw.content as string) : JSON.stringify(raw.content),
+                  messageType,
+                  ...(toolCallId ? { toolCallId } : {}),
+                });
+
+                // Broadcast via SSE if streaming is active
+                if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                  await this.streamingService.broadcastDelta(conversationId, {
+                    op: 'add',
+                    path: '/messages/-',
+                    value: persistedMsg,
+                  });
+                }
+
+                console.log(`[STREAMING] ✅ Persisted state message: ${role} at index ${i} (${persistedMsg.id})`);
+              } catch (persistError) {
+                console.error('[STREAMING] Failed to persist state message:', persistError);
+              }
             }
           }
         } catch (e) {

@@ -15,13 +15,15 @@ Incrementally build blueprint connectivity by adding edges one at a time, ensuri
 
 ## Required Parameters
 - **toolSlug**: Slug of the tool to modify
-- **edge**: New edge to add with from, to, ref, and optional condition
+- **edge**: New edge to add with ref, from, to, and optional condition/label/metadata
 
 ## Edge Requirements
-- **ref**: Unique identifier (string)
+- **ref**: Unique identifier (string, unique within blueprint)
 - **from**: Source node ref (must exist in blueprint)
 - **to**: Target node ref (must exist in blueprint)
 - **condition**: Optional JavaScript expression for conditional routing
+- **label**: Optional display label
+- **metadata**: Optional object for additional data
 
 ## Workflow
 1. Fetches current tool by slug
@@ -54,7 +56,10 @@ Returns updated tool with new edge added, or validation errors if addition fails
           from: { type: 'string', description: 'Source node ref' },
           to: { type: 'string', description: 'Target node ref' },
           condition: { type: 'string', description: 'Optional condition expression' },
+          label: { type: 'string', description: 'Optional display label for the edge' },
+          metadata: { type: 'object', description: 'Optional metadata for the edge' },
         },
+        required: ['ref', 'from', 'to'],
       },
     },
     required: ['toolSlug', 'edge'],
@@ -162,10 +167,20 @@ Returns updated tool with new edge added, or validation errors if addition fails
             }
 
             // Validate condition if provided
-            if (newEdge.condition && typeof newEdge.condition !== 'string') {
+            if (newEdge.condition !== undefined && typeof newEdge.condition !== 'string') {
               errors.push('Edge condition must be a string expression');
             }
 
+            // Validate label if provided
+            if (newEdge.label !== undefined && typeof newEdge.label !== 'string') {
+              errors.push('Edge label must be a string');
+            }
+
+            // Validate metadata if provided
+            if (newEdge.metadata !== undefined && (typeof newEdge.metadata !== 'object' || Array.isArray(newEdge.metadata))) {
+              errors.push('Edge metadata must be an object');
+            }
+            
             if (errors.length > 0) {
               return {
                 success: false,
@@ -174,14 +189,24 @@ Returns updated tool with new edge added, or validation errors if addition fails
               };
             }
 
+            // Sanitize to allowed schema fields only
+            const sanitizedEdge = {
+              ref: newEdge.ref,
+              from: newEdge.from,
+              to: newEdge.to,
+              ...(newEdge.condition !== undefined ? { condition: newEdge.condition } : {}),
+              ...(newEdge.label !== undefined ? { label: newEdge.label } : {}),
+              ...(newEdge.metadata !== undefined ? { metadata: newEdge.metadata } : {}),
+            };
+            
             // Add the edge
-            blueprint.edges.push(newEdge);
-
+            blueprint.edges.push(sanitizedEdge);
+            
             return {
               success: true,
               toolData,
               updatedBlueprint: blueprint,
-              addedEdge: newEdge,
+              addedEdge: sanitizedEdge,
               edgeCount: blueprint.edges.length
             };
           `,

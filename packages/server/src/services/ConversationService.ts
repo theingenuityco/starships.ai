@@ -3,7 +3,17 @@ import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent, Execution } from '@starships/autopilot';
+import type {
+  ToolParams,
+  ExecutionItem,
+  AgentParams,
+  ExecutionEvent,
+  LLMEvent,
+  ToolEvent,
+  Execution,
+  LlmToolCall,
+  LlmMessage,
+} from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -20,6 +30,15 @@ interface AutopilotConfig {
   killGraceMs: number;
 }
 
+type StreamingToolCallAccum = {
+  id?: string;
+  type: 'function';
+  function: {
+    name?: string;
+    arguments: string; // accumulating JSON string during streaming
+  };
+};
+
 /**
  * Clean conversation service with proper error handling
  */
@@ -33,7 +52,7 @@ export class ConversationService {
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated toolCalls during streaming per conversation
-  private streamingToolCalls: Map<string, any[]> = new Map();
+  private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
   // Track last persisted message index to avoid re-persisting on workflow loops
@@ -298,35 +317,22 @@ export class ConversationService {
         secureEnv,
       });
 
-      // Convert database messages to OpenRouter format
-      // OpenRouter standardizes format and translates to provider-specific formats automatically
-      const llmMessages = messages.map((msg) => {
-        const baseMessage: any = {
+      // Prepare messages for Agent input in canonical format (camelCase, parsed toolCalls)
+      const llmMessages: LlmMessage[] = messages.map((msg): LlmMessage => {
+        const baseMessage: LlmMessage = {
           role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
           content: msg.content,
+          ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
         };
 
-        // Add reasoning if present
-        if (msg.reasoning) {
-          baseMessage.reasoning = msg.reasoning;
+        // Keep canonical toolCalls as-is
+        if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+          (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
         }
 
-        // For assistant messages with tool calls, use OpenRouter snake_case format
-        if (msg.role === 'assistant' && msg.toolCalls && Array.isArray(msg.toolCalls)) {
-          baseMessage.tool_calls = msg.toolCalls.map((tc: any) => ({
-            id: tc.id,
-            type: tc.type || 'function',
-            function: {
-              name: tc.function?.name,
-              arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
-            },
-          }));
-        }
-
-        // For tool result messages, use OpenRouter snake_case format
-        // OpenRouter translates tool_call_id to provider-specific format (e.g., tool_use_id for Anthropic)
-        if (msg.role === 'tool' && msg.toolCallId) {
-          baseMessage.tool_call_id = msg.toolCallId;
+        // Keep canonical toolCallId for tool messages
+        if (msg.role === 'tool' && typeof msg.toolCallId === 'string') {
+          (baseMessage as LlmMessage).toolCallId = msg.toolCallId;
         }
 
         return baseMessage;
@@ -608,7 +614,7 @@ export class ConversationService {
           if (hasToolCalls) {
             try {
               if (toolCallsFromDelta.length > 0) {
-                const acc = this.streamingToolCalls.get(conversationId) || [];
+                const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
 
                 for (const rawTc of toolCallsFromDelta as any[]) {
                   const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
@@ -668,7 +674,7 @@ export class ConversationService {
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot toolCalls from message node (no incremental indices)
                 // Parse arguments using partial-json for robustness
-                const normalized = toolCallsFromMessage.map((tc: any) => {
+                const normalized: LlmToolCall[] = toolCallsFromMessage.map((tc: any) => {
                   const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
                   let argsObj: unknown = {};
                   if (argsStr) {
@@ -684,15 +690,30 @@ export class ConversationService {
                   }
                   return {
                     id: tc?.id,
-                    type: 'function',
+                    type: 'function' as const,
                     function: {
                       name: tc?.function?.name,
-                      arguments: argsObj, // Store as parsed object
+                      arguments: argsObj, // Store as parsed object for UI
                     },
                   };
                 });
 
-                this.streamingToolCalls.set(conversationId, normalized);
+                // Maintain streaming accumulator with string arguments form
+                const accumFromSnapshot: StreamingToolCallAccum[] = normalized.map((tc) => ({
+                  id: tc.id,
+                  type: 'function',
+                  function: {
+                    name: tc.function.name,
+                    arguments: (() => {
+                      try {
+                        return JSON.stringify(tc.function.arguments ?? {});
+                      } catch {
+                        return '{}';
+                      }
+                    })(),
+                  },
+                }));
+                this.streamingToolCalls.set(conversationId, accumFromSnapshot);
 
                 // Broadcast only valid entries (non-empty function name)
                 await this.streamingService.broadcastDelta(conversationId, {
@@ -825,7 +846,7 @@ export class ConversationService {
           const execution: Execution | undefined = execEvent?.data?.execution;
 
           if (execution?.state) {
-            const stateObj = execution.state as { messages?: unknown[] };
+            const stateObj = execution.state as { messages?: LlmMessage[] };
             const stateMessages = Array.isArray(stateObj.messages) ? stateObj.messages : [];
 
             // Get last persisted index for this conversation
@@ -834,8 +855,10 @@ export class ConversationService {
             console.log(`[STREAMING] node_completed: Checking messages. Last index: ${lastIndex}, Current count: ${stateMessages.length}`);
 
             // Type guard for state messages coming from Autopilot mutations
-            const isStateMsg = (m: unknown): m is { role: string; content: unknown; toolCallId?: string; tool_call_id?: string } => {
-              return !!m && typeof (m as any).role === 'string' && 'content' in (m as any);
+            const isStateMsg = (m: unknown): m is LlmMessage => {
+              if (!m || typeof m !== 'object') return false;
+              const rec = m as Record<string, unknown>;
+              return typeof rec.role === 'string' && typeof rec.content === 'string';
             };
 
             // Only process messages added since last persistence
@@ -862,22 +885,28 @@ export class ConversationService {
               console.log(`[STREAMING] Processing message at index ${i}: ${role}`);
 
               try {
-                // Normalize optional toolCallId (supports snake_case and camelCase)
-                const toolCallId =
-                  typeof (raw as any).toolCallId === 'string'
-                    ? (raw as any).toolCallId
-                    : typeof (raw as any).tool_call_id === 'string'
-                      ? (raw as any).tool_call_id
-                      : undefined;
+                // Treat as canonical LlmMessage after type guard
+                const lm = raw as LlmMessage;
 
-                // Persist the message
+                // Read optional toolCallId (canonical only)
+                const toolCallId = typeof lm.toolCallId === 'string' ? lm.toolCallId : undefined;
+
+                // For assistant messages, persist toolCalls if present (already canonical from Agent/LLM)
+                let toolCalls: LlmToolCall[] | undefined = undefined;
+                if (role === 'assistant' && Array.isArray(lm.toolCalls) && lm.toolCalls.length > 0) {
+                  toolCalls = lm.toolCalls as LlmToolCall[];
+                }
+
+                // Persist the message (assistant or tool)
                 const messageType = role === 'tool' ? 'tool_result' : 'agent_response';
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,
                   role,
-                  content: typeof raw.content === 'string' ? (raw.content as string) : JSON.stringify(raw.content),
+                  content: lm.content,
                   messageType,
                   ...(toolCallId ? { toolCallId } : {}),
+                  ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
+                  ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
                 });
 
                 // Broadcast via SSE if streaming is active

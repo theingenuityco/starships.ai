@@ -90,8 +90,9 @@ export class Agent implements NodeHandler {
             const msg = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
             const content = typeof msg.content === "string" ? msg.content : "";
             const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+            const reasoning = typeof msg.reasoning === "string" ? msg.reasoning : undefined;
             if (calls.length > 0) {
-              const tool_calls = calls.map(tc => ({
+              const toolCalls = calls.map(tc => ({
                 id: tc?.id ?? "",
                 type: "function",
                 function: {
@@ -99,15 +100,15 @@ export class Agent implements NodeHandler {
                   arguments: (() => {
                     try {
                       const a = tc?.function?.arguments;
-                      if (typeof a === "string") return a;
-                      return JSON.stringify(a ?? {});
-                    } catch { return "{}"; }
+                      if (typeof a === "string") { try { return JSON.parse(a); } catch { return {}; } }
+                      return a ?? {};
+                    } catch { return {}; }
                   })()
                 }
               }));
-              return { role: "assistant", content, tool_calls };
+              return { role: "assistant", content, ...(reasoning ? { reasoning } : {}), toolCalls };
             }
-            return { role: "assistant", content };
+            return { role: "assistant", content, ...(reasoning ? { reasoning } : {}) };
           })() }}`,
           },
         ],
@@ -173,7 +174,7 @@ export class Agent implements NodeHandler {
             const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
             return {
               role: "tool",
-              tool_call_id: toolCallId,
+              toolCallId: toolCallId,
               content: content
             };
           })() }}`,

@@ -61,31 +61,6 @@ const SystemCard = memo(
 
 SystemCard.displayName = 'SystemCard'
 
-// Starship class showcase
-const StarshipClass = memo(({ name, description, features, highlight = false }: { name: string; description: string; features: string[]; highlight?: boolean }) => (
-  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-50px' }} transition={{ duration: 0.3 }} className="group">
-    <Card
-      className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:bg-white/10 ${highlight ? 'ring-2 ring-primary bg-primary/10 scale-105' : 'hover:ring-1 hover:ring-primary/50'}`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold">{name}</h3>
-        {highlight && <Badge className="bg-primary/10 text-primary">Recommended</Badge>}
-      </div>
-      <p className="text-muted-foreground mb-4 leading-relaxed">{description}</p>
-      <ul className="space-y-2">
-        {features.map((feature, i) => (
-          <li key={i} className="flex items-center space-x-2 text-sm">
-            <Star className="w-4 h-4 text-primary" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  </motion.div>
-))
-
-StarshipClass.displayName = 'StarshipClass'
-
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   const [launching, setLaunching] = useState(false)
@@ -658,107 +633,6 @@ export default function HomePage() {
                       </div>
                     </div>
                   }
-                />
-              </motion.div>
-            </div>
-          </div>
-        </section>
-
-        {/* Starship Classes Section */}
-        <section className="py-48 px-4 relative">
-          <div className="max-w-6xl mx-auto relative z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.85 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.9 }}
-              transition={{
-                duration: 0.8,
-                ease: [0.25, 0.1, 0.25, 1],
-              }}
-              viewport={{ once: false, margin: '-10%' }}
-              className="text-center mb-36"
-            >
-              <motion.h2
-                className="text-4xl md:text-5xl font-bold mb-6"
-                initial={{ opacity: 0, y: 30, scale: 0.85 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -15, scale: 0.9 }}
-                transition={{
-                  duration: 0.7,
-                  delay: 0.1,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-                viewport={{ once: false, margin: '-10%' }}
-              >
-                Choose Your Starship Class
-              </motion.h2>
-              <motion.p
-                className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
-                initial={{ opacity: 0, y: 20, scale: 0.85 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.9 }}
-                transition={{
-                  duration: 0.7,
-                  delay: 0.2,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-                viewport={{ once: false, margin: '-10%' }}
-              >
-                Each class shapes your strategy and scale. Start small or go big—your goals determine the path.
-              </motion.p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <motion.div
-                initial={{ opacity: 0, y: 30, scale: 0.85 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.1,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-                viewport={{ once: false, margin: '-10%' }}
-              >
-                <StarshipClass
-                  name="Scout Class"
-                  description="Perfect for focused exploration and individual tasks. Efficient and nimble."
-                  features={['3 Crew Members', '1 Concurrent Expedition', 'Minimal Burn Rate', 'Quick Deployment']}
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 30, scale: 0.85 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.2,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-                viewport={{ once: false, margin: '-10%' }}
-              >
-                <StarshipClass
-                  name="Cruiser Class"
-                  description="Balanced power and capability. Ideal for ambitious projects and sustained operations."
-                  features={['6-8 Crew Members', 'Up to 3 Expeditions', 'Moderate Burn Rate', 'Advanced Coordination']}
-                  highlight
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 30, scale: 0.85 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.3,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-                viewport={{ once: false, margin: '-10%' }}
-              >
-                <StarshipClass
-                  name="Dreadnought Class"
-                  description="Maximum capability for complex, multi-faceted projects. Built for large-scale operations."
-                  features={['12+ Crew Members', 'Unlimited Expeditions', 'High Burn Rate', 'Epic Scale Operations']}
                 />
               </motion.div>
             </div>

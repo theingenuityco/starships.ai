@@ -64,10 +64,6 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 - `STRIPE_SECRET_KEY` (string) - Stripe secret key
 - `STRIPE_PUBLISHABLE_KEY` (string) - Stripe publishable key
 - `STRIPE_WEBHOOK_SECRET` (string, optional) - Stripe webhook secret
-- `STRIPE_PRICE_CRUISER_MONTHLY` (string, optional) - Stripe price ID for cruiser monthly plan
-- `STRIPE_PRICE_CRUISER_YEARLY` (string, optional) - Stripe price ID for cruiser yearly plan
-- `STRIPE_PRICE_DRAUGHT_MONTHLY` (string, optional) - Stripe price ID for draught monthly plan
-- `STRIPE_PRICE_DRAUGHT_YEARLY` (string, optional) - Stripe price ID for draught yearly plan
 
 ### Analytics
 

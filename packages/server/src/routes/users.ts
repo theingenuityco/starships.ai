@@ -62,20 +62,12 @@ const CreateUserSchema = z.object({
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
   avatar: AvatarSchema.optional(),
-  stripeCustomerId: z
-    .string()
-    .regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format')
-    .optional(),
 });
 
 const UpdateUserSchema = z.object({
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
   avatar: AvatarSchema.optional(),
-  stripeCustomerId: z
-    .string()
-    .regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format')
-    .optional(),
 });
 
 const UpdateUserProfileSchema = z.object({
@@ -91,10 +83,6 @@ const CreateUserWithPasswordSchema = z.object({
   password: z.string().min(6).max(255),
   displayName: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(100).optional(), // Legacy support
-});
-
-const LinkStripeSchema = z.object({
-  stripeCustomerId: z.string().regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format'),
 });
 
 // Helper function to validate request data with Zod
@@ -369,63 +357,6 @@ router.get('/users/:id/starships', jwtAuthMiddleware, async (req: Request, res: 
     sendSuccess(res, paginatedStarships, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'fetching user starships');
-  }
-});
-
-// ============================================================================
-// STRIPE INTEGRATION ENDPOINTS
-// ============================================================================
-
-// POST /users/:id/stripe - Link user to Stripe customer (OpenAPI pattern)
-router.post('/users/:id/stripe', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
-
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
-    if (!paramValidation) return;
-
-    const linkRequest = validateData(LinkStripeSchema, req.body, res, 'Stripe data');
-    if (!linkRequest) return;
-
-    const userService = new UserService();
-    await userService.linkStripeCustomer(req.params.id, linkRequest.stripeCustomerId);
-
-    sendSuccess(res, { message: 'Stripe customer linked successfully' });
-  } catch (error) {
-    handleError(error, res, 'linking Stripe customer');
-  }
-});
-
-// GET /users/stripe/:stripeCustomerId - Get user by Stripe customer ID (OpenAPI pattern)
-router.get('/users/stripe/:stripeCustomerId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
-
-    const { stripeCustomerId } = req.params;
-
-    if (!stripeCustomerId.startsWith('cus_')) {
-      sendError(res, 'VALIDATION_ERROR', 'Invalid Stripe Customer ID format', 400, {
-        field: 'stripeCustomerId',
-        expected: 'cus_xxxxxxxx',
-        provided: stripeCustomerId,
-      });
-      return;
-    }
-
-    const userService = new UserService();
-    const user = await userService.getUserByStripeCustomerId(stripeCustomerId);
-
-    if (!user) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
-        resource: 'user',
-        stripeCustomerId: stripeCustomerId,
-      });
-      return;
-    }
-
-    sendSuccess(res, user);
-  } catch (error) {
-    handleError(error, res, 'fetching user by Stripe ID');
   }
 });
 

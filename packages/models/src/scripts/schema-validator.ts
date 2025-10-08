@@ -303,7 +303,7 @@ export class SchemaValidator {
       const invalidStarshipStatuses = await this.connection.query<{ count: string }>(`
         SELECT COUNT(*) as count
         FROM starships
-        WHERE status NOT IN ('active', 'inactive', 'restricted', 'disabled', 'pending_payment')
+        WHERE status NOT IN ('active', 'inactive')
       `);
 
       results.push({

@@ -66,14 +66,11 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> & { slug?: string; maxAgents?: number }
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
-
-        // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
-        const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
 
         // Generate unique slug if not provided
         const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
@@ -81,7 +78,7 @@ export class StarshipRepository extends BaseRepository {
         const starshipData = {
           ...entity,
           slug,
-          maxAgents,
+          maxAgents: entity.maxAgents ?? 3, // Default to 3 agents
           status: entity.status || 'active', // Default to active
           createdAt: now,
           updatedAt: now,
@@ -374,195 +371,6 @@ export class StarshipRepository extends BaseRepository {
       .replace(/\s+/g, '-') // Replace spaces with hyphens
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-  }
-
-  // Stripe integration methods
-  async findBySubscriptionId(subscriptionId: string): Promise<StarshipModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>(`SELECT * FROM starships WHERE subscription_id = $1`, [
-          subscriptionId,
-        ]);
-        return result ? fromDatabase(StarshipEntity, result) : null;
-      },
-      'findBySubscriptionId',
-      'Starship'
-    );
-  }
-
-  async updateSubscription(
-    starshipId: string,
-    updates: {
-      subscriptionId?: string;
-      status?: 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
-      plan?: 'scout' | 'cruiser' | 'draught';
-      billingPeriod?: 'monthly' | 'yearly';
-    }
-  ): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-
-        const setParts: string[] = [];
-        const values: unknown[] = [];
-        let paramIndex = 1;
-
-        Object.entries(updates).forEach(([key, value]) => {
-          if (value !== undefined) {
-            const dbKey = key === 'subscriptionId' ? 'subscription_id' : key === 'billingPeriod' ? 'billing_period' : key;
-            setParts.push(`${dbKey} = $${paramIndex++}`);
-            values.push(value);
-          }
-        });
-
-        if (setParts.length === 0) return;
-
-        setParts.push(`updated_at = NOW()`);
-        values.push(starshipId);
-
-        const query = `UPDATE starships SET ${setParts.join(', ')} WHERE id = $${paramIndex}`;
-        await connection.query(query, values);
-      },
-      'updateSubscription',
-      'Starship',
-      starshipId
-    );
-  }
-
-  async countFreeStarships(userId: string): Promise<number> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.queryOne<{ count: string }>(
-          `SELECT COUNT(*) as count FROM starships WHERE owner_id = $1 AND plan = 'scout'`,
-          [userId]
-        );
-        return parseInt(result?.count || '0', 10);
-      },
-      'countFreeStarships',
-      'Starship'
-    );
-  }
-
-  // Stripe events for webhook processing
-  async isEventProcessed(eventId: string): Promise<boolean> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.queryOne<{ count: string }>('SELECT COUNT(*) as count FROM stripe_events WHERE event_id = $1', [
-          eventId,
-        ]);
-        return parseInt(result?.count || '0', 10) > 0;
-      },
-      'isEventProcessed',
-      'StripeEvent'
-    );
-  }
-
-  async markEventProcessed(eventId: string, eventType?: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.query(
-          `INSERT INTO stripe_events (event_id, event_type, processed_at, data) 
-         VALUES ($1, $2, NOW(), '{}')`,
-          [eventId, eventType || 'unknown']
-        );
-      },
-      'markEventProcessed',
-      'StripeEvent'
-    );
-  }
-
-  async updateStripeCustomer(starshipId: string, stripeCustomerId: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.query(
-          `UPDATE starships SET 
-         stripe_customer_id = $1,
-         updated_at = NOW() 
-         WHERE id = $2`,
-          [stripeCustomerId, starshipId]
-        );
-      },
-      'updateStripeCustomer',
-      'Starship',
-      starshipId
-    );
-  }
-
-  async findByStripeCustomerId(customerId: string): Promise<StarshipModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM starships WHERE stripe_customer_id = $1 LIMIT 1', [
-          customerId,
-        ]);
-        return result ? fromDatabase(StarshipEntity, result) : null;
-      },
-      'findByStripeCustomerId',
-      'Starship'
-    );
-  }
-
-  // Cleanup and maintenance methods
-  async findAbandonedPendingStarships(hours: number = 24): Promise<StarshipModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-
-        const result = await connection.query<Record<string, unknown>>(
-          `SELECT * FROM starships
-         WHERE status = 'pending_payment'
-         AND created_at < $1
-         ORDER BY created_at DESC`,
-          [cutoffTime]
-        );
-
-        return fromDatabaseArray(StarshipEntity, result);
-      },
-      'findAbandonedPendingStarships',
-      'Starship'
-    );
-  }
-
-  async cleanupAbandonedStarship(starshipId: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        await this.deleteEntity('starships', starshipId);
-      },
-      'cleanupAbandonedStarship',
-      'Starship',
-      starshipId
-    );
-  }
-
-  async updatePaymentStatus(
-    starshipId: string,
-    status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
-    additionalFields?: Partial<StarshipModel>
-  ): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const updates = {
-          status,
-          ...additionalFields,
-          updatedAt: new Date().toISOString(),
-        };
-
-        const updateData = toDatabase(toEntityInstance(StarshipEntity, updates));
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
-
-        await this.updateEntity('starships', starshipId, filteredUpdateData);
-      },
-      'updatePaymentStatus',
-      'Starship',
-      starshipId
-    );
   }
 
   // Conversation methods (relationships converted to foreign keys)

@@ -21,7 +21,6 @@ export interface ClientUser extends UserModel {
 // User filters for search and filtering
 export interface UserFilters {
   email?: string
-  hasStripe?: boolean
   isNewUser?: boolean
 }
 
@@ -42,17 +41,11 @@ export interface UpdateUserProfileRequest {
   newPassword?: string
 }
 
-// Stripe integration request
-export interface LinkStripeRequest {
-  stripeCustomerId: string
-}
-
 // User statistics response
 export interface UserStats {
   totalUsers: number
   newUsersLast30Days: number
   activeUsers: number
-  usersWithStripe: number
 }
 
 // Centralized query keys following TanStack Query best practices
@@ -63,7 +56,6 @@ export const USER_QUERY_KEYS = {
   details: () => [...USER_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...USER_QUERY_KEYS.details(), id] as const,
   byEmail: (email: string) => [...USER_QUERY_KEYS.all, 'email', email] as const,
-  byStripe: (stripeCustomerId: string) => [...USER_QUERY_KEYS.all, 'stripe', stripeCustomerId] as const,
   stats: () => [...USER_QUERY_KEYS.all, 'stats'] as const,
   currentUser: () => [...USER_QUERY_KEYS.all, 'current'] as const,
 } as const
@@ -96,23 +88,6 @@ export function useUserByEmail(email: string, enabled: boolean = true) {
       return response.data.data
     },
     enabled: !!email && email.includes('@') && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: 2,
-  })
-}
-
-/**
- * Get user by Stripe customer ID
- */
-export function useUserByStripeId(stripeCustomerId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: USER_QUERY_KEYS.byStripe(stripeCustomerId),
-    queryFn: async (): Promise<UserModel> => {
-      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/stripe/${stripeCustomerId}`)
-      return response.data.data
-    },
-    enabled: !!stripeCustomerId && stripeCustomerId.startsWith('cus_') && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     retry: 2,
@@ -397,36 +372,6 @@ export function useDeleteUser() {
 
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete user'
       toast.error('Failed to delete user', {
-        description: errorMessage,
-      })
-    },
-  })
-}
-
-/**
- * Link user to Stripe customer
- */
-export function useLinkStripeCustomer() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ userId, stripeCustomerId }: { userId: string; stripeCustomerId: string }) => {
-      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/users/${userId}/stripe`, { stripeCustomerId })
-      return response.data.data
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate user data to refetch with Stripe info
-      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEYS.detail(variables.userId) })
-      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEYS.currentUser() })
-      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEYS.stats() })
-
-      toast.success('Stripe account linked successfully!', {
-        description: 'Your payment account has been connected.',
-      })
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to link Stripe account'
-      toast.error('Failed to link Stripe account', {
         description: errorMessage,
       })
     },

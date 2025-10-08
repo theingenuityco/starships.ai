@@ -7,7 +7,6 @@ import {
   AuthError,
   DatabaseError,
   ForbiddenError,
-  NetworkError,
   NotFoundError,
   ValidationError,
   createError,
@@ -227,15 +226,6 @@ describe('Lean Error System', () => {
       expect(error.message).toBe('Database create failed');
       expect(error.operation).toBe('create');
       expect(error.statusCode).toBe(500);
-    });
-
-    it('should create network error', () => {
-      const error = new NetworkError('stripe', '/v1/customers');
-
-      expect(error.message).toContain('stripe');
-      expect(error.service).toBe('stripe');
-      expect(error.endpoint).toBe('/v1/customers');
-      expect(error.statusCode).toBe(502);
     });
   });
 });

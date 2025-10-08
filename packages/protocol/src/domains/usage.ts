@@ -24,15 +24,6 @@ export interface UsageModel extends LLMUsage {
 }
 
 /**
- * Aggregate totals scoped to a user across all owned starships.
- * Includes requestCount = number of persisted usage records.
- */
-export interface UserUsageTotals {
-  totals: LLMUsage;
-  requestCount: number;
-}
-
-/**
  * Aggregated usage per day for a user (YYYY-MM-DD)
  */
 export interface DailyUsageRow {

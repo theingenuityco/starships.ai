@@ -180,27 +180,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: STRIPE_PUBLISHABLE_KEY
-            - name: STRIPE_PRICE_CRUISER_MONTHLY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: STRIPE_PRICE_CRUISER_MONTHLY
-            - name: STRIPE_PRICE_CRUISER_YEARLY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: STRIPE_PRICE_CRUISER_YEARLY
-            - name: STRIPE_PRICE_DRAUGHT_MONTHLY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: STRIPE_PRICE_DRAUGHT_MONTHLY
-            - name: STRIPE_PRICE_DRAUGHT_YEARLY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: STRIPE_PRICE_DRAUGHT_YEARLY
-
             # Analytics
             - name: GA_MEASUREMENT_ID
               valueFrom:

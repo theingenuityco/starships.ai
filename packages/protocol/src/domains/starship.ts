@@ -11,14 +11,9 @@ import type { TemplateCategory } from '../index';
 // ============================================================================
 
 /**
- * Starship class definitions
- */
-export type StarshipClass = 'scout' | 'cruiser' | 'draught';
-
-/**
  * Starship status definitions
  */
-export type StarshipStatus = 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
+export type StarshipStatus = 'active' | 'inactive';
 
 /**
  * Billing period options
@@ -36,18 +31,11 @@ export interface StarshipModel {
   id: string;
   slug: string;
   ownerId: string; // Foreign key to User
-  class: StarshipClass;
   name: string;
-  maxAgents: number; // Based on class: Scout=3, Cruiser=5, Draught=10
+  maxAgents: number;
   status: StarshipStatus;
   createdAt: string;
   updatedAt: string;
-
-  // Stripe integration
-  subscriptionId?: string; // Stripe subscription ID
-  plan?: StarshipClass; // Separate from class for billing
-  billingPeriod?: BillingPeriod; // Billing period
-  stripeCustomerId?: string; // Links to Stripe Customer for portal access
 }
 
 // ============================================================================
@@ -61,7 +49,6 @@ export interface UpdateStarshipRequest {
   name?: string;
   slug?: string; // Optional - will be auto-generated from name if not provided
   status?: StarshipStatus;
-  class?: StarshipClass;
 }
 
 /**
@@ -84,7 +71,6 @@ export interface StarshipResponse {
 export interface StarshipAgentsResponse {
   starshipId: string;
   starshipName: string;
-  starshipClass: StarshipClass;
   maxAgents: number;
   deployedAgents: Array<{
     // Core AgentParams fields
@@ -131,6 +117,5 @@ export interface StarshipDetailsResponse extends StarshipResponse {
  */
 export interface CreateStarshipRequest {
   name: string;
-  class: StarshipClass;
   slug?: string; // Optional - will be auto-generated if not provided
 }

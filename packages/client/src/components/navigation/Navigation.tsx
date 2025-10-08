@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { History, MessageSquare, Plus, Users, X, Settings, Key, Store } from 'lucide-react'
+import { History, MessageSquare, Plus, Users, X, Settings, Key, Store, User } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -165,7 +165,7 @@ export function Navigation(props: NavigationProps) {
 
   // Floating mode - expandable layout
   return (
-    <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-xl transition-all duration-300 ease-in-out">
+    <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
       <div
         className="flex flex-col w-16 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{
@@ -258,6 +258,31 @@ export function Navigation(props: NavigationProps) {
                         </TooltipTrigger>
                         <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
                           {showConversationList ? 'Hide' : 'Show'} History
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Ship Management Icon */}
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <Link href={`/ship/${starshipSlug}/management`}>
+                            <motion.div
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.3 }}
+                              className={`group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center ${
+                                pathname === `/ship/${starshipSlug}/management` ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15' : ''
+                              }`}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <Settings
+                                className={`w-4 h-4 ${pathname === `/ship/${starshipSlug}/management` ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}
+                              />
+                            </motion.div>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                          Ship Management
                         </TooltipContent>
                       </Tooltip>
                     </motion.div>

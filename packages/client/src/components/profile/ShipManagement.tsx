@@ -2,13 +2,17 @@
 
 import React from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { useUserUsageViewModel } from '@/hooks/useUserUsageViewModel'
+import { useStarshipUsageViewModel } from '@/hooks/useStarshipUsageViewModel'
 import UsageKpiCards from './UsageKpiCards'
 import UsageDetailsHeader from './UsageDetailsHeader'
 import UsageTable from './UsageTable'
 import UsagePagination from './UsagePagination'
 
-export function UserUsage(): React.JSX.Element {
+interface ShipManagementProps {
+  starshipId: string
+}
+
+export function ShipManagement({ starshipId }: ShipManagementProps): React.JSX.Element {
   const {
     isLoading,
     totalCost,
@@ -33,14 +37,14 @@ export function UserUsage(): React.JSX.Element {
     numberGroup,
     usd,
     formatDay,
-  } = useUserUsageViewModel()
+  } = useStarshipUsageViewModel(starshipId)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Usage Overview</h3>
-          <p className="text-sm text-muted-foreground">Aggregated across all your starships</p>
+          <h3 className="text-lg font-semibold">Analytics Overview</h3>
+          <p className="text-sm text-muted-foreground">Usage data and performance metrics for this starship</p>
         </div>
       </div>
 
@@ -70,15 +74,7 @@ export function UserUsage(): React.JSX.Element {
           />
         </CardHeader>
         <CardContent>
-          <UsageTable
-            isDaily={isDaily}
-            loadingList={loadingList}
-            rows={rows}
-            numberGroup={numberGroup}
-            usd={usd}
-            formatDay={formatDay}
-            total={total}
-          />
+          <UsageTable isDaily={isDaily} loadingList={loadingList} rows={rows} numberGroup={numberGroup} usd={usd} formatDay={formatDay} total={total} />
           <UsagePagination page={page} setPage={setPage} pagination={pagination} hasPrev={hasPrev} hasNext={hasNext} />
         </CardContent>
       </Card>
@@ -86,4 +82,4 @@ export function UserUsage(): React.JSX.Element {
   )
 }
 
-export default UserUsage
+export default ShipManagement

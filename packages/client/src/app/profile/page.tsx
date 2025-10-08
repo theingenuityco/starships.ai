@@ -2,13 +2,30 @@
 
 import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { User as UserIcon, LogOut } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 
 import AccountForm from '@/components/profile/AccountForm'
-import { UserUsage } from '@/components/profile/UserUsage'
 
 export default function ProfilePage(): React.JSX.Element {
+  const { logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push('/')
+    } catch (error) {
+      // Show toast/error message for logout failure
+      console.error('Logout failed:', error)
+      // You could also show a toast notification here
+      // toast.error('Logout failed', { description: 'Please try again.' })
+    }
+  }
+
   return (
     <PageLayout>
       <div className="bg-background">
@@ -19,64 +36,29 @@ export default function ProfilePage(): React.JSX.Element {
                 <UserIcon className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">My Profile</h1>
               </div>
-              <p className="text-muted-foreground">Manage your account, billing, and usage.</p>
+              <p className="text-muted-foreground">Manage your account settings and preferences.</p>
             </div>
 
-            {/* Sections using shared Tabs UI with improved alignment */}
-            <Tabs defaultValue="account" className="space-y-6">
-              <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="account" className="gap-2 rounded-xl px-4 py-2">
-                    <UserIcon className="h-4 w-4" />
-                    <span>Account</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="billing" className="gap-2 rounded-xl px-4 py-2">
-                    <CreditCard className="h-4 w-4" />
-                    <span>Billing</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="usage" className="gap-2 rounded-xl px-4 py-2">
-                    <Activity className="h-4 w-4" />
-                    <span>Usage</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            <div className="rounded-xl border border-border/40 bg-background p-6">
+              <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
+              <AccountForm />
+            </div>
 
-              <TabsContent value="account">
-                <section aria-labelledby="account-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="account-section" className="text-lg font-semibold">
-                    Account
-                  </h3>
-                  <div className="mt-4">
-                    <AccountForm />
+            {/* Logout Section */}
+            <Card className="shadow-sm border-border/50 bg-background/80">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-destructive">Sign Out</h3>
+                    <p className="text-sm text-muted-foreground">End your current session</p>
                   </div>
-                </section>
-              </TabsContent>
-
-              <TabsContent value="starship">
-                <section aria-labelledby="starship-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="starship-section" className="text-lg font-semibold">
-                    Starship
-                  </h3>
-                </section>
-              </TabsContent>
-
-              <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="billing-section" className="text-lg font-semibold">
-                    Billing
-                  </h3>
-                </section>
-              </TabsContent>
-
-              <TabsContent value="usage">
-                <section aria-labelledby="usage-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="usage-section" className="sr-only">
-                    Usage
-                  </h3>
-                  <UserUsage />
-                </section>
-              </TabsContent>
-            </Tabs>
+                  <Button variant="destructive" onClick={handleLogout} className="gap-2">
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
           </div>
         </div>
       </div>

@@ -5,9 +5,9 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
+import type { StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the StarshipEntity
@@ -26,26 +26,6 @@ export class StarshipTransformers {
         .replace(/[\s_]+/g, '-') // Replace spaces and underscores with hyphens
         .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
         .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-    });
-  }
-
-  /**
-   * Transform max agents based on starship class
-   */
-  static MaxAgentsTransform() {
-    return Transform(({ value, obj }) => {
-      if (typeof value === 'number' && value > 0) return value;
-      // Auto-calculate based on class if not provided
-      switch (obj.class) {
-        case 'scout':
-          return 3;
-        case 'cruiser':
-          return 5;
-        case 'draught':
-          return 10;
-        default:
-          return 3;
-      }
     });
   }
 }
@@ -68,23 +48,18 @@ export class StarshipEntity implements StarshipModel {
   ownerId!: string;
 
   @Expose()
-  @IsEnum(['scout', 'cruiser', 'draught'])
-  class!: StarshipClass;
-
-  @Expose()
   @IsString()
   @Length(1, 100)
   name!: string;
 
   @Expose()
-  @StarshipTransformers.MaxAgentsTransform()
   @IsNumber()
   @Min(1)
   @Max(50) // Reasonable upper limit
   maxAgents!: number;
 
   @Expose()
-  @IsEnum(['active', 'inactive', 'restricted', 'disabled', 'pending_payment'])
+  @IsEnum(['active', 'inactive'])
   status!: StarshipStatus;
 
   @Expose()
@@ -94,29 +69,6 @@ export class StarshipEntity implements StarshipModel {
   @Expose()
   @IsISO8601()
   updatedAt!: string;
-
-  // Stripe integration fields
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  subscriptionId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsEnum(['scout', 'cruiser', 'draught'])
-  plan?: StarshipClass;
-
-  @Expose()
-  @IsOptional()
-  @IsEnum(['monthly', 'yearly'])
-  billingPeriod?: BillingPeriod;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  stripeCustomerId?: string;
 
   /**
    * Simple validation function using class-validator
@@ -135,16 +87,11 @@ export class StarshipEntity implements StarshipModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         slug: dataRecord.slug || '',
         ownerId: dataRecord.ownerId || '',
-        class: dataRecord.class || 'scout',
         name: dataRecord.name || '',
         maxAgents: dataRecord.maxAgents ?? 3,
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        subscriptionId: dataRecord.subscriptionId,
-        plan: dataRecord.plan,
-        billingPeriod: dataRecord.billingPeriod,
-        stripeCustomerId: dataRecord.stripeCustomerId,
         ...dataRecord,
       });
     } else {
@@ -172,48 +119,19 @@ export class StarshipEntity implements StarshipModel {
   }
 
   /**
-   * Helper method to check if starship is restricted
-   */
-  isRestricted(): boolean {
-    return this.status === 'restricted';
-  }
-
-  /**
-   * Helper method to check if starship has pending payment
-   */
-  hasPendingPayment(): boolean {
-    return this.status === 'pending_payment';
-  }
-
-  /**
    * Helper method to check if starship is disabled
    */
   isDisabled(): boolean {
-    return this.status === 'disabled';
-  }
-
-  /**
-   * Helper method to get starship class display name
-   */
-  getClassDisplayName(): string {
-    const classNames = {
-      scout: 'Scout Class',
-      cruiser: 'Cruiser Class',
-      draught: 'Draught Class',
-    };
-    return classNames[this.class] || 'Unknown Class';
+    return this.status === 'inactive';
   }
 
   /**
    * Helper method to get starship status display name
    */
   getStatusDisplayName(): string {
-    const statusNames = {
+    const statusNames: Record<StarshipStatus, string> = {
       active: 'Active',
       inactive: 'Inactive',
-      restricted: 'Restricted',
-      disabled: 'Disabled',
-      pending_payment: 'Payment Pending',
     };
     return statusNames[this.status] || 'Unknown Status';
   }
@@ -230,31 +148,6 @@ export class StarshipEntity implements StarshipModel {
    */
   isNew(): boolean {
     return this.getAgeInDays() <= 7;
-  }
-
-  /**
-   * Helper method to check if starship has Stripe integration
-   */
-  hasStripeIntegration(): boolean {
-    return !!(this.subscriptionId || this.stripeCustomerId);
-  }
-
-  /**
-   * Helper method to check if starship is on a paid plan
-   */
-  isPaidPlan(): boolean {
-    return this.class !== 'scout' || this.hasStripeIntegration();
-  }
-
-  /**
-   * Helper method to get billing display info
-   */
-  getBillingInfo(): { plan: string; period?: string; status: string } {
-    return {
-      plan: this.plan ? this.getClassDisplayName() : this.getClassDisplayName(),
-      period: this.billingPeriod ? (this.billingPeriod === 'monthly' ? 'Monthly' : 'Yearly') : undefined,
-      status: this.getStatusDisplayName(),
-    };
   }
 
   /**
@@ -300,14 +193,9 @@ export class StarshipEntity implements StarshipModel {
   }
 
   /**
-   * Helper method to check if starship needs attention (e.g., payment issues, inactive)
+   * Helper method to check if starship needs attention (e.g., inactive for too long)
    */
   needsAttention(): boolean {
-    return (
-      this.status === 'pending_payment' ||
-      this.status === 'restricted' ||
-      this.status === 'disabled' ||
-      (this.status === 'inactive' && this.getAgeInDays() > 30)
-    );
+    return this.status === 'inactive' && this.getAgeInDays() > 30;
   }
 }

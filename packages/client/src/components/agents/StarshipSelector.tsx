@@ -19,19 +19,6 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
   const { userId } = useAuth()
   const { data: starships = [], isLoading: loading, error } = useUserStarships(userId || '', !!userId)
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
-    switch (starshipClass) {
-      case 'scout':
-        return '🚀'
-      case 'cruiser':
-        return '🛸'
-      case 'draught':
-        return '🚢'
-      default:
-        return '🚀'
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-muted/5">
@@ -71,7 +58,7 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
         {starships.map((starship: StarshipModel) => (
           <SelectItem key={starship.id} value={starship.id}>
             <div className="flex items-center space-x-3 py-1">
-              <span className="text-lg">{getStarshipIcon(starship.class)}</span>
+              <span className="text-lg">🚀</span>
               <div className="font-medium">{starship.name}</div>
             </div>
           </SelectItem>

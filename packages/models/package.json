@@ -18,8 +18,6 @@
     "backup:help": "tsx src/scripts/backup-cli.ts help",
     "test:backup": "tsx src/scripts/test-backup-restore.ts",
     "disaster:recovery": "tsx src/scripts/disaster-recovery.ts",
-    "cleanup:abandoned-starships": "tsx src/scripts/cleanup-abandoned-starships.ts",
-    "cleanup:abandoned-starships:dry": "tsx src/scripts/cleanup-abandoned-starships.ts --dry-run",
     "validate-schema": "tsx src/scripts/schema-validator.ts",
     "monitor": "tsx src/scripts/performance-monitor.ts",
     "db-cli": "tsx src/scripts/db-cli.ts",

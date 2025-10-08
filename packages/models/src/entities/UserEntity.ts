@@ -180,7 +180,6 @@ export class UserEntity implements UserModel {
         displayName: dataRecord.displayName,
         avatar: dataRecord.avatar,
         password: dataRecord.password,
-        stripeCustomerId: dataRecord.stripeCustomerId,
         ...dataRecord,
       });
     } else {

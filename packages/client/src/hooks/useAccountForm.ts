@@ -258,10 +258,6 @@ export function useAccountForm() {
     setPasswordErrors({})
   }
 
-  const goToBilling = () => {
-    router.push('/profile?tab=billing')
-  }
-
   const changeList: ChangeSummaryItem[] = useMemo(() => {
     const list: ChangeSummaryItem[] = []
     if (form.displayName !== initial.displayName) list.push({ type: 'displayName', from: initial.displayName || '—', to: form.displayName })
@@ -318,7 +314,6 @@ export function useAccountForm() {
     onSave,
     onRevertAll,
     cancelPasswordEdit,
-    goToBilling,
 
     // Refs
     currentPasswordRef,

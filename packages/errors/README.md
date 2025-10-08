@@ -106,7 +106,6 @@ For infrastructure failures:
 
 ```typescript
 new DatabaseError('create', originalError);
-new NetworkError('stripe-api', '/v1/customers', originalError);
 ```
 
 ## Utility Functions

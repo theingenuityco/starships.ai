@@ -42,7 +42,6 @@ export default function AccountForm() {
     onSave,
     onRevertAll,
     cancelPasswordEdit,
-    goToBilling,
     currentPasswordRef,
   } = useAccountForm()
 

@@ -88,32 +88,6 @@ export class UserRepository extends BaseRepository {
     }, 'delete');
   }
 
-  // Stripe integration methods
-  async findByStripeCustomerId(stripeCustomerId: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.getConnection();
-      const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM users WHERE stripe_customer_id = $1', [
-        stripeCustomerId,
-      ]);
-      return result ? fromDatabase(UserEntity, result) : null;
-    }, 'findByStripeCustomerId');
-  }
-
-  async updateStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
-    return this.executeWithErrorHandling(async () => {
-      // Validate required parameters
-      if (!userId) {
-        throw new Error('userId is required for updateStripeCustomerId');
-      }
-      if (!stripeCustomerId) {
-        throw new Error('stripeCustomerId is required for updateStripeCustomerId');
-      }
-
-      const connection = this.getConnection();
-      await connection.query('UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2', [stripeCustomerId, userId]);
-    }, 'updateStripeCustomerId');
-  }
-
   // Auth-specific methods
   async findByEmailWithPassword(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {

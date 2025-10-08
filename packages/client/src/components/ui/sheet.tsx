@@ -28,7 +28,7 @@ const SheetOverlay = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Ove
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  'fixed z-[1003] gap-4 frosted-glass-card shadow-frosted-xl p-6 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+  'fixed z-[1003] gap-4 frosted-glass-card shadow-frosted-lg p-6 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
   {
     variants: {
       side: {

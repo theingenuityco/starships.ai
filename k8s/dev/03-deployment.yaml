@@ -1,5 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: starships-app-headless
+  namespace: starships-dev
+  labels:
+    app: starships-ai
+    environment: dev
+spec:
+  clusterIP: None
+  selector:
+    app: starships-ai
+    environment: dev
+---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: starships-app
   namespace: starships-dev
@@ -7,13 +21,11 @@ metadata:
     app: starships-ai
     environment: dev
 spec:
+  serviceName: starships-app-headless
   replicas: 1
   revisionHistoryLimit: 5
-  strategy:
+  updateStrategy:
     type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app: starships-ai
@@ -23,37 +35,39 @@ spec:
       labels:
         app: starships-ai
         environment: dev
-      annotations:
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: '3000'
     spec:
+      terminationGracePeriodSeconds: 120
       imagePullSecrets:
         - name: ghcr-pull-secret
-
+      initContainers:
+        - name: init-starships-data
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /mnt/postgresql /mnt/app-data/sessions || true
+          volumeMounts:
+            - name: starships-data
+              mountPath: /mnt
       containers:
         - name: starships
-          image: 'PLACEHOLDER_IMAGE:latest' # Replaced automatically by GitHub Actions
+          image: ghcr.io/theingenuityco/starships.ai:latest
           imagePullPolicy: Always
-
           ports:
             - containerPort: 3000
               name: frontend
-              protocol: TCP
             - containerPort: 4000
               name: backend
-              protocol: TCP
-
-          # ✅ Environment variables (from Kubernetes secrets)
+            - containerPort: 5432
+              name: postgres
           env:
-            # Core environment
             - name: NODE_ENV
               value: 'development'
             - name: SKIP_BUILD
               value: 'true'
             - name: SKIP_INSTALL
               value: 'true'
-
-            # Server/Client configuration
             - name: SERVER_PORT
               valueFrom:
                 secretKeyRef:
@@ -69,8 +83,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: LOG_LEVEL
-
-            # URLs
             - name: PUBLIC_URL
               valueFrom:
                 secretKeyRef:
@@ -86,15 +98,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SERVER_URL
-
-            # JWT Auth
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: JWT_SECRET
-
-            # PostgreSQL Configuration (external EC2 DB)
             - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:
@@ -125,8 +133,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: POSTGRES_SSL
-
-            # LLM Providers
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -142,18 +148,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: OPENROUTER_API_KEY
-            - name: DEFAULT_LLM_PROVIDER
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DEFAULT_LLM_PROVIDER
-            - name: DEFAULT_CHAT_MODEL
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DEFAULT_CHAT_MODEL
-
-            # Stripe
             - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -169,19 +163,43 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: STRIPE_PUBLISHABLE_KEY
-
-            # Analytics
             - name: GA_MEASUREMENT_ID
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
-
-          # Resource limits (safe defaults for t3.small/t3.medium EKS nodes)
+            - name: PGDATA
+              value: '/var/lib/postgresql/data/pgdata'
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    /usr/bin/supervisorctl stop postgres || true
+                    sleep 5
+          volumeMounts:
+            - name: starships-data
+              mountPath: /var/lib/postgresql
+              subPath: postgres
+            - name: starships-data
+              mountPath: /app/data
+              subPath: app-data
           resources:
             requests:
-              memory: '512Mi'
               cpu: '250m'
+              memory: '512Mi'
             limits:
-              memory: '2Gi'
               cpu: '1000m'
+              memory: '2Gi'
+  volumeClaimTemplates:
+    - metadata:
+        name: starships-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 60Gi

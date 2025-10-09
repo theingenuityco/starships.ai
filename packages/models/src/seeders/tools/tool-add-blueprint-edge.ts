@@ -21,7 +21,7 @@ Incrementally build blueprint connectivity by adding edges one at a time, ensuri
 - **ref**: Unique identifier (string, unique within blueprint)
 - **from**: Source node ref (must exist in blueprint)
 - **to**: Target node ref (must exist in blueprint)
-- **condition**: Optional JavaScript expression for conditional routing
+- **condition**: Optional when the "from" node is conditional only. Must match the edgeCondition that node produces (e.g., "true", "false", "success", "error", "retry", "done"). Omit for non-conditional sources.
 - **label**: Optional display label
 - **metadata**: Optional object for additional data
 
@@ -55,7 +55,11 @@ Returns updated tool with new edge added, or validation errors if addition fails
           ref: { type: 'string', description: 'Unique edge identifier' },
           from: { type: 'string', description: 'Source node ref' },
           to: { type: 'string', description: 'Target node ref' },
-          condition: { type: 'string', description: 'Optional condition expression' },
+          condition: {
+            type: 'string',
+            description:
+              'Optional condition expression used ONLY when the source (from) node is conditional. Must match the edgeCondition produced by that node (e.g., "true", "false", "success", "error", "retry", "done"). Omit for non-conditional sources.',
+          },
           label: { type: 'string', description: 'Optional display label for the edge' },
           metadata: { type: 'object', description: 'Optional metadata for the edge' },
         },

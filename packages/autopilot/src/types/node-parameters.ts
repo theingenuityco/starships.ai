@@ -71,11 +71,77 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
  * Tool parameter schema for function calling
  */
 export interface ToolParameterSchema {
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-  description: string;
-  enum?: string[];
-  items?: ToolParameterSchema; // For array type
-  properties?: Record<string, ToolParameterSchema>; // For object type
+  // Core JSON Schema metadata
+  $id?: string;
+  $schema?: string;
+  $ref?: string;
+
+  // Basic annotations
+  title?: string;
+  description?: string;
+  default?: unknown;
+  examples?: unknown[];
+
+  // Type (single or union) including null
+  type?:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'object'
+    | 'array'
+    | 'null'
+    | Array<'string' | 'number' | 'boolean' | 'object' | 'array' | 'null'>;
+
+  // Enum / const
+  enum?: unknown[];
+  const?: unknown;
+
+  // String-specific constraints
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: string;
+
+  // Number-specific constraints
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  multipleOf?: number;
+
+  // Array-specific constraints
+  items?: ToolParameterSchema | ToolParameterSchema[];
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+
+  // Object-specific constraints
+  properties?: Record<string, ToolParameterSchema>;
+  patternProperties?: Record<string, ToolParameterSchema>;
+  additionalProperties?: boolean | ToolParameterSchema;
+  required?: string[];
+  minProperties?: number;
+  maxProperties?: number;
+  dependentRequired?: Record<string, string[]>;
+  dependentSchemas?: Record<string, ToolParameterSchema>;
+  propertyNames?: ToolParameterSchema;
+
+  // Combinators and conditionals
+  allOf?: ToolParameterSchema[];
+  anyOf?: ToolParameterSchema[];
+  oneOf?: ToolParameterSchema[];
+  not?: ToolParameterSchema;
+  if?: ToolParameterSchema;
+  then?: ToolParameterSchema;
+  else?: ToolParameterSchema;
+
+  // Read/write hints
+  readOnly?: boolean;
+  writeOnly?: boolean;
+  deprecated?: boolean;
+
+  // Local definitions
+  $defs?: Record<string, ToolParameterSchema>;
 }
 
 /**
@@ -83,6 +149,7 @@ export interface ToolParameterSchema {
  */
 export interface ToolParams extends BaseParams {
   name: string;
+  slug: string;
   description: string;
   parameters: {
     type: 'object';
@@ -138,14 +205,12 @@ export interface WorkflowParams extends BaseParams {
 
 /**
  * Agent state containing runtime data (messages and tools)
+ * Generic type that can be extended with additional properties
  */
-export interface AgentState {
+export type AgentState<T = Record<string, unknown>> = {
   messages?: LlmMessage[]; // Message history
   tools?: ToolParams[]; // Available tools
-  starshipId?: string; // Implicit context for host tools (e.g., Daedalus)
-  baseUrl?: string; // Server base URL for host tools (e.g., http://localhost:4000/api/v1)
-  authToken?: string; // JWT token for Authorization header (without "Bearer ")
-}
+} & T;
 
 /**
  * Agent-specific node parameters

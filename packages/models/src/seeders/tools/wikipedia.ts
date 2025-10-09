@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const wikipediaTool: ToolParams = {
   name: 'wikipedia_search',
+  slug: 'wikipedia-search',
   description: 'Search and retrieve comprehensive information from Wikipedia using REST API',
   parameters: {
     type: 'object',

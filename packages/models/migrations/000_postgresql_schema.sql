@@ -210,6 +210,7 @@ CREATE TABLE tools (
     condition TEXT,
     configuration JSONB DEFAULT '{}'::jsonb,
     is_enabled BOOLEAN NOT NULL DEFAULT true,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active')),
     starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE CASCADE,
     template_id VARCHAR(255) REFERENCES tool_templates(id) ON DELETE SET NULL,
     deployed_at TIMESTAMP WITH TIME ZONE,
@@ -225,6 +226,7 @@ CREATE INDEX idx_tools_template_id ON tools(template_id);
 CREATE INDEX idx_tools_name ON tools(name);
 CREATE INDEX idx_tools_slug ON tools(slug);
 CREATE INDEX idx_tools_enabled ON tools(is_enabled);
+CREATE INDEX idx_tools_status ON tools(status);
 
 -- ============================================================================
 -- NOTE: WORKFLOWS, BLUEPRINTS, AND EXECUTIONS TABLES REMOVED
@@ -241,6 +243,7 @@ CREATE TABLE conversations (
     id VARCHAR(255) PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
+    state JSONB DEFAULT '{}'::jsonb,
     starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -250,6 +253,7 @@ CREATE TABLE conversations (
 CREATE INDEX idx_conversations_starship_id ON conversations(starship_id);
 CREATE INDEX idx_conversations_status ON conversations(status);
 CREATE INDEX idx_conversations_created_at ON conversations(created_at);
+CREATE INDEX idx_conversations_state ON conversations USING GIN(state);
 
 -- ============================================================================
 -- MESSAGES TABLE
@@ -476,7 +480,7 @@ COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
 COMMENT ON TABLE ledger_entries IS 'Immutable ledger of wallet mutations for auditing and balance tracking';
 COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace';
 COMMENT ON TABLE tools IS 'Deployed tool instances associated with starships';
-COMMENT ON TABLE conversations IS 'Chat conversations within starships';
+COMMENT ON TABLE conversations IS 'Chat conversations within starships with runtime state management';
 COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';

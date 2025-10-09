@@ -192,7 +192,9 @@ export class StreamingService {
 
     // Helper: current placeholder index (top of stack)
     const topPlaceholder = (): number | undefined =>
-      connection.placeholderStack.length > 0 ? connection.placeholderStack[connection.placeholderStack.length - 1] : undefined;
+      connection.placeholderStack && connection.placeholderStack.length > 0
+        ? connection.placeholderStack[connection.placeholderStack.length - 1]
+        : undefined;
 
     // 1) Array append: '/messages/-' -> '/messages/{baseLength + runningAdds}'
     if (op === 'add' && path === '/messages/-') {
@@ -206,6 +208,7 @@ export class StreamingService {
         (raw.value.streaming === true || (typeof raw.value.content === 'string' && raw.value.content.length === 0));
 
       if (isAssistantPlaceholder) {
+        if (!connection.placeholderStack) connection.placeholderStack = [];
         connection.placeholderStack.push(index);
       }
 
@@ -231,7 +234,7 @@ export class StreamingService {
         isReplace && typeof normalized.path === 'string' && /\/streaming$/.test(normalized.path) && raw?.value === false;
       const replaceWhole = isReplace && typeof normalized.path === 'string' && /^\/messages\/\d+$/.test(normalized.path);
 
-      if ((streamingFalse || replaceWhole) && connection.placeholderStack.length > 0) {
+      if ((streamingFalse || replaceWhole) && connection.placeholderStack && connection.placeholderStack.length > 0) {
         const tokens = String(normalized.path).split('/');
         const idxInPath = tokens.length >= 3 ? Number(tokens[2]) : NaN;
         if (!Number.isNaN(idxInPath) && idxInPath === topPlaceholder()) {

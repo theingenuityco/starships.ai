@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintLintTool: ToolParams = {
   name: 'blueprint_lint',
+  slug: 'blueprint-lint',
   description: `Validates Autopilot blueprint structure and connectivity with comprehensive error reporting.
 
 ## Purpose
@@ -43,7 +44,7 @@ Returns structured validation result:
 \`\`\`
 
 ## Usage Scenarios
-- **Pre-deployment**: Validate blueprints before tool_create or tool_update operations
+- **Pre-deployment**: Validate blueprints before tool_create or tool_edit operations
 - **Development**: Catch structural issues during blueprint authoring
 - **Quality Assurance**: Verify blueprint integrity before production deployment
 - **Debugging**: Identify connectivity and reference issues in complex workflows
@@ -142,18 +143,34 @@ Returns structured validation result:
             if (!hasStart) issues.push('Missing start node');
             if (!hasEnd) issues.push('Missing end node');
 
-            // Validate edges reference existing nodes
+            // Validate edges structure and references
+            const seenEdgeRefs = new Set();
             for (const e of edges) {
               if (!e || typeof e !== 'object') {
                 issues.push('Edge entry must be an object');
                 continue;
               }
-              if (!e.from || !e.to) {
+              if (!e.ref || typeof e.ref !== 'string') {
+                issues.push('Edge missing valid "ref"');
+              } else {
+                if (seenEdgeRefs.has(e.ref)) issues.push(\`Duplicate edge ref: \${e.ref}\`);
+                seenEdgeRefs.add(e.ref);
+              }
+              if (!e.from || typeof e.from !== 'string' || !e.to || typeof e.to !== 'string') {
                 issues.push(\`\${e.ref ?? '?'} missing "from" or "to"\`);
                 continue;
               }
               if (!seenRefs.has(e.from)) issues.push(\`\${e.ref ?? '?'} "from" references unknown node: \${e.from}\`);
               if (!seenRefs.has(e.to)) issues.push(\`\${e.ref ?? '?'} "to" references unknown node: \${e.to}\`);
+              if (e.condition !== undefined && typeof e.condition !== 'string') {
+                issues.push(\`\${e.ref ?? '?'} condition must be a string\`);
+              }
+              if (e.label !== undefined && typeof e.label !== 'string') {
+                issues.push(\`\${e.ref ?? '?'} label must be a string\`);
+              }
+              if (e.metadata !== undefined && (typeof e.metadata !== 'object' || Array.isArray(e.metadata))) {
+                issues.push(\`\${e.ref ?? '?'} metadata must be an object\`);
+              }
             }
 
             // Basic summary

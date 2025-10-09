@@ -82,6 +82,66 @@ await engine.executeBlueprint(blueprint, execution);
 console.log('Results:', execution.results);
 ```
 
+### Blueprint Builder Usage
+
+Use the `BlueprintBuilder` to programmatically construct blueprints with explicit node references:
+
+```typescript
+import { BlueprintBuilder, Engine, ExecutionItemUtils } from '@starships/autopilot';
+
+// Create builder and add nodes with complete type checking
+const builder = new BlueprintBuilder();
+
+const startRef = builder.addNode({
+  type: 'start',
+  name: 'Begin',
+  description: 'Start node',
+  parameters: {},
+});
+
+const llmRef = builder.addNode({
+  type: 'llm',
+  name: 'AI Response',
+  description: 'LLM node',
+  parameters: {
+    model: 'anthropic/claude-3.5-sonnet',
+    messages: [{ role: 'user', content: 'Hello!' }],
+  },
+});
+
+const endRef = builder.addNode({
+  type: 'end',
+  name: 'Complete',
+  description: 'End node',
+  parameters: {},
+});
+
+// Connect nodes using the returned references
+const blueprint = builder.addEdge(startRef, llmRef).addEdge(llmRef, endRef).setMetadata('version', '1.0').build();
+
+// Execute with Engine
+const engine = new Engine();
+const execution = ExecutionItemUtils.createExecution();
+await engine.executeBlueprint(blueprint, execution);
+```
+
+**Key Features:**
+
+- **Full Type Safety**: Pass complete node objects with compile-time type checking
+- **Explicit References**: `addNode()` returns the generated node reference
+- **Parameter Validation**: TypeScript validates node parameters based on node type
+- **Clean & Maintainable**: Easy to read and modify
+
+**Builder Methods:**
+
+- `addNode(node)` - Add a complete node object (without ref), returns generated node reference
+- `addEdge(from, to, condition?)` - Connect nodes, returns this for chaining
+- `setMetadata(key, value)` - Set blueprint metadata, returns this for chaining
+- `build()` - Build and return the complete blueprint
+- `reset()` - Reset builder, returns this for chaining
+- `getNodeCount()` - Get current node count
+- `getEdgeCount()` - Get current edge count
+
 ### End Node Output
 
 You can optionally specify an `output` parameter on the End node. If present, the engine will resolve it (supports `{{ ... }}` template expressions) and return that value wrapped as an `ExecutionItem[]` from `executeBlueprint`, instead of the entire `execution.results`.
@@ -376,7 +436,7 @@ export class CustomNode extends BaseNode<CustomParams> {
 
 ```typescript
 // Core classes
-export { Engine, Agent, BaseNode } from '@starships/autopilot';
+export { Engine, Agent, BaseNode, BlueprintBuilder } from '@starships/autopilot';
 
 // Node handlers
 export { LLM, HttpRequest, Tool, Workflow, Conditional, Transform, Mutate } from '@starships/autopilot';

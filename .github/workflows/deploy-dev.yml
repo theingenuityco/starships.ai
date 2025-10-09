@@ -56,11 +56,11 @@ jobs:
 
       - name: Validate manifests
         run: |
-          kubectl apply --dry-run=server -f k8s/dev/00-namespace.yaml
-          kubectl apply --dry-run=server -f k8s/dev/02-pvc.yaml
-          kubectl apply --dry-run=server -f k8s/dev/03-deployment.yaml
-          kubectl apply --dry-run=server -f k8s/dev/04-service.yaml
-          kubectl apply --dry-run=server -f k8s/dev/05-ingress.yaml
+          kubectl apply --dry-run=client -f k8s/dev/00-namespace.yaml
+          kubectl apply --dry-run=client -f k8s/dev/02-pvc.yaml
+          kubectl apply --dry-run=client -f k8s/dev/03-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/dev/04-service.yaml
+          kubectl apply --dry-run=client -f k8s/dev/05-ingress.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests

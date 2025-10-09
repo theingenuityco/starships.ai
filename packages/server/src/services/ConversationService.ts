@@ -1079,12 +1079,6 @@ export class ConversationService {
         }
 
         const toolEvt = event as ToolEvent;
-        console.log('[STREAMING] 🎯 Tool call detected at depth 0:', {
-          toolName: toolEvt.data?.toolName,
-          toolCallId: toolEvt.data?.toolCallId,
-          conversationId,
-          isActive: this.streamingService?.isActive(conversationId),
-        });
 
         // Broadcast tool_call_detected via ui_action event channel
         // This triggers UI form opening for specific tools like tool_create
@@ -1094,11 +1088,9 @@ export class ConversationService {
             toolCallId: toolEvt.data?.toolCallId,
             toolName: toolEvt.data?.toolName,
           };
-          console.log('[STREAMING] 📤 Broadcasting ui_action:', payload);
           await this.streamingService.broadcastUIAction(conversationId, payload);
-          console.log('[STREAMING] ✅ ui_action broadcast complete');
         } else {
-          console.warn('[STREAMING] ⚠️  StreamingService not active, cannot broadcast tool_call_detected');
+          console.warn('[STREAMING] ⚠️ StreamingService not active, cannot broadcast tool_call_detected');
         }
         break;
       }

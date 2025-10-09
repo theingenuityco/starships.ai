@@ -55,7 +55,7 @@ describe('Tool List Tool', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(toolListTool.name).toBe('tool_list');
+      expect(toolListTool.name).toBe('List Tools');
       expect(toolListTool.description).toContain('List all tools');
       expect(toolListTool.description.length).toBeGreaterThan(10);
       expect(toolListTool.parameters).toBeDefined();

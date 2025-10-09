@@ -10,12 +10,18 @@ export { wikipediaToolTemplate } from './wikipedia';
 export { duckduckgoToolTemplate } from './duckduckgo';
 export { toolListToolTemplate } from './tool-list';
 export { toolGetToolTemplate } from './tool-get';
-export { toolCreateToolTemplate } from './tool-create';
-export { toolUpdateToolTemplate } from './tool-update';
+export { toolOpenToolTemplate } from './tool-open';
+export { toolEditToolTemplate } from './tool-edit';
 export { blueprintLintToolTemplate } from './blueprint-lint';
 export { toolTestToolTemplate } from './tool-test';
 export { nodeSchemaIntrospectionToolTemplate } from './node-schema';
 export { blueprintExamplesToolTemplate } from './blueprint-examples';
+export { toolAddBlueprintNodeToolTemplate } from './tool-add-blueprint-node';
+export { toolAddBlueprintEdgeToolTemplate } from './tool-add-blueprint-edge';
+export { toolEditBlueprintNodeToolTemplate } from './tool-edit-blueprint-node';
+export { toolRemoveBlueprintNodeToolTemplate } from './tool-remove-blueprint-node';
+export { toolEditBlueprintEdgeToolTemplate } from './tool-edit-blueprint-edge';
+export { toolRemoveBlueprintEdgeToolTemplate } from './tool-remove-blueprint-edge';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -25,12 +31,18 @@ import { wikipediaToolTemplate } from './wikipedia';
 import { duckduckgoToolTemplate } from './duckduckgo';
 import { toolListToolTemplate } from './tool-list';
 import { toolGetToolTemplate } from './tool-get';
-import { toolCreateToolTemplate } from './tool-create';
-import { toolUpdateToolTemplate } from './tool-update';
+import { toolOpenToolTemplate } from './tool-open';
+import { toolEditToolTemplate } from './tool-edit';
 import { blueprintLintToolTemplate } from './blueprint-lint';
 import { toolTestToolTemplate } from './tool-test';
 import { nodeSchemaIntrospectionToolTemplate } from './node-schema';
 import { blueprintExamplesToolTemplate } from './blueprint-examples';
+import { toolAddBlueprintNodeToolTemplate } from './tool-add-blueprint-node';
+import { toolAddBlueprintEdgeToolTemplate } from './tool-add-blueprint-edge';
+import { toolEditBlueprintNodeToolTemplate } from './tool-edit-blueprint-node';
+import { toolRemoveBlueprintNodeToolTemplate } from './tool-remove-blueprint-node';
+import { toolEditBlueprintEdgeToolTemplate } from './tool-edit-blueprint-edge';
+import { toolRemoveBlueprintEdgeToolTemplate } from './tool-remove-blueprint-edge';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -40,10 +52,16 @@ export const ALL_TOOL_TEMPLATES = [
   duckduckgoToolTemplate,
   toolListToolTemplate,
   toolGetToolTemplate,
-  toolCreateToolTemplate,
-  toolUpdateToolTemplate,
+  toolOpenToolTemplate,
+  toolEditToolTemplate,
   blueprintLintToolTemplate,
   toolTestToolTemplate,
   nodeSchemaIntrospectionToolTemplate,
   blueprintExamplesToolTemplate,
+  toolAddBlueprintNodeToolTemplate,
+  toolAddBlueprintEdgeToolTemplate,
+  toolEditBlueprintNodeToolTemplate,
+  toolRemoveBlueprintNodeToolTemplate,
+  toolEditBlueprintEdgeToolTemplate,
+  toolRemoveBlueprintEdgeToolTemplate,
 ];

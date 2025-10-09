@@ -55,7 +55,7 @@ describe('Tool Test Tool', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(toolTestTool.name).toBe('tool_test');
+      expect(toolTestTool.name).toBe('Test Tool');
       expect(toolTestTool.description).toContain('Execute another tool');
       expect(toolTestTool.parameters).toBeDefined();
       expect(toolTestTool.blueprint).toBeDefined();

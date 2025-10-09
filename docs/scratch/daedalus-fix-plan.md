@@ -14,7 +14,7 @@ Constraints
 
 Current behavior (from logs)
 
-- LLM exposes correct tool functions via function-calling (tool_create, tool_update, tool_get, tool_list, blueprint_lint, tool_test).
+- LLM exposes correct tool functions via function-calling (tool_create, tool_edit, tool_get, tool_list, blueprint_lint, tool_test).
 - Daedalus calls tool_list once, then returns a long planning monologue and stops; it does not call blueprint_lint/tool_create.
 - secureEnv is present (tool_list succeeds). state.tools is correctly wired (LLM toolCalls emitted).
 

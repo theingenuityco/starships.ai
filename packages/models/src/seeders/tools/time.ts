@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const timeTool: ToolParams = {
   name: 'get_current_time',
+  slug: 'get-current-time',
   description: 'Get the current date and time',
   parameters: {
     type: 'object',

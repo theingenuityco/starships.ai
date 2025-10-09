@@ -304,8 +304,8 @@ export class StarshipService {
       const defaultToolSlugs = [
         'tool-list',
         'tool-get',
-        'tool-create',
-        'tool-update',
+        'tool-open',
+        'tool-edit',
         'tool-test',
         'blueprint-lint',
         'node-schema',

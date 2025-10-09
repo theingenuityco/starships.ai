@@ -41,8 +41,8 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" side="bottom" sideOffset={8} className={cn('p-0 rounded-lg shadow-lg', compact ? 'w-48' : 'min-w-[250px] w-[min(320px,calc(100vw-40px))]')}>
-        <div className="p-2 max-h-64 overflow-y-auto">
+      <PopoverContent align="start" side="bottom" sideOffset={8} className={cn('p-0 rounded-lg shadow-frosted-lg', compact ? 'w-48' : 'min-w-[250px] w-[min(320px,calc(100vw-40px))]')}>
+        <div className="p-2 max-h-64 overflow-y-auto custom-scrollbar">
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -52,17 +52,6 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
             <div className="text-center py-4 text-sm text-muted-foreground">No agents available</div>
           ) : (
             <>
-              {selectedAgent && (
-                <button
-                  onClick={() => {
-                    onAgentChange(null)
-                    setIsOpen(false)
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-muted rounded-md transition-colors"
-                >
-                  Clear selection
-                </button>
-              )}
               {agents.map(agent => (
                 <button
                   key={agent.id}
@@ -70,7 +59,10 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                     onAgentChange(agent)
                     setIsOpen(false)
                   }}
-                  className={cn('w-full text-left px-3 py-2 rounded-md transition-colors', selectedAgent?.id === agent.id ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted')}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring',
+                    selectedAgent?.id === agent.id ? 'bg-accent text-accent-foreground ring-1 ring-primary/20' : 'text-foreground hover:bg-accent/60 hover:text-accent-foreground'
+                  )}
                 >
                   <div className="font-medium">{agent.name}</div>
                   {agent.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{agent.description}</div>}

@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
@@ -41,7 +42,12 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" side="bottom" sideOffset={8} className={cn('p-0 rounded-lg shadow-frosted-lg', compact ? 'w-48' : 'min-w-[250px] w-[min(320px,calc(100vw-40px))]')}>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        className={cn('p-0 rounded-lg shadow-frosted-lg text-sm leading-6', compact ? 'w-80' : 'min-w-[320px] w-[min(420px,calc(100vw-40px))]')}
+      >
         <div className="p-2 max-h-64 overflow-y-auto custom-scrollbar">
           {loading ? (
             <div className="flex items-center justify-center py-4">
@@ -61,11 +67,21 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                   }}
                   className={cn(
                     'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring',
-                    selectedAgent?.id === agent.id ? 'bg-accent text-accent-foreground ring-1 ring-primary/20' : 'text-foreground hover:bg-accent/60 hover:text-accent-foreground'
+                    selectedAgent?.id === agent.id ? 'bg-primary/5 text-foreground' : 'text-foreground hover:bg-primary/5'
                   )}
                 >
-                  <div className="font-medium">{agent.name}</div>
-                  {agent.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{agent.description}</div>}
+                  <div className="flex items-center gap-3">
+                    <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
+                      {((agent as any).avatarUrl || (agent as any).imageUrl || (agent as any).iconUrl) && (
+                        <AvatarImage src={(agent as any).avatarUrl || (agent as any).imageUrl || (agent as any).iconUrl} alt={agent.name} />
+                      )}
+                      <AvatarFallback className="bg-muted text-muted-foreground text-xs font-medium">{agent.name?.[0]?.toUpperCase() || 'A'}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="font-medium leading-5">{agent.name}</div>
+                      {agent.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div>}
+                    </div>
+                  </div>
                 </button>
               ))}
             </>

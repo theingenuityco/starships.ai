@@ -14,6 +14,77 @@ This implementation strictly follows the [Layered Architecture Patterns](./layer
 - **Business logic isolation** in the service layer
 - **Complete separation of concerns**
 
+## Critical Issues & Elegant Solutions Identified
+
+### ✅ Issues Identified and ELEGANTLY RESOLVED Through Comprehensive Codebase Analysis
+
+After systematically analyzing all 6 layers of the current architecture, the following critical gaps were identified and **ELEGANTLY FIXED** in this updated plan:
+
+1. **✅ FIXED - Database Schema Architecture**: 
+   - **Issue**: Original plan suggested extending `oauth_auth_codes` which violates Single Responsibility Principle
+   - **Solution**: Create dedicated `email_verification_tokens` table with proper separation of concerns
+   - **Evidence**: OAuth codes have 5-minute expiration, email verification needs 24-hour expiration
+
+2. **✅ FIXED - Environment Configuration Pattern Mismatch**: 
+   - **Issue**: Plan showed inconsistent required vs optional environment variables
+   - **Solution**: Follow exact pattern from current `getEnvConfig()` - add to `requiredEnvVars` object with fail-fast validation
+   - **Evidence**: Current pattern requires `POSTGRES_HOST`, `PUBLIC_URL` etc. with no fallbacks
+
+3. **✅ FIXED - Service Layer Constructor Pattern**: 
+   - **Issue**: Plan didn't match current service injection patterns  
+   - **Solution**: Follow exact `UserService` constructor pattern (no parameters) with internal repository instantiation
+   - **Evidence**: Current services instantiate repositories internally: `this.userRepository = new UserRepository()`
+
+4. **✅ FIXED - Client Hook Interface Consistency**: 
+   - **Issue**: Plan interfaces didn't match current `useAuth.ts` structure
+   - **Solution**: Extend existing `AuthLoginResponse` and `AuthRegisterResponse` interfaces properly  
+   - **Evidence**: Current interfaces already have `waitlisted?`, `status?`, `message?` fields
+
+5. **✅ FIXED - Database Index Strategy**: 
+   - **Issue**: New table indexes didn't follow established patterns
+   - **Solution**: Follow exact index patterns from current schema with proper WHERE clauses and GIN indexes
+   - **Evidence**: Current schema uses `WHERE NOT consumed` and proper index naming conventions
+
+6. **✅ FIXED - Service Method Naming Consistency**: 
+   - **Issue**: Plan methods didn't match current service naming patterns
+   - **Solution**: Follow exact naming from `UserService` - use `getUserByEmail()`, `createUser()` patterns
+   - **Evidence**: Current service uses consistent verb-noun naming conventions
+
+### ✅ Elegant Solutions Following Established Patterns
+
+**🎯 Database Schema Solution (UPDATED)**: 
+- Create dedicated `email_verification_tokens` table for clean separation of concerns
+- Follows single responsibility principle - each table serves one purpose
+- No migration needed - just add new table without touching existing OAuth infrastructure
+- Different expiration times (24 hours vs 5 minutes) appropriate for each use case
+
+**🎯 Dependency Management Solution**: 
+- Add `@aws-sdk/client-ses` only to `packages/server/package.json` where needed
+- No existing AWS dependencies - clean addition following workspace patterns
+
+**🎯 Service Layer Solution (FIXED)**: 
+- Create `EmailService` following exact `UserService` constructor pattern (no parameters)
+- Internal repository instantiation: `this.emailVerificationTokenRepo = new EmailVerificationTokenRepository()`
+- Use `getEnvConfig()` for environment access, matching current service patterns
+- Proper error handling following established service layer patterns
+
+**🎯 Environment Configuration Solution (FIXED)**: 
+- Add email configuration to `requiredEnvVars` object in `getEnvConfig()` with fail-fast validation
+- Follow exact pattern: check if missing, throw error with helpful message
+- No fallback values - application crashes on startup if email config missing (following established pattern)
+- Pattern: `EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS` in requiredEnvVars object
+
+**🎯 Client Hook Solution (FIXED)**: 
+- Add `useResendVerification` following exact TanStack Query patterns from existing hooks
+- Extend existing `AuthLoginResponse`/`AuthRegisterResponse` interfaces by adding optional fields
+- Follow current pattern: `emailNotVerified?: boolean` (optional fields with descriptive names)
+- Integrate with main `useAuth` hook using established patterns from current implementation
+
+**🎯 Protocol Layer Solution (FIXED)**: 
+- Extend existing auth interfaces in `packages/protocol/src/domains/auth.ts` 
+- Add fields to existing interfaces rather than creating new ones
+- Follow current optional field pattern: `waitlisted?: boolean`, `status?: 'pending' | 'approved'`
+
 ## Current State Analysis
 
 ### ✅ Existing Infrastructure We Can Leverage
@@ -66,137 +137,311 @@ export interface ResendVerificationRequest {
 
 // EXTEND existing AuthLoginResponse interface:
 export interface AuthLoginResponse {
-  // ... existing fields ...
+  user?: AuthUser;
+  token?: string;
+  starship?: { slug: string };
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+  // ✅ ADD email verification fields
   emailNotVerified?: boolean;
   canResendVerification?: boolean;
 }
 
 // EXTEND existing AuthRegisterResponse interface:
 export interface AuthRegisterResponse {
-  // ... existing fields ...
+  user?: AuthUser;
+  token?: string;
+  starship?: { slug: string };
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+  // ✅ ADD email verification fields
   emailVerificationSent?: boolean;
 }
 ```
 
-### Layer 2: Entity Layer Extensions (Models)
+### Layer 2: Entity Layer Implementation (Models)
 
-**Extend `packages/models/src/entities/OAuthAuthCodeEntity.ts`:**
+**Create `packages/models/src/entities/EmailVerificationTokenEntity.ts`:**
 
-Following the established entity pattern with proper validation and transformation:
+Following the established entity pattern from `UserEntity.ts` and `OAuthAuthCodeEntity.ts` with proper validation and transformation:
 
 ```typescript
-// EXTEND existing OAuthAuthCodeModel interface:
-export interface OAuthAuthCodeModel {
-  // ... existing fields ...
-  purpose?: 'oauth_exchange' | 'email_verification';
+/**
+ * Email Verification Token Entity - Database-backed email verification
+ * 
+ * Follows the established Entity pattern for email verification token management.
+ * Separate from OAuth system for clean separation of concerns.
+ */
+
+import { Expose, Transform } from 'class-transformer';
+import { IsString, IsEmail, IsBoolean, IsISO8601, Length, validate, ValidationError } from 'class-validator';
+
+/**
+ * Email Verification Token domain model for protocol sharing
+ */
+export interface EmailVerificationTokenModel {
+  id: string;
+  token: string;
+  userId: string;
+  email: string;
+  consumed: boolean;
+  createdAt: string;
+  expiresAt: string;
 }
 
-// ADD to OAuthAuthCodeEntity class:
-export class OAuthAuthCodeEntity implements OAuthAuthCodeModel {
-  // ... existing fields ...
+/**
+ * Email Verification Token Transformers - Following established patterns
+ */
+export class EmailVerificationTokenTransformers {
+  /**
+   * Transform email to ensure consistency
+   */
+  static EmailTransform() {
+    return Transform(({ value }) => {
+      if (!value || typeof value !== 'string') return value;
+      return value.toLowerCase().trim();
+    });
+  }
+
+  /**
+   * Transform token to ensure consistency
+   */
+  static TokenTransform() {
+    return Transform(({ value }) => {
+      if (!value || typeof value !== 'string') return value;
+      return value.trim();
+    });
+  }
+}
+
+export class EmailVerificationTokenEntity implements EmailVerificationTokenModel {
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  id!: string;
 
   @Expose()
-  @IsOptional()
-  @IsIn(['oauth_exchange', 'email_verification'])
-  purpose?: 'oauth_exchange' | 'email_verification';
+  @EmailVerificationTokenTransformers.TokenTransform()
+  @IsString()
+  @Length(64, 64) // Exactly 64 characters for hex-encoded 32 bytes
+  token!: string;
 
-  // ADD factory method following established patterns:
-  static createForEmailVerification(userId: string, email: string, code: string): Partial<OAuthAuthCodeModel> {
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  userId!: string;
+
+  @Expose()
+  @EmailVerificationTokenTransformers.EmailTransform()
+  @IsEmail({}, { message: 'Email must be a valid email address' })
+  @Length(1, 255)
+  email!: string;
+
+  @Expose()
+  @IsBoolean()
+  consumed!: boolean;
+
+  @Expose()
+  @IsISO8601()
+  createdAt!: string;
+
+  @Expose()
+  @IsISO8601()
+  expiresAt!: string;
+
+  /**
+   * Validation method - Following established Entity pattern
+   */
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new EmailVerificationTokenEntity();
+
+    if (operation === 'create') {
+      // Set defaults for creation
+      const now = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id',
+        createdAt: dataRecord.createdAt || now,
+        expiresAt: dataRecord.expiresAt || expiresAt,
+        consumed: dataRecord.consumed || false,
+        ...dataRecord,
+      });
+    } else {
+      Object.assign(entity, dataRecord);
+    }
+
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    if (errors.length > 0) {
+      const errorMessages = errors
+        .map((error: ValidationError) => Object.values(error.constraints || {}).join(', '))
+        .join('; ');
+      throw new Error(`Email Verification Token validation failed: ${errorMessages}`);
+    }
+  }
+
+  /**
+   * Create from user data - factory method
+   */
+  static createFromUserData(userId: string, email: string, token: string): Partial<EmailVerificationTokenModel> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours vs 5 min for OAuth
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
 
     return {
       userId,
       email,
-      code,
+      token,
       consumed: false,
-      purpose: 'email_verification',
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
     };
   }
-
-  // ADD validation for email verification purpose:
-  static async validateEmailVerification(data: unknown): Promise<void> {
-    await this.validate(data, 'create');
-    // Additional email verification specific validation if needed
-  }
 }
 ```
 
-### Layer 3: Repository Layer Extensions (Models)
+### Layer 3: Repository Layer Implementation (Models)
 
-**Extend `packages/models/src/repositories/OAuthAuthCodeRepository.ts`:**
+**Create `packages/models/src/repositories/EmailVerificationTokenRepository.ts`:**
 
 Following the established repository pattern with proper error handling:
 
 ```typescript
-export class OAuthAuthCodeRepository extends BaseRepository {
-  // ... existing methods ...
+/**
+ * Email Verification Token Repository - Database-backed email verification management
+ * 
+ * Follows the established BaseRepository pattern for email verification token persistence.
+ * Separate from OAuth system for clean separation of concerns.
+ */
 
-  /**
-   * Generate email verification token (reuses OAuth infrastructure)
-   * Follows established repository patterns
-   */
-  async generateEmailVerificationToken(userId: string, email: string): Promise<string> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const code = crypto.randomBytes(32).toString('hex');
-        const id = nanoid();
+import { EmailVerificationTokenEntity } from '@/entities/EmailVerificationTokenEntity';
+import { toDatabase } from '@/helpers/serialization-helper';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { nanoid } from 'nanoid';
+import crypto from 'crypto';
 
-        // Use existing factory pattern
-        const entityData = OAuthAuthCodeEntity.createForEmailVerification(userId, email, code);
-
-        // Validate using Entity layer
-        await OAuthAuthCodeEntity.validateEmailVerification({ id, ...entityData });
-
-        // Convert to database format
-        const dbData = toDatabase({ id, ...entityData });
-
-        const connection = this.getConnection();
-
-        // Insert with conflict handling
-        await connection.queryOne(
-          `INSERT INTO oauth_auth_codes (id, code, user_id, email, consumed, created_at, expires_at, purpose) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [dbData.id, dbData.code, dbData.user_id, dbData.email, dbData.consumed, dbData.created_at, dbData.expires_at, dbData.purpose]
-        );
-
-        return code;
-      },
-      'generateEmailVerificationToken',
-      'oauth_auth_codes'
-    );
+export class EmailVerificationTokenRepository extends BaseRepository {
+  constructor() {
+    super('EmailVerificationTokenRepository');
   }
 
   /**
-   * Validate email verification token (reuses OAuth infrastructure)
-   * Follows established atomic transaction patterns
+   * Generate and store a secure email verification token
+   * Returns the generated token for email sending
    */
-  async validateAndConsumeEmailVerificationToken(token: string): Promise<{ userId: string; email: string } | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
+  async generateToken(userId: string, email: string): Promise<string> {
+    return this.executeWithErrorHandling(async () => {
+      // Generate cryptographically secure token (64 hex chars = 32 bytes)
+      const token = crypto.randomBytes(32).toString('hex');
+      const id = nanoid();
+      
+      // Create entity data using factory method
+      const entityData = EmailVerificationTokenEntity.createFromUserData(userId, email, token);
+      
+      // Validate before database insertion
+      await EmailVerificationTokenEntity.validate({ id, ...entityData }, 'create');
+      
+      // Convert to database format
+      const dbData = toDatabase({ id, ...entityData });
+      
+      const connection = this.getConnection();
+      
+      // Insert with conflict handling (token collisions are extremely rare but possible)
+      try {
+        await connection.queryOne(
+          `INSERT INTO email_verification_tokens (id, token, user_id, email, consumed, created_at, expires_at) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [dbData.id, dbData.token, dbData.user_id, dbData.email, dbData.consumed, dbData.created_at, dbData.expires_at]
+        );
+        
+        return token;
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === '23505') { // PostgreSQL unique constraint violation
+          // Extremely rare - retry with new token
+          return this.generateToken(userId, email);
+        }
+        throw error;
+      }
+    }, 'generateToken', 'email_verification_tokens');
+  }
 
-        return await connection.transaction(async (tx) => {
-          const result = await tx.query(
-            `UPDATE oauth_auth_codes 
+  /**
+   * Validate and consume an email verification token atomically
+   * Returns user data if successful, null if token is invalid/expired/consumed
+   */
+  async validateAndConsumeToken(token: string): Promise<{ userId: string; email: string } | null> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      
+      // Atomic transaction to prevent race conditions
+      return await connection.transaction(async (tx) => {
+        // Find and update in one atomic operation
+        const result = await tx.query(
+          `UPDATE email_verification_tokens 
            SET consumed = true
-           WHERE code = $1 
-             AND purpose = 'email_verification'
+           WHERE token = $1 
              AND NOT consumed 
              AND expires_at > NOW()
            RETURNING user_id, email`,
-            [token]
-          );
+          [token]
+        );
+        
+        const row = result.rows.length > 0 ? result.rows[0] : null;
+        
+        if (!row) {
+          return null;
+        }
+        
+        return {
+          userId: row.user_id as string,
+          email: row.email as string,
+        };
+      });
+    }, 'validateAndConsumeToken', 'email_verification_tokens');
+  }
 
-          const row = result.rows[0];
-          return row ? { userId: row.user_id, email: row.email } : null;
-        });
-      },
-      'validateAndConsumeEmailVerificationToken',
-      'oauth_auth_codes'
-    );
+  /**
+   * Clean up expired email verification tokens
+   * Returns number of tokens deleted
+   */
+  async cleanupExpiredTokens(): Promise<number> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      
+      const pool = connection.getPool();
+      const result = await pool.query(
+        `DELETE FROM email_verification_tokens WHERE expires_at <= NOW()`
+      );
+      
+      return result.rowCount || 0;
+    }, 'cleanupExpiredTokens', 'email_verification_tokens');
+  }
+
+  /**
+   * Count active (non-expired, non-consumed) email verification tokens
+   */
+  async countActiveTokens(): Promise<number> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      
+      const result = await connection.queryOne<{ count: string }>(
+        `SELECT COUNT(*) as count FROM email_verification_tokens 
+         WHERE expires_at > NOW() AND NOT consumed`
+      );
+      
+      return result ? parseInt(result.count, 10) : 0;
+    }, 'countActiveTokens', 'email_verification_tokens');
   }
 }
 ```
@@ -205,17 +450,25 @@ export class OAuthAuthCodeRepository extends BaseRepository {
 
 **Create `packages/server/src/services/EmailService.ts`:**
 
+**🎯 ELEGANT SOLUTION**: Following the established service patterns from `WaitlistService.ts` - uses constructor dependency injection for repositories, proper error handling, logging patterns, and interface definitions for return types.
+
 Following established service patterns with proper error handling:
 
 ```typescript
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { getEnvConfig } from '@starships/env';
+import { EmailVerificationTokenRepository } from '@starships/models';
+import { logger } from '@/utils/logger';
 
 export class EmailService {
   private sesClient: SESClient;
-  private env = getEnvConfig();
+  private env: ReturnType<typeof getEnvConfig>;
+  private emailVerificationTokenRepo: EmailVerificationTokenRepository;
 
   constructor() {
+    // ✅ Follow exact UserService constructor pattern (no parameters)
+    this.env = getEnvConfig();
+    this.emailVerificationTokenRepo = new EmailVerificationTokenRepository();
     this.sesClient = new SESClient({
       region: this.env.AWS_SES_REGION,
     });
@@ -299,6 +552,12 @@ export class EmailService {
 Add email verification business logic following established patterns:
 
 ```typescript
+// ADD imports at top of file
+import { EmailVerificationTokenRepository, WaitlistRepository } from '@starships/models';
+import { EmailService } from '@/services/EmailService';
+import { StarshipService } from '@/services/StarshipService';
+import { WaitlistService } from '@/services/WaitlistService';
+
 export class UserService {
   // ... existing methods ...
 
@@ -318,11 +577,11 @@ export class UserService {
       throw new ValidationError('User email is already verified', 'emailVerified');
     }
 
-    // Generate token using repository
-    const oauthRepo = new OAuthAuthCodeRepository();
-    const token = await oauthRepo.generateEmailVerificationToken(userId, email);
+    // Generate token using dedicated repository
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const token = await emailVerificationTokenRepo.generateToken(userId, email);
 
-    // Send email using email service
+    // Send email using email service - follows current service patterns
     const emailService = new EmailService();
     await emailService.sendVerificationEmail(email, token);
   }
@@ -337,8 +596,8 @@ export class UserService {
     starshipCreated: boolean;
   }> {
     // Validate and consume token
-    const oauthRepo = new OAuthAuthCodeRepository();
-    const verification = await oauthRepo.validateAndConsumeEmailVerificationToken(token);
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const verification = await emailVerificationTokenRepo.validateAndConsumeToken(token);
 
     if (!verification) {
       throw new ValidationError('Invalid or expired verification token', 'token');
@@ -348,6 +607,7 @@ export class UserService {
     await this.updateUserProfile(verification.userId, { emailVerified: true });
 
     // Business logic: Check waitlist and create starship if approved
+    // ✅ Follow current service instantiation pattern
     const waitlistService = new WaitlistService(new WaitlistRepository());
     const waitlistStatus = await waitlistService.getDetailedStatus(verification.email);
 
@@ -360,7 +620,7 @@ export class UserService {
           starshipCreated = true;
         }
       } catch (error) {
-        console.error(`[EMAIL-VERIFY] Failed to create starship:`, error);
+        logger.error(`[EMAIL-VERIFY] Failed to create starship:`, error);
         // Continue - user can create starship later
       }
     }
@@ -377,6 +637,8 @@ export class UserService {
 ### Layer 5: API Routes Layer Extensions (Server)
 
 **Modify `packages/server/src/routes/auth.ts`:**
+
+**🎯 ELEGANT SOLUTION**: The auth routes already have excellent patterns with Zod validation, proper error handling, service layer delegation, and consistent response formats. We extend the existing registration/login routes and add new endpoints following identical patterns. The existing `validateData` helper function ensures consistent validation across all endpoints.
 
 Following established API patterns with Zod validation and proper error handling:
 
@@ -407,11 +669,9 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     await userService.sendEmailVerification(user.id, email);
 
     // ✅ RETURN email verification response following protocol contracts
-    const response: EmailVerificationResponse = {
+    const response: AuthRegisterResponse = {
       emailVerificationSent: true,
-      email: email,
       message: 'Registration successful! Please check your email to verify your account.',
-      expiresIn: '24 hours',
     };
 
     sendSuccess(res, response, 201);
@@ -510,9 +770,8 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
 
     // ✅ ADD: Email verification gate following business rules
     if (!user.emailVerified) {
-      const response: Partial<AuthLoginResponse> = {
+      const response: AuthLoginResponse = {
         emailNotVerified: true,
-        email: user.email,
         message: 'Please verify your email address before signing in.',
         canResendVerification: true,
       };
@@ -531,18 +790,32 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
 
 **Extend `packages/client/src/hooks/useAuth.ts`:**
 
+**🎯 ELEGANT SOLUTION**: The codebase already has perfect TanStack Query patterns with individual hook functions (`useLogin`, `useRegister`, etc.) and a main `useAuth` hook that orchestrates them. We add `useResendVerification` following the exact same pattern and expose it through the main hook.
+
 Following established client patterns with TanStack Query:
 
 ```typescript
 // EXTEND existing interfaces following protocol contracts:
 interface AuthLoginResponse {
-  // ... existing fields ...
+  user?: AuthUser;
+  token?: string;
+  starship?: { slug: string };
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+  // ✅ ADD email verification fields
   emailNotVerified?: boolean;
   canResendVerification?: boolean;
 }
 
 interface AuthRegisterResponse {
-  // ... existing fields ...
+  user?: AuthUser;
+  token?: string;
+  starship?: { slug: string };
+  waitlisted?: boolean;
+  status?: 'pending' | 'approved';
+  message?: string;
+  // ✅ ADD email verification fields
   emailVerificationSent?: boolean;
 }
 
@@ -655,14 +928,16 @@ const handleResendVerification = async (email: string) => {
 
 **Extend `packages/env/src/types.ts`:**
 
+**🎯 ELEGANT SOLUTION**: The environment configuration follows fail-fast validation with no fallback values, matching the critical infrastructure pattern.
+
 ```typescript
 export interface EnvironmentConfig {
   // ... existing configuration ...
 
   // ✅ ADD Email Service Configuration following established patterns
-  EMAIL_FROM_ADDRESS?: string;
-  EMAIL_FROM_NAME?: string;
-  AWS_SES_REGION?: string;
+  EMAIL_FROM_ADDRESS: string;
+  EMAIL_FROM_NAME: string;
+  AWS_SES_REGION: string;
 }
 ```
 
@@ -670,30 +945,70 @@ export interface EnvironmentConfig {
 
 ```typescript
 export function getEnvConfig(): EnvironmentConfig {
+  // Validate critical environment variables for production safety
+  const requiredEnvVars = {
+    PUBLIC_URL: process.env.PUBLIC_URL,
+    CLIENT_URL: process.env.CLIENT_URL,
+    SERVER_URL: process.env.SERVER_URL,
+    POSTGRES_HOST: process.env.POSTGRES_HOST,
+    POSTGRES_USER: process.env.POSTGRES_USER,
+    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
+    POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
+    // ✅ ADD Required Email Configuration following exact current pattern
+    EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,
+    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
+    AWS_SES_REGION: process.env.AWS_SES_REGION,
+  };
+
+  // Check for missing required environment variables (follows exact current pattern)
+  const missing = Object.entries(requiredEnvVars)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}. Please check your .env file.`);
+  }
+
   return {
     // ... existing config ...
 
-    // ✅ ADD Email Service Configuration
-    EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS || 'noreply@starships.ai',
-    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Starships.ai',
-    AWS_SES_REGION: process.env.AWS_SES_REGION || 'us-east-1',
+    // ✅ ADD Email Service Configuration (required, no fallbacks) following current pattern
+    EMAIL_FROM_ADDRESS: requiredEnvVars.EMAIL_FROM_ADDRESS!,
+    EMAIL_FROM_NAME: requiredEnvVars.EMAIL_FROM_NAME!,
+    AWS_SES_REGION: requiredEnvVars.AWS_SES_REGION!,
   };
 }
 ```
 
 ## Database Schema Extension
 
-**Modify existing `packages/models/migrations/000_postgresql_schema.sql`:**
+**Add to `packages/models/migrations/000_postgresql_schema.sql`:**
+
+**🎯 ELEGANT SOLUTION**: Create dedicated `email_verification_tokens` table following exact current schema patterns. Clean separation from OAuth infrastructure.
 
 ```sql
--- EXTEND existing oauth_auth_codes table for email verification
-ALTER TABLE oauth_auth_codes
-ADD COLUMN purpose VARCHAR(20) DEFAULT 'oauth_exchange'
-CHECK (purpose IN ('oauth_exchange', 'email_verification'));
+-- ============================================================================
+-- EMAIL VERIFICATION TOKENS TABLE (following current schema patterns)
+-- ============================================================================
 
--- Update existing index to include purpose for efficient queries:
-DROP INDEX idx_oauth_auth_codes_code;
-CREATE INDEX idx_oauth_auth_codes_code ON oauth_auth_codes(code, purpose) WHERE NOT consumed;
+CREATE TABLE email_verification_tokens (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    token VARCHAR(64) UNIQUE NOT NULL,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    consumed BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+-- Email verification token indexes (following exact current patterns)
+CREATE INDEX idx_email_verification_tokens_token ON email_verification_tokens(token) WHERE NOT consumed;
+CREATE INDEX idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
+CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+CREATE INDEX idx_email_verification_tokens_email ON email_verification_tokens(email);
+
+-- Comment for documentation (following current pattern)
+COMMENT ON TABLE email_verification_tokens IS 'Email verification tokens for user registration - separate from OAuth for clean architecture';
 ```
 
 - Create user with `emailVerified: false`
@@ -794,28 +1109,33 @@ Unverified user: Blocked with "Please verify email" + resend button
 - One-time use with database enforcement
 - Atomic validation and consumption (prevents race conditions)
 
-## Files to Modify (Not Create)
+## Files to Modify and Create
 
 ### ✅ Database Schema:
 
-- `packages/models/migrations/000_postgresql_schema.sql` - Add purpose column to oauth_auth_codes
+- `packages/models/migrations/000_postgresql_schema.sql` - Add dedicated `email_verification_tokens` table
 
-### ✅ Entities:
+### ✅ New Entities:
 
-- `packages/models/src/entities/OAuthAuthCodeEntity.ts` - Add email verification factory method
+- `packages/models/src/entities/EmailVerificationTokenEntity.ts` - NEW: Email verification token entity
 
-### ✅ Repositories:
+### ✅ New Repositories:
 
-- `packages/models/src/repositories/OAuthAuthCodeRepository.ts` - Add email verification methods
-
-### ✅ Utilities:
-
-- `packages/server/src/utils/jwt.ts` - Add email verification token functions
+- `packages/models/src/repositories/EmailVerificationTokenRepository.ts` - NEW: Email verification repository
 
 ### ✅ Configuration:
 
-- `packages/env/src/types.ts` - Add SES configuration types
-- `packages/env/src/index.ts` - Add SES configuration values
+- `packages/env/src/types.ts` - Add required SES configuration types
+- `packages/env/src/index.ts` - Add required SES configuration values (fail-fast)
+
+### ✅ Protocol Extensions:
+
+- `packages/protocol/src/domains/auth.ts` - Extend existing auth interfaces
+
+### ✅ Server Services:
+
+- `packages/server/src/services/EmailService.ts` - NEW: Amazon SES email service
+- `packages/server/src/services/UserService.ts` - ADD: Email verification business logic methods
 
 ### ✅ Server Routes:
 
@@ -823,60 +1143,178 @@ Unverified user: Blocked with "Please verify email" + resend button
 
 ### ✅ Client Hooks:
 
-- `packages/client/src/hooks/useAuth.ts` - Extend existing interfaces for email verification
+- `packages/client/src/hooks/useAuth.ts` - Extend existing interfaces and add resend mutation
 
 ### ✅ Client Components:
 
 - `packages/client/src/components/auth/LoginForm.tsx` - Add verification UI and handlers
 
-## New Files (Minimal)
+### ✅ Package Dependencies:
 
-### ✅ Single New File:
+- `packages/server/package.json` - Add `@aws-sdk/client-ses` dependency
 
-- `packages/server/src/services/EmailService.ts` - Amazon SES email service
+## Implementation Phases & Progress Tracker
 
-## Implementation Phases
+### Phase 1: Backend Infrastructure ⏳ `0/5 Complete`
 
-### Phase 1: Backend Infrastructure
+- [ ] **Task 1.1**: Add dedicated email verification tokens table
+  - **File**: `packages/models/migrations/000_postgresql_schema.sql`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: None
+  - **Estimated Time**: 15 minutes
 
-1. Extend database schema with purpose column
-2. Extend OAuthAuthCodeEntity for email verification
-3. Extend OAuthAuthCodeRepository with email verification methods
-4. Add SES configuration to environment
+- [ ] **Task 1.2**: Create EmailVerificationTokenEntity
+  - **File**: `packages/models/src/entities/EmailVerificationTokenEntity.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 1.1
+  - **Estimated Time**: 45 minutes
 
-### Phase 2: Email Service
+- [ ] **Task 1.3**: Create EmailVerificationTokenRepository
+  - **File**: `packages/models/src/repositories/EmailVerificationTokenRepository.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 1.2
+  - **Estimated Time**: 60 minutes
 
-1. Create EmailService with SES integration
-2. Design professional verification email template
-3. Add JWT utilities for email verification tokens
+- [ ] **Task 1.4**: Add required SES configuration to environment
+  - **Files**: `packages/env/src/types.ts`, `packages/env/src/index.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: None
+  - **Estimated Time**: 20 minutes
 
-### Phase 3: Authentication Flow
+- [ ] **Task 1.5**: Export new entities and repositories in models package
+  - **Files**: `packages/models/src/index.ts` or equivalent
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 1.2, Task 1.3
+  - **Estimated Time**: 10 minutes
 
-1. Modify registration route to send email instead of creating starship
-2. Add email verification endpoint
-3. Add resend verification endpoint
-4. Modify login route to check email verification
+### Phase 2: Email Service ⏳ `0/3 Complete`
 
-### Phase 4: Client-Side Integration
+- [ ] **Task 2.1**: Install AWS SES dependency
+  - **File**: `packages/server/package.json`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: None
+  - **Estimated Time**: 5 minutes
 
-1. Extend auth hook interfaces
-2. Update LoginForm with verification UI
-3. Handle verification responses and states
+- [ ] **Task 2.2**: Create EmailService with SES integration and constructor injection
+  - **File**: `packages/server/src/services/EmailService.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 2.1, Task 1.4, Task 1.3
+  - **Estimated Time**: 75 minutes
 
-### Phase 5: Testing & Validation
+- [ ] **Task 2.3**: Design professional verification email template
+  - **File**: `packages/server/src/services/EmailService.ts` (email templates)
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 2.2
+  - **Estimated Time**: 30 minutes
 
-1. Test email delivery with SES
-2. Test verification flow end-to-end
-3. Test error cases (expired tokens, invalid tokens)
-4. Test resend functionality
+### Phase 3: Authentication Flow ⏳ `0/7 Complete`
+
+- [ ] **Task 3.1**: Extend protocol layer interfaces
+  - **File**: `packages/protocol/src/domains/auth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: None
+  - **Estimated Time**: 25 minutes
+
+- [ ] **Task 3.2**: Add email verification methods to UserService
+  - **File**: `packages/server/src/services/UserService.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 1.3, Task 2.2
+  - **Estimated Time**: 60 minutes
+
+- [ ] **Task 3.3**: Add email verification Zod schemas
+  - **File**: `packages/server/src/routes/auth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 3.1
+  - **Estimated Time**: 15 minutes
+
+- [ ] **Task 3.4**: Modify registration route to send email verification
+  - **File**: `packages/server/src/routes/auth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 3.2, Task 3.3
+  - **Estimated Time**: 35 minutes
+
+- [ ] **Task 3.5**: Add email verification endpoint
+  - **File**: `packages/server/src/routes/auth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 3.2, Task 3.3
+  - **Estimated Time**: 35 minutes
+
+- [ ] **Task 3.6**: Add resend verification endpoint
+  - **File**: `packages/server/src/routes/auth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 3.2, Task 3.3
+  - **Estimated Time**: 25 minutes
+
+- [ ] **Task 3.7**: Modify login route to check email verification
+  - **File**: `packages/server/src/routes/auth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 3.1
+  - **Estimated Time**: 20 minutes
+
+### Phase 4: Client-Side Integration ⏳ `0/3 Complete`
+
+- [ ] **Task 4.1**: Add resend verification hook to useAuth
+  - **File**: `packages/client/src/hooks/useAuth.ts`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 3.1, Task 3.6
+  - **Estimated Time**: 30 minutes
+
+- [ ] **Task 4.2**: Update LoginForm with verification UI components
+  - **File**: `packages/client/src/components/auth/LoginForm.tsx`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 4.1
+  - **Estimated Time**: 45 minutes
+
+- [ ] **Task 4.3**: Handle verification responses and states in LoginForm
+  - **File**: `packages/client/src/components/auth/LoginForm.tsx`
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 4.2
+  - **Estimated Time**: 30 minutes
+
+### Phase 5: Testing & Validation ⏳ `0/4 Complete`
+
+- [ ] **Task 5.1**: Test email delivery with SES (manual testing)
+  - **Files**: Environment setup + manual testing
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 2.2, AWS SES setup
+  - **Estimated Time**: 30 minutes
+
+- [ ] **Task 5.2**: Test verification flow end-to-end
+  - **Files**: Full stack testing
+  - **Status**: ❌ Not Started
+  - **Dependencies**: All previous tasks
+  - **Estimated Time**: 45 minutes
+
+- [ ] **Task 5.3**: Test error cases (expired tokens, invalid tokens)
+  - **Files**: Backend + frontend error handling
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 5.2
+  - **Estimated Time**: 30 minutes
+
+- [ ] **Task 5.4**: Test resend functionality
+  - **Files**: Frontend resend button + backend endpoint
+  - **Status**: ❌ Not Started
+  - **Dependencies**: Task 5.2
+  - **Estimated Time**: 20 minutes
+
+## Overall Progress Summary
+
+- **Total Tasks**: 21
+- **Completed**: 0 ✅
+- **In Progress**: 0 🚧
+- **Not Started**: 21 ❌
+- **Estimated Total Time**: ~8.5 hours
+- **Current Phase**: Phase 1 (Backend Infrastructure)
 
 ## Environment Variables Required
 
+**🚨 CRITICAL**: These are now **REQUIRED** environment variables. Application will crash on startup if missing.
+
 ```bash
-# Amazon SES Configuration
+# Amazon SES Configuration (REQUIRED - NO FALLBACKS)
 EMAIL_FROM_ADDRESS=noreply@starships.ai
 EMAIL_FROM_NAME=Starships.ai
-AWS_SES_REGION=ap-south-1
+AWS_SES_REGION=us-east-1
 
 # AWS credentials (if not using IAM roles)
 AWS_ACCESS_KEY_ID=your_access_key
@@ -930,14 +1368,18 @@ Since we're extending existing systems rather than creating new ones:
 
 ### New Dependencies:
 
-- `@aws-sdk/client-ses` - Amazon SES SDK for Node.js
+**🎯 ELEGANT SOLUTION**: Add dependency only to the server package where it's needed, following the established workspace pattern. No AWS dependencies exist currently, so this is a clean addition.
+
+- `@aws-sdk/client-ses` - Amazon SES SDK for Node.js (add to `packages/server/package.json` only)
 
 ### Existing Dependencies Leveraged:
 
-- Existing OAuth token system infrastructure
-- Existing environment configuration system
-- Existing authentication flow patterns
-- Existing database connection and transaction handling
+- Existing Entity and Repository patterns (followed exactly for EmailVerificationTokenEntity/Repository)
+- Existing environment configuration system (enhanced with fail-fast validation)
+- Existing authentication flow patterns (extended, not replaced)
+- Existing database connection and transaction handling (reused for email verification tokens)
+- Existing service dependency injection patterns (followed for EmailService constructor)
+- Existing TanStack Query patterns (extended for email verification hooks)
 
 ## Notes
 

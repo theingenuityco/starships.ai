@@ -21,7 +21,7 @@ Update edge properties and routing logic while maintaining blueprint connectivit
 ## Supported Updates
 - **from**: Update source node reference
 - **to**: Update target node reference
-- **condition**: Update conditional expression for routing
+- **condition**: Update conditional expression ONLY when the "from" node is conditional. It must match that node's evaluated edgeCondition (e.g., "true", "false", "success", "error"). Omit for non-conditional sources.
 - **label**: Update edge display label
 - **metadata**: Update edge metadata object
 
@@ -57,7 +57,11 @@ Returns updated tool with edge modifications, or validation errors if update fai
         properties: {
           from: { type: 'string', description: 'New source node ref' },
           to: { type: 'string', description: 'New target node ref' },
-          condition: { type: 'string', description: 'New condition expression' },
+          condition: {
+            type: 'string',
+            description:
+              "New condition expression. Use ONLY when the 'from' node is conditional; must match that node's edgeCondition (e.g., 'true', 'false', 'success', 'error'). Omit otherwise.",
+          },
           label: { type: 'string', description: 'New display label for the edge' },
           metadata: { type: 'object', description: 'New metadata object for the edge' },
         },

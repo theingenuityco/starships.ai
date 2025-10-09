@@ -117,7 +117,7 @@ export class ToolEntity implements ToolModel {
       // For draft tools, parameters and blueprint are optional
       // For active tools, they are required
       if (status === 'active' && (!dataRecord.parameters || !dataRecord.blueprint)) {
-        throw new Error('Active tools must have parameters and blueprint defined');
+        throw new Error('Validation failed: Active tools must have parameters and blueprint defined');
       }
 
       Object.assign(entity, {

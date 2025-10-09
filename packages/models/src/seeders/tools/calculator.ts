@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const calculatorTool: ToolParams = {
   name: 'calculator',
+  slug: 'calculator',
   description: 'Perform mathematical calculations with basic arithmetic operations',
   parameters: {
     type: 'object',

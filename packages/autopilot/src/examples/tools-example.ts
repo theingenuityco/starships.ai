@@ -15,6 +15,7 @@ autopilot.setCredentials({
 // Define tool configurations
 const calculatorTool: ToolParams = {
   name: 'calculator',
+  slug: 'calculator',
   description: 'Perform mathematical calculations with basic arithmetic operations',
   parameters: {
     type: 'object',
@@ -38,6 +39,7 @@ const calculatorTool: ToolParams = {
 
 const timeTool: ToolParams = {
   name: 'get_current_time',
+  slug: 'get-current-time',
   description: 'Get the current date and time',
   parameters: {
     type: 'object',
@@ -67,6 +69,7 @@ const timeTool: ToolParams = {
 
 const echoTool: ToolParams = {
   name: 'echo',
+  slug: 'echo',
   description: 'Echo back the provided input for testing purposes',
   parameters: {
     type: 'object',
@@ -176,7 +179,8 @@ export async function customToolExample() {
 
   // Example of how you could extend the Tool class for custom tools
   const customTool: ToolParams = {
-    name: 'echo',
+    name: 'text_processor',
+    slug: 'text-processor',
     description: 'Process user data with custom logic',
     parameters: {
       type: 'object',

@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintExamplesTool: ToolParams = {
   name: 'blueprint_examples',
+  slug: 'blueprint-examples',
   description: `Query a library of working blueprint examples for different scenarios and patterns.
 
 ## Purpose

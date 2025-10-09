@@ -11,7 +11,7 @@ import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { autopilot } from '@/Autopilot';
 import { NodeHandlerOptions } from '@/types/node-handler';
-import { LLMMessageRole, LLMResponse, LLMUsage } from '@/types/llm';
+import { LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -58,9 +58,11 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Prepare request options - only include params that are explicitly provided
       // This allows OpenRouter/model providers to use their own defaults
+      const sourceMessages = this.coerceToLlmMessages(messages || params.messages);
+      const openaiMessages = this.convertMessagesToOpenAI(sourceMessages);
       const requestOptions: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
         model: params.model,
-        messages: (messages || params.messages) as OpenAI.Chat.ChatCompletionMessageParam[],
+        messages: openaiMessages,
         stream: true,
         stream_options: { include_usage: true }, // OpenRouter usage accounting
       };
@@ -86,14 +88,19 @@ export class LLM extends BaseNode<LlmParams> {
       if (params.tools && Array.isArray(params.tools) && params.tools.length > 0) {
         requestOptions.tools = this.convertToOpenAITools(params.tools);
         requestOptions.tool_choice = 'auto';
+        // Prevent multiple tool calls within a single assistant response
+        // OpenAI/compatible providers honor `parallel_tool_calls: false`
+        requestOptions.parallel_tool_calls = false;
       }
 
+      console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
       // Stream with OpenAI SDK (handles all accumulation reliably)
       const stream = await client.chat.completions.create(requestOptions);
       const llmResponse = await this.processOpenAIStream(stream);
 
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
+      console.error(error);
       throw this.handleExecutionError(error, 'LLM execution failed');
     }
   }
@@ -122,16 +129,148 @@ export class LLM extends BaseNode<LlmParams> {
 
   /**
    * Convert ToolParams to OpenAI function calling format
+   * Uses tool.slug as the function name for consistent kebab-case format
    */
   private convertToOpenAITools(tools: ToolParams[]): OpenAI.Chat.ChatCompletionTool[] {
     return tools.map((tool) => ({
       type: 'function' as const,
       function: {
-        name: tool.name,
+        name: tool.slug,
         description: tool.description,
         parameters: tool.parameters as Record<string, unknown>,
       },
     }));
+  }
+
+  /**
+   * Convert canonical LlmMessage[] to OpenAI ChatCompletionMessageParam[]
+   * - assistant with toolCalls -> assistant with tool_calls (arguments stringified)
+   * - tool with toolCallId -> tool with tool_call_id
+   */
+  private convertMessagesToOpenAI(messages: LlmMessage[] | undefined): OpenAI.Chat.ChatCompletionMessageParam[] {
+    const list = Array.isArray(messages) ? messages : [];
+    return list.map((m) => this.convertMessageToOpenAI(m));
+  }
+
+  private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
+    const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
+    const contentVal = m.content;
+
+    if (role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+      const toolCalls = m.toolCalls.map((tc) => ({
+        id: typeof tc.id === 'string' ? tc.id : undefined,
+        type: 'function' as const,
+        function: {
+          name: tc.function.name,
+          arguments:
+            typeof tc.function.arguments === 'string'
+              ? (tc.function.arguments as string)
+              : (() => {
+                  try {
+                    return JSON.stringify(tc.function.arguments ?? {});
+                  } catch {
+                    return '{}';
+                  }
+                })(),
+        },
+      }));
+      return {
+        role: 'assistant',
+        content: contentVal,
+        tool_calls: toolCalls,
+      } as OpenAI.Chat.ChatCompletionAssistantMessageParam;
+    }
+
+    if (role === 'tool') {
+      const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
+      return {
+        role: 'tool',
+        content: contentVal,
+        tool_call_id: toolCallId,
+      } as OpenAI.Chat.ChatCompletionToolMessageParam;
+    }
+
+    if (role === 'system') {
+      return { role: 'system', content: contentVal } as OpenAI.Chat.ChatCompletionSystemMessageParam;
+    }
+
+    // default user
+    return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
+  }
+
+  /**
+   * Coerce arbitrary messages into canonical LlmMessage[] (handles legacy snake_case fields).
+   */
+  private coerceToLlmMessages(messagesParam: unknown): LlmMessage[] {
+    if (!Array.isArray(messagesParam)) return [];
+    const out: LlmMessage[] = [];
+
+    for (const item of messagesParam) {
+      if (!item || typeof item !== 'object') continue;
+      const obj = item as Record<string, unknown>;
+
+      const role = (typeof obj.role === 'string' ? obj.role : 'user') as LLMMessageRole;
+      const content = typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content ?? '');
+
+      const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : undefined;
+
+      let toolCalls: LlmToolCall[] | undefined;
+      const toolCallsCanonical = (obj as { toolCalls?: unknown }).toolCalls;
+      const toolCallsSnake = (obj as { tool_calls?: unknown }).tool_calls;
+
+      const normalizeToolCall = (tcUnknown: unknown): LlmToolCall | null => {
+        if (!tcUnknown || typeof tcUnknown !== 'object') return null;
+        const rec = tcUnknown as Record<string, unknown>;
+        const id = typeof rec.id === 'string' ? rec.id : undefined;
+
+        let name = '';
+        let args: unknown = {};
+        const fn = rec.function;
+        if (fn && typeof fn === 'object') {
+          const fnRec = fn as Record<string, unknown>;
+          name = typeof fnRec.name === 'string' ? fnRec.name : '';
+          const rawArgs = fnRec.arguments;
+          if (typeof rawArgs === 'string') {
+            try {
+              args = JSON.parse(rawArgs);
+            } catch {
+              args = {};
+            }
+          } else if (rawArgs && typeof rawArgs === 'object') {
+            args = rawArgs;
+          } else {
+            args = {};
+          }
+        }
+
+        if (!name) return null;
+        return { id, type: 'function', function: { name, arguments: args } };
+      };
+
+      if (Array.isArray(toolCallsCanonical)) {
+        toolCalls = toolCallsCanonical.map((tc) => normalizeToolCall(tc)).filter((x): x is LlmToolCall => x !== null);
+      } else if (Array.isArray(toolCallsSnake)) {
+        toolCalls = toolCallsSnake.map((tc) => normalizeToolCall(tc)).filter((x): x is LlmToolCall => x !== null);
+      }
+
+      let toolCallId: string | undefined;
+      if (typeof (obj as { toolCallId?: unknown }).toolCallId === 'string') {
+        toolCallId = (obj as { toolCallId?: string }).toolCallId;
+      } else if (typeof (obj as { tool_call_id?: unknown }).tool_call_id === 'string') {
+        toolCallId = (obj as { tool_call_id?: string }).tool_call_id;
+      }
+
+      const canonical: LlmMessage = {
+        role,
+        content,
+        ...(reasoning ? { reasoning } : {}),
+        ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
+        ...(toolCallId ? { toolCallId } : {}),
+      };
+      out.push(canonical);
+    }
+
+    return out;
   }
 
   /**

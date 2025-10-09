@@ -628,6 +628,7 @@ export const ToolMatchers = {
   toHaveValidBlueprint(received: ToolParams['blueprint']) {
     const mockToolParams: ToolParams = {
       name: 'test',
+      slug: 'test',
       description: 'test',
       parameters: { type: 'object', properties: {} },
       blueprint: received,

@@ -7,6 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const nodeSchemaIntrospectionTool: ToolParams = {
   name: 'node_schema',
+  slug: 'node-schema',
   description: `Query detailed schema information for Autopilot node types including parameters, validation rules, and execution behavior.
 
 ## Purpose

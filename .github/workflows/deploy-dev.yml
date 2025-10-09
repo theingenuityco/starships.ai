@@ -111,9 +111,6 @@ jobs:
             --from-literal=SERVER_URL="$SERVER_URL" \
             --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
-            --from-literal=LOG_LEVEL="$LOG_LEVEL" \
-            --from-literal=DEFAULT_LLM_PROVIDER="$DEFAULT_LLM_PROVIDER" \
-            --from-literal=DEFAULT_CHAT_MODEL="$DEFAULT_CHAT_MODEL" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
             -n ${{ env.NAMESPACE }}
 

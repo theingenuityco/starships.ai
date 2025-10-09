@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { History, MessageSquare, Plus, Users, X, Settings, Key, Store, User } from 'lucide-react'
+import { History, MessageSquare, Plus, X, Settings, Key, Store } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -21,14 +21,6 @@ interface NavigationProps {
 
 // Global navigation structure that works for all authenticated users
 const getGlobalNavigationSections = (starshipSlug: string | null) => [
-  ...(starshipSlug
-    ? [
-        {
-          title: 'Starship Systems',
-          items: [{ href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' }],
-        },
-      ]
-    : []),
   {
     title: 'Resources',
     items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],

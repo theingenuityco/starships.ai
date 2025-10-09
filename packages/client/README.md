@@ -55,7 +55,6 @@ src/
 │   ├── ship/[slug]/             # Individual starship interface
 │   │   ├── layout.tsx           # Ship-specific layout
 │   │   ├── conversations/       # Chat and communication
-│   │   └── crew/                # Agent management
 │   ├── starships/create/        # Starship creation flow
 │   ├── waitlist/page.tsx        # Waitlist management
 │   └── api/                     # API route handlers
@@ -63,7 +62,6 @@ src/
 │   ├── agents/                  # Agent-related components
 │   ├── auth/                    # Authentication components
 │   ├── conversation/            # Chat and messaging interface
-│   ├── crew/                    # Agent deployment and management
 │   ├── layout/                  # Layout components
 │   ├── navigation/              # Navigation system
 │   ├── starships/               # Starship creation and management
@@ -159,7 +157,6 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - **Authentication**: `/login` - User authentication
 - **Ship Interface**: `/ship/[slug]` - Individual starship control panel
   - `/ship/[slug]/conversations` - Chat and communication interface
-  - `/ship/[slug]/crew` - Agent deployment and management
 - **Starship Creation**: `/starships/create` - New starship creation flow
   - `/starships/create/success` - Post-creation success page
   - `/starships/create/cancel` - Creation cancellation handling

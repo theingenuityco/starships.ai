@@ -5,6 +5,7 @@ on:
     workflows: ['Build and Push Image']
     types:
       - completed
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -12,6 +13,10 @@ env:
   AWS_REGION: ap-south-1
   EKS_CLUSTER: starships-dev
   NAMESPACE: starships-dev
+
+concurrency:
+  group: deploy-dev-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write

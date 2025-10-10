@@ -407,7 +407,8 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     if (!paramValidation) return;
 
     const { provider } = paramValidation;
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
+    // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
     
     // Check if this is a linking request (user already logged in)
     const isLinking = req.query.link === 'true';
@@ -756,7 +757,8 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
 
     const { provider } = paramValidation;
     const userId = (req as any).user!.id;
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/v1/auth/${provider}/callback`;
+    // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
     
     // Generate secure state with authenticated user ID
     const state = await generateOAuthState(true, userId);

@@ -4,23 +4,31 @@ metadata:
   name: starships-app
   namespace: starships-dev
   annotations:
+    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80,"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:577012215849:certificate/df86adc3-a423-49f0-a0f0-cdfc09bfa1ce
     alb.ingress.kubernetes.io/ssl-redirect: '443'
-    # TODO: Replace ACM_CERT_ID with your actual ACM Certificate ID
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:577012215849:certificate/ACM_CERT_ID
     alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
-    alb.ingress.kubernetes.io/success-codes: '200,301,302'
+    alb.ingress.kubernetes.io/healthcheck-port: '3000'
+    alb.ingress.kubernetes.io/healthcheck-port: '4000'
 
+    alb.ingress.kubernetes.io/success-codes: '200,301,302'
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
 spec:
   ingressClassName: alb
   rules:
     - host: dev.starships.ai
       http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app
+                port:
+                  name: backend
           - path: /
             pathType: Prefix
             backend:

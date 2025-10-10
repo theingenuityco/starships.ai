@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ import { useStarshipConversations } from '@/hooks/useConversations'
 import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
+  const router = useRouter()
   const { slug } = useParams<{ slug: string }>()
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug, true)
 
@@ -184,7 +185,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               {agentsLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map(i => (
-                    <Card key={i} className="shadow-sm border-border/50">
+                    <Card key={i} className="frosted-glass-card shadow-frosted-lg">
                       <CardHeader>
                         <Skeleton className="h-5 w-3/4 mb-2" />
                         <Skeleton className="h-4 w-full" />
@@ -202,13 +203,17 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       align: 'start',
                       loop: true,
                     }}
-                    className="w-full"
+                    className="w-full px-1 py-2"
                   >
-                    <CarouselContent className="-ml-2 md:-ml-4">
+                    <CarouselContent className="-ml-2 md:-ml-4 py-2">
                       {agents.map(agent => (
-                        <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
-                          <Card className="shadow-sm border-border/50 bg-background/80 hover:border-primary/50 transition-colors h-full">
-                            <CardHeader className="pb-3">
+                        <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 pb-2">
+                          <Card
+                            className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 h-full cursor-pointer"
+                            onClick={() => router.push(`/ship/${slug}/conversations?agent=${agent.id}`)}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                            <CardHeader className="pb-3 relative z-10">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
                                   <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
@@ -217,7 +222,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                                 <Bot className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                               </div>
                             </CardHeader>
-                            <CardContent className="pt-0">
+                            <CardContent className="pt-0 relative z-10">
                               <div className="flex items-center justify-between">
                                 <Badge variant="secondary" className="text-xs">
                                   {agent.model || 'N/A'}
@@ -239,8 +244,13 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {agents.map(agent => (
-                      <Card key={agent.id} className="shadow-sm border-border/50 bg-background/80 hover:border-primary/50 transition-colors">
-                        <CardHeader className="pb-3">
+                      <Card
+                        key={agent.id}
+                        className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
+                        onClick={() => router.push(`/ship/${slug}/conversations?agent=${agent.id}`)}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                        <CardHeader className="pb-3 relative z-10">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
@@ -249,7 +259,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                             <Bot className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                           </div>
                         </CardHeader>
-                        <CardContent className="pt-0">
+                        <CardContent className="pt-0 relative z-10">
                           <div className="flex items-center justify-between">
                             <Badge variant="secondary" className="text-xs">
                               {agent.model || 'N/A'}

@@ -37,6 +37,8 @@ spec:
         environment: dev
     spec:
       terminationGracePeriodSeconds: 120
+      nodeSelector:
+        topology.kubernetes.io/zone: ap-south-1a
       imagePullSecrets:
         - name: ghcr-pull-secret
       initContainers:

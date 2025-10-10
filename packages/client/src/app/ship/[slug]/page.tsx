@@ -14,7 +14,7 @@ import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { UsageKpiCards } from '@/components/profile/UsageKpiCards'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipUsageViewModel } from '@/hooks/useStarshipUsageViewModel'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipAgents, useAgentTools } from '@/hooks/useAgents'
 import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
@@ -41,6 +41,9 @@ export default function StarshipOverviewPage(): React.JSX.Element {
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipId || '', !!starshipId)
   const { data: convData, isLoading: convLoading } = useStarshipConversations(starshipId || '', !!starshipId)
   const conversations = convData?.conversations || []
+
+  // Fetch tools for the selected agent
+  const { data: agentTools = [], isLoading: toolsLoading } = useAgentTools(selectedAgent?.id || '', starshipId || '', !!selectedAgent?.id && !!starshipId && isDetailsModalOpen)
 
   const {
     isLoading: usageLoading,
@@ -355,18 +358,6 @@ export default function StarshipOverviewPage(): React.JSX.Element {
 
           {selectedAgent && (
             <div className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
-              {/* ID and Timestamps */}
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border">
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Agent ID</h4>
-                  <code className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">{selectedAgent.id}</code>
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Created</h4>
-                  <p className="text-sm text-muted-foreground">{new Date(selectedAgent.createdAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-
               {/* Description */}
               <div>
                 <h4 className="text-sm font-semibold mb-2">Description</h4>
@@ -401,12 +392,18 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               </div>
 
               {/* Tools */}
-              {selectedAgent.state?.tools && selectedAgent.state.tools.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Allocated Tools ({selectedAgent.state.tools.length})</h4>
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Allocated Tools {toolsLoading ? '...' : `(${agentTools.length})`}</h4>
+                {toolsLoading ? (
                   <div className="space-y-2">
-                    {selectedAgent.state.tools.map((tool, index) => (
-                      <div key={index} className="bg-muted/30 p-3 rounded-lg">
+                    {[1, 2].map(i => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : agentTools.length > 0 ? (
+                  <div className="space-y-2">
+                    {agentTools.map(tool => (
+                      <div key={tool.id} className="bg-muted/30 p-3 rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-xs">
                             {tool.slug}
@@ -417,8 +414,10 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">No tools assigned to this agent</p>
+                )}
+              </div>
 
               {/* System Prompt */}
               {selectedAgent.systemPrompt && (

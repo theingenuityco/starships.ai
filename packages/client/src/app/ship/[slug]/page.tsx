@@ -79,6 +79,9 @@ export default function StarshipOverviewPage(): React.JSX.Element {
 
             {/* Top Row - 4 Column Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Conversation Activity Card */}
+              <ConversationActivityCard starshipSlug={slug} recentConversation={conversations.length > 0 ? conversations[0] : null} conversationCount={conversations.length} />
+
               <Card className="frosted-glass-card shadow-frosted-lg">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -110,9 +113,6 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   <DailyUsageCostSparkline starshipId={starshipId} inline />
                 </CardContent>
               </Card>
-
-              {/* Conversation Activity Card */}
-              <ConversationActivityCard starshipSlug={slug} recentConversation={conversations.length > 0 ? conversations[0] : null} conversationCount={conversations.length} />
             </div>
 
             <section aria-labelledby="deployed-agents">

@@ -22,7 +22,7 @@ import { useStarshipConversations } from '@/hooks/useConversations'
 import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
 import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
-import { CreateAgentCard } from '@/components/starship/CreateAgentCard'
+import { ConversationActivityCard } from '@/components/starship/ConversationActivityCard'
 import { cn } from '@/lib/utils'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
@@ -111,8 +111,8 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 </CardContent>
               </Card>
 
-              {/* Create Agent Card */}
-              <CreateAgentCard starshipSlug={slug} recentConversation={conversations.length > 0 ? conversations[0] : null} conversationCount={conversations.length} />
+              {/* Conversation Activity Card */}
+              <ConversationActivityCard starshipSlug={slug} recentConversation={conversations.length > 0 ? conversations[0] : null} conversationCount={conversations.length} />
             </div>
 
             <section aria-labelledby="deployed-agents">

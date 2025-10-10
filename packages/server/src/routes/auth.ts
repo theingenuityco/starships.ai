@@ -435,7 +435,7 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
       const scope = 'user:email';
       authUrl =
         `https://github.com/login/oauth/authorize?` +
-        `client_id=${env.GITHUB_CLIENT_ID}&` +
+        `client_id=${env.GH_OAUTH_CLIENT_ID}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `scope=${encodeURIComponent(scope)}&` +
         `state=${state}`;
@@ -777,7 +777,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
       const scope = 'user:email';
       authUrl =
         `https://github.com/login/oauth/authorize?` +
-        `client_id=${env.GITHUB_CLIENT_ID}&` +
+        `client_id=${env.GH_OAUTH_CLIENT_ID}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `scope=${encodeURIComponent(scope)}&` +
         `state=${state}`;

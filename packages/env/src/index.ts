@@ -77,8 +77,8 @@ export function getEnvConfig(): EnvironmentConfig {
     // OAuth Provider Configuration
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+    GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
+    GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
 
 
     // Environment Variables Encryption Key

@@ -509,8 +509,8 @@ export class UserService {
           'User-Agent': 'starships.ai/1.0',  // Required by GitHub API
         },
         body: JSON.stringify({
-          client_id: env.GITHUB_CLIENT_ID,
-          client_secret: env.GITHUB_CLIENT_SECRET,
+          client_id: env.GH_OAUTH_CLIENT_ID,
+          client_secret: env.GH_OAUTH_CLIENT_SECRET,
           code: authCode,
           redirect_uri: redirectUri,
         }),

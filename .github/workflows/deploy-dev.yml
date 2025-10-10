@@ -109,8 +109,8 @@ jobs:
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
-            --from-literal=GITHUB_CLIENT_ID="${GH_OAUTH_CLIENT_ID}" \
-            --from-literal=GITHUB_CLIENT_SECRET="${GH_OAUTH_CLIENT_SECRET}" \
+            --from-literal=GH_OAUTH_CLIENT_ID="${GH_OAUTH_CLIENT_ID}" \
+            --from-literal=GH_OAUTH_CLIENT_SECRET="${GH_OAUTH_CLIENT_SECRET}" \
             --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
             --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
             --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \

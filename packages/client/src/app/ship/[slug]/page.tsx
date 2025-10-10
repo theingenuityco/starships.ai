@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { UsageKpiCards } from '@/components/profile/UsageKpiCards'
@@ -18,13 +19,22 @@ import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
+import type { AgentModel } from '@starships/protocol'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
   const router = useRouter()
   const { slug } = useParams<{ slug: string }>()
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug, true)
+  const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
   const starshipId = starship?.id || ''
+
+  const handleShowDetails = (e: React.MouseEvent, agent: AgentModel) => {
+    e.stopPropagation() // Prevent card click
+    setSelectedAgent(agent)
+    setIsDetailsModalOpen(true)
+  }
 
   const { data: agents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId || '', !!starshipId)
   const { data: envVars = [], isLoading: envLoading } = useEnvironmentVariables(starshipId || '', !!starshipId)
@@ -227,10 +237,8 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                                 <Badge variant="secondary" className="text-xs">
                                   {agent.model || 'N/A'}
                                 </Badge>
-                                <Button asChild size="sm" variant="ghost" className="h-8 px-2">
-                                  <Link href={`/ship/${slug}/conversations?agent=${agent.id}`}>
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                  </Link>
+                                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={e => handleShowDetails(e, agent)}>
+                                  <Info className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
                             </CardContent>
@@ -264,10 +272,8 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                             <Badge variant="secondary" className="text-xs">
                               {agent.model || 'N/A'}
                             </Badge>
-                            <Button asChild size="sm" variant="ghost" className="h-8 px-2">
-                              <Link href={`/ship/${slug}/conversations?agent=${agent.id}`}>
-                                <MessageSquare className="h-3.5 w-3.5" />
-                              </Link>
+                            <Button size="sm" variant="ghost" className="h-8 px-2" onClick={e => handleShowDetails(e, agent)}>
+                              <Info className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </CardContent>
@@ -335,6 +341,122 @@ export default function StarshipOverviewPage(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Agent Details Modal */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-primary" />
+              {selectedAgent?.name}
+            </DialogTitle>
+            <DialogDescription>Agent details and configuration</DialogDescription>
+          </DialogHeader>
+
+          {selectedAgent && (
+            <div className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
+              {/* ID and Timestamps */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border">
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Agent ID</h4>
+                  <code className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">{selectedAgent.id}</code>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Created</h4>
+                  <p className="text-sm text-muted-foreground">{new Date(selectedAgent.createdAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Description</h4>
+                <p className="text-sm text-muted-foreground">{selectedAgent.description || 'No description provided'}</p>
+              </div>
+
+              {/* Configuration */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Model</h4>
+                  <Badge variant="secondary">{selectedAgent.model}</Badge>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Temperature</h4>
+                  <p className="text-sm text-muted-foreground">{selectedAgent.temperature ?? 'Default'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {selectedAgent.maxTokens && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Max Tokens</h4>
+                    <p className="text-sm text-muted-foreground">{selectedAgent.maxTokens}</p>
+                  </div>
+                )}
+                {selectedAgent.timeout && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Timeout</h4>
+                    <p className="text-sm text-muted-foreground">{selectedAgent.timeout}ms</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Tools */}
+              {selectedAgent.state?.tools && selectedAgent.state.tools.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Allocated Tools ({selectedAgent.state.tools.length})</h4>
+                  <div className="space-y-2">
+                    {selectedAgent.state.tools.map((tool, index) => (
+                      <div key={index} className="bg-muted/30 p-3 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs">
+                            {tool.slug}
+                          </Badge>
+                          <span className="text-sm font-medium">{tool.name}</span>
+                        </div>
+                        {tool.description && <p className="text-xs text-muted-foreground mt-1">{tool.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* System Prompt */}
+              {selectedAgent.systemPrompt && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">System Prompt</h4>
+                  <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg max-h-40 overflow-y-auto font-mono text-xs whitespace-pre-wrap">{selectedAgent.systemPrompt}</div>
+                </div>
+              )}
+
+              {/* Blueprint Preview */}
+              {selectedAgent.blueprint && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Blueprint</h4>
+                  <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg max-h-32 overflow-y-auto font-mono">
+                    <pre>{JSON.stringify(selectedAgent.blueprint, null, 2)}</pre>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    setIsDetailsModalOpen(false)
+                    router.push(`/ship/${slug}/conversations?agent=${selectedAgent.id}`)
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Start Conversation
+                </Button>
+                <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   )
 }

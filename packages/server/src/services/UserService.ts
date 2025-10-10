@@ -452,7 +452,7 @@ export class UserService {
     const env = getEnvConfig();
     
     try {
-      const redirectUri = `${env.SERVER_URL}/api/v1/auth/google/callback`;
+      const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/google/callback`;
       
       // Create OAuth2 client
       const oauth2Client = new google.auth.OAuth2(
@@ -498,7 +498,7 @@ export class UserService {
     
     try {
       // Step 1: Construct redirect URI (same pattern as Google)
-      const redirectUri = `${env.SERVER_URL}/api/v1/auth/github/callback`;
+      const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/github/callback`;
       
       // Step 2: Exchange authorization code for access token
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {

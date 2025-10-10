@@ -19,9 +19,10 @@ interface ConversationInterfaceProps {
   starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
+  initialAgentId?: string
 }
 
-export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange }: ConversationInterfaceProps) {
+export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
 
   // Agent and UI state
@@ -124,6 +125,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
   }, [externalConversationId])
+
+  // Handle initial agent selection from URL parameter
+  useEffect(() => {
+    if (initialAgentId && starshipAgentsData.length > 0 && !selectedAgent) {
+      const agent = starshipAgentsData.find(a => a.id === initialAgentId)
+      if (agent) {
+        setSelectedAgent(agent)
+      }
+    }
+  }, [initialAgentId, starshipAgentsData, selectedAgent])
 
   // Restore selected agent from conversation data
   useEffect(() => {

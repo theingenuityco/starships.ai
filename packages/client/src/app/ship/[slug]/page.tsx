@@ -4,9 +4,11 @@ import React from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { UsageKpiCards } from '@/components/profile/UsageKpiCards'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -15,7 +17,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
-import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info } from 'lucide-react'
+import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
   const { slug } = useParams<{ slug: string }>()
@@ -161,6 +163,122 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 </CardContent>
               </Card>
             </div>
+
+            <section aria-labelledby="deployed-agents" className="rounded-xl border border-border/80 bg-background p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 id="deployed-agents" className="text-lg font-semibold flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Deployed Agents
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">Active agents available in this starship</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/ship/${slug}/conversations`}>
+                    View All
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              </div>
+
+              {agentsLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <Card key={i} className="shadow-sm border-border/50">
+                      <CardHeader>
+                        <Skeleton className="h-5 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-full" />
+                      </CardHeader>
+                      <CardContent>
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : agents.length > 0 ? (
+                agents.length > 3 ? (
+                  <Carousel
+                    opts={{
+                      align: 'start',
+                      loop: true,
+                    }}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4">
+                      {agents.map(agent => (
+                        <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
+                          <Card className="shadow-sm border-border/50 bg-background/80 hover:border-primary/50 transition-colors h-full">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
+                                  <CardDescription className="text-xs mt-1 line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
+                                </div>
+                                <Bot className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="flex items-center justify-between">
+                                <Badge variant="secondary" className="text-xs">
+                                  {agent.model || 'N/A'}
+                                </Badge>
+                                <Button asChild size="sm" variant="ghost" className="h-8 px-2">
+                                  <Link href={`/ship/${slug}/conversations?agent=${agent.id}`}>
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </Link>
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="hidden md:flex" />
+                    <CarouselNext className="hidden md:flex" />
+                  </Carousel>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {agents.map(agent => (
+                      <Card key={agent.id} className="shadow-sm border-border/50 bg-background/80 hover:border-primary/50 transition-colors">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
+                              <CardDescription className="text-xs mt-1 line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
+                            </div>
+                            <Bot className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex items-center justify-between">
+                            <Badge variant="secondary" className="text-xs">
+                              {agent.model || 'N/A'}
+                            </Badge>
+                            <Button asChild size="sm" variant="ghost" className="h-8 px-2">
+                              <Link href={`/ship/${slug}/conversations?agent=${agent.id}`}>
+                                <MessageSquare className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-12">
+                  <Bot className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Agents Deployed</h3>
+                  <p className="text-sm text-muted-foreground mb-6">Deploy your first agent to start using AI capabilities</p>
+                  <Button asChild>
+                    <Link href={`/ship/${slug}/conversations`}>
+                      <Bot className="w-4 h-4 mr-2" />
+                      Deploy Agent
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </section>
 
             <section aria-labelledby="quick-actions" className="rounded-xl border border-border/80 bg-background p-6">
               <div className="flex flex-wrap gap-3 justify-center sm:justify-start">

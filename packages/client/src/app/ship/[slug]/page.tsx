@@ -362,7 +362,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
 
       {/* Agent Details Modal */}
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-primary" />
@@ -372,7 +372,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
           </DialogHeader>
 
           {selectedAgent && (
-            <div className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div className="space-y-4 mt-4 overflow-y-auto pr-2 flex-1">
               {/* System Prompt */}
               {selectedAgent.systemPrompt && (
                 <div>
@@ -382,12 +382,10 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               )}
 
               {/* Blueprint Visualization */}
-              {selectedAgent.blueprint && (
+              {selectedAgent.blueprint && selectedAgent.blueprint.nodes && selectedAgent.blueprint.nodes.length > 0 && (
                 <div>
                   <h3 className="text-base font-semibold mb-3">Blueprint</h3>
-                  <div className="h-[400px]">
-                    <BlueprintVisualization blueprint={selectedAgent.blueprint} transparent={false} nodesDraggable={false} />
-                  </div>
+                  <BlueprintVisualization blueprint={selectedAgent.blueprint} className="h-[400px]" transparent={true} nodesDraggable={false} />
                 </div>
               )}
 

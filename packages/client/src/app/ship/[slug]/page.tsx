@@ -22,6 +22,7 @@ import { useStarshipConversations } from '@/hooks/useConversations'
 import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
 import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import { cn } from '@/lib/utils'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
   const router = useRouter()
@@ -77,39 +78,34 @@ export default function StarshipOverviewPage(): React.JSX.Element {
 
             {/* Wallet Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="shadow-sm border-border/50 bg-background/80">
+              <Card className="frosted-glass-card shadow-frosted-lg">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <CreditCard className="h-4 w-4" />
-                      Wallet
-                    </CardTitle>
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col gap-2">
+                      <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <CreditCard className="h-4 w-4" />
+                        Wallet
+                      </CardTitle>
+                      {walletLoading || !starshipId ? (
+                        <Skeleton className="h-[32px] w-24" />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="text-2xl font-bold leading-8">${Number(wallet?.balance ?? 0).toFixed(2)}</div>
+                          <div
+                            className={cn(
+                              'w-2 h-2 rounded-full animate-pulse',
+                              Number(wallet?.balance ?? 0) >= 1.0 ? 'bg-green-400' : Number(wallet?.balance ?? 0) < 0.05 ? 'bg-red-400' : 'bg-orange-400'
+                            )}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/ship/${slug}/management?tab=billing`}>Billing</Link>
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">
-                  <div className="flex items-center justify-between h-[44px]">
-                    {walletLoading || !starshipId ? (
-                      <>
-                        <div className="flex flex-col gap-1.5">
-                          <Skeleton className="h-[32px] w-24" />
-                          <Skeleton className="h-[14px] w-20" />
-                        </div>
-                        <Skeleton className="h-6 w-6 rounded-full" />
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex flex-col">
-                          <div className="text-2xl font-bold leading-8">${Number(wallet?.balance ?? 0).toFixed(2)}</div>
-                          <div className="text-xs text-muted-foreground leading-[14px]">Active balance</div>
-                        </div>
-                        <BalanceStatusIndicator wallet={wallet} isLoading={false} variant="minimal" />
-                      </>
-                    )}
-                  </div>
-
                   <DailyUsageCostSparkline starshipId={starshipId} inline />
                 </CardContent>
               </Card>

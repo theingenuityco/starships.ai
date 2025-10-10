@@ -299,7 +299,7 @@ ${instructions}
   });
 
   // Connect all nodes
-  return builder
+  let blueprintBuilder = builder
     .addEdge(startRef, checkFocusedEntityRef)
     .addEdge(checkFocusedEntityRef, focusedEntityContextRef, 'add_context')
     .addEdge(focusedEntityContextRef, llmNodeRef)
@@ -318,7 +318,12 @@ ${instructions}
     .setMetadata('generatedBy', 'focusedEntity blueprint factory')
     .setMetadata('pattern', 'focused-entity-management')
     .setMetadata('stateField', stateFieldName)
-    .setMetadata('contextTag', contextTag)
-    .setMetadata(...Object.entries(metadata))
-    .build();
+    .setMetadata('contextTag', contextTag);
+
+  // Add custom metadata entries
+  for (const [key, value] of Object.entries(metadata)) {
+    blueprintBuilder = blueprintBuilder.setMetadata(key, value);
+  }
+
+  return blueprintBuilder.build();
 }

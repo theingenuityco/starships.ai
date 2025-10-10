@@ -70,21 +70,6 @@ spec:
               value: 'true'
             - name: SKIP_INSTALL
               value: 'true'
-            - name: SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: SERVER_PORT
-            - name: CLIENT_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: CLIENT_PORT
-            - name: LOG_LEVEL
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: LOG_LEVEL
             - name: PUBLIC_URL
               valueFrom:
                 secretKeyRef:

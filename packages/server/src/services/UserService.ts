@@ -6,14 +6,15 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { OAuthAccountRepository, UserRepository } from '@starships/models';
+import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository, WaitlistRepository } from '@starships/models';
 import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest, AuthMethod } from '@starships/protocol';
 import { WaitlistService } from '@/services/WaitlistService';
-import { WaitlistRepository } from '@starships/models';
+import { EmailService } from '@/services/EmailService';
 import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
 import { StarshipService } from '@/services/StarshipService';
+import { logger } from '@/utils/logger';
 
 export interface UserOptions {
   includePassword?: boolean;
@@ -30,6 +31,7 @@ export interface CreateUserWithPasswordRequest {
   password: string;
   displayName?: string;
   name?: string; // Legacy support
+  emailVerified?: boolean;
 }
 
 export interface UpdateUserProfileRequest extends UpdateUserRequest {
@@ -785,5 +787,119 @@ export class UserService {
   }> {
     const userService = new UserService();
     return userService.createUserFromOAuth(provider, authCode);
+  }
+
+  // ============================================================================
+  // EMAIL VERIFICATION METHODS
+  // ============================================================================
+
+  /**
+   * Send email verification (business logic layer)
+   * Orchestrates repository and email service calls
+   */
+  async sendEmailVerification(userId: string, email: string): Promise<void> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Business rule: User must not already be verified
+    if (user.emailVerified) {
+      throw new ValidationError('User email is already verified', 'emailVerified');
+    }
+
+    // Generate token using dedicated repository
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const token = await emailVerificationTokenRepo.generateToken(userId, email);
+
+    // Send email using email service - follows current service patterns
+    const emailService = new EmailService();
+    await emailService.sendVerificationEmail(email, token);
+    
+    logger.info('[UserService] Email verification sent', { userId, email });
+  }
+
+  /**
+   * Get verification token info for redirect logic
+   * Business logic: Determine appropriate redirect based on token and user state
+   */
+  async getVerificationTokenInfo(token: string): Promise<{
+    tokenInfo: { userId: string; email: string; consumed: boolean; expired: boolean; valid: boolean } | null;
+    userAlreadyVerified: boolean;
+    shouldRedirectToStarship: boolean;
+  }> {
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const tokenInfo = await emailVerificationTokenRepo.getTokenInfo(token);
+    
+    if (!tokenInfo) {
+      return { tokenInfo: null, userAlreadyVerified: false, shouldRedirectToStarship: false };
+    }
+    
+    // Check if user is already verified
+    const user = await this.getUserById(tokenInfo.userId);
+    const userAlreadyVerified = user?.emailVerified || false;
+    
+    // If user is verified and has access, should redirect to starship
+    let shouldRedirectToStarship = false;
+    if (userAlreadyVerified) {
+      // Check if user has starship access (waitlist approved)
+      const waitlistService = new WaitlistService(new WaitlistRepository());
+      const waitlistStatus = await waitlistService.getDetailedStatus(tokenInfo.email);
+      shouldRedirectToStarship = waitlistStatus.status === 'approved';
+    }
+    
+    return { tokenInfo, userAlreadyVerified, shouldRedirectToStarship };
+  }
+
+  /**
+   * Verify email address (business logic layer)
+   * Handles multi-step verification and starship creation
+   */
+  async verifyEmailAddress(token: string): Promise<{
+    userId: string;
+    email: string;
+    starshipCreated: boolean;
+  }> {
+    // Validate and consume token
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const verification = await emailVerificationTokenRepo.validateAndConsumeToken(token);
+
+    if (!verification) {
+      throw new ValidationError('Invalid or expired verification token', 'token');
+    }
+
+    // Mark user as verified
+    await this.updateUserProfile(verification.userId, { emailVerified: true });
+
+    // Business logic: Check waitlist and create starship if approved
+    const waitlistService = new WaitlistService(new WaitlistRepository());
+    const waitlistStatus = await waitlistService.getDetailedStatus(verification.email);
+
+    let starshipCreated = false;
+    if (waitlistStatus.status === 'approved') {
+      try {
+        const defaultStarship = await StarshipService.createDefaultStarship(verification.userId);
+        if (defaultStarship) {
+          await StarshipService.createDefaultAgent(verification.userId, defaultStarship.id);
+          starshipCreated = true;
+        }
+      } catch (error) {
+        logger.error('[UserService] Failed to create starship during email verification:', { error });
+        // Continue - user can create starship later
+      }
+    }
+
+    logger.info('[UserService] Email verified successfully', { 
+      userId: verification.userId,
+      email: verification.email,
+      starshipCreated 
+    });
+
+    return {
+      userId: verification.userId,
+      email: verification.email,
+      starshipCreated,
+    };
   }
 }

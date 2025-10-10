@@ -25,6 +25,9 @@ interface AuthLoginResponse {
   waitlisted?: boolean
   status?: 'pending' | 'approved'
   message?: string
+  // Email verification fields
+  emailNotVerified?: boolean
+  canResendVerification?: boolean
 }
 
 interface AuthRegisterResponse {
@@ -36,6 +39,8 @@ interface AuthRegisterResponse {
   waitlisted?: boolean
   status?: 'pending' | 'approved'
   message?: string
+  // Email verification fields
+  emailVerificationSent?: boolean
 }
 
 // Centralized query keys
@@ -43,6 +48,7 @@ export const AUTH_QUERY_KEYS = {
   all: ['auth'] as const,
   user: () => [...AUTH_QUERY_KEYS.all, 'user'] as const,
   me: () => [...AUTH_QUERY_KEYS.user(), 'me'] as const,
+  emailVerification: () => [...AUTH_QUERY_KEYS.all, 'email-verification'] as const,
 } as const
 
 // Token storage utilities
@@ -296,6 +302,36 @@ export function useOAuthLogin() {
   })
 }
 
+// Resend verification mutation
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const response = await fetch('/api/v1/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to resend verification email')
+      }
+
+      return data.data
+    },
+    onSuccess: () => {
+      toast.success('Verification email sent! Please check your email.')
+    },
+    onError: (error: any) => {
+      console.error('[AUTH] Resend verification error:', error)
+      toast.error('Failed to send verification email. Please try again.')
+    },
+  })
+}
+
 // Logout mutation
 export function useLogout() {
   const queryClient = useQueryClient()
@@ -345,6 +381,7 @@ export function useAuth() {
   const loginMutation = useLogin()
   const registerMutation = useRegister()
   const oauthLoginMutation = useOAuthLogin()
+  const resendVerificationMutation = useResendVerification()
   const logoutMutation = useLogout()
 
   // Set up token provider for API calls on mount
@@ -369,11 +406,14 @@ export function useAuth() {
 
   // Login function
   const login = useCallback(
-    async (email: string, password: string): Promise<{ success: boolean; error?: string; waitlisted?: boolean; status?: 'pending' | 'approved'; message?: string }> => {
+    async (email: string, password: string): Promise<{ success: boolean; error?: string; waitlisted?: boolean; status?: 'pending' | 'approved'; message?: string; emailNotVerified?: boolean; canResendVerification?: boolean }> => {
       try {
         const result = await loginMutation.mutateAsync({ email, password })
         if (result.waitlisted) {
           return { success: true, waitlisted: true, status: result.status, message: result.message }
+        }
+        if (result.emailNotVerified) {
+          return { success: true, emailNotVerified: true, canResendVerification: result.canResendVerification, message: result.message }
         }
         return { success: true }
       } catch (error: any) {
@@ -385,11 +425,14 @@ export function useAuth() {
 
   // Register function
   const register = useCallback(
-    async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string; waitlisted?: boolean; status?: 'pending' | 'approved'; message?: string }> => {
+    async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string; waitlisted?: boolean; status?: 'pending' | 'approved'; message?: string; emailVerificationSent?: boolean }> => {
       try {
         const result = await registerMutation.mutateAsync({ email, password, name })
         if (result.waitlisted) {
           return { success: true, waitlisted: true, status: result.status, message: result.message }
+        }
+        if (result.emailVerificationSent) {
+          return { success: true, emailVerificationSent: true, message: result.message }
         }
         return { success: true }
       } catch (error: any) {
@@ -445,9 +488,22 @@ export function useAuth() {
     [refetch]
   )
 
+  // Resend verification function
+  const resendVerification = useCallback(
+    async (email: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        await resendVerificationMutation.mutateAsync(email)
+        return { success: true }
+      } catch (error: any) {
+        return { success: false, error: error.message || 'Failed to resend verification email' }
+      }
+    },
+    [resendVerificationMutation]
+  )
+
   const isAuthenticated = !!user
-  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || oauthLoginMutation.error?.message || null
-  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || oauthLoginMutation.isPending || logoutMutation.isPending
+  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || oauthLoginMutation.error?.message || resendVerificationMutation.error?.message || null
+  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || oauthLoginMutation.isPending || resendVerificationMutation.isPending || logoutMutation.isPending
 
   return {
     // Auth state
@@ -463,6 +519,7 @@ export function useAuth() {
     oauthLogin,
     logout,
     setPassword,
+    resendVerification,
     getToken: getStoredToken, // Expose token getter
 
     // Authentication method info
@@ -482,6 +539,7 @@ export function useAuth() {
     loginMutation,
     registerMutation,
     oauthLoginMutation,
+    resendVerificationMutation,
     logoutMutation,
   }
 }

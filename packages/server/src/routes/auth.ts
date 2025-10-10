@@ -11,6 +11,7 @@ import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { getEnvConfig } from '@starships/env';
 import { getConnection, StarshipRepository, WaitlistRepository } from '@starships/models';
+import type { AuthRegisterResponse, AuthLoginResponse } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -54,6 +55,11 @@ const SetPasswordSchema = z.object({
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
+});
+
+// Zod schema for email verification
+const EmailVerificationSchema = z.object({
+  email: z.string().email('Invalid email format'),
 });
 
 // Helper function for Zod validation
@@ -114,14 +120,33 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     // Create user regardless of waitlist status (stores credentials for future)
     // User creation happens for both pending and approved users
 
-    // Create user (password will be hashed in UserService)
+    // Create user with emailVerified: false (password will be hashed in UserService)
     const user = await UserService.createUser({
       email,
       password, // Pass plain password - UserService will hash it
       name,
       displayName: name,
+      emailVerified: false, // Force unverified following business rules
     });
 
+    // Send email verification for all new users
+    const userService = new UserService();
+    await userService.sendEmailVerification(user.id, email);
+
+    // Return email verification response (NO JWT token, NO starship creation)
+    const response: AuthRegisterResponse = {
+      emailVerificationSent: true,
+      message: 'Registration successful! Please check your email to verify your account.',
+    };
+
+    sendSuccess(res, response, 201);
+  } catch (error: any) {
+    handleError(error, res, 'user registration');
+  }
+});
+
+/* OLD CODE REMOVED - Registration now sends email verification instead of creating starships
+   The following code was removed:
     // Check final waitlist status to determine response
     const finalStatus = await waitlistService.getDetailedStatus(email);
 
@@ -195,11 +220,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       },
       201
     );
-  } catch (error: any) {
-    logger.error('[AUTH] Registration error:', error);
-    handleError(error, res, 'user registration');
-  }
-});
+*/
 
 /**
  * Login user
@@ -247,6 +268,17 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     if (!isValidPassword) {
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
       return;
+    }
+
+    // Add email verification check before proceeding
+    if (!user.emailVerified) {
+      const response: AuthLoginResponse = {
+        emailNotVerified: true,
+        message: 'Please verify your email address before signing in.',
+        canResendVerification: true,
+      };
+
+      return sendSuccess(res, response, 200);
     }
 
     // Check waitlist status for existing user
@@ -390,6 +422,101 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
   // With JWT, logout is primarily handled client-side by removing the token
   // Server-side logout would require a token blacklist, which adds complexity
   sendSuccess(res, { message: 'Logged out successfully' });
+});
+
+// ============================================================================
+// EMAIL VERIFICATION ROUTES
+// ============================================================================
+
+/**
+ * Verify email address using verification token
+ * GET /auth/verify-email?token=xxx
+ * Follows established route patterns with Zod validation
+ */
+router.get('/auth/verify-email', async (req: Request, res: Response) => {
+  try {
+    // Validate query parameters using Zod
+    const queryValidation = validateData(z.object({ token: z.string().min(1, 'Token is required') }), req.query, res, 'verification token');
+    if (!queryValidation) return;
+
+    const { token } = queryValidation;
+    const env = getEnvConfig();
+    const userService = new UserService();
+
+    // First check token status and user state without consuming
+    const { tokenInfo, userAlreadyVerified, shouldRedirectToStarship } = await userService.getVerificationTokenInfo(token);
+
+    // Handle different scenarios elegantly
+    if (!tokenInfo) {
+      // Token doesn't exist
+      return res.redirect(`${env.PUBLIC_URL}/login?verification=error`);
+    }
+
+    if (userAlreadyVerified) {
+      // User is already verified - redirect appropriately
+      if (shouldRedirectToStarship) {
+        // User has access, redirect to their starship
+        return res.redirect(`${env.PUBLIC_URL}/`);
+      } else {
+        // User verified but waitlisted, redirect to login with success
+        return res.redirect(`${env.PUBLIC_URL}/login?verification=success&waitlisted=true`);
+      }
+    }
+
+    if (!tokenInfo.valid) {
+      // Token is expired or consumed
+      return res.redirect(`${env.PUBLIC_URL}/login?verification=expired`);
+    }
+
+    // Token is valid and user not verified - proceed with verification
+    const result = await userService.verifyEmailAddress(token);
+
+    // Determine redirect URL based on business logic results
+    const redirectUrl = result.starshipCreated
+      ? `${env.PUBLIC_URL}/login?verification=success&starship=true`
+      : `${env.PUBLIC_URL}/login?verification=success&waitlisted=true`;
+
+    return res.redirect(redirectUrl);
+  } catch (error: any) {
+    logger.error('[EMAIL-VERIFY] Error:', { error });
+    const env = getEnvConfig();
+    return res.redirect(`${env.PUBLIC_URL}/login?verification=error`);
+  }
+});
+
+/**
+ * Resend verification email using established patterns
+ * POST /auth/resend-verification
+ * Follows established route patterns with Zod validation
+ */
+router.post('/auth/resend-verification', async (req: Request, res: Response) => {
+  try {
+    // Validate request body using Zod
+    const bodyValidation = validateData(EmailVerificationSchema, req.body, res, 'resend verification data');
+    if (!bodyValidation) return;
+
+    const { email } = bodyValidation;
+
+    // Delegate to service layer for business logic
+    const userService = new UserService();
+    const user = await UserService.getUserByEmail(email);
+
+    if (!user || user.emailVerified) {
+      // Don't reveal if user exists (security best practice)
+      return sendSuccess(res, {
+        message: 'If an unverified account exists, a verification email has been sent.',
+      });
+    }
+
+    // Send verification email via service layer
+    await userService.sendEmailVerification(user.id, email);
+
+    sendSuccess(res, {
+      message: 'Verification email sent successfully.',
+    });
+  } catch (error: any) {
+    handleError(error, res, 'resend verification email');
+  }
 });
 
 // ============================================================================

@@ -30,6 +30,10 @@ export function getEnvConfig(): EnvironmentConfig {
     POSTGRES_USER: process.env.POSTGRES_USER,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
+    // Email Service Configuration (required for email verification)
+    EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,
+    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
+    AWS_SES_REGION: process.env.AWS_SES_REGION,
   };
 
   // Check for missing required environment variables
@@ -99,5 +103,10 @@ export function getEnvConfig(): EnvironmentConfig {
     RUNNER_URL: resolvedRunnerUrl,
     RUNNER_PORT: defaultRunnerPort,
     RUNNER_AUTH_TOKEN: process.env.RUNNER_AUTH_TOKEN,
+
+    // Email Service Configuration (required, no fallbacks)
+    EMAIL_FROM_ADDRESS: requiredEnvVars.EMAIL_FROM_ADDRESS!,
+    EMAIL_FROM_NAME: requiredEnvVars.EMAIL_FROM_NAME!,
+    AWS_SES_REGION: requiredEnvVars.AWS_SES_REGION!,
   };
 }

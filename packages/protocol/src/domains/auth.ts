@@ -64,6 +64,8 @@ export interface AuthRegisterResponse {
   waitlisted?: boolean;
   status?: 'pending' | 'approved';
   message?: string;
+  // Email verification fields
+  emailVerificationSent?: boolean;
 }
 
 /**
@@ -80,6 +82,9 @@ export interface AuthLoginResponse {
   waitlisted?: boolean;
   status?: 'pending' | 'approved';
   message?: string;
+  // Email verification fields
+  emailNotVerified?: boolean;
+  canResendVerification?: boolean;
 }
 
 /**
@@ -89,6 +94,30 @@ export interface AuthVerifyResponse {
   valid: boolean;
   user?: AuthUser;
   exp?: number;
+}
+
+/**
+ * Email verification request
+ */
+export interface EmailVerificationRequest {
+  email: string;
+}
+
+/**
+ * Email verification response
+ */
+export interface EmailVerificationResponse {
+  emailVerificationSent: boolean;
+  email: string;
+  message: string;
+  expiresIn: string;
+}
+
+/**
+ * Resend verification request
+ */
+export interface ResendVerificationRequest {
+  email: string;
 }
 
 /**

@@ -1,8 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -11,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
-
 import { motion } from 'motion/react'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -38,7 +36,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  * JWT-based login and registration form
  */
 export function LoginForm() {
-  const { login, register, oauthLogin, isLoading, error } = useAuth()
+  const { login, register, oauthLogin, resendVerification, isLoading, error } = useAuth()
   const searchParams = useSearchParams()
 
   // OAuth initiation function - uses relative URL like regular auth
@@ -64,6 +62,11 @@ export function LoginForm() {
   const [formError, setFormError] = useState<string | null>(null)
   const [waitlistStatus, setWaitlistStatus] = useState<{
     isWaitlisted: boolean
+    message: string
+  } | null>(null)
+  const [emailVerificationStatus, setEmailVerificationStatus] = useState<{
+    needsVerification: boolean
+    email: string
     message: string
   } | null>(null)
   const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
@@ -103,6 +106,7 @@ export function LoginForm() {
     e.preventDefault()
     setFormError(null)
     setWaitlistStatus(null)
+    setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
 
     if (!loginData.email || !loginData.password) {
@@ -117,6 +121,16 @@ export function LoginForm() {
       setWaitlistStatus({
         isWaitlisted: true,
         message: result.message || 'You are on our waitlist. Stay tuned!',
+      })
+      return
+    }
+
+    // Check if email verification required
+    if (result.emailNotVerified) {
+      setEmailVerificationStatus({
+        needsVerification: true,
+        email: loginData.email,
+        message: result.message || 'Please verify your email address to continue.',
       })
       return
     }
@@ -143,6 +157,7 @@ export function LoginForm() {
     e.preventDefault()
     setFormError(null)
     setWaitlistStatus(null)
+    setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
 
     if (!registerData.email || !registerData.password || !registerData.name) {
@@ -173,9 +188,26 @@ export function LoginForm() {
       return
     }
 
+    // Check if email verification sent
+    if (result.emailVerificationSent) {
+      setEmailVerificationStatus({
+        needsVerification: false,
+        email: registerData.email,
+        message: result.message || 'Please check your email to verify your account.',
+      })
+      // Clear form following established UX patterns
+      setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
+      return
+    }
+
     if (!result.success) {
       setFormError(result.error || 'Registration failed')
     }
+  }
+
+  // Resend verification handler following established patterns
+  const handleResendVerification = async (email: string) => {
+    await resendVerification(email)
   }
 
   return (
@@ -194,6 +226,26 @@ export function LoginForm() {
             <div className="mb-4">
               <WaitlistMessage message={waitlistStatus.message} onClose={() => setWaitlistStatus(null)} />
             </div>
+          )}
+
+          {emailVerificationStatus && (
+            <Alert className="mb-4 border-blue-200 bg-blue-50">
+              <Icon name="mail" className="h-4 w-4" />
+              <AlertTitle>
+                {emailVerificationStatus.needsVerification ? 'Email Verification Required' : 'Check Your Email'}
+              </AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p className="text-blue-800">{emailVerificationStatus.message}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleResendVerification(emailVerificationStatus.email)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Sending...' : 'Resend Verification Email'}
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
 
           <Tabs value={activeTab} onValueChange={(value) => {

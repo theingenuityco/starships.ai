@@ -37,8 +37,8 @@ export interface EnvironmentConfig {
   // OAuth Provider Configuration
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
-  GITHUB_CLIENT_ID?: string;
-  GITHUB_CLIENT_SECRET?: string;
+  GH_OAUTH_CLIENT_ID?: string;
+  GH_OAUTH_CLIENT_SECRET?: string;
 
 
   // Environment Variables Encryption Key

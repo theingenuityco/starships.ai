@@ -155,6 +155,26 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
+            - name: GH_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GH_OAUTH_CLIENT_ID
+            - name: GH_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GH_OAUTH_CLIENT_SECRET
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GOOGLE_CLIENT_SECRET
             - name: PGDATA
               value: '/var/lib/postgresql/data/pgdata'
           lifecycle:

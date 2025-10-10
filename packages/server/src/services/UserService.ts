@@ -452,7 +452,7 @@ export class UserService {
     const env = getEnvConfig();
     
     try {
-      const redirectUri = `${env.SERVER_URL}/api/v1/auth/google/callback`;
+      const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/google/callback`;
       
       // Create OAuth2 client
       const oauth2Client = new google.auth.OAuth2(
@@ -498,7 +498,7 @@ export class UserService {
     
     try {
       // Step 1: Construct redirect URI (same pattern as Google)
-      const redirectUri = `${env.SERVER_URL}/api/v1/auth/github/callback`;
+      const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/github/callback`;
       
       // Step 2: Exchange authorization code for access token
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
@@ -509,8 +509,8 @@ export class UserService {
           'User-Agent': 'starships.ai/1.0',  // Required by GitHub API
         },
         body: JSON.stringify({
-          client_id: env.GITHUB_CLIENT_ID,
-          client_secret: env.GITHUB_CLIENT_SECRET,
+          client_id: env.GH_OAUTH_CLIENT_ID,
+          client_secret: env.GH_OAUTH_CLIENT_SECRET,
           code: authCode,
           redirect_uri: redirectUri,
         }),

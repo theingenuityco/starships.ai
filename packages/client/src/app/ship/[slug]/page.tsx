@@ -20,6 +20,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { Rocket, Activity, CreditCard, Key, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
 import type { AgentModel } from '@starships/protocol'
+import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
   const router = useRouter()
@@ -29,12 +30,6 @@ export default function StarshipOverviewPage(): React.JSX.Element {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
   const starshipId = starship?.id || ''
-
-  const handleShowDetails = (e: React.MouseEvent, agent: AgentModel) => {
-    e.stopPropagation() // Prevent card click
-    setSelectedAgent(agent)
-    setIsDetailsModalOpen(true)
-  }
 
   const { data: agents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId || '', !!starshipId)
   const { data: envVars = [], isLoading: envLoading } = useEnvironmentVariables(starshipId || '', !!starshipId)
@@ -93,6 +88,147 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 numberGroup={numberGroup}
                 usd={usd}
               />
+            </section>
+
+            <section aria-labelledby="deployed-agents" className="rounded-xl border border-border/80 bg-background p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 id="deployed-agents" className="text-lg font-semibold flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Deployed Agents
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">Active agents available in this starship</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/ship/${slug}/conversations`}>
+                    View All
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              </div>
+
+              {agentsLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <Card key={i} className="frosted-glass-card shadow-frosted-lg">
+                      <CardHeader>
+                        <Skeleton className="h-5 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-full" />
+                      </CardHeader>
+                      <CardContent>
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : agents.length > 0 ? (
+                agents.length > 3 ? (
+                  <Carousel
+                    opts={{
+                      align: 'start',
+                      loop: true,
+                    }}
+                    className="w-full px-1 py-2"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4 py-2">
+                      {agents.map(agent => (
+                        <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 pb-2">
+                          <Card
+                            className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 h-full cursor-pointer"
+                            onClick={() => {
+                              setSelectedAgent(agent)
+                              setIsDetailsModalOpen(true)
+                            }}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                            <CardHeader className="pb-3 relative z-10">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                                <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
+                              </div>
+                              <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-0 relative z-10">
+                              <div className="flex items-center justify-between">
+                                <Badge variant="secondary" className="text-xs">
+                                  {agent.model || 'N/A'}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
+                                  }}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                                  Chat
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="hidden md:flex" />
+                    <CarouselNext className="hidden md:flex" />
+                  </Carousel>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {agents.map(agent => (
+                      <Card
+                        key={agent.id}
+                        className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
+                        onClick={() => {
+                          setSelectedAgent(agent)
+                          setIsDetailsModalOpen(true)
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                        <CardHeader className="pb-3 relative z-10">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                            <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
+                          </div>
+                          <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-0 relative z-10">
+                          <div className="flex items-center justify-between">
+                            <Badge variant="secondary" className="text-xs">
+                              {agent.model || 'N/A'}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8"
+                              onClick={e => {
+                                e.stopPropagation()
+                                router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
+                              }}
+                            >
+                              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                              Chat
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-12">
+                  <Bot className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Agents Deployed</h3>
+                  <p className="text-sm text-muted-foreground mb-6">Deploy your first agent to start using AI capabilities</p>
+                  <Button asChild>
+                    <Link href={`/ship/${slug}/conversations`}>
+                      <Bot className="w-4 h-4 mr-2" />
+                      Deploy Agent
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </section>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -178,127 +314,6 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               </Card>
             </div>
 
-            <section aria-labelledby="deployed-agents" className="rounded-xl border border-border/80 bg-background p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 id="deployed-agents" className="text-lg font-semibold flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    Deployed Agents
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-1">Active agents available in this starship</p>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/ship/${slug}/conversations`}>
-                    View All
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Link>
-                </Button>
-              </div>
-
-              {agentsLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3].map(i => (
-                    <Card key={i} className="frosted-glass-card shadow-frosted-lg">
-                      <CardHeader>
-                        <Skeleton className="h-5 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-full" />
-                      </CardHeader>
-                      <CardContent>
-                        <Skeleton className="h-4 w-1/2" />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : agents.length > 0 ? (
-                agents.length > 3 ? (
-                  <Carousel
-                    opts={{
-                      align: 'start',
-                      loop: true,
-                    }}
-                    className="w-full px-1 py-2"
-                  >
-                    <CarouselContent className="-ml-2 md:-ml-4 py-2">
-                      {agents.map(agent => (
-                        <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 pb-2">
-                          <Card
-                            className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 h-full cursor-pointer"
-                            onClick={() => router.push(`/ship/${slug}/conversations?agent=${agent.id}`)}
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                            <CardHeader className="pb-3 relative z-10">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
-                                  <CardDescription className="text-xs mt-1 line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
-                                </div>
-                                <Bot className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                              </div>
-                            </CardHeader>
-                            <CardContent className="pt-0 relative z-10">
-                              <div className="flex items-center justify-between">
-                                <Badge variant="secondary" className="text-xs">
-                                  {agent.model || 'N/A'}
-                                </Badge>
-                                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={e => handleShowDetails(e, agent)}>
-                                  <Info className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-                    <CarouselPrevious className="hidden md:flex" />
-                    <CarouselNext className="hidden md:flex" />
-                  </Carousel>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {agents.map(agent => (
-                      <Card
-                        key={agent.id}
-                        className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
-                        onClick={() => router.push(`/ship/${slug}/conversations?agent=${agent.id}`)}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                        <CardHeader className="pb-3 relative z-10">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
-                              <CardDescription className="text-xs mt-1 line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
-                            </div>
-                            <Bot className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0 relative z-10">
-                          <div className="flex items-center justify-between">
-                            <Badge variant="secondary" className="text-xs">
-                              {agent.model || 'N/A'}
-                            </Badge>
-                            <Button size="sm" variant="ghost" className="h-8 px-2" onClick={e => handleShowDetails(e, agent)}>
-                              <Info className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )
-              ) : (
-                <div className="text-center py-12">
-                  <Bot className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Agents Deployed</h3>
-                  <p className="text-sm text-muted-foreground mb-6">Deploy your first agent to start using AI capabilities</p>
-                  <Button asChild>
-                    <Link href={`/ship/${slug}/conversations`}>
-                      <Bot className="w-4 h-4 mr-2" />
-                      Deploy Agent
-                    </Link>
-                  </Button>
-                </div>
-              )}
-            </section>
-
             <section aria-labelledby="quick-actions" className="rounded-xl border border-border/80 bg-background p-6">
               <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
                 <Button asChild>
@@ -353,47 +368,62 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               <Bot className="h-5 w-5 text-primary" />
               {selectedAgent?.name}
             </DialogTitle>
-            <DialogDescription>Agent details and configuration</DialogDescription>
+            <DialogDescription>{selectedAgent?.description || 'No description provided'}</DialogDescription>
           </DialogHeader>
 
           {selectedAgent && (
             <div className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
-              {/* Description */}
+              {/* System Prompt */}
+              {selectedAgent.systemPrompt && (
+                <div>
+                  <h3 className="text-base font-semibold mb-3">System Prompt</h3>
+                  <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg max-h-40 overflow-y-auto font-mono text-xs whitespace-pre-wrap">{selectedAgent.systemPrompt}</div>
+                </div>
+              )}
+
+              {/* Blueprint Visualization */}
+              {selectedAgent.blueprint && (
+                <div>
+                  <h3 className="text-base font-semibold mb-3">Blueprint</h3>
+                  <div className="h-[400px]">
+                    <BlueprintVisualization blueprint={selectedAgent.blueprint} transparent={false} nodesDraggable={false} />
+                  </div>
+                </div>
+              )}
+
+              {/* Model Details */}
               <div>
-                <h4 className="text-sm font-semibold mb-2">Description</h4>
-                <p className="text-sm text-muted-foreground">{selectedAgent.description || 'No description provided'}</p>
-              </div>
-
-              {/* Configuration */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Model</h4>
-                  <Badge variant="secondary">{selectedAgent.model}</Badge>
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Temperature</h4>
-                  <p className="text-sm text-muted-foreground">{selectedAgent.temperature ?? 'Default'}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {selectedAgent.maxTokens && (
+                <h3 className="text-base font-semibold mb-3">Model Details</h3>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-semibold mb-2">Max Tokens</h4>
-                    <p className="text-sm text-muted-foreground">{selectedAgent.maxTokens}</p>
+                    <h4 className="text-sm font-semibold mb-2">Model</h4>
+                    <Badge variant="secondary">{selectedAgent.model}</Badge>
                   </div>
-                )}
-                {selectedAgent.timeout && (
                   <div>
-                    <h4 className="text-sm font-semibold mb-2">Timeout</h4>
-                    <p className="text-sm text-muted-foreground">{selectedAgent.timeout}ms</p>
+                    <h4 className="text-sm font-semibold mb-2">Temperature</h4>
+                    <p className="text-sm text-muted-foreground">{selectedAgent.temperature ?? 'Default'}</p>
                   </div>
-                )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  {selectedAgent.maxTokens && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2">Max Tokens</h4>
+                      <p className="text-sm text-muted-foreground">{selectedAgent.maxTokens}</p>
+                    </div>
+                  )}
+                  {selectedAgent.timeout && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2">Timeout</h4>
+                      <p className="text-sm text-muted-foreground">{selectedAgent.timeout}ms</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Tools */}
               <div>
-                <h4 className="text-sm font-semibold mb-2">Allocated Tools {toolsLoading ? '...' : `(${agentTools.length})`}</h4>
+                <h3 className="text-base font-semibold mb-3">Allocated Tools {toolsLoading ? '...' : `(${agentTools.length})`}</h3>
                 {toolsLoading ? (
                   <div className="space-y-2">
                     {[1, 2].map(i => (
@@ -418,24 +448,6 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   <p className="text-sm text-muted-foreground">No tools assigned to this agent</p>
                 )}
               </div>
-
-              {/* System Prompt */}
-              {selectedAgent.systemPrompt && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">System Prompt</h4>
-                  <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg max-h-40 overflow-y-auto font-mono text-xs whitespace-pre-wrap">{selectedAgent.systemPrompt}</div>
-                </div>
-              )}
-
-              {/* Blueprint Preview */}
-              {selectedAgent.blueprint && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Blueprint</h4>
-                  <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg max-h-32 overflow-y-auto font-mono">
-                    <pre>{JSON.stringify(selectedAgent.blueprint, null, 2)}</pre>
-                  </div>
-                </div>
-              )}
 
               <div className="flex gap-2 pt-4">
                 <Button

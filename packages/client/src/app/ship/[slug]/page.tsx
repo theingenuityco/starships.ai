@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
+import { DailyUsageCostSparkline } from '@/components/billing/DailyUsageCostSparkline'
 import { UsageKpiCards } from '@/components/profile/UsageKpiCards'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipUsageViewModel } from '@/hooks/useStarshipUsageViewModel'
@@ -74,23 +75,47 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Overview and quick controls for your starship</p>
             </div>
 
-            <section aria-labelledby="usage-kpis" className="rounded-xl border border-border/80 bg-background p-6">
-              <UsageKpiCards
-                isLoading={usageLoading}
-                totalCost={totalCost}
-                totalTokens={totalTokens}
-                promptTokens={promptTokens}
-                completionTokens={completionTokens}
-                totalRequests={totalRequests}
-                avgTokensPerRequest={avgTokensPerRequest}
-                avgCostPerRequest={avgCostPerRequest}
-                numberCompact={numberCompact}
-                numberGroup={numberGroup}
-                usd={usd}
-              />
-            </section>
+            {/* Wallet Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="shadow-sm border-border/50 bg-background/80">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <CreditCard className="h-4 w-4" />
+                      Wallet
+                    </CardTitle>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/ship/${slug}/management?tab=billing`}>Billing</Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-2">
+                  <div className="flex items-center justify-between h-[44px]">
+                    {walletLoading || !starshipId ? (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <Skeleton className="h-[32px] w-24" />
+                          <Skeleton className="h-[14px] w-20" />
+                        </div>
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex flex-col">
+                          <div className="text-2xl font-bold leading-8">${Number(wallet?.balance ?? 0).toFixed(2)}</div>
+                          <div className="text-xs text-muted-foreground leading-[14px]">Active balance</div>
+                        </div>
+                        <BalanceStatusIndicator wallet={wallet} isLoading={false} variant="minimal" />
+                      </>
+                    )}
+                  </div>
 
-            <section aria-labelledby="deployed-agents" className="rounded-xl border border-border/80 bg-background p-6">
+                  <DailyUsageCostSparkline starshipId={starshipId} inline />
+                </CardContent>
+              </Card>
+            </div>
+
+            <section aria-labelledby="deployed-agents">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 id="deployed-agents" className="text-lg font-semibold flex items-center gap-2">
@@ -231,31 +256,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               )}
             </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Wallet */}
-              <Card className="shadow-sm border-border/50 bg-background/80">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <CreditCard className="h-4 w-4" />
-                    Wallet
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-2xl font-bold">{walletLoading ? '—' : `$${Number(wallet?.balance ?? 0).toFixed(2)}`}</div>
-                      <div className="text-xs text-muted-foreground">Active balance</div>
-                    </div>
-                    <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" />
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/ship/${slug}/management?tab=billing`}>Billing</Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Agents */}
               <Card className="shadow-sm border-border/50 bg-background/80">
                 <CardHeader>

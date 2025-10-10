@@ -67,13 +67,13 @@ export function DailyUsageCostSparkline({ starshipId, inline = false }: DailyUsa
                 </feMerge>
               </filter>
               <linearGradient id="sparkline-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="white" stopOpacity="0.7" />
-                <stop offset="100%" stopColor="white" stopOpacity="0.9" />
+                <stop offset="0%" stopColor="currentColor" stopOpacity="0.7" />
+                <stop offset="100%" stopColor="currentColor" stopOpacity="0.9" />
               </linearGradient>
             </defs>
             <path d={sparklineData.path} fill="none" stroke="url(#sparkline-gradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter="url(#sparkline-glow)" />
             {sparklineData.points.map((point, i) => (
-              <circle key={i} cx={point.x} cy={point.y} r="0.6" fill="white" fillOpacity="0.8" filter="url(#sparkline-glow)" />
+              <circle key={i} cx={point.x} cy={point.y} r="0.6" fill="currentColor" fillOpacity="0.8" filter="url(#sparkline-glow)" />
             ))}
           </>
         )}

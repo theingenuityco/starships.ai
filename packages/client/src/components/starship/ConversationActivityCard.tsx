@@ -35,9 +35,14 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
   }
 
   return (
-    <Card className={cn('frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300', className)}>
-      {/* Frosted glass hover gradient - matching agent cards */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+    <Card
+      className={cn(
+        'frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg border-2 !border-primary/30 hover:!border-primary/70 group relative overflow-hidden transition-all duration-300',
+        className
+      )}
+    >
+      {/* Frosted glass gradient with visible tint that expands on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-30 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
       {/* Sparkle decoration */}
       <div className="absolute top-2 right-2 opacity-30 group-hover:opacity-60 transition-opacity duration-300">

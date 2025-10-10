@@ -46,6 +46,11 @@ export class AgentEntity implements AgentModel {
   name!: string;
 
   @Expose()
+  @IsString()
+  @Length(1, 100)
+  slug!: string;
+
+  @Expose()
   @IsOptional()
   @IsString()
   @Length(0, 500)

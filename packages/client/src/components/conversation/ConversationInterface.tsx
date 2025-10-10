@@ -10,6 +10,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
+import { agentAPI, toolAPI } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -54,6 +55,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Track if the builder was opened via streaming UI action
   const wasOpenedByStreamingRef = useRef(false)
+
+  // Track pending tool calls for completion detection
+  const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
 
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
@@ -331,6 +335,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
+            // Store tool call info for later completion handling
+            if (toolCallId) {
+              pendingToolCallsRef.current.set(toolCallId, { toolName, args: {} })
+            }
+
             // Open tool builder for tool actions that affect tool data or blueprint
             const openToolBuilderSlugs = new Set([
               'tool-open',
@@ -432,6 +441,71 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [handleToolBuilderSave]
   )
 
+  // Handle tool completion for entity-modifying tools
+  const handleToolComplete = useCallback(
+    async (toolName: string, toolArgs: any) => {
+      try {
+        // Agent tools - fetch and sync agent data
+        const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+        if (agentTools.includes(toolName) && toolArgs?.slug && viewModeRef.current === 'agent-builder') {
+          console.log('🔄 Fetching agent after tool completion:', toolArgs.slug)
+
+          // Fetch complete agent data by slug
+          const agent = await agentAPI.getBySlug(toolArgs.slug)
+
+          if (agent && agentBuilderViewRef.current) {
+            // Sync all fields with server data
+            agentBuilderViewRef.current.updateField('name', agent.name)
+            if (agent.description) agentBuilderViewRef.current.updateField('description', agent.description)
+            if (agent.model) agentBuilderViewRef.current.updateField('model', agent.model)
+            if (agent.systemPrompt) agentBuilderViewRef.current.updateField('systemPrompt', agent.systemPrompt)
+            if (agent.temperature !== undefined) agentBuilderViewRef.current.updateField('temperature', agent.temperature)
+            if (agent.maxTokens !== undefined) agentBuilderViewRef.current.updateField('maxTokens', agent.maxTokens)
+            if (agent.timeout !== undefined) agentBuilderViewRef.current.updateField('timeout', agent.timeout)
+
+            // Most important: sync the blueprint
+            if (agent.blueprint) {
+              agentBuilderViewRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
+            }
+
+            console.log('✅ Agent form synced with server data')
+          }
+        }
+
+        // Tool tools - fetch and sync tool data
+        const toolTools = [
+          'tool-open',
+          'tool-edit',
+          'tool-add-blueprint-node',
+          'tool-add-blueprint-edge',
+          'tool-blueprint-edit-node',
+          'tool-blueprint-remove-node',
+          'tool-blueprint-edit-edge',
+          'tool-blueprint-remove-edge',
+        ]
+        if (toolTools.includes(toolName) && toolArgs?.slug && viewModeRef.current === 'tool-builder') {
+          console.log('🔄 Fetching tool after tool completion:', toolArgs.slug)
+
+          // Fetch complete tool data by slug
+          const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
+
+          if (tool && toolBuilderViewRef.current) {
+            // Sync all fields with server data
+            toolBuilderViewRef.current.updateField('name', tool.name)
+            if (tool.description) toolBuilderViewRef.current.updateField('description', tool.description)
+            if (tool.parameters) toolBuilderViewRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
+            if (tool.blueprint) toolBuilderViewRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
+
+            console.log('✅ Tool form synced with server data')
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch entity after tool completion:', error)
+      }
+    },
+    [starshipId]
+  )
+
   // Detect special UI action responses from assistant messages (back-compat path)
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length) return
@@ -446,6 +520,39 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
   }, [currentConversationId, liveMessages, handleUIPayload])
+
+  // Detect tool completion from streaming messages
+  useEffect(() => {
+    if (!liveMessages || liveMessages.length === 0) return
+
+    // Check last few messages for tool results
+    const recentMessages = liveMessages.slice(-5)
+
+    for (const msg of recentMessages) {
+      if (msg.role === 'tool' && msg.toolCallId) {
+        const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
+
+        if (pendingCall && !pendingCall.completed) {
+          // Mark as completed
+          pendingCall.completed = true
+
+          // Extract tool arguments from the conversation history
+          // Look for assistant message with this toolCallId
+          const assistantMsg = liveMessages.find(m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === msg.toolCallId))
+
+          if (assistantMsg) {
+            const toolCall = assistantMsg.toolCalls?.find(tc => tc.id === msg.toolCallId)
+            if (toolCall?.function?.arguments) {
+              pendingCall.args = toolCall.function.arguments
+
+              // Trigger fetch after tool completes
+              handleToolComplete(pendingCall.toolName, pendingCall.args)
+            }
+          }
+        }
+      }
+    }
+  }, [liveMessages, handleToolComplete])
 
   // Consume SSE 'ui_action' events directly (clean channel)
   useEffect(() => {

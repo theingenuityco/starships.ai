@@ -9,6 +9,7 @@
 import { Agent, AgentParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
+import { generateSimpleAgentSlug } from '@starships/models/src/utils/slugGenerator';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
@@ -55,16 +56,20 @@ export class AgentService {
    * Create a new agent and return as AgentModel
    */
   async createAgent(data: CreateAgentRequest & { starshipId: string }): Promise<AgentModel> {
+    // Generate unique slug for the agent
+    const slug = await generateSimpleAgentSlug(this.agentRepository);
+
     const agentData = {
       name: data.name,
+      slug,
       description: data.description,
       model: data.model,
       temperature: data.temperature,
       maxTokens: data.maxTokens,
       timeout: data.timeout || 30000,
-      blueprint: data.blueprint,
+      blueprint: data.blueprint || {}, // Default to empty object if not provided
       systemPrompt: data.systemPrompt,
-      state: data.state,
+      state: data.state || { tools: [], messages: [] }, // Default to empty state if not provided
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -82,6 +87,13 @@ export class AgentService {
    */
   async getAgent(agentId: string): Promise<AgentModel | null> {
     return await this.agentRepository.findById(agentId);
+  }
+
+  /**
+   * Get agent by slug as AgentModel
+   */
+  async getAgentBySlug(slug: string): Promise<AgentModel | null> {
+    return await this.agentRepository.findBySlug(slug);
   }
 
   /**

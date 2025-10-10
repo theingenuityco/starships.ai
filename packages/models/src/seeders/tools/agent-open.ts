@@ -101,20 +101,23 @@ Automatically inferred from agent state (do not pass manually):
               }
               
               return {
-                url: \`\${baseUrl}/starships/\${starshipId}/agents\`,
+                url: \`\${baseUrl}/agents\`,
                 method: 'POST',
                 headers: {
                   'Authorization': \`Bearer \${authToken}\`,
                   'Content-Type': 'application/json'
                 },
-                body,
+                body: {
+                  ...body,
+                  starshipId
+                },
                 timeout: 10000
               };
             }
 
             // Open existing
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/agents/\${slug}\`,
+              url: \`\${baseUrl}/agents/\${slug}\`,
               method: 'GET',
               headers: {
                 'Authorization': \`Bearer \${authToken}\`,

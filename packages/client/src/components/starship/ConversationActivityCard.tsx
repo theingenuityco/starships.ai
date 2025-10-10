@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { MessageSquare, Sparkles, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export interface CreateAgentCardProps {
+export interface ConversationActivityCardProps {
   starshipSlug: string
   recentConversation?: {
     id: string
@@ -18,7 +18,7 @@ export interface CreateAgentCardProps {
   className?: string
 }
 
-export function CreateAgentCard({ starshipSlug, recentConversation, conversationCount, className }: CreateAgentCardProps): React.JSX.Element {
+export function ConversationActivityCard({ starshipSlug, recentConversation, conversationCount, className }: ConversationActivityCardProps): React.JSX.Element {
   const hasConversations = conversationCount > 0 && recentConversation
 
   const formatTimeAgo = (dateString?: string) => {

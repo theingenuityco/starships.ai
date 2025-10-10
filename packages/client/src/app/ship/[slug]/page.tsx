@@ -132,126 +132,123 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 </Button>
               </div>
 
-              {agentsLoading ? (
+              {agentsLoading || agents.length === 0 ? (
+                <div className="w-full px-1 py-2">
+                  <div className="-ml-2 md:-ml-4 py-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 pb-2">
+                        <Card className="frosted-glass-card shadow-frosted-lg">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Skeleton className="h-4 w-4" />
+                              <Skeleton className="h-4 w-32" />
+                            </div>
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-3/4" />
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="flex items-center justify-between">
+                              <Skeleton className="h-5 w-16" />
+                              <Skeleton className="h-8 w-14" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : agents.length > 3 ? (
+                <Carousel
+                  opts={{
+                    align: 'start',
+                    loop: true,
+                  }}
+                  className="w-full px-1 py-2"
+                >
+                  <CarouselContent className="-ml-2 md:-ml-4 py-2">
+                    {agents.map(agent => (
+                      <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 pb-2">
+                        <Card
+                          className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 h-full cursor-pointer"
+                          onClick={() => {
+                            setSelectedAgent(agent)
+                            setIsDetailsModalOpen(true)
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                          <CardHeader className="pb-3 relative z-10">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                              <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
+                            </div>
+                            <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="pt-0 relative z-10">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary" className="text-xs">
+                                {agent.model || 'N/A'}
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8"
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
+                                }}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                                Chat
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="hidden md:flex" />
+                  <CarouselNext className="hidden md:flex" />
+                </Carousel>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3].map(i => (
-                    <Card key={i} className="frosted-glass-card shadow-frosted-lg">
-                      <CardHeader>
-                        <Skeleton className="h-5 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-full" />
+                  {agents.map(agent => (
+                    <Card
+                      key={agent.id}
+                      className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
+                      onClick={() => {
+                        setSelectedAgent(agent)
+                        setIsDetailsModalOpen(true)
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                      <CardHeader className="pb-3 relative z-10">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                          <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
+                        </div>
+                        <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
                       </CardHeader>
-                      <CardContent>
-                        <Skeleton className="h-4 w-1/2" />
+                      <CardContent className="pt-0 relative z-10">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="secondary" className="text-xs">
+                            {agent.model || 'N/A'}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8"
+                            onClick={e => {
+                              e.stopPropagation()
+                              router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
+                            }}
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                            Chat
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
-                </div>
-              ) : agents.length > 0 ? (
-                agents.length > 3 ? (
-                  <Carousel
-                    opts={{
-                      align: 'start',
-                      loop: true,
-                    }}
-                    className="w-full px-1 py-2"
-                  >
-                    <CarouselContent className="-ml-2 md:-ml-4 py-2">
-                      {agents.map(agent => (
-                        <CarouselItem key={agent.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 pb-2">
-                          <Card
-                            className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 h-full cursor-pointer"
-                            onClick={() => {
-                              setSelectedAgent(agent)
-                              setIsDetailsModalOpen(true)
-                            }}
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                            <CardHeader className="pb-3 relative z-10">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Bot className="h-4 w-4 text-primary flex-shrink-0" />
-                                <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
-                              </div>
-                              <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-0 relative z-10">
-                              <div className="flex items-center justify-between">
-                                <Badge variant="secondary" className="text-xs">
-                                  {agent.model || 'N/A'}
-                                </Badge>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8"
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
-                                  }}
-                                >
-                                  <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                                  Chat
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-                    <CarouselPrevious className="hidden md:flex" />
-                    <CarouselNext className="hidden md:flex" />
-                  </Carousel>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {agents.map(agent => (
-                      <Card
-                        key={agent.id}
-                        className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
-                        onClick={() => {
-                          setSelectedAgent(agent)
-                          setIsDetailsModalOpen(true)
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                        <CardHeader className="pb-3 relative z-10">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Bot className="h-4 w-4 text-primary flex-shrink-0" />
-                            <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
-                          </div>
-                          <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-0 relative z-10">
-                          <div className="flex items-center justify-between">
-                            <Badge variant="secondary" className="text-xs">
-                              {agent.model || 'N/A'}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8"
-                              onClick={e => {
-                                e.stopPropagation()
-                                router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
-                              }}
-                            >
-                              <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                              Chat
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )
-              ) : (
-                <div className="text-center py-12">
-                  <Bot className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Agents Deployed</h3>
-                  <p className="text-sm text-muted-foreground mb-6">Deploy your first agent to start using AI capabilities</p>
-                  <Button asChild>
-                    <Link href={`/ship/${slug}/conversations`}>
-                      <Bot className="w-4 h-4 mr-2" />
-                      Deploy Agent
-                    </Link>
-                  </Button>
                 </div>
               )}
             </section>

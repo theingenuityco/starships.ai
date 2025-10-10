@@ -714,15 +714,6 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
   return (
     <div
       className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
-      style={
-        !transparent
-          ? {
-              backgroundImage: `radial-gradient(circle, #9ca3af 1.2px, transparent 1.2px)`,
-              backgroundSize: '24px 24px',
-              backgroundPosition: '0 0',
-            }
-          : undefined
-      }
     >
       <ReactFlow
         nodes={nodesWithSelection}

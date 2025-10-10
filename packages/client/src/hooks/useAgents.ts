@@ -1,5 +1,5 @@
 import api from '@/lib/api'
-import type { AgentModel, ApiResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
+import type { AgentModel, ApiResponse, CreateAgentRequest, UpdateAgentRequest, ToolModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -448,6 +448,24 @@ export function useSelectedAgent() {
     getSelectedAgentId,
     clearSelectedAgent,
   }
+}
+
+/**
+ * Get tools assigned to an agent
+ */
+export function useAgentTools(agentId: string, starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: [...AGENT_QUERY_KEYS.detail(agentId), 'tools', starshipId] as const,
+    queryFn: async (): Promise<ToolModel[]> => {
+      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/agents/${agentId}/tools`, {
+        params: { starshipId },
+      })
+      return response.data.data
+    },
+    enabled: !!agentId && !!starshipId && enabled,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
 }
 
 /**

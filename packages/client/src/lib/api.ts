@@ -1,6 +1,5 @@
 import type { ApiResponse, TemplateCategory } from '@starships/protocol'
 
-import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
 // Custom fetch response wrapper to match axios-like interface
@@ -363,35 +362,6 @@ export type {
 export type Agent = AgentModel
 export type AgentTemplate = AgentTemplateModel
 
-// MCP Server Option interface (matching backend model)
-export interface MCPServerOption {
-  id: string // Unique identifier (e.g., "github", "puppeteer")
-  name: string // Display name (e.g., "Github", "Puppeteer")
-  command: string // Execution command (e.g., "docker", "npx", "uvx")
-  args: string[] // Command arguments array
-  env?: string // Environment variables as JSON string (optional)
-}
-
-// NEW: MCP Server Connector Instance interface (matching backend model)
-export interface MCPServerConnector {
-  id: string
-  starshipId: string
-  templateId: string
-  status: 'active' | 'inactive' | 'error' | 'connecting'
-  isActive: boolean
-  connectedAt: string
-  lastUsed?: string
-  errorMessage?: string
-  // NEW: Simplified environment variables support
-  env?: string
-  configTemplateId?: string
-  configVersion?: number
-  createdAt: string
-  updatedAt: string
-  // Include template information for UI display
-  template?: MCPServerOption
-}
-
 export interface Message {
   id: string
   content: string
@@ -611,133 +581,10 @@ export const templateAPI = {
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
 
-
-// Deprecated: MCP Server API functionality has been removed
-export const mcpServerAPI = {
-  // Get all available MCP server options - DEPRECATED
-  getAll: async (): Promise<MCPServerOption[]> => {
-    console.warn('[API] MCP Server functionality has been removed')
-    return []
-  },
-
-  // Get connected MCP servers for a starship - DEPRECATED
-  getConnectedToStarship: async (starshipId: string): Promise<MCPServerOption[]> => {
-    console.warn('[API] MCP Server functionality has been removed for starship:', starshipId)
-    return []
-  },
-
-  // Connect MCP server to starship - DEPRECATED
-  connectToStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
-    console.warn('[API] MCP Server connection functionality has been removed:', {
-      starshipId,
-      mcpServerId,
-    })
-    // No-op for compatibility
-  },
-
-  // Disconnect MCP server from starship - DEPRECATED
-  disconnectFromStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
-    console.warn('[API] MCP Server disconnection functionality has been removed:', {
-      starshipId,
-      mcpServerId,
-    })
-    // No-op for compatibility
-  },
-
-  // Get connector instances - DEPRECATED
-  getConnectorInstances: async (starshipId: string): Promise<MCPServerConnector[]> => {
-    console.warn('[API] MCP Connector instances functionality has been removed for starship:', starshipId)
-    return []
-  },
-
-  // Create connector instance - DEPRECATED
-  createConnectorInstance: async (starshipId: string, templateId: string, _env?: string): Promise<MCPServerConnector> => {
-    console.warn('[API] MCP Connector instance creation has been removed:', {
-      starshipId,
-      templateId,
-    })
-    throw new Error('MCP functionality has been removed')
-  },
-
-  // Remove connector instance - DEPRECATED
-  removeConnectorInstance: async (starshipId: string, connectorId: string): Promise<void> => {
-    console.warn('[API] MCP Connector instance removal has been removed:', {
-      starshipId,
-      connectorId,
-    })
-    // No-op for compatibility
-  },
-
-  // Update connector configuration - DEPRECATED
-  updateConnectorConfig: async (starshipId: string, connectorId: string, _config: ConnectorInstanceConfig): Promise<MCPServerConnector> => {
-    console.warn('[API] MCP Connector configuration update has been removed:', {
-      starshipId,
-      connectorId,
-    })
-    throw new Error('MCP functionality has been removed')
-  },
-
-  // Apply configuration template - DEPRECATED
-  applyConfigTemplate: async (starshipId: string, connectorId: string, templateId: string): Promise<MCPServerConnector> => {
-    console.warn('[API] MCP Configuration template application has been removed:', {
-      starshipId,
-      connectorId,
-      templateId,
-    })
-    throw new Error('MCP functionality has been removed')
-  },
-
-  // Get connector configuration - DEPRECATED
-  getConnectorConfig: async (
-    starshipId: string,
-    connectorId: string
-  ): Promise<{
-    config: ConnectorInstanceConfig
-    templateId?: string
-    version: number
-    lastModified: string
-  }> => {
-    console.warn('[API] MCP Connector configuration retrieval has been removed:', {
-      starshipId,
-      connectorId,
-    })
-    throw new Error('MCP functionality has been removed')
-  },
-
-  // Get configuration history - DEPRECATED
-  getConnectorConfigHistory: async (
-    starshipId: string,
-    connectorId: string
-    // Removed unused parameter
-  ): Promise<any[]> => {
-    console.warn('[API] MCP Configuration history retrieval has been removed:', {
-      starshipId,
-      connectorId,
-    })
-    return []
-  },
-
-  // Rollback connector configuration - DEPRECATED
-  rollbackConnectorConfig: async (
-    starshipId: string,
-    connectorId: string,
-    historyId: string
-    // Removed unused parameter
-  ): Promise<void> => {
-    console.warn('[API] MCP Configuration rollback has been removed:', {
-      starshipId,
-      connectorId,
-      historyId,
-    })
-    // No-op for compatibility
-  },
-}
-
 export const userAPI = {
   // Get user by ID
   getById: (id: string): Promise<SyncedUser> => api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
-
 
 // Starship API functions for compatibility
 export const starshipAPI = {

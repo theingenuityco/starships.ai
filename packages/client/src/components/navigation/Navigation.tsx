@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { History, MessageSquare, Plus, Users, X, Settings, Key, Store, User } from 'lucide-react'
+import { History, MessageSquare, Plus, X, Settings, Key, Store, Rocket } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -21,14 +21,6 @@ interface NavigationProps {
 
 // Global navigation structure that works for all authenticated users
 const getGlobalNavigationSections = (starshipSlug: string | null) => [
-  ...(starshipSlug
-    ? [
-        {
-          title: 'Starship Systems',
-          items: [{ href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' }],
-        },
-      ]
-    : []),
   {
     title: 'Resources',
     items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
@@ -99,6 +91,7 @@ export function Navigation(props: NavigationProps) {
 
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')
+  const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
@@ -155,8 +148,8 @@ export function Navigation(props: NavigationProps) {
     setAnimationTrigger(prev => prev + 1)
 
     if (starshipSlug) {
-      // Go to conversations if we have a starship
-      router.push(`/ship/${starshipSlug}/conversations`)
+      // Go to overview if we have a starship
+      router.push(`/ship/${starshipSlug}`)
     } else {
       // Go to marketplace as default for authenticated users without starships
       router.push('/marketplace')
@@ -174,7 +167,7 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Compact Header with Theme Toggle */}
         <div className="px-2 py-4 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Conversations">
+          <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Overview">
             <StarshipsLogo width={36} height={36} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger} />
           </div>
         </div>
@@ -182,6 +175,29 @@ export function Navigation(props: NavigationProps) {
         {/* Navigation Content */}
         <div className="flex-1 flex flex-col justify-center min-h-0">
           <div className="p-2 space-y-2">
+            {/* Overview - First nav item */}
+            {starshipSlug && (
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Link href={`/ship/${starshipSlug}`}>
+                    <motion.div
+                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
+                        isOverviewRoute
+                          ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
+                          : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                      }`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Rocket className={`w-5 h-5 ${isOverviewRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                    </motion.div>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                  Overview
+                </TooltipContent>
+              </Tooltip>
+            )}
             {/* Conversations Section - Only show when user has a starship */}
             {starshipSlug && (
               <div>

@@ -2,26 +2,15 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "EKSDescribe",
+      "Sid": "EKSDescribeAndAccess",
       "Effect": "Allow",
-      "Action": ["eks:DescribeCluster"],
+      "Action": ["eks:DescribeCluster", "eks:ListClusters", "eks:AccessKubernetesApi"],
       "Resource": "*"
-    },
-    {
-      "Sid": "AllowAssumeClusterAdminRole",
-      "Effect": "Allow",
-      "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::577012215849:role/EKSClusterAdminRole"
     },
     {
       "Sid": "ReadSecretsAndECR",
       "Effect": "Allow",
-      "Action": [
-        "ecr:GetAuthorizationToken",
-        "secretsmanager:GetSecretValue",
-        "ssm:GetParameter",
-        "ssm:GetParameters"
-      ],
+      "Action": ["ecr:GetAuthorizationToken", "secretsmanager:GetSecretValue", "ssm:GetParameter", "ssm:GetParameters"],
       "Resource": "*"
     }
   ]

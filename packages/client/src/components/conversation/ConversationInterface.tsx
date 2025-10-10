@@ -331,8 +331,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
-            // Open builder for tool actions that affect tool data or blueprint
-            const openBuilderSlugs = new Set([
+            // Open tool builder for tool actions that affect tool data or blueprint
+            const openToolBuilderSlugs = new Set([
               'tool-open',
               'tool-edit',
               'tool-add-blueprint-node',
@@ -342,7 +342,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               'tool-blueprint-edit-edge',
               'tool-blueprint-remove-edge',
             ])
-            if (openBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
+            if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
               console.log('📂 Opening tool builder view for', toolName)
               // Only reset when transitioning into the builder; preserve existing form if already open
               if (viewModeRef.current !== 'tool-builder') {
@@ -351,6 +351,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               // Mark that this transition was triggered by streaming
               wasOpenedByStreamingRef.current = true
               if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
+            }
+
+            // Open agent builder for agent actions that affect agent data
+            const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+            if (openAgentBuilderSlugs.has(toolName)) {
+              console.log('🌍 Opening agent builder view for', toolName)
+              // Only reset when transitioning into the builder; preserve existing form if already open
+              if (viewModeRef.current !== 'agent-builder') {
+                agentBuilderViewRef.current?.resetForm()
+              }
+              // Mark that this transition was triggered by streaming
+              wasOpenedByStreamingRef.current = true
+              if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
             }
             break
           }
@@ -444,9 +457,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, lastUIAction, handleUIPayload])
 
-  // Auto-expand overlay when transitioning to tool-builder via streaming
+  // Auto-expand overlay when transitioning to builder views via streaming
   useEffect(() => {
-    if (viewMode === 'tool-builder' && wasOpenedByStreamingRef.current) {
+    if ((viewMode === 'tool-builder' || viewMode === 'agent-builder') && wasOpenedByStreamingRef.current) {
       // Auto-expand the message overlay
       setIsMessageOverlayExpanded(true)
       // Reset the flag after a short delay
@@ -459,7 +472,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Handle click outside to collapse overlay
   useEffect(() => {
-    if (viewMode !== 'tool-builder' || !isMessageOverlayExpanded) return
+    if ((viewMode !== 'tool-builder' && viewMode !== 'agent-builder') || !isMessageOverlayExpanded) return
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement

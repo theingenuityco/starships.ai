@@ -80,7 +80,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                       {amountAdded
                         ? `${amountAdded} in fresh credits has landed safely in ${starship?.name ?? 'your starship'}’s wallet.`
                         : `Fresh credits have landed safely in ${starship?.name ?? 'your starship'}’s wallet.`}{' '}
-                      You're clear to launch the next workflow.
+                      You’re clear to launch the next workflow.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">

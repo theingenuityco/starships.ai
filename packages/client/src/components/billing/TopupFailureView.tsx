@@ -149,7 +149,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-rose-800 dark:text-rose-200/80">
-                  <p>Send us your top-up reference and timestamps and we'll coordinate directly with Stripe to surface the exact failure reason.</p>
+                  <p>Send us your top-up reference and timestamps and we’ll coordinate directly with Stripe to surface the exact failure reason.</p>
                   <Button variant="secondary" className="w-full bg-white/80 text-rose-700 hover:bg-white dark:bg-rose-50/20 dark:text-rose-200" onClick={() => router.push('/support')}>
                     Contact support
                   </Button>

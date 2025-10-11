@@ -61,6 +61,22 @@ spec:
               name: backend
             - containerPort: 5432
               name: postgres
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 3
+
           env:
             - name: NODE_ENV
               value: 'development'
@@ -175,6 +191,7 @@ spec:
                   key: GOOGLE_CLIENT_SECRET
             - name: PGDATA
               value: '/var/lib/postgresql/data/pgdata'
+
           lifecycle:
             preStop:
               exec:
@@ -184,6 +201,7 @@ spec:
                   - |
                     /usr/bin/supervisorctl stop postgres || true
                     sleep 5
+
           volumeMounts:
             - name: starships-data
               mountPath: /var/lib/postgresql
@@ -191,6 +209,7 @@ spec:
             - name: starships-data
               mountPath: /app/data
               subPath: app-data
+
           resources:
             requests:
               cpu: '250m'
@@ -198,6 +217,7 @@ spec:
             limits:
               cpu: '1000m'
               memory: '2Gi'
+
   volumeClaimTemplates:
     - metadata:
         name: starships-data

@@ -1,7 +1,4 @@
-export type ResolvedIcon =
-  | { type: 'phosphor'; component: string }
-  | { type: 'radix'; component: string }
-  | { type: 'iconify'; icon: string }
+export type ResolvedIcon = { type: 'phosphor'; component: string } | { type: 'radix'; component: string } | { type: 'iconify'; icon: string }
 
 const map: Record<string, ResolvedIcon> = {
   // Controls → Radix
@@ -18,6 +15,14 @@ const map: Record<string, ResolvedIcon> = {
   rocket: { type: 'phosphor', component: 'Rocket' },
   sparkles: { type: 'phosphor', component: 'Sparkle' },
 
+  // Navbar / UI common
+  store: { type: 'phosphor', component: 'Storefront' },
+  key: { type: 'phosphor', component: 'Key' },
+  'message-square': { type: 'phosphor', component: 'ChatCircleText' },
+  plus: { type: 'phosphor', component: 'Plus' },
+  x: { type: 'phosphor', component: 'X' },
+  history: { type: 'phosphor', component: 'ClockCounterClockwise' },
+
   // Animated affordances → Iconify line-md
   loading: { type: 'iconify', icon: 'line-md:loading-twotone-loop' },
 }
@@ -29,5 +34,3 @@ export function resolveIcon(name: string): ResolvedIcon | undefined {
 export function registerIcons(entries: Record<string, ResolvedIcon>) {
   Object.assign(map, entries)
 }
-
-

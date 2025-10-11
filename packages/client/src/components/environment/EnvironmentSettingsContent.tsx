@@ -1,6 +1,7 @@
+'use client'
+
 import { Info, Key, Search, Shield } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useState } from 'react'
 import { EnvironmentSummary } from '@starships/protocol'

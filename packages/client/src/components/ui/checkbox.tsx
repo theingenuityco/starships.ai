@@ -1,6 +1,7 @@
+'use client'
+
 import { Check } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import * as React from 'react'
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox'

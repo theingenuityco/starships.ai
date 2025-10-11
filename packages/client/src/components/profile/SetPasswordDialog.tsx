@@ -1,6 +1,7 @@
+'use client'
+
 import { Eye, EyeOff, Shield } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'

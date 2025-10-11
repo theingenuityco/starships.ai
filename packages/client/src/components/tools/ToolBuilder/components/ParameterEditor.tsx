@@ -1,6 +1,7 @@
+'use client'
+
 import { AlertCircle } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'

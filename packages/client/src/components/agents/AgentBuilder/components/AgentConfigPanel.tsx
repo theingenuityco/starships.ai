@@ -1,6 +1,7 @@
+'use client'
+
 import { ChevronDown, Settings } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React, { useRef, useEffect } from 'react'
 import { Label } from '@/components/ui/label'

@@ -1,6 +1,7 @@
+'use client'
+
 import { BarChart2, Bot, Brain, Calendar, CheckCircle, Code, Copy, Download, GitBranch, HeartPulse, Lightbulb, MessageSquare, Settings, Sparkles, Star, Users, Zap } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'

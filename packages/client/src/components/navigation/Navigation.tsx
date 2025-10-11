@@ -1,6 +1,7 @@
+'use client'
+
 import { History, Key, MessageSquare, Plus, Rocket, Store, X } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'

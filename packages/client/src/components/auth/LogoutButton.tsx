@@ -1,6 +1,7 @@
+'use client'
+
 import { LogOut } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { Button } from '@/components/ui/button'
 

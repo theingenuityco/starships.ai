@@ -1,6 +1,7 @@
+'use client'
+
 import { Sparkles } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React, { useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'

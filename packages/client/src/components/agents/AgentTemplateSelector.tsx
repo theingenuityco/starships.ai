@@ -1,6 +1,7 @@
-import { ChevronDown, Search, Sparkles, Users } from 'lucide-react'
-import Icon from '@/components/primitives/Icon'
 'use client'
+
+import { BarChart3, ChevronDown, Headphones, Palette, Search, Sparkles, Users, Code } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'

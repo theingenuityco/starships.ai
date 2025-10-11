@@ -1,6 +1,7 @@
+'use client'
+
 import { AlertTriangle, Key, Trash2 } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { EnvironmentSummary } from '@starships/protocol'
 import { Button } from '@/components/ui/button'

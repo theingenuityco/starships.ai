@@ -1,6 +1,7 @@
+'use client'
+
 import { Calendar, Edit, FileText, Key, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useState } from 'react'
 import { EnvironmentSummary } from '@starships/protocol'

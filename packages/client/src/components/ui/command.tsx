@@ -1,6 +1,7 @@
+"use client"
+
 import { Search } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-"use client"
 
 import * as React from "react"
 import { type DialogProps } from "@radix-ui/react-dialog"

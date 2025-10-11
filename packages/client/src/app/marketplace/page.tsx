@@ -1,6 +1,7 @@
+'use client'
+
 import { Bot, Search, Store, Wrench } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { AgentDetailsDrawer } from '@/components/marketplace/AgentDetailsDrawer'

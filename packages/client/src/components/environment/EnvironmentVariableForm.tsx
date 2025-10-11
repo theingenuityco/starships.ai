@@ -1,6 +1,7 @@
+'use client'
+
 import { AlertCircle, FileText, Key } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useState, useEffect } from 'react'
 import { EnvironmentSummary } from '@starships/protocol'

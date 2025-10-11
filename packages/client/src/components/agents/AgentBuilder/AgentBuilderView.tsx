@@ -1,6 +1,7 @@
+'use client'
+
 import { Sparkles } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
 

@@ -1,6 +1,7 @@
+'use client'
+
 import { Lock, Mail, User as UserIcon } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import { Button } from '@/components/ui/button'

@@ -1,6 +1,7 @@
+'use client'
+
 import { AlertTriangle, Bug, RefreshCw } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

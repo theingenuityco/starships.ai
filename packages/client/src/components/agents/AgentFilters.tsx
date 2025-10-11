@@ -1,6 +1,7 @@
+'use client'
+
 import { ChevronDown, Filter, X } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useState } from 'react'
 import { AgentModel } from '@starships/protocol'

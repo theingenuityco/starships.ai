@@ -1,6 +1,7 @@
+'use client'
+
 import { Shield } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'

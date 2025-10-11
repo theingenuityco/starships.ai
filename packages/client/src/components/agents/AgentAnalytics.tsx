@@ -1,6 +1,7 @@
+'use client'
+
 import { Activity, BarChart3, Calendar, Eye, MessageSquare, Star, TrendingUp } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

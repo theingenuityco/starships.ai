@@ -1,6 +1,7 @@
+'use client'
+
 import { Check, Copy, ExternalLink, Loader2, MessageCircleMore, Wrench } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'

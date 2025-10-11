@@ -1,6 +1,7 @@
+'use client'
+
 import { Mail, User as UserIcon } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import type { FormState } from '@/hooks/useAccountForm'

@@ -1,6 +1,7 @@
+'use client'
+
 import { Moon, Sun } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import * as React from 'react'
 

@@ -1,6 +1,7 @@
+'use client'
+
 import { Activity, CreditCard, Rocket } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'

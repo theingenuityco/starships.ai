@@ -1,6 +1,7 @@
-import { AlertTriangle, Sparkles } from 'lucide-react'
-import Icon from '@/components/primitives/Icon'
 'use client'
+
+import { AlertTriangle, Bot, Sparkles, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'

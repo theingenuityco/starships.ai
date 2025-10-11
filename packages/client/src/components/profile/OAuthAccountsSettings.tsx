@@ -1,6 +1,7 @@
+'use client'
+
 import { CheckCircle, Chrome, ExternalLink, Github, Shield, Unlink } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React, { useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'

@@ -1,6 +1,7 @@
+'use client'
+
 import { AlertCircle, CheckCircle, Key } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 

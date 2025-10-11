@@ -1,6 +1,7 @@
+'use client'
+
 import { BarChart2, Bot, Calendar, CheckCircle, Code, Copy, Download, GitBranch, Key, Package, Settings, Sparkles, Star, Users, Wrench } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import type { ToolTemplateModel } from '@starships/protocol'

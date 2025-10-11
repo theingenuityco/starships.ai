@@ -1,6 +1,7 @@
+'use client'
+
 import { Archive, MessageSquare, MoreVertical, Trash2 } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'

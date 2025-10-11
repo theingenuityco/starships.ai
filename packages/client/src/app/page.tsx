@@ -1,6 +1,7 @@
+'use client'
+
 import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, User, Users } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { LoginButton } from '@/components/auth/LoginButton'
 import { StarTheme } from '@/components/theme-context'

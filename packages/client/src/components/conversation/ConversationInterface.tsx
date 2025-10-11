@@ -1,6 +1,7 @@
+'use client'
+
 import { Sparkles, Users } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'

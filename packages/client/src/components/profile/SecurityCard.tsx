@@ -1,6 +1,7 @@
+'use client'
+
 import { Chrome, Github, Lock, Plus, Shield } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
-'use client'
 
 import React from 'react'
 import type { FormState, PasswordErrors } from '@/hooks/useAccountForm'

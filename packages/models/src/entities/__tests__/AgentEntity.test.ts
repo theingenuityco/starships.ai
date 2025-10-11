@@ -155,6 +155,7 @@ describe('AgentEntity', () => {
     it('should pass validation for valid create data', async () => {
       const validData = {
         name: 'Test Agent',
+        slug: 'test-agent',
         model: 'gpt-4',
         timeout: 30000,
         state: { messages: [], tools: [] },
@@ -177,6 +178,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: '',
+          slug: 'test-agent',
           model: 'gpt-4',
           timeout: 30000,
           state: { messages: [], tools: [] },
@@ -187,6 +189,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'a'.repeat(101),
+          slug: 'test-agent',
           model: 'gpt-4',
           timeout: 30000,
           state: { messages: [], tools: [] },
@@ -197,6 +200,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Valid Name',
+          slug: 'valid-name',
           model: 'gpt-4',
           timeout: 30000,
           state: { messages: [], tools: [] },
@@ -209,6 +213,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           temperature: -0.1,
           timeout: 30000,
@@ -220,6 +225,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           temperature: 2.1,
           timeout: 30000,
@@ -231,6 +237,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           temperature: 0.7,
           timeout: 30000,
@@ -244,6 +251,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           maxTokens: 0,
           timeout: 30000,
@@ -255,6 +263,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           maxTokens: 100001,
           timeout: 30000,
@@ -266,6 +275,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           maxTokens: 4000,
           timeout: 30000,
@@ -279,6 +289,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           timeout: 999,
           state: { messages: [], tools: [] },
@@ -289,6 +300,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           timeout: 300001,
           state: { messages: [], tools: [] },
@@ -299,6 +311,7 @@ describe('AgentEntity', () => {
       await expect(
         AgentEntity.validate({
           name: 'Test Agent',
+          slug: 'test-agent',
           model: 'gpt-4',
           timeout: 30000,
           state: { messages: [], tools: [] },

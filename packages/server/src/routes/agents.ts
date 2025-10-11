@@ -16,6 +16,7 @@ const PaginationSchema = z.object({
 });
 
 const CreateAgentSchema = z.object({
+  slug: z.string().min(1).max(100).optional(),
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
   description: z.string().optional(),
   systemPrompt: z.string().optional(),
@@ -137,6 +138,48 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
   }
 });
 
+// GET /starships/:starshipId/agents/:slug - Get agent by slug within a starship (for tools)
+router.get('/starships/:starshipId/agents/:slug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate parameters
+    const paramValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+        slug: z.string().min(1).max(255),
+      }),
+      req.params,
+      res,
+      'starship and slug parameters'
+    );
+    if (!paramValidation) return;
+
+    const { starshipId, slug } = paramValidation;
+    const agentService = new AgentService();
+
+    // Validate access to the starship
+    const userId = req.user!.id;
+    const hasAccess = await agentService.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
+      return;
+    }
+
+    // Fetch agents for starship and find by slug to ensure membership without relying on starshipId typing
+    const starshipAgents = await agentService.getAgentsByStarship(starshipId);
+    const agent = starshipAgents.find((a) => a.slug === slug) || null;
+
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', slug, starshipId });
+      return;
+    }
+
+    sendSuccess(res, agent);
+  } catch (error) {
+    console.error('[AGENTS] Error getting agent by slug for starship:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
+  }
+});
+
 // GET /agents/:slugOrId - Get agent by slug or ID (OpenAPI pattern)
 router.get('/agents/:slugOrId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -152,16 +195,22 @@ router.get('/agents/:slugOrId', jwtAuthMiddleware, async (req: Request, res: Res
     if (!paramValidation) return;
 
     const agentService = new AgentService();
-    let agent: AgentModel | null = null;
 
-    // First try to find by slug (if it matches slug pattern)
-    if (/^[a-z0-9-_]+$/.test(paramValidation.slugOrId)) {
-      agent = await agentService.getAgentBySlug(paramValidation.slugOrId);
-    }
+    // Always try slug first
+    let agent: AgentModel | null = await agentService.getAgentBySlug(paramValidation.slugOrId);
 
     // If not found by slug, try to find by ID
     if (!agent) {
       agent = await agentService.getAgent(paramValidation.slugOrId);
+    }
+
+    // If still not found, return 404
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+        resource: 'agent',
+        slugOrId: paramValidation.slugOrId,
+      });
+      return;
     }
 
     sendSuccess(res, agent);

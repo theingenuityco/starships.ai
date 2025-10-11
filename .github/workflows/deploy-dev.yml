@@ -28,8 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
-    # Only run if previous workflow succeeded
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Run when build workflow succeeded, or when dispatched manually
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout repository

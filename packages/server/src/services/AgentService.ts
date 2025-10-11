@@ -9,6 +9,7 @@
 import { Agent, AgentParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
+import { generateSimpleAgentSlug } from '@starships/models/src/utils/slugGenerator';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
@@ -55,16 +56,40 @@ export class AgentService {
    * Create a new agent and return as AgentModel
    */
   async createAgent(data: CreateAgentRequest & { starshipId: string }): Promise<AgentModel> {
-    const agentData = {
+    // Use provided slug if present; otherwise generate a simple unique slug
+    const slug = data.slug && data.slug.trim().length > 0 ? data.slug : await generateSimpleAgentSlug(this.agentRepository);
+
+    // Create agent parameters for the Agent class
+    const agentParams: AgentParams = {
       name: data.name,
       description: data.description,
       model: data.model,
       temperature: data.temperature,
       maxTokens: data.maxTokens,
       timeout: data.timeout || 30000,
-      blueprint: data.blueprint,
       systemPrompt: data.systemPrompt,
-      state: data.state,
+      state: data.state, // Let Agent class handle state initialization
+      blueprint: data.blueprint, // This will be null/undefined to trigger default blueprint generation
+    };
+
+    // Instantiate Agent class to generate default blueprint if needed
+    const agent = new Agent(agentParams);
+    const generatedBlueprint = agent.getCurrentBlueprint();
+
+    // Initialize state with default if not provided (same logic as Agent class)
+    const agentState = data.state || { tools: [], messages: [] };
+
+    const agentData = {
+      name: data.name,
+      slug,
+      description: data.description,
+      model: data.model,
+      temperature: data.temperature,
+      maxTokens: data.maxTokens,
+      timeout: data.timeout || 30000,
+      blueprint: generatedBlueprint, // Use the blueprint from Agent class (default or provided)
+      systemPrompt: data.systemPrompt,
+      state: agentState, // Use provided state or default initialization
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -82,6 +107,13 @@ export class AgentService {
    */
   async getAgent(agentId: string): Promise<AgentModel | null> {
     return await this.agentRepository.findById(agentId);
+  }
+
+  /**
+   * Get agent by slug as AgentModel
+   */
+  async getAgentBySlug(slug: string): Promise<AgentModel | null> {
+    return await this.agentRepository.findBySlug(slug);
   }
 
   /**

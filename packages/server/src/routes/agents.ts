@@ -4,17 +4,19 @@ import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
+import { AgentModel } from '@starships/protocol';
 
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
+const IdSchema = z.string().min(1, 'ID is required');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 const CreateAgentSchema = z.object({
+  slug: z.string().min(1).max(100).optional(),
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
   description: z.string().optional(),
   systemPrompt: z.string().optional(),
@@ -25,7 +27,7 @@ const CreateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  starshipId: z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID'),
+  starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
 const UpdateAgentSchema = z.object({
@@ -39,14 +41,11 @@ const UpdateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  starshipId: z
-    .string()
-    .regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID')
-    .optional(),
+  starshipId: z.string().min(1, 'Starship ID is required').optional(),
 });
 
 const StarshipAssignmentSchema = z.object({
-  starshipId: z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID'),
+  starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
 const ToolAssignmentSchema = z.object({
@@ -139,20 +138,84 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
   }
 });
 
-// GET /agents/:id - Get specific agent (OpenAPI pattern)
-router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /starships/:starshipId/agents/:slug - Get agent by slug within a starship (for tools)
+router.get('/starships/:starshipId/agents/:slug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    // Validate parameters
+    const paramValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+        slug: z.string().min(1).max(255),
+      }),
+      req.params,
+      res,
+      'starship and slug parameters'
+    );
     if (!paramValidation) return;
 
-    // Delegate to service layer
+    const { starshipId, slug } = paramValidation;
     const agentService = new AgentService();
-    const agent = await agentService.getAgent(paramValidation.id);
+
+    // Validate access to the starship
+    const userId = req.user!.id;
+    const hasAccess = await agentService.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
+      return;
+    }
+
+    // Fetch agents for starship and find by slug to ensure membership without relying on starshipId typing
+    const starshipAgents = await agentService.getAgentsByStarship(starshipId);
+    const agent = starshipAgents.find((a) => a.slug === slug) || null;
+
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', slug, starshipId });
+      return;
+    }
 
     sendSuccess(res, agent);
   } catch (error) {
-    console.error('[AGENTS] Error getting agent:', error);
+    console.error('[AGENTS] Error getting agent by slug for starship:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
+  }
+});
+
+// GET /agents/:slugOrId - Get agent by slug or ID (OpenAPI pattern)
+router.get('/agents/:slugOrId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate parameters - accept any string for slugOrId
+    const paramValidation = validateData(
+      z.object({
+        slugOrId: z.string().min(1).max(255),
+      }),
+      req.params,
+      res,
+      'slugOrId parameter'
+    );
+    if (!paramValidation) return;
+
+    const agentService = new AgentService();
+
+    // Always try slug first
+    let agent: AgentModel | null = await agentService.getAgentBySlug(paramValidation.slugOrId);
+
+    // If not found by slug, try to find by ID
+    if (!agent) {
+      agent = await agentService.getAgent(paramValidation.slugOrId);
+    }
+
+    // If still not found, return 404
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+        resource: 'agent',
+        slugOrId: paramValidation.slugOrId,
+      });
+      return;
+    }
+
+    sendSuccess(res, agent);
+  } catch (error) {
+    console.error('[AGENTS] Error getting agent by slugOrId:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
   }
 });

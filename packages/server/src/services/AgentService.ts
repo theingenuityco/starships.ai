@@ -56,8 +56,28 @@ export class AgentService {
    * Create a new agent and return as AgentModel
    */
   async createAgent(data: CreateAgentRequest & { starshipId: string }): Promise<AgentModel> {
-    // Generate unique slug for the agent
-    const slug = await generateSimpleAgentSlug(this.agentRepository);
+    // Use provided slug if present; otherwise generate a simple unique slug
+    const slug = data.slug && data.slug.trim().length > 0 ? data.slug : await generateSimpleAgentSlug(this.agentRepository);
+
+    // Create agent parameters for the Agent class
+    const agentParams: AgentParams = {
+      name: data.name,
+      description: data.description,
+      model: data.model,
+      temperature: data.temperature,
+      maxTokens: data.maxTokens,
+      timeout: data.timeout || 30000,
+      systemPrompt: data.systemPrompt,
+      state: data.state, // Let Agent class handle state initialization
+      blueprint: data.blueprint, // This will be null/undefined to trigger default blueprint generation
+    };
+
+    // Instantiate Agent class to generate default blueprint if needed
+    const agent = new Agent(agentParams);
+    const generatedBlueprint = agent.getCurrentBlueprint();
+
+    // Initialize state with default if not provided (same logic as Agent class)
+    const agentState = data.state || { tools: [], messages: [] };
 
     const agentData = {
       name: data.name,
@@ -67,9 +87,9 @@ export class AgentService {
       temperature: data.temperature,
       maxTokens: data.maxTokens,
       timeout: data.timeout || 30000,
-      blueprint: data.blueprint || {}, // Default to empty object if not provided
+      blueprint: generatedBlueprint, // Use the blueprint from Agent class (default or provided)
       systemPrompt: data.systemPrompt,
-      state: data.state || { tools: [], messages: [] }, // Default to empty state if not provided
+      state: agentState, // Use provided state or default initialization
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);

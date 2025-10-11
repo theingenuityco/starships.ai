@@ -22,6 +22,13 @@ export { toolEditBlueprintNodeToolTemplate } from './tool-edit-blueprint-node';
 export { toolRemoveBlueprintNodeToolTemplate } from './tool-remove-blueprint-node';
 export { toolEditBlueprintEdgeToolTemplate } from './tool-edit-blueprint-edge';
 export { toolRemoveBlueprintEdgeToolTemplate } from './tool-remove-blueprint-edge';
+export { agentListToolTemplate } from './agent-list';
+export { agentGetToolTemplate } from './agent-get';
+export { agentOpenToolTemplate } from './agent-open';
+export { agentEditToolTemplate } from './agent-edit';
+export { agentTestToolTemplate } from './agent-test';
+export { agentAssignToolToolTemplate } from './agent-assign-tool';
+export { agentUnassignToolToolTemplate } from './agent-unassign-tool';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -43,6 +50,13 @@ import { toolEditBlueprintNodeToolTemplate } from './tool-edit-blueprint-node';
 import { toolRemoveBlueprintNodeToolTemplate } from './tool-remove-blueprint-node';
 import { toolEditBlueprintEdgeToolTemplate } from './tool-edit-blueprint-edge';
 import { toolRemoveBlueprintEdgeToolTemplate } from './tool-remove-blueprint-edge';
+import { agentListToolTemplate } from './agent-list';
+import { agentGetToolTemplate } from './agent-get';
+import { agentOpenToolTemplate } from './agent-open';
+import { agentEditToolTemplate } from './agent-edit';
+import { agentTestToolTemplate } from './agent-test';
+import { agentAssignToolToolTemplate } from './agent-assign-tool';
+import { agentUnassignToolToolTemplate } from './agent-unassign-tool';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -64,4 +78,11 @@ export const ALL_TOOL_TEMPLATES = [
   toolRemoveBlueprintNodeToolTemplate,
   toolEditBlueprintEdgeToolTemplate,
   toolRemoveBlueprintEdgeToolTemplate,
+  agentListToolTemplate,
+  agentGetToolTemplate,
+  agentOpenToolTemplate,
+  agentEditToolTemplate,
+  agentTestToolTemplate,
+  agentAssignToolToolTemplate,
+  agentUnassignToolToolTemplate,
 ];

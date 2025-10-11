@@ -1,51 +1,39 @@
-const { migrationRunner } = require('./dist/scripts/migration-runner.js');
-const { createConnection } = require('./dist/helpers/database');
-const dotenv = require('dotenv');
+#!/usr/bin/env node
 
-// Load environment variables
-dotenv.config({ path: '../../.env' });
+/**
+ * Run Database Migration Script
+ *
+ * This script runs the agent slug migration to add the slug column
+ * and unique constraint to the agents table.
+ */
+
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 async function runMigration() {
   try {
-    console.log('🚀 Initializing database connection...');
+    console.log('🔄 Running agent slug migration...');
 
-    // Create database connection with environment variables
-    const config = {
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      user: process.env.POSTGRES_USER || 'postgres',
-      password: process.env.POSTGRES_PASSWORD || 'password',
-      database: process.env.POSTGRES_DATABASE || 'starships',
-      ssl: process.env.POSTGRES_SSL === 'true',
-    };
+    // Read the migration file
+    const migrationPath = path.join(__dirname, 'migrations', '001_add_agent_slug.sql');
+    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
 
-    console.log(`Connecting to database: ${config.user}@${config.host}:${config.port}/${config.database}`);
+    // Execute the migration using psql
+    // Note: This assumes you have psql installed and configured
+    // You may need to adjust the connection parameters
+    const command = `psql -d starships_dev -f "${migrationPath}"`;
 
-    const connection = createConnection(config);
-    await connection.connect();
+    console.log('📝 Executing migration:', migrationPath);
+    execSync(command, { stdio: 'inherit' });
 
-    console.log('✅ Database connection established');
-
-    console.log('🚀 Running migration...');
-    const result = await migrationRunner.initializeSchema();
-
-    if (result.success) {
-      console.log('✅ Migration completed successfully!');
-      console.log(`Execution time: ${result.executionTime}ms`);
-      if (result.warnings && result.warnings.length > 0) {
-        console.log('⚠️ Warnings:', result.warnings);
-      }
-    } else {
-      console.error('❌ Migration failed!');
-      console.error('Errors:', result.errors);
-    }
-
-    await connection.disconnect();
-    process.exit(result.success ? 0 : 1);
+    console.log('✅ Migration completed successfully!');
+    console.log('🎯 Agent slugs are now globally unique');
   } catch (error) {
-    console.error('❌ Migration runner failed:', error);
+    console.error('❌ Migration failed:', error.message);
     process.exit(1);
   }
 }
 
+// Run the migration
 runMigration();

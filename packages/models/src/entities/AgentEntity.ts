@@ -46,6 +46,11 @@ export class AgentEntity implements AgentModel {
   name!: string;
 
   @Expose()
+  @IsString()
+  @Length(1, 100)
+  slug!: string;
+
+  @Expose()
   @IsOptional()
   @IsString()
   @Length(0, 500)
@@ -82,12 +87,14 @@ export class AgentEntity implements AgentModel {
   systemPrompt?: string; // System prompt moved to root level
 
   @Expose()
+  @IsOptional()
   @IsObject()
-  state!: AgentState; // Runtime state with messages and tools
+  state?: AgentState; // Runtime state with messages and tools
 
   @Expose()
+  @IsOptional()
   @IsObject()
-  blueprint!: Blueprint; // Blueprint - keeping flexible for now
+  blueprint?: Blueprint; // Blueprint - keeping flexible for now
 
   /**
    * Simple validation function using class-validator

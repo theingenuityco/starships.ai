@@ -1,4 +1,4 @@
-import type { ApiResponse, TemplateCategory } from '@starships/protocol'
+import type { ApiResponse, TemplateCategory, ToolModel as Tool } from '@starships/protocol'
 
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
@@ -450,6 +450,11 @@ export const agentAPI = {
     invalidateAgentCaches(id)
   },
 
+  getBySlug: async (slug: string): Promise<Agent> => {
+    const data = await api.get(`/api/v1/agents/${slug}`).then(res => extractResponseData<Agent>(res))
+    return data
+  },
+
   // Enhanced query methods with caching
   getByCategory: async (category: TemplateCategory): Promise<Agent[]> => {
     const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
@@ -502,6 +507,14 @@ export const agentAPI = {
   // Get agent analytics
   getAnalytics: async (id: string): Promise<any> => {
     const data = await api.get(`/api/v1/agents/${id}/analytics`).then(res => extractResponseData<any>(res))
+    return data
+  },
+}
+
+// Tool API
+export const toolAPI = {
+  getBySlug: async (starshipId: string, slug: string): Promise<Tool> => {
+    const data = await api.get(`/api/v1/starships/${starshipId}/tools/${slug}`).then(res => extractResponseData<Tool>(res))
     return data
   },
 }

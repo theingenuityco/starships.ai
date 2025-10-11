@@ -9,7 +9,7 @@
 import { Agent, AgentParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
-import { generateSimpleAgentSlug } from '@starships/models/src/utils/slugGenerator';
+import { generateSimpleAgentSlug } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';

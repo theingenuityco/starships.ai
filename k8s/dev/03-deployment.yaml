@@ -177,17 +177,6 @@ spec:
             - name: PGDATA
               value: '/var/lib/postgresql/data/pgdata'
 
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - |
-                    echo "Delaying shutdown for graceful handover..."
-                    sleep 25
-                    /usr/bin/supervisorctl stop postgres || true
-                    sleep 5
           readinessProbe:
             httpGet:
               path: /

@@ -210,7 +210,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               type="target"
               position={Position.Left}
               className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
-              style={{ left: -6 }}
+              style={{ left: -6, zIndex: 10 }}
             />
           )}
           {incoming.length > 1 &&
@@ -228,6 +228,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                     left: -6,
                     top: `calc(50% + ${offset}px)`,
                     transform: 'translateY(-50%)',
+                    zIndex: 10,
                   }}
                 />
               )
@@ -275,6 +276,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                       right: -6,
                       top: '50%',
                       transform: 'translateY(-50%)',
+                      zIndex: 10,
                     }}
                   />
                 </div>
@@ -285,7 +287,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
         {/* Single output handle for nodes with only one output */}
         {edges.length <= 1 && (
-          <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
+          <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6, zIndex: 10 }} />
         )}
       </div>
     </>
@@ -317,7 +319,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
           type="target"
           position={Position.Left}
           className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
-          style={{ left: -6 }}
+          style={{ left: -6, zIndex: 10 }}
         />
       )}
       {data.type !== 'start' &&
@@ -332,7 +334,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
               type="target"
               position={Position.Left}
               className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
-              style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)' }}
+              style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', zIndex: 10 }}
             />
           )
         })}
@@ -370,7 +372,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 
       {/* Output handle - all nodes except end (horizontal layout: right) */}
       {data.type !== 'end' && (
-        <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
+        <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6, zIndex: 10 }} />
       )}
     </>
   )

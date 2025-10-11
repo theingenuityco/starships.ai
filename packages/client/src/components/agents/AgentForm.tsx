@@ -1,3 +1,5 @@
+import { Bot, Globe, Info, Lock, MessageSquare, Plus, Rocket, Settings, Tag, X } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState } from 'react'
@@ -11,7 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { StarshipSelector } from '@/components/agents/StarshipSelector'
-import { X, Plus, Bot, Sparkles, Code, Palette, BarChart3, Headphones, Tag, Settings, Info, Globe, Lock, MessageSquare, Rocket } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 interface AgentFormProps {

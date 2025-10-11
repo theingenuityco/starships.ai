@@ -1,7 +1,9 @@
+import { ArrowDown, ArrowUp, Coins } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Coins, ArrowDown, ArrowUp } from 'lucide-react'
+
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 
 interface ConversationContextBarProps {

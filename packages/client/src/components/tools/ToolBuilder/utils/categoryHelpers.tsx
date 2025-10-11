@@ -1,5 +1,7 @@
+import { BarChart2, Bot, Package, Users, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 import type { ToolTemplateCategory } from '@starships/protocol'
-import { Bot, BarChart2, Users, Package, Wrench } from 'lucide-react'
+
 
 export const getCategoryIcon = (category: ToolTemplateCategory) => {
   switch (category) {

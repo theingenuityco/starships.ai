@@ -1,3 +1,5 @@
+import { ChevronDown, Settings2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
@@ -5,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Settings2, ChevronDown } from 'lucide-react'
+
 import type { AgentFormData, FormErrors } from '../types'
 import { CategorySelector } from './CategorySelector'
 import { IconSelector } from './IconSelector'

@@ -1,10 +1,12 @@
+import { Lock, Mail, User as UserIcon } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ChangeSummaryItem } from '@/hooks/useAccountForm'
-import { Lock, Mail, User as UserIcon } from 'lucide-react'
+
 
 type ConfirmUpdateDialogProps = {
   open: boolean

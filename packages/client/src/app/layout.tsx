@@ -1,3 +1,4 @@
+
 import { ClientLayout } from '@/app/client-layout'
 import '@/app/globals.css'
 import { GoogleAnalytics } from '@/components/analytics/google-analytics'

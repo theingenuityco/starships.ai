@@ -1,8 +1,10 @@
+import { BarChart2, BarChart3, Bot, Brain, Code, Edit, HeartPulse, Lightbulb, MoreVertical, Sparkles, Star, TestTube, Trash2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
 import type { AgentModel } from '@starships/protocol'
-import { Bot, Edit, Trash2, EyeOff, Star, TestTube, BarChart3, Code, Lightbulb, BarChart2, HeartPulse, MoreVertical, Sparkles, Brain } from 'lucide-react'
+
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'

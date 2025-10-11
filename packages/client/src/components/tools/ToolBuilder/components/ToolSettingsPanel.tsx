@@ -1,3 +1,5 @@
+import { Settings2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
@@ -5,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Settings2 } from 'lucide-react'
+
 import type { ToolFormData, FormErrors } from '../types'
 import { CategorySelector } from './CategorySelector'
 

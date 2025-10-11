@@ -1,3 +1,5 @@
+import { AlertTriangle, CheckCircle2, Clock, Eye, MessageSquare, XCircle } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useState } from 'react'
@@ -8,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, Eye, MessageSquare } from 'lucide-react'
+
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 
 // Client-side workflow type for compatibility
 type WorkflowDSL = any
@@ -98,12 +101,12 @@ const ApprovalActions: React.FC<{
 }> = ({ onApprove, onReject, loading, hasRejectionReason }) => (
   <div className="flex gap-3">
     <Button variant="outline" onClick={onReject} disabled={loading} className="flex-1">
-      {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
+      {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
       {hasRejectionReason ? 'Reject with Reason' : 'Reject Workflow'}
     </Button>
 
     <Button onClick={onApprove} disabled={loading} className="flex-1">
-      {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+      {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
       Approve & Execute
     </Button>
   </div>

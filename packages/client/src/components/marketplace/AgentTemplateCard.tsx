@@ -1,3 +1,5 @@
+import { BarChart2, Bot, CheckCircle, Code, Download, HeartPulse, Lightbulb, Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +10,7 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Sparkles, Download, CheckCircle } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'

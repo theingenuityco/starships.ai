@@ -1,3 +1,5 @@
+import { Bot, ChevronRight, CreditCard, Info, MessageSquare, Rocket, Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useState } from 'react'
@@ -19,7 +21,7 @@ import { useStarshipAgents, useAgentTools } from '@/hooks/useAgents'
 import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
-import { Rocket, CreditCard, Bot, MessageSquare, Info, Sparkles, ChevronRight } from 'lucide-react'
+
 import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { ConversationActivityCard } from '@/components/starship/ConversationActivityCard'

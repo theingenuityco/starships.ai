@@ -1,9 +1,11 @@
+import { Menu } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { Menu } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'

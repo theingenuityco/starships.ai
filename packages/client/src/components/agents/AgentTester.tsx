@@ -1,3 +1,5 @@
+import { AlertCircle, Play, Plus, RotateCcw, Send, Trash2, Wifi, WifiOff } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +11,7 @@ import { useToast } from '@/hooks/useToast'
 import { useTypewriter } from '@/hooks/useTypewriter'
 import api, { Agent } from '@/lib/api'
 import type { MessageModel } from '@starships/protocol'
-import { AlertCircle, Play, Plus, RotateCcw, Send, Trash2, Wifi, WifiOff } from 'lucide-react'
+
 import { useEffect, useState } from 'react'
 
 interface AgentTesterProps {

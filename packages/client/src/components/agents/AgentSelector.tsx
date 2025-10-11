@@ -1,3 +1,5 @@
+import { Bot, Loader2, Plus, Search, Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
@@ -10,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
 import type { AgentModel } from '@starships/protocol'
-import { Bot, Loader2, Plus, Sparkles } from 'lucide-react'
+
 import { useEffect, useMemo, useState } from 'react'
 
 interface AgentSelectorProps {

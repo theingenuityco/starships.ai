@@ -1,3 +1,5 @@
+import { Mail, User as UserIcon } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
@@ -5,7 +7,7 @@ import type { FormState } from '@/hooks/useAccountForm'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mail, User as UserIcon } from 'lucide-react'
+
 
 type AccountDetailsCardProps = {
   form: Pick<FormState, 'displayName' | 'email'>

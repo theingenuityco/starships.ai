@@ -1,3 +1,5 @@
+import { Calendar, Edit, FileText, Key, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState } from 'react'
@@ -6,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Key, MoreHorizontal, Edit, Trash2, Calendar, User, FileText, Plus } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 interface EnvironmentVariableListProps {

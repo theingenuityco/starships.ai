@@ -1,3 +1,5 @@
+import { Chrome, Github, Lock, Plus, Shield } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
@@ -6,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Lock, Shield, Plus, Chrome, Github } from 'lucide-react'
+
 
 type SecurityCardProps = {
   // Authentication state

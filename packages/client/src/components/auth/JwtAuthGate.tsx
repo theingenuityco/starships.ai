@@ -1,7 +1,9 @@
+import { Rocket, Stars, Zap } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useAuth } from '@/hooks/useAuth'
-import { Rocket, Stars, Zap } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { LoginForm } from '@/components/auth/LoginForm'
 

@@ -1,10 +1,12 @@
+import { Archive, Clock, MessageSquare, Pause, Play, Settings, Trash2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
-import { Archive, Clock, MessageSquare, Pause, Play, Settings, Trash2, Zap } from 'lucide-react'
+
 import { motion } from 'motion/react'
 
 interface ConversationHeaderProps {

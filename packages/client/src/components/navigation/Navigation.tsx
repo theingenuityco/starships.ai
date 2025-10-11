@@ -1,3 +1,5 @@
+import { History, Key, MessageSquare, Plus, Rocket, Store, X } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { UserProfile } from '@/components/auth/UserProfile'
@@ -9,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { History, MessageSquare, Plus, X, Settings, Key, Store, Rocket } from 'lucide-react'
+
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -291,7 +293,7 @@ export function Navigation(props: NavigationProps) {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              <Settings
+                              <Icon name="settings"
                                 className={`w-4 h-4 ${pathname === `/ship/${starshipSlug}/management` ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}
                               />
                             </motion.div>

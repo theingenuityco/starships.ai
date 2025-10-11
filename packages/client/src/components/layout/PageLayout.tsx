@@ -1,5 +1,6 @@
 'use client'
 
+
 import { motion } from 'motion/react'
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { cn } from '@/lib/utils'

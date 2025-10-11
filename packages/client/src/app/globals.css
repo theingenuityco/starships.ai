@@ -4,6 +4,12 @@
 
 /* ReactFlow styles - Required for proper functionality */
 @import '@xyflow/react/dist/style.css';
+/* Icon tokens */
+:root {
+  --icon-size: 20px;
+  --icon-color: currentColor;
+  --icon-stroke: 1.75;
+}
 
 /* Prism.js Syntax Highlighting - VS Code Dark Inspired */
 /* Blue and white theme matching VS Code's aesthetic */

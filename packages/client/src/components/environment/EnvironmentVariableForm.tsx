@@ -1,3 +1,5 @@
+import { AlertCircle, FileText, Key } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -7,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertCircle, Key, FileText } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 interface EnvironmentVariableFormProps {

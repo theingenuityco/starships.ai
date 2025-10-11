@@ -1,7 +1,9 @@
+import { Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
-import { Wrench } from 'lucide-react'
+
 import type { Blueprint } from '@starships/autopilot'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'

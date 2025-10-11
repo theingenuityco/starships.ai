@@ -1,3 +1,5 @@
+import { Eye, EyeOff, Shield } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState } from 'react'
@@ -8,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
-import { Shield, Eye, EyeOff } from 'lucide-react'
+
 
 interface SetPasswordDialogProps {
   open: boolean

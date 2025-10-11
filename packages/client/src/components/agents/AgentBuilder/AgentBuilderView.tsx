@@ -1,7 +1,9 @@
+import { Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
-import { Sparkles } from 'lucide-react'
+
 import type { Blueprint } from '@starships/autopilot'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import type { AgentBuilderViewProps, AgentBuilderViewRef } from './types'

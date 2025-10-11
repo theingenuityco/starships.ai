@@ -1,7 +1,9 @@
+import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import * as React from 'react'
-import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 import { useToast, type Toast } from '@/hooks/useToast'
 

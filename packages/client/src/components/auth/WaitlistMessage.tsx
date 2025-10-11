@@ -1,7 +1,9 @@
+import { Clock, Rocket } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Card } from '@/components/ui/card'
-import { CheckCircle, Clock, Rocket } from 'lucide-react'
+
 import { motion } from 'motion/react'
 
 interface WaitlistMessageProps {

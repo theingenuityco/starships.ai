@@ -1,10 +1,12 @@
+import { Clock, MessageSquare, Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MessageSquare, Sparkles, Clock } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 export interface ConversationActivityCardProps {

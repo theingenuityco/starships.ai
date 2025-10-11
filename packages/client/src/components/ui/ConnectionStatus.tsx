@@ -1,3 +1,5 @@
+import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Shield, Wifi, WifiOff, X } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -6,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Wifi, WifiOff, AlertTriangle, CheckCircle, RefreshCw, Clock, Activity, Shield, X } from 'lucide-react'
+
 // Note: ConnectionMetrics type definition for socket client connections
 interface ConnectionMetrics {
   isConnected: boolean

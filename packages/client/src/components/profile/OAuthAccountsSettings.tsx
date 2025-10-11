@@ -1,3 +1,5 @@
+import { CheckCircle, Chrome, ExternalLink, Github, Shield, Unlink } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useEffect } from 'react'
@@ -10,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { toast } from 'sonner'
 import type { OAuthAccountModel } from '@starships/protocol'
-import { Github, Chrome, ExternalLink, Unlink, Shield, CheckCircle } from 'lucide-react'
+
 import { motion } from 'motion/react'
 
 // OAuth query keys following established pattern

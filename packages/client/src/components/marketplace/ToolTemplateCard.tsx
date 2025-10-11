@@ -1,3 +1,5 @@
+import { BarChart2, Bot, CheckCircle, Download, Package, Sparkles, Star, Users, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -7,7 +9,7 @@ import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
-import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download, CheckCircle } from 'lucide-react'
+
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import type { FetchResponse } from '@/lib/types'

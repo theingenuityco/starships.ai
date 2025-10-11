@@ -1,9 +1,11 @@
+import { Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Sparkles } from 'lucide-react'
+
 import type { AgentFormData, FormErrors } from '../types'
 
 interface AgentInfoPanelProps {

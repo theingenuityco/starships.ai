@@ -1,7 +1,9 @@
+import { LogOut } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { LogOut } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 

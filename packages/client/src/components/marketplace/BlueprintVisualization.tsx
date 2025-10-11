@@ -1,3 +1,5 @@
+import { CheckCircle2, Clock, Code, Cog, Edit3, Eye, GitBranch, Globe, Play, Settings, Split, User, Wrench, X, Zap } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
@@ -19,7 +21,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X, Edit3, Split } from 'lucide-react'
+
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

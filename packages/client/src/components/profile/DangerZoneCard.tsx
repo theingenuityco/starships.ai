@@ -1,9 +1,11 @@
+import { Trash2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Trash2 } from 'lucide-react'
+
 
 type DangerZoneCardProps = {
   deleting: boolean

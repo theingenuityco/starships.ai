@@ -1,10 +1,12 @@
+import { LogOut, User as UserIcon } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { User as UserIcon, LogOut } from 'lucide-react'
+
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 

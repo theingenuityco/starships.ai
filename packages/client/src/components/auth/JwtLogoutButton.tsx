@@ -1,9 +1,11 @@
+import { LogOut } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
-import { LogOut } from 'lucide-react'
+
 
 interface JwtLogoutButtonProps {
   variant?: 'default' | 'secondary' | 'outline' | 'ghost'

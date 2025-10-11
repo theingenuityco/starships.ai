@@ -1,10 +1,13 @@
+import { AlertCircle, Rocket } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
-import { AlertCircle, Loader2, Rocket } from 'lucide-react'
+
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 
 interface StarshipSelectorProps {
   value?: string
@@ -22,7 +25,7 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
   if (loading) {
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-muted/5">
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <LoadingSpinner className="w-4 h-4" />
         <span className="text-sm text-muted-foreground">Loading starships...</span>
       </div>
     )

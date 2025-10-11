@@ -1,3 +1,5 @@
+import { Info, Key, Search, Shield } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState } from 'react'
@@ -12,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Input } from '@/components/ui/input'
-import { Settings, Key, Shield, Info, Search, Plus } from 'lucide-react'
+
 
 interface EnvironmentSettingsContentProps {
   slug: string

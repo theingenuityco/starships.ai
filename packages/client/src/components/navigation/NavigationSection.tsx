@@ -1,5 +1,6 @@
 'use client'
 
+
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { motion } from 'motion/react'
 

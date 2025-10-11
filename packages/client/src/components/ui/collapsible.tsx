@@ -1,8 +1,10 @@
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+
 
 interface CollapsibleProps {
   children: React.ReactNode

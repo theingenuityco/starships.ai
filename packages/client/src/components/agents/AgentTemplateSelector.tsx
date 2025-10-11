@@ -1,3 +1,5 @@
+import { ChevronDown, Search, Sparkles, Users } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useState, useEffect } from 'react'
@@ -7,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { Search, Star, Users, Sparkles, Code, Palette, BarChart3, Headphones, ChevronDown } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 import { AgentTemplate } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'

@@ -1,3 +1,5 @@
+import { BarChart2, Bot, Calendar, CheckCircle, Code, Copy, Download, GitBranch, Key, Package, Settings, Sparkles, Star, Users, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
@@ -13,7 +15,7 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { BlueprintVisualization } from './BlueprintVisualization'
-import { Wrench, Package, Bot, BarChart2, Users, Download, CheckCircle, Sparkles, Star, Calendar, Settings, Copy, Code, Key, GitBranch } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { format } from 'date-fns'

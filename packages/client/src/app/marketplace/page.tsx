@@ -1,3 +1,5 @@
+import { Bot, Search, Store, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
@@ -9,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Bot, Search, Wrench, Store } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'

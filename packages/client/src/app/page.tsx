@@ -1,3 +1,5 @@
+import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, User, Users } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { LoginButton } from '@/components/auth/LoginButton'
@@ -8,7 +10,7 @@ import { Card } from '@/components/ui/card'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
-import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, Star, User, Users } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { lazy, memo, Suspense, useEffect, useState } from 'react'
 const StarfieldBackground = lazy(() =>
@@ -145,7 +147,7 @@ export default function HomePage() {
             <div className="flex items-center justify-center gap-8">
               {/* Rocket Logo on the left */}
               <motion.div initial={{ scale: 0, x: -50 }} animate={{ scale: 1, x: 0 }} transition={{ delay: 0.5, duration: 0.8, type: 'spring', stiffness: 80 }} className="relative flex-shrink-0">
-                <StarshipsLogo width={120} height={120} gradientId="gradient" animationDelay={2} repeatDelay={10} />
+                <Icon name="star"shipsLogo width={120} height={120} gradientId="gradient" animationDelay={2} repeatDelay={10} />
               </motion.div>
 
               {/* Title and Tagline on the right */}
@@ -714,7 +716,7 @@ export default function HomePage() {
                   Documentation
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}>
-                  <Users className="w-4 h-4 mr-2" />
+                  <Icon name="user"s className="w-4 h-4 mr-2" />
                   Discord
                 </Button>
               </div>

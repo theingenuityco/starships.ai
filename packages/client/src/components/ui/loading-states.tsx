@@ -1,7 +1,10 @@
+import { AlertCircle, CheckCircle, Key } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
-import { Loader2, CheckCircle, AlertCircle, Key } from 'lucide-react'
+
+import LoadingIcon from '@/components/primitives/LoadingSpinner'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +33,7 @@ export function LoadingSpinner({ className, size = 'md', message, showIcon = tru
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      {showIcon && <Loader2 className={cn('animate-spin text-primary', sizeClasses[size])} />}
+      {showIcon && <LoadingIcon className={cn('text-primary', sizeClasses[size])} />}
       {message && <span className={cn('text-muted-foreground', size === 'sm' && 'text-sm', size === 'lg' && 'text-lg')}>{message}</span>}
     </div>
   )
@@ -43,7 +46,7 @@ export function LoadingProgress({ className, message, description, progress = 0 
   return (
     <div className={cn('space-y-3', className)}>
       <div className="flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        <LoadingIcon className="h-4 w-4 text-primary" />
         {message && <span className="text-sm font-medium">{message}</span>}
       </div>
 
@@ -114,7 +117,7 @@ export function ConnectorListSkeleton({ count = 3, className }: { count?: number
 export function ApiKeyValidationLoading({ keyName, className }: { keyName: string; className?: string }) {
   return (
     <div className={cn('flex items-center gap-2 text-sm text-muted-foreground', className)}>
-      <Loader2 className="h-3 w-3 animate-spin" />
+      <LoadingIcon className="h-3 w-3" />
       <span>Validating {keyName}...</span>
     </div>
   )
@@ -133,7 +136,7 @@ export interface ConnectionStatusProps {
 export function ConnectionStatus({ status, message, className, showLabel = true }: ConnectionStatusProps) {
   const statusConfig = {
     connecting: {
-      icon: <Loader2 className="h-4 w-4 animate-spin text-blue-500" />,
+      icon: <LoadingIcon className="h-4 w-4 text-blue-500" />,
       label: 'Connecting...',
       badgeVariant: 'secondary' as const,
       color: 'text-blue-600',
@@ -218,7 +221,7 @@ export function MultiStepLoading({ steps, currentStep, className }: MultiStepLoa
             )}
           >
             <div className="flex-shrink-0">
-              {isLoading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+              {isLoading && <LoadingIcon className="h-4 w-4 text-primary" />}
               {isCompleted && <CheckCircle className="h-4 w-4 text-green-500" />}
               {isError && <AlertCircle className="h-4 w-4 text-red-500" />}
               {step.status === 'pending' && <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
@@ -273,7 +276,7 @@ export function LoadingOverlay({ isLoading, message = 'Loading...', description,
           <Card className="w-full max-w-sm">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto mb-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <LoadingIcon className="h-8 w-8 text-primary" />
               </div>
               <CardTitle className="text-lg">{message}</CardTitle>
               {description && <CardDescription>{description}</CardDescription>}
@@ -312,7 +315,7 @@ export function InlineLoading({ message, size = 'sm', className }: { message?: s
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <Loader2 className={cn('animate-spin text-muted-foreground', sizeClasses[size])} />
+      <LoadingIcon className={cn('text-muted-foreground', sizeClasses[size])} />
       {message && <span className={cn('text-muted-foreground', textSizeClasses[size])}>{message}</span>}
     </div>
   )

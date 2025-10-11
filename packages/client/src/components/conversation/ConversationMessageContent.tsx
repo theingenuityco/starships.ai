@@ -1,10 +1,12 @@
+import { Check, Copy, ExternalLink, Loader2, MessageCircleMore, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore } from 'lucide-react'
+
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'

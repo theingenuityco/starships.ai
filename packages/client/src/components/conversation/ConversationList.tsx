@@ -1,10 +1,12 @@
+import { Archive, MessageSquare, MoreVertical, Trash2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
-import { Archive, MessageSquare, MoreVertical, Trash2 } from 'lucide-react'
+
 import { useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '../ui/button'

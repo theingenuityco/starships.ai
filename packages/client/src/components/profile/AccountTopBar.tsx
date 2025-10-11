@@ -1,8 +1,10 @@
+import { CheckCircle2, Shield } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
 import { Button } from '@/components/ui/button'
-import { Shield, CheckCircle2 } from 'lucide-react'
+
 
 type AccountTopBarProps = {
   dirty: boolean

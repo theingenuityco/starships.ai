@@ -1,8 +1,10 @@
+import { User } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
-import { User } from 'lucide-react'
+
 import { useRouter } from 'next/navigation'
 import React from 'react'
 

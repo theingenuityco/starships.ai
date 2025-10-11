@@ -1,3 +1,5 @@
+import { Sparkles, Users } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { AgentSelector } from '@/components/conversation/AgentSelector'
@@ -11,7 +13,7 @@ import { useConversationAgents, useConversationStreamed } from '@/hooks/useConve
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { agentAPI, toolAPI } from '@/lib/api'
-import { Sparkles, Users } from 'lucide-react'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'

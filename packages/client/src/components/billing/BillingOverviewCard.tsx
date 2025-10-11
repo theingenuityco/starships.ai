@@ -1,5 +1,6 @@
 'use client'
 
+
 import { WalletModel } from '@starships/protocol'
 import React from 'react'
 import { Button } from '@/components/ui/button'

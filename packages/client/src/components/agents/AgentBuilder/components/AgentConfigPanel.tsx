@@ -1,3 +1,5 @@
+import { ChevronDown, Settings } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useRef, useEffect } from 'react'
@@ -6,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Settings, ChevronDown } from 'lucide-react'
+
 import type { AgentFormData, FormErrors } from '../types'
 import { ModelSelector } from './ModelSelector'
 

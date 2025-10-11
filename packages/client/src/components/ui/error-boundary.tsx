@@ -1,10 +1,12 @@
+import { AlertTriangle, Bug, RefreshCw } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { EnhancedError, ErrorRecoveryManager } from '@/lib/error-recovery'
-import { AlertTriangle, Bug, RefreshCw } from 'lucide-react'
+
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 
 interface Props {

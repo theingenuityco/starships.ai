@@ -1,7 +1,9 @@
+import { Activity, ArrowDown, ArrowUp, Coins, Cpu, Receipt } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React from 'react'
-import { Coins, Activity, Cpu, ArrowDown, ArrowUp, Receipt } from 'lucide-react'
+
 import MetricCard from './MetricCard'
 
 export interface UsageKpiCardsProps {

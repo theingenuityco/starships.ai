@@ -1,3 +1,5 @@
+import { Send, Wrench } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Button } from '@/components/ui/button'
@@ -9,7 +11,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
-import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
+
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'

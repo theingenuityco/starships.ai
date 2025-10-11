@@ -1,3 +1,5 @@
+import { ChevronDown, Filter, X } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useState } from 'react'
@@ -14,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { X, Filter, ChevronDown } from 'lucide-react'
+
 
 interface FilterState {
   category?: 'general' | 'coding' | 'creative' | 'analysis' | 'support'

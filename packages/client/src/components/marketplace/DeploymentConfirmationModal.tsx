@@ -1,9 +1,11 @@
+import { AlertTriangle, Sparkles } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Bot, Wrench, AlertTriangle, Sparkles } from 'lucide-react'
+
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 
 interface DeploymentConfirmationModalProps {

@@ -1,3 +1,5 @@
+import { ChevronDown, Plus, Search, Wrench, X } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import React, { useState } from 'react'
@@ -7,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Wrench, Plus, X, ChevronDown, Search } from 'lucide-react'
+
 import type { AgentFormData, FormErrors } from '../types'
 
 interface AgentToolsPanelProps {

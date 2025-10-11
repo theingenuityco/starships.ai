@@ -1,9 +1,11 @@
+import { AlertTriangle, Key, Trash2 } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { EnvironmentSummary } from '@starships/protocol'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertTriangle, Key, Trash2 } from 'lucide-react'
+
 
 interface EnvironmentVariableDeleteModalProps {
   isOpen: boolean

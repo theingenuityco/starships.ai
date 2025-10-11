@@ -1,9 +1,12 @@
+import { Bot, User } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 'use client'
 
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { Bot, User, Loader2 } from 'lucide-react'
+
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationStreamed } from '@/hooks/useConversations'
@@ -370,7 +373,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    <LoadingSpinner className="w-4 h-4 text-muted-foreground" />
                     <span>{(agentName || 'Assistant') + ' is typing...'}</span>
                   </div>
                 </div>

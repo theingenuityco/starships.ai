@@ -9,7 +9,7 @@ interface NavigationSectionProps {
   items: Array<{
     href: string
     label: string
-    icon: React.ComponentType<{ className?: string }>
+    icon: string
   }>
   pathname: string
 }

@@ -1,6 +1,5 @@
 'use client'
 
-import { Activity, BarChart3, Calendar, Eye, MessageSquare, Star, TrendingUp } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useState, useEffect } from 'react'

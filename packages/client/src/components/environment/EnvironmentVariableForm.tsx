@@ -1,6 +1,5 @@
 'use client'
 
-import { AlertCircle, FileText, Key } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useState, useEffect } from 'react'

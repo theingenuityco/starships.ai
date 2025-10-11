@@ -1,6 +1,5 @@
 'use client'
 
-import { BarChart2, Bot, CheckCircle, Code, Download, HeartPulse, Lightbulb, Sparkles } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'

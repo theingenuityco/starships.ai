@@ -1,6 +1,5 @@
 'use client'
 
-import { Sparkles, Users } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { AgentSelector } from '@/components/conversation/AgentSelector'

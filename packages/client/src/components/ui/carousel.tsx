@@ -1,6 +1,5 @@
 "use client"
 
-import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import * as React from "react"

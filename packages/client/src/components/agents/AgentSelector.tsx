@@ -1,6 +1,5 @@
 'use client'
 
-import { Bot, Loader2, Plus, Search, Sparkles } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { AgentAnalytics } from '@/components/agents/AgentAnalytics'

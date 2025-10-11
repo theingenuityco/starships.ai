@@ -1,6 +1,5 @@
 'use client'
 
-import { History, Key, MessageSquare, Plus, Rocket, Store, X } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { UserProfile } from '@/components/auth/UserProfile'
@@ -26,13 +25,13 @@ interface NavigationProps {
 const getGlobalNavigationSections = (starshipSlug: string | null) => [
   {
     title: 'Resources',
-    items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
+    items: [{ href: `/marketplace`, label: 'Marketplace', icon: 'store', status: 'optimal' }],
   },
   ...(starshipSlug
     ? [
         {
           title: 'Settings',
-          items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: Key, status: 'optimal' }],
+          items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', status: 'optimal' }],
         },
       ]
     : []),
@@ -192,7 +191,7 @@ export function Navigation(props: NavigationProps) {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <Rocket className={`w-5 h-5 ${isOverviewRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                      <Icon name="rocket" className={`w-5 h-5 ${isOverviewRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
                     </motion.div>
                   </Link>
                 </TooltipTrigger>
@@ -217,7 +216,7 @@ export function Navigation(props: NavigationProps) {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <MessageSquare className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                        <Icon name="message-square" className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
                       </motion.div>
                     </Link>
                   </TooltipTrigger>
@@ -248,7 +247,7 @@ export function Navigation(props: NavigationProps) {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            <Icon name="plus" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                           </motion.button>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -269,9 +268,9 @@ export function Navigation(props: NavigationProps) {
                             whileTap={{ scale: 0.95 }}
                           >
                             {showConversationList ? (
-                              <X className="w-4 h-4 text-primary transition-colors" />
+                              <Icon name="x" className="w-4 h-4 text-primary transition-colors" />
                             ) : (
-                              <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              <Icon name="history" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                             )}
                           </motion.button>
                         </TooltipTrigger>
@@ -294,7 +293,8 @@ export function Navigation(props: NavigationProps) {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              <Icon name="settings"
+                              <Icon
+                                name="settings"
                                 className={`w-4 h-4 ${pathname === `/ship/${starshipSlug}/management` ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}
                               />
                             </motion.div>

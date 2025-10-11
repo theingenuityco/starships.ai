@@ -1,6 +1,5 @@
 'use client'
 
-import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, User, Users } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { LoginButton } from '@/components/auth/LoginButton'

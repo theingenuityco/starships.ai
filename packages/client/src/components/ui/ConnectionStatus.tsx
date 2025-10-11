@@ -1,6 +1,5 @@
 'use client'
 
-import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Shield, Wifi, WifiOff, X } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useState, useEffect, useMemo } from 'react'

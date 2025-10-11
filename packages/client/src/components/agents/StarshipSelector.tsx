@@ -1,6 +1,5 @@
 'use client'
 
-import { AlertCircle, Rocket } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'

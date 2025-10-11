@@ -1,6 +1,5 @@
 'use client'
 
-import { User } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'

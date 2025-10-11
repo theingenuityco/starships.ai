@@ -1,6 +1,5 @@
 'use client'
 
-import { Archive, Clock, MessageSquare, Pause, Play, Settings, Trash2 } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'

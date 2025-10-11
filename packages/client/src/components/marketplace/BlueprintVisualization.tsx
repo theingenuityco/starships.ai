@@ -1,6 +1,5 @@
 'use client'
 
-import { CheckCircle2, Clock, Code, Cog, Edit3, Eye, GitBranch, Globe, Play, Settings, Split, User, Wrench, X, Zap } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'

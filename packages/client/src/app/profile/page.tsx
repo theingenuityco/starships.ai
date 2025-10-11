@@ -1,6 +1,5 @@
 'use client'
 
-import { LogOut, User as UserIcon } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

@@ -1,6 +1,5 @@
 'use client'
 
-import { ChevronDown, Settings2 } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

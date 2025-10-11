@@ -1,6 +1,5 @@
 'use client'
 
-import { Braces } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

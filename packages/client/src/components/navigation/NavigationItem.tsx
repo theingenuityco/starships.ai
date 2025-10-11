@@ -2,17 +2,18 @@
 
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import Icon from '@/components/primitives/Icon'
 import { motion } from 'motion/react'
 import Link from 'next/link'
 
 interface NavigationItemProps {
   href: string
   label: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: string
   isActive: boolean
 }
 
-export function NavigationItem({ href, label, icon: Icon, isActive }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive }: NavigationItemProps) {
   const content = (
     <Link href={href}>
       <motion.div
@@ -22,7 +23,7 @@ export function NavigationItem({ href, label, icon: Icon, isActive }: Navigation
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+        <Icon name={icon} className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-foreground'} transition-colors`} />
       </motion.div>
     </Link>
   )

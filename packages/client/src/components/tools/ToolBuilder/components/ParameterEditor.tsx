@@ -1,6 +1,5 @@
 'use client'
 
-import { AlertCircle } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React, { useState, useEffect, useRef } from 'react'

@@ -1,6 +1,5 @@
 'use client'
 
-import { Bot, ChevronDown } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'

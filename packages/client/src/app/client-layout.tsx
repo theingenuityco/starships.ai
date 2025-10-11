@@ -1,6 +1,5 @@
 'use client'
 
-import { Menu } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'

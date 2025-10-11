@@ -6,8 +6,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "lucide-react": ["./src/components/primitives/lucide-compat"],
-      "lucide-react/*": ["./src/components/primitives/lucide-compat"]
+      
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/**/*"],

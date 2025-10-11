@@ -1,6 +1,5 @@
 'use client'
 
-import { CheckCircle, Chrome, ExternalLink, Github, Shield, Unlink } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React, { useEffect } from 'react'

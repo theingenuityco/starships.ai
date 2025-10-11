@@ -1,6 +1,5 @@
 'use client'
 
-import { Activity, CreditCard, Rocket } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

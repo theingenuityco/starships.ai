@@ -1,6 +1,5 @@
 'use client'
 
-import { Wrench } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'

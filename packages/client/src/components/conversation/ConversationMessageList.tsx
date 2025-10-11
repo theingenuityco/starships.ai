@@ -1,6 +1,5 @@
 'use client'
 
-import { Bot, User } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useStarshipUIStore } from '@/store/starship-ui-store'

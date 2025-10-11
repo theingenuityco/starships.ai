@@ -1,6 +1,5 @@
 'use client'
 
-import { Clock, MessageSquare, Sparkles } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

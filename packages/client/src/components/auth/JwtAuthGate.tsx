@@ -1,6 +1,5 @@
 'use client'
 
-import { Rocket, Stars, Zap } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useAuth } from '@/hooks/useAuth'

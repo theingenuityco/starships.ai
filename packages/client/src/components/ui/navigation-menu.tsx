@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 import * as React from 'react'
 import * as NavigationMenuPrimitive from '@radix-ui/react-navigation-menu'

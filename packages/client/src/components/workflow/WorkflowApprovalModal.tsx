@@ -1,6 +1,5 @@
 'use client'
 
-import { AlertTriangle, CheckCircle2, Clock, Eye, MessageSquare, XCircle } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React, { useState } from 'react'

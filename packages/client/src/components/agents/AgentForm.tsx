@@ -1,6 +1,5 @@
 'use client'
 
-import { BarChart3, Bot, Code, Globe, Headphones, Info, Lock, MessageSquare, Palette, Plus, Rocket, Settings, Sparkles, Tag, X } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useState } from 'react'

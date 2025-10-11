@@ -1,6 +1,5 @@
 'use client'
 
-import { Activity, ArrowDown, ArrowUp, Coins, Cpu, Receipt } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

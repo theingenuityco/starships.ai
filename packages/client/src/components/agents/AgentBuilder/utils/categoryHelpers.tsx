@@ -1,4 +1,3 @@
-import { BarChart2, Bot, Package, Users, Wrench } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 import type { AgentTemplateCategory } from '@starships/protocol'
 

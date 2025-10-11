@@ -1,6 +1,5 @@
 'use client'
 
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'

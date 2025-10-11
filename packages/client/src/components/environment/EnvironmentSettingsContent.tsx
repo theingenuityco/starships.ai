@@ -1,6 +1,5 @@
 'use client'
 
-import { Info, Key, Search, Shield } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { useState } from 'react'

@@ -1,6 +1,5 @@
 'use client'
 
-import { Bot, ChevronRight, CreditCard, Info, MessageSquare, Rocket, Sparkles } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React, { useState } from 'react'

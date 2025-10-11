@@ -1,6 +1,5 @@
 'use client'
 
-import { Clock, Rocket } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Card } from '@/components/ui/card'

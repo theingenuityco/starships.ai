@@ -1,6 +1,5 @@
 'use client'
 
-import { AlertCircle, Play, Plus, RotateCcw, Send, Trash2, Wifi, WifiOff } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'

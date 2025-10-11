@@ -1,6 +1,5 @@
 'use client'
 
-import { BarChart2, Bot, Calendar, CheckCircle, Code, Copy, Download, GitBranch, Key, Package, Settings, Sparkles, Star, Users, Wrench } from 'lucide-react'
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'

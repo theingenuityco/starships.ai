@@ -115,6 +115,7 @@ describe('AgentRepository', () => {
     describe('create', () => {
       const mockAgentData = {
         name: 'Test Agent',
+        slug: 'test-agent',
         description: 'Test Description',
         model: 'gpt-4',
         temperature: 0.7,

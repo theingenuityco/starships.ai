@@ -4,11 +4,13 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
+import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
+import { agentAPI, toolAPI } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -19,9 +21,10 @@ interface ConversationInterfaceProps {
   starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
+  initialAgentId?: string
 }
 
-export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange }: ConversationInterfaceProps) {
+export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
 
   // Agent and UI state
@@ -35,22 +38,26 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const toolBuilderViewRef = useRef<ToolBuilderViewRef>(null)
+  const agentBuilderViewRef = useRef<AgentBuilderViewRef>(null)
   const lastUIActionKeyRef = useRef<string | null>(null)
 
-  // View mode state: 'conversation' or 'tool-builder'
-  const [viewMode, setViewMode] = useState<'conversation' | 'tool-builder'>('conversation')
+  // View mode state: 'conversation' or 'tool-builder' or 'agent-builder'
+  const [viewMode, setViewMode] = useState<'conversation' | 'tool-builder' | 'agent-builder'>('conversation')
   // Ref to avoid stale closures inside streaming handlers
-  const viewModeRef = useRef<'conversation' | 'tool-builder'>('conversation')
+  const viewModeRef = useRef<'conversation' | 'tool-builder' | 'agent-builder'>('conversation')
   // Track applied tool call keys to accumulate across messages
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
   // Track last conversation id to reset applied set
   const lastAppliedConversationRef = useRef<string | null>(null)
 
-  // Expanded overlay state for message history when in tool-builder mode
+  // Expanded overlay state for message history when in builder mode
   const [isMessageOverlayExpanded, setIsMessageOverlayExpanded] = useState(false)
 
-  // Track if the tool-builder was opened via streaming UI action
+  // Track if the builder was opened via streaming UI action
   const wasOpenedByStreamingRef = useRef(false)
+
+  // Track pending tool calls for completion detection
+  const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
 
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
@@ -124,6 +131,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
   }, [externalConversationId])
+
+  // Handle initial agent selection from URL parameter
+  useEffect(() => {
+    if (initialAgentId && starshipAgentsData.length > 0 && !selectedAgent) {
+      const agent = starshipAgentsData.find(a => a.id === initialAgentId)
+      if (agent) {
+        setSelectedAgent(agent)
+      }
+    }
+  }, [initialAgentId, starshipAgentsData, selectedAgent])
 
   // Restore selected agent from conversation data
   useEffect(() => {
@@ -204,6 +221,26 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toolBuilderViewRef.current?.resetForm()
   }, [])
 
+  // Handle agent builder save
+  const handleAgentBuilderSave = useCallback((data: any) => {
+    console.log('Agent builder data:', data)
+    toast.success('Agent created successfully!', {
+      description: `${data.name} has been created and is ready to use.`,
+    })
+    setViewMode('conversation')
+    setIsMessageOverlayExpanded(false)
+    wasOpenedByStreamingRef.current = false
+    agentBuilderViewRef.current?.resetForm()
+  }, [])
+
+  // Handle agent builder cancel
+  const handleAgentBuilderCancel = useCallback(() => {
+    setViewMode('conversation')
+    setIsMessageOverlayExpanded(false)
+    wasOpenedByStreamingRef.current = false
+    agentBuilderViewRef.current?.resetForm()
+  }, [])
+
   // Handle manual toggle of Tool Builder (persist and restore focused tool from conversation)
   const handleToggleToolBuilder = useCallback(() => {
     setViewMode(prev => {
@@ -213,6 +250,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         wasOpenedByStreamingRef.current = false
         // Reset the builder UI before replaying state
         toolBuilderViewRef.current?.resetForm()
+        // Clear applied tool call dedupe so we can replay from conversation messages
+        appliedToolCallKeysRef.current.clear()
+        // Allow future UI payloads to be processed again if needed
+        lastUIActionKeyRef.current = null
+      }
+      return next
+    })
+  }, [])
+
+  // Handle manual toggle of Agent Builder
+  const handleToggleAgentBuilder = useCallback(() => {
+    setViewMode(prev => {
+      const next = prev === 'agent-builder' ? 'conversation' : 'agent-builder'
+      if (next === 'agent-builder') {
+        // Manual open: ensure streaming flag is off and rebuild state from conversation tool calls
+        wasOpenedByStreamingRef.current = false
+        // Reset the builder UI before replaying state
+        agentBuilderViewRef.current?.resetForm()
         // Clear applied tool call dedupe so we can replay from conversation messages
         appliedToolCallKeysRef.current.clear()
         // Allow future UI payloads to be processed again if needed
@@ -280,8 +335,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
-            // Open builder for tool actions that affect tool data or blueprint
-            const openBuilderSlugs = new Set([
+            // Store tool call info for later completion handling
+            if (toolCallId) {
+              pendingToolCallsRef.current.set(toolCallId, { toolName, args: {} })
+            }
+
+            // Open tool builder for tool actions that affect tool data or blueprint
+            const openToolBuilderSlugs = new Set([
               'tool-open',
               'tool-edit',
               'tool-add-blueprint-node',
@@ -291,7 +351,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               'tool-blueprint-edit-edge',
               'tool-blueprint-remove-edge',
             ])
-            if (openBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
+            if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
               console.log('📂 Opening tool builder view for', toolName)
               // Only reset when transitioning into the builder; preserve existing form if already open
               if (viewModeRef.current !== 'tool-builder') {
@@ -300,6 +360,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               // Mark that this transition was triggered by streaming
               wasOpenedByStreamingRef.current = true
               if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
+            }
+
+            // Open agent builder for agent actions that affect agent data
+            const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+            if (openAgentBuilderSlugs.has(toolName)) {
+              console.log('🌍 Opening agent builder view for', toolName)
+              // Only reset when transitioning into the builder; preserve existing form if already open
+              if (viewModeRef.current !== 'agent-builder') {
+                agentBuilderViewRef.current?.resetForm()
+              }
+              // Mark that this transition was triggered by streaming
+              wasOpenedByStreamingRef.current = true
+              if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
             }
             break
           }
@@ -368,6 +441,71 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [handleToolBuilderSave]
   )
 
+  // Handle tool completion for entity-modifying tools
+  const handleToolComplete = useCallback(
+    async (toolName: string, toolArgs: any) => {
+      try {
+        // Agent tools - fetch and sync agent data
+        const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+        if (agentTools.includes(toolName) && toolArgs?.slug && viewModeRef.current === 'agent-builder') {
+          console.log('🔄 Fetching agent after tool completion:', toolArgs.slug)
+
+          // Fetch complete agent data by slug
+          const agent = await agentAPI.getBySlug(toolArgs.slug)
+
+          if (agent && agentBuilderViewRef.current) {
+            // Sync all fields with server data
+            agentBuilderViewRef.current.updateField('name', agent.name)
+            if (agent.description) agentBuilderViewRef.current.updateField('description', agent.description)
+            if (agent.model) agentBuilderViewRef.current.updateField('model', agent.model)
+            if (agent.systemPrompt) agentBuilderViewRef.current.updateField('systemPrompt', agent.systemPrompt)
+            if (agent.temperature !== undefined) agentBuilderViewRef.current.updateField('temperature', agent.temperature)
+            if (agent.maxTokens !== undefined) agentBuilderViewRef.current.updateField('maxTokens', agent.maxTokens)
+            if (agent.timeout !== undefined) agentBuilderViewRef.current.updateField('timeout', agent.timeout)
+
+            // Most important: sync the blueprint
+            if (agent.blueprint) {
+              agentBuilderViewRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
+            }
+
+            console.log('✅ Agent form synced with server data')
+          }
+        }
+
+        // Tool tools - fetch and sync tool data
+        const toolTools = [
+          'tool-open',
+          'tool-edit',
+          'tool-add-blueprint-node',
+          'tool-add-blueprint-edge',
+          'tool-blueprint-edit-node',
+          'tool-blueprint-remove-node',
+          'tool-blueprint-edit-edge',
+          'tool-blueprint-remove-edge',
+        ]
+        if (toolTools.includes(toolName) && toolArgs?.slug && viewModeRef.current === 'tool-builder') {
+          console.log('🔄 Fetching tool after tool completion:', toolArgs.slug)
+
+          // Fetch complete tool data by slug
+          const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
+
+          if (tool && toolBuilderViewRef.current) {
+            // Sync all fields with server data
+            toolBuilderViewRef.current.updateField('name', tool.name)
+            if (tool.description) toolBuilderViewRef.current.updateField('description', tool.description)
+            if (tool.parameters) toolBuilderViewRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
+            if (tool.blueprint) toolBuilderViewRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
+
+            console.log('✅ Tool form synced with server data')
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch entity after tool completion:', error)
+      }
+    },
+    [starshipId]
+  )
+
   // Detect special UI action responses from assistant messages (back-compat path)
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length) return
@@ -383,6 +521,39 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, liveMessages, handleUIPayload])
 
+  // Detect tool completion from streaming messages
+  useEffect(() => {
+    if (!liveMessages || liveMessages.length === 0) return
+
+    // Check last few messages for tool results
+    const recentMessages = liveMessages.slice(-5)
+
+    for (const msg of recentMessages) {
+      if (msg.role === 'tool' && msg.toolCallId) {
+        const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
+
+        if (pendingCall && !pendingCall.completed) {
+          // Mark as completed
+          pendingCall.completed = true
+
+          // Extract tool arguments from the conversation history
+          // Look for assistant message with this toolCallId
+          const assistantMsg = liveMessages.find(m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === msg.toolCallId))
+
+          if (assistantMsg) {
+            const toolCall = assistantMsg.toolCalls?.find(tc => tc.id === msg.toolCallId)
+            if (toolCall?.function?.arguments) {
+              pendingCall.args = toolCall.function.arguments
+
+              // Trigger fetch after tool completes
+              handleToolComplete(pendingCall.toolName, pendingCall.args)
+            }
+          }
+        }
+      }
+    }
+  }, [liveMessages, handleToolComplete])
+
   // Consume SSE 'ui_action' events directly (clean channel)
   useEffect(() => {
     if (!currentConversationId || !lastUIAction) return
@@ -393,9 +564,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, lastUIAction, handleUIPayload])
 
-  // Auto-expand overlay when transitioning to tool-builder via streaming
+  // Auto-expand overlay when transitioning to builder views via streaming
   useEffect(() => {
-    if (viewMode === 'tool-builder' && wasOpenedByStreamingRef.current) {
+    if ((viewMode === 'tool-builder' || viewMode === 'agent-builder') && wasOpenedByStreamingRef.current) {
       // Auto-expand the message overlay
       setIsMessageOverlayExpanded(true)
       // Reset the flag after a short delay
@@ -408,7 +579,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Handle click outside to collapse overlay
   useEffect(() => {
-    if (viewMode !== 'tool-builder' || !isMessageOverlayExpanded) return
+    if ((viewMode !== 'tool-builder' && viewMode !== 'agent-builder') || !isMessageOverlayExpanded) return
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement
@@ -625,6 +796,162 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, liveMessages, viewMode])
 
+  // Stream agent arguments into builder as they arrive
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length || viewMode !== 'agent-builder') return
+
+    // Eligible tool slugs that should drive the Agent Builder
+    const builderToolSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+
+    const form = agentBuilderViewRef.current?.getFormData?.()
+    if (!form) return
+
+    // Initialize blueprint from form
+    let bp: any
+    try {
+      bp = JSON.parse(form.blueprint || '{}')
+    } catch {
+      bp = {}
+    }
+    if (!Array.isArray(bp.nodes)) bp.nodes = []
+    if (!Array.isArray(bp.edges)) bp.edges = []
+
+    // Helper to parse JSON-like values
+    const normalizeJson = (v: any) => {
+      if (typeof v === 'string') {
+        try {
+          return JSON.parse(v)
+        } catch {
+          return v
+        }
+      }
+      return v
+    }
+
+    // Collect only new toolCalls across all assistant messages in chronological order
+    const newCalls: { name: string; args: any }[] = []
+    for (let mi = 0; mi < liveMessages.length; mi++) {
+      const msg = liveMessages[mi]
+      if (msg.role !== 'assistant') continue
+      const calls = (msg as any).toolCalls
+      if (!Array.isArray(calls)) continue
+      for (let ci = 0; ci < calls.length; ci++) {
+        const call = calls[ci]
+        const name = call?.function?.name as string
+        if (!builderToolSlugs.has(name)) continue
+        let raw = call?.function?.arguments
+        const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
+        if (appliedToolCallKeysRef.current.has(key)) continue
+        // parse args after key computation to keep key stable on parse errors
+        let parsed = raw
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed)
+          } catch {
+            // keep as-is (may still be partial)
+          }
+        }
+        // skip clearly empty args to avoid wiping state
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0) {
+          continue
+        }
+        newCalls.push({ name, args: parsed })
+        appliedToolCallKeysRef.current.add(key)
+      }
+    }
+
+    if (newCalls.length === 0) return
+
+    // Compose pending scalar field updates
+    const compose = {
+      name: undefined as undefined | string,
+      slug: undefined as undefined | string,
+      description: undefined as undefined | string,
+      category: undefined as undefined | string,
+      model: undefined as undefined | string,
+      temperature: undefined as undefined | number,
+      maxTokens: undefined as undefined | number,
+      systemPrompt: undefined as undefined | string,
+      assignedToolSlugs: undefined as undefined | string[],
+      icon: undefined as undefined | string,
+      timeout: undefined as undefined | number,
+      blueprintChanged: false,
+    }
+
+    const hasContent = (b: any) => (Array.isArray(b?.nodes) && b.nodes.length > 0) || (Array.isArray(b?.edges) && b.edges.length > 0)
+
+    // Apply each new call in order
+    for (const call of newCalls) {
+      const toolName = call.name
+      const args = call.args
+
+      if (toolName === 'agent-open' || toolName === 'agent-edit') {
+        if (args?.name !== undefined) compose.name = args.name
+        if (args?.slug !== undefined) compose.slug = args.slug
+        if (args?.description !== undefined) compose.description = args.description
+        if (args?.category !== undefined) compose.category = args.category
+        if (args?.model !== undefined) compose.model = args.model
+        if (args?.temperature !== undefined) compose.temperature = args.temperature
+        if (args?.maxTokens !== undefined) compose.maxTokens = args.maxTokens
+        if (args?.systemPrompt !== undefined) compose.systemPrompt = args.systemPrompt
+        if (args?.icon !== undefined) compose.icon = args.icon
+        if (args?.timeout !== undefined) compose.timeout = args.timeout
+        if (args?.assignedToolSlugs !== undefined) {
+          compose.assignedToolSlugs = Array.isArray(args.assignedToolSlugs) ? args.assignedToolSlugs : []
+        }
+        if (args?.blueprint !== undefined) {
+          const incoming = normalizeJson(args.blueprint) || {}
+          if (!Array.isArray(incoming.nodes)) incoming.nodes = []
+          if (!Array.isArray(incoming.edges)) incoming.edges = []
+          // Only replace blueprint if incoming has content OR current bp is empty
+          if (hasContent(incoming) || !hasContent(bp)) {
+            bp = incoming
+            compose.blueprintChanged = true
+          }
+        }
+        continue
+      }
+
+      // Handle tool assignment/unassignment
+      if (toolName === 'agent-assign-tool') {
+        const toolSlug = args?.toolSlug
+        if (toolSlug && typeof toolSlug === 'string') {
+          const current = compose.assignedToolSlugs ?? form.assignedToolSlugs ?? []
+          if (!current.includes(toolSlug)) {
+            compose.assignedToolSlugs = [...current, toolSlug]
+          }
+        }
+        continue
+      }
+
+      if (toolName === 'agent-unassign-tool') {
+        const toolSlug = args?.toolSlug
+        if (toolSlug && typeof toolSlug === 'string') {
+          const current = compose.assignedToolSlugs ?? form.assignedToolSlugs ?? []
+          compose.assignedToolSlugs = current.filter(s => s !== toolSlug)
+        }
+        continue
+      }
+    }
+
+    // Write back composed updates once
+    if (compose.name !== undefined) agentBuilderViewRef.current?.updateField('name', compose.name)
+    if (compose.slug !== undefined) agentBuilderViewRef.current?.updateField('slug', compose.slug)
+    if (compose.description !== undefined) agentBuilderViewRef.current?.updateField('description', compose.description)
+    if (compose.category !== undefined) agentBuilderViewRef.current?.updateField('category', compose.category)
+    if (compose.model !== undefined) agentBuilderViewRef.current?.updateField('model', compose.model)
+    if (compose.temperature !== undefined) agentBuilderViewRef.current?.updateField('temperature', compose.temperature)
+    if (compose.maxTokens !== undefined) agentBuilderViewRef.current?.updateField('maxTokens', compose.maxTokens)
+    if (compose.systemPrompt !== undefined) agentBuilderViewRef.current?.updateField('systemPrompt', compose.systemPrompt)
+    if (compose.icon !== undefined) agentBuilderViewRef.current?.updateField('icon', compose.icon)
+    if (compose.timeout !== undefined) agentBuilderViewRef.current?.updateField('timeout', compose.timeout)
+    if (compose.assignedToolSlugs !== undefined) agentBuilderViewRef.current?.updateField('assignedToolSlugs', compose.assignedToolSlugs)
+    if (compose.blueprintChanged) {
+      const bpStr = JSON.stringify(bp, null, 2)
+      agentBuilderViewRef.current?.updateField('blueprint', bpStr)
+    }
+  }, [currentConversationId, liveMessages, viewMode])
+
   // Show loading state
   if (isLoading) {
     return (
@@ -658,14 +985,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       className="relative flex flex-col h-screen transition-all duration-500 ease-in-out"
       style={{
         marginLeft: '5.5rem', // Consistent offset for both modes to prevent content shift
-        overflow: viewMode === 'tool-builder' ? 'visible' : 'hidden',
+        overflow: viewMode === 'tool-builder' || viewMode === 'agent-builder' ? 'visible' : 'hidden',
       }}
     >
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
-        {/* Main Content Area - Switches between Conversation and Tool Builder */}
+        {/* Main Content Area - Switches between Conversation, Tool Builder, and Agent Builder */}
         {viewMode === 'tool-builder' ? (
           <ToolBuilderView ref={toolBuilderViewRef} onSave={handleToolBuilderSave} onCancel={handleToolBuilderCancel} starshipId={starshipId} />
+        ) : viewMode === 'agent-builder' ? (
+          <AgentBuilderView ref={agentBuilderViewRef} onSave={handleAgentBuilderSave} onCancel={handleAgentBuilderCancel} starshipId={starshipId} />
         ) : (
           <>
             {/* Messages Area or Welcome Screen */}
@@ -712,7 +1041,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           ref={inputContainerRef}
           className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
           style={{
-            bottom: viewMode === 'tool-builder' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
+            bottom: viewMode === 'tool-builder' || viewMode === 'agent-builder' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
           }}
         >
           <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
@@ -723,13 +1052,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               conversationId={currentConversationId}
               onConversationStart={handleConversationStart}
               onToggleToolForm={handleToggleToolBuilder}
-              isToolFormOpen={viewMode === 'tool-builder'}
+              isToolFormOpen={viewMode === 'tool-builder' || viewMode === 'agent-builder'}
               disabled={!selectedAgent}
-              minimal={viewMode === 'tool-builder' || showMessagesArea}
-              onFocus={() => viewMode === 'tool-builder' && !uiStreaming && setIsMessageOverlayExpanded(true)}
+              minimal={viewMode === 'tool-builder' || viewMode === 'agent-builder' || showMessagesArea}
+              onFocus={() => (viewMode === 'tool-builder' || viewMode === 'agent-builder') && !uiStreaming && setIsMessageOverlayExpanded(true)}
               onBlur={() => setIsMessageOverlayExpanded(false)}
               onToggleOverlay={handleToggleOverlay}
-              showExpandableOverlay={viewMode === 'tool-builder'}
+              showExpandableOverlay={viewMode === 'tool-builder' || viewMode === 'agent-builder'}
               isOverlayExpanded={isMessageOverlayExpanded}
               budgetTokens={budgetTokens}
             >

@@ -5,6 +5,7 @@ on:
     workflows: ['Build and Push Image']
     types:
       - completed
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -12,6 +13,10 @@ env:
   AWS_REGION: ap-south-1
   EKS_CLUSTER: starships-dev
   NAMESPACE: starships-dev
+
+concurrency:
+  group: deploy-dev-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -23,28 +28,31 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
-    # Only run if previous workflow succeeded
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Run when build workflow succeeded, or when dispatched manually
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get Image Tag from Build
+      - name: Determine image tag
         id: get-image
         run: |
-          echo "Fetching latest semantic release version..."
-          VERSION=$(gh release view --json tagName -q '.tagName' || echo "latest")
-          echo "Detected version: $VERSION"
-          echo "image_tag=$VERSION" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          if [ -z "$SHA" ]; then
+            IMAGE_TAG="latest"
+          else
+            SHORT_SHA=$(echo "$SHA" | cut -c1-7)
+            IMAGE_TAG="sha-${SHORT_SHA}"
+          fi
+          echo "Using image tag: ${IMAGE_TAG}"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: github-actions-deploy-dev
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Update kubeconfig
@@ -53,12 +61,17 @@ jobs:
 
       - name: Validate manifests
         run: |
-          kubectl apply --dry-run=client -f k8s/dev/
+          kubectl apply --dry-run=client -f k8s/dev/00-namespace.yaml
+          kubectl apply --dry-run=client -f k8s/dev/02-pvc.yaml
+          kubectl apply --dry-run=client -f k8s/dev/03-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/dev/04-service.yaml
+          kubectl apply --dry-run=client -f k8s/dev/05-ingress.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
         run: |
           kubectl apply -f k8s/dev/00-namespace.yaml
+          kubectl apply -f k8s/dev/02-pvc.yaml
           kubectl apply -f k8s/dev/03-deployment.yaml
           kubectl apply -f k8s/dev/04-service.yaml
           kubectl apply -f k8s/dev/05-ingress.yaml
@@ -82,7 +95,12 @@ jobs:
           SERVER_URL: ${{ vars.SERVER_URL }}
           CLIENT_URL: ${{ vars.CLIENT_URL }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          GH_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
+          GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
@@ -91,6 +109,10 @@ jobs:
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
+            --from-literal=GH_OAUTH_CLIENT_ID="${GH_OAUTH_CLIENT_ID}" \
+            --from-literal=GH_OAUTH_CLIENT_SECRET="${GH_OAUTH_CLIENT_SECRET}" \
+            --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
             --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
             --from-literal=POSTGRES_HOST="$POSTGRES_HOST" \
             --from-literal=POSTGRES_PORT="$POSTGRES_PORT" \
@@ -102,6 +124,7 @@ jobs:
             --from-literal=SERVER_URL="$SERVER_URL" \
             --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
+            --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
             -n ${{ env.NAMESPACE }}
 
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true
@@ -115,14 +138,15 @@ jobs:
       - name: Deploy new image
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
-          kubectl set image deployment/starships-app \
+          kubectl set image statefulset/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
             -n ${{ env.NAMESPACE }}
-          kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl rollout status statefulset/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 
       - name: Verify deployment
         run: |
           kubectl get pods -n ${{ env.NAMESPACE }}
-          kubectl logs -n ${{ env.NAMESPACE }} deployment/starships-app --tail=30 || true
+          kubectl get pv,pvc -n ${{ env.NAMESPACE }} || true
+          kubectl logs -n ${{ env.NAMESPACE }} statefulset/starships-app --tail=30 || true
           echo "✅ Verification complete."

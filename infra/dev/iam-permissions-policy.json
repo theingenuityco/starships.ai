@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EKSDescribeAndAccess",
+      "Effect": "Allow",
+      "Action": ["eks:DescribeCluster", "eks:ListClusters", "eks:AccessKubernetesApi"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadSecretsAndECR",
+      "Effect": "Allow",
+      "Action": ["ecr:GetAuthorizationToken", "secretsmanager:GetSecretValue", "ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "*"
+    }
+  ]
+}

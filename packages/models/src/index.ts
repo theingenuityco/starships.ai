@@ -47,3 +47,6 @@ export { migrationRunner } from './scripts/migration-runner';
 export { seedToolTemplates } from './scripts/seed-tool-templates';
 export { seedAgentTemplates } from './scripts/seed-agent-templates';
 export { seedWaitlist } from './scripts/seed-waitlist';
+
+// Utilities
+export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';

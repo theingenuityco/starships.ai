@@ -1,6 +1,7 @@
 import { TopupRepository } from '@starships/models';
 import { WalletService } from '@/services/WalletService';
 import { StripeService } from '@/services/StripeService';
+import { StarshipService } from '@/services/StarshipService';
 import type { TopupModel, CreateTopupRequest } from '@starships/protocol';
 import { logger } from '@/utils/logger';
 
@@ -11,10 +12,12 @@ import { logger } from '@/utils/logger';
 export class TopupService {
   private topupRepository: TopupRepository;
   private walletService: WalletService;
+  private starshipService: StarshipService;
 
   constructor() {
     this.topupRepository = new TopupRepository();
     this.walletService = new WalletService();
+    this.starshipService = new StarshipService();
   }
 
   /**
@@ -60,6 +63,12 @@ export class TopupService {
         throw new Error('Wallet ID does not match starship');
       }
 
+      // Resolve starship metadata (slug) for redirect destinations
+      const starship = await this.starshipService.getStarship(starshipId);
+      if (!starship) {
+        throw new Error('Starship not found');
+      }
+
       // Generate idempotency key
       const idempotencyKey = `${starshipId}-${Math.random().toString(36)}`;
 
@@ -78,6 +87,7 @@ export class TopupService {
           amountUsd,
           walletId,
           starshipId,
+          starshipSlug: starship.slug,
           idempotencyKey,
           topupId: topup.id,
         });

@@ -11,13 +11,25 @@ metadata:
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:577012215849:certificate/df86adc3-a423-49f0-a0f0-cdfc09bfa1ce
     alb.ingress.kubernetes.io/ssl-redirect: '443'
     alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/healthcheck-port: '3000'
-    alb.ingress.kubernetes.io/healthcheck-port: '4000'
-
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '10'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '10'
     alb.ingress.kubernetes.io/success-codes: '200,301,302'
-    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+    alb.ingress.kubernetes.io/target-group-attributes: >-
+      stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=120
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=120
+    alb.ingress.kubernetes.io/actions.ssl-redirect: >
+      {"Type": "redirect", "RedirectConfig":
+      {"Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}
 spec:
   ingressClassName: alb
+  tls:
+    - hosts:
+        - dev.starships.ai
+      secretName: starships-tls
   rules:
     - host: dev.starships.ai
       http:
@@ -36,7 +48,3 @@ spec:
                 name: starships-app
                 port:
                   name: frontend
-  tls:
-    - hosts:
-        - dev.starships.ai
-      secretName: starships-tls

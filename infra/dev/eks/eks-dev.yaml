@@ -8,9 +8,9 @@ metadata:
 
 managedNodeGroups:
   - name: dev-nodes
-    instanceType: t3.small
+    instanceType: t3.medium
     desiredCapacity: 1
     minSize: 1
-    maxSize: 1
+    maxSize: 2
     volumeSize: 30
     privateNetworking: true

@@ -11,10 +11,20 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
   const [errors, setErrors] = useState<FormErrors>({})
 
   const handleFieldChange = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }))
+    setFormData(prev => {
+      const current = prev[field] as unknown
+      let nextValue: any = value as any
+      if (nextValue == null) {
+        if (typeof current === 'string') nextValue = ''
+        else if (typeof current === 'number') nextValue = 0
+        else if (typeof current === 'boolean') nextValue = false
+        else if (Array.isArray(current)) nextValue = []
+      }
+      return {
+        ...prev,
+        [field]: nextValue,
+      }
+    })
     // Clear error for this field
     setErrors(prev => {
       const newErrors = { ...prev }
@@ -79,10 +89,20 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
   }, [])
 
   const updateField = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }))
+    setFormData(prev => {
+      const current = prev[field] as unknown
+      let nextValue: any = value as any
+      if (nextValue == null) {
+        if (typeof current === 'string') nextValue = ''
+        else if (typeof current === 'number') nextValue = 0
+        else if (typeof current === 'boolean') nextValue = false
+        else if (Array.isArray(current)) nextValue = []
+      }
+      return {
+        ...prev,
+        [field]: nextValue,
+      }
+    })
     // Clear error for this field when updated
     setErrors(prev => {
       const newErrors = { ...prev }

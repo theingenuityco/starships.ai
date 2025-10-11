@@ -22,6 +22,7 @@ export type AgentParamsWithoutMetadata = Omit<AgentParams, 'metadata' | 'tools'>
 export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields
   id: string;
+  slug: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +35,7 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
  * Request to create a new agent
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
+  slug?: string; // Optional: if not provided, will be generated
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
 };
 

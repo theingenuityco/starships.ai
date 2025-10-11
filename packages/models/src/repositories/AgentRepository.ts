@@ -4,6 +4,7 @@ import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
@@ -46,6 +47,19 @@ export class AgentRepository extends BaseRepository {
       },
       'findByStarship',
       'Agent'
+    );
+  }
+
+  async findBySlug(slug: string): Promise<AgentModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agents WHERE slug = $1', [slug]);
+        return result ? fromDatabase(AgentEntity, result) : null;
+      },
+      'findBySlug',
+      'Agent',
+      slug
     );
   }
 
@@ -103,6 +117,7 @@ export class AgentRepository extends BaseRepository {
         const agentProps = {
           // Core AgentParams fields
           name: data.name,
+          slug: data.slug, // Include slug field
           description: data.description,
           model: data.model,
           temperature: data.temperature,
@@ -236,17 +251,21 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('AgentTemplate', templateId);
         }
 
+        // Generate unique slug based on template slug
+        const slug = await generateUniqueAgentSlug(template.slug, this);
+
         // Create agent from template with optional customizations
         const agentData = {
           name: customizations?.name || template.name,
+          slug,
           description: customizations?.description || template.description,
           model: customizations?.model || template.model,
           temperature: customizations?.temperature ?? template.temperature,
           maxTokens: customizations?.maxTokens ?? template.maxTokens,
           timeout: customizations?.timeout ?? template.timeout,
           systemPrompt: customizations?.systemPrompt || template.systemPrompt,
-          state: customizations?.state || template.state,
-          blueprint: customizations?.blueprint || template.blueprint,
+          state: customizations?.state || template.state || { tools: [], messages: [] },
+          blueprint: customizations?.blueprint || template.blueprint || {},
         };
 
         // Create agent with template_id foreign key

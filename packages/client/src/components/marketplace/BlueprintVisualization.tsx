@@ -13,14 +13,10 @@ import {
   Handle,
   BackgroundVariant,
   Panel,
-  NodeProps,
   OnNodesChange,
   OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
-  EdgeProps,
-  getBezierPath,
-  BaseEdge,
 } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X, Edit3, Split } from 'lucide-react'
@@ -45,6 +41,8 @@ interface ReactFlowNode extends Node {
     description?: string
     nodeType: string // Store node type instead of icon element
     outgoingEdges?: BlueprintEdge[]
+    incomingEdges?: BlueprintEdge[]
+    nodeId: string
   }
 }
 
@@ -179,6 +177,7 @@ const getNodeColors = (nodeType: string) => {
 const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const { theme } = useTheme()
   const colors = getNodeColors(data.type)
+  const incoming = data.incomingEdges || []
   const edges = data.outgoingEdges || []
   const isSelected = data.isSelected
 
@@ -204,8 +203,31 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
             background: `linear-gradient(135deg, ${colors.handle}${primaryOpacity} 0%, ${colors.handle}${secondaryOpacity} 100%)`,
           }}
         >
-          {/* Input handle - positioned relative to main node body only */}
-          <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
+          {/* Target handles - distribute vertically around center when multiple incoming */}
+          {(incoming.length || 0) <= 1 && (
+            <Handle
+              id={`${data.nodeId}-in-0`}
+              type="target"
+              position={Position.Left}
+              className="!w-2 !h-2 !rounded-full"
+              style={{ left: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+            />
+          )}
+          {incoming.length > 1 &&
+            incoming.map((edge, i) => {
+              const spacing = 16
+              const offset = (i - (incoming.length - 1) / 2) * spacing
+              return (
+                <Handle
+                  key={`in-${i}`}
+                  id={`${data.nodeId}-in-${i}`}
+                  type="target"
+                  position={Position.Left}
+                  className="!w-2 !h-2 !rounded-full"
+                  style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+                />
+              )
+            })}
           {/* Circular icon container */}
           <div
             className="flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 shadow-sm"
@@ -244,11 +266,14 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                     type="source"
                     position={Position.Right}
                     id={edge?.ref}
-                    className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
+                    className="!w-2 !h-2 !rounded-full"
                     style={{
                       right: -6,
                       top: '50%',
                       transform: 'translateY(-50%)',
+                      backgroundColor: colors.handle,
+                      border: `2px solid ${colors.handle}`,
+                      zIndex: 10,
                     }}
                   />
                 </div>
@@ -259,7 +284,12 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
         {/* Single output handle for nodes with only one output */}
         {edges.length <= 1 && (
-          <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
+          <Handle
+            type="source"
+            position={Position.Right}
+            className="!w-2 !h-2 !rounded-full"
+            style={{ right: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+          />
         )}
       </div>
     </>
@@ -270,6 +300,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[]; isSelected?: boolean } }> = ({ data }) => {
   const { theme } = useTheme()
   const colors = getNodeColors(data.type)
+  const incoming = data.incomingEdges || []
   const isSelected = data.isSelected
 
   // Adjust opacity based on theme - darker in light mode for better visibility
@@ -284,9 +315,31 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
   return (
     <>
       {/* Input handle - all nodes except start (horizontal layout: left) */}
-      {data.type !== 'start' && (
-        <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ left: -6 }} />
+      {data.type !== 'start' && (incoming.length || 0) <= 1 && (
+        <Handle
+          id={`${data.nodeId}-in-0`}
+          type="target"
+          position={Position.Left}
+          className="!w-2 !h-2 !rounded-full"
+          style={{ left: -4, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+        />
       )}
+      {data.type !== 'start' &&
+        incoming.length > 1 &&
+        incoming.map((edge, i) => {
+          const spacing = 16
+          const offset = (i - (incoming.length - 1) / 2) * spacing
+          return (
+            <Handle
+              key={`in-${i}`}
+              id={`${data.nodeId}-in-${i}`}
+              type="target"
+              position={Position.Left}
+              className="!w-2 !h-2 !rounded-full"
+              style={{ left: -4, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+            />
+          )
+        })}
 
       <div
         className={`
@@ -321,7 +374,12 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 
       {/* Output handle - all nodes except end (horizontal layout: right) */}
       {data.type !== 'end' && (
-        <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ right: -6 }} />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-2 !h-2 !rounded-full"
+          style={{ right: -4, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+        />
       )}
     </>
   )
@@ -340,30 +398,35 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
       // DO NOT BREAK CYCLES - Preserve them completely
       'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST', // Minimal cycle intervention
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+      'elk.layered.considerModelOrder': 'true', // honor model order when possible
 
       // Adjusted spacing: tighter horizontal, much more vertical room for loopback routing
       'elk.spacing.nodeNode': '350', // Much more vertical space between nodes at same level
       'elk.layered.spacing.nodeNodeBetweenLayers': '150', // Decreased horizontal layer spacing
-      'elk.spacing.edgeNode': '80', // Sufficient edge routing space
-      'elk.spacing.edgeEdge': '30', // Space between edges
+      'elk.spacing.edgeNode': '100', // More space between edges and nodes
+      'elk.spacing.edgeEdge': '40', // More space between edges
+      'elk.spacing.portPort': '14', // space between ports
       'elk.padding': '[top=40,left=40,bottom=40,right=40]', // Reasonable padding
 
       // Node Placement - Optimized for cycles
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
-      'elk.layered.layering.strategy': 'MIN_WIDTH', // Minimize width, allow cycles
+      'elk.layered.nodePlacement.bk.fixedAlignment': 'LEFTUP', // Deterministic alignment
+      'elk.layered.nodePlacement.favorStraightEdges': 'true',
+      'elk.layered.layering.strategy': 'LONGEST_PATH', // Often cleaner for DAG-like flows
 
       // SPLINES routing - Better for cycles than orthogonal
       'elk.edgeRouting': 'SPLINES', // Smooth curves that route around
       'elk.layered.unnecessaryBendpoints': 'false',
       'elk.layered.wrapping.strategy': 'OFF',
+      'elk.layered.edgeStraightening': 'true',
+      'elk.layered.mergeEdges': 'false',
 
       // Allow back edges to route naturally
       'elk.layered.allowNonFlowPortsToSwitchSides': 'true', // Flexible port routing
       'elk.layered.feedbackEdges': 'true', // Track but don't break back edges
 
       // Port flexibility for better cycle routing
-      'elk.portConstraints': 'FREE', // Allow flexible port positioning
+      'elk.portConstraints': 'FIXED_SIDE', // Respect port sides for cleaner attachments
 
       // Quality settings
       'elk.layered.thoroughness': '100',
@@ -374,16 +437,65 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
       'elk.layered.compaction.postCompaction.strategy': 'EDGE_LENGTH',
       'elk.layered.compaction.connectedComponents': 'false', // Don't compact SCCs
     },
-    children: nodes.map(node => ({
-      id: node.id,
-      width: 220,
-      height: 80,
-    })),
-    edges: edges.map(edge => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
-    })),
+    children: nodes.map(node => {
+      const data: any = (node as any).data || {}
+      const incoming: any[] = Array.isArray(data.incomingEdges) ? data.incomingEdges : []
+      const outgoing: any[] = Array.isArray(data.outgoingEdges) ? data.outgoingEdges : []
+
+      // Define ports matching React Flow handle ids
+      const targetPorts: any[] = []
+      const incomingCount = Math.max(1, incoming.length)
+      for (let i = 0; i < incomingCount; i++) {
+        targetPorts.push({
+          id: `${node.id}-in-${i}`,
+          layoutOptions: {
+            'elk.port.side': 'WEST',
+            'elk.port.index': String(i),
+          },
+        })
+      }
+
+      const sourcePorts: any[] = []
+      if (data.type === 'conditional' && outgoing.length > 1) {
+        // One port per branch, id is the branch edge.ref (matches sourceHandle)
+        outgoing.forEach((be: any, i: number) => {
+          if (be && be.ref) {
+            sourcePorts.push({
+              id: String(be.ref),
+              layoutOptions: {
+                'elk.port.side': 'EAST',
+                'elk.port.index': String(i),
+              },
+            })
+          }
+        })
+      } else {
+        // Default single output port
+        sourcePorts.push({
+          id: `${node.id}-out-0`,
+          layoutOptions: {
+            'elk.port.side': 'EAST',
+            'elk.port.index': '0',
+          },
+        })
+      }
+
+      return {
+        id: node.id,
+        width: 220,
+        height: 80,
+        ports: [...targetPorts, ...sourcePorts],
+      }
+    }),
+    edges: edges.map(edge => {
+      const srcPort = edge.sourceHandle ? String(edge.sourceHandle) : `${edge.source}-out-0`
+      const tgtPort = edge.targetHandle ? String(edge.targetHandle) : `${edge.target}-in-0`
+      return {
+        id: edge.id,
+        sources: [srcPort],
+        targets: [tgtPort],
+      }
+    }),
   }
 
   const layoutedGraph = await elk.layout(graph)
@@ -435,6 +547,15 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
     outgoingEdgesMap.get(edge.from)!.push(edge)
   })
 
+  // Build incoming edges map for target handle distribution
+  const incomingEdgesMap = new Map<string, BlueprintEdge[]>()
+  validEdges.forEach(edge => {
+    if (!incomingEdgesMap.has(edge.to)) {
+      incomingEdgesMap.set(edge.to, [])
+    }
+    incomingEdgesMap.get(edge.to)!.push(edge)
+  })
+
   // Create initial nodes without positioning
   const initialNodes: ReactFlowNode[] = validNodes.map((node: BlueprintNode) => ({
     id: node.ref,
@@ -442,11 +563,13 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
     position: { x: 0, y: 0 }, // Will be overridden by layout
     draggable: nodesDraggable,
     data: {
+      nodeId: node.ref,
       label: node.name,
       type: node.type,
       description: node.description,
       nodeType: node.type, // Store node type instead of icon element
       outgoingEdges: outgoingEdgesMap.get(node.ref) || [],
+      incomingEdges: incomingEdgesMap.get(node.ref) || [],
     },
     style: {
       background: 'transparent',
@@ -454,17 +577,26 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
     },
   }))
 
-  // Create edges with simple bezier - combines smoothstep routing with bezier curves
+  // Create edges using built-in bezier; loop-backs updated later
   const flowEdges: Edge[] = validEdges.map((edge: BlueprintEdge) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+
+    // Determine target handle index for the target node based on ordering of incoming edges
+    const incomingList = incomingEdgesMap.get(edge.to) || []
+    const targetIndex = Math.max(
+      0,
+      incomingList.findIndex(e => e.ref === edge.ref)
+    )
+    const targetHandle = `${edge.to}-in-${targetIndex}`
 
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
-      type: 'simplebezier', // Simple bezier combines smoothstep-style routing with bezier curves
+      targetHandle,
+      type: 'bezier',
       animated: false,
       style: {
         stroke: '#94a3b8',
@@ -485,8 +617,79 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   // Apply ELK layout
   const layoutResult = await getElkLayout(initialNodes, flowEdges)
 
-  // Detect back edges after layout and use custom smooth edges
-  const edgesWithZIndex = layoutResult.edges.map(edge => {
+  // Post-layout refinement: reassign target handles so incoming edges attach
+  // top-to-bottom on the target side based on source Y to reduce crossings
+  const nodeYById = new Map(layoutResult.nodes.map(n => [n.id, n.position.y]))
+  const edgesByTarget = new Map<string, Edge[]>()
+  layoutResult.edges.forEach(edge => {
+    const arr = edgesByTarget.get(edge.target) || []
+    arr.push(edge)
+    edgesByTarget.set(edge.target, arr)
+  })
+
+  const edgesWithOrderedHandles: Edge[] = []
+  edgesByTarget.forEach((edgesForTarget, targetId) => {
+    const sorted = [...edgesForTarget].sort((a, b) => {
+      const ay = nodeYById.get(a.source) ?? 0
+      const by = nodeYById.get(b.source) ?? 0
+      return ay - by
+    })
+    sorted.forEach((e, idx) => {
+      edgesWithOrderedHandles.push({
+        ...e,
+        targetHandle: `${targetId}-in-${idx}`,
+      })
+    })
+  })
+
+  // Post-layout branch refinement: reorder outgoing branch handles (conditional nodes)
+  // so that branch rows (and their right-side handles) are ordered by their targets' Y
+  const edgesBySource = new Map<string, Edge[]>()
+  edgesWithOrderedHandles.forEach(edge => {
+    const arr = edgesBySource.get(edge.source) || []
+    arr.push(edge)
+    edgesBySource.set(edge.source, arr)
+  })
+
+  const blueprintEdgeByRef = new Map(validEdges.map(be => [be.ref, be]))
+
+  const nodesWithSortedBranches = layoutResult.nodes.map(node => {
+    const data: any = (node as any).data
+    if (!data || data.type !== 'conditional' || !Array.isArray(data.outgoingEdges) || data.outgoingEdges.length <= 1) {
+      return node
+    }
+    const edgesForSource = edgesBySource.get(node.id) || []
+    if (edgesForSource.length === 0) return node
+
+    const sortedByTargetY = [...edgesForSource].sort((a, b) => {
+      const ay = nodeYById.get(a.target) ?? 0
+      const by = nodeYById.get(b.target) ?? 0
+      return ay - by
+    })
+
+    const sortedBlueprintEdges: BlueprintEdge[] = []
+    sortedByTargetY.forEach(e => {
+      const be = blueprintEdgeByRef.get(e.id)
+      if (be) sortedBlueprintEdges.push(be)
+    })
+
+    // Include any missing edges in original order as fallback
+    const existingRefs = new Set(sortedBlueprintEdges.map(e => e.ref))
+    data.outgoingEdges.forEach((be: BlueprintEdge) => {
+      if (!existingRefs.has(be.ref)) sortedBlueprintEdges.push(be)
+    })
+
+    return {
+      ...node,
+      data: {
+        ...data,
+        outgoingEdges: sortedBlueprintEdges,
+      },
+    }
+  })
+
+  // Detect back edges after layout and assign built-in types
+  const edgesWithZIndex = edgesWithOrderedHandles.map(edge => {
     const sourceNode = layoutResult.nodes.find(n => n.id === edge.source)
     const targetNode = layoutResult.nodes.find(n => n.id === edge.target)
 
@@ -495,7 +698,8 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
 
     return {
       ...edge,
-      type: 'smooth', // Use custom smooth edge for all edges
+      // Use built-in smoothstep for back edges; others as bezier
+      type: isBackEdge ? 'smoothstep' : 'bezier',
       zIndex: -1, // All edges render behind nodes
       style: {
         ...edge.style,
@@ -503,79 +707,18 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       },
       data: {
         ...edge.data,
-        isBackEdge, // Pass back edge flag to custom edge component
+        isBackEdge, // Pass back edge flag (not used by built-ins but harmless)
       },
     }
   })
 
-  // Return layout with properly configured edges
-  return { nodes: layoutResult.nodes, edges: edgesWithZIndex }
-}
-
-// Custom edge component with smooth curves for loopback edges
-const CustomSmoothEdge: React.FC<EdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd, data }) => {
-  // Check if this is a back edge (loopback)
-  const isBackEdge = data?.isBackEdge === true
-
-  let edgePath: string
-
-  if (isBackEdge) {
-    // For back edges, create a custom path with very smooth curves
-    // Simulate a stiff steel rope that maintains large bend radius
-
-    // Calculate distance and direction
-    const dx = targetX - sourceX
-    const dy = targetY - sourceY
-    const distance = Math.sqrt(dx * dx + dy * dy)
-
-    // Create control points for smoother curves with reduced intensity
-    // Lower multiplier = gentler, wider curves
-    const controlPointOffset = Math.max(distance * 0.3, 80) // Reduced curvature for more natural flow
-
-    // Control points positioned to create smooth "C" shape
-    const controlPoint1X = sourceX + controlPointOffset
-    const controlPoint1Y = sourceY
-    const controlPoint2X = targetX - controlPointOffset
-    const controlPoint2Y = targetY
-
-    // Create cubic bezier path with custom control points
-    edgePath = `M ${sourceX},${sourceY} C ${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${targetX},${targetY}`
-  } else {
-    // For normal edges, use standard bezier with moderate curvature
-    ;[edgePath] = getBezierPath({
-      sourceX,
-      sourceY,
-      sourcePosition,
-      targetX,
-      targetY,
-      targetPosition,
-      curvature: 0.25,
-    })
-  }
-
-  return (
-    <BaseEdge
-      id={id}
-      path={edgePath}
-      markerEnd={markerEnd}
-      style={{
-        ...style,
-        // Ensure smooth rendering
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-      }}
-    />
-  )
+  // Return layout with properly configured edges and sorted branch rows
+  return { nodes: nodesWithSortedBranches, edges: edgesWithZIndex }
 }
 
 // Node types for React Flow
 const nodeTypes = {
   custom: CustomBlueprintNode,
-}
-
-// Edge types for React Flow
-const edgeTypes = {
-  smooth: CustomSmoothEdge,
 }
 
 // Node details panel component
@@ -719,7 +862,6 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}

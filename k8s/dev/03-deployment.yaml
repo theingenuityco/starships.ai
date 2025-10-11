@@ -23,7 +23,7 @@ metadata:
 spec:
   serviceName: starships-app-headless
   replicas: 1
-  revisionHistoryLimit: 5
+  revisionHistoryLimit: 2
   updateStrategy:
     type: RollingUpdate
   selector:
@@ -37,8 +37,6 @@ spec:
         environment: dev
     spec:
       terminationGracePeriodSeconds: 120
-      nodeSelector:
-        topology.kubernetes.io/zone: ap-south-1a
       imagePullSecrets:
         - name: ghcr-pull-secret
       initContainers:
@@ -209,4 +207,4 @@ spec:
         storageClassName: gp3
         resources:
           requests:
-            storage: 60Gi
+            storage: 50Gi

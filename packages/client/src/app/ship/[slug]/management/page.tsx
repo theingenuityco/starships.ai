@@ -55,7 +55,7 @@ export default function ShipProfilePage(): React.JSX.Element {
 
               <TabsContent value="billing">
                 <section aria-labelledby="billing-section" className="rounded-xl border border-border/80 bg-background p-6">
-                  <StarshipBillingSection starshipId={starshipData?.id} />
+                  <Icon name="star"shipBillingSection starshipId={starshipData?.id}  />
                 </section>
               </TabsContent>
             </Tabs>

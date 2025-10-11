@@ -14,13 +14,13 @@ interface ToastProps {
 const getToastIcon = (variant?: string) => {
   switch (variant) {
     case 'success':
-      return <CheckCircle className="h-4 w-4 text-green-600" />
+      return <Icon name="check-circle" className="h-4 w-4 text-green-600" />
     case 'destructive':
-      return <AlertCircle className="h-4 w-4 text-red-600" />
+      return <Icon name="alert-circle" className="h-4 w-4 text-red-600" />
     case 'warning':
-      return <AlertTriangle className="h-4 w-4 text-yellow-600" />
+      return <Icon name="alert-triangle" className="h-4 w-4 text-yellow-600" />
     default:
-      return <Info className="h-4 w-4 text-blue-600" />
+      return <Icon name="info" className="h-4 w-4 text-blue-600" />
   }
 }
 
@@ -57,7 +57,7 @@ export function ToastComponent({ toast }: ToastProps) {
       </div>
 
       <button onClick={() => dismiss(toast.id)} className="flex-shrink-0 rounded-md p-1 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2">
-        <X className="h-4 w-4" />
+        <Icon name="x" className="h-4 w-4" />
       </button>
     </div>
   )

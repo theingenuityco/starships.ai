@@ -140,7 +140,7 @@ export function ConnectionStatus({
 
     if (circuitBreakerState === 'open') {
       return {
-        icon: Shield,
+        icon: 'shield',
         color: 'text-red-600',
         bgColor: 'bg-red-100',
         borderColor: 'border-red-200',
@@ -152,7 +152,7 @@ export function ConnectionStatus({
 
     if (circuitBreakerState === 'half-open') {
       return {
-        icon: Activity,
+        icon: 'activity',
         color: 'text-yellow-600',
         bgColor: 'bg-yellow-100',
         borderColor: 'border-yellow-200',
@@ -164,7 +164,7 @@ export function ConnectionStatus({
 
     if (!isConnected) {
       return {
-        icon: WifiOff,
+        icon: 'wifi-off',
         color: 'text-red-600',
         bgColor: 'bg-red-100',
         borderColor: 'border-red-200',
@@ -177,7 +177,7 @@ export function ConnectionStatus({
     switch (connectionQuality) {
       case 'excellent':
         return {
-          icon: Wifi,
+          icon: 'wifi',
           color: 'text-green-600',
           bgColor: 'bg-green-100',
           borderColor: 'border-green-200',
@@ -187,7 +187,7 @@ export function ConnectionStatus({
         }
       case 'good':
         return {
-          icon: Wifi,
+          icon: 'wifi',
           color: 'text-blue-600',
           bgColor: 'bg-blue-100',
           borderColor: 'border-blue-200',
@@ -197,7 +197,7 @@ export function ConnectionStatus({
         }
       case 'poor':
         return {
-          icon: AlertTriangle,
+          icon: 'alert-triangle',
           color: 'text-yellow-600',
           bgColor: 'bg-yellow-100',
           borderColor: 'border-yellow-200',
@@ -207,7 +207,7 @@ export function ConnectionStatus({
         }
       default:
         return {
-          icon: WifiOff,
+          icon: 'wifi-off',
           color: 'text-gray-600',
           bgColor: 'bg-gray-100',
           borderColor: 'border-gray-200',
@@ -218,7 +218,7 @@ export function ConnectionStatus({
     }
   }, [connectionState.isConnected, connectionState.connectionQuality, connectionState.circuitBreakerState])
 
-  const StatusIcon = statusConfig.icon
+  const StatusIconName = statusConfig.icon
 
   // Format time duration
   const formatDuration = (ms: number) => {
@@ -236,7 +236,7 @@ export function ConnectionStatus({
     return (
       <div className={`flex items-center space-x-2 ${className}`} title={`${statusConfig.label}: ${statusConfig.description}`}>
         <div className={`w-2 h-2 rounded-full ${statusConfig.bgColor.replace('bg-', 'bg-')}`} />
-        <StatusIcon className={`h-4 w-4 ${statusConfig.color}`} />
+        <Icon name={StatusIconName} className={`h-4 w-4 ${statusConfig.color}`} />
         {connectionState.reconnectAttempts > 0 && (
           <Badge variant="outline" className="text-xs">
             Retry {connectionState.reconnectAttempts}
@@ -252,14 +252,14 @@ export function ConnectionStatus({
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
             <div className={`p-2 rounded-full ${statusConfig.bgColor}`}>
-              <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
+              <Icon name={StatusIconName} className={`h-5 w-5 ${statusConfig.color}`} />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="font-medium">{statusConfig.label}</h3>
                 {connectionState.reconnectAttempts > 0 && (
                   <Badge variant="outline" className="text-xs">
-                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    <Icon name="refresh" className="h-3 w-3 mr-1 animate-spin" />
                     Retry {connectionState.reconnectAttempts}
                   </Badge>
                 )}
@@ -271,12 +271,12 @@ export function ConnectionStatus({
           <div className="flex items-center space-x-2">
             {!isExpanded && (
               <Button variant="ghost" size="sm" onClick={() => setIsExpanded(true)} className="h-8 w-8 p-0">
-                <Activity className="h-4 w-4" />
+                <Icon name="activity" className="h-4 w-4" />
               </Button>
             )}
             {isExpanded && (
               <Button variant="ghost" size="sm" onClick={() => setIsExpanded(false)} className="h-8 w-8 p-0">
-                <X className="h-4 w-4" />
+                <Icon name="x" className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -344,7 +344,7 @@ export function ConnectionStatus({
                   <ul className="text-xs space-y-1">
                     {healthStatus.issues.map((issue, index) => (
                       <li key={index} className="flex items-center space-x-2">
-                        <AlertTriangle className="h-3 w-3 text-red-500" />
+                        <Icon name="alert-triangle" className="h-3 w-3 text-red-500" />
                         <span>{issue}</span>
                       </li>
                     ))}
@@ -359,7 +359,7 @@ export function ConnectionStatus({
                   <ul className="text-xs space-y-1">
                     {healthStatus.recommendations.map((rec, index) => (
                       <li key={index} className="flex items-center space-x-2">
-                        <CheckCircle className="h-3 w-3 text-blue-500" />
+                        <Icon name="check-circle" className="h-3 w-3 text-blue-500" />
                         <span>{rec}</span>
                       </li>
                     ))}
@@ -371,19 +371,19 @@ export function ConnectionStatus({
               <div className="flex flex-wrap gap-2 pt-2 border-t">
                 {onForceReconnect && (
                   <Button variant="outline" size="sm" onClick={onForceReconnect} disabled={connectionState.isConnected && connectionState.circuitBreakerState === 'closed'}>
-                    <RefreshCw className="h-3 w-3 mr-1" />
+                    <Icon name="refresh" className="h-3 w-3 mr-1" />
                     Force Reconnect
                   </Button>
                 )}
                 {onResetCircuitBreaker && connectionState.circuitBreakerState !== 'closed' && (
                   <Button variant="outline" size="sm" onClick={onResetCircuitBreaker}>
-                    <Shield className="h-3 w-3 mr-1" />
+                    <Icon name="shield" className="h-3 w-3 mr-1" />
                     Reset Circuit Breaker
                   </Button>
                 )}
                 {onClearQueue && queueStatus && queueStatus.queueSize > 0 && (
                   <Button variant="outline" size="sm" onClick={onClearQueue}>
-                    <Clock className="h-3 w-3 mr-1" />
+                    <Icon name="clock" className="h-3 w-3 mr-1" />
                     Clear Queue ({queueStatus.queueSize})
                   </Button>
                 )}

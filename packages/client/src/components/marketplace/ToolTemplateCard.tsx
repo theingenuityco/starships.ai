@@ -67,7 +67,7 @@ export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateC
       case 'data':
         return <BarChart2 className="w-4 h-4" />
       case 'communication':
-        return <Users className="w-4 h-4" />
+        return <Icon name="user"s className="w-4 h-4"  />
       default:
         return <Wrench className="w-4 h-4" />
     }

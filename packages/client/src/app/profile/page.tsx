@@ -35,7 +35,7 @@ export default function ProfilePage(): React.JSX.Element {
           <div className="w-full max-w-6xl mx-auto space-y-8">
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <UserIcon className="h-6 w-6 text-primary" />
+                <Icon name="user" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">My Profile</h1>
               </div>
               <p className="text-muted-foreground">Manage your account settings and preferences.</p>
@@ -55,7 +55,7 @@ export default function ProfilePage(): React.JSX.Element {
                     <p className="text-sm text-muted-foreground">End your current session</p>
                   </div>
                   <Button variant="destructive" onClick={handleLogout} className="gap-2">
-                    <LogOut className="w-4 h-4" />
+                    <Icon name="log-out" className="w-4 h-4" />
                     Sign Out
                   </Button>
                 </div>

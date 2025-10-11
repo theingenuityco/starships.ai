@@ -122,7 +122,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
               </div>
             </div>
             <div className="flex items-center gap-1 text-sm text-muted-foreground bg-background/50 px-2 py-1 rounded-full">
-              <Users className="w-3 h-3" />
+              <Icon name="user"s className="w-3 h-3"  />
               <span>{template.usageCount}</span>
             </div>
           </div>

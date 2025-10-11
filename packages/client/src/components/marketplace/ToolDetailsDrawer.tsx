@@ -75,7 +75,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
       case 'data':
         return <BarChart2 className="w-5 h-5" />
       case 'communication':
-        return <Users className="w-5 h-5" />
+        return <Icon name="user"s className="w-5 h-5"  />
       default:
         return <Wrench className="w-5 h-5" />
     }
@@ -256,7 +256,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                     <div className="space-y-4">
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 border border-muted-foreground/20">
                         <div className="p-2 rounded-lg bg-primary/10">
-                          <Users className="w-4 h-4 text-primary" />
+                          <Icon name="user"s className="w-4 h-4 text-primary"  />
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Install to</p>
@@ -290,7 +290,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <Icon name="user"s className="w-12 h-12 mx-auto mb-3 opacity-50"  />
                       <p className="text-sm">No starship available for installation</p>
                     </div>
                   )}

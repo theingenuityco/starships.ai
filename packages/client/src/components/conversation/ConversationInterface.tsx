@@ -974,7 +974,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-            <Users className="w-8 h-8 text-muted-foreground" />
+            <Icon name="user"s className="w-8 h-8 text-muted-foreground"  />
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </div>

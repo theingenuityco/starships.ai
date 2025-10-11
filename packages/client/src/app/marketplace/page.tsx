@@ -95,7 +95,7 @@ export default function MarketplacePage() {
             {/* Header */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Store className="h-6 w-6 text-primary" />
+                <Icon name="store" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Agent Marketplace</h1>
               </div>
               <p className="text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship&apos;s capabilities.</p>
@@ -104,7 +104,7 @@ export default function MarketplacePage() {
             {/* Search and Filters */}
             <div className="mb-8">
               <div className="relative max-w-md mb-6 mx-auto">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                <Icon name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                 <Input type="text" placeholder="Search Agent & Tools..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
               </div>
             </div>
@@ -121,7 +121,7 @@ export default function MarketplacePage() {
             {/* Agents Section */}
             <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <Bot className="w-6 h-6 text-primary" />
+                <Icon name="bot" className="w-6 h-6 text-primary" />
                 <h2 className="text-xl font-semibold">Agents</h2>
                 <Badge variant="outline" className="ml-2">
                   {filteredAgentTemplates.length}
@@ -144,7 +144,7 @@ export default function MarketplacePage() {
                 </div>
               ) : (
                 <div className="text-center py-8 border border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
-                  <Bot className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <Icon name="bot" className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                   <h3 className="text-lg font-medium mb-2">No agent templates found</h3>
                   <p className="text-sm text-muted-foreground">Try adjusting your search or category filter.</p>
                 </div>
@@ -154,7 +154,7 @@ export default function MarketplacePage() {
             {/* Tools Section */}
             <div className="space-y-6 mt-12">
               <div className="flex items-center gap-3">
-                <Wrench className="w-6 h-6 text-primary" />
+                <Icon name="wrench" className="w-6 h-6 text-primary" />
                 <h2 className="text-xl font-semibold">Tools</h2>
                 <Badge variant="outline" className="ml-2">
                   {filteredToolTemplates.length}
@@ -177,7 +177,7 @@ export default function MarketplacePage() {
                 </div>
               ) : (
                 <div className="text-center py-8 border border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
-                  <Wrench className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <Icon name="wrench" className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                   <h3 className="text-lg font-medium mb-2">No tool templates found</h3>
                   <p className="text-sm text-muted-foreground">Try adjusting your search or category filter.</p>
                 </div>

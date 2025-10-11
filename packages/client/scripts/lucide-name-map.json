@@ -61,7 +61,9 @@
   "Send": "send",
   "StopCircle": "stop-circle",
   "LogIn": "log-in",
+  "LogOut": "log-out",
   "UserPlus": "user-plus",
+  "UserIcon": "user",
   "Activity": "activity",
   "Braces": "braces",
   "Download": "download",
@@ -86,6 +88,10 @@
   "TestTube": "test-tube",
   "Wifi": "wifi",
   "WifiOff": "wifi-off",
-  "Loader2": "loading"
+  "Loader2": "loading",
+  "Menu": "menu",
+  "Sun": "sun",
+  "Moon": "moon",
+  "XCircle": "x-circle",
+  "Zap": "zap"
 }
-

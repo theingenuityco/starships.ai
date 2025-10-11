@@ -88,7 +88,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             aria-label="Open navigation menu"
             style={{ zIndex: 999 }}
           >
-            <Menu className="w-5 h-5" />
+            <Icon name="menu" className="w-5 h-5" />
           </motion.button>
         )}
 

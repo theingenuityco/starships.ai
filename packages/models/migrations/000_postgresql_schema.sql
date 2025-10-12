@@ -82,29 +82,6 @@ CREATE INDEX idx_oauth_auth_codes_user_id ON oauth_auth_codes(user_id);
 -- Note: OAuth cleanup is handled by OAuthAuthCodeRepository.cleanupExpiredCodes()
 
 -- ============================================================================
--- EMAIL VERIFICATION TOKENS TABLE
--- ============================================================================
-
-CREATE TABLE email_verification_tokens (
-    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    token VARCHAR(64) UNIQUE NOT NULL,
-    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    email VARCHAR(255) NOT NULL,
-    consumed BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
-);
-
--- Email verification token indexes
-CREATE INDEX idx_email_verification_tokens_token ON email_verification_tokens(token) WHERE NOT consumed;
-CREATE INDEX idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
-CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
-CREATE INDEX idx_email_verification_tokens_email ON email_verification_tokens(email);
-
--- Comment for documentation
-COMMENT ON TABLE email_verification_tokens IS 'Email verification tokens for user registration - separate from OAuth for clean architecture';
-
--- ============================================================================
 -- STARSHIPS TABLE
 -- ============================================================================
 
@@ -430,6 +407,22 @@ ALTER TABLE usage
   ON DELETE SET NULL;
 
 -- ============================================================================
+-- WAITLIST TABLE
+-- ============================================================================
+
+CREATE TABLE waitlist (
+    email VARCHAR(255) PRIMARY KEY,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Waitlist indexes
+CREATE INDEX idx_waitlist_status ON waitlist(status);
+CREATE INDEX idx_waitlist_created_at ON waitlist(created_at);
+
+
+-- ============================================================================
 -- JUNCTION TABLES FOR RELATIONSHIPS
 -- ============================================================================
 
@@ -493,6 +486,7 @@ COMMENT ON TABLE environments IS 'Environment variables scoped to starships with
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
 COMMENT ON TABLE wallets IS 'Wallets for starships with currency and balance';
 COMMENT ON TABLE topups IS 'Payment topup records for wallet funding via Stripe';
+COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';
 COMMENT ON TABLE conversation_agents IS 'Many-to-many relationship between conversations and agents';

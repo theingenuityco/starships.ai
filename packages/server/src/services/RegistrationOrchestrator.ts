@@ -55,10 +55,14 @@ export class RegistrationOrchestrator {
   async registerUser(userData: RegisterUserData): Promise<RegistrationResult> {
     const userService = ServiceFactory.createUserService();
 
-    // Check if user already exists
+    // Check if user already exists - handle gracefully without throwing errors
     const existingUser = await userService.getUserByEmail(userData.email);
     if (existingUser) {
-      throw new ConflictError('User already exists');
+      // Simply return a friendly message without throwing errors
+      return {
+        emailVerificationSent: false,
+        message: 'An account with this email already exists. Please sign in instead.'
+      };
     }
 
     // Handle waitlist logic

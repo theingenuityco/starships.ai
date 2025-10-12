@@ -200,6 +200,22 @@ export function LoginForm() {
       return
     }
 
+    // Handle "user already exists" case gracefully
+    if (result.message && result.message.includes('already exists')) {
+      // Switch to login tab and pre-fill email
+      setActiveTab('login')
+      setLoginData(prev => ({ ...prev, email: registerData.email }))
+      // Show as informational message, not error
+      setFormError(null)
+      setEmailVerificationStatus({
+        needsVerification: true,
+        email: registerData.email,
+        message: result.message,
+      })
+      setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
+      return
+    }
+
     if (!result.success) {
       setFormError(result.error || 'Registration failed')
     }

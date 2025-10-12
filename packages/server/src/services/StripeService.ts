@@ -1,7 +1,9 @@
 import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2025-09-30.clover',
+});
 
 /**
  * Stripe Service - Handles Stripe payment operations
@@ -15,12 +17,14 @@ export class StripeService {
     amountUsd,
     walletId,
     starshipId,
+    starshipSlug,
     idempotencyKey,
     topupId,
   }: {
     amountUsd: number;
     walletId: string;
     starshipId: string;
+    starshipSlug?: string;
     idempotencyKey: string;
     topupId: string;
   }) {
@@ -66,6 +70,7 @@ export class StripeService {
           metadata: {
             wallet_id: walletId,
             starship_id: starshipId,
+            starship_slug: starshipSlug ?? null,
             amount_usd: amountUsd.toString(),
             topup_id: topupId,
             idempotency_key: idempotencyKey,
@@ -76,11 +81,16 @@ export class StripeService {
               topup_id: topupId,
               wallet_id: walletId,
               starship_id: starshipId,
+              starship_slug: starshipSlug ?? null,
               idempotency_key: idempotencyKey,
             },
           },
-          success_url: `${process.env.PUBLIC_URL}/ship/${starshipId}/management?tab=billing&status=success`,
-          cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipId}/management?tab=billing&status=cancelled`,
+          success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/success?topupId=${encodeURIComponent(
+            topupId
+          )}&amount=${encodeURIComponent(amountUsd.toFixed(2))}`,
+          cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/failure?topupId=${encodeURIComponent(
+            topupId
+          )}`,
           expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
         },
         {

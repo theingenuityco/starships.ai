@@ -22,6 +22,7 @@ import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
 import walletRoutes from '@/routes/wallets';
 import topupRoutes from '@/routes/topups';
+import promoRoutes from '@/routes/promo';
 import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
@@ -89,6 +90,7 @@ app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
 app.use('/api/v1', walletRoutes);
 app.use('/api/v1', topupRoutes);
+app.use('/api/v1', promoRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
 app.use('/api/v1', ledgerRoutes);
@@ -150,7 +152,6 @@ httpServer.listen(PORT, async () => {
       console.error('⚠️ Failed to seed waitlist:', error);
       // Continue - seeding is not critical for startup
     }
-
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

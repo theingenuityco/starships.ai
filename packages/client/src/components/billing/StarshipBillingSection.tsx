@@ -5,6 +5,7 @@ import React, { useEffect } from 'react'
 import BillingOverviewCard from '@/components/billing/BillingOverviewCard'
 import AmountSelector from '@/components/billing/AmountSelector'
 import LedgerHistoryTable from '@/components/billing/LedgerHistoryTable'
+import PromoRedeemForm from '@/components/billing/PromoRedeemForm'
 import { useWallet, WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
@@ -29,12 +30,20 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
 
   return (
     <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <BillingOverviewCard wallet={wallet} isLoading={isLoading} error={error} />
+      {/* Left: Overview + Promo (stacked) */}
+      <div className="space-y-4 flex flex-col justify-center">
+        <BillingOverviewCard wallet={wallet} isLoading={isLoading} error={error} />
+        {starshipId && <PromoRedeemForm starshipId={starshipId} />}
+      </div>
+
+      {/* Right: Top-up amounts */}
       {starshipId && (
-        <div className="space-y-2">
+        <div className="space-y-4">
           <AmountSelector starshipId={starshipId} />
         </div>
       )}
+
+      {/* Full-width: Ledger */}
       {wallet?.id && (
         <div className="lg:col-span-2">
           <LedgerHistoryTable walletId={wallet.id} />

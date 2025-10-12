@@ -35,6 +35,7 @@ export * from './domains/wallet';
 export * from './domains/topup';
 export * from './domains/ledger';
 export * from './domains/openrouter';
+export * from './domains/promo';
 
 // Export API contracts
 export * from './contracts/api-response';

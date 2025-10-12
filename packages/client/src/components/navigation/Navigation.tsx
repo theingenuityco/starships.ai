@@ -96,7 +96,7 @@ export function Navigation(props: NavigationProps) {
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
-  const isManagementRoute = starshipSlug ? pathname === `/ship/${starshipSlug}/management` : false
+  const isSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings`) : false
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
@@ -297,7 +297,7 @@ export function Navigation(props: NavigationProps) {
             {/* Ship Management - Root-level at the end */}
             {starshipSlug && (
               <div>
-                <NavigationItem href={`/ship/${starshipSlug}/management`} label="Ship Management" icon="settings" isActive={isManagementRoute} />
+                <NavigationItem href={`/ship/${starshipSlug}/settings/usage`} label="Ship Settings" icon="settings" isActive={isSettingsRoute} />
               </div>
             )}
           </div>

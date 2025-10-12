@@ -41,7 +41,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <Button size="lg" className="group bg-rose-600 text-white hover:bg-rose-700" onClick={() => router.push(`/ship/${slug}/management?tab=billing`)}>
+                    <Button size="lg" className="group bg-rose-600 text-white hover:bg-rose-700" onClick={() => router.push(`/ship/${slug}/settings/billing`)}>
                       Retry top-up
                       <Icon name="arrow-right" className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
@@ -49,9 +49,9 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                       size="lg"
                       variant="outline"
                       className="border-rose-500/40 text-rose-700 hover:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-200"
-                      onClick={() => router.push(`/ship/${slug}/management`)}
+                      onClick={() => router.push(`/ship/${slug}/settings/usage`)}
                     >
-                      Back to management
+                      Go to analytics
                     </Button>
                   </div>
                 </div>
@@ -130,7 +130,8 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                     <Button
                       variant="outline"
                       className="border-slate-300 text-slate-700 hover:bg-slate-200/50 dark:border-slate-600 dark:text-slate-200"
-                      onClick={() => router.push(`/ship/${slug}/management?tab=billing`)}
+                      onClick={() => router.push(`/ship/${slug}/settings/billing`)}
+                      onClick={() => router.push(`/ship/${slug}/settings/billing`)}
                     >
                       Go to billing
                     </Button>

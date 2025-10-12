@@ -104,7 +104,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       )}
                     </div>
                     <Button asChild size="sm" variant="outline">
-                      <Link href={`/ship/${slug}/management?tab=billing`}>Billing</Link>
+                      <Link href={`/ship/${slug}/settings/billing`}>Billing</Link>
                     </Button>
                   </div>
                 </CardHeader>

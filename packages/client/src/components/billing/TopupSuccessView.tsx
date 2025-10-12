@@ -84,7 +84,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <Button size="lg" className="group bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => router.push(`/ship/${slug}/management?tab=billing`)}>
+                    <Button size="lg" className="group bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => router.push(`/ship/${slug}/settings/billing`)}>
                       Return to billing
                       <Icon name="arrow-right" className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
@@ -92,7 +92,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                       size="lg"
                       variant="outline"
                       className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:border-emerald-400/30 dark:text-emerald-200"
-                      onClick={() => router.push(`/ship/${slug}/management?tab=usage`)}
+                      onClick={() => router.push(`/ship/${slug}/settings/usage`)}
                     >
                       View usage analytics
                     </Button>

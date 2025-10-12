@@ -186,8 +186,8 @@ export function Navigation(props: NavigationProps) {
                     <motion.div
                       className={`group relative transition-all duration-300 mx-auto rounded-xl z-10 flex items-center justify-center w-12 h-12 border ${
                         isOverviewRoute
-                          ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
-                          : 'border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                          ? 'text-primary bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
+                          : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
                       }`}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -211,8 +211,8 @@ export function Navigation(props: NavigationProps) {
                       <motion.div
                         className={`group relative transition-all duration-300 mx-auto rounded-xl z-10 flex items-center justify-center w-12 h-12 border ${
                           isConversationRoute
-                            ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
-                            : 'border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                            ? 'text-primary bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
+                            : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
                         }`}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -244,7 +244,7 @@ export function Navigation(props: NavigationProps) {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.1 }}
                             onClick={handleNewConversation}
-                            className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                            className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
@@ -264,7 +264,7 @@ export function Navigation(props: NavigationProps) {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.2 }}
                             onClick={handleToggleConversationHistory}
-                            className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                            className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
@@ -290,8 +290,8 @@ export function Navigation(props: NavigationProps) {
                               transition={{ delay: 0.3 }}
                               className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border ${
                                 pathname === `/ship/${starshipSlug}/management`
-                                  ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
-                                  : 'border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                                  ? 'text-primary bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
+                                  : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
                               }`}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}

@@ -18,7 +18,9 @@ export function NavigationItem({ href, label, icon, isActive }: NavigationItemPr
     <Link href={href}>
       <motion.div
         className={`group relative transition-all duration-300 mx-auto rounded-xl w-12 h-12 flex items-center justify-center border ${
-          isActive ? 'bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border-primary/30' : 'border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+          isActive
+            ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border-primary/30'
+            : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
         }`}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}

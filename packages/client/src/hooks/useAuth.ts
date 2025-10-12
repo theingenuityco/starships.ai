@@ -215,6 +215,13 @@ export function useRegister() {
         return
       }
 
+      // Check if this is an email verification response
+      if (data.emailVerificationSent) {
+        // Email verification sent - no immediate login
+        // The UI should already show the verification message
+        return
+      }
+
       const { user, token, starship } = data
 
       if (!user || !token) {

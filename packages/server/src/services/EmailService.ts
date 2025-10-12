@@ -70,7 +70,7 @@ export class EmailService {
             <div style="text-align: center; margin: 30px 0;">
               <a href="${verificationUrl}" 
                  style="background: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-                Verify Email & Create Starship
+                Verify Email
               </a>
             </div>
             <p style="font-size: 14px; color: #718096;">

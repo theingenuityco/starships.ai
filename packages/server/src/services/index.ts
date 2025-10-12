@@ -22,4 +22,10 @@ export { ToolService } from './ToolService';
 export { StreamingService } from './StreamingService';
 export { WebSocketService } from './WebSocketService';
 
+// Registration orchestration service
+export { RegistrationOrchestrator } from './RegistrationOrchestrator';
+
+// Service Factory for centralized service creation
+export { ServiceFactory, initWaitlistService } from './ServiceFactory';
+
 // Note: Workflow execution engine has been moved to @starships/autopilot package

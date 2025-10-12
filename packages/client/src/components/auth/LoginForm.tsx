@@ -229,22 +229,32 @@ export function LoginForm() {
           )}
 
           {emailVerificationStatus && (
-            <Alert className="mb-4 border-blue-200 bg-blue-50">
-              <Icon name="mail" className="h-4 w-4" />
-              <AlertTitle>
-                {emailVerificationStatus.needsVerification ? 'Email Verification Required' : 'Check Your Email'}
-              </AlertTitle>
-              <AlertDescription className="space-y-2">
-                <p className="text-blue-800">{emailVerificationStatus.message}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleResendVerification(emailVerificationStatus.email)}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Sending...' : 'Resend Verification Email'}
-                </Button>
-              </AlertDescription>
+            <Alert className="mb-4 border-emerald-200 bg-emerald-50">
+              <Icon name="check-circle" className="h-4 w-4" />
+              <div className="space-y-3">
+                <AlertTitle className="text-emerald-900 font-medium">
+                  {emailVerificationStatus.needsVerification ? 'Email Verification Required' : 'Registration successful! We\'ve sent a verification email to:'}
+                </AlertTitle>
+                <AlertDescription>
+                  <div className="bg-white border border-emerald-200 rounded-md px-4 py-3 mb-4">
+                    <p className="font-medium text-gray-900 text-center">
+                      {emailVerificationStatus.email}
+                    </p>
+                  </div>
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResendVerification(emailVerificationStatus.email)}
+                      disabled={isLoading}
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                    >
+                      <Icon name="mail" className="h-4 w-4 mr-2" />
+                      {isLoading ? 'Sending...' : 'Resend Email'}
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </div>
             </Alert>
           )}
 

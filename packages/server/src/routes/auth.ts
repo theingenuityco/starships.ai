@@ -6,12 +6,12 @@
 
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
-import { WaitlistService } from '@/services/WaitlistService';
+import { ServiceFactory } from '@/services/ServiceFactory';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { getEnvConfig } from '@starships/env';
-import { getConnection, StarshipRepository, WaitlistRepository } from '@starships/models';
-import type { AuthRegisterResponse, AuthLoginResponse } from '@starships/protocol';
+import { StarshipRepository } from '@starships/models';
+import type { AuthLoginResponse } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -22,11 +22,6 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 const router: Router = Router();
 const env = getEnvConfig();
 
-// Initialize waitlist service
-const initWaitlistService = () => {
-  const waitlistRepo = new WaitlistRepository();
-  return new WaitlistService(waitlistRepo);
-};
 
 // Zod schemas for validation
 const RegisterSchema = z.object({
@@ -99,128 +94,16 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
 
     const { email, password, name } = bodyValidation;
 
-    // Check if user already exists
-    const existingUser = await UserService.getUserByEmail(email);
-    if (existingUser) {
-      sendError(res, 'RESOURCE_CONFLICT', 'User already exists', 409);
-      return;
-    }
+    // Use RegistrationOrchestrator for clean business logic separation
+    const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
+    const result = await registrationOrchestrator.registerUser({ email, password, name });
 
-    // Initialize waitlist service
-    const waitlistService = initWaitlistService();
-
-    // Check waitlist status
-    const waitlistStatus = await waitlistService.getDetailedStatus(email);
-
-    // If not in waitlist, add as pending
-    if (!waitlistStatus.exists) {
-      await waitlistService.addToPendingWaitlist(email);
-    }
-
-    // Create user regardless of waitlist status (stores credentials for future)
-    // User creation happens for both pending and approved users
-
-    // Create user with emailVerified: false (password will be hashed in UserService)
-    const user = await UserService.createUser({
-      email,
-      password, // Pass plain password - UserService will hash it
-      name,
-      displayName: name,
-      emailVerified: false, // Force unverified following business rules
-    });
-
-    // Send email verification for all new users
-    const userService = new UserService();
-    await userService.sendEmailVerification(user.id, email);
-
-    // Return email verification response (NO JWT token, NO starship creation)
-    const response: AuthRegisterResponse = {
-      emailVerificationSent: true,
-      message: 'Registration successful! Please check your email to verify your account.',
-    };
-
-    sendSuccess(res, response, 201);
+    sendSuccess(res, result, 201);
   } catch (error: any) {
     handleError(error, res, 'user registration');
   }
 });
 
-/* OLD CODE REMOVED - Registration now sends email verification instead of creating starships
-   The following code was removed:
-    // Check final waitlist status to determine response
-    const finalStatus = await waitlistService.getDetailedStatus(email);
-
-    // If user is pending, return waitlist message (don't provide token)
-    if (finalStatus.status === 'pending') {
-      return sendSuccess(
-        res,
-        {
-          waitlisted: true,
-          status: 'pending',
-          message: 'Thanks for signing up! Please wait for approval to access the app.',
-        },
-        200
-      );
-    }
-
-    // Only create starship and provide token for approved users
-    let defaultStarship;
-    let defaultAgent;
-
-    if (finalStatus.status === 'approved') {
-      try {
-        defaultStarship = await StarshipService.createDefaultStarship(user.id);
-
-        // Create default Daedalus agent and host tools from template
-        if (defaultStarship) {
-          try {
-            defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
-          } catch (agentError) {
-            console.error(`[AUTH] Failed to create default agent for user ${user.id}:`, agentError);
-            // Continue even if agent creation fails
-          }
-        }
-      } catch (error) {
-        console.error(`[AUTH] Failed to create default starship for user ${user.id}:`, error);
-        // Continue with registration even if starship creation fails
-      }
-    }
-
-    // Generate JWT token only for approved users
-    const token = await generateJWT({
-      id: user.id,
-      email: user.email,
-      name: user.displayName || user.email?.split('@')[0],
-    });
-
-    sendSuccess(
-      res,
-      {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.displayName || user.email?.split('@')[0],
-          avatar: user.avatar,
-        },
-        token,
-        starship: defaultStarship
-          ? {
-              id: defaultStarship.id,
-              slug: defaultStarship.slug,
-              name: defaultStarship.name,
-            }
-          : null,
-        agent: defaultAgent
-          ? {
-              id: defaultAgent.id,
-              name: defaultAgent.name,
-              description: defaultAgent.description,
-            }
-          : null,
-      },
-      201
-    );
-*/
 
 /**
  * Login user
@@ -238,7 +121,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     const user = await UserService.getUserByEmailWithPassword(email);
     if (!user || !user.password) {
       // Check waitlist status when user doesn't exist
-      const waitlistService = initWaitlistService();
+      const waitlistService = ServiceFactory.createWaitlistService();
       const waitlistStatus = await waitlistService.getDetailedStatus(email);
 
       if (!waitlistStatus.exists) {
@@ -282,7 +165,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     }
 
     // Check waitlist status for existing user
-    const waitlistService = initWaitlistService();
+    const waitlistService = ServiceFactory.createWaitlistService();
     const waitlistStatus = await waitlistService.getDetailedStatus(email);
 
     // If user exists but is still pending on waitlist, deny access
@@ -441,41 +324,13 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
 
     const { token } = queryValidation;
     const env = getEnvConfig();
-    const userService = new UserService();
 
-    // First check token status and user state without consuming
-    const { tokenInfo, userAlreadyVerified, shouldRedirectToStarship } = await userService.getVerificationTokenInfo(token);
+    // Use RegistrationOrchestrator for clean business logic separation
+    const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
+    const result = await registrationOrchestrator.completeEmailVerification(token);
 
-    // Handle different scenarios elegantly
-    if (!tokenInfo) {
-      // Token doesn't exist
-      return res.redirect(`${env.PUBLIC_URL}/login?verification=error`);
-    }
-
-    if (userAlreadyVerified) {
-      // User is already verified - redirect appropriately
-      if (shouldRedirectToStarship) {
-        // User has access, redirect to their starship
-        return res.redirect(`${env.PUBLIC_URL}/`);
-      } else {
-        // User verified but waitlisted, redirect to login with success
-        return res.redirect(`${env.PUBLIC_URL}/login?verification=success&waitlisted=true`);
-      }
-    }
-
-    if (!tokenInfo.valid) {
-      // Token is expired or consumed
-      return res.redirect(`${env.PUBLIC_URL}/login?verification=expired`);
-    }
-
-    // Token is valid and user not verified - proceed with verification
-    const result = await userService.verifyEmailAddress(token);
-
-    // Determine redirect URL based on business logic results
-    const redirectUrl = result.starshipCreated
-      ? `${env.PUBLIC_URL}/login?verification=success&starship=true`
-      : `${env.PUBLIC_URL}/login?verification=success&waitlisted=true`;
-
+    // Redirect based on orchestrator result
+    const redirectUrl = `${env.PUBLIC_URL}${result.redirectPath}`;
     return res.redirect(redirectUrl);
   } catch (error: any) {
     logger.error('[EMAIL-VERIFY] Error:', { error });
@@ -498,7 +353,7 @@ router.post('/auth/resend-verification', async (req: Request, res: Response) => 
     const { email } = bodyValidation;
 
     // Delegate to service layer for business logic
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await UserService.getUserByEmail(email);
 
     if (!user || user.emailVerified) {
@@ -614,7 +469,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       // Implement actual account linking logic
       try {
         // Get OAuth profile from provider using the authorization code
-        const userService = new UserService();
+        const userService = ServiceFactory.createUserService();
         const profile = await userService.getOAuthProfile(provider, code);
         
         // Link the OAuth account to the existing authenticated user
@@ -647,7 +502,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
 
     // ADD THIS SECURITY FIX:
     // Re-check waitlist status immediately before token generation
-    const waitlistService = initWaitlistService();
+    const waitlistService = ServiceFactory.createWaitlistService();
     const currentStatus = await waitlistService.getDetailedStatus(result.user.email!);
 
     if (currentStatus.status === 'pending') {
@@ -681,7 +536,7 @@ router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: 
     const userId = (req as any).user!.id;
 
     // Delegate to service layer (Layer 4)
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const accounts = await userService.getUserOAuthAccounts(userId);
 
     sendSuccess(res, {
@@ -711,7 +566,7 @@ router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Req
     const { provider } = paramValidation;
 
     // Delegate to service layer (Layer 4) - includes business rule validation
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     await userService.unlinkOAuthAccount(userId, provider);
 
     sendSuccess(res, { message: `${provider} account unlinked successfully` });
@@ -734,7 +589,7 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await userService.setPasswordForOAuthUser(userId, validation);
 
     sendSuccess(res, { user, message: 'Password set successfully' });
@@ -753,7 +608,7 @@ router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Respons
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await userService.getUserById(userId);
 
     if (!user) return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
@@ -798,7 +653,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     }
     
     // Re-check waitlist status for security (prevent timing attacks)
-    const waitlistService = initWaitlistService();
+    const waitlistService = ServiceFactory.createWaitlistService();
     const currentStatus = await waitlistService.getDetailedStatus(user.email!);
     
     if (currentStatus.status === 'pending') {
@@ -860,7 +715,7 @@ router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: R
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await userService.initializeUserAuthMethods(userId);
 
     sendSuccess(res, { 

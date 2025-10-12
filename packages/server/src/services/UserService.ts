@@ -6,10 +6,8 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository, WaitlistRepository } from '@starships/models';
+import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository } from '@starships/models';
 import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest, AuthMethod } from '@starships/protocol';
-import { WaitlistService } from '@/services/WaitlistService';
-import { EmailService } from '@/services/EmailService';
 import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
@@ -67,12 +65,18 @@ export class UserService {
       }
     }
 
+    // SECURITY: Hash password if provided to prevent plain text storage
+    let hashedPassword = request.password;
+    if (request.password) {
+      hashedPassword = await bcrypt.hash(request.password, 10);
+    }
+
     // Transform CreateUserRequest to UserModel format with required fields
     const userData: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'> = {
       email: request.email,
       displayName: request.displayName,
       avatar: request.avatar,
-      password: request.password,
+      password: hashedPassword,
       emailVerified: request.emailVerified || false,
       stripeCustomerId: request.stripeCustomerId,
       hasPassword: !!request.password,
@@ -284,9 +288,9 @@ export class UserService {
     // Get OAuth profile from provider
     const profile = await this.getOAuthProfile(provider, authCode);
 
-    // Check waitlist status using existing service
-    const waitlistRepository = new WaitlistRepository();
-    const waitlistService = new WaitlistService(waitlistRepository);
+    // Check waitlist status using ServiceFactory
+    const { ServiceFactory } = await import('./ServiceFactory');
+    const waitlistService = ServiceFactory.createWaitlistService();
     const waitlistStatus = await waitlistService.getDetailedStatus(profile.email);
 
     // Handle waitlist logic (EXISTING PATTERN)
@@ -813,8 +817,9 @@ export class UserService {
     const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
     const token = await emailVerificationTokenRepo.generateToken(userId, email);
 
-    // Send email using email service - follows current service patterns
-    const emailService = new EmailService();
+    // Send email using email service - use ServiceFactory for consistent instantiation
+    const { ServiceFactory } = await import('./ServiceFactory');
+    const emailService = ServiceFactory.createEmailService();
     await emailService.sendVerificationEmail(email, token);
     
     logger.info('[UserService] Email verification sent', { userId, email });
@@ -844,7 +849,8 @@ export class UserService {
     let shouldRedirectToStarship = false;
     if (userAlreadyVerified) {
       // Check if user has starship access (waitlist approved)
-      const waitlistService = new WaitlistService(new WaitlistRepository());
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const waitlistService = ServiceFactory.createWaitlistService();
       const waitlistStatus = await waitlistService.getDetailedStatus(tokenInfo.email);
       shouldRedirectToStarship = waitlistStatus.status === 'approved';
     }
@@ -854,12 +860,11 @@ export class UserService {
 
   /**
    * Verify email address (business logic layer)
-   * Handles multi-step verification and starship creation
+   * Validates token and marks user email as verified
    */
   async verifyEmailAddress(token: string): Promise<{
     userId: string;
     email: string;
-    starshipCreated: boolean;
   }> {
     // Validate and consume token
     const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
@@ -869,37 +874,17 @@ export class UserService {
       throw new ValidationError('Invalid or expired verification token', 'token');
     }
 
-    // Mark user as verified
+    // Mark user as verified - this is the single responsibility of this method
     await this.updateUserProfile(verification.userId, { emailVerified: true });
-
-    // Business logic: Check waitlist and create starship if approved
-    const waitlistService = new WaitlistService(new WaitlistRepository());
-    const waitlistStatus = await waitlistService.getDetailedStatus(verification.email);
-
-    let starshipCreated = false;
-    if (waitlistStatus.status === 'approved') {
-      try {
-        const defaultStarship = await StarshipService.createDefaultStarship(verification.userId);
-        if (defaultStarship) {
-          await StarshipService.createDefaultAgent(verification.userId, defaultStarship.id);
-          starshipCreated = true;
-        }
-      } catch (error) {
-        logger.error('[UserService] Failed to create starship during email verification:', { error });
-        // Continue - user can create starship later
-      }
-    }
 
     logger.info('[UserService] Email verified successfully', { 
       userId: verification.userId,
-      email: verification.email,
-      starshipCreated 
+      email: verification.email
     });
 
     return {
       userId: verification.userId,
-      email: verification.email,
-      starshipCreated,
+      email: verification.email
     };
   }
 }

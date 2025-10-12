@@ -1,12 +1,23 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import type { LedgerEntryModel } from '@starships/protocol'
 import { useLedger } from '@/hooks/useLedger'
 import { Button } from '@/components/ui/button'
 
 export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
-  const { data, isLoading, error } = useLedger(walletId, { page: 1, limit: 20 })
+  const [page, setPage] = useState(1)
+  const [limit] = useState(10)
+  const { data, isLoading, error } = useLedger(walletId, { page, limit, order: 'DESC' })
+
+  const rows = data?.records ?? []
+  const pagination = data?.pagination
+  const pageInfo = useMemo(() => {
+    const total = pagination?.total ?? 0
+    const start = rows.length ? (page - 1) * limit + 1 : 0
+    const end = rows.length ? (page - 1) * limit + rows.length : 0
+    return { total, start, end }
+  }, [pagination, rows.length, page, limit])
 
   if (isLoading) {
     return (
@@ -50,38 +61,82 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
     )
   }
 
-  const rows = data?.records ?? []
-
   return (
     <div className="ip-card-shadow rounded-2xl p-4">
-      <h4 className="font-medium">Transaction history</h4>
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold text-slate-900 dark:text-slate-100">Transaction history</h4>
+        {pagination && (
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Showing {pageInfo.start}-{pageInfo.end} of {pageInfo.total}
+          </div>
+        )}
+      </div>
       <table className="w-full mt-4 text-sm">
         <thead>
           <tr className="text-left text-slate-500 dark:text-slate-400">
             <th className="py-2 pr-3">Date</th>
             <th className="py-2 pr-3">Type</th>
+            <th className="py-2 pr-3">Details</th>
             <th className="py-2 pr-3">Amount</th>
             <th className="py-2 pr-3">Balance After</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r: LedgerEntryModel) => (
-            <tr key={r.id} className="border-t border-slate-200/60 dark:border-slate-800/60">
-              <td className="py-2 pr-3">{new Date(r.createdAt).toLocaleString()}</td>
-              <td className="py-2 pr-3">{r.type}</td>
-              <td className="py-2 pr-3">{r.amount}</td>
-              <td className="py-2 pr-3">{r.balanceAfter}</td>
-            </tr>
-          ))}
+          {rows.map((r: LedgerEntryModel) => {
+            const meta = (r.meta as any) || {}
+            let details: string = ''
+            if (r.type === 'TOPUP') {
+              details = meta.stripePaymentIntent ? `Stripe PI ${String(meta.stripePaymentIntent).slice(-8)}` : meta.topupId ? `Topup ${meta.topupId}` : 'Wallet top-up'
+            } else if (r.type === 'REFUND') {
+              details = meta.stripeChargeId ? `Refund for charge ${String(meta.stripeChargeId).slice(-8)}` : 'Refund issued'
+            } else if (r.type === 'ADJUSTMENT') {
+              details = meta.promoCode ? `Promo ${meta.promoCode}` : 'Adjustment'
+            }
+            return (
+              <tr key={r.id} className="border-t border-slate-200/60 dark:border-slate-800/60">
+                <td className="py-2 pr-3 whitespace-nowrap">{new Date(r.createdAt).toLocaleString()}</td>
+                <td className="py-2 pr-3">
+                  <span
+                    className={
+                      'px-2 py-0.5 rounded-full text-[11px] font-medium ' +
+                      (r.type === 'TOPUP'
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
+                        : r.type === 'REFUND'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                        : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200')
+                    }
+                  >
+                    {r.type}
+                  </span>
+                </td>
+                <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{details}</td>
+                <td className="py-2 pr-3">${Number(r.amount).toFixed(2)}</td>
+                <td className="py-2 pr-3">${Number(r.balanceAfter).toFixed(2)}</td>
+              </tr>
+            )
+          })}
           {rows.length === 0 && (
             <tr>
-              <td className="py-4 pr-3 text-slate-500 dark:text-slate-400" colSpan={4}>
+              <td className="py-4 pr-3 text-slate-500 dark:text-slate-400" colSpan={5}>
                 No transactions yet
               </td>
             </tr>
           )}
         </tbody>
       </table>
+      {pagination && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-xs text-slate-500 dark:text-slate-400">Page {page} of {Math.max(1, Math.ceil((pagination.total ?? 0) / limit))}</div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" disabled={!pagination.has_next} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

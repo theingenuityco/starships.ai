@@ -73,9 +73,17 @@ export class LedgerRepository extends BaseRepository {
   /**
    * Count ledger entries for a wallet (for offset-based pagination metadata)
    */
-  async countByWallet(walletId: string): Promise<number> {
+  async countByWallet(walletId: string, types?: Array<'TOPUP' | 'USAGE' | 'REFUND' | 'ADJUSTMENT'>): Promise<number> {
     if (!walletId?.trim()) throw new Error('walletId is required');
     const conn = this.getConnection();
+
+    if (types && types.length > 0) {
+      const inClause = types.map((_, i) => `$${i + 2}`).join(',');
+      const sql = `SELECT COUNT(*) as count FROM ledger_entries WHERE wallet_id = $1 AND type IN (${inClause})`;
+      const result = await conn.queryOne<{ count: string }>(sql, [walletId, ...types]);
+      return result ? parseInt(result.count, 10) : 0;
+    }
+
     const result = await conn.queryOne<{ count: string }>(`SELECT COUNT(*) as count FROM ledger_entries WHERE wallet_id = $1`, [walletId]);
     return result ? parseInt(result.count, 10) : 0;
   }
@@ -83,22 +91,37 @@ export class LedgerRepository extends BaseRepository {
   /**
    * Offset-based pagination for a wallet ledger, ordered by created_at,id
    */
-  async listByWalletPage(walletId: string, limit: number, offset: number, order: 'ASC' | 'DESC'): Promise<LedgerEntryModel[]> {
+  async listByWalletPage(
+    walletId: string,
+    limit: number,
+    offset: number,
+    order: 'ASC' | 'DESC',
+    types?: Array<'TOPUP' | 'USAGE' | 'REFUND' | 'ADJUSTMENT'>
+  ): Promise<LedgerEntryModel[]> {
     if (!walletId?.trim()) throw new Error('walletId is required');
     const conn = this.getConnection();
 
     // Order is constrained by type to prevent SQL injection
     const orderSql = order === 'ASC' ? 'ASC' : 'DESC';
 
+    const params: unknown[] = [walletId];
+    let where = 'wallet_id = $1';
+    if (types && types.length > 0) {
+      const placeholders = types.map((_, i) => `$${i + 2}`).join(',');
+      where += ` AND type IN (${placeholders})`;
+      params.push(...types);
+    }
+    params.push(limit, offset);
+
     const rows = await conn.query(
       `
       SELECT *
       FROM ledger_entries
-      WHERE wallet_id = $1
+      WHERE ${where}
       ORDER BY created_at ${orderSql}, id ${orderSql}
-      LIMIT $2 OFFSET $3
+      LIMIT $${params.length - 1} OFFSET $${params.length}
       `,
-      [walletId, limit, offset]
+      params
     );
 
     return rows.map((r) => fromDatabase(LedgerEntryEntity, r));

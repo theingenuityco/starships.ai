@@ -29,7 +29,7 @@ export function EnvironmentVariableDeleteModal({ isOpen, onClose, onConfirm, env
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <Icon name="alert-triangle" className="h-5 w-5 text-destructive" />
             Delete Environment Variable
           </DialogTitle>
           <DialogDescription className="text-left">This action cannot be undone. The environment variable will be permanently deleted and removed from all agents using it.</DialogDescription>
@@ -38,7 +38,7 @@ export function EnvironmentVariableDeleteModal({ isOpen, onClose, onConfirm, env
         <div className="py-4">
           <div className="p-4 bg-muted/50 rounded-lg border border-muted">
             <div className="flex items-center gap-2 mb-2">
-              <Key className="h-4 w-4 text-muted-foreground" />
+              <Icon name="key" className="h-4 w-4 text-muted-foreground" />
               <span className="font-mono font-medium text-sm">{environmentVariable.key}</span>
             </div>
             {environmentVariable.description && <p className="text-sm text-muted-foreground">{environmentVariable.description}</p>}
@@ -46,7 +46,7 @@ export function EnvironmentVariableDeleteModal({ isOpen, onClose, onConfirm, env
 
           <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+              <Icon name="alert-triangle" className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-destructive mb-1">Warning</p>
                 <p className="text-destructive/80">Any agents or workflows currently using this environment variable may stop functioning correctly after deletion.</p>
@@ -60,7 +60,7 @@ export function EnvironmentVariableDeleteModal({ isOpen, onClose, onConfirm, env
             Cancel
           </Button>
           <Button type="button" variant="destructive" onClick={handleConfirm} disabled={loading} className="flex items-center gap-2">
-            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Trash2 className="h-4 w-4" />}
+            {loading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Icon name="trash" className="h-4 w-4" />}
             {loading ? 'Deleting...' : 'Delete Variable'}
           </Button>
         </DialogFooter>

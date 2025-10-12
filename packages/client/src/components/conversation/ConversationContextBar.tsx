@@ -47,7 +47,7 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Cost pill */}
             <div className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-[11px] border border-border/50">
-              <Coins className="w-3 h-3 text-amber-500" />
+              <Icon name="coins" className="w-3 h-3 text-amber-500" />
               <span className="text-muted-foreground">Cost</span>
               <span className="font-medium text-foreground">{formatUSD2(cost)}</span>
             </div>
@@ -65,11 +65,11 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
             </div>
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-1">
-                <ArrowDown className="w-3 h-3 text-sky-500" aria-label="In" />
+                <Icon name="arrow-down" className="w-3 h-3 text-sky-500" aria-label="In" />
                 <span className="text-foreground font-medium">{formatCompactTokens(prompt)}</span>
               </div>
               <div className="flex items-center gap-1">
-                <ArrowUp className="w-3 h-3 text-violet-500" aria-label="Out" />
+                <Icon name="arrow-up" className="w-3 h-3 text-violet-500" aria-label="Out" />
                 <span className="text-foreground font-medium">{formatCompactTokens(completion)}</span>
               </div>
             </div>

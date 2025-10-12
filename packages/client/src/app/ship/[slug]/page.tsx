@@ -66,7 +66,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
           <div className="w-full max-w-6xl mx-auto space-y-8">
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Rocket className="h-6 w-6 text-primary" />
+                <Icon name="rocket" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">{starship?.name || 'Starship'}</h1>
               </div>
               <div className="flex items-center justify-center gap-2">
@@ -86,7 +86,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col gap-2">
                       <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <CreditCard className="h-4 w-4" />
+                        <Icon name="credit-card" className="h-4 w-4" />
                         Wallet
                       </CardTitle>
                       {walletLoading || !starshipId ? (
@@ -118,7 +118,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 id="deployed-agents" className="text-lg font-semibold flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
+                    <Icon name="sparkles" className="h-5 w-5 text-primary" />
                     Deployed Agents
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1">Active agents available in this starship</p>
@@ -126,7 +126,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/ship/${slug}/conversations`}>
                     View All
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                    <Icon name="chevron-right" className="h-4 w-4 ml-1" />
                   </Link>
                 </Button>
               </div>
@@ -177,7 +177,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                           <CardHeader className="pb-3 relative z-10">
                             <div className="flex items-center gap-2 mb-1">
-                              <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                              <Icon name="bot" className="h-4 w-4 text-primary flex-shrink-0" />
                               <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
                             </div>
                             <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
@@ -196,7 +196,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                                   router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
                                 }}
                               >
-                                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                                <Icon name="message-square" className="h-3.5 w-3.5 mr-1" />
                                 Chat
                               </Button>
                             </div>
@@ -222,7 +222,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                       <CardHeader className="pb-3 relative z-10">
                         <div className="flex items-center gap-2 mb-1">
-                          <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                          <Icon name="bot" className="h-4 w-4 text-primary flex-shrink-0" />
                           <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
                         </div>
                         <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
@@ -241,7 +241,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                               router.push(`/ship/${slug}/conversations?agent=${agent.id}`)
                             }}
                           >
-                            <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                            <Icon name="message-square" className="h-3.5 w-3.5 mr-1" />
                             Chat
                           </Button>
                         </div>
@@ -256,7 +256,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               <Card className="shadow-sm border-destructive/50 bg-background/80">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-sm font-medium text-destructive">
-                    <Info className="h-4 w-4" />
+                    <Icon name="info" className="h-4 w-4" />
                     Starship not found
                   </CardTitle>
                 </CardHeader>
@@ -274,7 +274,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-primary" />
+              <Icon name="bot" className="h-5 w-5 text-primary" />
               {selectedAgent?.name}
             </DialogTitle>
             <DialogDescription>{selectedAgent?.description || 'No description provided'}</DialogDescription>
@@ -364,7 +364,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                     router.push(`/ship/${slug}/conversations?agent=${selectedAgent.id}`)
                   }}
                 >
-                  <MessageSquare className="h-4 w-4 mr-2" />
+                  <Icon name="message-square" className="h-4 w-4 mr-2" />
                   Start Conversation
                 </Button>
                 <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>

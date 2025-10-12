@@ -240,7 +240,7 @@ export function LoginForm() {
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -256,7 +256,7 @@ export function LoginForm() {
                     <>Signing in...</>
                   ) : (
                     <>
-                      <LogIn className="h-4 w-4 mr-2" />
+                      <Icon name="log-in" className="h-4 w-4 mr-2" />
                       Sign In
                     </>
                   )}
@@ -320,7 +320,7 @@ export function LoginForm() {
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -345,7 +345,7 @@ export function LoginForm() {
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       disabled={isLoading}
                     >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -361,7 +361,7 @@ export function LoginForm() {
                     <>Creating account...</>
                   ) : (
                     <>
-                      <UserPlus className="h-4 w-4 mr-2" />
+                      <Icon name="user-plus" className="h-4 w-4 mr-2" />
                       Create Account
                     </>
                   )}

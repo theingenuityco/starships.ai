@@ -85,9 +85,9 @@ function useUnlinkOAuthAccount() {
 
 const ProviderIcon = ({ provider }: { provider: 'google' | 'github' }) => {
   if (provider === 'google') {
-    return <Chrome className="h-4 w-4 text-blue-600" />
+    return <Icon name="chrome" className="h-4 w-4 text-blue-600" />
   }
-  return <Github className="h-4 w-4 text-gray-900 dark:text-gray-100" />
+  return <Icon name="github" className="h-4 w-4 text-gray-900 dark:text-gray-100" />
 }
 
 const ProviderName = ({ provider }: { provider: 'google' | 'github' }) => {
@@ -193,7 +193,7 @@ export function OAuthAccountsSettings() {
     <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Shield className="h-4 w-4 text-primary" />
+          <Icon name="shield" className="h-4 w-4 text-primary" />
           Connected Accounts
         </CardTitle>
         <CardDescription>
@@ -224,7 +224,7 @@ export function OAuthAccountsSettings() {
                     </p>
                     {isLinked && (
                       <Badge variant="secondary" className="text-xs">
-                        <CheckCircle className="h-3 w-3 mr-1" />
+                        <Icon name="check-circle" className="h-3 w-3 mr-1" />
                         Connected
                       </Badge>
                     )}
@@ -251,7 +251,7 @@ export function OAuthAccountsSettings() {
                     disabled={unlinkMutation.isPending}
                     className="text-destructive hover:text-destructive"
                   >
-                    <Unlink className="h-3 w-3 mr-1" />
+                    <Icon name="unlink" className="h-3 w-3 mr-1" />
                     Unlink
                   </Button>
                 ) : (
@@ -260,7 +260,7 @@ export function OAuthAccountsSettings() {
                     size="sm"
                     onClick={() => handleLinkAccount(provider)}
                   >
-                    <ExternalLink className="h-3 w-3 mr-1" />
+                    <Icon name="external-link" className="h-3 w-3 mr-1" />
                     Connect
                   </Button>
                 )}
@@ -271,7 +271,7 @@ export function OAuthAccountsSettings() {
         
         {accounts.length > 0 && (
           <Alert>
-            <Shield className="h-4 w-4" />
+            <Icon name="shield" className="h-4 w-4" />
             <AlertDescription>
               You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.
             </AlertDescription>

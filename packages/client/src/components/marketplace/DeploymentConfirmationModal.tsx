@@ -21,7 +21,7 @@ interface DeploymentConfirmationModalProps {
 export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName }: DeploymentConfirmationModalProps) {
   const isAgent = type === 'agent'
   const actionText = isAgent ? 'deploy' : 'install'
-  const ActionIcon = isAgent ? Bot : Wrench
+  const ActionIconName = isAgent ? 'bot' : 'wrench'
 
   const handleConfirm = async () => {
     await onConfirm()
@@ -33,7 +33,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ActionIcon className="w-5 h-5 text-primary" />
+            <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
             Confirm {isAgent ? 'Deployment' : 'Installation'}
           </DialogTitle>
           <DialogDescription>
@@ -69,7 +69,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
           {/* Additional Info */}
           {!isAgent && (template as ToolTemplateModel).requiresApiKey && (
             <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+              <Icon name="alert-triangle" className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
               <span className="text-sm text-yellow-800 dark:text-yellow-200">This tool requires an API key to function properly.</span>
             </div>
           )}
@@ -96,7 +96,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Icon name="sparkles" className="w-4 h-4 mr-2" />
                 {isAgent ? 'Deploy' : 'Install'}
               </>
             )}

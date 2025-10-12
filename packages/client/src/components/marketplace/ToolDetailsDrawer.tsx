@@ -69,15 +69,15 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'integration':
-        return <Package className="w-5 h-5" />
+        return <Icon name="package" className="w-5 h-5" />
       case 'automation':
-        return <Bot className="w-5 h-5" />
+        return <Icon name="bot" className="w-5 h-5" />
       case 'data':
-        return <BarChart2 className="w-5 h-5" />
+        return <Icon name="bar-chart" className="w-5 h-5" />
       case 'communication':
         return <Icon name="user"s className="w-5 h-5"  />
       default:
-        return <Wrench className="w-5 h-5" />
+        return <Icon name="wrench" className="w-5 h-5" />
     }
   }
 
@@ -126,7 +126,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                 {/* Main Header with Icon and Title */}
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0 p-4 rounded-xl bg-primary/20 group-hover:bg-primary/30 transition-colors">
-                    <Wrench className="w-8 h-8 text-primary" />
+                    <Icon name="wrench" className="w-8 h-8 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <SheetTitle className="text-2xl font-bold text-left mb-2">{template.name}</SheetTitle>
@@ -137,7 +137,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                       </Badge>
                       {template.requiresApiKey && (
                         <div className="flex items-center gap-2 bg-yellow-500/10 px-3 py-1 rounded-lg border border-yellow-500/30">
-                          <Key className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                          <Icon name="key" className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                           <span className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">API Key Required</span>
                         </div>
                       )}
@@ -153,13 +153,13 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
               <div className="space-y-6">
                 <Card className="p-4 frosted-glass-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <BarChart2 className="w-5 h-5 text-primary" />
+                    <Icon name="bar-chart" className="w-5 h-5 text-primary" />
                     Usage Statistics
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-primary/10">
-                        <Download className="w-4 h-4 text-primary" />
+                        <Icon name="download" className="w-4 h-4 text-primary" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Installations</p>
@@ -168,7 +168,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-green-500/10">
-                        <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <Icon name="star" className="w-4 h-4 text-green-600 dark:text-green-400" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Rating</p>
@@ -182,7 +182,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                 {template.exampleUsage && (
                   <Card className="p-4 frosted-glass-card">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Code className="w-5 h-5 text-primary" />
+                      <Icon name="code" className="w-5 h-5 text-primary" />
                       Example Usage
                     </h3>
                     <div className="space-y-3">
@@ -191,7 +191,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                           <pre className="whitespace-pre-wrap text-foreground/90">{template.exampleUsage}</pre>
                         </div>
                         <Button size="sm" variant="ghost" className="absolute top-2 right-2 h-8 w-8 p-0" onClick={() => navigator.clipboard?.writeText(template.exampleUsage || '')}>
-                          <Copy className="w-3 h-3" />
+                          <Icon name="copy" className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
@@ -202,7 +202,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                 {template.configurationFields && template.configurationFields.length > 0 && (
                   <Card className="p-4 frosted-glass-card">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Settings className="w-5 h-5 text-primary" />
+                      <Icon name="settings" className="w-5 h-5 text-primary" />
                       Configuration Fields
                     </h3>
                     <div className="space-y-3">
@@ -238,7 +238,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                 {template.blueprint && template.blueprint.nodes && template.blueprint.nodes.length > 0 && (
                   <Card className="p-4 frosted-glass-card">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <GitBranch className="w-5 h-5 text-primary" />
+                      <Icon name="git-branch" className="w-5 h-5 text-primary" />
                       Blueprint Workflow
                     </h3>
                     <BlueprintVisualization blueprint={template.blueprint} className="h-[500px]" />
@@ -248,7 +248,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                 {/* Installation Section */}
                 <Card className="p-4 frosted-glass-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
+                    <Icon name="sparkles" className="w-5 h-5 text-primary" />
                     Installation
                   </h3>
 
@@ -267,7 +267,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                       {template.requiresApiKey && (
                         <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                           <div className="flex items-start gap-2">
-                            <Key className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                            <Icon name="key" className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                             <div className="text-sm">
                               <p className="text-yellow-700 dark:text-yellow-300 font-medium">API Key Required</p>
                               <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">You&apos;ll need to configure API credentials after installation.</p>
@@ -278,12 +278,12 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
 
                       {isAlreadyInstalled ? (
                         <Button size="lg" variant="outline" className="w-full" disabled>
-                          <CheckCircle className="w-4 h-4 mr-2" />
+                          <Icon name="check-circle" className="w-4 h-4 mr-2" />
                           Already Installed
                         </Button>
                       ) : (
                         <Button size="lg" className="w-full transition-colors" onClick={handleInstallClick} disabled={isInstalling}>
-                          <Sparkles className="w-4 h-4 mr-2" />
+                          <Icon name="sparkles" className="w-4 h-4 mr-2" />
                           {isInstalling ? 'Installing...' : 'Install Tool'}
                         </Button>
                       )}
@@ -299,7 +299,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                 {/* Metadata */}
                 <Card className="p-4 frosted-glass-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-primary" />
+                    <Icon name="calendar" className="w-5 h-5 text-primary" />
                     Details
                   </h3>
                   <div className="space-y-3 text-sm">

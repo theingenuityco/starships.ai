@@ -369,7 +369,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-                  <Bot className="w-4 h-4 text-muted-foreground" />
+                  <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
@@ -417,7 +417,7 @@ const MemoizedMessageBubble = memo(
               )}
             </div>
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <User className="w-4 h-4 text-primary" />
+              <Icon name="user" className="w-4 h-4 text-primary" />
             </div>
           </div>
         </div>
@@ -428,7 +428,7 @@ const MemoizedMessageBubble = memo(
         <div className="flex justify-start">
           <div className="flex items-start gap-3 max-w-[85%]">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-              <Bot className="w-4 h-4 text-muted-foreground" />
+              <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
               <ConversationMessageContent

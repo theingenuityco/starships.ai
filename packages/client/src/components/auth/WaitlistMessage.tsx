@@ -21,12 +21,12 @@ export function WaitlistMessage({ message, onClose }: WaitlistMessageProps) {
             animate={{ rotate: 10 }}
             transition={{ repeat: Infinity, repeatType: 'reverse', duration: 2 }}
           >
-            <Clock className="h-6 w-6 text-primary" />
+            <Icon name="clock" className="h-6 w-6 text-primary" />
           </motion.div>
 
           <div className="flex-1">
             <h3 className="font-semibold mb-2 flex items-center">
-              <Rocket className="h-5 w-5 mr-2" />
+              <Icon name="rocket" className="h-5 w-5 mr-2" />
               You&apos;re on the waitlist!
             </h3>
             <p className="text-muted-foreground">{message}</p>

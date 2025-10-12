@@ -287,7 +287,7 @@ export default function HomePage() {
               >
                 <div className="flex flex-col items-center space-y-4 max-w-md text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-full border border-white/30 backdrop-blur-sm flex items-center justify-center animate-pulse-glow will-change-transform">
-                    <User className="w-8 h-8 text-white/80" />
+                    <Icon name="user" className="w-8 h-8 text-white/80" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold mb-2">You</h3>
@@ -646,7 +646,7 @@ export default function HomePage() {
                     className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
                   >
                     <span className="relative z-10">
-                      <Rocket className="w-5 h-5 mr-2 inline" />
+                      <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
                       Enter Command Deck
                     </span>
                     <motion.div
@@ -665,7 +665,7 @@ export default function HomePage() {
                     className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
                   >
                     <span className="relative z-10">
-                      <Rocket className="w-5 h-5 mr-2 inline" />
+                      <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
                       Begin Your Journey
                     </span>
                     <motion.div

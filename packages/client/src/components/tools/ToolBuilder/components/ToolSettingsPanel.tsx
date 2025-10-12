@@ -24,7 +24,7 @@ export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, 
         <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Settings2 className="w-3.5 h-3.5 text-primary" />
+              <Icon name="settings" className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-semibold">Tool Settings</span>
             </div>
           </div>

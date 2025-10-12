@@ -142,25 +142,25 @@ export function ConnectionStatus({ status, message, className, showLabel = true 
       color: 'text-blue-600',
     },
     connected: {
-      icon: <CheckCircle className="h-4 w-4 text-green-500" />,
+      icon: <Icon name="check-circle" className="h-4 w-4 text-green-500" />,
       label: 'Connected',
       badgeVariant: 'default' as const,
       color: 'text-green-600',
     },
     disconnected: {
-      icon: <Key className="h-4 w-4 text-gray-400" />,
+      icon: <Icon name="key" className="h-4 w-4 text-gray-400" />,
       label: 'Disconnected',
       badgeVariant: 'outline' as const,
       color: 'text-gray-500',
     },
     error: {
-      icon: <AlertCircle className="h-4 w-4 text-red-500" />,
+      icon: <Icon name="alert-circle" className="h-4 w-4 text-red-500" />,
       label: 'Error',
       badgeVariant: 'destructive' as const,
       color: 'text-red-600',
     },
     validating: {
-      icon: <Key className="h-4 w-4 animate-pulse text-amber-500" />,
+      icon: <Icon name="key" className="h-4 w-4 animate-pulse text-amber-500" />,
       label: 'Validating...',
       badgeVariant: 'secondary' as const,
       color: 'text-amber-600',
@@ -222,8 +222,8 @@ export function MultiStepLoading({ steps, currentStep, className }: MultiStepLoa
           >
             <div className="flex-shrink-0">
               {isLoading && <LoadingIcon className="h-4 w-4 text-primary" />}
-              {isCompleted && <CheckCircle className="h-4 w-4 text-green-500" />}
-              {isError && <AlertCircle className="h-4 w-4 text-red-500" />}
+              {isCompleted && <Icon name="check-circle" className="h-4 w-4 text-green-500" />}
+              {isError && <Icon name="alert-circle" className="h-4 w-4 text-red-500" />}
               {step.status === 'pending' && <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
             </div>
 

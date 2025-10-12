@@ -21,12 +21,12 @@ interface AgentTemplateSelectorProps {
 }
 
 const categoryIcons = {
-  general: Sparkles,
-  coding: Code,
-  creative: Palette,
-  analysis: BarChart3,
-  support: Headphones,
-}
+  general: 'sparkles',
+  coding: 'code',
+  creative: 'palette',
+  analysis: 'bar-chart3',
+  support: 'headphones',
+} as const
 
 const categoryColors = {
   general: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -92,7 +92,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
   }
 
   const renderTemplateCard = (template: AgentTemplate) => {
-    const CategoryIcon = categoryIcons[template.category as keyof typeof categoryIcons]
+    const iconName = categoryIcons[template.category as keyof typeof categoryIcons]
 
     return (
       <Card key={template.id} className="cursor-pointer hover:shadow-md transition-all border-border/50 hover:border-primary/30 overflow-hidden">
@@ -115,7 +115,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
                 <CardTitle className="text-lg">{template.name}</CardTitle>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className={`text-xs ${categoryColors[template.category as keyof typeof categoryColors]}`}>
-                    <CategoryIcon className="w-3 h-3 mr-1" />
+                    <Icon name={iconName} className="w-3 h-3 mr-1" />
                     {template.category.charAt(0).toUpperCase() + template.category.slice(1)}
                   </Badge>
                 </div>
@@ -164,7 +164,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
         <DialogTrigger asChild>
           {trigger || (
             <Button variant="outline">
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Icon name="sparkles" className="w-4 h-4 mr-2" />
               Browse Templates
             </Button>
           )}
@@ -172,7 +172,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col p-6 gap-6">
           <DialogHeader className="pb-2 border-b">
             <DialogTitle className="text-2xl flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <Icon name="sparkles" className="h-5 w-5 text-primary" />
               Agent Templates
             </DialogTitle>
             <DialogDescription className="text-base mt-1">Choose from pre-built agent templates to quickly create specialized agents.</DialogDescription>
@@ -180,7 +180,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
 
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Icon name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input placeholder="Search templates..." value={searchQuery} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)} className="pl-10 h-10" />
             </div>
             <div className="w-full sm:w-56">
@@ -188,7 +188,7 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-10 px-3">
                     <span className="truncate mr-1">{selectedCategory === 'all' ? 'All Categories' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}</span>
-                    <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
+                    <Icon name="chevron-down" className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">

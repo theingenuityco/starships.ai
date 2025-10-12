@@ -66,15 +66,15 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
     const category = inferCategoryFromName(agentName)
     switch (category) {
       case 'coding':
-        return <Code className="w-3.5 h-3.5 mr-1" />
+        return <Icon name="code" className="w-3.5 h-3.5 mr-1" />
       case 'creative':
-        return <Lightbulb className="w-3.5 h-3.5 mr-1" />
+        return <Icon name="lightbulb" className="w-3.5 h-3.5 mr-1" />
       case 'analysis':
-        return <BarChart2 className="w-3.5 h-3.5 mr-1" />
+        return <Icon name="bar-chart3" className="w-3.5 h-3.5 mr-1" />
       case 'support':
-        return <HeartPulse className="w-3.5 h-3.5 mr-1" />
+        return <Icon name="heart-pulse" className="w-3.5 h-3.5 mr-1" />
       default:
-        return <Bot className="w-3.5 h-3.5 mr-1" />
+        return <Icon name="bot" className="w-3.5 h-3.5 mr-1" />
     }
   }
 
@@ -144,7 +144,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
 
                 {(agent as any).rating && (
                   <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
-                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+                    <Icon name="star" className="w-3.5 h-3.5 text-yellow-500 fill-current" />
                     <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{((agent as any).rating as number).toFixed(1)}</span>
                   </div>
                 )}
@@ -156,7 +156,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                   {inferCategoryFromName(agent.name).charAt(0).toUpperCase() + inferCategoryFromName(agent.name).slice(1)}
                 </Badge>
                 <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
-                  <Brain className="w-3 h-3 text-muted-foreground" />
+                  <Icon name="brain" className="w-3 h-3 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground font-mono">{agent.model}</span>
                 </div>
               </div>
@@ -168,7 +168,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                 <div className="flex flex-wrap gap-1.5">
                   {((agent as any).tags as string[]).slice(0, 3).map((tag: string) => (
                     <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors">
-                      <Sparkles className="w-2.5 h-2.5 mr-1" />
+                      <Icon name="sparkles" className="w-2.5 h-2.5 mr-1" />
                       {tag.charAt(0).toUpperCase() + tag.slice(1)}
                     </Badge>
                   ))}
@@ -193,7 +193,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                       className="h-8 w-8 p-0 rounded-full bg-background/90 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/30 hover:border-primary/50 transition-all duration-200"
                       title="Agent Actions"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <Icon name="dots-vertical" className="w-4 h-4" />
                       <span className="sr-only">Open agent actions menu</span>
                     </Button>
                   </DropdownMenuTrigger>
@@ -206,7 +206,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                         }}
                         className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
                       >
-                        <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                        <Icon name="bar-chart3" className="w-4 h-4 text-muted-foreground" />
                         <span>View Analytics</span>
                       </DropdownMenuItem>
                     )}
@@ -219,7 +219,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                         }}
                         className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
                       >
-                        <TestTube className="w-4 h-4 text-muted-foreground" />
+                        <Icon name="test-tube" className="w-4 h-4 text-muted-foreground" />
                         <span>Test Agent</span>
                       </DropdownMenuItem>
                     )}
@@ -232,7 +232,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                         }}
                         className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
                       >
-                        <Edit className="w-4 h-4 text-muted-foreground" />
+                        <Icon name="edit" className="w-4 h-4 text-muted-foreground" />
                         <span>Edit Agent</span>
                       </DropdownMenuItem>
                     )}
@@ -247,7 +247,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                           }}
                           className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Icon name="trash" className="w-4 h-4" />
                           <span>Delete Agent</span>
                         </DropdownMenuItem>
                       </>

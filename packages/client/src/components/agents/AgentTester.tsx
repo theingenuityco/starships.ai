@@ -237,12 +237,12 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${'bg-red-500/10 text-red-500'}`}>
               {isConnected ? (
                 <>
-                  <Wifi className="w-3 h-3" />
+                  <Icon name="wifi" className="w-3 h-3" />
                   <span>Connected</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3 h-3" />
+                  <Icon name="wifi-off" className="w-3 h-3" />
                   <span>Disconnected</span>
                 </>
               )}
@@ -251,7 +251,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             {/* Connection Error Indicator */}
             {connectionError && (
               <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/10 text-red-500">
-                <AlertCircle className="w-3 h-3" />
+                <Icon name="alert-circle" className="w-3 h-3" />
                 <span>Error</span>
               </div>
             )}
@@ -259,8 +259,8 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             <Button onClick={() => setShowTestCases(!showTestCases)} size="sm" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
               {showTestCases ? 'Hide' : 'Show'} Test Cases
             </Button>
-            <Button onClick={clearChat} size="sm" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-              <RotateCcw className="w-4 h-4 mr-2" />
+              <Button onClick={clearChat} size="sm" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                <Icon name="rotate-ccw" className="w-4 h-4 mr-2" />
               Clear Chat
             </Button>
             {onClose && (
@@ -342,7 +342,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                 }}
               />
               <Button onClick={handleSendMessage} disabled={!input.trim() || loading || !isConnected} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Send className="w-4 h-4" />
+                <Icon name="send" className="w-4 h-4" />
               </Button>
             </div>
 
@@ -400,7 +400,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                       className="w-full px-2 py-1 text-xs bg-zinc-700 border-none rounded h-16 resize-none text-white placeholder-zinc-500 focus:ring-1 focus:ring-blue-500"
                     />
                     <Button onClick={addTestCase} size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                      <Plus className="w-3 h-3 mr-1" />
+                      <Icon name="plus" className="w-3 h-3 mr-1" />
                       Add Test Case
                     </Button>
                   </div>
@@ -416,10 +416,10 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                       </div>
                       <div className="flex gap-1">
                         <Button onClick={() => runTestCase(testCase)} size="sm" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-700" disabled={loading}>
-                          <Play className="w-3 h-3" />
+                          <Icon name="play" className="w-3 h-3" />
                         </Button>
                         <Button onClick={() => deleteTestCase(testCase.id)} size="sm" variant="ghost" className="text-red-400 hover:bg-red-500/10">
-                          <Trash2 className="w-3 h-3" />
+                          <Icon name="trash" className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>

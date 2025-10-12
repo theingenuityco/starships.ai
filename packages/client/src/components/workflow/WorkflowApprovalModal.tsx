@@ -101,12 +101,12 @@ const ApprovalActions: React.FC<{
 }> = ({ onApprove, onReject, loading, hasRejectionReason }) => (
   <div className="flex gap-3">
     <Button variant="outline" onClick={onReject} disabled={loading} className="flex-1">
-      {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+      {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <Icon name="x-circle" className="w-4 h-4 mr-2" />}
       {hasRejectionReason ? 'Reject with Reason' : 'Reject Workflow'}
     </Button>
 
     <Button onClick={onApprove} disabled={loading} className="flex-1">
-      {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+      {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <Icon name="check-circle" className="w-4 h-4 mr-2" />}
       Approve & Execute
     </Button>
   </div>
@@ -169,7 +169,7 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({ wo
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Eye className="w-5 h-5" />
+            <Icon name="eye" className="w-5 h-5" />
             Workflow Approval Required
           </DialogTitle>
           <DialogDescription>
@@ -182,7 +182,7 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({ wo
             {/* Workflow Summary */}
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Clock className="w-4 h-4" />
+                <Icon name="clock" className="w-4 h-4" />
                 Workflow Summary
               </h3>
               <WorkflowSummary workflow={workflow} />
@@ -197,7 +197,7 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({ wo
                   <Separator />
                   <div>
                     <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
+                      <Icon name="message-square" className="w-4 h-4" />
                       Rejection Reason
                     </h3>
                     <Textarea
@@ -219,7 +219,7 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({ wo
           <div className="flex flex-col gap-3 w-full">
             {/* Warning message */}
             <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+              <Icon name="alert-triangle" className="w-4 h-4 text-yellow-600 flex-shrink-0" />
               <p className="text-sm text-yellow-800">Once approved, this workflow will begin execution immediately. Make sure you&apos;ve reviewed all steps carefully.</p>
             </div>
 

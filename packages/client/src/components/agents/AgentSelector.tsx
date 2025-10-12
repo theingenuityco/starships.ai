@@ -197,7 +197,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   if (loading) {
     return (
       <div className="flex items-center justify-center p-6">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <Icon name="loading" className="w-6 h-6 animate-spin text-primary" />
         <span className="ml-2 text-sm text-muted-foreground">{LOADING_TEXT.AGENTS}</span>
       </div>
     )
@@ -229,7 +229,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       <div className="p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-6">
         <div className="flex items-center gap-4">
           <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
-            <Bot className="h-6 w-6 text-primary" />
+            <Icon name="bot" className="h-6 w-6 text-primary" />
           </span>
           <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
@@ -251,7 +251,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
                   className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!starshipId ? 'No starship available for agent deployment' : undefined}
                 >
-                  <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <Icon name="sparkles" className="w-4 h-4 mr-2 flex-shrink-0" />
                   <span>From Template</span>
                 </Button>
               }
@@ -264,7 +264,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
               className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
               title={!starshipId ? 'No starship available for agent deployment' : undefined}
             >
-              <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
+              <Icon name="plus" className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>Create Agent</span>
             </Button>
           </div>
@@ -286,7 +286,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
               {/* Search Input */}
             {/* <div className="flex-1 relative">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
-                  <Search className="w-4 h-4" />
+                  <Icon name="search" className="w-4 h-4" />
                 </div>
                 <Input
                   placeholder="Search agents..."

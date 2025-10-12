@@ -38,13 +38,13 @@ function replaceInFile(text) {
     const mapped = nameMap[Name]
 
     // Replace self-closing tags: <Name ... />
-    const reSelf = new RegExp(`<${Name}(\s[^>]*?)?\s*/>`, 'g')
+    const reSelf = new RegExp(`<${Name}(\\s[^>]*?)?\\s*/>`, 'g')
     const prevSelf = text
     text = text.replace(reSelf, (m, attrs = '') => `<Icon name=\"${mapped}\"${attrs || ''} />`)
     if (text !== prevSelf) changed = true
 
     // Replace paired tags <Name ...>...</Name>
-    const reOpen = new RegExp(`<${Name}(\s[^>]*?)?>`, 'g')
+    const reOpen = new RegExp(`<${Name}(\\s[^>]*?)?>`, 'g')
     const reClose = new RegExp(`</${Name}>`, 'g')
     let opened = false
     const prevOpen = text

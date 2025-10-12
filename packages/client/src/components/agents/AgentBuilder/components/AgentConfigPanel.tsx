@@ -36,10 +36,10 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ formData, er
         <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Settings className="w-3.5 h-3.5 text-primary" />
+              <Icon name="settings" className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-semibold">Agent Configuration</span>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
+            <Icon name="chevron-down" className="w-3.5 h-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
           </div>
         </CollapsibleTrigger>
 

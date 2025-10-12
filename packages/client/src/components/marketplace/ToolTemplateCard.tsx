@@ -61,15 +61,15 @@ export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateC
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'integration':
-        return <Package className="w-4 h-4" />
+        return <Icon name="package" className="w-4 h-4" />
       case 'automation':
-        return <Bot className="w-4 h-4" />
+        return <Icon name="bot" className="w-4 h-4" />
       case 'data':
-        return <BarChart2 className="w-4 h-4" />
+        return <Icon name="bar-chart" className="w-4 h-4" />
       case 'communication':
         return <Icon name="user"s className="w-4 h-4"  />
       default:
-        return <Wrench className="w-4 h-4" />
+        return <Icon name="wrench" className="w-4 h-4" />
     }
   }
 
@@ -125,7 +125,7 @@ export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateC
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
-            <Wrench className="w-6 h-6 text-primary" />
+            <Icon name="wrench" className="w-6 h-6 text-primary" />
           </div>
 
           <div className="flex-1 min-w-0">
@@ -148,12 +148,12 @@ export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateC
         <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <Download className="w-4 h-4" />
+              <Icon name="download" className="w-4 h-4" />
               <span>{template.usageCount}</span>
             </div>
             {template.requiresApiKey && (
               <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 text-yellow-500" />
+                <Icon name="star" className="w-4 h-4 text-yellow-500" />
                 <span className="text-xs">API Key</span>
               </div>
             )}
@@ -196,12 +196,12 @@ export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateC
         <div className="mt-auto">
           {isAlreadyInstalled ? (
             <Button size="sm" variant="outline" className="w-full transition-colors" disabled onClick={e => e.stopPropagation()}>
-              <CheckCircle className="w-4 h-4 mr-2" />
+              <Icon name="check-circle" className="w-4 h-4 mr-2" />
               <span className="truncate">Already installed on {primaryStarship?.name || 'starship'}</span>
             </Button>
           ) : (
             <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstallClick} disabled={isInstalling || !primaryStarship}>
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Icon name="sparkles" className="w-4 h-4 mr-2" />
               {isInstalling ? 'Installing...' : 'Install'}
             </Button>
           )}

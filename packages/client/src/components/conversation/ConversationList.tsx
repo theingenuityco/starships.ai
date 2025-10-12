@@ -119,7 +119,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         <div className="p-2">
           {Object.keys(groupedConversations).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4">
-              <MessageSquare className="w-12 h-12 text-muted-foreground/30 mb-3" />
+              <Icon name="message-square" className="w-12 h-12 text-muted-foreground/30 mb-3" />
               <p className="text-muted-foreground text-sm text-center">No conversations yet</p>
               <p className="text-muted-foreground/70 text-xs text-center mt-1">Start a new conversation to get started</p>
             </div>
@@ -160,7 +160,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <MoreVertical className="h-4 w-4" />
+                                  <Icon name="dots-vertical" className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
@@ -170,7 +170,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                                     onConversationArchive?.(conversation.id)
                                   }}
                                 >
-                                  <Archive className="mr-2 h-4 w-4" />
+                                  <Icon name="archive" className="mr-2 h-4 w-4" />
                                   Archive
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
@@ -181,7 +181,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                                     onConversationDelete?.(conversation.id)
                                   }}
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  <Icon name="trash" className="mr-2 h-4 w-4" />
                                   Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>

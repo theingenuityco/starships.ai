@@ -63,7 +63,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4 max-w-md px-6">
                 <div className="w-20 h-20 mx-auto rounded-full frosted-glass-card shadow-frosted-lg flex items-center justify-center">
-                  <Wrench className="w-10 h-10 text-muted-foreground/50" />
+                  <Icon name="wrench" className="w-10 h-10 text-muted-foreground/50" />
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-foreground">No Blueprint Yet</h3>

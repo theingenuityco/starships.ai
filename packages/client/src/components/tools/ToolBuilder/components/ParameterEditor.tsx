@@ -588,7 +588,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
       {/* Validation Messages */}
       {validationError && (
         <Alert variant="destructive" className="py-2">
-          <AlertCircle className="h-3 w-3" />
+          <Icon name="alert-circle" className="h-3 w-3" />
           <AlertDescription className="text-xs">
             <p className="font-medium">{validationError.message}</p>
             {validationError.details && <p className="text-[10px] mt-1 opacity-90">{validationError.details}</p>}
@@ -597,7 +597,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
       )}
       {error && (
         <Alert variant="destructive" className="py-2">
-          <AlertCircle className="h-3 w-3" />
+          <Icon name="alert-circle" className="h-3 w-3" />
           <AlertDescription className="text-xs">{error}</AlertDescription>
         </Alert>
       )}

@@ -23,7 +23,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, erro
         <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Braces className="w-3.5 h-3.5 text-primary" />
+              <Icon name="braces" className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-semibold">Tool Inputs</span>
             </div>
           </div>

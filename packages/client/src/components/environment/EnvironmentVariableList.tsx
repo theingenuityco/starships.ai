@@ -53,7 +53,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Variables</h3>
           <Button onClick={onAdd} size="sm" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
+            <Icon name="plus" className="h-4 w-4" />
             Add Variable
           </Button>
         </div>
@@ -62,13 +62,13 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
       <CardContent className="p-0">
         {variables.length === 0 ? (
           <div className="p-8 text-center">
-            <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <Icon name="key" className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             {variables.length === 0 ? (
               <>
                 <h3 className="text-lg font-medium mb-2">No environment variables</h3>
                 <p className="text-muted-foreground mb-4">Get started by adding your first environment variable. These will be securely encrypted and available to your agents.</p>
                 <Button onClick={onAdd} className="flex items-center gap-2 mx-auto">
-                  <Plus className="h-4 w-4" />
+                  <Icon name="plus" className="h-4 w-4" />
                   Add Your First Variable
                 </Button>
               </>
@@ -86,24 +86,24 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <Key className="h-4 w-4 text-primary flex-shrink-0" />
+                      <Icon name="key" className="h-4 w-4 text-primary flex-shrink-0" />
                       <span className="font-mono font-medium text-sm">{variable.key}</span>
                     </div>
 
                     {variable.description && (
                       <div className="flex items-start gap-2 mb-2">
-                        <FileText className="h-3 w-3 text-muted-foreground mt-1 flex-shrink-0" />
+                        <Icon name="file-text" className="h-3 w-3 text-muted-foreground mt-1 flex-shrink-0" />
                         <span className="text-xs text-muted-foreground">{variable.description}</span>
                       </div>
                     )}
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
+                        <Icon name="calendar" className="h-3 w-3" />
                         <span>Created {formatDate(variable.createdAt)}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
+                        <Icon name="calendar" className="h-3 w-3" />
                         <span>Updated {formatDate(variable.updatedAt)}</span>
                       </div>
                     </div>
@@ -112,16 +112,16 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4" />
+                        <Icon name="dots-horizontal" className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onEdit(variable)} className="flex items-center gap-2">
-                        <Edit className="h-4 w-4" />
+                        <Icon name="edit" className="h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onDelete(variable)} className="flex items-center gap-2 text-destructive focus:text-destructive">
-                        <Trash2 className="h-4 w-4" />
+                        <Icon name="trash" className="h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>

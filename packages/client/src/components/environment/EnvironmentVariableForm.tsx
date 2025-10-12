@@ -93,7 +93,7 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5 text-primary" />
+            <Icon name="key" className="h-5 w-5 text-primary" />
             {isEdit ? 'Edit Environment Variable' : 'Add Environment Variable'}
           </DialogTitle>
         </DialogHeader>
@@ -103,7 +103,7 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
             {/* Key Field */}
             <div className="space-y-2">
               <Label htmlFor="key" className="flex items-center gap-2">
-                <Key className="h-4 w-4 text-muted-foreground" />
+                <Icon name="key" className="h-4 w-4 text-muted-foreground" />
                 Key
               </Label>
               <Input
@@ -116,7 +116,7 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
               />
               {errors.key && (
                 <p className="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle className="h-3 w-3" />
+                  <Icon name="alert-circle" className="h-3 w-3" />
                   {errors.key}
                 </p>
               )}
@@ -126,7 +126,7 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
             {/* Value Field */}
             <div className="space-y-2">
               <Label htmlFor="value" className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
+                <Icon name="file-text" className="h-4 w-4 text-muted-foreground" />
                 Value {isEdit && '(leave empty to keep current value)'}
               </Label>
               <Input
@@ -139,7 +139,7 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
               />
               {errors.value && (
                 <p className="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle className="h-3 w-3" />
+                  <Icon name="alert-circle" className="h-3 w-3" />
                   {errors.value}
                 </p>
               )}

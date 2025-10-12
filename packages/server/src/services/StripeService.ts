@@ -1,7 +1,9 @@
 import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2025-09-30.clover',
+});
 
 /**
  * Stripe Service - Handles Stripe payment operations

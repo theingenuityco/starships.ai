@@ -1,8 +1,8 @@
 'use client'
 
-
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import Icon from '@/components/primitives/Icon'
+import { LordIcon } from '@/components/animated/LordIcon'
+import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 import { motion } from 'motion/react'
 import Link from 'next/link'
 
@@ -23,7 +23,7 @@ export function NavigationItem({ href, label, icon, isActive }: NavigationItemPr
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <Icon name={icon} className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-foreground'} transition-colors`} />
+        <LordIcon src={getLordiconUrl(icon)} width={20} height={20} className="w-5 h-5" trigger="hover" />
       </motion.div>
     </Link>
   )

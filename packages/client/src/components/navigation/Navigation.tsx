@@ -1,6 +1,7 @@
 'use client'
 
-import Icon from '@/components/primitives/Icon'
+import { LordIcon } from '@/components/animated/LordIcon'
+import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 
 import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'
@@ -170,7 +171,7 @@ export function Navigation(props: NavigationProps) {
         {/* Compact Header with Theme Toggle */}
         <div className="px-2 py-4 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
           <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Overview">
-            <Icon name="star"shipsLogo width={36} height={36} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger}  />
+            <LordIcon src={getLordiconUrl('rocket')} width={36} height={36} className="text-foreground" trigger="hover" />
           </div>
         </div>
 
@@ -191,7 +192,7 @@ export function Navigation(props: NavigationProps) {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <Icon name="rocket" className={`w-5 h-5 ${isOverviewRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                      <LordIcon src={getLordiconUrl('rocket')} width={20} height={20} className="w-5 h-5" trigger="hover" />
                     </motion.div>
                   </Link>
                 </TooltipTrigger>
@@ -216,7 +217,7 @@ export function Navigation(props: NavigationProps) {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <Icon name="message-square" className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                        <LordIcon src={getLordiconUrl('message-square')} width={20} height={20} className="w-5 h-5" trigger="hover" />
                       </motion.div>
                     </Link>
                   </TooltipTrigger>
@@ -247,7 +248,7 @@ export function Navigation(props: NavigationProps) {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <Icon name="plus" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            <LordIcon src={getLordiconUrl('plus')} width={16} height={16} className="w-4 h-4" trigger="hover" />
                           </motion.button>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -268,9 +269,9 @@ export function Navigation(props: NavigationProps) {
                             whileTap={{ scale: 0.95 }}
                           >
                             {showConversationList ? (
-                              <Icon name="x" className="w-4 h-4 text-primary transition-colors" />
+                              <LordIcon src={getLordiconUrl('x')} width={16} height={16} className="w-4 h-4" trigger="hover" />
                             ) : (
-                              <Icon name="history" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4" trigger="hover" />
                             )}
                           </motion.button>
                         </TooltipTrigger>
@@ -293,10 +294,7 @@ export function Navigation(props: NavigationProps) {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              <Icon
-                                name="settings"
-                                className={`w-4 h-4 ${pathname === `/ship/${starshipSlug}/management` ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}
-                              />
+                              <LordIcon src={getLordiconUrl('settings')} width={16} height={16} className="w-4 h-4" trigger="hover" />
                             </motion.div>
                           </Link>
                         </TooltipTrigger>

@@ -430,22 +430,6 @@ ALTER TABLE usage
   ON DELETE SET NULL;
 
 -- ============================================================================
--- WAITLIST TABLE
--- ============================================================================
-
-CREATE TABLE waitlist (
-    email VARCHAR(255) PRIMARY KEY,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Waitlist indexes
-CREATE INDEX idx_waitlist_status ON waitlist(status);
-CREATE INDEX idx_waitlist_created_at ON waitlist(created_at);
-
-
--- ============================================================================
 -- JUNCTION TABLES FOR RELATIONSHIPS
 -- ============================================================================
 
@@ -509,7 +493,6 @@ COMMENT ON TABLE environments IS 'Environment variables scoped to starships with
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
 COMMENT ON TABLE wallets IS 'Wallets for starships with currency and balance';
 COMMENT ON TABLE topups IS 'Payment topup records for wallet funding via Stripe';
-COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';
 COMMENT ON TABLE conversation_agents IS 'Many-to-many relationship between conversations and agents';

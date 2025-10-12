@@ -35,7 +35,6 @@ export { ToolRepository } from './repositories/ToolRepository';
 export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';
 export { UsageRepository } from './repositories/UsageRepository';
 export { UserRepository } from './repositories/UserRepository';
-export { WaitlistRepository } from './repositories/WaitlistRepository';
 export { WalletRepository } from './repositories/WalletRepository';
 export { TopupRepository } from './repositories/TopupRepository';
 export { LedgerRepository } from './repositories/LedgerRepository';
@@ -50,7 +49,6 @@ export type { HealthStatus, LogContext, LogLevel, PerformanceMetrics } from './h
 export { migrationRunner } from './scripts/migration-runner';
 export { seedToolTemplates } from './scripts/seed-tool-templates';
 export { seedAgentTemplates } from './scripts/seed-agent-templates';
-export { seedWaitlist } from './scripts/seed-waitlist';
 
 // Utilities
 export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';

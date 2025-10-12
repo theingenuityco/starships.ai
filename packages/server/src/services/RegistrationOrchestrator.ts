@@ -1,11 +1,10 @@
 /**
  * Registration Orchestrator Service
  * 
- * Orchestrates complex registration workflows including:
+ * Orchestrates registration workflows including:
  * - User registration with email verification
  * - Email verification and account activation
- * - Waitlist management
- * - Starship creation for approved users
+ * - Starship creation for verified users
  * 
  * This service follows the orchestration pattern to coordinate multiple services
  * while maintaining clear separation of concerns.
@@ -48,9 +47,8 @@ export class RegistrationOrchestrator {
    * 
    * Coordinates:
    * 1. User existence check
-   * 2. Waitlist management
-   * 3. User creation
-   * 4. Email verification sending
+   * 2. User creation
+   * 3. Email verification sending
    */
   async registerUser(userData: RegisterUserData): Promise<RegistrationResult> {
     const userService = ServiceFactory.createUserService();
@@ -64,9 +62,6 @@ export class RegistrationOrchestrator {
         message: 'An account with this email already exists. Please sign in instead.'
       };
     }
-
-    // Handle waitlist logic
-    await this.ensureUserInWaitlist(userData.email);
 
     // Create user with email unverified (password will be automatically hashed)
     const displayName = userData.name || userData.email.split('@')[0];
@@ -99,9 +94,8 @@ export class RegistrationOrchestrator {
    * 
    * Coordinates:
    * 1. Token validation and user verification
-   * 2. Waitlist status check
-   * 3. Starship creation for approved users
-   * 4. Redirect path determination
+   * 2. Starship creation for verified users
+   * 3. Redirect path determination
    */
   async completeEmailVerification(token: string): Promise<VerificationResult> {
     const userService = ServiceFactory.createUserService();
@@ -114,15 +108,14 @@ export class RegistrationOrchestrator {
     }
 
     if (tokenInfo.userAlreadyVerified) {
-      // User already verified - determine appropriate redirect
+      // User already verified - check if they have a starship
+      const starshipCreated = await this.checkUserHasStarship(tokenInfo.tokenInfo.userId);
       return {
         userId: tokenInfo.tokenInfo.userId,
         email: tokenInfo.tokenInfo.email,
         verified: true,
-        starshipCreated: tokenInfo.shouldRedirectToStarship,
-        redirectPath: tokenInfo.shouldRedirectToStarship 
-          ? '/login?verification=success&starship=true'
-          : '/login?verification=success&waitlisted=true'
+        starshipCreated,
+        redirectPath: '/login?verification=success'
       };
     }
 
@@ -133,64 +126,62 @@ export class RegistrationOrchestrator {
     // Proceed with verification - this only handles user verification
     const verificationResult = await userService.verifyEmailAddress(token);
 
-    // Check if user should get starship access
-    const starshipCreated = await this.handleApprovedUser(verificationResult.userId, verificationResult.email);
+    // Create starship for all verified users
+    const starshipCreated = await this.createStarshipForUser(verificationResult.userId);
 
     return {
       userId: verificationResult.userId,
       email: verificationResult.email,
       verified: true,
       starshipCreated,
-      redirectPath: starshipCreated
-        ? '/login?verification=success&starship=true'
-        : '/login?verification=success&waitlisted=true'
+      redirectPath: '/login?verification=success'
     };
   }
 
   /**
-   * Ensure user is in waitlist (private helper)
+   * Create starship for verified user (private helper)
    */
-  private async ensureUserInWaitlist(email: string): Promise<void> {
-    const waitlistService = ServiceFactory.createWaitlistService();
-    
-    const waitlistStatus = await waitlistService.getDetailedStatus(email);
-    if (!waitlistStatus.exists) {
-      await waitlistService.addToPendingWaitlist(email);
-    }
-  }
-
-  /**
-   * Handle starship creation for approved users (private helper)
-   */
-  private async handleApprovedUser(userId: string, email: string): Promise<boolean> {
-    const waitlistService = ServiceFactory.createWaitlistService();
-    
+  private async createStarshipForUser(userId: string): Promise<boolean> {
     try {
-      const waitlistStatus = await waitlistService.getDetailedStatus(email);
+      const defaultStarship = await StarshipService.createDefaultStarship(userId);
       
-      if (waitlistStatus.status === 'approved') {
-        const defaultStarship = await StarshipService.createDefaultStarship(userId);
+      if (defaultStarship) {
+        await StarshipService.createDefaultAgent(userId, defaultStarship.id);
         
-        if (defaultStarship) {
-          await StarshipService.createDefaultAgent(userId, defaultStarship.id);
-          
-          logger.info('[RegistrationOrchestrator] Starship created for verified user', {
-            userId,
-            starshipId: defaultStarship.id,
-            operation: 'email_verification'
-          });
-          
-          return true;
-        }
+        logger.info('[RegistrationOrchestrator] Starship created for verified user', {
+          userId,
+          starshipId: defaultStarship.id,
+          operation: 'email_verification'
+        });
+        
+        return true;
       }
-    } catch {
+    } catch (error) {
       logger.error('[RegistrationOrchestrator] Failed to create starship during verification', {
         userId,
-        operation: 'starship_creation'
+        operation: 'starship_creation',
+        error: { message: error instanceof Error ? error.message : 'Unknown error' }
       });
       // Don't throw - user can create starship later
     }
 
     return false;
+  }
+
+  /**
+   * Check if user already has a starship (private helper)
+   */
+  private async checkUserHasStarship(userId: string): Promise<boolean> {
+    try {
+      const starshipService = ServiceFactory.createStarshipService();
+      const userStarships = await starshipService.getStarshipsByOwner(userId);
+      return userStarships.length > 0;
+    } catch (error) {
+      logger.error('[RegistrationOrchestrator] Failed to check user starships', {
+        userId,
+        error: { message: error instanceof Error ? error.message : 'Unknown error' }
+      });
+      return false;
+    }
   }
 }

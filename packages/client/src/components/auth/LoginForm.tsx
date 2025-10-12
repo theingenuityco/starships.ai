@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { motion } from 'motion/react'
@@ -60,10 +59,6 @@ export function LoginForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
   const [formError, setFormError] = useState<string | null>(null)
-  const [waitlistStatus, setWaitlistStatus] = useState<{
-    isWaitlisted: boolean
-    message: string
-  } | null>(null)
   const [emailVerificationStatus, setEmailVerificationStatus] = useState<{
     needsVerification: boolean
     email: string
@@ -78,7 +73,6 @@ export function LoginForm() {
   useEffect(() => {
     const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
-    const oauthWaitlist = searchParams?.get('oauth_waitlist')
 
 
     // Prevent duplicate handling (synchronous check with ref)
@@ -94,18 +88,12 @@ export function LoginForm() {
       oauthLogin(authCode)
     } else if (oauthError) {
       setFormError(getOAuthErrorMessage(oauthError))
-    } else if (oauthWaitlist) {
-      setWaitlistStatus({
-        isWaitlisted: true,
-        message: 'Thanks for signing up! Please wait for approval to access the app.',
-      })
     }
   }, [searchParams, oauthLogin])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
-    setWaitlistStatus(null)
     setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
 
@@ -115,15 +103,6 @@ export function LoginForm() {
     }
 
     const result = await login(loginData.email, loginData.password)
-
-    // Check if waitlisted response
-    if (result.waitlisted) {
-      setWaitlistStatus({
-        isWaitlisted: true,
-        message: result.message || 'You are on our waitlist. Stay tuned!',
-      })
-      return
-    }
 
     // Check if email verification required
     if (result.emailNotVerified) {
@@ -156,7 +135,6 @@ export function LoginForm() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
-    setWaitlistStatus(null)
     setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
 
@@ -176,17 +154,6 @@ export function LoginForm() {
     }
 
     const result = await register(registerData.email, registerData.password, registerData.name)
-
-    // Check if waitlisted response
-    if (result.waitlisted) {
-      setWaitlistStatus({
-        isWaitlisted: true,
-        message: result.message || 'You have been added to the waitlist!',
-      })
-      // Optionally clear form
-      setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
-      return
-    }
 
     // Check if email verification sent
     if (result.emailVerificationSent) {
@@ -236,20 +203,15 @@ export function LoginForm() {
 
         <CardContent>
           {/* OAuth buttons ABOVE existing tabs */}
-          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading || !!waitlistStatus} />
+          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
-          {waitlistStatus && (
-            <div className="mb-4">
-              <WaitlistMessage message={waitlistStatus.message} onClose={() => setWaitlistStatus(null)} />
-            </div>
-          )}
 
           {emailVerificationStatus && (
             <Alert className="mb-4 border-emerald-200 bg-emerald-50">
               <Icon name="check-circle" className="h-4 w-4" />
               <div className="space-y-3">
                 <AlertTitle className="text-emerald-900 font-medium">
-                  {emailVerificationStatus.needsVerification ? 'Email Verification Required' : 'Registration successful! We\'ve sent a verification email to:'}
+                  Registration successful! We&apos;ve sent a verification email to:
                 </AlertTitle>
                 <AlertDescription>
                   <div className="bg-white border border-emerald-200 rounded-md px-4 py-3 mb-4">

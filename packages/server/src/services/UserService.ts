@@ -281,31 +281,11 @@ export class UserService {
    */
   async createUserFromOAuth(provider: string, authCode: string): Promise<{
     user: UserModel;
-    waitlisted?: boolean;
-    status?: 'pending' | 'approved';
-    message?: string;
   }> {
     // Get OAuth profile from provider
     const profile = await this.getOAuthProfile(provider, authCode);
 
-    // Check waitlist status using ServiceFactory
-    const { ServiceFactory } = await import('./ServiceFactory');
-    const waitlistService = ServiceFactory.createWaitlistService();
-    const waitlistStatus = await waitlistService.getDetailedStatus(profile.email);
-
-    // Handle waitlist logic (EXISTING PATTERN)
-    if (!waitlistStatus.exists) {
-      await waitlistService.addToPendingWaitlist(profile.email);
-    }
-
-    if (waitlistStatus.status === 'pending') {
-      return {
-        user: { email: profile.email } as UserModel,
-        waitlisted: true,
-        status: 'pending',
-        message: 'Thanks for signing up! Please wait for approval to access the app.',
-      };
-    }
+    // All users are now approved automatically
 
     // Check if user exists by email (for account linking)
     let user = await this.getUserByEmail(profile.email);
@@ -848,11 +828,8 @@ export class UserService {
     // If user is verified and has access, should redirect to starship
     let shouldRedirectToStarship = false;
     if (userAlreadyVerified) {
-      // Check if user has starship access (waitlist approved)
-      const { ServiceFactory } = await import('./ServiceFactory');
-      const waitlistService = ServiceFactory.createWaitlistService();
-      const waitlistStatus = await waitlistService.getDetailedStatus(tokenInfo.email);
-      shouldRedirectToStarship = waitlistStatus.status === 'approved';
+      // All verified users get starship access
+      shouldRedirectToStarship = true;
     }
     
     return { tokenInfo, userAlreadyVerified, shouldRedirectToStarship };

@@ -26,6 +26,6 @@ export { WebSocketService } from './WebSocketService';
 export { RegistrationOrchestrator } from './RegistrationOrchestrator';
 
 // Service Factory for centralized service creation
-export { ServiceFactory, initWaitlistService } from './ServiceFactory';
+export { ServiceFactory } from './ServiceFactory';
 
 // Note: Workflow execution engine has been moved to @starships/autopilot package

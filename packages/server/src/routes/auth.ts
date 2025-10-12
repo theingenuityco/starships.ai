@@ -120,30 +120,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     // Get user with password
     const user = await UserService.getUserByEmailWithPassword(email);
     if (!user || !user.password) {
-      // Check waitlist status when user doesn't exist
-      const waitlistService = ServiceFactory.createWaitlistService();
-      const waitlistStatus = await waitlistService.getDetailedStatus(email);
-
-      if (!waitlistStatus.exists) {
-        // Not in system at all
-        return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
-      }
-
-      if (waitlistStatus.status === 'pending') {
-        // On waitlist but not approved
-        return sendSuccess(
-          res,
-          {
-            waitlisted: true,
-            status: 'pending',
-            message: 'Please wait for approval to access the app.',
-          },
-          200
-        );
-      }
-
-      // Approved but no account - suggest registration
-      return sendError(res, 'AUTHENTICATION_FAILED', 'No account found. Please sign up first.', 401);
+      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
     }
 
     // Verify password
@@ -164,42 +141,24 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       return sendSuccess(res, response, 200);
     }
 
-    // Check waitlist status for existing user
-    const waitlistService = ServiceFactory.createWaitlistService();
-    const waitlistStatus = await waitlistService.getDetailedStatus(email);
-
-    // If user exists but is still pending on waitlist, deny access
-    if (waitlistStatus.status === 'pending') {
-      return sendSuccess(
-        res,
-        {
-          waitlisted: true,
-          status: 'pending',
-          message: 'Please wait for approval to access the app.',
-        },
-        200
-      );
-    }
-
     // Get user's starships for redirect purpose
     let firstStarship = null;
-    let defaultAgent = null;
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
       firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
 
-      // If approved user has no starship (was pending when registered), create one now
-      if (!firstStarship && waitlistStatus.status === 'approved') {
-        logger.info(`[AUTH] Creating starship for newly approved user ${user.email}`);
+      // If user has no starship, create one now
+      if (!firstStarship) {
+        logger.info(`[AUTH] Creating starship for user ${user.email}`);
         try {
           firstStarship = await StarshipService.createDefaultStarship(user.id);
 
           // Also create default Daedalus agent and host tools
           if (firstStarship) {
             try {
-              defaultAgent = await StarshipService.createDefaultAgent(user.id, firstStarship.id);
+              await StarshipService.createDefaultAgent(user.id, firstStarship.id);
               logger.info(`[AUTH] Created default agent for user ${user.email}`);
             } catch (agentError) {
               logger.error(`[AUTH] Failed to create default agent for user ${user.id}:`, {
@@ -496,19 +455,6 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     // Delegate to service layer (Layer 4)
     const result = await UserService.createUserFromOAuth(provider, code);
 
-    if (result.waitlisted) {
-      return res.redirect(`${env.PUBLIC_URL}/login?oauth_waitlist=pending`);
-    }
-
-    // ADD THIS SECURITY FIX:
-    // Re-check waitlist status immediately before token generation
-    const waitlistService = ServiceFactory.createWaitlistService();
-    const currentStatus = await waitlistService.getDetailedStatus(result.user.email!);
-
-    if (currentStatus.status === 'pending') {
-      return res.redirect(`${env.PUBLIC_URL}/login?oauth_waitlist=pending`);
-    }
-
     // ✅ SECURITY FIX: Generate secure authorization code instead of JWT token
     const authCode = await generateAuthCode(result.user.id, result.user.email!);
 
@@ -650,14 +596,6 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     const user = await UserService.getUserById(codeData.userId);
     if (!user) {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
-    }
-    
-    // Re-check waitlist status for security (prevent timing attacks)
-    const waitlistService = ServiceFactory.createWaitlistService();
-    const currentStatus = await waitlistService.getDetailedStatus(user.email!);
-    
-    if (currentStatus.status === 'pending') {
-      return sendError(res, 'ACCESS_DENIED', 'User is still on waitlist', 403);
     }
     
     // Generate JWT token (returned in response body, NOT URL)

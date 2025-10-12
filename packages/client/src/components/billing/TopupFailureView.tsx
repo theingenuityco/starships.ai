@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowLeft, ArrowRight, HelpCircle, LifeBuoy, ShieldAlert, Wallet } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Button } from '@/components/ui/button'
@@ -31,7 +31,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
               <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-col gap-4">
                   <Badge className="w-fit bg-rose-500/10 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200" variant="secondary">
-                    <ShieldAlert className="mr-1 h-3.5 w-3.5" />
+                    <Icon name="shield-alert" className="mr-1 h-3.5 w-3.5" />
                     Payment interrupted
                   </Badge>
                   <div>
@@ -43,7 +43,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                   <div className="flex flex-wrap gap-3">
                     <Button size="lg" className="group bg-rose-600 text-white hover:bg-rose-700" onClick={() => router.push(`/ship/${slug}/management?tab=billing`)}>
                       Retry top-up
-                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      <Icon name="arrow-right" className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
                     <Button
                       size="lg"
@@ -56,7 +56,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-2xl bg-white/80 px-6 py-4 shadow-lg shadow-rose-200/30 backdrop-blur-lg dark:bg-rose-950/40">
-                  <AlertTriangle className="h-9 w-9 text-rose-500" />
+                  <Icon name="alert-triangle" className="h-9 w-9 text-rose-500" />
                   <div>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Top-up reference</p>
                     <p className="font-semibold text-slate-900 dark:text-white">{topupId ? topupId.slice(0, 10).toUpperCase() : 'Unavailable'}</p>
@@ -70,7 +70,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
               <Card className="border-rose-500/10 bg-white/80 backdrop-blur dark:border-rose-500/20 dark:bg-rose-950/30">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
-                    <Wallet className="h-5 w-5 text-rose-500" />
+                    <Icon name="wallet" className="h-5 w-5 text-rose-500" />
                     What happened?
                   </CardTitle>
                 </CardHeader>
@@ -97,7 +97,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
               <Card className="border-slate-200/70 bg-white/85 backdrop-blur dark:border-slate-700/50 dark:bg-slate-900/40">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
-                    <HelpCircle className="h-5 w-5 text-primary" />
+                    <Icon name="help-circle" className="h-5 w-5 text-primary" />
                     Suggested actions
                   </CardTitle>
                 </CardHeader>
@@ -144,7 +144,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
               <Card className="border-rose-500/20 bg-rose-100/40 backdrop-blur dark:border-rose-500/30 dark:bg-rose-900/30">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-200">
-                    <LifeBuoy className="h-4 w-4" />
+                    <Icon name="lifebuoy" className="h-4 w-4" />
                     Priority support
                   </CardTitle>
                 </CardHeader>
@@ -159,7 +159,7 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
           </div>
 
           <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <ArrowLeft className="h-3 w-3" />
+            <Icon name="arrow-left" className="h-3 w-3" />
             <button type="button" className="underline-offset-2 transition hover:underline" onClick={() => router.back()}>
               Back to previous page
             </button>

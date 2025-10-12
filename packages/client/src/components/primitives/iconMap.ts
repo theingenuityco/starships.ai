@@ -6,6 +6,8 @@ const map: Record<string, ResolvedIcon> = {
   'chevron-left': { type: 'radix', component: 'ChevronLeftIcon' },
   'chevron-down': { type: 'radix', component: 'ChevronDownIcon' },
   'chevron-up': { type: 'radix', component: 'ChevronUpIcon' },
+  'arrow-right': { type: 'radix', component: 'ArrowRightIcon' },
+  'arrow-left': { type: 'radix', component: 'ArrowLeftIcon' },
 
   // Common → Phosphor
   search: { type: 'phosphor', component: 'MagnifyingGlass' },
@@ -14,6 +16,10 @@ const map: Record<string, ResolvedIcon> = {
   bot: { type: 'phosphor', component: 'Robot' },
   rocket: { type: 'phosphor', component: 'Rocket' },
   sparkles: { type: 'phosphor', component: 'Sparkle' },
+  'check-circle': { type: 'phosphor', component: 'CheckCircle' },
+  wallet: { type: 'phosphor', component: 'Wallet' },
+  mail: { type: 'radix', component: 'EnvelopeClosedIcon' },
+  'user-cog': { type: 'phosphor', component: 'UserGear' },
 
   // Navbar / UI common
   store: { type: 'phosphor', component: 'Storefront' },
@@ -22,6 +28,12 @@ const map: Record<string, ResolvedIcon> = {
   plus: { type: 'phosphor', component: 'Plus' },
   x: { type: 'phosphor', component: 'X' },
   history: { type: 'phosphor', component: 'ClockCounterClockwise' },
+
+  // Status & help
+  'alert-triangle': { type: 'phosphor', component: 'Warning' },
+  'help-circle': { type: 'phosphor', component: 'Question' },
+  'shield-alert': { type: 'phosphor', component: 'ShieldWarning' },
+  lifebuoy: { type: 'phosphor', component: 'Lifebuoy' },
 
   // Animated affordances → Iconify line-md
   loading: { type: 'iconify', icon: 'line-md:loading-twotone-loop' },

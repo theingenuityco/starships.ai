@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle2, ArrowRight, Sparkles, Wallet, Bot, MessageSquare, UserCog, Mail } from 'lucide-react'
+import Icon from '@/components/primitives/Icon'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { PageLayout } from '@/components/layout/PageLayout'
@@ -71,7 +71,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
               <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-col gap-4">
                   <Badge className="w-fit bg-emerald-500/10 text-emerald-700 backdrop-blur-sm dark:bg-emerald-500/20 dark:text-emerald-200" variant="secondary">
-                    <Sparkles className="mr-1 h-3.5 w-3.5" />
+                    <Icon name="sparkles" className="mr-1 h-3.5 w-3.5" />
                     Payment successful
                   </Badge>
                   <div>
@@ -86,7 +86,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                   <div className="flex flex-wrap gap-3">
                     <Button size="lg" className="group bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => router.push(`/ship/${slug}/management?tab=billing`)}>
                       Return to billing
-                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      <Icon name="arrow-right" className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
                     <Button
                       size="lg"
@@ -99,7 +99,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-2xl bg-white/80 px-6 py-4 shadow-lg shadow-emerald-200/40 backdrop-blur-lg dark:bg-emerald-950/30">
-                  <CheckCircle2 className="h-9 w-9 text-emerald-500" />
+                  <Icon name="check-circle" className="h-9 w-9 text-emerald-500" />
                   <div>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Top-up reference</p>
                     <p className="font-semibold text-slate-900 dark:text-white">{topupId ? topupId.slice(0, 10).toUpperCase() : 'N/A'}</p>
@@ -114,7 +114,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                   <CardHeader className="flex flex-row items-center justify-between pb-6">
                     <div>
                       <CardTitle className="flex items-center gap-2 text-lg font-medium text-slate-900 dark:text-white">
-                        <Wallet className="h-5 w-5 text-emerald-500" />
+                        <Icon name="wallet" className="h-5 w-5 text-emerald-500" />
                         Wallet overview
                       </CardTitle>
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Current balance and latest credit details</p>
@@ -144,7 +144,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                 <Card className="flex h-full flex-col border-slate-200/70 bg-white/80 backdrop-blur dark:border-slate-700/50 dark:bg-slate-900/30">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                      <Mail className="h-4 w-4 text-primary" />
+                      <Icon name="mail" className="h-4 w-4 text-primary" />
                       Need a receipt?
                     </CardTitle>
                   </CardHeader>
@@ -171,7 +171,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                 <CardContent className="grid gap-4 lg:grid-cols-3">
                   <div className="rounded-xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/40">
                     <div className="flex items-start gap-3">
-                      <Bot className="mt-1 h-5 w-5 text-primary" />
+                      <Icon name="bot" className="mt-1 h-5 w-5 text-primary" />
                       <div className="space-y-2">
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">Launch a new agent</p>
@@ -185,7 +185,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                   </div>
                   <div className="rounded-xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/40">
                     <div className="flex items-start gap-3">
-                      <MessageSquare className="mt-1 h-5 w-5 text-primary" />
+                      <Icon name="message-square" className="mt-1 h-5 w-5 text-primary" />
                       <div className="space-y-2">
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">Start a conversation</p>
@@ -199,7 +199,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                   </div>
                   <div className="rounded-xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/40">
                     <div className="flex items-start gap-3">
-                      <UserCog className="mt-1 h-5 w-5 text-primary" />
+                      <Icon name="user-cog" className="mt-1 h-5 w-5 text-primary" />
                       <div className="space-y-2">
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">Refresh your profile</p>

@@ -960,7 +960,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+            <Icon name="sparkles" className="w-8 h-8 text-primary animate-pulse" />
           </div>
           <p className="text-muted-foreground">Initializing conversation...</p>
         </div>
@@ -974,7 +974,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-            <Icon name="user"s className="w-8 h-8 text-muted-foreground"  />
+            <Icon name="user" s className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </div>
@@ -1027,7 +1027,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                       onClick={() => handleSuggestionClick(suggestion)}
                     >
                       <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                        <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                        <Icon name="sparkles" className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
                       </div>
                       <span className="flex-1">{suggestion}</span>
                     </button>

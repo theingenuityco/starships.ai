@@ -38,10 +38,10 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
       <PopoverTrigger asChild>
         <Button variant="outline" className={cn('justify-between', compact ? 'h-8 px-3 text-xs min-w-[120px]' : 'min-w-[180px]')} disabled={loading}>
           <div className="flex items-center gap-2">
-            <Bot className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+            <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
             <span className="truncate">{selectedAgent ? selectedAgent.name : compact ? 'Select Agent' : 'Select an agent'}</span>
           </div>
-          {loading ? <LoadingSpinner className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} /> : <ChevronDown className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
+          {loading ? <LoadingSpinner className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} /> : <Icon name="chevron-down" className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
         </Button>
       </PopoverTrigger>
 

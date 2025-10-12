@@ -45,7 +45,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
                 <AvatarFallback className="text-xs">{userAvatar}</AvatarFallback>
               </Avatar>
             ) : (
-              <User className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <Icon name="user" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             )}
           </div>
         </div>
@@ -61,7 +61,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
     >
       <div className="relative">
         <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
-          <User className="w-4 h-4 text-primary" />
+          <Icon name="user" className="w-4 h-4 text-primary" />
         </div>
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-background animate-pulse"></div>
       </div>

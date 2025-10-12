@@ -163,28 +163,28 @@ export function Navigation(props: NavigationProps) {
   return (
     <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
       <div
-        className="flex flex-col w-16 flex-shrink-0 transition-all duration-300 ease-in-out"
+        className="flex flex-col w-20 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
         }}
       >
         {/* Compact Header with Theme Toggle */}
-        <div className="px-2 py-4 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
+        <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
           <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Overview">
-            <StarshipsLogo width={36} height={36} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger} />
+            <StarshipsLogo width={42} height={42} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger} />
           </div>
         </div>
 
         {/* Navigation Content */}
         <div className="flex-1 flex flex-col justify-center min-h-0">
-          <div className="p-2 space-y-2">
+          <div className="p-3 space-y-3">
             {/* Overview - First nav item */}
             {starshipSlug && (
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <Link href={`/ship/${starshipSlug}`}>
                     <motion.div
-                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
+                      className={`group relative transition-all duration-300 mx-1.5 p-2.5 rounded-xl z-10 flex items-center justify-center ${
                         isOverviewRoute
                           ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
                           : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
@@ -192,7 +192,7 @@ export function Navigation(props: NavigationProps) {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <LordIcon src={getLordiconUrl('rocket')} width={20} height={20} className="w-5 h-5" trigger="hover" />
+                      <LordIcon src={getLordiconUrl('rocket')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
                     </motion.div>
                   </Link>
                 </TooltipTrigger>
@@ -209,7 +209,7 @@ export function Navigation(props: NavigationProps) {
                   <TooltipTrigger asChild>
                     <Link href={`/ship/${starshipSlug}/conversations`}>
                       <motion.div
-                        className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
+                        className={`group relative transition-all duration-300 mx-1.5 p-2.5 rounded-xl z-10 flex items-center justify-center ${
                           isConversationRoute
                             ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
                             : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
@@ -217,7 +217,7 @@ export function Navigation(props: NavigationProps) {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <LordIcon src={getLordiconUrl('message-square')} width={20} height={20} className="w-5 h-5" trigger="hover" />
+                        <LordIcon src={getLordiconUrl('message-square')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
                       </motion.div>
                     </Link>
                   </TooltipTrigger>
@@ -234,7 +234,7 @@ export function Navigation(props: NavigationProps) {
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
-                      className="border-l border-r border-b border-primary/15 rounded-bl-xl rounded-br-xl mx-1 space-y-1 overflow-hidden -mt-2 pt-4 pb-2 flex flex-col items-center three-way-border"
+                      className="border-l border-r border-b border-primary/15 rounded-bl-xl rounded-br-xl mx-1.5 space-y-1.5 overflow-hidden -mt-2 pt-4 pb-2 flex flex-col items-center three-way-border"
                     >
                       {/* New Conversation Icon */}
                       <Tooltip delayDuration={300}>
@@ -244,11 +244,11 @@ export function Navigation(props: NavigationProps) {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.1 }}
                             onClick={handleNewConversation}
-                            className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
+                            className="group relative transition-all duration-300 p-2 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <LordIcon src={getLordiconUrl('plus')} width={16} height={16} className="w-4 h-4" trigger="hover" />
+                            <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                           </motion.button>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -264,14 +264,14 @@ export function Navigation(props: NavigationProps) {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.2 }}
                             onClick={handleToggleConversationHistory}
-                            className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
+                            className="group relative transition-all duration-300 p-2 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
                             {showConversationList ? (
-                              <LordIcon src={getLordiconUrl('x')} width={16} height={16} className="w-4 h-4" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('x')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                             ) : (
-                              <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('history')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                             )}
                           </motion.button>
                         </TooltipTrigger>
@@ -288,13 +288,13 @@ export function Navigation(props: NavigationProps) {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: 0.3 }}
-                              className={`group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center ${
+                              className={`group relative transition-all duration-300 p-2 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center ${
                                 pathname === `/ship/${starshipSlug}/management` ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15' : ''
                               }`}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              <LordIcon src={getLordiconUrl('settings')} width={16} height={16} className="w-4 h-4" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('settings')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                             </motion.div>
                           </Link>
                         </TooltipTrigger>

@@ -17,13 +17,13 @@ export function NavigationItem({ href, label, icon, isActive }: NavigationItemPr
   const content = (
     <Link href={href}>
       <motion.div
-        className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl flex items-center justify-center ${
+        className={`group relative transition-all duration-300 mx-1.5 p-2.5 rounded-xl flex items-center justify-center ${
           isActive ? 'bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border border-primary/30' : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
         }`}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <LordIcon src={getLordiconUrl(icon)} width={20} height={20} className="w-5 h-5" trigger="hover" />
+        <LordIcon src={getLordiconUrl(icon)} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
       </motion.div>
     </Link>
   )

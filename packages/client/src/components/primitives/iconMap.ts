@@ -28,6 +28,8 @@ const map: Record<string, ResolvedIcon> = {
   plus: { type: 'phosphor', component: 'Plus' },
   x: { type: 'phosphor', component: 'X' },
   history: { type: 'phosphor', component: 'ClockCounterClockwise' },
+  sun: { type: 'phosphor', component: 'Sun' },
+  moon: { type: 'phosphor', component: 'Moon' },
 
   // Status & help
   'alert-triangle': { type: 'phosphor', component: 'Warning' },

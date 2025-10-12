@@ -6,6 +6,7 @@ import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
+import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -95,6 +96,7 @@ export function Navigation(props: NavigationProps) {
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
+  const isManagementRoute = starshipSlug ? pathname === `/ship/${starshipSlug}/management` : false
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
@@ -177,7 +179,7 @@ export function Navigation(props: NavigationProps) {
 
         {/* Navigation Content */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
-          <div className="p-3 space-y-3">
+          <div className="p-3 space-y-4">
             {/* Overview - First nav item */}
             {starshipSlug && (
               <Tooltip delayDuration={300}>
@@ -279,34 +281,11 @@ export function Navigation(props: NavigationProps) {
                           {showConversationList ? 'Hide' : 'Show'} History
                         </TooltipContent>
                       </Tooltip>
-
-                      {/* Ship Management Icon */}
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <Link href={`/ship/${starshipSlug}/management`}>
-                            <motion.div
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.3 }}
-                              className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border ${
-                                pathname === `/ship/${starshipSlug}/management`
-                                  ? 'text-primary bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
-                                  : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                              }`}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              <LordIcon src={getLordiconUrl('settings')} width={24} height={24} className="w-[24px] h-[24px]" trigger="hover" />
-                            </motion.div>
-                          </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                          Ship Management
-                        </TooltipContent>
-                      </Tooltip>
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Ship Management moved to end of navigation */}
               </div>
             )}
 
@@ -314,6 +293,13 @@ export function Navigation(props: NavigationProps) {
             {navigationSections.map(section => (
               <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} />
             ))}
+
+            {/* Ship Management - Root-level at the end */}
+            {starshipSlug && (
+              <div>
+                <NavigationItem href={`/ship/${starshipSlug}/management`} label="Ship Management" icon="settings" isActive={isManagementRoute} />
+              </div>
+            )}
           </div>
         </div>
 

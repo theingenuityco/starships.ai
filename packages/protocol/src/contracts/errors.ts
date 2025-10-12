@@ -98,7 +98,11 @@ export type StandardErrorCode =
   | 'OAUTH_CALLBACK_ERROR'
   | 'OAUTH_TOKEN_INVALID'
   | 'OAUTH_EMAIL_MISMATCH'
-  | 'OAUTH_ACCOUNT_LINKING_FAILED';
+  | 'OAUTH_ACCOUNT_LINKING_FAILED'
+  // Promo specific
+  | 'PROMO_CODE_INVALID'
+  | 'PROMO_CODE_EXPIRED'
+  | 'PROMO_CODE_EXHAUSTED';
 
 /**
  * Base error interface

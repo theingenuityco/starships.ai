@@ -37,6 +37,9 @@ export function Navigation(props: NavigationProps) {
   // Smooth height animation: measure content height
   const [userSubnavHeight, setUserSubnavHeight] = useState(0)
   const userSubnavContentRef = useRef<HTMLDivElement>(null)
+  // Smooth height animation (conversations)
+  const [conversationSubnavHeight, setConversationSubnavHeight] = useState(0)
+  const conversationSubnavContentRef = useRef<HTMLDivElement>(null)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -99,6 +102,8 @@ export function Navigation(props: NavigationProps) {
     return () => window.removeEventListener('resize', measure)
   }, [showUserSubnav])
 
+  // Measure conversation subnav content height (declared after route flags below)
+
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
@@ -108,6 +113,22 @@ export function Navigation(props: NavigationProps) {
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
+
+  // Measure conversation subnav content height
+  useEffect(() => {
+    const measure = () => {
+      const el = conversationSubnavContentRef.current
+      if (!el) return
+      setConversationSubnavHeight(el.offsetHeight)
+    }
+    if (isConversationRoute) {
+      measure()
+      window.addEventListener('resize', measure)
+    } else {
+      setConversationSubnavHeight(0)
+    }
+    return () => window.removeEventListener('resize', measure)
+  }, [isConversationRoute])
 
   // Conversation action handlers
   const deleteConversationMutation = useDeleteConversation()
@@ -207,29 +228,24 @@ export function Navigation(props: NavigationProps) {
                 if (!isConversations) return null
 
                 return (
-                  <AnimatePresence>
-                    {isConversationRoute && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3, ease: 'easeInOut' }}
-                        className="rounded-bl-xl rounded-br-xl mx-1.5 space-y-1.5 overflow-hidden -mt-2 pt-4 pb-2 px-2 flex flex-col items-center bg-muted/40"
-                      >
+                  isConversationRoute && (
+                    <motion.div
+                      initial={false}
+                      animate={{ height: isConversationRoute ? conversationSubnavHeight : 0, opacity: isConversationRoute ? 1 : 0, y: isConversationRoute ? 0 : 4 }}
+                      transition={{ duration: 0.24, ease: 'easeInOut' }}
+                      className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden -mt-2 bg-muted/40"
+                      style={{ willChange: 'height, opacity, transform' }}
+                    >
+                      <div ref={conversationSubnavContentRef} className="pt-4 pb-2 px-2 flex flex-col items-center space-y-1.5">
                         {/* New Conversation Icon */}
                         <Tooltip delayDuration={300}>
                           <TooltipTrigger asChild>
-                            <motion.button
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.1 }}
+                            <button
                               onClick={handleNewConversation}
                               className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
                             >
                               <LordIcon src={getLordiconUrl('plus')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
-                            </motion.button>
+                            </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
                             New Conversation
@@ -239,29 +255,24 @@ export function Navigation(props: NavigationProps) {
                         {/* Conversation History Toggle Icon */}
                         <Tooltip delayDuration={300}>
                           <TooltipTrigger asChild>
-                            <motion.button
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.2 }}
+                            <button
                               onClick={handleToggleConversationHistory}
                               className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
                             >
                               {showConversationList ? (
                                 <LordIcon src={getLordiconUrl('x')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
                               ) : (
                                 <LordIcon src={getLordiconUrl('history')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
                               )}
-                            </motion.button>
+                            </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
                             {showConversationList ? 'Hide' : 'Show'} History
                           </TooltipContent>
                         </Tooltip>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  )
                 )
               }}
             />

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autopilot-runner
+  namespace: starships-prod
+  labels:
+    app: autopilot-runner
+    environment: production
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: autopilot-runner
+      environment: production
+  template:
+    metadata:
+      labels:
+        app: autopilot-runner
+        environment: production
+    spec:
+      serviceAccountName: autopilot-runner
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: autopilot-runner
+          image: ghcr.io/theingenuityco/autopilot-runner:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 50051
+              name: grpc
+          env:
+            - name: RUNNER_PORT
+              value: '50051'
+            - name: RUNNER_CONCURRENCY
+              value: '8'
+            - name: RUNNER_FASTPATH_ENABLED
+              value: 'true'
+            - name: RUNNER_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: RUNNER_AUTH_TOKEN
+          resources:
+            requests:
+              cpu: '250m'
+              memory: '256Mi'
+            limits:
+              cpu: '2000m'
+              memory: '2Gi'

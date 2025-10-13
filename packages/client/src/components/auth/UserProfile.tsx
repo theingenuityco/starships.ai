@@ -1,6 +1,8 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
+import { LordIcon } from '@/components/animated/LordIcon'
+import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
@@ -38,16 +40,23 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
   if (mode === 'collapsed') {
     return (
       <div className="flex justify-center group">
-        <div className="p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" onClick={handleGoToProfile}>
-          <div className="flex items-center gap-2">
-            {userAvatar ? (
-              <Avatar className="w-5 h-5">
-                <AvatarFallback className="text-xs">{userAvatar}</AvatarFallback>
-              </Avatar>
-            ) : (
-              <Icon name="user" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-            )}
-          </div>
+        <div
+          className={`group relative transition-all duration-300 mx-auto rounded-xl w-12 h-12 flex items-center justify-center border text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md cursor-pointer`}
+          onClick={handleGoToProfile}
+          role="button"
+          aria-label="Open profile"
+          tabIndex={0}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') handleGoToProfile()
+          }}
+        >
+          {userAvatar ? (
+            <Avatar className="w-8 h-8">
+              <AvatarFallback className="text-xs">{userAvatar}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <LordIcon src={getLordiconUrl('user')} width={32} height={32} className="w-[32px] h-[32px]" trigger="click" />
+          )}
         </div>
       </div>
     )
@@ -61,7 +70,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
     >
       <div className="relative">
         <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
-          <Icon name="user" className="w-4 h-4 text-primary" />
+          <LordIcon src={getLordiconUrl('user')} width={16} height={16} className="w-4 h-4 text-primary" trigger="click" />
         </div>
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-background animate-pulse"></div>
       </div>

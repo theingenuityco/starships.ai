@@ -81,6 +81,7 @@ export class KubernetesJobRunner implements Runner {
               {
                 name: this.opts.containerName ?? 'runner',
                 image: this.opts.image,
+                imagePullPolicy: 'Always',
                 command: ['node', 'scripts/runner-cli.js'],
                 env: [
                   { name: 'NODE_ENV', value: 'production' },

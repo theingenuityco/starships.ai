@@ -139,6 +139,13 @@ jobs:
             -n ${{ env.NAMESPACE }}
           echo "✅ Secrets updated successfully."
 
+      - name: Set runner image env (by SHA tag)
+        run: |
+          echo "Setting AUTOPILOT_K8S_IMAGE to runner tag: ${{ steps.get-image.outputs.image_tag }}"
+          kubectl set env statefulset/starships-app \
+            AUTOPILOT_K8S_IMAGE=${{ env.REGISTRY }}/theingenuityco/autopilot-runner:${{ steps.get-image.outputs.image_tag }} \
+            -n ${{ env.NAMESPACE }}
+
       - name: Deploy new image
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"

@@ -249,6 +249,10 @@ jobs:
 
           # Update deployment with new image
           IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          # Ensure app uses the intended runner image version (matches input version)
+          kubectl set env deployment/starships-app \
+            AUTOPILOT_K8S_IMAGE=ghcr.io/theingenuityco/autopilot-runner:${{ steps.version.outputs.version }} \
+            -n starships-prod
           kubectl set image deployment/starships-app \
             starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }} \
             -n starships-prod

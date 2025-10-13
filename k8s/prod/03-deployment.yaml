@@ -27,7 +27,8 @@ spec:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '3000'
     spec:
-      serviceAccountName: autopilot-runner
+      # serviceAccount no longer required (server does not create Jobs)
+      # serviceAccountName: autopilot-runner
       # Security Context - Temporarily disabled due to supervisor permission issues
       # TODO: Fix Docker image to work with non-root user
       # securityContext:
@@ -62,17 +63,13 @@ spec:
               value: 'production'
             - name: AUTOPILOT_RUNNER
               value: 'remote'
-            - name: AUTOPILOT_REMOTE_URL
+            - name: RUNNER_URL
               value: 'http://autopilot-runner.starships-prod.svc.cluster.local:50051'
-            - name: AUTOPILOT_REMOTE_TOKEN
+            - name: RUNNER_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: RUNNER_AUTH_TOKEN
-            - name: AUTOPILOT_K8S_IMAGE
-              value: 'ghcr.io/theingenuityco/autopilot-runner:latest'
-            - name: AUTOPILOT_K8S_NAMESPACE
-              value: 'starships-prod'
             - name: SKIP_BUILD
               value: 'true'
             - name: SKIP_INSTALL

@@ -10,5 +10,5 @@ export default function ProfilePage(): React.JSX.Element {
     router.replace('/ship')
   }, [router])
 
-  return null
+  return <></>
 }

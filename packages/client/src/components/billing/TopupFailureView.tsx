@@ -131,7 +131,6 @@ export function TopupFailureView({ slug }: TopupFailureViewProps): React.JSX.Ele
                       variant="outline"
                       className="border-slate-300 text-slate-700 hover:bg-slate-200/50 dark:border-slate-600 dark:text-slate-200"
                       onClick={() => router.push(`/ship/${slug}/settings/billing`)}
-                      onClick={() => router.push(`/ship/${slug}/settings/billing`)}
                     >
                       Go to billing
                     </Button>

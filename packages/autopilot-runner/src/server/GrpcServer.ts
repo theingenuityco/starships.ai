@@ -62,8 +62,7 @@ export class GrpcServer {
 
   async start(): Promise<void> {
     const routes = (router: ConnectRouter) => {
-      // Unary Execute via generated descriptor (temporary any-cast for registration only)
-      const executeDesc = RunnerService.methods.Execute as DescMethod;
+      const executeDesc = RunnerService.methods.Execute as unknown as DescMethod;
       (
         router as unknown as { rpc: (m: DescMethod, h: (req: ExecuteRequest, ctx: RequestContext) => Promise<ExecuteResponse>) => void }
       ).rpc(executeDesc, async (req: ExecuteRequest, ctx: RequestContext): Promise<ExecuteResponse> => {
@@ -77,9 +76,8 @@ export class GrpcServer {
         };
       });
 
-      // Server-streaming ExecuteStream (typed handler; method registration until real codegen)
       const registrar = router as unknown as StreamingRegistrar;
-      const streamDesc = RunnerService.methods.ExecuteStream as DescMethod;
+      const streamDesc = RunnerService.methods.ExecuteStream as unknown as DescMethod;
       registrar.serverStreaming(streamDesc, async (req: ExecuteRequest, ctx: StreamContext) => {
         this.checkAuth(ctx.requestHeader.get('authorization'));
         const write = async (type: string, data: unknown) => {

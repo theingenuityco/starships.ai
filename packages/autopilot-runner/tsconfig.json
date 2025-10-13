@@ -8,7 +8,8 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "isolatedModules": true
+    "isolatedModules": true,
+    "preserveSymlinks": true
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]

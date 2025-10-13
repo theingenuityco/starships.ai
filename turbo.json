@@ -50,6 +50,7 @@
       "outputs": ["dist/**"]
     },
     "@starships/autopilot-runner#build": {
+      "dependsOn": ["@starships/autopilot#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", "buf.yaml", "buf.gen.yaml", "src/proto/**"],
       "outputs": ["dist/**", "src/gen/**"]
     },

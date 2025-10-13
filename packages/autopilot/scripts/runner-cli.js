@@ -6,10 +6,18 @@
 
 (async () => {
   try {
-    const chunks = [];
-    for await (const c of process.stdin) chunks.push(c);
-    const raw = Buffer.concat(chunks).toString('utf8');
-    const payload = raw ? JSON.parse(raw) : {};
+    let payload;
+    const payloadPath = process.env.PAYLOAD_PATH;
+    if (payloadPath && typeof payloadPath === 'string') {
+      const fs = require('node:fs');
+      const raw = fs.readFileSync(payloadPath, 'utf8');
+      payload = raw ? JSON.parse(raw) : {};
+    } else {
+      const chunks = [];
+      for await (const c of process.stdin) chunks.push(c);
+      const raw = Buffer.concat(chunks).toString('utf8');
+      payload = raw ? JSON.parse(raw) : {};
+    }
 
     const { blueprint, execution, config, autopilotCredentials } = payload || {};
 
@@ -46,14 +54,16 @@
 process.on('uncaughtException', (err) => {
   const message = err && err.message ? String(err.message) : 'uncaughtException';
   const stack = err && err.stack ? String(err.stack) : undefined;
-  try { process.stdout.write(JSON.stringify({ ok: false, error: { message, stack } }) + '\n'); } catch {}
+  try {
+    process.stdout.write(JSON.stringify({ ok: false, error: { message, stack } }) + '\n');
+  } catch {}
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
   const err = reason instanceof Error ? reason : new Error(String(reason));
-  try { process.stdout.write(JSON.stringify({ ok: false, error: { message: err.message, stack: err.stack } }) + '\n'); } catch {}
+  try {
+    process.stdout.write(JSON.stringify({ ok: false, error: { message: err.message, stack: err.stack } }) + '\n');
+  } catch {}
   process.exit(1);
 });
-
-

@@ -2,11 +2,19 @@ FROM node:20-slim AS build
 WORKDIR /app
 # Install pnpm
 RUN npm i -g pnpm
-# Pre-copy only runner package manifests for a scoped install
-COPY packages/autopilot-runner/package.json packages/autopilot-runner/pnpm-lock.yaml* packages/autopilot-runner/.npmrc ./packages/autopilot-runner/
-RUN pnpm -C packages/autopilot-runner install --frozen-lockfile
-# Copy runner source and build
-COPY ./packages/autopilot-runner/ ./packages/autopilot-runner/
+# Copy workspace manifests
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY tsconfig.json tsconfig.nodejs.json ./
+# Pre-copy package manifests for filtered workspaces
+COPY packages/autopilot/package.json ./packages/autopilot/package.json
+COPY packages/autopilot-runner/package.json ./packages/autopilot-runner/package.json
+# Install only required workspaces
+RUN pnpm install -w --filter @starships/autopilot --filter @starships/autopilot-runner --frozen-lockfile
+# Copy sources for the two workspaces
+COPY packages/autopilot/ ./packages/autopilot/
+COPY packages/autopilot-runner/ ./packages/autopilot-runner/
+# Build dependencies in order: autopilot first, then runner
+RUN pnpm -C packages/autopilot build
 RUN pnpm -C packages/autopilot-runner build
 
 FROM node:20-slim

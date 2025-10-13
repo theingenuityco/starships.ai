@@ -1,14 +1,13 @@
 FROM node:20-slim AS build
 WORKDIR /app
-# Copy workspace root files for pnpm install
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
-COPY tsconfig.json tsconfig.nodejs.json ./
-RUN npm i -g pnpm && pnpm fetch
-# Copy only the runner package
+# Install pnpm
+RUN npm i -g pnpm
+# Pre-copy only runner package manifests for a scoped install
+COPY packages/autopilot-runner/package.json packages/autopilot-runner/pnpm-lock.yaml* packages/autopilot-runner/.npmrc ./packages/autopilot-runner/
+RUN pnpm -C packages/autopilot-runner install --frozen-lockfile
+# Copy runner source and build
 COPY ./packages/autopilot-runner/ ./packages/autopilot-runner/
-RUN echo "node-linker=hoisted" >> packages/autopilot-runner/.npmrc \
-  && pnpm -C packages/autopilot-runner install \
-  && pnpm -C packages/autopilot-runner build
+RUN pnpm -C packages/autopilot-runner build
 
 FROM node:20-slim
 WORKDIR /app

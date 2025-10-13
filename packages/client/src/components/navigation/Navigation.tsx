@@ -7,7 +7,6 @@ import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
@@ -122,13 +121,14 @@ export function Navigation(props: NavigationProps) {
       setConversationSubnavHeight(el.offsetHeight)
     }
     if (isConversationRoute) {
-      measure()
+      // Measure on next frame to ensure subnav content is mounted
+      requestAnimationFrame(measure)
       window.addEventListener('resize', measure)
     } else {
       setConversationSubnavHeight(0)
     }
     return () => window.removeEventListener('resize', measure)
-  }, [isConversationRoute])
+  }, [isConversationRoute, starshipSlug])
 
   // Conversation action handlers
   const deleteConversationMutation = useDeleteConversation()
@@ -170,9 +170,9 @@ export function Navigation(props: NavigationProps) {
 
   // Build a single unified navigation section list
   const mainNavigationItems = [
-    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'Conversations', icon: 'message-square', isActive: isConversationRoute }] : []),
-    { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
+    { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
 
@@ -236,7 +236,7 @@ export function Navigation(props: NavigationProps) {
                       className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
                       style={{ willChange: 'height, opacity, transform' }}
                     >
-                      <div ref={conversationSubnavContentRef} className="pt-4 pb-2 px-2 flex flex-col items-center space-y-1.5">
+                      <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-2 flex flex-col items-center space-y-1.5">
                         {/* New Conversation Icon */}
                         <Tooltip delayDuration={300}>
                           <TooltipTrigger asChild>
@@ -279,11 +279,8 @@ export function Navigation(props: NavigationProps) {
           </div>
         </div>
 
-        <div className="flex items-center justify-center">
-          <ThemeToggle />
-        </div>
         {/* User Profile Section - Collapsed Mode with upward subnav */}
-        <div className="border-t border-border/20 flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
+        <div className="flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
           {/* Upward subnav - renders ABOVE the user icon */}
           <motion.div
             initial={false}

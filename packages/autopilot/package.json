@@ -24,6 +24,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@kubernetes/client-node": "^1.0.0",
     "fast-json-patch": "^3.1.1",
     "nanoid": "^5.1.5",
     "openai": "^6.1.0"

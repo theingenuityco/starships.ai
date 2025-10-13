@@ -11,8 +11,7 @@ import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { EngineConfig } from '@/engine/Engine';
-import { LocalRunner } from '@/runner/LocalRunner';
-import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
+import { RunnerFactory } from '@/runner/RunnerFactory';
 import { BlueprintBuilder } from '@/BlueprintBuilder';
 
 export class Agent implements NodeHandler {
@@ -270,8 +269,7 @@ export class Agent implements NodeHandler {
       // Execute using runner chosen by current execution depth
       const blueprint = this.getCurrentBlueprint();
       const depth = execution.depth ?? 0;
-      // Use ChildProcessRunner for top-level Agent executions (depth 0) and LocalRunner for nested (depth > 0)
-      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      const runner = RunnerFactory.getTopLevelRunner(depth);
       return await runner.run(blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

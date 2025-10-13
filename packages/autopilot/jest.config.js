@@ -4,6 +4,10 @@ const baseConfig = require('../../jest.preset.js');
 module.exports = {
   ...baseConfig,
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
+  moduleNameMapper: {
+    ...(baseConfig.moduleNameMapper || {}),
+    '^@kubernetes/client-node$': '<rootDir>/src/tests/mocks/k8s-client-node.ts',
+  },
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/**/index.ts'],
   coverageThreshold: {
     global: {

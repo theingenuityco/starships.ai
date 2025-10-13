@@ -11,8 +11,7 @@ import { ValidationResult, ValidationError, ExecutionItem, Execution } from '@/t
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
-import { LocalRunner } from '@/runner/LocalRunner';
-import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
+import { RunnerFactory } from '@/runner/RunnerFactory';
 
 export class Tool extends BaseNode<ToolParams> {
   constructor(params: ToolParams, options?: NodeHandlerOptions) {
@@ -67,7 +66,7 @@ export class Tool extends BaseNode<ToolParams> {
         secureEnv: this.getOptions()?.secureEnv,
       };
       const depth = subExec.depth ?? 0;
-      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      const runner = RunnerFactory.getTopLevelRunner(depth);
       const items = await runner.run(params.blueprint, subExec, engineConfig);
       const result = ExecutionItemUtils.unwrapSingle(items);
 

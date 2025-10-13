@@ -41,6 +41,8 @@ export { config } from './constants';
 export type { Runner } from './runner/Runner';
 export { LocalRunner } from './runner/LocalRunner';
 export { ChildProcessRunner } from './runner/ChildProcessRunner';
+export { KubernetesJobRunner } from './runner/KubernetesJobRunner';
+export { RunnerFactory } from './runner/RunnerFactory';
 
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';

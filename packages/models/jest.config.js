@@ -14,6 +14,7 @@ module.exports = {
     '^@starships/autopilot/src/(.*)$': '<rootDir>/../autopilot/src/$1',
     '^@starships/autopilot/(.*)$': '<rootDir>/../autopilot/dist/$1',
     '^@starships/(.+)$': '<rootDir>/../$1/src',
+    '^@kubernetes/client-node$': '<rootDir>/../autopilot/src/tests/mocks/k8s-client-node.ts',
   },
   // Override transform to handle TypeScript compilation for TS sources
   transform: {

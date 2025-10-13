@@ -51,4 +51,8 @@ export interface EnvironmentConfig {
 
   // Google Analytics
   GA_MEASUREMENT_ID?: string;
+
+  // Autopilot Remote Runner
+  AUTOPILOT_REMOTE_URL?: string;
+  AUTOPILOT_REMOTE_TOKEN?: string;
 }

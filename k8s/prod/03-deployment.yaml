@@ -61,7 +61,14 @@ spec:
             - name: NODE_ENV
               value: 'production'
             - name: AUTOPILOT_RUNNER
-              value: 'k8s'
+              value: 'remote'
+            - name: AUTOPILOT_REMOTE_URL
+              value: 'http://autopilot-runner.starships-prod.svc.cluster.local:50051'
+            - name: AUTOPILOT_REMOTE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: RUNNER_AUTH_TOKEN
             - name: AUTOPILOT_K8S_IMAGE
               value: 'ghcr.io/theingenuityco/autopilot-runner:latest'
             - name: AUTOPILOT_K8S_NAMESPACE

@@ -1,0 +1,36 @@
+{
+  "name": "@starships/autopilot-runner",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Low-latency gRPC runner service for executing Autopilot blueprints with a local worker pool",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -f tsconfig.tsbuildinfo && tsc --build && tsc-alias -p tsconfig.json",
+    "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/index.ts",
+    "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "gen": "buf generate"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.2.2",
+    "@connectrpc/connect": "^2.0.0",
+    "@connectrpc/connect-node": "^2.0.0",
+    "@starships/autopilot": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

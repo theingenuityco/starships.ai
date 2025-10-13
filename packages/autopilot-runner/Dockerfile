@@ -2,6 +2,8 @@ FROM node:20-slim AS build
 WORKDIR /app
 # Install pnpm
 RUN npm i -g pnpm
+# Install curl for fetching buf
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 # Copy workspace manifests
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY tsconfig.json tsconfig.nodejs.json ./
@@ -14,9 +16,13 @@ RUN echo "node-linker=hoisted" >> packages/autopilot-runner/.npmrc \
 # Copy sources for the two workspaces
 COPY packages/autopilot/ ./packages/autopilot/
 COPY packages/autopilot-runner/ ./packages/autopilot-runner/
-# Build dependencies in order: autopilot first, then runner
+# Build dependencies in order: autopilot first, then generate runner types, then build runner
 RUN pnpm -C packages/autopilot build
-RUN pnpm -C packages/autopilot-runner build
+RUN curl -sSL -o /usr/local/bin/buf https://github.com/bufbuild/buf/releases/download/v1.45.0/buf-Linux-x86_64 \
+  && chmod +x /usr/local/bin/buf \
+  && buf --version \
+  && pnpm -C packages/autopilot-runner gen \
+  && pnpm -C packages/autopilot-runner build
 
 FROM node:20-slim
 WORKDIR /app/packages/autopilot-runner
@@ -28,6 +34,7 @@ RUN mkdir -p /app/packages/autopilot
 COPY --from=build /app/packages/autopilot/package.json /app/packages/autopilot/package.json
 COPY --from=build /app/packages/autopilot/dist /app/packages/autopilot/dist
 COPY --from=build /app/packages/autopilot/node_modules /app/packages/autopilot/node_modules
+COPY --from=build /app/node_modules /app/node_modules
 USER 1000:1000
 CMD ["node", "dist/index.js"]
 

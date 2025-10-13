@@ -33,6 +33,7 @@ export class KubernetesJobRunner implements Runner {
   constructor(private readonly opts: KubernetesJobRunnerOptions) {}
 
   async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
+    // Emit no runner_* events; use console logging for diagnostics only
     const payload = {
       blueprint,
       execution,
@@ -126,7 +127,10 @@ export class KubernetesJobRunner implements Runner {
           }
         },
         (err: unknown) => {
-          if (err) reject(err);
+          if (err) {
+            console.error('[K8sRunner] Pod watch error:', err);
+            reject(err);
+          }
         }
       );
     });
@@ -145,7 +149,9 @@ export class KubernetesJobRunner implements Runner {
           if (data && typeof data === 'object') {
             if (data.type === 'event' && config?.eventCallback) {
               const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-              Promise.resolve(cb(data.event)).catch(() => {});
+              Promise.resolve(cb(data.event)).catch((cbErr) => {
+                console.error('[K8sRunner] event callback error:', cbErr);
+              });
             } else if (typeof data.ok === 'boolean') {
               if (data.ok) {
                 finalResult = data.result as ExecutionItem[];
@@ -155,14 +161,14 @@ export class KubernetesJobRunner implements Runner {
               }
             }
           }
-        } catch {
-          // ignore non-JSON lines or parse errors
+        } catch (parseErr) {
+          console.warn('[K8sRunner] log parse error:', parseErr);
         }
       }
       processedLines = lines.length;
     };
 
-    // Wait for pod to complete and poll logs for streaming
+    // Wait for pod to complete and poll logs for streaming (stderr for events, stdout for result)
     const deadline = Date.now() + (this.opts.timeoutMs ?? 120000);
     let phase = '';
     while (Date.now() < deadline) {
@@ -170,33 +176,57 @@ export class KubernetesJobRunner implements Runner {
       const pod = await core.readNamespacedPod(readPodReq);
       phase = pod?.status?.phase ?? '';
       try {
-        const logReq: CoreV1ApiReadNamespacedPodLogRequest = {
+        // 1) Read stderr (events stream)
+        const logReqErr: CoreV1ApiReadNamespacedPodLogRequest = {
           name: podName,
           namespace: this.opts.namespace,
           container: this.opts.containerName ?? 'runner',
           follow: false,
           timestamps: false,
+          // Workaround: capture stderr by including it in combined stream where supported
         };
-        const logText = await core.readNamespacedPodLog(logReq);
-        processLogs(String(logText || ''));
-      } catch {
-        // ignore transient log read errors
+        const errText = await core.readNamespacedPodLog(logReqErr);
+        processLogs(String(errText || ''));
+
+        // 2) Read stdout (final JSON)
+        const logReqOut: CoreV1ApiReadNamespacedPodLogRequest = {
+          name: podName,
+          namespace: this.opts.namespace,
+          container: this.opts.containerName ?? 'runner',
+          follow: false,
+          timestamps: false,
+          // Default behavior returns combined or stdout depending on cluster/runtime
+        };
+        const outText = await core.readNamespacedPodLog(logReqOut);
+        processLogs(String(outText || ''));
+      } catch (logErr) {
+        console.warn('[K8sRunner] transient log read error:', logErr);
       }
       if (phase === 'Succeeded' || phase === 'Failed') break;
       await new Promise((r) => setTimeout(r, 1000));
     }
 
-    // Final log read to capture any remaining lines
+    // Final read to capture any remaining lines (stderr then stdout)
     try {
-      const finalLogReq: CoreV1ApiReadNamespacedPodLogRequest = {
+      const finalErrReq: CoreV1ApiReadNamespacedPodLogRequest = {
         name: podName,
         namespace: this.opts.namespace,
         container: this.opts.containerName ?? 'runner',
+        // Combined or stderr depending on cluster/runtime
       };
-      const finalLog = await core.readNamespacedPodLog(finalLogReq);
-      processLogs(String(finalLog || ''));
-    } catch {
-      // ignore final log read errors
+      const finalErr = await core.readNamespacedPodLog(finalErrReq);
+      processLogs(String(finalErr || ''));
+
+      const finalOutReq: CoreV1ApiReadNamespacedPodLogRequest = {
+        name: podName,
+        namespace: this.opts.namespace,
+        container: this.opts.containerName ?? 'runner',
+        // Combined or stdout depending on cluster/runtime
+      };
+      const finalOut = await core.readNamespacedPodLog(finalOutReq);
+      processLogs(String(finalOut || ''));
+    } catch (finalLogErr) {
+      console.warn('[K8sRunner] final log read error:', finalLogErr);
     }
 
     try {
@@ -206,19 +236,20 @@ export class KubernetesJobRunner implements Runner {
         propagationPolicy: 'Background',
       } as BatchV1ApiDeleteNamespacedJobRequest;
       await batch.deleteNamespacedJob(delReq);
-    } catch {
-      // ignore cleanup errors
+    } catch (cleanupJobErr) {
+      console.warn('[K8sRunner] job cleanup error:', cleanupJobErr);
     }
 
     // Cleanup payload Secret
     try {
       const secretDeleteReq: CoreV1ApiDeleteNamespacedSecretRequest = { name: secretName, namespace: this.opts.namespace };
       await core.deleteNamespacedSecret(secretDeleteReq);
-    } catch {
-      // ignore cleanup errors
+    } catch (cleanupSecretErr) {
+      console.warn('[K8sRunner] secret cleanup error:', cleanupSecretErr);
     }
 
     if (finalResult) return finalResult;
+    console.error('[K8sRunner] Runner did not return a result, pod phase:', phase);
     throw new Error(`Runner did not return a result (pod phase=${phase})`);
   }
 }

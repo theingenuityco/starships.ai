@@ -1,7 +1,18 @@
 import type { Runner } from './Runner';
 import type { Blueprint, Execution, ExecutionItem } from '@/types';
 import type { EngineConfig } from '@/engine/Engine';
-import { KubeConfig, BatchV1Api, CoreV1Api, Watch } from '@kubernetes/client-node';
+import {
+  KubeConfig,
+  BatchV1Api,
+  CoreV1Api,
+  Watch,
+  type V1Job,
+  type V1Pod,
+  type BatchV1ApiCreateNamespacedJobRequest,
+  type BatchV1ApiDeleteNamespacedJobRequest,
+  type CoreV1ApiReadNamespacedPodRequest,
+  type CoreV1ApiReadNamespacedPodLogRequest,
+} from '@kubernetes/client-node';
 
 export interface KubernetesJobRunnerOptions {
   namespace: string;
@@ -32,7 +43,7 @@ export class KubernetesJobRunner implements Runner {
     const core = kc.makeApiClient(CoreV1Api);
     const watch = new Watch(kc);
 
-    const jobManifest: any = {
+    const jobManifest: V1Job = {
       apiVersion: 'batch/v1',
       kind: 'Job',
       metadata: { generateName: 'autopilot-exec-', namespace: this.opts.namespace },
@@ -70,23 +81,24 @@ export class KubernetesJobRunner implements Runner {
       },
     };
 
-    const created = await batch.createNamespacedJob({ namespace: this.opts.namespace, body: jobManifest } as any);
-    const jobName = (created as any)?.metadata?.name || created?.metadata?.name;
+    const createReq: BatchV1ApiCreateNamespacedJobRequest = { namespace: this.opts.namespace, body: jobManifest };
+    const created = await batch.createNamespacedJob(createReq);
+    const jobName = created?.metadata?.name ?? 'autopilot-exec';
 
     const podName = await new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Pod watch timeout')), this.opts.timeoutMs ?? 120000);
       watch.watch(
         `/api/v1/namespaces/${this.opts.namespace}/pods`,
         { labelSelector: `job-name=${jobName}` },
-        (_type: string, obj: any) => {
+        (_type: string, obj: Partial<V1Pod>) => {
           const name = obj?.metadata?.name;
-          const phase = obj?.status?.phase;
+          const phase = obj?.status?.phase as string | undefined;
           if (name && phase) {
             clearTimeout(timer);
             resolve(name);
           }
         },
-        (err: any) => {
+        (err: unknown) => {
           if (err) reject(err);
         }
       );
@@ -116,7 +128,9 @@ export class KubernetesJobRunner implements Runner {
               }
             }
           }
-        } catch {}
+        } catch {
+          // ignore non-JSON lines or parse errors
+        }
       }
       processedLines = lines.length;
     };
@@ -125,36 +139,49 @@ export class KubernetesJobRunner implements Runner {
     const deadline = Date.now() + (this.opts.timeoutMs ?? 120000);
     let phase = '';
     while (Date.now() < deadline) {
-      const pod = await core.readNamespacedPod({ name: podName, namespace: this.opts.namespace } as any);
-      const podData: any = pod as any;
-      phase = podData?.status?.phase ?? '';
+      const readPodReq: CoreV1ApiReadNamespacedPodRequest = { name: podName, namespace: this.opts.namespace };
+      const pod = await core.readNamespacedPod(readPodReq);
+      phase = pod?.status?.phase ?? '';
       try {
-        const logText = await core.readNamespacedPodLog({
+        const logReq: CoreV1ApiReadNamespacedPodLogRequest = {
           name: podName,
           namespace: this.opts.namespace,
           container: this.opts.containerName ?? 'runner',
           follow: false,
           timestamps: false,
-        } as any);
-        processLogs(String((logText as any) || ''));
-      } catch {}
+        };
+        const logText = await core.readNamespacedPodLog(logReq);
+        processLogs(String(logText || ''));
+      } catch {
+        // ignore transient log read errors
+      }
       if (phase === 'Succeeded' || phase === 'Failed') break;
       await new Promise((r) => setTimeout(r, 1000));
     }
 
     // Final log read to capture any remaining lines
     try {
-      const finalLog = await core.readNamespacedPodLog({
+      const finalLogReq: CoreV1ApiReadNamespacedPodLogRequest = {
         name: podName,
         namespace: this.opts.namespace,
         container: this.opts.containerName ?? 'runner',
-      } as any);
-      processLogs(String((finalLog as any) || ''));
-    } catch {}
+      };
+      const finalLog = await core.readNamespacedPodLog(finalLogReq);
+      processLogs(String(finalLog || ''));
+    } catch {
+      // ignore final log read errors
+    }
 
     try {
-      await batch.deleteNamespacedJob({ name: jobName, namespace: this.opts.namespace, propagationPolicy: 'Background' } as any);
-    } catch {}
+      const delReq: BatchV1ApiDeleteNamespacedJobRequest = {
+        name: jobName,
+        namespace: this.opts.namespace,
+        propagationPolicy: 'Background',
+      } as BatchV1ApiDeleteNamespacedJobRequest;
+      await batch.deleteNamespacedJob(delReq);
+    } catch {
+      // ignore cleanup errors
+    }
 
     if (finalResult) return finalResult;
     throw new Error(`Runner did not return a result (pod phase=${phase})`);

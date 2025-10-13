@@ -19,7 +19,6 @@ spec:
         app: autopilot-runner
         environment: dev
     spec:
-      serviceAccountName: autopilot-runner
       imagePullSecrets:
         - name: ghcr-pull-secret
       containers:

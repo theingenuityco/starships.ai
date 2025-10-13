@@ -25,6 +25,8 @@ const map: Record<string, ResolvedIcon> = {
   store: { type: 'phosphor', component: 'Storefront' },
   key: { type: 'phosphor', component: 'Key' },
   'message-square': { type: 'phosphor', component: 'ChatCircleText' },
+  // Send / paper plane
+  send: { type: 'phosphor', component: 'PaperPlaneTilt' },
   plus: { type: 'phosphor', component: 'Plus' },
   x: { type: 'phosphor', component: 'X' },
   history: { type: 'phosphor', component: 'ClockCounterClockwise' },

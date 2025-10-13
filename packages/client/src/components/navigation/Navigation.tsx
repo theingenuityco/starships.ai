@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -34,6 +34,9 @@ export function Navigation(props: NavigationProps) {
   const [showConversationList, setShowConversationList] = useState(false)
   // State for user subnav toggle
   const [showUserSubnav, setShowUserSubnav] = useState(false)
+  // Smooth height animation: measure content height
+  const [userSubnavHeight, setUserSubnavHeight] = useState(0)
+  const userSubnavContentRef = useRef<HTMLDivElement>(null)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -79,6 +82,22 @@ export function Navigation(props: NavigationProps) {
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 
   const starshipSlug = navigationStarshipSlug
+
+  // Re-measure user subnav content when opened or on resize
+  useEffect(() => {
+    const measure = () => {
+      const el = userSubnavContentRef.current
+      if (!el) return
+      setUserSubnavHeight(el.offsetHeight)
+    }
+    if (showUserSubnav) {
+      measure()
+      window.addEventListener('resize', measure)
+    } else {
+      setUserSubnavHeight(0)
+    }
+    return () => window.removeEventListener('resize', measure)
+  }, [showUserSubnav])
 
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')
@@ -253,67 +272,59 @@ export function Navigation(props: NavigationProps) {
           <ThemeToggle />
         </div>
         {/* User Profile Section - Collapsed Mode with upward subnav */}
-        <div className="border-t border-border/20 flex-shrink-0 p-2 flex flex-col items-center justify-center">
+        <div className="border-t border-border/20 flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
           {/* Upward subnav - renders ABOVE the user icon */}
-          <AnimatePresence>
-            {showUserSubnav && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, y: 8 }}
-                animate={{ opacity: 1, height: 'auto', y: 0 }}
-                exit={{ opacity: 0, height: 0, y: 8 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="rounded-tl-xl rounded-tr-xl mx-1.5 space-y-1.5 overflow-hidden mb-2 pt-2 pb-2 px-2 flex flex-col items-center bg-muted/40"
-              >
-                <Tooltip delayDuration={300}>
-                  <TooltipTrigger asChild>
-                    <motion.button
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.05 }}
-                      onClick={() => {
-                        if (!starshipSlug) return
-                        router.push(`/ship/${starshipSlug}/settings/usage`)
-                        setShowUserSubnav(false)
-                      }}
-                      className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <LordIcon src={getLordiconUrl('settings')} width={22} height={22} className="w-[22px] h-[22px]" trigger="click" />
-                    </motion.button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                    Settings
-                  </TooltipContent>
-                </Tooltip>
+          <motion.div
+            initial={false}
+            animate={{ height: userSubnavHeight, opacity: showUserSubnav ? 1 : 0, y: showUserSubnav ? 0 : 4 }}
+            transition={{ duration: 0.24, ease: 'easeInOut' }}
+            className="rounded-tl-xl rounded-tr-xl mx-1.5 overflow-hidden mb-2 bg-muted/40"
+            style={{ willChange: 'height, opacity, transform' }}
+          >
+            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-2 flex flex-col items-center space-y-1.5">
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={() => {
+                      if (!starshipSlug) return
+                      router.push(`/ship/${starshipSlug}/settings/usage`)
+                      setShowUserSubnav(false)
+                    }}
+                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <LordIcon src={getLordiconUrl('settings')} width={22} height={22} className="w-[22px] h-[22px]" trigger="click" />
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                  Settings
+                </TooltipContent>
+              </Tooltip>
 
-                <Tooltip delayDuration={300}>
-                  <TooltipTrigger asChild>
-                    <motion.button
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 }}
-                      onClick={async () => {
-                        try {
-                          await logout()
-                        } finally {
-                          router.push('/')
-                        }
-                      }}
-                      className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <LordIcon src={getLordiconUrl('x')} width={22} height={22} className="w-[22px] h-[22px]" trigger="click" />
-                    </motion.button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                    Sign out
-                  </TooltipContent>
-                </Tooltip>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={async () => {
+                      try {
+                        await logout()
+                      } finally {
+                        router.push('/')
+                      }
+                    }}
+                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <LordIcon src={getLordiconUrl('x')} width={22} height={22} className="w-[22px] h-[22px]" trigger="click" />
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                  Sign out
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </motion.div>
           {/* Profile icon (click to toggle) */}
           <UserProfile
             mode="collapsed"

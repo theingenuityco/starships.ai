@@ -18,7 +18,8 @@
     "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/index.ts",
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "gen": "buf generate"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.2",

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: autopilot-runner
+  namespace: starships-prod
+  labels:
+    app: autopilot-runner
+    environment: production
+spec:
+  type: ClusterIP
+  selector:
+    app: autopilot-runner
+    environment: production
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc

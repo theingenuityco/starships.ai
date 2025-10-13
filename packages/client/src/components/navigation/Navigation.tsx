@@ -25,14 +25,6 @@ interface NavigationProps {
 
 // Global navigation structure that works for all authenticated users
 const getGlobalNavigationSections = (starshipSlug: string | null) => [
-  ...(starshipSlug
-    ? [
-        {
-          title: 'Settings',
-          items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', status: 'optimal' }],
-        },
-      ]
-    : []),
   {
     title: 'Resources',
     items: [{ href: `/marketplace`, label: 'Marketplace', icon: 'store', status: 'optimal' }],

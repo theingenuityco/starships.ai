@@ -11,8 +11,7 @@ import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem } f
 import { ValidationError } from '@/types/validation';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
-import { LocalRunner } from '@/runner/LocalRunner';
-import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
+import { RunnerFactory } from '@/runner/RunnerFactory';
 
 export class Workflow extends BaseNode<WorkflowParams> {
   constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
@@ -41,7 +40,7 @@ export class Workflow extends BaseNode<WorkflowParams> {
         secureEnv: this.getOptions()?.secureEnv,
       };
       const depth = execution.depth ?? 0;
-      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      const runner = RunnerFactory.getTopLevelRunner(depth);
       return await runner.run(params.blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

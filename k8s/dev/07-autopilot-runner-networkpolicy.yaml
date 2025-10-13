@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: autopilot-runner-default-deny-egress
+  namespace: starships-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: autopilot-runner
+  policyTypes: ["Egress"]
+  egress: []
+
+

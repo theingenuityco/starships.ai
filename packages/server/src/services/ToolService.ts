@@ -1,4 +1,4 @@
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import { Engine, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { ToolParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository, ToolRepository } from '@starships/models';
@@ -157,17 +157,13 @@ export class ToolService {
               config: toolConfig,
             };
 
-            // Execute the tool's blueprint using the autopilot Engine
-            const engine = new Engine({
-              failOnNodeError: true, // Fail fast on tool errors
-            });
-
-            // Create an execution context and add initial input
+            // Execute the tool's blueprint using the autopilot Runner abstraction
             const execution = ExecutionItemUtils.createExecution();
             const initialItems = ExecutionItemUtils.wrapSingle(executionContext);
             execution.results.push({ nodeRef: '__initial__', items: initialItems });
 
-            const resultItems = await engine.executeBlueprint(dbTool.blueprint!, execution);
+            const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
+            const resultItems = await runner.run(dbTool.blueprint!, execution, { failOnNodeError: true });
             const result = ExecutionItemUtils.unwrapSingle(resultItems);
 
             // Return the result as a string

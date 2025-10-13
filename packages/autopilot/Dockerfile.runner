@@ -1,0 +1,15 @@
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package.json pnpm-lock.yaml* ./
+RUN npm i -g pnpm && pnpm fetch
+COPY ./packages/autopilot/ ./packages/autopilot/
+RUN pnpm -C packages/autopilot install --offline && pnpm -C packages/autopilot build
+
+FROM node:20-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/packages/autopilot/dist ./dist
+COPY packages/autopilot/scripts/runner-cli.js ./scripts/runner-cli.js
+USER 1000:1000
+ENTRYPOINT ["node", "scripts/runner-cli.js"]
+

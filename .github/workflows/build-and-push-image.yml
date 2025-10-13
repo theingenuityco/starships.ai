@@ -146,6 +146,50 @@ jobs:
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
 
+  build-autopilot-runner:
+    name: Build Autopilot Runner Image
+    runs-on: ubuntu-latest
+    needs: [calculate-version]
+    if: |
+      needs.calculate-version.outputs.should_build == 'true' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_build != 'true')
+      )
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (runner)
+        id: meta_runner
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/theingenuityco/autopilot-runner
+          tags: |
+            type=raw,value=${{ needs.calculate-version.outputs.new_release_version }},enable=${{ needs.calculate-version.outputs.new_release_published == 'true' }}
+            type=sha,format=short
+            type=raw,value=latest
+
+      - name: Build and push runner image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/autopilot
+          file: ./packages/autopilot/Dockerfile.runner
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta_runner.outputs.tags }}
+          labels: ${{ steps.meta_runner.outputs.labels }}
+
   # Create Release and Tag (AFTER successful build)
   create-release:
     name: Create Release

@@ -66,6 +66,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/dev/03-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/04-service.yaml
           kubectl apply --dry-run=client -f k8s/dev/05-ingress.yaml
+          kubectl apply --dry-run=client -f k8s/dev/06-autopilot-runner-rbac.yaml
+          kubectl apply --dry-run=client -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
@@ -75,6 +77,8 @@ jobs:
           kubectl apply -f k8s/dev/03-deployment.yaml
           kubectl apply -f k8s/dev/04-service.yaml
           kubectl apply -f k8s/dev/05-ingress.yaml
+          kubectl apply -f k8s/dev/06-autopilot-runner-rbac.yaml
+          kubectl apply -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           echo "✅ Applied manifests to dev cluster."
 
       - name: Update secrets

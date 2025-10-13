@@ -217,6 +217,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/03-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/04-service.yaml
           kubectl apply --dry-run=client -f k8s/prod/05-ingress.yaml
+          kubectl apply --dry-run=client -f k8s/prod/06-autopilot-runner-rbac.yaml
+          kubectl apply --dry-run=client -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
 
           echo "✅ All manifests validated successfully"
 
@@ -231,6 +233,8 @@ jobs:
           kubectl apply -f k8s/prod/03-deployment.yaml
           kubectl apply -f k8s/prod/04-service.yaml
           kubectl apply -f k8s/prod/05-ingress.yaml
+          kubectl apply -f k8s/prod/06-autopilot-runner-rbac.yaml
+          kubectl apply -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
 
           # Add deployment annotations for tracking
           kubectl annotate deployment starships-app \

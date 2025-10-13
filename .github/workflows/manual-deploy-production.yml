@@ -252,8 +252,12 @@ jobs:
             deployment.starships.ai/dev-verified="${{ steps.dev_check.outputs.dev_verified }}" \
             -n starships-prod --overwrite
 
-          # Update app deployment image only (runner is managed as a separate deployment)
+          # Update runner deployment image to the new version
           IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          kubectl set image deployment/autopilot-runner \
+            autopilot-runner=ghcr.io/theingenuityco/autopilot-runner:${{ steps.version.outputs.version }} \
+            -n starships-prod
+          # Update app deployment image
           kubectl set image deployment/starships-app \
             starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }} \
             -n starships-prod
@@ -262,7 +266,20 @@ jobs:
 
           # Wait for rollout with timeout
           echo "⏳ Waiting for rollout to complete (timeout: 10 minutes)..."
+          # Wait for both runner and app rollouts
+          RUNNER_OK=false
+          APP_OK=false
+          if kubectl rollout status deployment/autopilot-runner -n starships-prod --timeout=600s; then
+            RUNNER_OK=true
+          else
+            RUNNER_OK=false
+          fi
           if kubectl rollout status deployment/starships-app -n starships-prod --timeout=600s; then
+            APP_OK=true
+          else
+            APP_OK=false
+          fi
+          if [ "$RUNNER_OK" = true ] && [ "$APP_OK" = true ]; then
             echo "✅ Rollout completed successfully"
             echo "deployment_status=success" >> $GITHUB_OUTPUT
           else

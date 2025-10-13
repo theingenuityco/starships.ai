@@ -259,7 +259,7 @@ export function Navigation(props: NavigationProps) {
                       className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
                       style={{ willChange: 'height, opacity, transform' }}
                     >
-                      <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1.5">
+                      <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
                         {/* New Conversation Icon */}
                         <Tooltip delayDuration={300}>
                           <TooltipTrigger asChild>
@@ -267,7 +267,7 @@ export function Navigation(props: NavigationProps) {
                               onClick={handleNewConversation}
                               className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             >
-                              <LordIcon src={getLordiconUrl('plus')} width={20} height={20} className="w-[20px] h-[20px]" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -283,9 +283,9 @@ export function Navigation(props: NavigationProps) {
                               className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             >
                               {showConversationList ? (
-                                <LordIcon src={getLordiconUrl('x')} width={20} height={20} className="w-[20px] h-[20px]" trigger="hover" />
+                                <LordIcon src={getLordiconUrl('x')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                               ) : (
-                                <LordIcon src={getLordiconUrl('history')} width={20} height={20} className="w-[20px] h-[20px]" trigger="hover" />
+                                <LordIcon src={getLordiconUrl('history')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                               )}
                             </button>
                           </TooltipTrigger>
@@ -312,7 +312,7 @@ export function Navigation(props: NavigationProps) {
             className="rounded-tl-xl rounded-tr-xl mx-1.5 overflow-hidden mb-2 bg-muted/40"
             style={{ willChange: 'height, opacity, transform' }}
           >
-            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1.5">
+            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <motion.button

@@ -265,9 +265,9 @@ export function Navigation(props: NavigationProps) {
                           <TooltipTrigger asChild>
                             <button
                               onClick={handleNewConversation}
-                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             >
-                              <LordIcon src={getLordiconUrl('plus')} width={28} height={28} className="w-[28px] h-[28px]" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('plus')} width={20} height={20} className="w-[20px] h-[20px]" trigger="hover" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -280,12 +280,12 @@ export function Navigation(props: NavigationProps) {
                           <TooltipTrigger asChild>
                             <button
                               onClick={handleToggleConversationHistory}
-                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             >
                               {showConversationList ? (
-                                <LordIcon src={getLordiconUrl('x')} width={28} height={28} className="w-[28px] h-[28px]" trigger="hover" />
+                                <LordIcon src={getLordiconUrl('x')} width={20} height={20} className="w-[20px] h-[20px]" trigger="hover" />
                               ) : (
-                                <LordIcon src={getLordiconUrl('history')} width={28} height={28} className="w-[28px] h-[28px]" trigger="hover" />
+                                <LordIcon src={getLordiconUrl('history')} width={20} height={20} className="w-[20px] h-[20px]" trigger="hover" />
                               )}
                             </button>
                           </TooltipTrigger>
@@ -321,7 +321,7 @@ export function Navigation(props: NavigationProps) {
                       router.push(`/ship/${starshipSlug}/settings/usage`)
                       // keep subnav expanded; do not setShowUserSubnav(false)
                     }}
-                    className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border ${
+                    className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
                       isSettingsRoute
                         ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
@@ -329,7 +329,7 @@ export function Navigation(props: NavigationProps) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <LordIcon src={getLordiconUrl('settings')} width={28} height={28} className="w-[28px] h-[28px]" trigger="click" />
+                    <LordIcon src={getLordiconUrl('settings')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
                   </motion.button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -347,11 +347,11 @@ export function Navigation(props: NavigationProps) {
                         router.push('/')
                       }
                     }}
-                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-10 h-10 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <LordIcon src={getLordiconUrl('x')} width={28} height={28} className="w-[28px] h-[28px]" trigger="click" />
+                    <LordIcon src={getLordiconUrl('x')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
                   </motion.button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>

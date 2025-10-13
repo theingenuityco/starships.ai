@@ -36,6 +36,7 @@ spec:
         app: starships-ai
         environment: dev
     spec:
+      serviceAccountName: autopilot-runner
       terminationGracePeriodSeconds: 120
       imagePullSecrets:
         - name: ghcr-pull-secret
@@ -65,6 +66,12 @@ spec:
           env:
             - name: NODE_ENV
               value: 'development'
+            - name: AUTOPILOT_RUNNER
+              value: 'k8s'
+            - name: AUTOPILOT_K8S_IMAGE
+              value: 'ghcr.io/theingenuityco/autopilot-runner:latest'
+            - name: AUTOPILOT_K8S_NAMESPACE
+              value: 'starships-dev'
             - name: SKIP_BUILD
               value: 'true'
             - name: SKIP_INSTALL

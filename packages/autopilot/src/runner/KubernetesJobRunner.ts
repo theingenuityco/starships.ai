@@ -8,10 +8,13 @@ import {
   Watch,
   type V1Job,
   type V1Pod,
+  type V1Secret,
   type BatchV1ApiCreateNamespacedJobRequest,
   type BatchV1ApiDeleteNamespacedJobRequest,
   type CoreV1ApiReadNamespacedPodRequest,
   type CoreV1ApiReadNamespacedPodLogRequest,
+  type CoreV1ApiCreateNamespacedSecretRequest,
+  type CoreV1ApiDeleteNamespacedSecretRequest,
 } from '@kubernetes/client-node';
 
 export interface KubernetesJobRunnerOptions {
@@ -36,13 +39,25 @@ export class KubernetesJobRunner implements Runner {
       config: { ...config, eventCallback: undefined },
       autopilotCredentials: { openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined },
     };
-    const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
+    const payloadJson = JSON.stringify(payload);
 
     const kc = new KubeConfig();
     kc.loadFromDefault();
     const batch = kc.makeApiClient(BatchV1Api);
     const core = kc.makeApiClient(CoreV1Api);
     const watch = new Watch(kc);
+
+    // Create a Secret to hold the payload (protects secureContext/credentials)
+    const payloadSecret: V1Secret = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      type: 'Opaque',
+      metadata: { generateName: 'autopilot-exec-payload-', namespace: this.opts.namespace },
+      stringData: { 'payload.json': payloadJson },
+    } as V1Secret;
+    const secretCreateReq: CoreV1ApiCreateNamespacedSecretRequest = { namespace: this.opts.namespace, body: payloadSecret };
+    const createdSecret = await core.createNamespacedSecret(secretCreateReq);
+    const secretName = createdSecret?.metadata?.name ?? 'autopilot-exec-payload';
 
     const jobManifest: V1Job = {
       apiVersion: 'batch/v1',
@@ -56,6 +71,7 @@ export class KubernetesJobRunner implements Runner {
           metadata: { labels: { app: 'autopilot-runner' } },
           spec: {
             serviceAccountName: this.opts.serviceAccountName ?? 'autopilot-runner',
+            automountServiceAccountToken: false,
             imagePullSecrets: (this.opts.imagePullSecrets?.length ? this.opts.imagePullSecrets : ['ghcr-pull-secret']).map((name) => ({
               name,
             })),
@@ -65,10 +81,10 @@ export class KubernetesJobRunner implements Runner {
               {
                 name: this.opts.containerName ?? 'runner',
                 image: this.opts.image,
-                command: ['sh', '-lc', 'echo "$PAYLOAD_B64" | base64 -d | node scripts/runner-cli.js'],
+                command: ['node', 'scripts/runner-cli.js'],
                 env: [
                   { name: 'NODE_ENV', value: 'production' },
-                  { name: 'PAYLOAD_B64', value: payloadB64 },
+                  { name: 'PAYLOAD_PATH', value: '/run/payload/payload.json' },
                   ...Object.entries(this.opts.extraEnv ?? {}).map(([k, v]) => ({ name: k, value: v })),
                 ],
                 resources: {
@@ -76,10 +92,16 @@ export class KubernetesJobRunner implements Runner {
                   requests: { cpu: '100m', memory: '128Mi' },
                 },
                 securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } },
-                volumeMounts: [{ name: 'tmp', mountPath: '/tmp' }],
+                volumeMounts: [
+                  { name: 'tmp', mountPath: '/tmp' },
+                  { name: 'payload', mountPath: '/run/payload', readOnly: true },
+                ],
               },
             ],
-            volumes: [{ name: 'tmp', emptyDir: { medium: 'Memory' } }],
+            volumes: [
+              { name: 'tmp', emptyDir: { medium: 'Memory' } },
+              { name: 'payload', secret: { secretName } },
+            ],
           },
         },
       },
@@ -183,6 +205,14 @@ export class KubernetesJobRunner implements Runner {
         propagationPolicy: 'Background',
       } as BatchV1ApiDeleteNamespacedJobRequest;
       await batch.deleteNamespacedJob(delReq);
+    } catch {
+      // ignore cleanup errors
+    }
+
+    // Cleanup payload Secret
+    try {
+      const secretDeleteReq: CoreV1ApiDeleteNamespacedSecretRequest = { name: secretName, namespace: this.opts.namespace };
+      await core.deleteNamespacedSecret(secretDeleteReq);
     } catch {
       // ignore cleanup errors
     }

@@ -1,7 +1,9 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
-import { Sparkles } from 'lucide-react'
+
 import type { Blueprint } from '@starships/autopilot'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import type { AgentBuilderViewProps, AgentBuilderViewRef } from './types'
@@ -65,7 +67,7 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4 max-w-md px-6">
                 <div className="w-20 h-20 mx-auto rounded-full frosted-glass-card shadow-frosted-lg flex items-center justify-center">
-                  <Sparkles className="w-10 h-10 text-muted-foreground/50" />
+                  <Icon name="sparkles" className="w-10 h-10 text-muted-foreground/50" />
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-foreground">No Blueprint Yet</h3>

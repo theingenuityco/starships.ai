@@ -1,5 +1,6 @@
 'use client'
 
+
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import type { PaginationMeta } from '@starships/protocol'

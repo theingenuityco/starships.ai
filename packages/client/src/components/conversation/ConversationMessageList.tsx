@@ -1,9 +1,12 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { Bot, User, Loader2 } from 'lucide-react'
+
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationStreamed } from '@/hooks/useConversations'
@@ -366,11 +369,11 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-                  <Bot className="w-4 h-4 text-muted-foreground" />
+                  <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    <LoadingSpinner className="w-4 h-4 text-muted-foreground" />
                     <span>{(agentName || 'Assistant') + ' is typing...'}</span>
                   </div>
                 </div>
@@ -414,7 +417,7 @@ const MemoizedMessageBubble = memo(
               )}
             </div>
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <User className="w-4 h-4 text-primary" />
+              <Icon name="user" className="w-4 h-4 text-primary" />
             </div>
           </div>
         </div>
@@ -425,7 +428,7 @@ const MemoizedMessageBubble = memo(
         <div className="flex justify-start">
           <div className="flex items-start gap-3 max-w-[85%]">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-              <Bot className="w-4 h-4 text-muted-foreground" />
+              <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
               <ConversationMessageContent

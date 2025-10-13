@@ -1,18 +1,18 @@
+import Icon from '@/components/primitives/Icon'
 import type { ToolTemplateCategory } from '@starships/protocol'
-import { Bot, BarChart2, Users, Package, Wrench } from 'lucide-react'
 
 export const getCategoryIcon = (category: ToolTemplateCategory) => {
   switch (category) {
     case 'automation':
-      return <Bot className="w-5 h-5" />
+      return <Icon name="bot" className="w-5 h-5" />
     case 'data':
-      return <BarChart2 className="w-5 h-5" />
+      return <Icon name="bar-chart" className="w-5 h-5" />
     case 'communication':
-      return <Users className="w-5 h-5" />
+      return <Icon name="user" className="w-5 h-5" />
     case 'utility':
-      return <Package className="w-5 h-5" />
+      return <Icon name="package" className="w-5 h-5" />
     default:
-      return <Wrench className="w-5 h-5" />
+      return <Icon name="wrench" className="w-5 h-5" />
   }
 }
 

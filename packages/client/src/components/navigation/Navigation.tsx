@@ -1,48 +1,45 @@
 'use client'
 
+import { LordIcon } from '@/components/animated/LordIcon'
+import { getLordiconUrl } from '@/components/primitives/lordiconMap'
+
 import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { History, MessageSquare, Plus, X, Settings, Key, Store, Rocket } from 'lucide-react'
+
 import { AnimatePresence, motion } from 'motion/react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface NavigationProps {
   isMobile?: boolean
 }
 
-// Global navigation structure that works for all authenticated users
-const getGlobalNavigationSections = (starshipSlug: string | null) => [
-  {
-    title: 'Resources',
-    items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
-  },
-  ...(starshipSlug
-    ? [
-        {
-          title: 'Settings',
-          items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: Key, status: 'optimal' }],
-        },
-      ]
-    : []),
-]
+// (All items are composed into a single NavigationSection below)
 
 export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, logout } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
   // State for conversation list toggle
   const [showConversationList, setShowConversationList] = useState(false)
+  // State for user subnav toggle
+  const [showUserSubnav, setShowUserSubnav] = useState(false)
+  // Smooth height animation: measure content height
+  const [userSubnavHeight, setUserSubnavHeight] = useState(0)
+  const userSubnavContentRef = useRef<HTMLDivElement>(null)
+  const userSectionRef = useRef<HTMLDivElement>(null)
+  // Smooth height animation (conversations)
+  const [conversationSubnavHeight, setConversationSubnavHeight] = useState(0)
+  const conversationSubnavContentRef = useRef<HTMLDivElement>(null)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -89,12 +86,72 @@ export function Navigation(props: NavigationProps) {
 
   const starshipSlug = navigationStarshipSlug
 
+  // Re-measure user subnav content when opened or on resize
+  useEffect(() => {
+    const measure = () => {
+      const el = userSubnavContentRef.current
+      if (!el) return
+      setUserSubnavHeight(el.offsetHeight)
+    }
+    if (showUserSubnav) {
+      measure()
+      window.addEventListener('resize', measure)
+    } else {
+      setUserSubnavHeight(0)
+    }
+    return () => window.removeEventListener('resize', measure)
+  }, [showUserSubnav])
+
+  // Measure conversation subnav content height (declared after route flags below)
+
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
+  const isSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings`) : false
+  const isUsageSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/usage`) : false
+  const isEnvironmentSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/environment`) : false
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
+
+  // Collapse user subnav on outside click when not on settings route
+  useEffect(() => {
+    const handleDocClick = (e: MouseEvent) => {
+      if (!showUserSubnav) return
+      if (isSettingsRoute) return // keep expanded on settings routes
+      const container = userSectionRef.current
+      const target = e.target as Node | null
+      if (container && target && !container.contains(target)) {
+        setShowUserSubnav(false)
+      }
+    }
+    document.addEventListener('mousedown', handleDocClick)
+    return () => document.removeEventListener('mousedown', handleDocClick)
+  }, [showUserSubnav, isSettingsRoute])
+
+  // Collapse user subnav on route changes away from settings
+  useEffect(() => {
+    if (!isSettingsRoute) {
+      setShowUserSubnav(false)
+    }
+  }, [pathname, isSettingsRoute])
+
+  // Measure conversation subnav content height
+  useEffect(() => {
+    const measure = () => {
+      const el = conversationSubnavContentRef.current
+      if (!el) return
+      setConversationSubnavHeight(el.offsetHeight)
+    }
+    if (isConversationRoute) {
+      // Measure on next frame to ensure subnav content is mounted
+      requestAnimationFrame(measure)
+      window.addEventListener('resize', measure)
+    } else {
+      setConversationSubnavHeight(0)
+    }
+    return () => window.removeEventListener('resize', measure)
+  }, [isConversationRoute, starshipSlug])
 
   // Conversation action handlers
   const deleteConversationMutation = useDeleteConversation()
@@ -134,13 +191,13 @@ export function Navigation(props: NavigationProps) {
     setShowConversationList(false)
   }
 
-  // Show comprehensive navigation for all authenticated users
-  const getNavigationSections = () => {
-    if (!isAuthenticated) return []
-    return getGlobalNavigationSections(starshipSlug)
-  }
-
-  const navigationSections = getNavigationSections()
+  // Build a single unified navigation section list
+  const mainNavigationItems = [
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'Conversations', icon: 'message-square', isActive: isConversationRoute }] : []),
+    { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
+  ]
 
   // Handle logo click - smart navigation based on context
   const handleLogoClick = () => {
@@ -160,166 +217,158 @@ export function Navigation(props: NavigationProps) {
   return (
     <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
       <div
-        className="flex flex-col w-16 flex-shrink-0 transition-all duration-300 ease-in-out"
+        className="flex flex-col items-center justify-center w-14 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
         }}
       >
         {/* Compact Header with Theme Toggle */}
-        <div className="px-2 py-4 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Overview">
-            <StarshipsLogo width={36} height={36} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger} />
+        <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
+          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Navigate to Overview">
+            <StarshipsLogo
+              width={36}
+              height={36}
+              className="opacity-70"
+              gradientId="nav-gradient"
+              animationDelay={1}
+              repeatDelay={20}
+              triggerAnimation={animationTrigger}
+              idleLoop={false}
+              playOnMountOnce={true}
+            />
           </div>
         </div>
 
         {/* Navigation Content */}
-        <div className="flex-1 flex flex-col justify-center min-h-0">
-          <div className="p-2 space-y-2">
-            {/* Overview - First nav item */}
-            {starshipSlug && (
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link href={`/ship/${starshipSlug}`}>
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
+          <div className="p-3 space-y-4">
+            <NavigationSection
+              title="Navigation"
+              items={mainNavigationItems}
+              pathname={pathname}
+              renderAfter={item => {
+                const isConversations = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}/conversations`
+                if (!isConversations) return null
+
+                return (
+                  isConversationRoute && (
                     <motion.div
-                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
-                        isOverviewRoute
-                          ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
-                          : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      initial={false}
+                      animate={{ height: isConversationRoute ? conversationSubnavHeight : 0, opacity: isConversationRoute ? 1 : 0, y: isConversationRoute ? 0 : 4 }}
+                      transition={{ duration: 0.24, ease: 'easeInOut' }}
+                      className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
+                      style={{ willChange: 'height, opacity, transform' }}
                     >
-                      <Rocket className={`w-5 h-5 ${isOverviewRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
-                    </motion.div>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                  Overview
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {/* Conversations Section - Only show when user has a starship */}
-            {starshipSlug && (
-              <div>
-                {/* Main Conversations Icon - Standalone */}
-                <Tooltip delayDuration={300}>
-                  <TooltipTrigger asChild>
-                    <Link href={`/ship/${starshipSlug}/conversations`}>
-                      <motion.div
-                        className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
-                          isConversationRoute
-                            ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
-                            : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                        }`}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <MessageSquare className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
-                      </motion.div>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                    Conversations
-                  </TooltipContent>
-                </Tooltip>
-
-                {/* Expanded Sub-icons Container - Visually joined from bottom */}
-                <AnimatePresence>
-                  {isConversationRoute && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                      className="border-l border-r border-b border-primary/15 rounded-bl-xl rounded-br-xl mx-1 space-y-1 overflow-hidden -mt-2 pt-4 pb-2 flex flex-col items-center three-way-border"
-                    >
-                      {/* New Conversation Icon */}
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <motion.button
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 }}
-                            onClick={handleNewConversation}
-                            className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                          </motion.button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                          New Conversation
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Conversation History Toggle Icon */}
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <motion.button
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.2 }}
-                            onClick={handleToggleConversationHistory}
-                            className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            {showConversationList ? (
-                              <X className="w-4 h-4 text-primary transition-colors" />
-                            ) : (
-                              <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                            )}
-                          </motion.button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                          {showConversationList ? 'Hide' : 'Show'} History
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Ship Management Icon */}
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <Link href={`/ship/${starshipSlug}/management`}>
-                            <motion.div
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.3 }}
-                              className={`group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center ${
-                                pathname === `/ship/${starshipSlug}/management` ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15' : ''
-                              }`}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                      <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
+                        {/* New Conversation Icon */}
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={handleNewConversation}
+                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                             >
-                              <Settings
-                                className={`w-4 h-4 ${pathname === `/ship/${starshipSlug}/management` ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}
-                              />
-                            </motion.div>
-                          </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                          Ship Management
-                        </TooltipContent>
-                      </Tooltip>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+                              <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                            New Conversation
+                          </TooltipContent>
+                        </Tooltip>
 
-            {/* Other Navigation Items */}
-            {navigationSections.map(section => (
-              <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} />
-            ))}
+                        {/* Conversation History Toggle Icon */}
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={handleToggleConversationHistory}
+                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                            >
+                              {showConversationList ? (
+                                <LordIcon src={getLordiconUrl('x')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
+                              ) : (
+                                <LordIcon src={getLordiconUrl('history')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                            {showConversationList ? 'Hide' : 'Show'} History
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </motion.div>
+                  )
+                )
+              }}
+            />
           </div>
         </div>
 
-        <div className="flex items-center justify-center">
-          <ThemeToggle />
-        </div>
-        {/* User Profile Section - Collapsed Mode */}
-        <div className="border-t border-border/20 flex-shrink-0 p-2 flex items-center justify-center">
-          <UserProfile mode="collapsed" />
+        {/* User Profile Section - Collapsed Mode with upward subnav */}
+        <div ref={userSectionRef} className="flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
+          {/* Upward subnav - renders ABOVE the user icon */}
+          <motion.div
+            initial={false}
+            animate={{ height: userSubnavHeight, opacity: showUserSubnav ? 1 : 0, y: showUserSubnav ? 0 : 4 }}
+            transition={{ duration: 0.24, ease: 'easeInOut' }}
+            className="rounded-tl-xl rounded-tr-xl mx-1.5 overflow-hidden mb-2 bg-muted/40"
+            style={{ willChange: 'height, opacity, transform' }}
+          >
+            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={() => {
+                      if (!starshipSlug) return
+                      router.push(`/ship/${starshipSlug}/settings/usage`)
+                      // keep subnav expanded; do not setShowUserSubnav(false)
+                    }}
+                    className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
+                      isSettingsRoute
+                        ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <LordIcon src={getLordiconUrl('settings')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                  Settings
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={async () => {
+                      try {
+                        await logout()
+                      } finally {
+                        router.push('/')
+                      }
+                    }}
+                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <LordIcon src={getLordiconUrl('logout')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                  Sign out
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </motion.div>
+          {/* Profile icon (click to toggle) */}
+          <UserProfile
+            mode="collapsed"
+            active={showUserSubnav || isSettingsRoute}
+            onClick={() => {
+              setShowConversationList(false)
+              setShowUserSubnav(prev => !prev)
+            }}
+          />
         </div>
       </div>
 

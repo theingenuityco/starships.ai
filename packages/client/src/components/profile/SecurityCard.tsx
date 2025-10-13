@@ -1,12 +1,14 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React from 'react'
 import type { FormState, PasswordErrors } from '@/hooks/useAccountForm'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Lock, Shield, Plus, Chrome, Github } from 'lucide-react'
+
 
 type SecurityCardProps = {
   // Authentication state
@@ -55,7 +57,7 @@ export default function SecurityCard({
     <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Shield className="h-4 w-4 text-primary" />
+          <Icon name="shield" className="h-4 w-4 text-primary" />
           Account Security
         </CardTitle>
         <CardDescription>
@@ -70,7 +72,7 @@ export default function SecurityCard({
             {!showPassword ? (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-primary" />
+                  <Icon name="lock" className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Password</p>
                     <p className="text-xs text-muted-foreground">
@@ -156,7 +158,7 @@ export default function SecurityCard({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4 text-muted-foreground" />
+                <Icon name="lock" className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Password (Optional)</p>
                   <p className="text-xs text-muted-foreground">
@@ -165,7 +167,7 @@ export default function SecurityCard({
                 </div>
               </div>
               <Button type="button" variant="outline" onClick={onSetPassword}>
-                <Plus className="h-3 w-3 mr-1" />
+                <Icon name="plus" className="h-3 w-3 mr-1" />
                 Set up password
               </Button>
             </div>
@@ -176,7 +178,7 @@ export default function SecurityCard({
         {isPasswordOnly && onConnectOAuth && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-primary" />
+              <Icon name="plus" className="h-4 w-4 text-primary" />
               <div>
                 <p className="text-sm font-medium">Connect Additional Accounts</p>
                 <p className="text-xs text-muted-foreground">
@@ -192,7 +194,7 @@ export default function SecurityCard({
                 size="sm" 
                 onClick={() => onConnectOAuth('google')}
               >
-                <Chrome className="h-3 w-3 mr-1" />
+                <Icon name="chrome" className="h-3 w-3 mr-1" />
                 Connect Google
               </Button>
               <Button 
@@ -201,7 +203,7 @@ export default function SecurityCard({
                 size="sm" 
                 onClick={() => onConnectOAuth('github')}
               >
-                <Github className="h-3 w-3 mr-1" />
+                <Icon name="github" className="h-3 w-3 mr-1" />
                 Connect GitHub
               </Button>
             </div>

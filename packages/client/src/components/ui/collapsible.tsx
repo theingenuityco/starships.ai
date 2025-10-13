@@ -1,8 +1,10 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+
 
 interface CollapsibleProps {
   children: React.ReactNode
@@ -64,7 +66,7 @@ const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTrigge
   return (
     <button ref={ref} className={cn('flex items-center justify-between w-full text-left transition-colors hover:bg-muted/50 rounded-md p-2', className)} onClick={toggle} {...props}>
       <div className="flex items-center gap-2">
-        {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        {isOpen ? <Icon name="chevron-down" className="w-4 h-4 text-muted-foreground" /> : <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground" />}
         {children}
       </div>
     </button>

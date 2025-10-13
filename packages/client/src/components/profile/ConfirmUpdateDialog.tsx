@@ -1,10 +1,12 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ChangeSummaryItem } from '@/hooks/useAccountForm'
-import { Lock, Mail, User as UserIcon } from 'lucide-react'
+
 
 type ConfirmUpdateDialogProps = {
   open: boolean
@@ -30,7 +32,7 @@ export default function ConfirmUpdateDialog({ open, onOpenChange, changeList, sa
                 if (c.type === 'displayName') {
                   return (
                     <li key={i} className="flex items-center gap-2">
-                      <UserIcon className="h-3.5 w-3.5 text-primary" />
+                      <Icon name="user" className="h-3.5 w-3.5 text-primary" />
                       <span>{`Display name: ${c.from} → ${c.to}`}</span>
                     </li>
                   )
@@ -38,14 +40,14 @@ export default function ConfirmUpdateDialog({ open, onOpenChange, changeList, sa
                 if (c.type === 'email') {
                   return (
                     <li key={i} className="flex items-center gap-2">
-                      <Mail className="h-3.5 w-3.5 text-primary" />
+                      <Icon name="mail" className="h-3.5 w-3.5 text-primary" />
                       <span>{`Email: ${c.from} → ${c.to}`}</span>
                     </li>
                   )
                 }
                 return (
                   <li key={i} className="flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5 text-primary" />
+                    <Icon name="lock" className="h-3.5 w-3.5 text-primary" />
                     <span>Password will be updated</span>
                   </li>
                 )

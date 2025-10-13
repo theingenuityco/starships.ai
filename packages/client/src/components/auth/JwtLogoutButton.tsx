@@ -1,9 +1,11 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
-import { LogOut } from 'lucide-react'
+
 
 interface JwtLogoutButtonProps {
   variant?: 'default' | 'secondary' | 'outline' | 'ghost'
@@ -24,7 +26,7 @@ export function JwtLogoutButton({ variant = 'ghost', size = 'default', className
 
   return (
     <Button variant={variant} size={size} className={cn('flex items-center gap-2', className)} onClick={handleLogout} disabled={isLoading}>
-      <LogOut className="h-4 w-4" />
+      <Icon name="log-out" className="h-4 w-4" />
       {children || 'Sign Out'}
     </Button>
   )

@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { useState } from 'react'
 import { AgentModel } from '@starships/protocol'
 import {
@@ -14,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { X, Filter, ChevronDown } from 'lucide-react'
+
 
 interface FilterState {
   category?: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
@@ -63,7 +65,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
       {/* Filter Header */}
       <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/20 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Icon name="filter" className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Filters</span>
           {hasActiveFilters && (
             <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -99,7 +101,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-9 px-3">
                     <span className="truncate mr-1">{filters.category ? filters.category.charAt(0).toUpperCase() + filters.category.slice(1) : 'All categories'}</span>
-                    <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
+                    <Icon name="chevron-down" className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
@@ -123,7 +125,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-9 px-3">
                     <span className="truncate mr-1">{filters.isPublic === undefined ? 'All agents' : filters.isPublic ? 'Public only' : 'Private only'}</span>
-                    <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
+                    <Icon name="chevron-down" className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
@@ -147,7 +149,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-9 px-3">
                     <span className="truncate mr-1">Add tag filter</span>
-                    <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
+                    <Icon name="chevron-down" className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
@@ -178,7 +180,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
                   <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-1">
                     {tag.charAt(0).toUpperCase() + tag.slice(1)}
                     <button onClick={() => removeTag(tag)} className="ml-1 hover:bg-muted rounded-full">
-                      <X className="w-3 h-3" />
+                      <Icon name="x" className="w-3 h-3" />
                     </button>
                   </Badge>
                 ))}

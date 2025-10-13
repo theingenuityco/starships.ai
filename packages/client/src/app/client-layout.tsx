@@ -1,9 +1,11 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { Menu } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -86,12 +88,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             aria-label="Open navigation menu"
             style={{ zIndex: 999 }}
           >
-            <Menu className="w-5 h-5" />
+            <Icon name="menu" className="w-5 h-5" />
           </motion.button>
         )}
 
         {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto">{children}</main>
+        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+          {children}
+        </main>
       </div>
     </JwtAuthGate>
   )

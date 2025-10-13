@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -8,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
-import { Shield, Eye, EyeOff } from 'lucide-react'
+
 
 interface SetPasswordDialogProps {
   open: boolean
@@ -63,7 +65,7 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-primary" />
+            <Icon name="shield" className="h-4 w-4 text-primary" />
             Set up backup password
           </DialogTitle>
           <DialogDescription>
@@ -89,7 +91,7 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
                 onClick={() => setShowPasswords(!showPasswords)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPasswords ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
               </button>
             </div>
           </div>

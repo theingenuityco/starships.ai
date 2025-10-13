@@ -102,8 +102,8 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
                       (r.type === 'TOPUP'
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
                         : r.type === 'REFUND'
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
-                        : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200')
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                          : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200')
                     }
                   >
                     {r.type}
@@ -126,12 +126,14 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
       </table>
       {pagination && (
         <div className="mt-4 flex items-center justify-between">
-          <div className="text-xs text-slate-500 dark:text-slate-400">Page {page} of {Math.max(1, Math.ceil((pagination.total ?? 0) / limit))}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Page {page} of {Math.max(1, Math.ceil((pagination.total ?? 0) / limit))}
+          </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
               Previous
             </Button>
-            <Button variant="outline" size="sm" disabled={!pagination.has_next} onClick={() => setPage((p) => p + 1)}>
+            <Button variant="outline" size="sm" disabled={!pagination.has_next} onClick={() => setPage(p => p + 1)}>
               Next
             </Button>
           </div>

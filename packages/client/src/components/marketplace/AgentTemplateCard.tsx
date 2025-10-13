@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -8,7 +10,7 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Sparkles, Download, CheckCircle } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
@@ -39,15 +41,15 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'coding':
-        return <Code className="w-4 h-4" />
+        return <Icon name="code" className="w-4 h-4" />
       case 'creative':
-        return <Lightbulb className="w-4 h-4" />
+        return <Icon name="lightbulb" className="w-4 h-4" />
       case 'analysis':
-        return <BarChart2 className="w-4 h-4" />
+        return <Icon name="bar-chart3" className="w-4 h-4" />
       case 'support':
-        return <HeartPulse className="w-4 h-4" />
+        return <Icon name="heart-pulse" className="w-4 h-4" />
       default:
-        return <Bot className="w-4 h-4" />
+        return <Icon name="bot" className="w-4 h-4" />
     }
   }
 
@@ -124,11 +126,11 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         {/* Stats */}
         <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1 flex-1 min-w-0">
-            <Bot className="w-4 h-4 flex-shrink-0" />
+            <Icon name="bot" className="w-4 h-4 flex-shrink-0" />
             <span className="font-mono text-xs truncate">{template.model}</span>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Download className="w-4 h-4" />
+            <Icon name="download" className="w-4 h-4" />
             <span>{template.usageCount}</span>
           </div>
         </div>
@@ -151,12 +153,12 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         <div className="mt-auto">
           {isAlreadyDeployed ? (
             <Button size="sm" variant="outline" className="w-full transition-colors" disabled onClick={e => e.stopPropagation()}>
-              <CheckCircle className="w-4 h-4 mr-2" />
+              <Icon name="check-circle" className="w-4 h-4 mr-2" />
               <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
             </Button>
           ) : (
             <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || !primaryStarship}>
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Icon name="sparkles" className="w-4 h-4 mr-2" />
               {isDeploying ? 'Deploying...' : 'Deploy'}
             </Button>
           )}

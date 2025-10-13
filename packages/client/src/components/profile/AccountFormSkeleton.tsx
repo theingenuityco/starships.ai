@@ -1,9 +1,11 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Shield } from 'lucide-react'
+
 
 export default function AccountFormSkeleton() {
   return (
@@ -11,7 +13,7 @@ export default function AccountFormSkeleton() {
       <div className="sticky top-0 z-10 rounded-2xl border border-border/60 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 p-4 ring-1 ring-inset ring-border/40">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
-            <Shield className="h-5 w-5 text-primary" />
+            <Icon name="shield" className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">

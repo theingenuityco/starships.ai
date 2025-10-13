@@ -1,12 +1,15 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
-import { Bot, ChevronDown, Loader2 } from 'lucide-react'
+
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useState } from 'react'
 
 interface AgentSelectorProps {
@@ -35,10 +38,10 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
       <PopoverTrigger asChild>
         <Button variant="outline" className={cn('justify-between', compact ? 'h-8 px-3 text-xs min-w-[120px]' : 'min-w-[180px]')} disabled={loading}>
           <div className="flex items-center gap-2">
-            <Bot className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+            <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
             <span className="truncate">{selectedAgent ? selectedAgent.name : compact ? 'Select Agent' : 'Select an agent'}</span>
           </div>
-          {loading ? <Loader2 className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', 'animate-spin')} /> : <ChevronDown className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
+          {loading ? <LoadingSpinner className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} /> : <Icon name="chevron-down" className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
         </Button>
       </PopoverTrigger>
 
@@ -51,7 +54,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         <div className="p-2 max-h-64 overflow-y-auto custom-scrollbar">
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <LoadingSpinner className="h-4 w-4" />
               <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
             </div>
           ) : agents.length === 0 ? (

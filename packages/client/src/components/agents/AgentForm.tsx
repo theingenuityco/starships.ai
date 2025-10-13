@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { useState } from 'react'
 import { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
 import { agentAPI } from '@/lib/api'
@@ -11,7 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { StarshipSelector } from '@/components/agents/StarshipSelector'
-import { X, Plus, Bot, Sparkles, Code, Palette, BarChart3, Headphones, Tag, Settings, Info, Globe, Lock, MessageSquare, Rocket } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 interface AgentFormProps {
@@ -103,12 +105,12 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
   // Category icons mapping
   const categoryIcons = {
-    general: Sparkles,
-    coding: Code,
-    creative: Palette,
-    analysis: BarChart3,
-    support: Headphones,
-  }
+    general: 'sparkles',
+    coding: 'code',
+    creative: 'palette',
+    analysis: 'bar-chart3',
+    support: 'headphones',
+  } as const
 
   return (
     <div className="p-6">
@@ -116,7 +118,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
         {/* Header with icon */}
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-primary/10 p-2 rounded-lg">
-            <Bot className="h-6 w-6 text-primary" />
+            <Icon name="bot" className="h-6 w-6 text-primary" />
           </div>
           <h2 className="text-xl font-semibold">{agent ? 'Edit Agent' : 'Create New Agent'}</h2>
         </div>
@@ -132,7 +134,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Bot className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="bot" className="h-4 w-4 text-muted-foreground" />
                   Name
                 </label>
                 <Input
@@ -147,7 +149,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="tag" className="h-4 w-4 text-muted-foreground" />
                   Category
                 </label>
                 <div className="text-sm text-muted-foreground p-2 border rounded border-muted-foreground/20 bg-muted/5">Category inferred from agent name</div>
@@ -158,7 +160,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
             <div className="mt-6">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Rocket className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="rocket" className="h-4 w-4 text-muted-foreground" />
                   Starship Assignment
                 </label>
                 <div className="text-sm text-muted-foreground p-2 border rounded border-muted-foreground/20 bg-muted/5">Starship assignment managed separately</div>
@@ -176,7 +178,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="info" className="h-4 w-4 text-muted-foreground" />
                   Description
                 </label>
                 <Textarea
@@ -191,7 +193,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="message-square" className="h-4 w-4 text-muted-foreground" />
                   System Prompt
                 </label>
                 <Textarea
@@ -216,7 +218,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
+                  <Icon name="tag" className="h-4 w-4 text-muted-foreground" />
                   Tags
                 </label>
                 <div className="flex flex-wrap gap-2 mb-2 min-h-[40px] p-2 border rounded-md border-muted-foreground/20 bg-background">
@@ -227,7 +229,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                       <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-1">
                         {tag}
                         <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:bg-muted rounded-full">
-                          <X className="w-3 h-3" />
+                          <Icon name="x" className="w-3 h-3" />
                         </button>
                       </Badge>
                     ))
@@ -242,7 +244,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                   />
                   <Button type="button" onClick={addTag} size="sm" className="px-3">
-                    <Plus className="w-4 h-4 mr-1" />
+                    <Icon name="plus" className="w-4 h-4 mr-1" />
                     Add
                   </Button>
                 </div>
@@ -253,7 +255,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 border rounded-md border-muted-foreground/20 bg-muted/5">
                   <div className="flex items-start gap-3">
-                    {isPublic ? <Globe className="h-5 w-5 text-primary mt-0.5" /> : <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />}
+                    {isPublic ? <Icon name="globe" className="h-5 w-5 text-primary mt-0.5" /> : <Icon name="lock" className="h-5 w-5 text-muted-foreground mt-0.5" />}
                     <div>
                       <label className="text-sm font-medium">Make Public</label>
                       <p className="text-xs text-muted-foreground mt-1">Allow other users to discover and use this agent</p>
@@ -268,7 +270,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
           {/* Advanced Settings */}
           <div>
             <Button type="button" variant="ghost" onClick={() => setShowAdvanced(!showAdvanced)} className="flex items-center gap-2 text-sm">
-              <Settings className="h-4 w-4" />
+              <Icon name="settings" className="h-4 w-4" />
               {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
             </Button>
 
@@ -282,7 +284,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-sm font-medium">
-                      <Settings className="h-4 w-4 text-muted-foreground" />
+                      <Icon name="settings" className="h-4 w-4 text-muted-foreground" />
                       Temperature
                     </label>
                     <Input
@@ -305,7 +307,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-sm font-medium">
-                      <Settings className="h-4 w-4 text-muted-foreground" />
+                      <Icon name="settings" className="h-4 w-4 text-muted-foreground" />
                       Max Tokens
                     </label>
                     <Input
@@ -328,7 +330,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium">
-                    <Settings className="h-4 w-4 text-muted-foreground" />
+                    <Icon name="settings" className="h-4 w-4 text-muted-foreground" />
                     Custom Instructions
                   </label>
                   <Textarea

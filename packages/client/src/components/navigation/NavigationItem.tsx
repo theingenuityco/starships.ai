@@ -1,27 +1,45 @@
 'use client'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { LordIcon } from '@/components/animated/LordIcon'
+import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 import { motion } from 'motion/react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useCallback } from 'react'
 
 interface NavigationItemProps {
   href: string
   label: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: string
   isActive: boolean
 }
 
-export function NavigationItem({ href, label, icon: Icon, isActive }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive }: NavigationItemProps) {
+  const router = useRouter()
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Delay navigation slightly so the icon click animation is visible
+      e.preventDefault()
+      setTimeout(() => router.push(href), 160)
+    },
+    [href, router]
+  )
+
   const content = (
     <Link href={href}>
       <motion.div
-        className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl flex items-center justify-center ${
-          isActive ? 'bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border border-primary/30' : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+        onClick={handleClick}
+        className={`group relative transition-all duration-300 mx-auto rounded-xl w-10 h-10 flex items-center justify-center border ${
+          isActive
+            ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border-primary/30'
+            : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
         }`}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+        <LordIcon src={getLordiconUrl(icon)} width={28} height={28} className="w-[28px] h-[28px]" trigger="click" />
       </motion.div>
     </Link>
   )

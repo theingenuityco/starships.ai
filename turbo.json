@@ -152,6 +152,11 @@
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/env/dist/**"],
       "outputs": []
     },
+    "@starships/autopilot-runner#type-check": {
+      "dependsOn": ["@starships/autopilot#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**"],
+      "outputs": []
+    },
     "type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []

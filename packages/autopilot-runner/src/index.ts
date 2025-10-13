@@ -21,12 +21,10 @@ async function main(): Promise<void> {
 
   const server = new GrpcServer({ port, authToken, queue, executor, workers, fastPathEnabled });
   await server.start();
-  // eslint-disable-next-line no-console
   console.log(`[autopilot-runner] gRPC server listening on :${port}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error('[autopilot-runner] Fatal error', err);
   process.exit(1);
 });

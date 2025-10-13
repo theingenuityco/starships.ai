@@ -1,5 +1,5 @@
 import { Executor, ExecuteInput } from './Executor';
-import { Engine } from '@starships/autopilot/dist/engine/Engine';
+import { Engine } from '@starships/autopilot';
 
 export class InProcessExecutor implements Executor {
   async execute(input: ExecuteInput): Promise<unknown> {
@@ -13,7 +13,11 @@ export class InProcessExecutor implements Executor {
         ? async (event: unknown) => {
             try {
               await input.onEvent?.({ type: 'event', data: event });
-            } catch {}
+            } catch (err) {
+              console.error('[InProcessExecutor] Failed to forward event to onEvent handler', {
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
           }
         : undefined,
       failOnNodeError: config?.failOnNodeError ?? true,

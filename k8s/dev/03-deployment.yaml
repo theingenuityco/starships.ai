@@ -36,7 +36,8 @@ spec:
         app: starships-ai
         environment: dev
     spec:
-      serviceAccountName: autopilot-runner
+      # serviceAccount no longer required (server does not create Jobs)
+      # serviceAccountName: autopilot-runner
       terminationGracePeriodSeconds: 120
       imagePullSecrets:
         - name: ghcr-pull-secret
@@ -68,9 +69,9 @@ spec:
               value: 'development'
             - name: AUTOPILOT_RUNNER
               value: 'remote'
-            - name: AUTOPILOT_REMOTE_URL
+            - name: RUNNER_URL
               value: 'http://autopilot-runner.starships-dev.svc.cluster.local:50051'
-            - name: AUTOPILOT_REMOTE_TOKEN
+            - name: RUNNER_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets

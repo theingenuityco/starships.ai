@@ -92,8 +92,9 @@ export function getEnvConfig(): EnvironmentConfig {
     // Google Analytics
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
 
-    // Autopilot Remote Runner
-    AUTOPILOT_REMOTE_URL: process.env.AUTOPILOT_REMOTE_URL,
-    AUTOPILOT_REMOTE_TOKEN: process.env.AUTOPILOT_REMOTE_TOKEN,
+    // Remote runner (optional)
+    RUNNER_URL: process.env.RUNNER_URL,
+    RUNNER_PORT: process.env.RUNNER_PORT ? parseInt(process.env.RUNNER_PORT, 10) : undefined,
+    RUNNER_AUTH_TOKEN: process.env.RUNNER_AUTH_TOKEN,
   };
 }

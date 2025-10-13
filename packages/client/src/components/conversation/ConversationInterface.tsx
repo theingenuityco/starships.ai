@@ -986,7 +986,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     <div
       className="relative flex flex-col h-screen transition-all duration-500 ease-in-out"
       style={{
-        marginLeft: '5.5rem', // Consistent offset for both modes to prevent content shift
         overflow: viewMode === 'tool-builder' || viewMode === 'agent-builder' ? 'visible' : 'hidden',
       }}
     >

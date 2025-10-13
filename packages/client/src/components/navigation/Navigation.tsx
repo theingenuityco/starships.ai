@@ -162,7 +162,7 @@ export function Navigation(props: NavigationProps) {
   return (
     <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
       <div
-        className="flex flex-col items-center justify-center w-20 flex-shrink-0 transition-all duration-300 ease-in-out"
+        className="flex flex-col items-center justify-center w-16 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
         }}

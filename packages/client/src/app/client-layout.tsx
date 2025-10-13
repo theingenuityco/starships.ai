@@ -93,7 +93,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         )}
 
         {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto">{children}</main>
+        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+          {children}
+        </main>
       </div>
     </JwtAuthGate>
   )

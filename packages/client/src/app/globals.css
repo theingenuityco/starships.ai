@@ -497,8 +497,8 @@
     background-color: hsl(var(--background));
     background-image:
       /* Light: subtle bluish-gray diagonal + vignettes, no uniform wash */
-      linear-gradient(135deg, #0b12201a 0%, transparent 60%), radial-gradient(1400px 900px at 50% -10%, #0b122026, transparent 75%),
-      radial-gradient(1600px 1000px at 50% 120%, #0b12201f, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af1f, transparent 60%);
+      linear-gradient(135deg, #0b12201a 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, #0b122026, transparent 75%),
+      radial-gradient(1600px 1000px at 53% 120%, #0b12201f, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af1f, transparent 60%);
     backface-visibility: hidden;
     will-change: background;
   }
@@ -506,8 +506,8 @@
   .dark .app-gradient-bg {
     background-image:
       /* Dark: lighter near-dark overlays to avoid pure black */
-      linear-gradient(0deg, #0b12204d, #0b12204d), linear-gradient(135deg, #0b122033 0%, transparent 60%), radial-gradient(1400px 900px at 50% -10%, #0b122040, transparent 75%),
-      radial-gradient(1600px 1000px at 50% 120%, #0b122033, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af33, transparent 60%);
+      linear-gradient(0deg, #0b12204d, #0b12204d), linear-gradient(135deg, #0b122033 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, #0b122040, transparent 75%),
+      radial-gradient(1600px 1000px at 53% 120%, #0b122033, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af33, transparent 60%);
   }
 }
 

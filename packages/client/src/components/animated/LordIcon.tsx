@@ -18,6 +18,8 @@ interface LordIconProps {
 export function LordIcon({ src, width = 20, height = 20, className, label, trigger = 'hover', speed = 1 }: LordIconProps) {
   const [animationData, setAnimationData] = useState<any>(null)
   const lottieRef = useRef<any>(null)
+  const [totalFrames, setTotalFrames] = useState<number>(60)
+  const [restFrame, setRestFrame] = useState<number>(1)
 
   useEffect(() => {
     let isMounted = true
@@ -27,7 +29,14 @@ export function LordIcon({ src, width = 20, height = 20, className, label, trigg
         const res = await fetch(src)
         if (!res.ok) return
         const json = await res.json()
-        if (isMounted) setAnimationData(json)
+        if (isMounted) {
+          setAnimationData(json)
+          const op = typeof json?.op === 'number' ? Math.max(1, Math.floor(json.op)) : 60
+          setTotalFrames(op)
+          // Prefer the last frame as resting frame; Lordicon docs suggest seeking to end for a stable visible state
+          const last = Math.max(1, op - 1)
+          setRestFrame(last)
+        }
       } catch {}
     }
     setAnimationData(null)
@@ -52,7 +61,7 @@ export function LordIcon({ src, width = 20, height = 20, className, label, trigg
         onMouseLeave: () => {
           if (lottieRef.current) {
             lottieRef.current.stop?.()
-            lottieRef.current.goToAndStop?.(0, true)
+            lottieRef.current.goToAndStop?.(restFrame, true)
           }
         },
       }
@@ -62,13 +71,39 @@ export function LordIcon({ src, width = 20, height = 20, className, label, trigg
         onClick: () => {
           if (lottieRef.current) {
             lottieRef.current.setSpeed?.(speed)
-            lottieRef.current.playSegments?.([0, 999], true)
+            // Use total frames to play from start through end correctly
+            lottieRef.current.playSegments?.([0, totalFrames - 1], true)
           }
         },
       }
     }
     return {}
-  }, [trigger, speed])
+  }, [trigger, speed, restFrame, totalFrames])
+
+  // Ensure the icon does not disappear after a click-triggered animation.
+  // When the animation completes, reset to the first frame (static icon state).
+  useEffect(() => {
+    if (trigger !== 'click') return
+    const inst = lottieRef.current
+    if (!inst || typeof inst.addEventListener !== 'function') return
+    const handleComplete = () => {
+      inst.goToAndStop?.(restFrame, true)
+    }
+    inst.addEventListener('complete', handleComplete)
+    return () => {
+      if (typeof inst.removeEventListener === 'function') {
+        inst.removeEventListener('complete', handleComplete)
+      }
+    }
+  }, [trigger, restFrame])
+
+  // After the animation data loads and the lottie instance mounts, ensure we start on a visible resting frame
+  useEffect(() => {
+    if (!animationData || !lottieRef.current) return
+    try {
+      lottieRef.current.goToAndStop?.(restFrame, true)
+    } catch {}
+  }, [animationData, restFrame])
 
   if (!src) return null
   if (!animationData) return null

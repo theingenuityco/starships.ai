@@ -121,6 +121,12 @@ httpServer.listen(PORT, async () => {
       openrouterApiKey: config.OPENROUTER_API_KEY,
     });
 
+    // Configure remote runner (URL and optional token)
+    autopilot.setRunnerConfig({
+      url: config.RUNNER_URL,
+      token: config.RUNNER_AUTH_TOKEN,
+    });
+
     // Initialize database connection FIRST
     await dbConnection.connect();
     console.log('✅ PostgreSQL database connected');

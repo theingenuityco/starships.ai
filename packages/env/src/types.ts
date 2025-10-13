@@ -40,7 +40,6 @@ export interface EnvironmentConfig {
   GH_OAUTH_CLIENT_ID?: string;
   GH_OAUTH_CLIENT_SECRET?: string;
 
-
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;
 
@@ -52,7 +51,8 @@ export interface EnvironmentConfig {
   // Google Analytics
   GA_MEASUREMENT_ID?: string;
 
-  // Autopilot Remote Runner
-  AUTOPILOT_REMOTE_URL?: string;
-  AUTOPILOT_REMOTE_TOKEN?: string;
+  // Remote runner (optional)
+  RUNNER_URL?: string;
+  RUNNER_PORT?: number;
+  RUNNER_AUTH_TOKEN?: string;
 }

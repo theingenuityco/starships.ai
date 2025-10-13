@@ -41,6 +41,10 @@ export function getEnvConfig(): EnvironmentConfig {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}. Please check your .env file.`);
   }
 
+  // Optional runner defaults: prefer explicit RUNNER_URL if provided; otherwise localhost with default port
+  const defaultRunnerPort = process.env.RUNNER_PORT ? parseInt(process.env.RUNNER_PORT, 10) : 50051;
+  const resolvedRunnerUrl = process.env.RUNNER_URL || `http://localhost:${defaultRunnerPort}`;
+
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
@@ -80,7 +84,6 @@ export function getEnvConfig(): EnvironmentConfig {
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
 
-
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
 
@@ -92,8 +95,9 @@ export function getEnvConfig(): EnvironmentConfig {
     // Google Analytics
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
 
-    // Autopilot Remote Runner
-    AUTOPILOT_REMOTE_URL: process.env.AUTOPILOT_REMOTE_URL,
-    AUTOPILOT_REMOTE_TOKEN: process.env.AUTOPILOT_REMOTE_TOKEN,
+    // Remote runner (optional)
+    RUNNER_URL: resolvedRunnerUrl,
+    RUNNER_PORT: defaultRunnerPort,
+    RUNNER_AUTH_TOKEN: process.env.RUNNER_AUTH_TOKEN,
   };
 }

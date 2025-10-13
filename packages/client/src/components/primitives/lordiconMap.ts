@@ -10,6 +10,7 @@ export const LORDICON_URLS: Record<string, string> = {
   history: '/lordicon/history.json',
   key: '/lordicon/key.json',
   user: '/lordicon/user.json',
+  logout: '/lordicon/logout.json',
 }
 
 export function getLordiconUrl(name: string): string | undefined {

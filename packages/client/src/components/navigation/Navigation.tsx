@@ -351,7 +351,7 @@ export function Navigation(props: NavigationProps) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <LordIcon src={getLordiconUrl('x')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
+                    <LordIcon src={getLordiconUrl('logout')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
                   </motion.button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>

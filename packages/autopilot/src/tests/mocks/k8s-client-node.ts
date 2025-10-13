@@ -2,30 +2,41 @@
 
 export class KubeConfig {
   loadFromDefault(): void {}
-  makeApiClient<T>(_cls: unknown): any {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  makeApiClient<T>(_cls: unknown): unknown {
     return {};
   }
 }
 
 export class BatchV1Api {
-  async createNamespacedJob(_req: any): Promise<any> {
-    return { metadata: { name: 'job-mock' } } as any;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async createNamespacedJob(_req: unknown): Promise<{ metadata: { name: string } }> {
+    return { metadata: { name: 'job-mock' } };
   }
-  async deleteNamespacedJob(_req: any): Promise<void> {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async deleteNamespacedJob(_req: unknown): Promise<void> {}
 }
 
 export class CoreV1Api {
-  async readNamespacedPod(_req: any): Promise<any> {
-    return { status: { phase: 'Succeeded' } } as any;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async readNamespacedPod(_req: unknown): Promise<{ status: { phase: string } }> {
+    return { status: { phase: 'Succeeded' } };
   }
-  async readNamespacedPodLog(_req: any): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async readNamespacedPodLog(_req: unknown): Promise<string> {
     return JSON.stringify({ ok: true, result: [] }) + '\n';
   }
 }
 
 export class Watch {
-  constructor(_kc: any) {}
-  watch(_path: string, _query: any, cb: (type: string, obj: any) => void, _done: (err?: any) => void): void {
+  constructor(kc: unknown) {
+    void kc;
+  }
+  watch(
+    _path: string,
+    _query: unknown,
+    cb: (type: string, obj: { metadata?: { name?: string }; status?: { phase?: string } }) => void
+  ): void {
     cb('ADDED', { metadata: { name: 'pod-mock' }, status: { phase: 'Running' } });
   }
 }

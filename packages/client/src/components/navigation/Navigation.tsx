@@ -27,11 +27,13 @@ interface NavigationProps {
 export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, logout } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
   // State for conversation list toggle
   const [showConversationList, setShowConversationList] = useState(false)
+  // State for user subnav toggle
+  const [showUserSubnav, setShowUserSubnav] = useState(false)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -131,17 +133,7 @@ export function Navigation(props: NavigationProps) {
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'Conversations', icon: 'message-square', isActive: isConversationRoute }] : []),
     { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
-    ...(isAuthenticated && starshipSlug
-      ? [
-          { href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute },
-          {
-            href: `/ship/${starshipSlug}/settings/usage`,
-            label: 'Ship Settings',
-            icon: 'settings',
-            isActive: isUsageSettingsRoute || (isSettingsRoute && !isEnvironmentSettingsRoute),
-          },
-        ]
-      : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
 
   // Handle logo click - smart navigation based on context
@@ -260,9 +252,76 @@ export function Navigation(props: NavigationProps) {
         <div className="flex items-center justify-center">
           <ThemeToggle />
         </div>
-        {/* User Profile Section - Collapsed Mode */}
-        <div className="border-t border-border/20 flex-shrink-0 p-2 flex items-center justify-center">
-          <UserProfile mode="collapsed" />
+        {/* User Profile Section - Collapsed Mode with upward subnav */}
+        <div className="border-t border-border/20 flex-shrink-0 p-2 flex flex-col items-center justify-center">
+          {/* Upward subnav - renders ABOVE the user icon */}
+          <AnimatePresence>
+            {showUserSubnav && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: 8 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: 8 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="rounded-tl-xl rounded-tr-xl mx-1.5 space-y-1.5 overflow-hidden mb-2 pt-2 pb-2 px-2 flex flex-col items-center bg-muted/40"
+              >
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <motion.button
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.05 }}
+                      onClick={() => {
+                        if (!starshipSlug) return
+                        router.push(`/ship/${starshipSlug}/settings/usage`)
+                        setShowUserSubnav(false)
+                      }}
+                      className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <LordIcon src={getLordiconUrl('settings')} width={22} height={22} className="w-[22px] h-[22px]" trigger="click" />
+                    </motion.button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                    Settings
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <motion.button
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 }}
+                      onClick={async () => {
+                        try {
+                          await logout()
+                        } finally {
+                          router.push('/')
+                        }
+                      }}
+                      className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <LordIcon src={getLordiconUrl('x')} width={22} height={22} className="w-[22px] h-[22px]" trigger="click" />
+                    </motion.button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                    Sign out
+                  </TooltipContent>
+                </Tooltip>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {/* Profile icon (click to toggle) */}
+          <UserProfile
+            mode="collapsed"
+            onClick={() => {
+              setShowConversationList(false)
+              setShowUserSubnav(prev => !prev)
+            }}
+          />
         </div>
       </div>
 

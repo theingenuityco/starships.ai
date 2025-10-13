@@ -49,6 +49,10 @@
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
+    "@starships/autopilot-runner#build": {
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", "buf.yaml", "buf.gen.yaml", "src/proto/**"],
+      "outputs": ["dist/**", "src/gen/**"]
+    },
     "@starships/reverse-proxy#build": {
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
@@ -65,6 +69,11 @@
     },
     "start": {
       "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@starships/autopilot-runner#start": {
+      "dependsOn": ["@starships/autopilot-runner#build"],
       "cache": false,
       "persistent": true
     },

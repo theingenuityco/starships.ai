@@ -2,6 +2,7 @@ import { LocalRunner } from './LocalRunner';
 import { ChildProcessRunner } from './ChildProcessRunner';
 import { KubernetesJobRunner } from './KubernetesJobRunner';
 import type { Runner } from './Runner';
+import { RemoteRunner } from './RemoteRunner';
 
 export class RunnerFactory {
   static getTopLevelRunner(depth: number | undefined): Runner {
@@ -14,6 +15,9 @@ export class RunnerFactory {
         timeoutMs: Number(process.env.AUTOPILOT_K8S_TIMEOUT_MS || '120000'),
         serviceAccountName: process.env.AUTOPILOT_K8S_SA || 'autopilot-runner',
       });
+    }
+    if (mode === 'remote') {
+      return new RemoteRunner();
     }
     return new ChildProcessRunner();
   }

@@ -15,9 +15,9 @@ export interface AutopilotCredentials {
 
 export interface AutopilotConfig {
   credentials: AutopilotCredentials;
-  // Add other configuration as needed
-  // defaultTimeout?: number;
-  // maxRetries?: number;
+  // Remote runner configuration (server sets these)
+  remoteRunnerUrl?: string;
+  remoteRunnerToken?: string;
 }
 
 class AutopilotManager {
@@ -38,6 +38,14 @@ class AutopilotManager {
       ...this.config.credentials,
       ...credentials,
     };
+  }
+
+  /**
+   * Configure remote runner endpoint and token
+   */
+  setRunnerConfig(opts: { url?: string; token?: string }): void {
+    if (typeof opts.url === 'string' && opts.url.length > 0) this.config.remoteRunnerUrl = opts.url;
+    if (typeof opts.token === 'string' && opts.token.length > 0) this.config.remoteRunnerToken = opts.token;
   }
 
   /**

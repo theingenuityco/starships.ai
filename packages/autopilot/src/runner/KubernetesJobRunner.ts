@@ -23,6 +23,7 @@ export interface KubernetesJobRunnerOptions {
   extraEnv?: Record<string, string>;
   jobTTLSeconds?: number;
   containerName?: string;
+  imagePullSecrets?: string[];
 }
 
 export class KubernetesJobRunner implements Runner {
@@ -55,6 +56,9 @@ export class KubernetesJobRunner implements Runner {
           metadata: { labels: { app: 'autopilot-runner' } },
           spec: {
             serviceAccountName: this.opts.serviceAccountName ?? 'autopilot-runner',
+            imagePullSecrets: (this.opts.imagePullSecrets?.length ? this.opts.imagePullSecrets : ['ghcr-pull-secret']).map((name) => ({
+              name,
+            })),
             restartPolicy: 'Never',
             securityContext: { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: { type: 'RuntimeDefault' } },
             containers: [

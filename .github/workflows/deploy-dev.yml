@@ -66,7 +66,7 @@ jobs:
           kubectl apply --dry-run=client -f k8s/dev/03-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/04-service.yaml
           kubectl apply --dry-run=client -f k8s/dev/05-ingress.yaml
-          kubectl apply --dry-run=client -f k8s/dev/06-autopilot-runner-rbac.yaml
+          # RBAC for k8s job runner was removed
           kubectl apply --dry-run=client -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/dev/08-autopilot-runner-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/09-autopilot-runner-service.yaml
@@ -79,7 +79,7 @@ jobs:
           kubectl apply -f k8s/dev/03-deployment.yaml
           kubectl apply -f k8s/dev/04-service.yaml
           kubectl apply -f k8s/dev/05-ingress.yaml
-          kubectl apply -f k8s/dev/06-autopilot-runner-rbac.yaml
+          # RBAC for k8s job runner was removed
           kubectl apply -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/dev/08-autopilot-runner-deployment.yaml
           kubectl apply -f k8s/dev/09-autopilot-runner-service.yaml

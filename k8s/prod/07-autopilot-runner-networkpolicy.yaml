@@ -1,15 +1,25 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: autopilot-runner-default-deny-egress
+  name: autopilot-runner-policy
   namespace: starships-prod
 spec:
   podSelector:
     matchLabels:
       app: autopilot-runner
-  policyTypes: ['Egress']
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: starships-ai
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 50051
   egress:
-    # Allow DNS to CoreDNS (TCP/UDP 53) in kube-system
     - to:
         - namespaceSelector:
             matchLabels:
@@ -22,7 +32,6 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Allow outbound HTTPS for API calls (tighten ipBlock if you have known CIDRs)
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

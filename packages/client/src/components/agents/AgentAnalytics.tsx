@@ -1,12 +1,14 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/useToast'
-import { BarChart3, TrendingUp, Star, Activity, Calendar, Eye, MessageSquare } from 'lucide-react'
+
 
 interface AgentAnalytics {
   usageCount: number
@@ -127,7 +129,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+            <Icon name="bar-chart3" className="h-5 w-5" />
             Analytics for {agentName}
           </CardTitle>
         </CardHeader>
@@ -145,7 +147,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+            <Icon name="bar-chart3" className="h-5 w-5" />
             Analytics for {agentName}
           </CardTitle>
         </CardHeader>
@@ -164,7 +166,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
+              <Icon name="bar-chart3" className="h-5 w-5" />
               Analytics for {agentName}
             </CardTitle>
             <CardDescription>Performance metrics and usage statistics</CardDescription>
@@ -181,7 +183,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
-              <MessageSquare className="h-8 w-8 text-blue-500" />
+              <Icon name="message-square" className="h-8 w-8 text-blue-500" />
             </div>
             <div className="text-2xl font-bold">{analytics.usageCount}</div>
             <div className="text-sm text-muted-foreground">Total Uses</div>
@@ -189,7 +191,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
 
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
-              <Star className={`h-8 w-8 ${getRatingColor(analytics.rating)}`} />
+              <Icon name="star" className={`h-8 w-8 ${getRatingColor(analytics.rating)}`} />
             </div>
             <div className="text-2xl font-bold">{analytics.rating.toFixed(1)}</div>
             <div className="text-sm text-muted-foreground">Rating</div>
@@ -197,7 +199,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
 
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
-              <Eye className="h-8 w-8 text-purple-500" />
+              <Icon name="eye" className="h-8 w-8 text-purple-500" />
             </div>
             <Badge variant={analytics.isPublic ? 'default' : 'secondary'}>{analytics.isPublic ? 'Public' : 'Private'}</Badge>
             <div className="text-sm text-muted-foreground mt-1">Visibility</div>
@@ -205,7 +207,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
 
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
-              <Activity className="h-8 w-8 text-green-500" />
+              <Icon name="activity" className="h-8 w-8 text-green-500" />
             </div>
             <Badge variant="outline">{analytics.category}</Badge>
             <div className="text-sm text-muted-foreground mt-1">Category</div>
@@ -228,7 +230,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
           <div className="flex items-center gap-2">
             {[1, 2, 3, 4, 5].map(star => (
               <button key={star} onClick={() => submitRating(star)} disabled={submittingRating} className="p-1 rounded transition-colors text-gray-300 hover:text-yellow-400 disabled:opacity-50">
-                <Star className="h-6 w-6 fill-current" />
+                <Icon name="star" className="h-6 w-6 fill-current" />
               </button>
             ))}
             {submittingRating && <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>}
@@ -241,12 +243,12 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
           <h3 className="text-sm font-medium">Timeline</h3>
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Icon name="calendar" className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Created:</span>
               <span>{formatDate(analytics.createdAt)}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <Icon name="trending-up" className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Last Updated:</span>
               <span>{formatDate(analytics.updatedAt)}</span>
             </div>

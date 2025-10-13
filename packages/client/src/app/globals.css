@@ -4,6 +4,12 @@
 
 /* ReactFlow styles - Required for proper functionality */
 @import '@xyflow/react/dist/style.css';
+/* Icon tokens */
+:root {
+  --icon-size: 20px;
+  --icon-color: currentColor;
+  --icon-stroke: 1.75;
+}
 
 /* Prism.js Syntax Highlighting - VS Code Dark Inspired */
 /* Blue and white theme matching VS Code's aesthetic */
@@ -307,6 +313,13 @@
     /* Shadow colors for light mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
     --frosted-border: 1px solid rgba(255, 255, 255, 0.05);
+
+    /* App gradient variables (light) */
+    --app-tint: hsl(220 10% 22%); /* adjust hue/sat/lightness for gray temperature */
+    --app-wash: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 12%);
+    --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 16%);
+    --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 14%);
+    --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
   }
 
   .dark {
@@ -339,6 +352,13 @@
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
     --frosted-border: 1px solid rgba(255, 255, 255, 0.06);
+
+    /* App gradient variables (dark) */
+    --app-tint: hsl(220 12% 20%); /* adjust for darker theme tint */
+    --app-wash: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 68%);
+    --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 60%);
+    --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%);
+    --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 56%);
   }
 
   /* 
@@ -380,6 +400,114 @@
     transform: translateZ(0);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/*
+ * Global subtle background textures
+ * - Uses layered gradients for faint grid + radial vignette
+ * - Honors light/dark via CSS vars
+ */
+@layer components {
+  .app-textured-bg {
+    /* Base color */
+    background-color: hsl(var(--background));
+
+    /* Layered gradients: radial vignette + ultra-faint grid */
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, hsl(var(--primary) / 0.06), transparent 60%),
+      radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.05), transparent 60%),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.02), transparent 15%, transparent 85%, hsl(var(--foreground) / 0.02)),
+      /* Faint grid */ linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px),
+      linear-gradient(0deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
+
+    background-size:
+      100% 100%,
+      100% 100%,
+      100% 100%,
+      24px 24px,
+      24px 24px;
+
+    background-position: center, center, center, center, center;
+
+    /* Prevent jitter during animations */
+    backface-visibility: hidden;
+    will-change: background;
+  }
+
+  /* Slightly adjust intensities for dark mode */
+  .dark .app-textured-bg {
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, hsl(var(--primary) / 0.1), transparent 60%), radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.08), transparent 60%),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.06), transparent 15%, transparent 85%, hsl(var(--foreground) / 0.06)),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.1) 1px, transparent 1px), linear-gradient(0deg, hsl(var(--foreground) / 0.1) 1px, transparent 1px);
+  }
+
+  /*
+   * Fabric-like folded background
+   * - Broad diagonal folds with subtle highlights and shadows
+   * - Soft radial vignettes to add depth
+   */
+  .app-folded-bg {
+    background-color: hsl(var(--background));
+    background-image:
+      /* Soft bias highlight across the diagonal */
+      linear-gradient(115deg, hsl(var(--primary) / 0.04), transparent 40%, transparent 60%, hsl(var(--primary) / 0.04)),
+      /* Wide repeating bands to emulate folds (shadow edge + soft belly) */
+        repeating-linear-gradient(
+          115deg,
+          hsl(var(--foreground) / 0.1) 0px,
+          hsl(var(--foreground) / 0.1) 2px,
+          transparent 2px,
+          transparent 74px,
+          hsl(var(--foreground) / 0.14) 74px,
+          hsl(var(--foreground) / 0.14) 76px,
+          transparent 76px,
+          transparent 150px
+        ),
+      /* Gentle vignettes to avoid flatness */ radial-gradient(1000px 520px at 18% -10%, hsl(var(--foreground) / 0.05), transparent 60%),
+      radial-gradient(860px 480px at 82% 110%, hsl(var(--foreground) / 0.05), transparent 60%);
+
+    backface-visibility: hidden;
+    will-change: background;
+  }
+
+  .dark .app-folded-bg {
+    background-image:
+      linear-gradient(115deg, hsl(var(--primary) / 0.08), transparent 40%, transparent 60%, hsl(var(--primary) / 0.08)),
+      repeating-linear-gradient(
+        115deg,
+        hsl(var(--foreground) / 0.18) 0px,
+        hsl(var(--foreground) / 0.18) 2px,
+        transparent 2px,
+        transparent 74px,
+        hsl(var(--foreground) / 0.22) 74px,
+        hsl(var(--foreground) / 0.22) 76px,
+        transparent 76px,
+        transparent 150px
+      ),
+      radial-gradient(1000px 520px at 18% -10%, hsl(var(--foreground) / 0.1), transparent 60%), radial-gradient(860px 480px at 82% 110%, hsl(var(--foreground) / 0.1), transparent 60%);
+  }
+
+  /*
+   * Gradient-only background (no textures)
+   * - Soft diagonal wash with optional radial bias
+   */
+  .app-gradient-bg {
+    background-color: hsl(var(--background));
+    background-image:
+      /* Light: subtle bluish-gray diagonal + vignettes, no uniform wash */
+      linear-gradient(135deg, #0b12201a 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, #0b122026, transparent 75%),
+      radial-gradient(1600px 1000px at 53% 120%, #0b12201f, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af1f, transparent 60%);
+    backface-visibility: hidden;
+    will-change: background;
+  }
+
+  .dark .app-gradient-bg {
+    background-image:
+      /* Dark: lighter near-dark overlays to avoid pure black */
+      linear-gradient(0deg, #0b12204d, #0b12204d), linear-gradient(135deg, #0b122033 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, #0b122040, transparent 75%),
+      radial-gradient(1600px 1000px at 53% 120%, #0b122033, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af33, transparent 60%);
   }
 }
 

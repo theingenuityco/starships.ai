@@ -1,7 +1,9 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Button } from '@/components/ui/button'
-import { LogIn } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 
@@ -30,7 +32,7 @@ export function LoginButton({ variant = 'default', size = 'default', className, 
 
   return (
     <Button variant={variant} size={size} className={cn('flex items-center gap-2', className)} onClick={handleLogin}>
-      <LogIn className="h-4 w-4" />
+      <Icon name="log-in" className="h-4 w-4" />
       {children || 'Sign In'}
     </Button>
   )

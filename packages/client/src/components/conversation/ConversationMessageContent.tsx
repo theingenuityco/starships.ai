@@ -1,10 +1,12 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore } from 'lucide-react'
+
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -222,7 +224,7 @@ export function ConversationMessageContent({
       a: ({ href, children }: any) => (
         <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 inline-flex items-center gap-1">
           {children}
-          {enableLinkPreview && <ExternalLink className="w-3 h-3" />}
+          {enableLinkPreview && <Icon name="external-link" className="w-3 h-3" />}
         </a>
       ),
 
@@ -242,7 +244,7 @@ export function ConversationMessageContent({
               <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20">
                 <span className="text-xs font-medium text-muted-foreground uppercase">{language}</span>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(codeContent, blockId)}>
-                  {copiedStates[blockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                  {copiedStates[blockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
                 </Button>
               </div>
 
@@ -308,7 +310,7 @@ export function ConversationMessageContent({
         </div>
         {enableCopy && (
           <Button variant="ghost" size="icon" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
-            <Copy className="w-3 h-3" />
+            <Icon name="copy" className="w-3 h-3" />
           </Button>
         )}
       </div>
@@ -324,7 +326,7 @@ export function ConversationMessageContent({
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming && openReasoning ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircleMore className="w-3 h-3" />}
+              {isStreaming && openReasoning ? <Icon name="loading" className="w-3 h-3 animate-spin" /> : <Icon name="message-circle-more" className="w-3 h-3" />}
               <span>{reasoningHeaderLabel}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -356,11 +358,11 @@ export function ConversationMessageContent({
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
-                <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />
               ) : (
-                <Wrench className="w-3 h-3" />
+                <Icon name="wrench" className="w-3 h-3" />
               )}
               {toolCallHeaderLabel ?? `Tool Calls (${normalizedToolCalls.length})`}
             </CollapsibleTrigger>
@@ -461,7 +463,7 @@ export function ConversationMessageContent({
                                 handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
                               }}
                             >
-                              {copiedStates[combinedBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                              {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
                             </Button>
                           </div>
                         </div>
@@ -481,7 +483,7 @@ export function ConversationMessageContent({
                               <div className="border-t border-border/50" />
                               <div className="flex items-center justify-between px-3 pt-2">
                                 <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
-                                  <Check className="w-3 h-3" />
+                                  <Icon name="check" className="w-3 h-3" />
                                   Result
                                 </div>
                               </div>
@@ -518,12 +520,12 @@ export function ConversationMessageContent({
           <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
             <div className="flex items-center gap-2">
               <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
-                <Check className="w-3 h-3" />
+                <Icon name="check" className="w-3 h-3" />
                 Tool Result (Standalone)
               </div>
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
-              {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+              {copiedStates[`${messageId}-tool-result`] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
             </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
@@ -538,7 +540,7 @@ export function ConversationMessageContent({
           <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
             <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-workflow-result`)}>
-              {copiedStates[`${messageId}-workflow-result`] ? <Check className="w-3 h-3 text-blue-500" /> : <Copy className="w-3 h-3" />}
+              {copiedStates[`${messageId}-workflow-result`] ? <Icon name="check" className="w-3 h-3 text-blue-500" /> : <Icon name="copy" className="w-3 h-3" />}
             </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
@@ -550,7 +552,7 @@ export function ConversationMessageContent({
       {/* Copy button for entire message */}
       {enableCopy && !isStreaming && (
         <Button variant="ghost" size="icon" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
-          <Copy className="w-3 h-3" />
+          <Icon name="copy" className="w-3 h-3" />
         </Button>
       )}
     </div>

@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -238,7 +240,7 @@ export function LoginForm() {
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -254,7 +256,7 @@ export function LoginForm() {
                     <>Signing in...</>
                   ) : (
                     <>
-                      <LogIn className="h-4 w-4 mr-2" />
+                      <Icon name="log-in" className="h-4 w-4 mr-2" />
                       Sign In
                     </>
                   )}
@@ -318,7 +320,7 @@ export function LoginForm() {
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -343,7 +345,7 @@ export function LoginForm() {
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       disabled={isLoading}
                     >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -359,7 +361,7 @@ export function LoginForm() {
                     <>Creating account...</>
                   ) : (
                     <>
-                      <UserPlus className="h-4 w-4 mr-2" />
+                      <Icon name="user-plus" className="h-4 w-4 mr-2" />
                       Create Account
                     </>
                   )}

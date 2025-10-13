@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { LoginButton } from '@/components/auth/LoginButton'
 import { StarTheme } from '@/components/theme-context'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +10,7 @@ import { Card } from '@/components/ui/card'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
-import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, Star, User, Users } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { lazy, memo, Suspense, useEffect, useState } from 'react'
 const StarfieldBackground = lazy(() =>
@@ -18,46 +20,32 @@ const StarfieldBackground = lazy(() =>
 )
 
 // System component cards
-const SystemCard = memo(
-  ({
-    icon: Icon,
-    title,
-    description,
-    accent = false,
-    imageContent,
-  }: {
-    icon: React.ComponentType<{ className?: string }>
-    title: string
-    description: string
-    accent?: boolean
-    imageContent?: React.ReactNode
-  }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      whileHover={{ y: -5, transition: { duration: 0.2 } }}
-      className="group max-w-2xl mx-auto"
+const SystemCard = memo(({ icon, title, description, accent = false, imageContent }: { icon: string; title: string; description: string; accent?: boolean; imageContent?: React.ReactNode }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+    className="group max-w-2xl mx-auto"
+  >
+    <Card
+      className={`p-8 bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 relative overflow-hidden ${accent ? 'ring-1 ring-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-br from-white/5 via-white/3 to-transparent'}`}
     >
-      <Card
-        className={`p-8 bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 relative overflow-hidden ${accent ? 'ring-1 ring-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-br from-white/5 via-white/3 to-transparent'}`}
-      >
-        <div className="grid md:grid-cols-2 gap-8 items-center">
-          <div>
-            <div className="flex items-center space-x-3 mb-4">
-              <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
-                <Icon className={`w-7 h-7 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
-              </div>
-              <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">{title}</h3>
+      <div className="grid md:grid-cols-2 gap-8 items-center">
+        <div>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
+              <Icon name={icon} className={`w-7 h-7 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
             </div>
-            <p className="text-muted-foreground leading-relaxed">{description}</p>
+            <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">{title}</h3>
           </div>
-          {imageContent && <div className="flex justify-center">{imageContent}</div>}
+          <p className="text-muted-foreground leading-relaxed">{description}</p>
         </div>
-      </Card>
-    </motion.div>
-  )
-)
+        {imageContent && <div className="flex justify-center">{imageContent}</div>}
+      </div>
+    </Card>
+  </motion.div>
+))
 
 SystemCard.displayName = 'SystemCard'
 
@@ -120,7 +108,7 @@ export default function HomePage() {
                 </LoginButton>
               )}
               <Button variant="outline" size="default" className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10">
-                <Book className="w-4 h-4 mr-2" />
+                <Icon name="book" className="w-4 h-4 mr-2" />
                 View Documentation
               </Button>
             </div>
@@ -145,7 +133,7 @@ export default function HomePage() {
             <div className="flex items-center justify-center gap-8">
               {/* Rocket Logo on the left */}
               <motion.div initial={{ scale: 0, x: -50 }} animate={{ scale: 1, x: 0 }} transition={{ delay: 0.5, duration: 0.8, type: 'spring', stiffness: 80 }} className="relative flex-shrink-0">
-                <StarshipsLogo width={120} height={120} gradientId="gradient" animationDelay={2} repeatDelay={10} />
+                <Icon name="star" shipsLogo width={120} height={120} gradientId="gradient" animationDelay={2} repeatDelay={10} />
               </motion.div>
 
               {/* Title and Tagline on the right */}
@@ -182,7 +170,7 @@ export default function HomePage() {
                   className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
                 >
                   <span className="relative z-10">
-                    <Rocket className="w-5 h-5 mr-2 inline" />
+                    <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
                     {isAuthenticated ? (hasExistingStarships ? 'Enter Command Deck' : 'Launch Your Starship') : 'Begin Your Journey'}
                   </span>
                   <motion.div
@@ -219,7 +207,7 @@ export default function HomePage() {
                     ease: 'easeInOut',
                   }}
                 >
-                  <ChevronDown className="w-6 h-6 text-white/70" />
+                  <Icon name="chevron-down" className="w-6 h-6 text-white/70" />
                 </motion.div>
               ))}
             </div>
@@ -299,7 +287,7 @@ export default function HomePage() {
               >
                 <div className="flex flex-col items-center space-y-4 max-w-md text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-full border border-white/30 backdrop-blur-sm flex items-center justify-center animate-pulse-glow will-change-transform">
-                    <User className="w-8 h-8 text-white/80" />
+                    <Icon name="user" className="w-8 h-8 text-white/80" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold mb-2">You</h3>
@@ -369,7 +357,7 @@ export default function HomePage() {
                 viewport={{ once: false, margin: '-10%' }}
               >
                 <SystemCard
-                  icon={Brain}
+                  icon="brain"
                   title="Command Deck"
                   description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
                   imageContent={
@@ -389,7 +377,7 @@ export default function HomePage() {
                             times: [0, 0.05, 0.55, 0.65],
                           }}
                         >
-                          <Sparkles className="w-7 h-7 text-white/50" />
+                          <Icon name="sparkles" className="w-7 h-7 text-white/50" />
                         </motion.div>
                         <motion.div
                           animate={{
@@ -403,7 +391,7 @@ export default function HomePage() {
                             times: [0, 0.38, 0.39, 0.4, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.7, 0.9, 0.91, 0.92, 0.93, 0.94, 1],
                           }}
                         >
-                          <Lightbulb className="w-8 h-8 text-white/60" />
+                          <Icon name="lightbulb" className="w-8 h-8 text-white/60" />
                         </motion.div>
                         <motion.div
                           animate={{ opacity: [0.2, 1, 0.2] }}
@@ -414,7 +402,7 @@ export default function HomePage() {
                           }}
                           className="relative"
                         >
-                          <Brain className="w-8 h-8 text-white/80" />
+                          <Icon name="brain" className="w-8 h-8 text-white/80" />
                         </motion.div>
                       </div>
                     </div>
@@ -486,7 +474,7 @@ export default function HomePage() {
                 viewport={{ once: false, margin: '-10%' }}
               >
                 <SystemCard
-                  icon={Compass}
+                  icon="compass"
                   title="Expeditions"
                   description="Your idea becomes reality through focused execution. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
                   imageContent={
@@ -518,7 +506,7 @@ export default function HomePage() {
                             ease: 'easeInOut',
                           }}
                         >
-                          <Minus className="w-8 h-8 text-white/40 rotate-90" />
+                          <Icon name="minus" className="w-8 h-8 text-white/40 rotate-90" />
                         </motion.div>
                       ))}
 
@@ -537,7 +525,7 @@ export default function HomePage() {
                             ease: 'linear',
                           }}
                         >
-                          <Rocket className="w-8 h-8 text-white/60" />
+                          <Icon name="rocket" className="w-8 h-8 text-white/60" />
                         </motion.div>
                       </div>
 
@@ -613,7 +601,7 @@ export default function HomePage() {
                 viewport={{ once: false, margin: '-10%' }}
               >
                 <SystemCard
-                  icon={Users}
+                  icon="users"
                   title="Crew"
                   description="The specialists your project needs, available when you need them. Development, design, strategy, growth. Not someday when you can afford them. Today."
                   imageContent={
@@ -658,7 +646,7 @@ export default function HomePage() {
                     className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
                   >
                     <span className="relative z-10">
-                      <Rocket className="w-5 h-5 mr-2 inline" />
+                      <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
                       Enter Command Deck
                     </span>
                     <motion.div
@@ -677,7 +665,7 @@ export default function HomePage() {
                     className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
                   >
                     <span className="relative z-10">
-                      <Rocket className="w-5 h-5 mr-2 inline" />
+                      <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
                       Begin Your Journey
                     </span>
                     <motion.div
@@ -710,11 +698,11 @@ export default function HomePage() {
               </div>
               <div className="flex space-x-6">
                 <Button variant="ghost" size="sm">
-                  <Book className="w-4 h-4 mr-2" />
+                  <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}>
-                  <Users className="w-4 h-4 mr-2" />
+                  <Icon name="user" className="w-4 h-4 mr-2" />
                   Discord
                 </Button>
               </div>

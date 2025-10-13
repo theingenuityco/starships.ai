@@ -1,7 +1,9 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Button } from '@/components/ui/button'
-import { LogOut } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -27,7 +29,7 @@ export function LogoutButton({ variant = 'ghost', size = 'default', className, c
 
   return (
     <Button variant={variant} size={size} className={cn('flex items-center gap-2', className)} onClick={handleLogout}>
-      <LogOut className="h-4 w-4" />
+      <Icon name="log-out" className="h-4 w-4" />
       {children || 'Sign Out'}
     </Button>
   )

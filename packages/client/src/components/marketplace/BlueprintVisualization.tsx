@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import {
@@ -19,7 +21,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock, Code, Globe, Settings, GitBranch, Database, Wrench, Cog, X, Edit3, Split } from 'lucide-react'
+
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -51,33 +53,33 @@ const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
   const className = 'w-5 h-5'
   switch (nodeType) {
     case 'start':
-      return <Play className={className} />
+      return <Icon name="play" className={className} />
     case 'end':
-      return <CheckCircle2 className={className} />
+      return <Icon name="check-circle" className={className} />
     case 'agent':
-      return <Zap className={className} />
+      return <Icon name="zap" className={className} />
     case 'user_prompt':
-      return <User className={className} />
+      return <Icon name="user" className={className} />
     case 'conditional':
-      return <Split className={className} />
+      return <Icon name="split" className={className} />
     case 'output':
-      return <Eye className={className} />
+      return <Icon name="eye" className={className} />
     case 'llm':
-      return <Zap className={className} />
+      return <Icon name="zap" className={className} />
     case 'http_request':
-      return <Globe className={className} />
+      return <Icon name="globe" className={className} />
     case 'code':
-      return <Code className={className} />
+      return <Icon name="code" className={className} />
     case 'tool':
-      return <Settings className={className} />
+      return <Icon name="settings" className={className} />
     case 'workflow':
-      return <GitBranch className={className} />
+      return <Icon name="git-branch" className={className} />
     case 'transform':
-      return <Cog className={className} />
+      return <Icon name="cog" className={className} />
     case 'mutate':
-      return <Edit3 className={className} />
+      return <Icon name="edit-3" className={className} />
     default:
-      return <Clock className={className} />
+      return <Icon name="clock" className={className} />
   }
 })
 NodeIcon.displayName = 'NodeIcon'
@@ -750,7 +752,7 @@ const NodeDetailsPanel: React.FC<{
           </div>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
-          <X className="h-3.5 w-3.5" />
+          <Icon name="x" className="h-3.5 w-3.5" />
         </Button>
       </div>
 
@@ -890,7 +892,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         {title && (
           <Panel position="top-left" className="m-4">
             <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
-              <Wrench className="w-5 h-5 text-primary" />
+              <Icon name="wrench" className="w-5 h-5 text-primary" />
               <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{title}</span>
             </div>
           </Panel>

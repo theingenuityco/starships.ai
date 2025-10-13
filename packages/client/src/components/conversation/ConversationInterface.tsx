@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
@@ -11,7 +13,7 @@ import { useConversationAgents, useConversationStreamed } from '@/hooks/useConve
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { agentAPI, toolAPI } from '@/lib/api'
-import { Sparkles, Users } from 'lucide-react'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
@@ -958,7 +960,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+            <Icon name="sparkles" className="w-8 h-8 text-primary animate-pulse" />
           </div>
           <p className="text-muted-foreground">Initializing conversation...</p>
         </div>
@@ -972,7 +974,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-            <Users className="w-8 h-8 text-muted-foreground" />
+            <Icon name="user" s className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </div>
@@ -984,7 +986,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     <div
       className="relative flex flex-col h-screen transition-all duration-500 ease-in-out"
       style={{
-        marginLeft: '5.5rem', // Consistent offset for both modes to prevent content shift
         overflow: viewMode === 'tool-builder' || viewMode === 'agent-builder' ? 'visible' : 'hidden',
       }}
     >
@@ -1025,7 +1026,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                       onClick={() => handleSuggestionClick(suggestion)}
                     >
                       <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                        <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                        <Icon name="sparkles" className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
                       </div>
                       <span className="flex-1">{suggestion}</span>
                     </button>

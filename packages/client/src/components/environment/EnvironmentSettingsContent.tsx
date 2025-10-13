@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { useState } from 'react'
 import { EnvironmentSummary } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -12,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Input } from '@/components/ui/input'
-import { Settings, Key, Shield, Info, Search, Plus } from 'lucide-react'
+
 
 interface EnvironmentSettingsContentProps {
   slug: string
@@ -104,7 +106,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
         <div className="flex flex-col h-screen items-center justify-center">
           <div className="text-center space-y-4 opacity-100">
             <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-              <Key className="w-8 h-8 text-primary animate-pulse" />
+              <Icon name="key" className="w-8 h-8 text-primary animate-pulse" />
             </div>
             <p className="text-muted-foreground">Loading environment settings...</p>
           </div>
@@ -119,7 +121,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
         <div className="flex flex-col h-screen items-center justify-center">
           <div className="w-full max-w-6xl mx-auto px-6">
             <Alert>
-              <Info className="h-4 w-4" />
+              <Icon name="info" className="h-4 w-4" />
               <AlertDescription>Starship not found. Please check the URL and try again.</AlertDescription>
             </Alert>
           </div>
@@ -136,7 +138,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
             {/* Header */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Key className="h-6 w-6 text-primary" />
+                <Icon name="key" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Environment Variables</h1>
               </div>
               <p className="text-muted-foreground">
@@ -147,14 +149,14 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
             {/* Search */}
             <div className="mb-8">
               <div className="relative max-w-md mb-6 mx-auto">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                <Icon name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                 <Input type="text" placeholder="Search environment variables..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
               </div>
             </div>
 
             {/* Security Notice */}
             <Alert>
-              <Shield className="h-4 w-4" />
+              <Icon name="shield" className="h-4 w-4" />
               <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
             </Alert>
 
@@ -162,7 +164,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
             <div>
               {variablesError ? (
                 <Alert>
-                  <Info className="h-4 w-4" />
+                  <Icon name="info" className="h-4 w-4" />
                   <AlertDescription>Failed to load environment variables. Please try refreshing the page.</AlertDescription>
                 </Alert>
               ) : (

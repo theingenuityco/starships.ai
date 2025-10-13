@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
@@ -9,7 +11,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
-import { Mic, Paperclip, Send, StopCircle, Wrench } from 'lucide-react'
+
 import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
@@ -376,7 +378,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     )}
                     disabled={disabled || isStreamingEffective}
                   >
-                    <Wrench className="h-4 w-4" />
+                    <Icon name="wrench" className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
@@ -429,7 +431,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                 )}
               >
-                {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+                {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
               </Button>
             )}
           </div>
@@ -455,7 +457,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                           )}
                           disabled={disabled || isStreamingEffective}
                         >
-                          <Wrench className="h-4 w-4" />
+                          <Icon name="wrench" className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground">
@@ -476,7 +478,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
-                    {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>

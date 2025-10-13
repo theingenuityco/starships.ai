@@ -1,9 +1,11 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Trash2 } from 'lucide-react'
+
 
 type DangerZoneCardProps = {
   deleting: boolean
@@ -20,7 +22,7 @@ export default function DangerZoneCard({ deleting, onDelete }: DangerZoneCardPro
       <CardContent>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm">
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Icon name="trash" className="h-4 w-4 text-destructive" />
             <span>This action cannot be undone.</span>
           </div>
           <Button type="button" variant="destructive" onClick={onDelete} disabled={deleting}>

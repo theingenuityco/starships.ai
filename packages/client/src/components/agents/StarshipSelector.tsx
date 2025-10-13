@@ -1,10 +1,13 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
-import { AlertCircle, Loader2, Rocket } from 'lucide-react'
+
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 
 interface StarshipSelectorProps {
   value?: string
@@ -22,7 +25,7 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
   if (loading) {
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-muted/5">
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <LoadingSpinner className="w-4 h-4" />
         <span className="text-sm text-muted-foreground">Loading starships...</span>
       </div>
     )
@@ -31,7 +34,7 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
   if (error) {
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-destructive/5 border-destructive/20">
-        <AlertCircle className="w-4 h-4 text-destructive" />
+        <Icon name="alert-circle" className="w-4 h-4 text-destructive" />
         <span className="text-sm text-destructive">{error?.message || 'Failed to load starships'}</span>
       </div>
     )
@@ -40,7 +43,7 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
   if (starships.length === 0) {
     return (
       <div className="flex flex-col items-center space-y-2 p-4 border rounded-md bg-muted/5 text-center">
-        <Rocket className="w-8 h-8 text-muted-foreground" />
+        <Icon name="rocket" className="w-8 h-8 text-muted-foreground" />
         <div>
           <p className="text-sm font-medium text-muted-foreground">No starships available</p>
           <p className="text-xs text-muted-foreground mt-1">Create a starship first to deploy agents</p>

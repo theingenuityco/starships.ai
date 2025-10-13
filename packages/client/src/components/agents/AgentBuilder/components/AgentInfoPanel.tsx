@@ -1,9 +1,11 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React, { useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Sparkles } from 'lucide-react'
+
 import type { AgentFormData, FormErrors } from '../types'
 
 interface AgentInfoPanelProps {
@@ -46,7 +48,7 @@ export const AgentInfoPanel: React.FC<AgentInfoPanelProps> = ({ formData, errors
     <div className="frosted-glass-card rounded-xl shadow-frosted-lg p-3 w-full">
       <div className="flex items-start gap-2.5">
         <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 shadow-sm flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-4 h-4 text-primary" />
+          <Icon name="sparkles" className="w-4 h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0 space-y-1">
           <Input

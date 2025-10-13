@@ -1,11 +1,13 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Settings2, ChevronDown } from 'lucide-react'
+
 import type { AgentFormData, FormErrors } from '../types'
 import { CategorySelector } from './CategorySelector'
 import { IconSelector } from './IconSelector'
@@ -23,10 +25,10 @@ export const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ formData
         <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Settings2 className="w-3.5 h-3.5 text-primary" />
+              <Icon name="settings2" className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-semibold">Agent Settings</span>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
+            <Icon name="chevron-down" className="w-3.5 h-3.5 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
           </div>
         </CollapsibleTrigger>
 

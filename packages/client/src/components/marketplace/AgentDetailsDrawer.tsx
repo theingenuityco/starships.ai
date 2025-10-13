@@ -1,5 +1,7 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import React from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -14,7 +16,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { BlueprintVisualization } from './BlueprintVisualization'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Sparkles, Download, CheckCircle, Brain, MessageSquare, Star, Users, Calendar, Zap, X, FileText, Settings, GitBranch, Copy } from 'lucide-react'
+
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { format } from 'date-fns'
@@ -47,15 +49,15 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'coding':
-        return <Code className="w-5 h-5" />
+        return <Icon name="code" className="w-5 h-5" />
       case 'creative':
-        return <Lightbulb className="w-5 h-5" />
+        return <Icon name="lightbulb" className="w-5 h-5" />
       case 'analysis':
-        return <BarChart2 className="w-5 h-5" />
+        return <Icon name="bar-chart" className="w-5 h-5" />
       case 'support':
-        return <HeartPulse className="w-5 h-5" />
+        return <Icon name="heart-pulse" className="w-5 h-5" />
       default:
-        return <Bot className="w-5 h-5" />
+        return <Icon name="bot" className="w-5 h-5" />
     }
   }
 
@@ -113,7 +115,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                         {template.category}
                       </Badge>
                       <div className="flex items-center gap-2 bg-muted/50 px-3 py-1 rounded-lg">
-                        <Brain className="w-4 h-4 text-muted-foreground" />
+                        <Icon name="brain" className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground font-mono">{template.model}</span>
                       </div>
                     </div>
@@ -128,13 +130,13 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
               <div className="space-y-6">
                 <Card className="p-4 frosted-glass-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <BarChart2 className="w-5 h-5 text-primary" />
+                    <Icon name="bar-chart" className="w-5 h-5 text-primary" />
                     Usage Statistics
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-primary/10">
-                        <Download className="w-4 h-4 text-primary" />
+                        <Icon name="download" className="w-4 h-4 text-primary" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Deployments</p>
@@ -143,7 +145,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-green-500/10">
-                        <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <Icon name="star" className="w-4 h-4 text-green-600 dark:text-green-400" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Rating</p>
@@ -157,7 +159,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 {template.systemPrompt && (
                   <Card className="p-4 frosted-glass-card">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Settings className="w-5 h-5 text-primary" />
+                      <Icon name="settings" className="w-5 h-5 text-primary" />
                       System Prompt
                     </h3>
                     <div className="space-y-3">
@@ -166,7 +168,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                           <pre className="whitespace-pre-wrap text-foreground/90">{template.systemPrompt}</pre>
                         </div>
                         <Button size="sm" variant="ghost" className="absolute top-2 right-2 h-8 w-8 p-0" onClick={() => navigator.clipboard?.writeText(template.systemPrompt || '')}>
-                          <Copy className="w-3 h-3" />
+                          <Icon name="copy" className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
@@ -177,7 +179,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 {template.blueprint && template.blueprint.nodes && template.blueprint.nodes.length > 0 && (
                   <Card className="p-4 frosted-glass-card">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <GitBranch className="w-5 h-5 text-primary" />
+                      <Icon name="git-branch" className="w-5 h-5 text-primary" />
                       Blueprint Workflow
                     </h3>
                     <BlueprintVisualization blueprint={template.blueprint} className="h-[500px]" />
@@ -188,7 +190,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 {template.previewPrompts && template.previewPrompts.length > 0 && (
                   <Card className="p-4 frosted-glass-card">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-primary" />
+                      <Icon name="message-square" className="w-5 h-5 text-primary" />
                       Try These Prompts
                     </h3>
                     <div className="space-y-3">
@@ -201,7 +203,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                           className="p-3 rounded-lg bg-muted/30 border border-muted-foreground/20 hover:bg-muted/50 transition-colors cursor-pointer group"
                         >
                           <div className="flex items-start gap-2">
-                            <Zap className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                            <Icon name="zap" className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                             <p className="text-sm leading-relaxed group-hover:text-foreground transition-colors">&quot;{prompt}&quot;</p>
                           </div>
                         </motion.div>
@@ -213,7 +215,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 {/* Deployment Section */}
                 <Card className="p-4 frosted-glass-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
+                    <Icon name="sparkles" className="w-5 h-5 text-primary" />
                     Deployment
                   </h3>
 
@@ -221,7 +223,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                     <div className="space-y-4">
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 border border-muted-foreground/20">
                         <div className="p-2 rounded-lg bg-primary/10">
-                          <Users className="w-4 h-4 text-primary" />
+                          <Icon name="user"s className="w-4 h-4 text-primary"  />
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Deploy to</p>
@@ -231,19 +233,19 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
 
                       {isAlreadyDeployed ? (
                         <Button size="lg" variant="outline" className="w-full" disabled>
-                          <CheckCircle className="w-4 h-4 mr-2" />
+                          <Icon name="check-circle" className="w-4 h-4 mr-2" />
                           Already Deployed
                         </Button>
                       ) : (
                         <Button size="lg" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying}>
-                          <Sparkles className="w-4 h-4 mr-2" />
+                          <Icon name="sparkles" className="w-4 h-4 mr-2" />
                           {isDeploying ? 'Deploying...' : 'Deploy Agent'}
                         </Button>
                       )}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <Icon name="user"s className="w-12 h-12 mx-auto mb-3 opacity-50"  />
                       <p className="text-sm">No starship available for deployment</p>
                     </div>
                   )}
@@ -252,7 +254,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 {/* Metadata */}
                 <Card className="p-4 frosted-glass-card">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-primary" />
+                    <Icon name="calendar" className="w-5 h-5 text-primary" />
                     Details
                   </h3>
                   <div className="space-y-3 text-sm">

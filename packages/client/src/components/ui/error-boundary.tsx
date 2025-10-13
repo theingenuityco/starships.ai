@@ -1,10 +1,12 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { EnhancedError, ErrorRecoveryManager } from '@/lib/error-recovery'
-import { AlertTriangle, Bug, RefreshCw } from 'lucide-react'
+
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 
 interface Props {
@@ -120,7 +122,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <Card className="w-full max-w-lg border-destructive/20">
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
+                <Icon name="alert-triangle" className="h-6 w-6 text-destructive" />
               </div>
               <CardTitle className="text-destructive">Something went wrong</CardTitle>
               <CardDescription className="text-center">{userMessage}</CardDescription>
@@ -177,7 +179,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="flex w-full gap-2">
                 {canRetry && (
                   <Button onClick={this.handleRetry} className="flex-1">
-                    <RefreshCw className="mr-2 h-4 w-4" />
+                    <Icon name="refresh" className="mr-2 h-4 w-4" />
                     Try Again
                   </Button>
                 )}
@@ -191,7 +193,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   Reset Component
                 </Button>
                 <Button onClick={this.handleReportIssue} variant="ghost" size="sm" className="flex-1">
-                  <Bug className="mr-2 h-4 w-4" />
+                  <Icon name="bug" className="mr-2 h-4 w-4" />
                   Report Issue
                 </Button>
               </div>

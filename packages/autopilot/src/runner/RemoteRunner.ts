@@ -2,20 +2,20 @@ import type { Runner } from './Runner';
 import type { Blueprint, Execution, ExecutionItem } from '@/types';
 import type { EngineConfig } from '@/engine/Engine';
 import { nanoid } from 'nanoid';
-import { getEnvConfig } from '@starships/env';
+import { autopilot } from '@/Autopilot';
 
 export class RemoteRunner implements Runner {
   private readonly baseUrl: string;
   private readonly authToken?: string;
 
   constructor() {
-    const env = getEnvConfig();
-    const url = env.AUTOPILOT_REMOTE_URL;
+    const cfg = autopilot.getConfig();
+    const url = cfg.remoteRunnerUrl;
     if (!url) {
-      throw new Error('AUTOPILOT_REMOTE_URL is required for RemoteRunner');
+      throw new Error('RemoteRunner URL not configured. Call autopilot.setRunnerConfig({ url, token })');
     }
     this.baseUrl = url;
-    this.authToken = env.AUTOPILOT_REMOTE_TOKEN;
+    this.authToken = cfg.remoteRunnerToken;
   }
 
   async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {

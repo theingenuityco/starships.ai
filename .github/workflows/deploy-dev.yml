@@ -68,6 +68,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/dev/05-ingress.yaml
           kubectl apply --dry-run=client -f k8s/dev/06-autopilot-runner-rbac.yaml
           kubectl apply --dry-run=client -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
+          kubectl apply --dry-run=client -f k8s/dev/08-autopilot-runner-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/dev/09-autopilot-runner-service.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
@@ -79,6 +81,8 @@ jobs:
           kubectl apply -f k8s/dev/05-ingress.yaml
           kubectl apply -f k8s/dev/06-autopilot-runner-rbac.yaml
           kubectl apply -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
+          kubectl apply -f k8s/dev/08-autopilot-runner-deployment.yaml
+          kubectl apply -f k8s/dev/09-autopilot-runner-service.yaml
           echo "✅ Applied manifests to dev cluster."
 
       - name: Update secrets
@@ -105,6 +109,7 @@ jobs:
           GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          RUNNER_AUTH_TOKEN: ${{ secrets.RUNNER_AUTH_TOKEN }}
         run: |
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
@@ -129,6 +134,7 @@ jobs:
             --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
+            --from-literal=RUNNER_AUTH_TOKEN="$RUNNER_AUTH_TOKEN" \
             -n ${{ env.NAMESPACE }}
 
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true

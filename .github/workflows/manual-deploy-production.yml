@@ -180,6 +180,7 @@ jobs:
             --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
             --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=RUNNER_AUTH_TOKEN="${{ secrets.RUNNER_AUTH_TOKEN }}" \
             --from-literal=POSTGRES_HOST="${{ secrets.POSTGRES_HOST }}" \
             --from-literal=POSTGRES_PORT="${{ secrets.POSTGRES_PORT }}" \
             --from-literal=POSTGRES_USER="${{ secrets.POSTGRES_USER }}" \
@@ -219,6 +220,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/05-ingress.yaml
           kubectl apply --dry-run=client -f k8s/prod/06-autopilot-runner-rbac.yaml
           kubectl apply --dry-run=client -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
+          kubectl apply --dry-run=client -f k8s/prod/08-autopilot-runner-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/prod/09-autopilot-runner-service.yaml
 
           echo "✅ All manifests validated successfully"
 
@@ -235,6 +238,8 @@ jobs:
           kubectl apply -f k8s/prod/05-ingress.yaml
           kubectl apply -f k8s/prod/06-autopilot-runner-rbac.yaml
           kubectl apply -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
+          kubectl apply -f k8s/prod/08-autopilot-runner-deployment.yaml
+          kubectl apply -f k8s/prod/09-autopilot-runner-service.yaml
 
           # Add deployment annotations for tracking
           kubectl annotate deployment starships-app \

@@ -15,7 +15,6 @@ import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hook
 import { useAuth } from '@/hooks/useAuth'
 
 import { AnimatePresence, motion } from 'motion/react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
@@ -23,13 +22,7 @@ interface NavigationProps {
   isMobile?: boolean
 }
 
-// Global navigation structure that works for all authenticated users
-const getGlobalNavigationSections = (starshipSlug: string | null) => [
-  {
-    title: 'Resources',
-    items: [{ href: `/marketplace`, label: 'Marketplace', icon: 'store', status: 'optimal' }],
-  },
-]
+// (All items are composed into a single NavigationSection below)
 
 export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
@@ -89,6 +82,8 @@ export function Navigation(props: NavigationProps) {
   const isConversationRoute = pathname.includes('/conversations')
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
   const isSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings`) : false
+  const isUsageSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/usage`) : false
+  const isEnvironmentSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/environment`) : false
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
@@ -131,13 +126,23 @@ export function Navigation(props: NavigationProps) {
     setShowConversationList(false)
   }
 
-  // Show comprehensive navigation for all authenticated users
-  const getNavigationSections = () => {
-    if (!isAuthenticated) return []
-    return getGlobalNavigationSections(starshipSlug)
-  }
-
-  const navigationSections = getNavigationSections()
+  // Build a single unified navigation section list
+  const mainNavigationItems = [
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'Conversations', icon: 'message-square', isActive: isConversationRoute }] : []),
+    { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
+    ...(isAuthenticated && starshipSlug
+      ? [
+          { href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute },
+          {
+            href: `/ship/${starshipSlug}/settings/usage`,
+            label: 'Ship Settings',
+            icon: 'settings',
+            isActive: isUsageSettingsRoute || (isSettingsRoute && !isEnvironmentSettingsRoute),
+          },
+        ]
+      : []),
+  ]
 
   // Handle logo click - smart navigation based on context
   const handleLogoClick = () => {
@@ -172,126 +177,73 @@ export function Navigation(props: NavigationProps) {
         {/* Navigation Content */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
           <div className="p-3 space-y-4">
-            {/* Overview - First nav item */}
-            {starshipSlug && (
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link href={`/ship/${starshipSlug}`}>
-                    <motion.div
-                      className={`group relative transition-all duration-300 mx-auto rounded-xl z-10 flex items-center justify-center w-12 h-12 border ${
-                        isOverviewRoute
-                          ? 'text-primary bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
-                          : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <LordIcon src={getLordiconUrl('rocket')} width={32} height={32} className="w-[32px] h-[32px]" trigger="hover" />
-                    </motion.div>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                  Overview
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {/* Conversations Section - Only show when user has a starship */}
-            {starshipSlug && (
-              <div>
-                {/* Main Conversations Icon - Standalone */}
-                <Tooltip delayDuration={300}>
-                  <TooltipTrigger asChild>
-                    <Link href={`/ship/${starshipSlug}/conversations`}>
+            <NavigationSection
+              title="Navigation"
+              items={mainNavigationItems}
+              pathname={pathname}
+              renderAfter={item => {
+                const isConversations = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}/conversations`
+                if (!isConversations) return null
+
+                return (
+                  <AnimatePresence>
+                    {isConversationRoute && (
                       <motion.div
-                        className={`group relative transition-all duration-300 mx-auto rounded-xl z-10 flex items-center justify-center w-12 h-12 border ${
-                          isConversationRoute
-                            ? 'text-primary bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border-primary/15'
-                            : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                        }`}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="rounded-bl-xl rounded-br-xl mx-1.5 space-y-1.5 overflow-hidden -mt-2 pt-4 pb-2 px-2 flex flex-col items-center bg-muted/40"
                       >
-                        <LordIcon src={getLordiconUrl('message-square')} width={32} height={32} className="w-[32px] h-[32px]" trigger="hover" />
+                        {/* New Conversation Icon */}
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <motion.button
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.1 }}
+                              onClick={handleNewConversation}
+                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <LordIcon src={getLordiconUrl('plus')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
+                            </motion.button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                            New Conversation
+                          </TooltipContent>
+                        </Tooltip>
+
+                        {/* Conversation History Toggle Icon */}
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <motion.button
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.2 }}
+                              onClick={handleToggleConversationHistory}
+                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              {showConversationList ? (
+                                <LordIcon src={getLordiconUrl('x')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
+                              ) : (
+                                <LordIcon src={getLordiconUrl('history')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
+                              )}
+                            </motion.button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                            {showConversationList ? 'Hide' : 'Show'} History
+                          </TooltipContent>
+                        </Tooltip>
                       </motion.div>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                    Conversations
-                  </TooltipContent>
-                </Tooltip>
-
-                {/* Expanded Sub-icons Container - Visually joined from bottom */}
-                <AnimatePresence>
-                  {isConversationRoute && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                      className="rounded-bl-xl rounded-br-xl mx-1.5 space-y-1.5 overflow-hidden -mt-2 pt-4 pb-2 px-2 flex flex-col items-center bg-muted/40"
-                    >
-                      {/* New Conversation Icon */}
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <motion.button
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 }}
-                            onClick={handleNewConversation}
-                            className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <LordIcon src={getLordiconUrl('plus')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
-                          </motion.button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                          New Conversation
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Conversation History Toggle Icon */}
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <motion.button
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.2 }}
-                            onClick={handleToggleConversationHistory}
-                            className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            {showConversationList ? (
-                              <LordIcon src={getLordiconUrl('x')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
-                            ) : (
-                              <LordIcon src={getLordiconUrl('history')} width={22} height={22} className="w-[22px] h-[22px]" trigger="hover" />
-                            )}
-                          </motion.button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                          {showConversationList ? 'Hide' : 'Show'} History
-                        </TooltipContent>
-                      </Tooltip>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Ship Management moved to end of navigation */}
-              </div>
-            )}
-
-            {/* Other Navigation Items */}
-            {navigationSections.map(section => (
-              <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} />
-            ))}
-
-            {/* Ship Management - Root-level at the end */}
-            {starshipSlug && (
-              <div>
-                <NavigationItem href={`/ship/${starshipSlug}/settings/usage`} label="Ship Settings" icon="settings" isActive={isSettingsRoute} />
-              </div>
-            )}
+                    )}
+                  </AnimatePresence>
+                )
+              }}
+            />
           </div>
         </div>
 

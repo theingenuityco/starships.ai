@@ -233,7 +233,7 @@ export function Navigation(props: NavigationProps) {
                       initial={false}
                       animate={{ height: isConversationRoute ? conversationSubnavHeight : 0, opacity: isConversationRoute ? 1 : 0, y: isConversationRoute ? 0 : 4 }}
                       transition={{ duration: 0.24, ease: 'easeInOut' }}
-                      className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden -mt-2 bg-muted/40"
+                      className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
                       style={{ willChange: 'height, opacity, transform' }}
                     >
                       <div ref={conversationSubnavContentRef} className="pt-4 pb-2 px-2 flex flex-col items-center space-y-1.5">
@@ -299,9 +299,13 @@ export function Navigation(props: NavigationProps) {
                     onClick={() => {
                       if (!starshipSlug) return
                       router.push(`/ship/${starshipSlug}/settings/usage`)
-                      setShowUserSubnav(false)
+                      // keep subnav expanded; do not setShowUserSubnav(false)
                     }}
-                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                    className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-9 h-9 border ${
+                      isSettingsRoute
+                        ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                    }`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -339,6 +343,7 @@ export function Navigation(props: NavigationProps) {
           {/* Profile icon (click to toggle) */}
           <UserProfile
             mode="collapsed"
+            active={showUserSubnav || isSettingsRoute}
             onClick={() => {
               setShowConversationList(false)
               setShowUserSubnav(prev => !prev)

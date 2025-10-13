@@ -14,13 +14,14 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/compon
 interface UserProfileProps {
   mode?: 'collapsed' | 'expanded'
   onClick?: () => void
+  active?: boolean
 }
 
 /**
  * User profile component for navigation bottom
  * Shows user name and email with logout functionality via tooltip
  */
-export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick }: UserProfileProps) {
+export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick, active = false }: UserProfileProps) {
   const { user, userName, userEmail, isAuthenticated, logout, userAvatar } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -47,7 +48,11 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     return (
       <div className="flex justify-center group">
         <div
-          className={`group relative transition-all duration-300 mx-auto rounded-xl w-12 h-12 flex items-center justify-center border text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md cursor-pointer`}
+          className={`group relative transition-all duration-300 mx-auto rounded-xl w-12 h-12 flex items-center justify-center border cursor-pointer ${
+            active
+              ? 'text-foreground bg-gradient-to-r from-muted/40 to-muted/30 shadow-md border-transparent'
+              : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+          }`}
           role="button"
           aria-label="Open user menu"
           tabIndex={0}

@@ -36,6 +36,7 @@ export function Navigation(props: NavigationProps) {
   // Smooth height animation: measure content height
   const [userSubnavHeight, setUserSubnavHeight] = useState(0)
   const userSubnavContentRef = useRef<HTMLDivElement>(null)
+  const userSectionRef = useRef<HTMLDivElement>(null)
   // Smooth height animation (conversations)
   const [conversationSubnavHeight, setConversationSubnavHeight] = useState(0)
   const conversationSubnavContentRef = useRef<HTMLDivElement>(null)
@@ -112,6 +113,28 @@ export function Navigation(props: NavigationProps) {
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
+
+  // Collapse user subnav on outside click when not on settings route
+  useEffect(() => {
+    const handleDocClick = (e: MouseEvent) => {
+      if (!showUserSubnav) return
+      if (isSettingsRoute) return // keep expanded on settings routes
+      const container = userSectionRef.current
+      const target = e.target as Node | null
+      if (container && target && !container.contains(target)) {
+        setShowUserSubnav(false)
+      }
+    }
+    document.addEventListener('mousedown', handleDocClick)
+    return () => document.removeEventListener('mousedown', handleDocClick)
+  }, [showUserSubnav, isSettingsRoute])
+
+  // Collapse user subnav on route changes away from settings
+  useEffect(() => {
+    if (!isSettingsRoute) {
+      setShowUserSubnav(false)
+    }
+  }, [pathname, isSettingsRoute])
 
   // Measure conversation subnav content height
   useEffect(() => {
@@ -280,7 +303,7 @@ export function Navigation(props: NavigationProps) {
         </div>
 
         {/* User Profile Section - Collapsed Mode with upward subnav */}
-        <div className="flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
+        <div ref={userSectionRef} className="flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
           {/* Upward subnav - renders ABOVE the user icon */}
           <motion.div
             initial={false}

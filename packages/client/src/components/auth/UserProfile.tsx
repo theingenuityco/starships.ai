@@ -48,7 +48,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     return (
       <div className="flex justify-center group">
         <div
-          className={`group relative transition-all duration-300 mx-auto rounded-xl w-12 h-12 flex items-center justify-center border cursor-pointer ${
+          className={`group relative transition-all duration-300 mx-auto rounded-xl w-10 h-10 flex items-center justify-center border cursor-pointer ${
             active
               ? 'text-foreground bg-gradient-to-r from-muted/40 to-muted/30 shadow-md border-transparent'
               : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
@@ -62,11 +62,11 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           }}
         >
           {userAvatar ? (
-            <Avatar className="w-8 h-8">
+            <Avatar className="w-7 h-7">
               <AvatarFallback className="text-xs">{userAvatar}</AvatarFallback>
             </Avatar>
           ) : (
-            <LordIcon src={getLordiconUrl('user')} width={32} height={32} className="w-[32px] h-[32px]" trigger="click" />
+            <LordIcon src={getLordiconUrl('user')} width={28} height={28} className="w-[28px] h-[28px]" trigger="click" />
           )}
         </div>
       </div>

@@ -1,9 +1,13 @@
 FROM node:20-slim AS build
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
+# Bring in workspace context so pnpm can resolve properly
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
+# Also bring in root tsconfigs so package tsconfig extends can resolve during build
+COPY tsconfig.json tsconfig.nodejs.json tsconfig.nextjs.json ./
 RUN npm i -g pnpm && pnpm fetch
 COPY ./packages/autopilot/ ./packages/autopilot/
-RUN pnpm -C packages/autopilot install --offline && pnpm -C packages/autopilot build
+# Install with network (no --offline) to avoid missing offline metadata
+RUN pnpm -C packages/autopilot install && pnpm -C packages/autopilot build
 
 FROM node:20-slim
 WORKDIR /app

@@ -183,7 +183,7 @@ jobs:
       - name: Build and push runner image
         uses: docker/build-push-action@v5
         with:
-          context: ./packages/autopilot
+          context: .
           file: ./packages/autopilot/Dockerfile.runner
           platforms: linux/amd64
           push: true

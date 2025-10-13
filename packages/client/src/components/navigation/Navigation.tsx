@@ -169,8 +169,18 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Compact Header with Theme Toggle */}
         <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Overview">
-            <StarshipsLogo width={42} height={42} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger} />
+          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Navigate to Overview">
+            <StarshipsLogo
+              width={42}
+              height={42}
+              className=""
+              gradientId="nav-gradient"
+              animationDelay={1}
+              repeatDelay={20}
+              triggerAnimation={animationTrigger}
+              idleLoop={false}
+              playOnMountOnce={true}
+            />
           </div>
         </div>
 

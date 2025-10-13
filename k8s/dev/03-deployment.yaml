@@ -36,8 +36,7 @@ spec:
         app: starships-ai
         environment: dev
     spec:
-      # serviceAccount no longer required (server does not create Jobs)
-      # serviceAccountName: autopilot-runner
+      
       terminationGracePeriodSeconds: 120
       imagePullSecrets:
         - name: ghcr-pull-secret

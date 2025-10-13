@@ -27,8 +27,7 @@ spec:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '3000'
     spec:
-      # serviceAccount no longer required (server does not create Jobs)
-      # serviceAccountName: autopilot-runner
+      
       # Security Context - Temporarily disabled due to supervisor permission issues
       # TODO: Fix Docker image to work with non-root user
       # securityContext:

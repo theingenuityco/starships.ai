@@ -113,7 +113,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
             <div className="flex flex-col items-center space-y-2">
               <div className="relative">
                 <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
-                <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative overflow-visible">
+                <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
                   <AnimatedBoringAvatar seed={agent.id} name={agent.name} size={40} emphasis={isSelected} />
                 </Avatar>
                 {/* Online indicator */}

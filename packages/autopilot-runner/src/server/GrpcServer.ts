@@ -91,8 +91,7 @@ export class GrpcServer {
               'Access-Control-Allow-Origin': '*',
             });
 
-            // eslint-disable-next-line no-console
-            console.log('[GrpcServer] ExecuteStream start', { requestId: currentRequestId });
+            // Minimal startup log can be noisy; keep only errors below
 
             const started = Date.now();
             const send = (eventName: string, data: Record<string, unknown>): void => {
@@ -120,8 +119,7 @@ export class GrpcServer {
               duration_ms: Date.now() - started,
               result_json: JSON.stringify(result ?? null),
             });
-            // eslint-disable-next-line no-console
-            console.log('[GrpcServer] ExecuteStream completed', { requestId: currentRequestId });
+
             res.end();
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);

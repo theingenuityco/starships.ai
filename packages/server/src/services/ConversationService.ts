@@ -410,9 +410,6 @@ export class ConversationService {
         if (msgs) {
           const baselineIndex = msgs.length - 1;
           this.lastPersistedIndex.set(conversationId, baselineIndex);
-          console.log(`[STREAMING] workflow_started: baseline messages length=${msgs.length}, set lastPersistedIndex=${baselineIndex}`);
-        } else {
-          console.log('[STREAMING] workflow_started: execution.state.messages not available; baseline not set');
         }
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
@@ -727,7 +724,6 @@ export class ConversationService {
               }
             } catch (e) {
               // ignore toolCall parse errors to avoid breaking streaming
-              console.warn('[STREAMING] Tool call processing error:', e);
             }
           }
         }
@@ -949,7 +945,6 @@ export class ConversationService {
 
               // Validate message shape
               if (!isStateMsg(raw)) {
-                console.log(`[STREAMING] Skipping non-message at index ${i}`);
                 continue;
               }
 
@@ -957,11 +952,8 @@ export class ConversationService {
 
               // Skip system messages (ephemeral, not persisted)
               if (role === 'system') {
-                console.log(`[STREAMING] Skipping message at index ${i}: system`);
                 continue;
               }
-
-              console.log(`[STREAMING] Processing message at index ${i}: ${role}`);
 
               try {
                 // Treat as canonical LlmMessage after type guard

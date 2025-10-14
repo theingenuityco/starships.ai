@@ -70,8 +70,6 @@ export class RemoteRunner implements Runner {
 
       // Minimal SSE parser
 
-      console.log('[RemoteRunner] SSE connection opened', { requestId, streamUrl });
-
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -106,8 +104,6 @@ export class RemoteRunner implements Runner {
           }
         }
       }
-
-      console.log('[RemoteRunner] SSE connection closed', { requestId });
 
       return Array.isArray(finalResult) ? finalResult : [];
     }

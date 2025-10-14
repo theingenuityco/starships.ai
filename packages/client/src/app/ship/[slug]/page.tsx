@@ -180,7 +180,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                           <CardHeader className="pb-3 relative z-10">
                             <div className="flex items-center gap-2 mb-1">
                               <Avatar className="h-6 w-6 ring-1 ring-border/40">
-                                <AgentAvatar seed={agent.id} size={24} />
+                                <AgentAvatar seed={agent.name} size={24} />
                               </Avatar>
                               <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
                             </div>
@@ -227,7 +227,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       <CardHeader className="pb-3 relative z-10">
                         <div className="flex items-center gap-2 mb-1">
                           <Avatar className="h-6 w-6 ring-1 ring-border/40">
-                            <AgentAvatar seed={agent.id} size={24} />
+                            <AgentAvatar seed={agent.name} size={24} />
                           </Avatar>
                           <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
                         </div>
@@ -282,7 +282,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
             <DialogTitle className="flex items-center gap-2">
               {selectedAgent ? (
                 <Avatar className="h-6 w-6 ring-1 ring-border/40">
-                  <AgentAvatar seed={selectedAgent.id} size={24} />
+                  <AgentAvatar seed={selectedAgent.name} size={24} />
                 </Avatar>
               ) : (
                 <Icon name="bot" className="h-5 w-5 text-primary" />

@@ -107,7 +107,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0">
             <Avatar className="h-12 w-12 ring-2 ring-background shadow-md">
-              <AgentAvatar seed={template.id} size={48} />
+              <AgentAvatar seed={template.name} size={48} />
             </Avatar>
           </div>
 

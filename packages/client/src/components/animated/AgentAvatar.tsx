@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { createAvatar } from '@dicebear/core'
 import { botttsNeutral } from '@dicebear/collection'
+import { normalizeAvatarSeed } from '@/lib/avatar'
 
 export type AgentAvatarProps = {
   seed: string
@@ -14,8 +15,9 @@ export type AgentAvatarProps = {
 
 export default function AgentAvatar({ seed, size = 40, className, emphasis = false, animation = 'none' }: AgentAvatarProps) {
   const svg = useMemo(() => {
+    const normalized = normalizeAvatarSeed(seed)
     return createAvatar(botttsNeutral, {
-      seed,
+      seed: normalized,
     }).toString()
   }, [seed])
 

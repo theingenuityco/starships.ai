@@ -123,7 +123,7 @@ export class GrpcServer {
             res.end();
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            // eslint-disable-next-line no-console
+
             console.error('[GrpcServer] ExecuteStream error', {
               error: message,
               requestUrl: req.url,
@@ -132,7 +132,9 @@ export class GrpcServer {
             try {
               res.write(`event: error\n`);
               res.write(`data: ${JSON.stringify({ error: { message } })}\n\n`);
-            } catch {}
+            } catch {
+              console.error('[GrpcServer] ExecuteStream error');
+            }
             res.end();
           }
           return;
@@ -171,7 +173,7 @@ export class GrpcServer {
             res.end(JSON.stringify(response));
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            // eslint-disable-next-line no-console
+
             console.error('[GrpcServer] Execute error', {
               error: message,
               requestUrl: req.url,

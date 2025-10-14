@@ -9,7 +9,6 @@ import { BaseNode } from './BaseNode';
 import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
-import { autopilot } from '@/Autopilot';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';

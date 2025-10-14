@@ -3,6 +3,8 @@
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
@@ -103,8 +105,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
       >
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
-          <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
-            <div className="text-2xl">{template.icon || '🤖'}</div>
+          <div className="flex-shrink-0">
+            <Avatar className="h-12 w-12 ring-2 ring-background shadow-md">
+              <AgentAvatar seed={template.name} size={48} />
+            </Avatar>
           </div>
 
           <div className="flex-1 min-w-0">

@@ -6,7 +6,8 @@ import React from 'react'
 import type { AgentModel } from '@starships/protocol'
 
 import { Card } from '@/components/ui/card'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
@@ -113,13 +114,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
               <div className="relative">
                 <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
                 <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
-                  <AvatarFallback
-                    className={`
-                  ${isSelected ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' : `${getAvatarBackgroundColor(agent.name)} text-foreground`}
-                `}
-                  >
-                    <span className="text-base">{getAgentAvatarContent(agent)}</span>
-                  </AvatarFallback>
+                  <AgentAvatar seed={agent.name} size={40} emphasis={isSelected} />
                 </Avatar>
                 {/* Online indicator */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />

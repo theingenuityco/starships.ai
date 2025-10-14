@@ -4,7 +4,8 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
@@ -75,10 +76,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                      {((agent as any).avatarUrl || (agent as any).imageUrl || (agent as any).iconUrl) && (
-                        <AvatarImage src={(agent as any).avatarUrl || (agent as any).imageUrl || (agent as any).iconUrl} alt={agent.name} />
-                      )}
-                      <AvatarFallback className="bg-muted text-muted-foreground text-xs font-medium">{agent.name?.[0]?.toUpperCase() || 'A'}</AvatarFallback>
+                      <AgentAvatar seed={agent.name} size={28} />
                     </Avatar>
                     <div className="min-w-0">
                       <div className="font-medium leading-5">{agent.name}</div>

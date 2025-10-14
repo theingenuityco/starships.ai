@@ -410,9 +410,6 @@ export class ConversationService {
         if (msgs) {
           const baselineIndex = msgs.length - 1;
           this.lastPersistedIndex.set(conversationId, baselineIndex);
-          console.log(`[STREAMING] workflow_started: baseline messages length=${msgs.length}, set lastPersistedIndex=${baselineIndex}`);
-        } else {
-          console.log('[STREAMING] workflow_started: execution.state.messages not available; baseline not set');
         }
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
@@ -727,7 +724,6 @@ export class ConversationService {
               }
             } catch (e) {
               // ignore toolCall parse errors to avoid breaking streaming
-              console.warn('[STREAMING] Tool call processing error:', e);
             }
           }
         }
@@ -849,6 +845,25 @@ export class ConversationService {
         break;
       }
 
+      case 'node_failed': {
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: Execution | undefined = execEvent?.data?.execution;
+          const nodeRef = execution?.currentNodeRef;
+          console.error('[STREAMING] Node failed', {
+            nodeRef,
+            depth: execEvent.executionDepth,
+          });
+          // Print execution snapshot for diagnosis
+          console.error('[STREAMING] Execution snapshot (node_failed)', {
+            results: execution?.results[0].items[0],
+          });
+        } catch (e) {
+          console.error('[STREAMING] Node failed (logging error):', e);
+        }
+        break;
+      }
+
       case 'node_completed': {
         // Handle tool node completion - persist tool result messages
         // Also detect UI actions emitted by code/end nodes and forward them to the client via SSE
@@ -930,7 +945,6 @@ export class ConversationService {
 
               // Validate message shape
               if (!isStateMsg(raw)) {
-                console.log(`[STREAMING] Skipping non-message at index ${i}`);
                 continue;
               }
 
@@ -938,11 +952,8 @@ export class ConversationService {
 
               // Skip system messages (ephemeral, not persisted)
               if (role === 'system') {
-                console.log(`[STREAMING] Skipping message at index ${i}: system`);
                 continue;
               }
-
-              console.log(`[STREAMING] Processing message at index ${i}: ${role}`);
 
               try {
                 // Treat as canonical LlmMessage after type guard
@@ -1051,7 +1062,8 @@ export class ConversationService {
 
       case 'workflow_failed': {
         const execEvent = event as ExecutionEvent;
-        console.error('[STREAMING] Workflow failed:', execEvent.data?.execution?.error);
+        const execution: Execution | undefined = execEvent.data?.execution;
+        console.error('[STREAMING] Workflow failed:', execution?.results);
 
         // Create error message
         const errorMessage = await this.messageService.createMessage({

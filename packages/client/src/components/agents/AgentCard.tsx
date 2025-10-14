@@ -114,7 +114,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
               <div className="relative">
                 <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
                 <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
-                  <AgentAvatar seed={agent.id} size={40} emphasis={isSelected} />
+                  <AgentAvatar seed={agent.name} size={40} emphasis={isSelected} />
                 </Avatar>
                 {/* Online indicator */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />

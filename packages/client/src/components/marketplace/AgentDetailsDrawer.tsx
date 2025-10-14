@@ -108,7 +108,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
                     <Avatar className="h-14 w-14 ring-2 ring-background shadow-md">
-                      <AgentAvatar seed={template.id} size={56} />
+                      <AgentAvatar seed={template.name} size={56} />
                     </Avatar>
                   </div>
                   <div className="flex-1 min-w-0">

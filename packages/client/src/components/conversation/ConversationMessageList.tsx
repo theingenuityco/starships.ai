@@ -1,6 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
@@ -9,7 +10,7 @@ import type { MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationStreamed, useConversationAgents } from '@/hooks/useConversations'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
@@ -29,10 +30,14 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
   // Use stable selectors to avoid returning new objects each render
   // messages are sourced from useConversationStreamed(conversationId)
-  const agentName = useStarshipUIStore(state => {
+  const storeAgentName = useStarshipUIStore(state => {
     if (!conversationId) return undefined
     return state.conversations[conversationId]?.agentName
   })
+  // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
+  const { data: conversationAgents = [] } = useConversationAgents(conversationId)
+  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
+  const agentName = storeAgentName || agentObj?.name
   const isResponding = isRespondingHook
 
   // Scroll container reference
@@ -368,8 +373,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-                  <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                  <AgentAvatar seed={agentName || 'assistant'} size={32} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
@@ -427,8 +432,8 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-start">
           <div className="flex items-start gap-3 max-w-[85%]">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-              <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+              <AgentAvatar seed={agentName || 'assistant'} size={32} />
             </div>
             <div className="min-w-0 flex-1">
               <ConversationMessageContent
@@ -459,6 +464,9 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+
+    // Re-render when agent label changes (post-reload agent restoration)
+    if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false
 
     // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false

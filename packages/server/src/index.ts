@@ -116,11 +116,6 @@ httpServer.listen(PORT, async () => {
   try {
     console.log('🚀 Starting Aether Core Server...');
 
-    // Configure autopilot credentials
-    autopilot.setCredentials({
-      openrouterApiKey: config.OPENROUTER_API_KEY,
-    });
-
     // Configure remote runner (URL and optional token)
     autopilot.setRunnerConfig({
       url: config.RUNNER_URL,

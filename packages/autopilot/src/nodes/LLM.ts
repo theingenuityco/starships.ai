@@ -9,7 +9,6 @@ import { BaseNode } from './BaseNode';
 import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
-import { autopilot } from '@/Autopilot';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -30,11 +29,9 @@ export class LLM extends BaseNode<LlmParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
     const secureEnv = this.getOptions()?.secureEnv;
-    const apiKey = secureEnv?.OPEN_ROUTER_KEY ?? autopilot.getOpenRouterApiKey();
+    const apiKey = secureEnv?.OPEN_ROUTER_KEY;
     if (!apiKey) {
-      throw this.handleExecutionError(
-        new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY") or autopilot.setCredentials().')
-      );
+      throw this.handleExecutionError(new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY").'));
     }
 
     try {
@@ -340,10 +337,7 @@ export class LLM extends BaseNode<LlmParams> {
             if (toolCallDelta.function?.name && toolCallDelta.id && eventCallback) {
               if (!this.emittedToolCalls.has(toolCallDelta.id)) {
                 this.emittedToolCalls.add(toolCallDelta.id);
-                console.log('[LLM] 🎯 Tool call detected:', {
-                  toolCallId: toolCallDelta.id,
-                  toolName: toolCallDelta.function.name,
-                });
+
                 await eventCallback({
                   type: 'tool_call_detected',
                   timestamp: new Date().toISOString(),
@@ -406,7 +400,6 @@ export class LLM extends BaseNode<LlmParams> {
           if (tc.function.arguments) {
             try {
               argsObj = JSON.parse(tc.function.arguments);
-              console.log(`[LLM FINAL] Successfully parsed ${tc.function.arguments.length} chars for tool '${tc.function.name}'`);
             } catch (parseError) {
               console.error(`[LLM FINAL] Failed to parse tool '${tc.function.name}' arguments:`, {
                 argsLength: tc.function.arguments.length,
@@ -550,13 +543,7 @@ export class LLM extends BaseNode<LlmParams> {
       });
     }
 
-    // API key validation
-    if (!autopilot.getOpenRouterApiKey()) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'OpenRouter API key is required. Configure it via autopilot.setCredentials().',
-      });
-    }
+    // API key validation moved to runtime via secureEnv only
 
     // Parameter range validation using helper methods
     const tempError = this.validateParameterRange(params.temperature, 'Temperature', 0, 2);

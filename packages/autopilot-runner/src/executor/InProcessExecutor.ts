@@ -24,6 +24,7 @@ export class InProcessExecutor implements Executor {
     });
 
     const result = await engine.executeBlueprint(blueprint, execution);
+
     return result;
   }
 }

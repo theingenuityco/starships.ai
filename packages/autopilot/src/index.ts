@@ -45,4 +45,4 @@ export { RunnerFactory } from './runner/RunnerFactory';
 
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';
-export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';
+export type { AutopilotConfig } from './Autopilot';

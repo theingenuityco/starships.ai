@@ -7,7 +7,7 @@
 import { Engine } from '@/engine/Engine';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { Blueprint, Node } from '@/types';
-import { autopilot } from '@/Autopilot';
+// Autopilot credentials are no longer used; secureEnv is passed to Engine
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
@@ -771,8 +771,6 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      // Provide credentials for validation to pass
-      autopilot.setCredentials({ openrouterApiKey: 'test-api-key-123' });
       const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);

@@ -109,9 +109,6 @@ describe('End-to-End Workflow Execution', () => {
       // Mock LLM API failure
       mockFetch.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      // Provide credentials for validation to pass
-      autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
-
       const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
       const execution = ExecutionItemUtils.createExecution();
 
@@ -578,8 +575,6 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"approved":true,"post_id":"123"}',
         });
 
-      // Provide credentials for validation to pass
-      autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
       const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);

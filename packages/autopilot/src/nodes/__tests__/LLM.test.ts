@@ -294,23 +294,7 @@ describe('LLM Node Handler', () => {
       expect((validation.errors ?? []).length).toBeGreaterThanOrEqual(6);
     });
 
-    it('should validate API key availability', () => {
-      const params: LlmParams = {
-        model: 'anthropic/claude-3.5-sonnet',
-        messages: [{ role: 'user', content: 'Hello!' }],
-      };
-
-      const llm = new LLM(params);
-      const validation = llm.validate();
-
-      expect(validation.valid).toBe(false);
-      expect(validation.errors).toContainEqual(
-        expect.objectContaining({
-          code: 'MISSING_REQUIRED_FIELD',
-          message: 'OpenRouter API key is required. Configure it via autopilot.setCredentials().',
-        })
-      );
-    });
+    // API key availability is enforced at runtime (execute), not at validate()
 
     it('should pass validation with valid parameters', () => {
       const params: LlmParams = {
@@ -327,15 +311,8 @@ describe('LLM Node Handler', () => {
       const llm = new LLM(params);
       const validation = llm.validate();
 
-      // Expect validation to fail only due to missing API key
-      expect(validation.valid).toBe(false);
-      expect(validation.errors).toHaveLength(1);
-      expect(validation.errors).toContainEqual(
-        expect.objectContaining({
-          code: 'MISSING_REQUIRED_FIELD',
-          message: 'OpenRouter API key is required. Configure it via autopilot.setCredentials().',
-        })
-      );
+      // Validation should pass; API key is checked at execute-time via secureEnv
+      expect(validation.valid).toBe(true);
     });
   });
 

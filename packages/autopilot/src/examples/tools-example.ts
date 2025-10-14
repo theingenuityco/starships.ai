@@ -4,13 +4,10 @@
  * Examples demonstrating how to use the new tool calling functionality
  */
 
-import { Agent, autopilot, ExecutionItemUtils } from '../index';
+import { Agent, ExecutionItemUtils } from '../index';
 import type { ToolParams } from '../types/node-parameters';
 
-// Configure credentials (required for LLM)
-autopilot.setCredentials({
-  openrouterApiKey: 'sk-or-v1-your-key-here',
-});
+// NOTE: Provide OPEN_ROUTER_KEY via secureEnv at runtime; credentials are not set here anymore.
 
 // Define tool configurations
 const calculatorTool: ToolParams = {

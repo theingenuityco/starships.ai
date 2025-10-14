@@ -12,6 +12,10 @@
     "POSTGRES_SSL",
     "STRIPE_SECRET_KEY",
     "STRIPE_PUBLISHABLE_KEY",
+    "AUTOPILOT_RUNNER",
+    "RUNNER_URL",
+    "RUNNER_PORT",
+    "RUNNER_AUTH_TOKEN",
     "AUTOPILOT_ISOLATE_MEM_MB",
     "AUTOPILOT_ISOLATE_TIMEOUT_MS"
   ],
@@ -63,8 +67,18 @@
       "cache": false,
       "persistent": true
     },
+    "@starships/autopilot#dev": {
+      "dependsOn": ["@starships/autopilot#build"],
+      "cache": false,
+      "persistent": true
+    },
     "@starships/reverse-proxy#dev": {
       "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@starships/autopilot-runner#dev": {
+      "dependsOn": ["@starships/autopilot-runner#build"],
       "cache": false,
       "persistent": true
     },

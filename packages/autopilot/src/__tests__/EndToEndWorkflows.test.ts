@@ -411,9 +411,6 @@ describe('End-to-End Workflow Execution', () => {
 
       const eventCallback = jest.fn();
 
-      // Provide credentials for validation to pass
-      autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
-
       const engine = new Engine({ eventCallback, secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
       const execution = ExecutionItemUtils.createExecution();
 

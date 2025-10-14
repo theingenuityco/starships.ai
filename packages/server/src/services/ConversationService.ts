@@ -849,6 +849,25 @@ export class ConversationService {
         break;
       }
 
+      case 'node_failed': {
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: Execution | undefined = execEvent?.data?.execution;
+          const nodeRef = execution?.currentNodeRef;
+          console.error('[STREAMING] Node failed', {
+            nodeRef,
+            depth: execEvent.executionDepth,
+          });
+          // Print execution snapshot for diagnosis
+          console.error('[STREAMING] Execution snapshot (node_failed)', {
+            results: execution?.results[0].items[0],
+          });
+        } catch (e) {
+          console.error('[STREAMING] Node failed (logging error):', e);
+        }
+        break;
+      }
+
       case 'node_completed': {
         // Handle tool node completion - persist tool result messages
         // Also detect UI actions emitted by code/end nodes and forward them to the client via SSE
@@ -1051,7 +1070,8 @@ export class ConversationService {
 
       case 'workflow_failed': {
         const execEvent = event as ExecutionEvent;
-        console.error('[STREAMING] Workflow failed:', execEvent.data?.execution?.error);
+        const execution: Execution | undefined = execEvent.data?.execution;
+        console.error('[STREAMING] Workflow failed:', execution?.results);
 
         // Create error message
         const errorMessage = await this.messageService.createMessage({

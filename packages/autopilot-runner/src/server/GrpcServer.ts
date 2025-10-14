@@ -60,28 +60,129 @@ export class GrpcServer {
         const url = req.url || '';
         const method = req.method || 'GET';
         // Unary execute compatible with RemoteRunner's HTTP call
+        if (method === 'POST' && url.endsWith('/runner.Runner/ExecuteStream')) {
+          // Server-Sent Events streaming endpoint
+          try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) chunks.push(Buffer.from(chunk));
+            const bodyStr = Buffer.concat(chunks).toString('utf-8');
+            const body = (bodyStr ? JSON.parse(bodyStr) : {}) as ExecuteRequest;
+            const currentRequestId = String(body?.request_id || '');
+            try {
+              this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
+            } catch (authErr) {
+              const message = authErr instanceof Error ? authErr.message : String(authErr);
+              res.statusCode = 401;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(
+                JSON.stringify({
+                  error: { message: `unauthorized: ${message}` },
+                  request_id: currentRequestId,
+                })
+              );
+              return;
+            }
+
+            // Setup SSE headers
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              Connection: 'keep-alive',
+              'Access-Control-Allow-Origin': '*',
+            });
+
+            // eslint-disable-next-line no-console
+            console.log('[GrpcServer] ExecuteStream start', { requestId: currentRequestId });
+
+            const started = Date.now();
+            const send = (eventName: string, data: Record<string, unknown>): void => {
+              const payload = JSON.stringify(data);
+              res.write(`event: ${eventName}\n`);
+              res.write(`data: ${payload}\n\n`);
+            };
+
+            const result = await this.executeFastOrEnqueue(body, async (c) => {
+              try {
+                // Unwrap executor wrapper { type: 'event', data: <AutopilotEvent> } if present
+                const maybe = c as unknown as { type?: string; data?: unknown } | undefined;
+                const payload =
+                  maybe && typeof maybe === 'object' && 'data' in (maybe as Record<string, unknown>)
+                    ? (maybe as { data?: unknown }).data
+                    : (c as unknown);
+                send('message', (payload ?? {}) as Record<string, unknown>);
+              } catch (e) {
+                console.error('[GrpcServer] SSE forward error', e);
+              }
+            });
+
+            // Send completion with result
+            send('completed', {
+              duration_ms: Date.now() - started,
+              result_json: JSON.stringify(result ?? null),
+            });
+            // eslint-disable-next-line no-console
+            console.log('[GrpcServer] ExecuteStream completed', { requestId: currentRequestId });
+            res.end();
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console
+            console.error('[GrpcServer] ExecuteStream error', {
+              error: message,
+              requestUrl: req.url,
+              method: req.method,
+            });
+            try {
+              res.write(`event: error\n`);
+              res.write(`data: ${JSON.stringify({ error: { message } })}\n\n`);
+            } catch {}
+            res.end();
+          }
+          return;
+        }
+
         if (method === 'POST' && url.endsWith('/runner.Runner/Execute')) {
           try {
             const chunks: Buffer[] = [];
             for await (const chunk of req) chunks.push(Buffer.from(chunk));
             const bodyStr = Buffer.concat(chunks).toString('utf-8');
             const body = (bodyStr ? JSON.parse(bodyStr) : {}) as ExecuteRequest;
-            this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
+            const currentRequestId = String(body?.request_id || '');
+            try {
+              this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
+            } catch (authErr) {
+              const message = authErr instanceof Error ? authErr.message : String(authErr);
+              res.statusCode = 401;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(
+                JSON.stringify({
+                  error: { message: `unauthorized: ${message}` },
+                  request_id: currentRequestId,
+                })
+              );
+              return;
+            }
             const started = Date.now();
             const result = await this.executeFastOrEnqueue(body);
             const response: ExecuteResponse = {
               result_json: JSON.stringify(result ?? null),
-              request_id: String(body?.request_id || ''),
+              request_id: currentRequestId,
               duration_ms: Date.now() - started,
             };
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify(response));
           } catch (err) {
-            console.error('[GrpcServer] Execute error', err);
+            const message = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console
+            console.error('[GrpcServer] Execute error', {
+              error: message,
+              requestUrl: req.url,
+              method: req.method,
+            });
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: { message: err instanceof Error ? err.message : String(err) } }));
+            // We cannot rely on body here; no request_id if parsing failed before
+            res.end(JSON.stringify({ error: { message } }));
           }
           return;
         }

@@ -302,6 +302,19 @@ export class Engine {
 
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
+    try {
+      console.error('[ERROR Engine.handleNodeError] node_failed', {
+        nodeRef: currentNode.ref,
+        error: errorMessage,
+        depth: execution.depth ?? 0,
+        currentNodeInputRef: execution.currentNodeInputRef,
+        visitCounts: execution.visitCounts,
+        stateKeys: execution.state ? Object.keys(execution.state as Record<string, unknown>) : [],
+        resultsCount: Array.isArray(execution.results) ? execution.results.length : 0,
+      });
+    } catch {
+      console.error('[ERROR Engine.handleNodeError] node_failed');
+    }
     execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
     // Only mark the whole workflow as failed and emit workflow_failed when configured to fail on node errors.
     if (this.failOnNodeError) {
@@ -312,6 +325,18 @@ export class Engine {
 
   private async handleExecutionError(error: unknown, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    try {
+      console.error('[ERROR Engine.handleExecutionError] execution_failed', {
+        error: errorMessage,
+        depth: execution.depth ?? 0,
+        currentNodeRef: execution.currentNodeRef,
+        visitCounts: execution.visitCounts,
+        stateKeys: execution.state ? Object.keys(execution.state as Record<string, unknown>) : [],
+        resultsCount: Array.isArray(execution.results) ? execution.results.length : 0,
+      });
+    } catch {
+      console.error('[ERROR Engine.handleExecutionError] execution_failed');
+    }
     await this.setExecutionError(execution, errorMessage);
     await this.emitEvent('workflow_failed', execution);
   }
@@ -403,11 +428,26 @@ export class Engine {
       try {
         outputItems = await handler.execute(processedInputItems);
       } catch (error) {
-        console.error('[ERROR Engine.executeNode] handler_failed', {
-          nodeRef: currentNode.ref,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
+        try {
+          const inputCount = Array.isArray(nodeInputItems) ? nodeInputItems.length : 0;
+          const paramsKeys =
+            resolvedParams && typeof resolvedParams === 'object' ? Object.keys(resolvedParams as Record<string, unknown>) : [];
+          console.error('[ERROR Engine.executeNode] handler_failed', {
+            nodeRef: currentNode.ref,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            inputCount,
+            paramsKeys,
+            currentNodeInputRef: execution.currentNodeInputRef,
+            depth: execution.depth ?? 0,
+          });
+        } catch {
+          console.error('[ERROR Engine.executeNode] handler_failed', {
+            nodeRef: currentNode.ref,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
+        }
         throw error;
       }
 

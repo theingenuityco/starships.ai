@@ -21,7 +21,7 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
-import AnimatedBoringAvatar from '@/components/animated/AnimatedBoringAvatar'
+import AnimatedAvatar from '@/components/animated/AnimatedAvatar'
 
 interface AgentDetailsDrawerProps {
   template: AgentTemplateModel | null
@@ -108,7 +108,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
                     <Avatar className="h-14 w-14 ring-2 ring-background shadow-md">
-                      <AnimatedBoringAvatar seed={template.id} name={template.name} size={56} />
+                      <AnimatedAvatar seed={template.id} name={template.name} size={56} />
                     </Avatar>
                   </div>
                   <div className="flex-1 min-w-0">

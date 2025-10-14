@@ -26,6 +26,8 @@ import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { ConversationActivityCard } from '@/components/starship/ConversationActivityCard'
 import { cn } from '@/lib/utils'
+import { Avatar } from '@/components/ui/avatar'
+import AnimatedAvatar from '@/components/animated/AnimatedAvatar'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
   const router = useRouter()
@@ -177,7 +179,9 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                           <CardHeader className="pb-3 relative z-10">
                             <div className="flex items-center gap-2 mb-1">
-                              <Icon name="bot" className="h-4 w-4 text-primary flex-shrink-0" />
+                              <Avatar className="h-6 w-6 ring-1 ring-border/40">
+                                <AnimatedAvatar seed={agent.id} name={agent.name} size={24} />
+                              </Avatar>
                               <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
                             </div>
                             <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
@@ -222,7 +226,9 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                       <CardHeader className="pb-3 relative z-10">
                         <div className="flex items-center gap-2 mb-1">
-                          <Icon name="bot" className="h-4 w-4 text-primary flex-shrink-0" />
+                          <Avatar className="h-6 w-6 ring-1 ring-border/40">
+                            <AnimatedAvatar seed={agent.id} name={agent.name} size={24} />
+                          </Avatar>
                           <CardTitle className="text-base font-semibold truncate">{agent.name}</CardTitle>
                         </div>
                         <CardDescription className="text-xs line-clamp-2">{agent.description || 'No description provided'}</CardDescription>
@@ -274,7 +280,13 @@ export default function StarshipOverviewPage(): React.JSX.Element {
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Icon name="bot" className="h-5 w-5 text-primary" />
+              {selectedAgent ? (
+                <Avatar className="h-6 w-6 ring-1 ring-border/40">
+                  <AnimatedAvatar seed={selectedAgent.id} name={selectedAgent.name} size={24} />
+                </Avatar>
+              ) : (
+                <Icon name="bot" className="h-5 w-5 text-primary" />
+              )}
               {selectedAgent?.name}
             </DialogTitle>
             <DialogDescription>{selectedAgent?.description || 'No description provided'}</DialogDescription>

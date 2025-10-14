@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
-import AnimatedBoringAvatar from '@/components/animated/AnimatedBoringAvatar'
+import AnimatedAvatar from '@/components/animated/AnimatedAvatar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
@@ -107,7 +107,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0">
             <Avatar className="h-12 w-12 ring-2 ring-background shadow-md">
-              <AnimatedBoringAvatar seed={template.id} name={template.name} size={48} />
+              <AnimatedAvatar seed={template.id} name={template.name} size={48} />
             </Avatar>
           </div>
 

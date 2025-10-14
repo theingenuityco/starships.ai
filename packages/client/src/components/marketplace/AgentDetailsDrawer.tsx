@@ -20,6 +20,8 @@ import { BlueprintVisualization } from './BlueprintVisualization'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { format } from 'date-fns'
+import { Avatar } from '@/components/ui/avatar'
+import AnimatedBoringAvatar from '@/components/animated/AnimatedBoringAvatar'
 
 interface AgentDetailsDrawerProps {
   template: AgentTemplateModel | null
@@ -104,8 +106,10 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
               <SheetHeader className="space-y-4">
                 {/* Main Header with Icon and Title */}
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 p-4 rounded-xl bg-primary/20 group-hover:bg-primary/30 transition-colors">
-                    <div className="text-3xl">{template.icon || '🤖'}</div>
+                  <div className="flex-shrink-0">
+                    <Avatar className="h-14 w-14 ring-2 ring-background shadow-md">
+                      <AnimatedBoringAvatar seed={template.id} name={template.name} size={56} />
+                    </Avatar>
                   </div>
                   <div className="flex-1 min-w-0">
                     <SheetTitle className="text-2xl font-bold text-left mb-2">{template.name}</SheetTitle>

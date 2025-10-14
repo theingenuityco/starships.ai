@@ -32,9 +32,7 @@ export class LLM extends BaseNode<LlmParams> {
     const secureEnv = this.getOptions()?.secureEnv;
     const apiKey = secureEnv?.OPEN_ROUTER_KEY;
     if (!apiKey) {
-      throw this.handleExecutionError(
-        new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY").')
-      );
+      throw this.handleExecutionError(new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY").'));
     }
 
     try {
@@ -340,10 +338,7 @@ export class LLM extends BaseNode<LlmParams> {
             if (toolCallDelta.function?.name && toolCallDelta.id && eventCallback) {
               if (!this.emittedToolCalls.has(toolCallDelta.id)) {
                 this.emittedToolCalls.add(toolCallDelta.id);
-                console.log('[LLM] 🎯 Tool call detected:', {
-                  toolCallId: toolCallDelta.id,
-                  toolName: toolCallDelta.function.name,
-                });
+
                 await eventCallback({
                   type: 'tool_call_detected',
                   timestamp: new Date().toISOString(),
@@ -406,7 +401,6 @@ export class LLM extends BaseNode<LlmParams> {
           if (tc.function.arguments) {
             try {
               argsObj = JSON.parse(tc.function.arguments);
-              console.log(`[LLM FINAL] Successfully parsed ${tc.function.arguments.length} chars for tool '${tc.function.name}'`);
             } catch (parseError) {
               console.error(`[LLM FINAL] Failed to parse tool '${tc.function.name}' arguments:`, {
                 argsLength: tc.function.arguments.length,

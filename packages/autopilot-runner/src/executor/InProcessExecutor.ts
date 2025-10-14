@@ -12,11 +12,6 @@ export class InProcessExecutor implements Executor {
       eventCallback: input.onEvent
         ? async (event: unknown) => {
             try {
-              // eslint-disable-next-line no-console
-              console.log('[InProcessExecutor] Forwarding event', {
-                type: (event as any)?.type,
-                depth: (event as any)?.executionDepth,
-              });
               await input.onEvent?.({ type: 'event', data: event });
             } catch (err) {
               console.error('[InProcessExecutor] Failed to forward event to onEvent handler', {
@@ -28,11 +23,8 @@ export class InProcessExecutor implements Executor {
       failOnNodeError: config?.failOnNodeError ?? true,
     });
 
-    // eslint-disable-next-line no-console
-    console.log('[InProcessExecutor] Executing blueprint');
     const result = await engine.executeBlueprint(blueprint, execution);
-    // eslint-disable-next-line no-console
-    console.log('[InProcessExecutor] Execution finished');
+
     return result;
   }
 }

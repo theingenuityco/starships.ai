@@ -1,6 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
@@ -427,8 +428,8 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-start">
           <div className="flex items-start gap-3 max-w-[85%]">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-              <Icon name="bot" className="w-4 h-4 text-muted-foreground" />
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+              <AgentAvatar seed={agentName || 'assistant'} size={32} />
             </div>
             <div className="min-w-0 flex-1">
               <ConversationMessageContent

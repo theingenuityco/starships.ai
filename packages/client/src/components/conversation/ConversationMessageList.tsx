@@ -10,7 +10,7 @@ import type { MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationStreamed, useConversationAgents } from '@/hooks/useConversations'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
@@ -30,10 +30,14 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
   // Use stable selectors to avoid returning new objects each render
   // messages are sourced from useConversationStreamed(conversationId)
-  const agentName = useStarshipUIStore(state => {
+  const storeAgentName = useStarshipUIStore(state => {
     if (!conversationId) return undefined
     return state.conversations[conversationId]?.agentName
   })
+  // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
+  const { data: conversationAgents = [] } = useConversationAgents(conversationId)
+  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
+  const agentName = storeAgentName || agentObj?.name
   const isResponding = isRespondingHook
 
   // Scroll container reference
@@ -460,6 +464,9 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+
+    // Re-render when agent label changes (post-reload agent restoration)
+    if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false
 
     // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false

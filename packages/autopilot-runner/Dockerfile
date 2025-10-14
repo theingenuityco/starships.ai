@@ -2,26 +2,39 @@ FROM node:20-slim AS build
 WORKDIR /app
 # Install pnpm
 RUN npm i -g pnpm
+# Install curl for fetching buf
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 # Copy workspace manifests
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY tsconfig.json tsconfig.nodejs.json ./
 # Pre-copy package manifests for filtered workspaces
 COPY packages/autopilot/package.json ./packages/autopilot/package.json
 COPY packages/autopilot-runner/package.json ./packages/autopilot-runner/package.json
-# Install only required workspaces
-RUN pnpm install -w --filter @starships/autopilot --filter @starships/autopilot-runner --frozen-lockfile
+# Install only required workspaces with hoisted node linker for local deps
+RUN echo "node-linker=hoisted" >> packages/autopilot-runner/.npmrc \
+  && pnpm install -w --filter @starships/autopilot --filter @starships/autopilot-runner --frozen-lockfile
 # Copy sources for the two workspaces
 COPY packages/autopilot/ ./packages/autopilot/
 COPY packages/autopilot-runner/ ./packages/autopilot-runner/
-# Build dependencies in order: autopilot first, then runner
+# Build dependencies in order: autopilot first, then generate runner types, then build runner
 RUN pnpm -C packages/autopilot build
-RUN pnpm -C packages/autopilot-runner build
+RUN curl -sSL -o /usr/local/bin/buf https://github.com/bufbuild/buf/releases/download/v1.45.0/buf-Linux-x86_64 \
+  && chmod +x /usr/local/bin/buf \
+  && buf --version \
+  && pnpm -C packages/autopilot-runner gen \
+  && pnpm -C packages/autopilot-runner build
 
 FROM node:20-slim
-WORKDIR /app
+WORKDIR /app/packages/autopilot-runner
 ENV NODE_ENV=production
 COPY --from=build /app/packages/autopilot-runner/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages/autopilot-runner/node_modules ./node_modules
+# Provide workspace-linked @starships/autopilot package in runtime
+RUN mkdir -p /app/packages/autopilot
+COPY --from=build /app/packages/autopilot/package.json /app/packages/autopilot/package.json
+COPY --from=build /app/packages/autopilot/dist /app/packages/autopilot/dist
+COPY --from=build /app/packages/autopilot/node_modules /app/packages/autopilot/node_modules
+COPY --from=build /app/node_modules /app/node_modules
 USER 1000:1000
 CMD ["node", "dist/index.js"]
 

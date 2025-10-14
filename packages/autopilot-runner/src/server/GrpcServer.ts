@@ -1,8 +1,4 @@
-import * as http2 from 'http2';
-import { connectNodeAdapter } from '@connectrpc/connect-node';
-import { ConnectRouter } from '@connectrpc/connect';
-import type { DescMethod } from '@bufbuild/protobuf';
-import { RunnerService } from '@/gen/runner_connect';
+import * as http from 'http';
 import { Queue, RunnerTask } from '@/queue/Queue';
 import { Executor } from '@/executor/Executor';
 import { WorkerPool } from '@/queue/Worker';
@@ -49,9 +45,7 @@ type StreamContext = RequestContext & {
 };
 
 // Registrar type for server-streaming until real codegen is added
-type StreamingRegistrar = {
-  serverStreaming: (method: DescMethod, impl: (req: ExecuteRequest, ctx: StreamContext) => Promise<void>) => void;
-};
+type StreamingRegistrar = unknown;
 
 export class GrpcServer {
   private readonly opts: GrpcServerOptions;
@@ -61,54 +55,40 @@ export class GrpcServer {
   }
 
   async start(): Promise<void> {
-    const routes = (router: ConnectRouter) => {
-      // Unary Execute via generated descriptor (temporary any-cast for registration only)
-      const executeDesc = RunnerService.methods.Execute as DescMethod;
-      (
-        router as unknown as { rpc: (m: DescMethod, h: (req: ExecuteRequest, ctx: RequestContext) => Promise<ExecuteResponse>) => void }
-      ).rpc(executeDesc, async (req: ExecuteRequest, ctx: RequestContext): Promise<ExecuteResponse> => {
-        this.checkAuth(ctx.requestHeader.get('authorization'));
-        const started = Date.now();
-        const result = await this.executeFastOrEnqueue(req);
-        return {
-          result_json: JSON.stringify(result ?? null),
-          request_id: String(req?.request_id || ''),
-          duration_ms: Date.now() - started,
-        };
-      });
-
-      // Server-streaming ExecuteStream (typed handler; method registration until real codegen)
-      const registrar = router as unknown as StreamingRegistrar;
-      const streamDesc = RunnerService.methods.ExecuteStream as DescMethod;
-      registrar.serverStreaming(streamDesc, async (req: ExecuteRequest, ctx: StreamContext) => {
-        this.checkAuth(ctx.requestHeader.get('authorization'));
-        const write = async (type: string, data: unknown) => {
-          const chunk: ExecuteChunk = {
-            type,
-            data_json: JSON.stringify(data ?? null),
-            request_id: String(req?.request_id || ''),
-          };
-          await ctx.stream.send(chunk);
-        };
-        await write('started', { ts: new Date().toISOString() });
-        try {
-          const result = await this.executeFastOrEnqueue(req, async (chunk) => {
-            try {
-              await write(chunk.type, chunk.data);
-            } catch (err) {
-              console.error('[GrpcServer] Failed to write stream chunk', err);
-            }
-          });
-          await write('completed', { result });
-        } catch (e) {
-          console.error('[GrpcServer] ExecuteStream error', e);
-          await write('error', { message: e instanceof Error ? e.message : String(e) });
-        }
-      });
-    };
-
     await new Promise<void>((resolve) => {
-      http2.createServer(connectNodeAdapter({ routes })).listen(this.opts.port, () => resolve());
+      const server = http.createServer(async (req, res) => {
+        const url = req.url || '';
+        const method = req.method || 'GET';
+        // Unary execute compatible with RemoteRunner's HTTP call
+        if (method === 'POST' && url.endsWith('/runner.Runner/Execute')) {
+          try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) chunks.push(Buffer.from(chunk));
+            const bodyStr = Buffer.concat(chunks).toString('utf-8');
+            const body = (bodyStr ? JSON.parse(bodyStr) : {}) as ExecuteRequest;
+            this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
+            const started = Date.now();
+            const result = await this.executeFastOrEnqueue(body);
+            const response: ExecuteResponse = {
+              result_json: JSON.stringify(result ?? null),
+              request_id: String(body?.request_id || ''),
+              duration_ms: Date.now() - started,
+            };
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(response));
+          } catch (err) {
+            console.error('[GrpcServer] Execute error', err);
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: { message: err instanceof Error ? err.message : String(err) } }));
+          }
+          return;
+        }
+        res.statusCode = 404;
+        res.end('Not Found');
+      });
+      server.listen(this.opts.port, () => resolve());
     });
   }
 

@@ -30,10 +30,10 @@ export class LLM extends BaseNode<LlmParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
     const secureEnv = this.getOptions()?.secureEnv;
-    const apiKey = secureEnv?.OPEN_ROUTER_KEY ?? autopilot.getOpenRouterApiKey();
+    const apiKey = secureEnv?.OPEN_ROUTER_KEY;
     if (!apiKey) {
       throw this.handleExecutionError(
-        new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY") or autopilot.setCredentials().')
+        new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY").')
       );
     }
 
@@ -550,13 +550,7 @@ export class LLM extends BaseNode<LlmParams> {
       });
     }
 
-    // API key validation
-    if (!autopilot.getOpenRouterApiKey()) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'OpenRouter API key is required. Configure it via autopilot.setCredentials().',
-      });
-    }
+    // API key validation moved to runtime via secureEnv only
 
     // Parameter range validation using helper methods
     const tempError = this.validateParameterRange(params.temperature, 'Temperature', 0, 2);

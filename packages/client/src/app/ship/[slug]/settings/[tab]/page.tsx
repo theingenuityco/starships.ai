@@ -50,15 +50,15 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
             <Tabs value={currentTab} onValueChange={value => router.push(`/ship/${slug}/settings/${value}`)} className="space-y-6">
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="profile" className="gap-2 rounded-xl px-4 py-2">
+                  <TabsTrigger value="profile" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user" className="h-4 w-4" />
                     <span>Profile</span>
                   </TabsTrigger>
-                  <TabsTrigger value="usage" className="gap-2 rounded-xl px-4 py-2">
+                  <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="activity" className="h-4 w-4" />
                     <span>Analytics</span>
                   </TabsTrigger>
-                  <TabsTrigger value="billing" className="gap-2 rounded-xl px-4 py-2">
+                  <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
                   </TabsTrigger>

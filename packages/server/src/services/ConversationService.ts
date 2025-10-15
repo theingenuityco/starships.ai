@@ -53,6 +53,11 @@ export class ConversationService {
   private billingService: BillingService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
+  // Resume state per conversation generation
+  private generationId: Map<string, string> = new Map();
+  private accumulatedLength: Map<string, number> = new Map();
+  private placeholderEmitted: Map<string, boolean> = new Map();
+  private ringBuffer: Map<string, Array<{ position: number; content: string; ts: number }>> = new Map();
   // Track accumulated toolCalls during streaming per conversation
   private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
@@ -399,6 +404,12 @@ export class ConversationService {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
+        // Start a new generation for resume
+        const genId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this.generationId.set(conversationId, genId);
+        this.accumulatedLength.set(conversationId, 0);
+        this.placeholderEmitted.set(conversationId, false);
+        this.ringBuffer.set(conversationId, []);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
         // Seed message index tracking to the current baseline so prior history isn't re-persisted
@@ -511,6 +522,7 @@ export class ConversationService {
             if (this.streamingService.isActive(conversationId)) {
               // Acquire lock upfront to avoid race between parallel content_chunk events
               this.streamingContent.set(conversationId, '');
+              this.placeholderEmitted.set(conversationId, true);
               // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
               this.streamingToolCalls.delete(conversationId);
 
@@ -535,6 +547,21 @@ export class ConversationService {
                 },
               };
               await this.streamingService.broadcastDelta(conversationId, shell);
+              // Emit initial resume token
+              try {
+                const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                const svc = ResumeTokenService.getInstance();
+                const token = svc.sign({
+                  c: conversationId,
+                  g: this.generationId.get(conversationId) || 'g',
+                  p: 0,
+                  m: '0',
+                  exp: Math.floor(Date.now() / 1000) + 600,
+                });
+                this.streamingService.sendResumeToken(conversationId, token);
+              } catch {
+                /* non-fatal: resume token emission failed */
+              }
             } else {
               break;
             }
@@ -562,6 +589,12 @@ export class ConversationService {
             if (append) {
               const newContent = currentContent + append;
               this.streamingContent.set(conversationId, newContent);
+              const newLen = (this.accumulatedLength.get(conversationId) || 0) + append.length;
+              this.accumulatedLength.set(conversationId, newLen);
+              const rb = this.ringBuffer.get(conversationId) || [];
+              rb.push({ position: currentLength, content: append, ts: Date.now() });
+              if (rb.length > 200) rb.splice(0, rb.length - 200);
+              this.ringBuffer.set(conversationId, rb);
 
               // Stream delta chunk as JSON Patch add into chunks array
               const chunkDelta: Operation = {
@@ -574,6 +607,23 @@ export class ConversationService {
                 },
               };
               await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+              // Periodically emit resume token (every ~2s)
+              try {
+                if (Math.random() < 0.15) {
+                  const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                  const svc = ResumeTokenService.getInstance();
+                  const token = svc.sign({
+                    c: conversationId,
+                    g: this.generationId.get(conversationId) || 'g',
+                    p: newLen,
+                    m: '0',
+                    exp: Math.floor(Date.now() / 1000) + 600,
+                  });
+                  this.streamingService.sendResumeToken(conversationId, token);
+                }
+              } catch {
+                /* non-fatal: periodic resume token emission failed */
+              }
             }
           }
 
@@ -996,6 +1046,22 @@ export class ConversationService {
                       value: persistedMsg,
                     });
                   }
+
+                  // Emit resume token checkpoint including last persisted message id
+                  try {
+                    const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                    const svc = ResumeTokenService.getInstance();
+                    const token = svc.sign({
+                      c: conversationId,
+                      g: this.generationId.get(conversationId) || 'g',
+                      p: this.accumulatedLength.get(conversationId) || 0,
+                      m: String((persistedMsg as any).id || '0'),
+                      exp: Math.floor(Date.now() / 1000) + 600,
+                    });
+                    this.streamingService.sendResumeToken(conversationId, token);
+                  } catch {
+                    /* non-fatal: resume token emission after persistence failed */
+                  }
                 }
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
@@ -1045,7 +1111,7 @@ export class ConversationService {
               }
             });
           } catch {
-            // non-fatal
+            /* non-fatal */
           }
 
           // Emit stream completion for the entire workflow (top-level only)
@@ -1056,6 +1122,21 @@ export class ConversationService {
             scope: 'workflow',
             conversationId,
           });
+          // Emit final resume token with terminal position (persist id not known here)
+          try {
+            const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+            const svc = ResumeTokenService.getInstance();
+            const token = svc.sign({
+              c: conversationId,
+              g: this.generationId.get(conversationId) || 'g',
+              p: this.accumulatedLength.get(conversationId) || 0,
+              m: '0',
+              exp: Math.floor(Date.now() / 1000) + 600,
+            });
+            this.streamingService.sendResumeToken(conversationId, token);
+          } catch {
+            /* non-fatal: final resume token emission failed */
+          }
         }
         break;
       }

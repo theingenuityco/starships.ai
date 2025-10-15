@@ -16,6 +16,7 @@ const map: Record<string, ResolvedIcon> = {
   bot: { type: 'phosphor', component: 'Robot' },
   rocket: { type: 'phosphor', component: 'Rocket' },
   sparkles: { type: 'phosphor', component: 'Sparkle' },
+  wrench: { type: 'phosphor', component: 'Wrench' },
   'check-circle': { type: 'phosphor', component: 'CheckCircle' },
   wallet: { type: 'phosphor', component: 'Wallet' },
   mail: { type: 'radix', component: 'EnvelopeClosedIcon' },

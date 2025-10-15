@@ -271,6 +271,11 @@ type StreamedChunk =
 // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events
 function makeSSEAsyncIterable(conversationId: string, token: string | null, signal?: AbortSignal, baselineLength?: number): AsyncIterable<StreamedChunk> {
   let url = `/api/v1/conversations/${conversationId}/messages?stream=true`
+  // Attach resume token via query param (avoid custom headers)
+  try {
+    const rt = typeof window !== 'undefined' ? window.localStorage.getItem(`conv:${conversationId}:resumeToken`) : null
+    if (rt) url += `&resumeToken=${encodeURIComponent(rt)}`
+  } catch {}
   if (typeof baselineLength === 'number' && baselineLength >= 0) {
     url += `&baselineLength=${baselineLength}`
   }
@@ -435,6 +440,14 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
           }
           case 'ui_action': {
             push({ type: 'ui_action', payload: parsed })
+            break
+          }
+          case 'resume_token': {
+            try {
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem(`conv:${conversationId}:resumeToken`, String(parsed))
+              }
+            } catch {}
             break
           }
           case 'error': {
@@ -673,6 +686,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
     const last = chunks[chunks.length - 1]
     if (last.type === 'complete') {
+      // Clear resume token once a new user message arrives (not here). Keep it for seamless reconnection between chunks.
       // Refresh usage totals for this conversation
       queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
       // Also refresh starship-level totals and wallet balance if starshipId is provided

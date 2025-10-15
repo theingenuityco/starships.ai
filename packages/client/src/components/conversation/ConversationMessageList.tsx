@@ -373,7 +373,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
                   <AgentAvatar seed={agentName || 'assistant'} size={32} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -432,7 +432,7 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-start">
           <div className="flex items-start gap-3 max-w-[85%]">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
               <AgentAvatar seed={agentName || 'assistant'} size={32} />
             </div>
             <div className="min-w-0 flex-1">

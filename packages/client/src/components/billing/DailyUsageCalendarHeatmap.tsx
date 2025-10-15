@@ -123,8 +123,14 @@ export function DailyUsageCalendarHeatmap({ starshipId, weeks = 8, cellSize = 10
 
   const formatTokensShort = (value: number): string => {
     if (value < 1000) return value.toLocaleString()
-    if (value < 1_000_000) return `${(value / 1000).toFixed(1)}k`
-    return `${(value / 1_000_000).toFixed(1)}m`
+    // One-decimal rounding at thousand scale
+    const thousandsRounded = Math.round(value / 100) / 10 // e.g. 12345 -> 123.5 (=> 123.5k)
+    if (thousandsRounded < 1000) {
+      return `${thousandsRounded.toFixed(1)}k`
+    }
+    // Carry over to millions cleanly when >= 999.95k
+    const millionsRounded = Math.round(value / 100_000) / 10 // e.g. 1_234_567 -> 12.3 (=> 12.3m)
+    return `${millionsRounded.toFixed(1)}m`
   }
 
   const levelFor = (value: number): number => {

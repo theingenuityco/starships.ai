@@ -7,12 +7,19 @@ import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import Link from 'next/link'
-import { Suspense } from 'react'
+import { useRouter } from 'next/navigation'
+import { Suspense, useEffect } from 'react'
 
 export default function LoginPage() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, starship } = useAuth()
+  const router = useRouter()
 
-  // Redirect is handled by useAuth hook - no need for additional redirect logic here
+  // Simple redirect for authenticated users
+  useEffect(() => {
+    if (isAuthenticated && !isLoading && starship?.slug) {
+      router.replace(`/ship/${starship.slug}/conversations`)
+    }
+  }, [isAuthenticated, isLoading, starship, router])
 
   // Show loading state while checking authentication
   if (isLoading) {

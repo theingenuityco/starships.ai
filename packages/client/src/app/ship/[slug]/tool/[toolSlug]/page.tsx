@@ -336,7 +336,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     <div className="relative h-screen w-full">
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (
-        <div className="absolute left-0 right-0 bottom-0 p-4 z-30 pointer-events-none">
+        <div className="absolute left-0 right-0 bottom-0 p-6 z-30 pointer-events-none">
           <div className="max-w-2xl mx-auto pointer-events-auto">
             <ConversationMessageInput
               selectedAgent={selectedAgent}

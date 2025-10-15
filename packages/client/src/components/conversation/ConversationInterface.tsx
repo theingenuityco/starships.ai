@@ -18,16 +18,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 interface ConversationInterfaceProps {
   starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
   initialAgentId?: string
+  starshipSlug?: string
 }
 
-export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId }: ConversationInterfaceProps) {
+export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -36,6 +39,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const currentConversationIdRef = useRef<string | null>(null)
 
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
@@ -133,6 +137,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
   }, [externalConversationId])
+
+  useEffect(() => {
+    currentConversationIdRef.current = currentConversationId
+  }, [currentConversationId])
 
   // Handle initial agent selection from URL parameter
   useEffect(() => {
@@ -354,14 +362,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               'tool-blueprint-remove-edge',
             ])
             if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
-              console.log('📂 Opening tool builder view for', toolName)
-              // Only reset when transitioning into the builder; preserve existing form if already open
-              if (viewModeRef.current !== 'tool-builder') {
-                toolBuilderViewRef.current?.resetForm()
+              console.log('📂 Navigating to tool builder page for', toolName)
+              try {
+                const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
+                const slug = starshipSlug
+                if (slug) {
+                  const convId = currentConversationIdRef.current || externalConversationId || null
+                  const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+                  router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+                } else {
+                  // Fallback: open overlay if slug is missing
+                  if (viewModeRef.current !== 'tool-builder') {
+                    toolBuilderViewRef.current?.resetForm()
+                  }
+                  wasOpenedByStreamingRef.current = true
+                  if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
+                }
+              } catch {
+                // Fallback to overlay on any navigation error
+                if (viewModeRef.current !== 'tool-builder') {
+                  toolBuilderViewRef.current?.resetForm()
+                }
+                wasOpenedByStreamingRef.current = true
+                if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
               }
-              // Mark that this transition was triggered by streaming
-              wasOpenedByStreamingRef.current = true
-              if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
             }
 
             // Open agent builder for agent actions that affect agent data

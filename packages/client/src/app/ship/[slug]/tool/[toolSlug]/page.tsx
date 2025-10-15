@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -26,7 +26,13 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   }, [convAgents, agents])
 
   // Keep conversation streaming active and capture live messages/UI actions
-  const { messages: liveMessages = [], lastUIAction } = useConversationStreamed(conversationId, starship?.id || '')
+  const { messages: liveMessages = [], lastUIAction, isResponding } = useConversationStreamed(conversationId, starship?.id || '')
+
+  // Control the expandable overlay: expand only while streaming; user can toggle
+  const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
+  useEffect(() => {
+    setIsOverlayExpanded(!!isResponding)
+  }, [isResponding])
 
   // Track applied tool calls to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
@@ -330,8 +336,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     <div className="relative h-screen w-full">
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (
-        <div className="absolute left-0 right-0 bottom-0 p-4 z-30">
-          <div className="max-w-2xl mx-auto">
+        <div className="absolute left-0 right-0 bottom-0 p-4 z-30 pointer-events-none">
+          <div className="max-w-2xl mx-auto pointer-events-auto">
             <ConversationMessageInput
               selectedAgent={selectedAgent}
               starshipId={starship.id}
@@ -339,7 +345,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
               isToolFormOpen={true}
               minimal={true}
               showExpandableOverlay={true}
-              isOverlayExpanded={true}
+              isOverlayExpanded={isOverlayExpanded}
+              onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
             >
               <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
             </ConversationMessageInput>

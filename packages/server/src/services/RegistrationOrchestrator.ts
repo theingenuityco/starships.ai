@@ -110,12 +110,13 @@ export class RegistrationOrchestrator {
     if (tokenInfo.userAlreadyVerified) {
       // User already verified - check if they have a starship
       const starshipCreated = await this.checkUserHasStarship(tokenInfo.tokenInfo.userId);
+      // For already verified users, redirect to a page that handles both logged-in and logged-out states
       return {
         userId: tokenInfo.tokenInfo.userId,
         email: tokenInfo.tokenInfo.email,
         verified: true,
         starshipCreated,
-        redirectPath: '/login?verification=success'
+        redirectPath: '/auth/verification-complete'
       };
     }
 
@@ -134,7 +135,7 @@ export class RegistrationOrchestrator {
       email: verificationResult.email,
       verified: true,
       starshipCreated,
-      redirectPath: '/login?verification=success'
+      redirectPath: '/auth/verification-complete'
     };
   }
 

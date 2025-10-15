@@ -7,29 +7,12 @@ import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect } from 'react'
+import { Suspense } from 'react'
 
-function LoginContent() {
-  const { isAuthenticated, isLoading, starship } = useAuth()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const verificationStatus = searchParams.get('verification')
+export default function LoginPage() {
+  const { isAuthenticated, isLoading } = useAuth()
 
-  useEffect(() => {
-    // If user is authenticated and lands on login page (e.g., from email verification link)
-    // redirect them to their dashboard
-    if (isAuthenticated && !isLoading && starship?.slug) {
-      // If coming from email verification, show a brief success message
-      if (verificationStatus === 'success') {
-        // Redirect to dashboard with success notification
-        router.replace(`/ship/${starship.slug}/conversations`)
-      } else {
-        // Regular redirect for already logged in users
-        router.replace(`/ship/${starship.slug}/conversations`)
-      }
-    }
-  }, [isAuthenticated, isLoading, starship, router, verificationStatus])
+  // Redirect is handled by useAuth hook - no need for additional redirect logic here
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -49,28 +32,9 @@ function LoginContent() {
     )
   }
 
-  // If already authenticated, show loading while redirecting
+  // If already authenticated, don't show login form (redirect will happen in useEffect)
   if (isAuthenticated) {
-    return (
-      <StarTheme theme="dark">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
-            <StarfieldBackground launching={false} density={400} speed={0.8} />
-          </Suspense>
-          <div className="relative z-10 text-center">
-            <div className="animate-pulse mb-4">
-              <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-            </div>
-            {verificationStatus === 'success' && (
-              <p className="text-sm text-muted-foreground">Email verified! Redirecting to your dashboard...</p>
-            )}
-            {!verificationStatus && (
-              <p className="text-sm text-muted-foreground">Redirecting to your dashboard...</p>
-            )}
-          </div>
-        </div>
-      </StarTheme>
-    )
+    return null
   }
 
   return (
@@ -101,23 +65,5 @@ function LoginContent() {
         </div>
       </div>
     </StarTheme>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <StarTheme theme="dark">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <div className="relative z-10">
-            <div className="animate-pulse">
-              <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-            </div>
-          </div>
-        </div>
-      </StarTheme>
-    }>
-      <LoginContent />
-    </Suspense>
   )
 }

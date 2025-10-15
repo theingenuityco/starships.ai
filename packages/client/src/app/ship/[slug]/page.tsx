@@ -162,7 +162,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   </Card>
                 </div>
 
-                <section aria-labelledby="deployed-agents">
+                <section aria-labelledby="deployed-agents" className="mt-6">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h2 id="deployed-agents" className="text-lg font-semibold flex items-center gap-2">

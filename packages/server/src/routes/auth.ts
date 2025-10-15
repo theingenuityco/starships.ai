@@ -288,8 +288,8 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
     const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
     const result = await registrationOrchestrator.completeEmailVerification(token);
 
-    // Redirect to login page where users expect to go after email verification
-    const redirectUrl = `${env.PUBLIC_URL}/login`;
+    // Redirect to home page - it handles auth state properly
+    const redirectUrl = `${env.PUBLIC_URL}/`;
     return res.redirect(redirectUrl);
   } catch (error: any) {
     logger.error('[EMAIL-VERIFY] Error:', { error });

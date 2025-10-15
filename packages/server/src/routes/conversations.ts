@@ -7,6 +7,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { WalletService } from '@/services/WalletService';
+import { ResumeTokenService } from '@/services/ResumeTokenService';
 
 const router: Router = Router();
 
@@ -60,6 +61,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = new StreamingService();
 
+      // Server-driven resume via query param (avoid custom headers)
+      const resumeToken = typeof (req.query as any).resumeToken === 'string' ? (req.query as any).resumeToken : '';
+
       // Determine a reliable baseline:
       // - client hint (query.baselineLength) if provided
       // - server truth (current messages count)
@@ -76,13 +80,48 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
 
-      // Send only messages the client may be missing based on their baselineLength hint
-      const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-      const messagesToSend = conversationMessages.slice(startIndexForSend);
+      // If this is a reconnection with Last-Event-ID, prefer event replay from buffer
+      // to avoid duplicating already-processed baseline messages. Otherwise send
+      // initial baseline snapshot messages.
+      if (resumeToken) {
+        // Verify token; fall back to baseline on failure
+        const svc = ResumeTokenService.getInstance();
+        const claims = svc.verify(resumeToken);
+        if (!claims || claims.c !== conversationId) {
+          // Invalid token; use baseline mode
+          const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
+          const messagesToSend = conversationMessages.slice(startIndexForSend);
+          if (messagesToSend.length > 0) {
+            for (const message of messagesToSend) {
+              await streamingService.broadcastMessage(conversationId, message);
+            }
+          }
+        } else {
+          // 1) Replay persisted messages beyond last persisted id in token (claims.m)
+          let startIdx = 0;
+          if (claims.m && claims.m !== '0') {
+            const idx = conversationMessages.findIndex((m) => String((m as any).id) === String(claims.m));
+            startIdx = idx >= 0 ? idx + 1 : 0;
+          }
+          const persistedTail = conversationMessages.slice(startIdx);
+          if (persistedTail.length > 0) {
+            for (const message of persistedTail) {
+              await streamingService.broadcastMessage(conversationId, message);
+            }
+          }
 
-      if (messagesToSend.length > 0) {
-        for (const message of messagesToSend) {
-          await streamingService.broadcastMessage(conversationId, message);
+          // 2) Replay recent ring buffer deltas (skip 'message' entries to avoid duplicate persisted messages)
+          await streamingService.replayBufferedEvents(conversationId, (evt) => evt.type !== 'message');
+        }
+      } else {
+        // Send only messages the client may be missing based on their baselineLength hint
+        const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
+        const messagesToSend = conversationMessages.slice(startIndexForSend);
+
+        if (messagesToSend.length > 0) {
+          for (const message of messagesToSend) {
+            await streamingService.broadcastMessage(conversationId, message);
+          }
         }
       }
 

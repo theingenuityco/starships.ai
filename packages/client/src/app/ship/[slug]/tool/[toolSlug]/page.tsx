@@ -17,6 +17,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   const { data: starship } = useStarshipBySlug(slug, true)
   const toolBuilderRef = useRef<ToolBuilderViewRef>(null)
+  const routeUpdatedRef = useRef<boolean>(false)
   const conversationId = useMemo(() => searchParams.get('conversationId') || null, [searchParams])
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
@@ -290,6 +291,12 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
               if (tool.description) toolBuilderRef.current.updateField('description', tool.description)
               if (tool.parameters) toolBuilderRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
               if (tool.blueprint) toolBuilderRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
+            }
+            // If we are currently at /tool/new, replace URL with real slug
+            if (!routeUpdatedRef.current && toolSlug === 'new' && typeof slugArg === 'string' && slugArg) {
+              const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+              router.replace(`/ship/${slug}/tool/${encodeURIComponent(slugArg)}${q}`)
+              routeUpdatedRef.current = true
             }
           } catch {
             // ignore fetch errors

@@ -391,14 +391,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             // Open agent builder for agent actions that affect agent data
             const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
             if (openAgentBuilderSlugs.has(toolName)) {
-              console.log('🌍 Opening agent builder view for', toolName)
-              // Only reset when transitioning into the builder; preserve existing form if already open
-              if (viewModeRef.current !== 'agent-builder') {
-                agentBuilderViewRef.current?.resetForm()
+              console.log('🌍 Navigating to agent builder page for', toolName)
+              try {
+                const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
+                const slug = starshipSlug
+                if (slug) {
+                  const convId = currentConversationIdRef.current || externalConversationId || null
+                  const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+                  router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+                } else {
+                  // Fallback: open overlay if slug is missing
+                  if (viewModeRef.current !== 'agent-builder') {
+                    agentBuilderViewRef.current?.resetForm()
+                  }
+                  wasOpenedByStreamingRef.current = true
+                  if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
+                }
+              } catch {
+                // Fallback to overlay on any navigation error
+                if (viewModeRef.current !== 'agent-builder') {
+                  agentBuilderViewRef.current?.resetForm()
+                }
+                wasOpenedByStreamingRef.current = true
+                if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
               }
-              // Mark that this transition was triggered by streaming
-              wasOpenedByStreamingRef.current = true
-              if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
             }
             break
           }

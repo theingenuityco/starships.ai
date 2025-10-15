@@ -29,6 +29,7 @@ import api from '@/lib/api'
 import type { AgentModel, ToolModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { ConversationActivityCard } from '@/components/starship/ConversationActivityCard'
+import { ShipHero } from '@/components/starship/ShipHero'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -117,6 +118,8 @@ export default function StarshipOverviewPage(): React.JSX.Element {
 
               {/* Ship Tab - existing overview content */}
               <TabsContent value="ship">
+                {/* Hero Section */}
+                <ShipHero starshipName={starship?.name} slug={slug} starshipId={starshipId} wallet={wallet} walletLoading={walletLoading} className="mb-6" />
                 {/* Top Row - 4 Column Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Conversation Activity Card */}

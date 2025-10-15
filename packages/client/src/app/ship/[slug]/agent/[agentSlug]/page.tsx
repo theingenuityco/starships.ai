@@ -279,6 +279,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               minimal={true}
               showExpandableOverlay={true}
               isOverlayExpanded={isOverlayExpanded}
+              onFocus={() => setIsOverlayExpanded(true)}
+              onBlur={() => setIsOverlayExpanded(false)}
               onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
             >
               <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />

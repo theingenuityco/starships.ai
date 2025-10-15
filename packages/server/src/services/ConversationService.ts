@@ -559,7 +559,9 @@ export class ConversationService {
                   exp: Math.floor(Date.now() / 1000) + 600,
                 });
                 this.streamingService.sendResumeToken(conversationId, token);
-              } catch {}
+              } catch {
+                /* non-fatal: resume token emission failed */
+              }
             } else {
               break;
             }
@@ -619,7 +621,9 @@ export class ConversationService {
                   });
                   this.streamingService.sendResumeToken(conversationId, token);
                 }
-              } catch {}
+              } catch {
+                /* non-fatal: periodic resume token emission failed */
+              }
             }
           }
 
@@ -1055,7 +1059,9 @@ export class ConversationService {
                       exp: Math.floor(Date.now() / 1000) + 600,
                     });
                     this.streamingService.sendResumeToken(conversationId, token);
-                  } catch {}
+                  } catch {
+                    /* non-fatal: resume token emission after persistence failed */
+                  }
                 }
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
@@ -1105,7 +1111,7 @@ export class ConversationService {
               }
             });
           } catch {
-            // non-fatal
+            /* non-fatal */
           }
 
           // Emit stream completion for the entire workflow (top-level only)
@@ -1128,7 +1134,9 @@ export class ConversationService {
               exp: Math.floor(Date.now() / 1000) + 600,
             });
             this.streamingService.sendResumeToken(conversationId, token);
-          } catch {}
+          } catch {
+            /* non-fatal: final resume token emission failed */
+          }
         }
         break;
       }

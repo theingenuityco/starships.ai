@@ -100,15 +100,15 @@ export default function StarshipOverviewPage(): React.JSX.Element {
             <Tabs defaultValue="ship" className="space-y-6">
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="ship" className="gap-2 rounded-xl px-4 py-2">
+                  <TabsTrigger value="ship" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="rocket" className="h-4 w-4" />
                     <span>Ship</span>
                   </TabsTrigger>
-                  <TabsTrigger value="agents" className="gap-2 rounded-xl px-4 py-2">
+                  <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user-cog" className="h-4 w-4" />
                     <span>Agents</span>
                   </TabsTrigger>
-                  <TabsTrigger value="tools" className="gap-2 rounded-xl px-4 py-2">
+                  <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="wrench" className="h-4 w-4" />
                     <span>Tools</span>
                   </TabsTrigger>

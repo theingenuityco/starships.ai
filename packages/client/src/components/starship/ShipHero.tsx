@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import type { WalletModel } from '@starships/protocol'
 import { cn } from '@/lib/utils'
-import { Bungee } from 'next/font/google'
+import { Outfit } from 'next/font/google'
 
 export interface ShipHeroProps {
   starshipName?: string | null
@@ -20,7 +20,7 @@ export interface ShipHeroProps {
   className?: string
 }
 
-const heroHeadingFont = Bungee({ subsets: ['latin'], weight: '400' })
+const heroHeadingFont = Outfit({ subsets: ['latin'], weight: ['600', '700'] })
 
 export function ShipHero({ starshipName, slug, starshipId, className }: ShipHeroProps): React.JSX.Element {
   const router = useRouter()
@@ -43,16 +43,17 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
       <div className="relative z-10 flex flex-col gap-8 md:flex-row md:items-center md:justify-between md:gap-10">
         {/* Gaia marketing content */}
         <div className="max-w-2xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            <Icon name="sparkles" className="h-3.5 w-3.5" />
-            <span>Gaia: Agent Creator</span>
-          </div>
           <h2 id="ship-hero" className={cn(heroHeadingFont.className, 'text-3xl md:text-4xl lg:text-4xl font-bold tracking-tight')}>
             Create agents with Gaia
           </h2>
           <p className="mt-3 md:mt-4 text-sm md:text-base text-muted-foreground">
             Tell Gaia what you want your agent to do. It helps you set it up, choose a model, connect the right tools, and get it ready to use on this ship.
           </p>
+
+          <div className="mt-4 mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <Icon name="sparkles" className="h-3.5 w-3.5" />
+            <span>Gaia: Agent Creator</span>
+          </div>
 
           {/* Benefits */}
           <ul className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

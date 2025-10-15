@@ -45,7 +45,7 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           }}
         >
           {/* Floating Panels - Top Left */}
-          <div className="absolute top-4 left-28 z-10 w-[420px] space-y-2">
+          <div className="absolute top-6 left-28 z-10 w-[420px] space-y-2">
             {/* Tool Info Panel */}
             <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
 

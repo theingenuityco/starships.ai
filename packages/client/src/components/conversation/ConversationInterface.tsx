@@ -5,8 +5,6 @@ import Icon from '@/components/primitives/Icon'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
-import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -43,23 +41,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
-  const toolBuilderViewRef = useRef<ToolBuilderViewRef>(null)
-  const agentBuilderViewRef = useRef<AgentBuilderViewRef>(null)
+  // Removed in-conversation builder overlays; now using dedicated routes
   const lastUIActionKeyRef = useRef<string | null>(null)
 
-  // View mode state: 'conversation' or 'tool-builder' or 'agent-builder'
-  const [viewMode, setViewMode] = useState<'conversation' | 'tool-builder' | 'agent-builder'>('conversation')
-  // Ref to avoid stale closures inside streaming handlers
-  const viewModeRef = useRef<'conversation' | 'tool-builder' | 'agent-builder'>('conversation')
+  // View is always 'conversation' now; builders have dedicated routes
+  const [viewMode] = useState<'conversation'>('conversation')
+  const viewModeRef = useRef<'conversation'>('conversation')
   // Track applied tool call keys to accumulate across messages
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
   // Track last conversation id to reset applied set
   const lastAppliedConversationRef = useRef<string | null>(null)
 
-  // Expanded overlay state for message history when in builder mode
-  const [isMessageOverlayExpanded, setIsMessageOverlayExpanded] = useState(false)
-
-  // Track if the builder was opened via streaming UI action
+  // Removed overlay state; no longer used without in-page builders
+  const [isMessageOverlayExpanded] = useState(false)
   const wasOpenedByStreamingRef = useRef(false)
 
   // Track pending tool calls for completion detection
@@ -127,10 +121,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [])
 
-  // Handle overlay toggle when clicking disabled input
-  const handleToggleOverlay = useCallback(() => {
-    setIsMessageOverlayExpanded(prev => !prev)
-  }, [])
+  // Overlay disabled; keep a no-op for prop compatibility
+  const handleToggleOverlay = useCallback(() => {}, [])
 
   // Reset conversation when external conversation ID changes
   useEffect(() => {
@@ -211,277 +203,100 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [hasMessages, currentConversationId])
 
-  // Handle tool builder save
-  const handleToolBuilderSave = useCallback((data: any) => {
-    console.log('Tool builder data:', data)
-    toast.success('Tool created successfully!', {
-      description: `${data.name} has been created and is ready to use.`,
-    })
-    setViewMode('conversation')
-    setIsMessageOverlayExpanded(false)
-    wasOpenedByStreamingRef.current = false
-    toolBuilderViewRef.current?.resetForm()
-  }, [])
+  // Removed in-page builder save/cancel handlers
 
-  // Handle tool builder cancel
-  const handleToolBuilderCancel = useCallback(() => {
-    setViewMode('conversation')
-    setIsMessageOverlayExpanded(false)
-    wasOpenedByStreamingRef.current = false
-    toolBuilderViewRef.current?.resetForm()
-  }, [])
-
-  // Handle agent builder save
-  const handleAgentBuilderSave = useCallback((data: any) => {
-    console.log('Agent builder data:', data)
-    toast.success('Agent created successfully!', {
-      description: `${data.name} has been created and is ready to use.`,
-    })
-    setViewMode('conversation')
-    setIsMessageOverlayExpanded(false)
-    wasOpenedByStreamingRef.current = false
-    agentBuilderViewRef.current?.resetForm()
-  }, [])
-
-  // Handle agent builder cancel
-  const handleAgentBuilderCancel = useCallback(() => {
-    setViewMode('conversation')
-    setIsMessageOverlayExpanded(false)
-    wasOpenedByStreamingRef.current = false
-    agentBuilderViewRef.current?.resetForm()
-  }, [])
-
-  // Handle manual toggle of Tool Builder (persist and restore focused tool from conversation)
+  // Toggle now navigates to tool builder route
   const handleToggleToolBuilder = useCallback(() => {
-    setViewMode(prev => {
-      const next = prev === 'tool-builder' ? 'conversation' : 'tool-builder'
-      if (next === 'tool-builder') {
-        // Manual open: ensure streaming flag is off and rebuild state from conversation tool calls
-        wasOpenedByStreamingRef.current = false
-        // Reset the builder UI before replaying state
-        toolBuilderViewRef.current?.resetForm()
-        // Clear applied tool call dedupe so we can replay from conversation messages
-        appliedToolCallKeysRef.current.clear()
-        // Allow future UI payloads to be processed again if needed
-        lastUIActionKeyRef.current = null
-      }
-      return next
-    })
-  }, [])
+    if (!starshipSlug) return
+    const convId = currentConversationIdRef.current || externalConversationId || null
+    const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+    router.push(`/ship/${starshipSlug}/tool/new${q}`)
+  }, [router, starshipSlug, externalConversationId])
 
-  // Handle manual toggle of Agent Builder
-  const handleToggleAgentBuilder = useCallback(() => {
-    setViewMode(prev => {
-      const next = prev === 'agent-builder' ? 'conversation' : 'agent-builder'
-      if (next === 'agent-builder') {
-        // Manual open: ensure streaming flag is off and rebuild state from conversation tool calls
-        wasOpenedByStreamingRef.current = false
-        // Reset the builder UI before replaying state
-        agentBuilderViewRef.current?.resetForm()
-        // Clear applied tool call dedupe so we can replay from conversation messages
-        appliedToolCallKeysRef.current.clear()
-        // Allow future UI payloads to be processed again if needed
-        lastUIActionKeyRef.current = null
-      }
-      return next
-    })
-  }, [])
+  // Removed manual agent builder toggle (route-based only)
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
-  const handleUIPayload = useCallback(
-    (payload: any) => {
-      try {
-        if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
-        const key = JSON.stringify(payload)
-        if (lastUIActionKeyRef.current === key) return
-        lastUIActionKeyRef.current = key
+  const handleUIPayload = useCallback((payload: any) => {
+    try {
+      if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
+      const key = JSON.stringify(payload)
+      if (lastUIActionKeyRef.current === key) return
+      lastUIActionKeyRef.current = key
 
-        const action = (payload as any).__ui_action as string
+      const action = (payload as any).__ui_action as string
 
-        const updateFieldWithGuard = (field: any, value: any) => {
-          if (!toolBuilderViewRef.current) return
-          if (field === 'blueprint') {
-            const form = toolBuilderViewRef.current.getFormData?.()
-            const currentStr = form?.blueprint || ''
-            let currentBp: any = {}
+      // Builders are route-based now; no in-place form updates
+
+      switch (action) {
+        case 'tool_call_detected': {
+          const toolName = (payload as any).toolName
+          const toolCallId = (payload as any).toolCallId
+
+          console.log('🎯 Tool call detected:', { toolName, toolCallId })
+
+          // Store tool call info for later completion handling
+          if (toolCallId) {
+            pendingToolCallsRef.current.set(toolCallId, { toolName, args: {} })
+          }
+
+          // Navigate to tool builder route for tool actions
+          const openToolBuilderSlugs = new Set([
+            'tool-open',
+            'tool-edit',
+            'tool-add-blueprint-node',
+            'tool-add-blueprint-edge',
+            'tool-blueprint-edit-node',
+            'tool-blueprint-remove-node',
+            'tool-blueprint-edit-edge',
+            'tool-blueprint-remove-edge',
+          ])
+          if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
+            console.log('📂 Navigating to tool builder page for', toolName)
             try {
-              currentBp = JSON.parse(currentStr || '{}')
-            } catch {}
-            let incoming: any = value
-            if (typeof incoming === 'string') {
-              try {
-                incoming = JSON.parse(incoming)
-              } catch {}
+              const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
+              const slug = starshipSlug
+              if (slug) {
+                const convId = currentConversationIdRef.current || externalConversationId || null
+                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+                router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+              } else {
+                // If slug missing, do nothing special
+              }
+            } catch {
+              // ignore navigation error
             }
-            const currentHas = (Array.isArray((currentBp as any).nodes) && (currentBp as any).nodes.length > 0) || (Array.isArray((currentBp as any).edges) && (currentBp as any).edges.length > 0)
-            const incomingHas = incoming && ((Array.isArray(incoming.nodes) && incoming.nodes.length > 0) || (Array.isArray(incoming.edges) && incoming.edges.length > 0))
-            if (!incomingHas && currentHas) {
-              return
-            }
-            const bpStr = typeof value === 'string' ? value : JSON.stringify(incoming || {}, null, 2)
-            toolBuilderViewRef.current.updateField('blueprint', bpStr)
-            return
           }
-          toolBuilderViewRef.current.updateField(field as any, value as any)
+
+          // Navigate to agent builder for agent actions
+          const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+          if (openAgentBuilderSlugs.has(toolName)) {
+            console.log('🌍 Navigating to agent builder page for', toolName)
+            try {
+              const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
+              const slug = starshipSlug
+              if (slug) {
+                const convId = currentConversationIdRef.current || externalConversationId || null
+                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+                router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+              } else {
+                // If slug missing, do nothing special
+              }
+            } catch {
+              // ignore navigation error
+            }
+          }
+          break
         }
 
-        const ensureOpenThen = (fn: () => void) => {
-          setTimeout(() => {
-            const needReset = action === 'open_tool_form' && viewModeRef.current !== 'tool-builder'
-            if (needReset) {
-              toolBuilderViewRef.current?.resetForm()
-            }
-            // Mark that this transition was triggered by streaming
-            wasOpenedByStreamingRef.current = true
-            if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
-            setTimeout(() => fn(), 150)
-          }, 100)
-        }
+        // All tool form management is handled in dedicated routes now
 
-        switch (action) {
-          case 'tool_call_detected': {
-            const toolName = (payload as any).toolName
-            const toolCallId = (payload as any).toolCallId
-
-            console.log('🎯 Tool call detected:', { toolName, toolCallId })
-
-            // Store tool call info for later completion handling
-            if (toolCallId) {
-              pendingToolCallsRef.current.set(toolCallId, { toolName, args: {} })
-            }
-
-            // Open tool builder for tool actions that affect tool data or blueprint
-            const openToolBuilderSlugs = new Set([
-              'tool-open',
-              'tool-edit',
-              'tool-add-blueprint-node',
-              'tool-add-blueprint-edge',
-              'tool-blueprint-edit-node',
-              'tool-blueprint-remove-node',
-              'tool-blueprint-edit-edge',
-              'tool-blueprint-remove-edge',
-            ])
-            if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
-              console.log('📂 Navigating to tool builder page for', toolName)
-              try {
-                const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
-                const slug = starshipSlug
-                if (slug) {
-                  const convId = currentConversationIdRef.current || externalConversationId || null
-                  const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                  router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}${q}`)
-                } else {
-                  // Fallback: open overlay if slug is missing
-                  if (viewModeRef.current !== 'tool-builder') {
-                    toolBuilderViewRef.current?.resetForm()
-                  }
-                  wasOpenedByStreamingRef.current = true
-                  if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
-                }
-              } catch {
-                // Fallback to overlay on any navigation error
-                if (viewModeRef.current !== 'tool-builder') {
-                  toolBuilderViewRef.current?.resetForm()
-                }
-                wasOpenedByStreamingRef.current = true
-                if (viewModeRef.current !== 'tool-builder') setViewMode('tool-builder')
-              }
-            }
-
-            // Open agent builder for agent actions that affect agent data
-            const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-            if (openAgentBuilderSlugs.has(toolName)) {
-              console.log('🌍 Navigating to agent builder page for', toolName)
-              try {
-                const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
-                const slug = starshipSlug
-                if (slug) {
-                  const convId = currentConversationIdRef.current || externalConversationId || null
-                  const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                  router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`)
-                } else {
-                  // Fallback: open overlay if slug is missing
-                  if (viewModeRef.current !== 'agent-builder') {
-                    agentBuilderViewRef.current?.resetForm()
-                  }
-                  wasOpenedByStreamingRef.current = true
-                  if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
-                }
-              } catch {
-                // Fallback to overlay on any navigation error
-                if (viewModeRef.current !== 'agent-builder') {
-                  agentBuilderViewRef.current?.resetForm()
-                }
-                wasOpenedByStreamingRef.current = true
-                if (viewModeRef.current !== 'agent-builder') setViewMode('agent-builder')
-              }
-            }
-            break
-          }
-
-          case 'open_tool_form': {
-            const form = (payload as any).formData || (payload as any).data || {}
-            ensureOpenThen(() => {
-              if (toolBuilderViewRef.current && form && typeof form === 'object') {
-                Object.entries(form).forEach(([field, value]) => {
-                  updateFieldWithGuard(field as any, value as any)
-                })
-              }
-            })
-            break
-          }
-
-          case 'update_tool_form': {
-            const patch = (payload as any).patch || (payload as any).formData || (payload as any).data || {}
-            if (viewMode !== 'tool-builder') {
-              // Mark that this transition was triggered by streaming
-              wasOpenedByStreamingRef.current = true
-              ensureOpenThen(() => {
-                if (toolBuilderViewRef.current && patch && typeof patch === 'object') {
-                  Object.entries(patch).forEach(([field, value]) => {
-                    updateFieldWithGuard(field as any, value as any)
-                  })
-                }
-              })
-            } else {
-              if (patch && typeof patch === 'object') {
-                Object.entries(patch).forEach(([field, value]) => {
-                  updateFieldWithGuard(field as any, value as any)
-                })
-              }
-            }
-            break
-          }
-
-          case 'submit_tool_form': {
-            const submit = () => {
-              const formData = toolBuilderViewRef.current?.getFormData()
-              if (formData) {
-                handleToolBuilderSave(formData)
-              }
-            }
-            if (viewMode !== 'tool-builder') {
-              ensureOpenThen(submit)
-            } else {
-              submit()
-            }
-            break
-          }
-
-          case 'close_tool_form': {
-            setViewMode('conversation')
-            break
-          }
-
-          default:
-            break
-        }
-      } catch {
-        // ignore
+        default:
+          break
       }
-    },
-    [handleToolBuilderSave]
-  )
+    } catch {
+      // ignore
+    }
+  }, [])
 
   // Handle tool completion for entity-modifying tools
   const handleToolComplete = useCallback(
@@ -489,29 +304,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       try {
         // Agent tools - fetch and sync agent data
         const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
-        if (agentTools.includes(toolName) && toolArgs?.slug && viewModeRef.current === 'agent-builder') {
+        if (agentTools.includes(toolName) && toolArgs?.slug) {
           console.log('🔄 Fetching agent after tool completion:', toolArgs.slug)
 
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
 
-          if (agent && agentBuilderViewRef.current) {
-            // Sync all fields with server data
-            agentBuilderViewRef.current.updateField('name', agent.name)
-            if (agent.description) agentBuilderViewRef.current.updateField('description', agent.description)
-            if (agent.model) agentBuilderViewRef.current.updateField('model', agent.model)
-            if (agent.systemPrompt) agentBuilderViewRef.current.updateField('systemPrompt', agent.systemPrompt)
-            if (agent.temperature !== undefined) agentBuilderViewRef.current.updateField('temperature', agent.temperature)
-            if (agent.maxTokens !== undefined) agentBuilderViewRef.current.updateField('maxTokens', agent.maxTokens)
-            if (agent.timeout !== undefined) agentBuilderViewRef.current.updateField('timeout', agent.timeout)
-
-            // Most important: sync the blueprint
-            if (agent.blueprint) {
-              agentBuilderViewRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
-            }
-
-            console.log('✅ Agent form synced with server data')
-          }
+          // In dedicated route, the page handles syncing; nothing to update here
         }
 
         // Tool tools - fetch and sync tool data
@@ -525,21 +324,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           'tool-blueprint-edit-edge',
           'tool-blueprint-remove-edge',
         ]
-        if (toolTools.includes(toolName) && toolArgs?.slug && viewModeRef.current === 'tool-builder') {
+        if (toolTools.includes(toolName) && toolArgs?.slug) {
           console.log('🔄 Fetching tool after tool completion:', toolArgs.slug)
 
           // Fetch complete tool data by slug
           const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
 
-          if (tool && toolBuilderViewRef.current) {
-            // Sync all fields with server data
-            toolBuilderViewRef.current.updateField('name', tool.name)
-            if (tool.description) toolBuilderViewRef.current.updateField('description', tool.description)
-            if (tool.parameters) toolBuilderViewRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
-            if (tool.blueprint) toolBuilderViewRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
-
-            console.log('✅ Tool form synced with server data')
-          }
+          // In dedicated route, the page handles syncing; nothing to update here
         }
       } catch (error) {
         console.error('Failed to fetch entity after tool completion:', error)
@@ -606,393 +397,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId, lastUIAction, handleUIPayload])
 
-  // Auto-expand overlay when transitioning to builder views via streaming
+  // Removed overlay UI effects
+
+  // Removed streaming into in-page tool builder (handled in dedicated route)
   useEffect(() => {
-    if ((viewMode === 'tool-builder' || viewMode === 'agent-builder') && wasOpenedByStreamingRef.current) {
-      // Auto-expand the message overlay
-      setIsMessageOverlayExpanded(true)
-      // Reset the flag after a short delay
-      const timer = setTimeout(() => {
-        wasOpenedByStreamingRef.current = false
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [viewMode])
+    return
+  }, [currentConversationId, liveMessages])
 
-  // Handle click outside to collapse overlay
+  // Removed streaming into in-page agent builder (handled in dedicated route)
   useEffect(() => {
-    if ((viewMode !== 'tool-builder' && viewMode !== 'agent-builder') || !isMessageOverlayExpanded) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      const inputContainer = inputContainerRef.current
-
-      // Check if click is outside the input container
-      if (inputContainer && !inputContainer.contains(target)) {
-        setIsMessageOverlayExpanded(false)
-      }
-    }
-
-    // Add listener after a small delay to avoid immediate collapse on the same click that opened it
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside)
-    }, 100)
-
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [viewMode, isMessageOverlayExpanded])
-
-  // Stream tool arguments into builder as they arrive (compose all mutations before writing)
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length || viewMode !== 'tool-builder') return
-
-    // Eligible tool slugs that should drive the Tool Builder
-    const builderToolSlugs = new Set([
-      'tool-open',
-      'tool-edit',
-      'tool-add-blueprint-node',
-      'tool-add-blueprint-edge',
-      'tool-blueprint-edit-node',
-      'tool-blueprint-remove-node',
-      'tool-blueprint-edit-edge',
-      'tool-blueprint-remove-edge',
-    ])
-
-    const form = toolBuilderViewRef.current?.getFormData?.()
-    if (!form) return
-
-    // Initialize blueprint from form
-    let bp: any
-    try {
-      bp = JSON.parse(form.blueprint || '{}')
-    } catch {
-      bp = {}
-    }
-    if (!Array.isArray(bp.nodes)) bp.nodes = []
-    if (!Array.isArray(bp.edges)) bp.edges = []
-
-    // Helper to parse JSON-like values
-    const normalizeJson = (v: any) => {
-      if (typeof v === 'string') {
-        try {
-          return JSON.parse(v)
-        } catch {
-          return v
-        }
-      }
-      return v
-    }
-
-    // Collect only new toolCalls across all assistant messages in chronological order
-    const newCalls: { name: string; args: any }[] = []
-    for (let mi = 0; mi < liveMessages.length; mi++) {
-      const msg = liveMessages[mi]
-      if (msg.role !== 'assistant') continue
-      const calls = (msg as any).toolCalls
-      if (!Array.isArray(calls)) continue
-      for (let ci = 0; ci < calls.length; ci++) {
-        const call = calls[ci]
-        const name = call?.function?.name as string
-        if (!(builderToolSlugs.has(name) || name?.startsWith?.('tool-blueprint-'))) continue
-        let raw = call?.function?.arguments
-        const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
-        if (appliedToolCallKeysRef.current.has(key)) continue
-        // parse args after key computation to keep key stable on parse errors
-        let parsed = raw
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed)
-          } catch {
-            // keep as-is (may still be partial)
-          }
-        }
-        // skip clearly empty args to avoid wiping state
-        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0) {
-          continue
-        }
-        newCalls.push({ name, args: parsed })
-        appliedToolCallKeysRef.current.add(key)
-      }
-    }
-
-    if (newCalls.length === 0) return
-
-    // Compose pending scalar field updates
-    const compose = {
-      name: undefined as undefined | string,
-      description: undefined as undefined | string,
-      category: undefined as undefined | string,
-      exampleUsage: undefined as undefined | string,
-      requiresApiKey: undefined as undefined | boolean,
-      parameters: undefined as undefined | string,
-      blueprintChanged: false,
-    }
-
-    const hasContent = (b: any) => (Array.isArray(b?.nodes) && b.nodes.length > 0) || (Array.isArray(b?.edges) && b.edges.length > 0)
-
-    // Apply each new call in order
-    for (const call of newCalls) {
-      const toolName = call.name
-      const args = call.args
-
-      if (toolName === 'tool-open' || toolName === 'tool-edit') {
-        if (args?.name !== undefined) compose.name = args.name
-        if (args?.description !== undefined) compose.description = args.description
-        if (args?.category !== undefined) compose.category = args.category
-        if (args?.exampleUsage !== undefined) compose.exampleUsage = args.exampleUsage
-        if (args?.requiresApiKey !== undefined) compose.requiresApiKey = args.requiresApiKey
-        if (args?.parameters !== undefined) {
-          compose.parameters = typeof args.parameters === 'string' ? args.parameters : JSON.stringify(args.parameters, null, 2)
-        }
-        if (args?.blueprint !== undefined) {
-          const incoming = normalizeJson(args.blueprint) || {}
-          if (!Array.isArray(incoming.nodes)) incoming.nodes = []
-          if (!Array.isArray(incoming.edges)) incoming.edges = []
-          // Only replace blueprint if incoming has content OR current bp is empty
-          if (hasContent(incoming) || !hasContent(bp)) {
-            bp = incoming
-            compose.blueprintChanged = true
-          }
-        }
-        continue
-      }
-
-      switch (toolName) {
-        case 'tool-add-blueprint-node': {
-          const node = normalizeJson(args?.node)
-          if (!node || typeof node !== 'object') break
-          bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== node.ref)
-          bp.nodes.push(node)
-          compose.blueprintChanged = true
-          break
-        }
-        case 'tool-add-blueprint-edge': {
-          const edge = normalizeJson(args?.edge)
-          if (!edge || typeof edge !== 'object') break
-          bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edge.ref)
-          bp.edges.push(edge)
-          compose.blueprintChanged = true
-          break
-        }
-        case 'tool-blueprint-edit-node': {
-          const nodeRef = args?.nodeRef
-          const updates = normalizeJson(args?.updates) || {}
-          if (!nodeRef) break
-          const idx = (bp.nodes || []).findIndex((n: any) => n?.ref === nodeRef)
-          if (idx >= 0) {
-            const cur = { ...(bp.nodes[idx] || {}) }
-            if ('name' in updates) cur.name = updates.name
-            if ('description' in updates) cur.description = updates.description
-            if ('type' in updates) cur.type = updates.type
-            if ('parameters' in updates) cur.parameters = updates.parameters
-            bp.nodes[idx] = cur
-            compose.blueprintChanged = true
-          }
-          break
-        }
-        case 'tool-blueprint-edit-edge': {
-          const edgeRef = args?.edgeRef
-          const updates = normalizeJson(args?.updates) || {}
-          if (!edgeRef) break
-          const idx = (bp.edges || []).findIndex((e: any) => e?.ref === edgeRef)
-          if (idx >= 0) {
-            const cur = { ...(bp.edges[idx] || {}) }
-            if ('from' in updates) cur.from = updates.from
-            if ('to' in updates) cur.to = updates.to
-            if ('condition' in updates) cur.condition = updates.condition
-            bp.edges[idx] = cur
-            compose.blueprintChanged = true
-          }
-          break
-        }
-        case 'tool-blueprint-remove-node': {
-          const nodeRef = args?.nodeRef
-          if (!nodeRef) break
-          bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== nodeRef)
-          bp.edges = (bp.edges || []).filter((e: any) => e?.from !== nodeRef && e?.to !== nodeRef)
-          compose.blueprintChanged = true
-          break
-        }
-        case 'tool-blueprint-remove-edge': {
-          const edgeRef = args?.edgeRef
-          if (!edgeRef) break
-          bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edgeRef)
-          compose.blueprintChanged = true
-          break
-        }
-      }
-    }
-
-    // Write back composed updates once
-    if (compose.name !== undefined) toolBuilderViewRef.current?.updateField('name', compose.name)
-    if (compose.description !== undefined) toolBuilderViewRef.current?.updateField('description', compose.description)
-    if (compose.category !== undefined) toolBuilderViewRef.current?.updateField('category', compose.category)
-    if (compose.exampleUsage !== undefined) toolBuilderViewRef.current?.updateField('exampleUsage', compose.exampleUsage)
-    if (compose.requiresApiKey !== undefined) toolBuilderViewRef.current?.updateField('requiresApiKey', compose.requiresApiKey)
-    if (compose.parameters !== undefined) toolBuilderViewRef.current?.updateField('parameters', compose.parameters)
-    if (compose.blueprintChanged) {
-      const bpStr = JSON.stringify(bp, null, 2)
-      toolBuilderViewRef.current?.updateField('blueprint', bpStr)
-    }
-  }, [currentConversationId, liveMessages, viewMode])
-
-  // Stream agent arguments into builder as they arrive
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length || viewMode !== 'agent-builder') return
-
-    // Eligible tool slugs that should drive the Agent Builder
-    const builderToolSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-
-    const form = agentBuilderViewRef.current?.getFormData?.()
-    if (!form) return
-
-    // Initialize blueprint from form
-    let bp: any
-    try {
-      bp = JSON.parse(form.blueprint || '{}')
-    } catch {
-      bp = {}
-    }
-    if (!Array.isArray(bp.nodes)) bp.nodes = []
-    if (!Array.isArray(bp.edges)) bp.edges = []
-
-    // Helper to parse JSON-like values
-    const normalizeJson = (v: any) => {
-      if (typeof v === 'string') {
-        try {
-          return JSON.parse(v)
-        } catch {
-          return v
-        }
-      }
-      return v
-    }
-
-    // Collect only new toolCalls across all assistant messages in chronological order
-    const newCalls: { name: string; args: any }[] = []
-    for (let mi = 0; mi < liveMessages.length; mi++) {
-      const msg = liveMessages[mi]
-      if (msg.role !== 'assistant') continue
-      const calls = (msg as any).toolCalls
-      if (!Array.isArray(calls)) continue
-      for (let ci = 0; ci < calls.length; ci++) {
-        const call = calls[ci]
-        const name = call?.function?.name as string
-        if (!builderToolSlugs.has(name)) continue
-        let raw = call?.function?.arguments
-        const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
-        if (appliedToolCallKeysRef.current.has(key)) continue
-        // parse args after key computation to keep key stable on parse errors
-        let parsed = raw
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed)
-          } catch {
-            // keep as-is (may still be partial)
-          }
-        }
-        // skip clearly empty args to avoid wiping state
-        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0) {
-          continue
-        }
-        newCalls.push({ name, args: parsed })
-        appliedToolCallKeysRef.current.add(key)
-      }
-    }
-
-    if (newCalls.length === 0) return
-
-    // Compose pending scalar field updates
-    const compose = {
-      name: undefined as undefined | string,
-      slug: undefined as undefined | string,
-      description: undefined as undefined | string,
-      category: undefined as undefined | string,
-      model: undefined as undefined | string,
-      temperature: undefined as undefined | number,
-      maxTokens: undefined as undefined | number,
-      systemPrompt: undefined as undefined | string,
-      assignedToolSlugs: undefined as undefined | string[],
-      icon: undefined as undefined | string,
-      timeout: undefined as undefined | number,
-      blueprintChanged: false,
-    }
-
-    const hasContent = (b: any) => (Array.isArray(b?.nodes) && b.nodes.length > 0) || (Array.isArray(b?.edges) && b.edges.length > 0)
-
-    // Apply each new call in order
-    for (const call of newCalls) {
-      const toolName = call.name
-      const args = call.args
-
-      if (toolName === 'agent-open' || toolName === 'agent-edit') {
-        if (args?.name !== undefined) compose.name = args.name
-        if (args?.slug !== undefined) compose.slug = args.slug
-        if (args?.description !== undefined) compose.description = args.description
-        if (args?.category !== undefined) compose.category = args.category
-        if (args?.model !== undefined) compose.model = args.model
-        if (args?.temperature !== undefined) compose.temperature = args.temperature
-        if (args?.maxTokens !== undefined) compose.maxTokens = args.maxTokens
-        if (args?.systemPrompt !== undefined) compose.systemPrompt = args.systemPrompt
-        if (args?.icon !== undefined) compose.icon = args.icon
-        if (args?.timeout !== undefined) compose.timeout = args.timeout
-        if (args?.assignedToolSlugs !== undefined) {
-          compose.assignedToolSlugs = Array.isArray(args.assignedToolSlugs) ? args.assignedToolSlugs : []
-        }
-        if (args?.blueprint !== undefined) {
-          const incoming = normalizeJson(args.blueprint) || {}
-          if (!Array.isArray(incoming.nodes)) incoming.nodes = []
-          if (!Array.isArray(incoming.edges)) incoming.edges = []
-          // Only replace blueprint if incoming has content OR current bp is empty
-          if (hasContent(incoming) || !hasContent(bp)) {
-            bp = incoming
-            compose.blueprintChanged = true
-          }
-        }
-        continue
-      }
-
-      // Handle tool assignment/unassignment
-      if (toolName === 'agent-assign-tool') {
-        const toolSlug = args?.toolSlug
-        if (toolSlug && typeof toolSlug === 'string') {
-          const current = compose.assignedToolSlugs ?? form.assignedToolSlugs ?? []
-          if (!current.includes(toolSlug)) {
-            compose.assignedToolSlugs = [...current, toolSlug]
-          }
-        }
-        continue
-      }
-
-      if (toolName === 'agent-unassign-tool') {
-        const toolSlug = args?.toolSlug
-        if (toolSlug && typeof toolSlug === 'string') {
-          const current = compose.assignedToolSlugs ?? form.assignedToolSlugs ?? []
-          compose.assignedToolSlugs = current.filter(s => s !== toolSlug)
-        }
-        continue
-      }
-    }
-
-    // Write back composed updates once
-    if (compose.name !== undefined) agentBuilderViewRef.current?.updateField('name', compose.name)
-    if (compose.slug !== undefined) agentBuilderViewRef.current?.updateField('slug', compose.slug)
-    if (compose.description !== undefined) agentBuilderViewRef.current?.updateField('description', compose.description)
-    if (compose.category !== undefined) agentBuilderViewRef.current?.updateField('category', compose.category)
-    if (compose.model !== undefined) agentBuilderViewRef.current?.updateField('model', compose.model)
-    if (compose.temperature !== undefined) agentBuilderViewRef.current?.updateField('temperature', compose.temperature)
-    if (compose.maxTokens !== undefined) agentBuilderViewRef.current?.updateField('maxTokens', compose.maxTokens)
-    if (compose.systemPrompt !== undefined) agentBuilderViewRef.current?.updateField('systemPrompt', compose.systemPrompt)
-    if (compose.icon !== undefined) agentBuilderViewRef.current?.updateField('icon', compose.icon)
-    if (compose.timeout !== undefined) agentBuilderViewRef.current?.updateField('timeout', compose.timeout)
-    if (compose.assignedToolSlugs !== undefined) agentBuilderViewRef.current?.updateField('assignedToolSlugs', compose.assignedToolSlugs)
-    if (compose.blueprintChanged) {
-      const bpStr = JSON.stringify(bp, null, 2)
-      agentBuilderViewRef.current?.updateField('blueprint', bpStr)
-    }
-  }, [currentConversationId, liveMessages, viewMode])
+    return
+  }, [currentConversationId, liveMessages])
 
   // Show loading state
   if (isLoading) {
@@ -1023,67 +438,54 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   return (
-    <div
-      className="relative flex flex-col h-screen transition-all duration-500 ease-in-out"
-      style={{
-        overflow: viewMode === 'tool-builder' || viewMode === 'agent-builder' ? 'visible' : 'hidden',
-      }}
-    >
+    <div className="relative flex flex-col h-screen transition-all duration-500 ease-in-out">
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
-        {/* Main Content Area - Switches between Conversation, Tool Builder, and Agent Builder */}
-        {viewMode === 'tool-builder' ? (
-          <ToolBuilderView ref={toolBuilderViewRef} onSave={handleToolBuilderSave} onCancel={handleToolBuilderCancel} starshipId={starshipId} />
-        ) : viewMode === 'agent-builder' ? (
-          <AgentBuilderView ref={agentBuilderViewRef} onSave={handleAgentBuilderSave} onCancel={handleAgentBuilderCancel} starshipId={starshipId} />
-        ) : (
-          <>
-            {/* Messages Area or Welcome Screen */}
-            {showMessagesArea ? (
-              <>
-                <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
-                <div className="flex-1 min-h-0">
-                  <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
-                {/* Welcome Section */}
-                <div className="text-center mb-8 max-w-2xl opacity-100">
-                  <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                  <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-                </div>
-
-                {/* Spacer for floating input */}
-                <div className="h-32 mb-8"></div>
-
-                {/* Suggestions */}
-                <div className="space-y-3 max-w-2xl w-full opacity-100">
-                  {AGENT_SUGGESTIONS.map((suggestion, index) => (
-                    <button
-                      key={suggestion}
-                      className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                    >
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                        <Icon name="sparkles" className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
-                      </div>
-                      <span className="flex-1">{suggestion}</span>
-                    </button>
-                  ))}
-                </div>
+        {/* Main Content Area - Conversation only; builders use dedicated routes */}
+        <>
+          {/* Messages Area or Welcome Screen */}
+          {showMessagesArea ? (
+            <>
+              <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
+              <div className="flex-1 min-h-0">
+                <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
               </div>
-            )}
-          </>
-        )}
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
+              {/* Welcome Section */}
+              <div className="text-center mb-8 max-w-2xl opacity-100">
+                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+              </div>
+
+              {/* Spacer for floating input */}
+              <div className="h-32 mb-8"></div>
+
+              {/* Suggestions */}
+              <div className="space-y-3 max-w-2xl w-full opacity-100">
+                {AGENT_SUGGESTIONS.map((suggestion, index) => (
+                  <button
+                    key={suggestion}
+                    className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                  >
+                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                      <Icon name="sparkles" className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                    </div>
+                    <span className="flex-1">{suggestion}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
 
         {/* Floating Input Container - Always visible, position changes based on state */}
         <div
           ref={inputContainerRef}
           className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
-          style={{
-            bottom: viewMode === 'tool-builder' || viewMode === 'agent-builder' || showMessagesArea ? '0px' : 'calc(50% + 2rem)',
-          }}
+          style={{ bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)' }}
         >
           <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
             <ConversationMessageInput
@@ -1093,14 +495,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               conversationId={currentConversationId}
               onConversationStart={handleConversationStart}
               onToggleToolForm={handleToggleToolBuilder}
-              isToolFormOpen={viewMode === 'tool-builder' || viewMode === 'agent-builder'}
+              isToolFormOpen={false}
               disabled={!selectedAgent}
-              minimal={viewMode === 'tool-builder' || viewMode === 'agent-builder' || showMessagesArea}
-              onFocus={() => (viewMode === 'tool-builder' || viewMode === 'agent-builder') && !uiStreaming && setIsMessageOverlayExpanded(true)}
-              onBlur={() => setIsMessageOverlayExpanded(false)}
+              minimal={showMessagesArea}
+              onFocus={() => {}}
+              onBlur={() => {}}
               onToggleOverlay={handleToggleOverlay}
-              showExpandableOverlay={viewMode === 'tool-builder' || viewMode === 'agent-builder'}
-              isOverlayExpanded={isMessageOverlayExpanded}
+              showExpandableOverlay={false}
+              isOverlayExpanded={false}
               budgetTokens={budgetTokens}
             >
               {/* Footer Content - Agent Selector */}

@@ -33,10 +33,7 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
     }
   }
   return (
-    <section
-      aria-labelledby="ship-hero"
-      className={cn('relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-primary/10 via-background to-background p-6', 'shadow-sm', className)}
-    >
+    <section aria-labelledby="ship-hero" className={cn('relative overflow-hidden rounded-2xl frosted-glass-card shadow-frosted-lg border border-border/80 p-6', className)}>
       {/* Decorative gradient overlay */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.15),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(168,85,247,0.12),transparent_35%)]" />
 

@@ -35,6 +35,11 @@ export class StreamingService {
   private static instance: StreamingService | null = null;
   private connections: Map<string, ConnectionInfo> = new Map();
 
+  // Resume ring buffer: store recent logical events per conversation (no per-event IDs)
+  private eventBuffers: Map<string, Array<{ type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action'; payload: any }>> = new Map();
+  private readonly bufferLimit: number = 300; // retain recent events per conversation
+  private suppressBuffering: boolean = false; // used during replay to avoid re-buffering
+
   /**
    * Constructor that enforces singleton pattern
    * Always returns the same instance when called with 'new'
@@ -129,6 +134,10 @@ export class StreamingService {
   async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
+      // Buffer logical (pre-normalization) delta
+      this.bufferLogicalEvent(streamId, 'delta', delta);
+
+      // Normalize for this connection and send
       const normalized = this.normalizeDelta(streamId, delta);
       this.sendEventToStream(streamId, connection.res, 'delta', normalized);
     }
@@ -148,6 +157,7 @@ export class StreamingService {
   async broadcastMessage(streamId: string, message: any): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
+      this.bufferLogicalEvent(streamId, 'message', message);
       this.sendEventToStream(streamId, connection.res, 'message', message);
     }
   }
@@ -166,6 +176,7 @@ export class StreamingService {
   async broadcastUIAction(streamId: string, payload: any): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
+      this.bufferLogicalEvent(streamId, 'ui_action', payload);
       this.sendEventToStream(streamId, connection.res, 'ui_action', payload);
     }
   }
@@ -257,6 +268,7 @@ export class StreamingService {
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
+      this.bufferLogicalEvent(streamId, 'complete', finalResponse);
       this.sendEventToStream(streamId, connection.res, 'complete', finalResponse);
     }
   }
@@ -268,6 +280,7 @@ export class StreamingService {
   async broadcastError(streamId: string, error: StreamingError): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
+      this.bufferLogicalEvent(streamId, 'error', error);
       this.sendEventToStream(streamId, connection.res, 'error', error);
     }
   }
@@ -303,6 +316,74 @@ export class StreamingService {
       }
     } catch (error) {
       console.error(`[StreamingService] Failed to send event to ${streamId}:`, error);
+    }
+  }
+
+  /** Emit a resume_token event */
+  sendResumeToken(streamId: string, token: string): void {
+    const connection = this.connections.get(streamId);
+    if (!connection || connection.res.destroyed) return;
+    // Do not buffer tokens; they are ephemeral hints
+    this.sendEventToStream(streamId, connection.res, 'resume_token', token);
+  }
+
+  /**
+   * Replay buffered logical events to the current active connection for the stream,
+   * starting AFTER a given Last-Event-ID (exclusive). If fromId is 0 or missing,
+   * replays the entire buffer.
+   */
+  async replayBufferedEvents(streamId: string, filter?: (evt: { type: string; payload: any }) => boolean): Promise<void> {
+    const connection = this.connections.get(streamId);
+    if (!connection || connection.res.destroyed) return;
+
+    const buffer = this.eventBuffers.get(streamId) || [];
+    if (buffer.length === 0) return;
+
+    // Suppress buffering while replaying to avoid duplicating into the buffer
+    this.suppressBuffering = true;
+    try {
+      for (const evt of buffer) {
+        if (filter && !filter(evt)) continue;
+        switch (evt.type) {
+          case 'delta': {
+            const normalized = this.normalizeDelta(streamId, evt.payload as Operation);
+            this.sendEventToStream(streamId, connection.res, 'delta', normalized);
+            break;
+          }
+          case 'message': {
+            this.sendEventToStream(streamId, connection.res, 'message', evt.payload);
+            break;
+          }
+          case 'complete': {
+            this.sendEventToStream(streamId, connection.res, 'complete', evt.payload);
+            break;
+          }
+          case 'error': {
+            this.sendEventToStream(streamId, connection.res, 'error', evt.payload);
+            break;
+          }
+          case 'ui_action': {
+            this.sendEventToStream(streamId, connection.res, 'ui_action', evt.payload);
+            break;
+          }
+        }
+      }
+    } finally {
+      this.suppressBuffering = false;
+    }
+  }
+
+  /** Buffer a logical event for potential replay */
+  private bufferLogicalEvent(streamId: string, type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action', payload: any): void {
+    if (this.suppressBuffering) return;
+    let buf = this.eventBuffers.get(streamId);
+    if (!buf) {
+      buf = [];
+      this.eventBuffers.set(streamId, buf);
+    }
+    buf.push({ type, payload });
+    if (buf.length > this.bufferLimit) {
+      buf.splice(0, buf.length - this.bufferLimit);
     }
   }
 

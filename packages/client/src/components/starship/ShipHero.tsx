@@ -48,30 +48,29 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
             <span>Gaia: Agent Creator</span>
           </div>
           <h2 id="ship-hero" className="text-2xl md:text-3xl font-bold tracking-tight">
-            Design and deploy Agent instances with Gaia
+            Create agents with Gaia
           </h2>
           <p className="mt-2 text-sm md:text-base text-muted-foreground">
-            Gaia designs and scaffolds Agent instances for this starship. Define the system prompt and model, assign tools by slug, add an optional blueprint, and validate with blueprint lint and Test
-            Agent before deployment.
+            Tell Gaia what you want your agent to do. It helps you set it up, choose a model, connect the right tools, and get it ready to use on this ship.
           </p>
 
           {/* Benefits */}
           <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <li className="flex items-start gap-2">
-              <Icon name="wand2" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Scaffold, edit, and test agents end‑to‑end</span>
+              <Icon name="store" className="h-4 w-4 text-primary mt-0.5" />
+              <span>Start fast with ready‑made templates</span>
             </li>
             <li className="flex items-start gap-2">
-              <Icon name="folder-plus" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Start from the Gaia template or adapt other templates</span>
+              <Icon name="user-cog" className="h-4 w-4 text-primary mt-0.5" />
+              <span>Shape the agent’s behavior in plain language</span>
             </li>
             <li className="flex items-start gap-2">
               <Icon name="wrench" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Assign tools by slug; keep config in env variables</span>
+              <span>Connect the tools your agent needs</span>
             </li>
             <li className="flex items-start gap-2">
               <Icon name="rocket" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Deploy directly to this starship</span>
+              <span>Launch to your ship in one click</span>
             </li>
           </ul>
 
@@ -95,7 +94,7 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
             onCreateFromTemplate={handleCreateFromTemplate}
             trigger={
               <Button size="sm" variant="outline" disabled={!starshipId} className="whitespace-nowrap">
-                <Icon name="library" className="h-4 w-4" />
+                <Icon name="store" className="h-4 w-4" />
                 <span className="ml-1">Browse agent templates</span>
               </Button>
             }

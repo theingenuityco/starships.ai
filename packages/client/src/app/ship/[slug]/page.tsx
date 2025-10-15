@@ -105,7 +105,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                     <span>Ship</span>
                   </TabsTrigger>
                   <TabsTrigger value="agents" className="gap-2 rounded-xl px-4 py-2">
-                    <Icon name="bot" className="h-4 w-4" />
+                    <Icon name="user-cog" className="h-4 w-4" />
                     <span>Agents</span>
                   </TabsTrigger>
                   <TabsTrigger value="tools" className="gap-2 rounded-xl px-4 py-2">
@@ -320,7 +320,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h2 id="agents-list" className="text-lg font-semibold flex items-center gap-2">
-                        <Icon name="bot" className="h-5 w-5 text-primary" />
+                        <Icon name="user-cog" className="h-5 w-5 text-primary" />
                         Agents
                       </h2>
                       <p className="text-sm text-muted-foreground mt-1">Manage and view all agents in this starship</p>
@@ -392,7 +392,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   <AgentAvatar seed={selectedAgent.name} size={24} />
                 </Avatar>
               ) : (
-                <Icon name="bot" className="h-5 w-5 text-primary" />
+                <Icon name="user-cog" className="h-5 w-5 text-primary" />
               )}
               {selectedAgent?.name}
             </DialogTitle>

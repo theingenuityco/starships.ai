@@ -5,7 +5,6 @@ import Icon from '@/components/primitives/Icon'
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import type { WalletModel } from '@starships/protocol'
@@ -46,40 +45,37 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
         <div className="max-w-2xl">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
             <Icon name="sparkles" className="h-3.5 w-3.5" />
-            <span>Gaia Agent Builder</span>
+            <span>Gaia: Agent Creator</span>
           </div>
           <h2 id="ship-hero" className="text-2xl md:text-3xl font-bold tracking-tight">
-            Ship-grade AI agents in minutes
+            Design and deploy Agent instances with Gaia
           </h2>
           <p className="mt-2 text-sm md:text-base text-muted-foreground">
-            Gaia turns natural language into production-ready agents. Start from proven templates, customize behavior, connect tools, and deploy to your starship—without the busywork.
+            Gaia designs and scaffolds Agent instances for this starship. Define the system prompt and model, assign tools by slug, add an optional blueprint, and validate with blueprint lint and Test
+            Agent before deployment.
           </p>
 
           {/* Benefits */}
           <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <li className="flex items-start gap-2">
               <Icon name="wand2" className="h-4 w-4 text-primary mt-0.5" />
-              <span>No-code to powerful: describe, generate, refine</span>
+              <span>Scaffold, edit, and test agents end‑to‑end</span>
             </li>
             <li className="flex items-start gap-2">
               <Icon name="folder-plus" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Template library for common workflows</span>
+              <span>Start from the Gaia template or adapt other templates</span>
             </li>
             <li className="flex items-start gap-2">
               <Icon name="wrench" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Plug in tools and data securely</span>
+              <span>Assign tools by slug; keep config in env variables</span>
             </li>
             <li className="flex items-start gap-2">
               <Icon name="rocket" className="h-4 w-4 text-primary mt-0.5" />
-              <span>Deploy instantly to this ship</span>
+              <span>Deploy directly to this starship</span>
             </li>
           </ul>
 
-          {/* Ship identity (subtle) */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <Badge variant="outline">/{slug}</Badge>
-            {starshipId && <Badge variant="secondary">ID: {starshipId.slice(0, 8)}…</Badge>}
-          </div>
+          {/* Ship identity removed per request */}
         </div>
 
         {/* Gaia-focused actions */}
@@ -100,7 +96,7 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
             trigger={
               <Button size="sm" variant="outline" disabled={!starshipId} className="whitespace-nowrap">
                 <Icon name="library" className="h-4 w-4" />
-                <span className="ml-1">Browse Gaia templates</span>
+                <span className="ml-1">Browse agent templates</span>
               </Button>
             }
           />

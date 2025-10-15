@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
-import { DailyUsageCostSparkline } from '@/components/billing/DailyUsageCostSparkline'
+import DailyUsageCalendarHeatmap from '@/components/billing/DailyUsageCalendarHeatmap'
 import { UsageKpiCards } from '@/components/profile/UsageKpiCards'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipUsageViewModel } from '@/hooks/useStarshipUsageViewModel'
@@ -122,9 +122,14 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 {/* Top Row - 4 Column Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Conversation Activity Card */}
-                  <ConversationActivityCard starshipSlug={slug} recentConversation={conversations.length > 0 ? conversations[0] : null} conversationCount={conversations.length} />
+                  <ConversationActivityCard
+                    starshipSlug={slug}
+                    recentConversation={conversations.length > 0 ? conversations[0] : null}
+                    conversationCount={conversations.length}
+                    className="lg:col-span-2"
+                  />
 
-                  <Card className="frosted-glass-card shadow-frosted-lg">
+                  <Card className="frosted-glass-card shadow-frosted-lg lg:col-span-2">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex flex-col gap-2">
@@ -151,8 +156,8 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                         </Button>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-0 space-y-2">
-                      <DailyUsageCostSparkline starshipId={starshipId} inline />
+                    <CardContent className="pt-0">
+                      <DailyUsageCalendarHeatmap starshipId={starshipId} weeks={12} cellSize={9} />
                     </CardContent>
                   </Card>
                 </div>

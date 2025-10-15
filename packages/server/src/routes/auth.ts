@@ -288,8 +288,9 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
     const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
     const result = await registrationOrchestrator.completeEmailVerification(token);
 
-    // Redirect based on orchestrator result
-    const redirectUrl = `${env.PUBLIC_URL}${result.redirectPath}`;
+    // Simple redirect logic - always redirect to home page
+    // The client-side routing will handle authentication state appropriately
+    const redirectUrl = `${env.PUBLIC_URL}/`;
     return res.redirect(redirectUrl);
   } catch (error: any) {
     logger.error('[EMAIL-VERIFY] Error:', { error });

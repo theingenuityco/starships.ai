@@ -157,7 +157,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      <DailyUsageCalendarHeatmap starshipId={starshipId} weeks={12} cellSize={9} />
+                      <DailyUsageCalendarHeatmap starshipId={starshipId} weeks={52} cellSize={7} />
                     </CardContent>
                   </Card>
                 </div>

@@ -332,7 +332,15 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                     </div>
                   </div>
 
-                  <AgentSelector selectedAgent={selectedAgent} onAgentSelect={setSelectedAgent} showCreateButton={true} showFilters={true} starshipId={starshipId} />
+                  <AgentSelector
+                    selectedAgent={selectedAgent}
+                    onAgentSelect={agent => {
+                      router.push(`/ship/${slug}/agent/${agent.slug}`)
+                    }}
+                    showCreateButton={true}
+                    showFilters={true}
+                    starshipId={starshipId}
+                  />
                 </section>
               </TabsContent>
 

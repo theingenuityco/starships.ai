@@ -28,8 +28,6 @@ type SecurityCardProps = {
   
   // New OAuth functionality
   onSetPassword: () => void
-  onConnectOAuth?: (provider: 'google' | 'github') => void
-  onManageSessions?: () => void
 }
 
 export default function SecurityCard({ 
@@ -44,14 +42,9 @@ export default function SecurityCard({
   saving, 
   cancelPasswordEdit, 
   currentPasswordRef,
-  onSetPassword,
-  onConnectOAuth,
-  onManageSessions
+  onSetPassword
 }: SecurityCardProps) {
   const errorInput = 'border-destructive focus-visible:ring-destructive aria-[invalid=true]:border-destructive'
-  const hasOAuth = authMethods.some(m => ['google', 'github'].includes(m))
-  const isPasswordOnly = hasPassword && !hasOAuth
-  const isHybrid = hasPassword && hasOAuth
 
   return (
     <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
@@ -174,56 +167,6 @@ export default function SecurityCard({
           </div>
         )}
 
-        {/* PASSWORD-ONLY USERS: CONNECT OAUTH */}
-        {isPasswordOnly && onConnectOAuth && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Icon name="plus" className="h-4 w-4 text-primary" />
-              <div>
-                <p className="text-sm font-medium">Connect Additional Accounts</p>
-                <p className="text-xs text-muted-foreground">
-                  Add Google or GitHub for easier sign-in options
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={() => onConnectOAuth('google')}
-              >
-                <Icon name="chrome" className="h-3 w-3 mr-1" />
-                Connect Google
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={() => onConnectOAuth('github')}
-              >
-                <Icon name="github" className="h-3 w-3 mr-1" />
-                Connect GitHub
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* SESSION MANAGEMENT (ALL USERS) */}
-        {onManageSessions && (
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div>
-              <p className="text-sm font-medium">Active Sessions</p>
-              <p className="text-xs text-muted-foreground">
-                Manage your active login sessions
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={onManageSessions}>
-              Manage
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   )

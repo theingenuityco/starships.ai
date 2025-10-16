@@ -255,6 +255,7 @@ export function LoginForm() {
                     placeholder="captain@starships.ai"
                     disabled={isLoading}
                     required
+                    className="h-12"
                   />
                 </div>
 
@@ -270,6 +271,7 @@ export function LoginForm() {
                       placeholder="Enter your password"
                       disabled={isLoading}
                       required
+                      className="h-12"
                     />
                     <Button
                       type="button"
@@ -284,13 +286,13 @@ export function LoginForm() {
                   </div>
                 </div>
 
-                {(formError || error) && (
+                {(formError || (error && !autoSwitchedToRegister)) && (
                   <Alert variant="destructive">
                     <AlertDescription>{formError || error}</AlertDescription>
                   </Alert>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Signing in...</>
                   ) : (
@@ -304,11 +306,6 @@ export function LoginForm() {
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4">
-              {autoSwitchedToRegister && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertDescription className="text-blue-800">No account found with that email address. Please create a new account below.</AlertDescription>
-                </Alert>
-              )}
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>
@@ -320,6 +317,7 @@ export function LoginForm() {
                     placeholder="Captain Starship"
                     disabled={isLoading}
                     required
+                    className="h-12"
                   />
                 </div>
 
@@ -333,6 +331,7 @@ export function LoginForm() {
                     placeholder="captain@starships.ai"
                     disabled={isLoading}
                     required
+                    className="h-12"
                   />
                 </div>
 
@@ -348,6 +347,7 @@ export function LoginForm() {
                       disabled={isLoading}
                       required
                       minLength={8}
+                      className="h-12"
                     />
                     <Button
                       type="button"
@@ -373,6 +373,7 @@ export function LoginForm() {
                       placeholder="Confirm your password"
                       disabled={isLoading}
                       required
+                      className="h-12"
                     />
                     <Button
                       type="button"
@@ -393,7 +394,7 @@ export function LoginForm() {
                   </Alert>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Creating account...</>
                   ) : (

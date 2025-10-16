@@ -22,7 +22,5 @@ export {
 export {
   EmailVerificationError,
   InvalidTokenError,
-  TokenNotFoundError,
-  UserAlreadyVerifiedError,
   EmailVerificationSendError
 } from './EmailVerificationErrors';

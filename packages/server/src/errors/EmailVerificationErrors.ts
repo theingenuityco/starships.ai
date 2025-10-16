@@ -5,7 +5,7 @@
  * Extends the base error classes from @starships/errors.
  */
 
-import { ValidationError, NotFoundError } from '@starships/errors';
+import { ValidationError } from '@starships/errors';
 
 /**
  * Base Email Verification Error
@@ -27,25 +27,6 @@ export class InvalidTokenError extends EmailVerificationError {
   }
 }
 
-/**
- * Token not found error
- */
-export class TokenNotFoundError extends NotFoundError {
-  constructor(tokenId: string = 'unknown', cause?: Error) {
-    super('Verification token', tokenId, cause);
-    this.name = 'TokenNotFoundError';
-  }
-}
-
-/**
- * User already verified error
- */
-export class UserAlreadyVerifiedError extends EmailVerificationError {
-  constructor(message: string = 'User email is already verified', details?: unknown, cause?: Error) {
-    super(message, 'USER_ALREADY_VERIFIED', details, cause);
-    this.name = 'UserAlreadyVerifiedError';
-  }
-}
 
 /**
  * Email verification send error

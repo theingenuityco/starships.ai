@@ -235,6 +235,7 @@ export function LoginForm() {
             onValueChange={value => {
               setActiveTab(value)
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
+              setFormError(null) // Clear form errors when switching tabs
             }}
           >
             <TabsList className="grid w-full grid-cols-2">

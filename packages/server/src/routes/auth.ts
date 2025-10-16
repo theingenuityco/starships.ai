@@ -120,7 +120,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     // Get user with password
     const user = await UserService.getUserByEmailWithPassword(email);
     if (!user || !user.password) {
-      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
+      return sendError(res, 'AUTHENTICATION_FAILED', 'No account found with this email address. Please sign up first.', 401);
     }
 
     // Verify password

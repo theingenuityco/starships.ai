@@ -10,9 +10,10 @@ import { Card } from '@/components/ui/card'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
-
+import { toast } from '@/hooks/useToast'
 import { motion } from 'motion/react'
 import { lazy, memo, Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 const StarfieldBackground = lazy(() =>
   import('@/components/StarfieldBackground').then(module => ({
     default: module.StarfieldBackground,
@@ -53,6 +54,7 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   const [launching, setLaunching] = useState(false)
   const { isAuthenticated, isLoading, userName, userId } = useAuth()
+  const searchParams = useSearchParams()
 
   // Use TanStack Query to fetch starships - only when authenticated
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(userId || '', !!userId && isAuthenticated)
@@ -61,7 +63,26 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    
+    // Check for email verification success parameter
+    const verification = searchParams?.get('verification')
+    if (verification === 'success') {
+      // Show success toast notification
+      toast({
+        title: 'Email Verified Successfully!',
+        description: 'Your email address has been verified. You can now access your account.',
+        variant: 'success',
+        duration: 8000
+      })
+      
+      // Clean up the URL parameter without triggering a page reload
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('verification')
+        window.history.replaceState({}, '', url.toString())
+      }
+    }
+  }, [searchParams])
 
   if (!mounted || isLoading) return null
 

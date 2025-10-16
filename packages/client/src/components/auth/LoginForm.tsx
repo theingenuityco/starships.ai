@@ -76,13 +76,11 @@ export function LoginForm() {
 
     // Prevent duplicate handling (synchronous check with ref)
     if (oauthHandledRef.current) {
-      console.log('[OAuth] Already handled, skipping')
       return
     }
 
     if (authCode) {
       oauthHandledRef.current = true
-      console.log('[OAuth] Exchanging authorization code for JWT token (secure)')
       // ✅ SECURE: Exchange authorization code for JWT via POST request
       oauthLogin(authCode)
     } else if (oauthError) {

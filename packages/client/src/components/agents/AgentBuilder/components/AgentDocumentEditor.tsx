@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { MarkdownEditor } from '@/components/ui/markdown-editor'
+import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { ModelSelector } from './ModelSelector'
 import { CategorySelector } from './CategorySelector'
 import { IconSelector } from './IconSelector'
@@ -59,15 +59,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       {/* Description */}
       <div className="space-y-2">
         <Label className="text-xs font-medium">Description</Label>
-        <MarkdownEditor
-          id="agent-description"
-          value={value.description}
-          onChange={val => onChange({ ...value, description: val })}
-          placeholder="Write a clear description. Markdown supported."
-          minHeightPx={140}
-          showToolbar={false}
-          borderless={true}
-        />
+        <RichMarkdownEditor value={value.description} onChange={val => onChange({ ...value, description: val })} placeholder="Write a clear description. Markdown supported." minHeightPx={140} />
       </div>
 
       {/* Model & generation settings */}
@@ -109,16 +101,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       {/* System Prompt */}
       <div className="space-y-2">
         <Label className="text-xs font-medium">System Prompt</Label>
-        <MarkdownEditor
-          id="agent-system-prompt"
-          value={value.systemPrompt}
-          onChange={val => onChange({ ...value, systemPrompt: val })}
-          placeholder="Define the agent's character, mission, and behavior..."
-          minHeightPx={200}
-          showToolbar={true}
-          borderless={true}
-          allowPreviewToggle={false}
-        />
+        <RichMarkdownEditor value={value.systemPrompt} onChange={val => onChange({ ...value, systemPrompt: val })} placeholder="Define the agent's character, mission, and behavior..." minHeightPx={200} />
       </div>
 
       {/* Tools */}

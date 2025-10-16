@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useTheme } from 'next-themes'
+import { getMarkdownComponents } from '@/components/markdown/markdownComponents'
 
 interface MarkdownEditorProps {
   id?: string
@@ -17,11 +19,25 @@ interface MarkdownEditorProps {
   showToolbar?: boolean
   borderless?: boolean
   allowPreviewToggle?: boolean
+  // When true, render Markdown live underneath the input in the same surface
+  renderWhileEditing?: boolean
 }
 
-export function MarkdownEditor({ id, value, onChange, placeholder, className, minHeightPx = 120, showToolbar = true, borderless = false, allowPreviewToggle = true }: MarkdownEditorProps) {
+export function MarkdownEditor({
+  id,
+  value,
+  onChange,
+  placeholder,
+  className,
+  minHeightPx = 120,
+  showToolbar = true,
+  borderless = false,
+  allowPreviewToggle = true,
+  renderWhileEditing = false,
+}: MarkdownEditorProps) {
   const [showPreview, setShowPreview] = useState<boolean>(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { theme } = useTheme()
 
   const applyWrap = (prefix: string, suffix?: string) => {
     const textarea = textareaRef.current
@@ -52,6 +68,68 @@ export function MarkdownEditor({ id, value, onChange, placeholder, className, mi
     const next = `${before}${lines.join('\n')}${after}`
     onChange(next)
     requestAnimationFrame(() => textarea.focus())
+  }
+
+  // WYSIWYG mode removed: keeping overlay/live-render markdown editor only
+
+  // Overlay mode: render markdown and editable textarea in the same surface
+  if (renderWhileEditing) {
+    return (
+      <div className={cn(borderless ? 'rounded-none border-none overflow-visible' : 'rounded-lg border border-border/60 overflow-hidden', className)}>
+        {showToolbar && (
+          <div className="flex items-center gap-1 p-1.5 bg-muted/40 border-b border-border/60">
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyWrap('**')} title="Bold (wrap with **)">
+              B
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyWrap('*')} title="Italic (wrap with *)">
+              <span className="italic">I</span>
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyWrap('`')} title="Inline code (wrap with `)">
+              <code className="text-xs">{`</>`}</code>
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyLinePrefix('#')} title="Heading">
+              H1
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyLinePrefix('##')} title="Subheading">
+              H2
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyLinePrefix('-')} title="Bullet list">
+              •
+            </Button>
+            <div className="flex-1" />
+          </div>
+        )}
+        <div className={cn('relative', borderless ? '' : 'bg-background')} style={{ minHeight: `${minHeightPx}px` }}>
+          {/* Rendered markdown underneath */}
+          <div className={cn('pointer-events-none', borderless ? 'p-0' : 'p-3')} aria-hidden>
+            {value?.trim() ? (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={getMarkdownComponents({ theme, enableLinkPreview: true })}>
+                  {value}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">{placeholder || 'Write with Markdown…'}</p>
+            )}
+          </div>
+          {/* Transparent textarea on top capturing input */}
+          <Textarea
+            id={id}
+            ref={textareaRef}
+            placeholder={placeholder}
+            value={value}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
+            className={cn(
+              // Make text transparent so the rendered markdown is visible; keep caret visible
+              'absolute inset-0 w-full h-full bg-transparent text-transparent caret-foreground selection:bg-primary/20 resize-none',
+              borderless ? 'border-none focus-visible:ring-0 focus-visible:ring-offset-0' : ''
+            )}
+            // Ensure the textarea overlays the rendered markdown and matches padding for correct caret position
+            style={{ minHeight: `${minHeightPx}px`, padding: borderless ? undefined : '0.75rem' }}
+          />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -85,8 +163,16 @@ export function MarkdownEditor({ id, value, onChange, placeholder, className, mi
         </div>
       )}
       {allowPreviewToggle && showPreview ? (
-        <div className={cn('prose prose-sm dark:prose-invert max-w-none bg-background', borderless ? 'p-0' : 'p-3')} style={{ minHeight: `${minHeightPx}px` }}>
-          {value?.trim() ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown> : <p className="text-xs text-muted-foreground">Nothing to preview</p>}
+        <div className={cn('bg-background', borderless ? 'p-0' : 'p-3')} style={{ minHeight: `${minHeightPx}px` }}>
+          {value?.trim() ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={getMarkdownComponents({ theme, enableLinkPreview: true })}>
+                {value}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Nothing to preview</p>
+          )}
         </div>
       ) : (
         <Textarea

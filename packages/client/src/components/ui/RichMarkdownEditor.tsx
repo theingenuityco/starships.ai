@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { BubbleMenu, FloatingMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
@@ -41,6 +41,7 @@ type RichMarkdownEditorProps = {
 }
 
 export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with Markdown…', className, minHeightPx = 200 }: RichMarkdownEditorProps) {
+  const suppressUpdateRef = useRef<boolean>(true)
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -64,6 +65,7 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
       },
     },
     onUpdate: ({ editor }) => {
+      if (suppressUpdateRef.current) return
       try {
         const md = (editor.storage as any)?.markdown?.getMarkdown?.()
         if (typeof md === 'string') onChange(md)
@@ -76,9 +78,19 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
     try {
       const md = (editor.storage as any)?.markdown?.getMarkdown?.()
       if (typeof value === 'string' && typeof md === 'string' && value !== md) {
+        suppressUpdateRef.current = true
         editor.commands.setContent(value)
+        // Allow editor to settle before emitting updates again
+        requestAnimationFrame(() => {
+          suppressUpdateRef.current = false
+        })
+      } else if (suppressUpdateRef.current) {
+        // Initial mount done; enable updates
+        suppressUpdateRef.current = false
       }
-    } catch {}
+    } catch {
+      suppressUpdateRef.current = false
+    }
   }, [editor, value])
 
   if (!editor) return null

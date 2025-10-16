@@ -1,14 +1,28 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { AgentFormData, FormErrors } from '../types'
 import { INITIAL_FORM_DATA } from '../constants'
 
 interface UseAgentFormProps {
   onSave?: (data: AgentFormData) => void
+  persistenceKey?: string
 }
 
-export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
-  const [formData, setFormData] = useState<AgentFormData>(INITIAL_FORM_DATA)
+export const useAgentForm = ({ onSave, persistenceKey }: UseAgentFormProps) => {
+  // Initialize from localStorage draft if available
+  const [formData, setFormData] = useState<AgentFormData>(() => {
+    if (typeof window === 'undefined' || !persistenceKey) return INITIAL_FORM_DATA
+    try {
+      const raw = window.localStorage.getItem(`agentBuilder:draft:${persistenceKey}`)
+      if (!raw) return INITIAL_FORM_DATA
+      const parsed = JSON.parse(raw)
+      // Basic shape merge to avoid missing keys
+      return { ...INITIAL_FORM_DATA, ...(parsed as Partial<AgentFormData>) }
+    } catch {
+      return INITIAL_FORM_DATA
+    }
+  })
   const [errors, setErrors] = useState<FormErrors>({})
+  const saveTimerRef = useRef<number | null>(null)
 
   const handleFieldChange = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
     setFormData(prev => {
@@ -80,13 +94,25 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
   const handleSave = useCallback(() => {
     if (validateForm()) {
       onSave?.(formData)
+      // Clear draft on successful save
+      if (typeof window !== 'undefined' && persistenceKey) {
+        try {
+          window.localStorage.removeItem(`agentBuilder:draft:${persistenceKey}`)
+        } catch {}
+      }
     }
-  }, [validateForm, onSave, formData])
+  }, [validateForm, onSave, formData, persistenceKey])
 
   const resetForm = useCallback(() => {
     setFormData(INITIAL_FORM_DATA)
     setErrors({})
-  }, [])
+    // Clear draft on reset
+    if (typeof window !== 'undefined' && persistenceKey) {
+      try {
+        window.localStorage.removeItem(`agentBuilder:draft:${persistenceKey}`)
+      } catch {}
+    }
+  }, [persistenceKey])
 
   const updateField = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
     setFormData(prev => {
@@ -110,6 +136,29 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
       return newErrors
     })
   }, [])
+
+  // Debounced persistence of formData to localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined' || !persistenceKey) return
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    // Avoid saving obviously empty initial state to not overwrite existing drafts
+    const isEmptyInitial = formData.name === '' && formData.slug === '' && formData.description === '' && formData.systemPrompt === '' && (formData.assignedToolSlugs || []).length === 0
+    if (isEmptyInitial) return
+    saveTimerRef.current = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(`agentBuilder:draft:${persistenceKey}`, JSON.stringify(formData))
+      } catch {}
+    }, 300)
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+    }
+  }, [formData, persistenceKey])
 
   return {
     formData,

@@ -439,7 +439,21 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           provider
         });
         
-        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=success&provider=${provider}`);
+        // Get user's first starship to redirect back to the proper context
+        let redirectPath = '/profile';
+        try {
+          const starshipRepo = new StarshipRepository();
+          const userStarships = await starshipRepo.findByOwner(userId);
+          const firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0];
+          
+          if (firstStarship) {
+            redirectPath = `/ship/${firstStarship.slug}/settings/profile`;
+          }
+        } catch (error) {
+          logger.warn('[OAUTH-LINKING] Failed to get starship for redirect, using default profile page', { error });
+        }
+        
+        return res.redirect(`${env.PUBLIC_URL}${redirectPath}?oauth_link=success&provider=${provider}`);
       } catch (error: any) {
         logger.error('[OAUTH-LINKING] Failed to link account', { 
           userId, 
@@ -447,7 +461,21 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           errorType: error.constructor.name
         });
         
-        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=linking_failed`);
+        // Get user's first starship for error redirect too
+        let errorRedirectPath = '/profile';
+        try {
+          const starshipRepo = new StarshipRepository();
+          const userStarships = await starshipRepo.findByOwner(userId);
+          const firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0];
+          
+          if (firstStarship) {
+            errorRedirectPath = `/ship/${firstStarship.slug}/settings/profile`;
+          }
+        } catch (error) {
+          logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', { error });
+        }
+        
+        return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=linking_failed`);
       }
     }
 

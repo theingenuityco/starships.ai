@@ -1,7 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -74,7 +74,6 @@ export function LoginForm() {
     const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
 
-
     // Prevent duplicate handling (synchronous check with ref)
     if (oauthHandledRef.current) {
       console.log('[OAuth] Already handled, skipping')
@@ -116,7 +115,7 @@ export function LoginForm() {
 
     if (!result.success) {
       const errorMessage = result.error || 'Login failed'
-      
+
       // Check if user doesn't exist - offer to switch to registration
       if (errorMessage.includes('No account found') || errorMessage.includes('Please sign up first')) {
         setFormError(null) // Clear error since we're handling it gracefully
@@ -127,7 +126,7 @@ export function LoginForm() {
         setAutoSwitchedToRegister(true)
         return
       }
-      
+
       setFormError(errorMessage)
     }
   }
@@ -205,27 +204,22 @@ export function LoginForm() {
           {/* OAuth buttons ABOVE existing tabs */}
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
-
           {emailVerificationStatus && (
-            <Alert className="mb-4 border-emerald-200 bg-emerald-50">
-              <Icon name="check-circle" className="h-4 w-4" />
-              <div className="space-y-3">
-                <AlertTitle className="text-emerald-900 font-medium">
-                  Registration successful! We&apos;ve sent a verification email to:
-                </AlertTitle>
+            <Alert className="mb-3 border-emerald-200 bg-emerald-50/50 backdrop-blur-sm text-center">
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-center space-x-2 flex-wrap">
+                  <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
+                  <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
+                  <span className="font-medium text-gray-900 text-sm break-all">{emailVerificationStatus.email}</span>
+                </div>
                 <AlertDescription>
-                  <div className="bg-white border border-emerald-200 rounded-md px-4 py-3 mb-4">
-                    <p className="font-medium text-gray-900 text-center">
-                      {emailVerificationStatus.email}
-                    </p>
-                  </div>
                   <div className="flex justify-center">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleResendVerification(emailVerificationStatus.email)}
                       disabled={isLoading}
-                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors"
                     >
                       <Icon name="mail" className="h-4 w-4 mr-2" />
                       {isLoading ? 'Sending...' : 'Resend Email'}
@@ -236,10 +230,13 @@ export function LoginForm() {
             </Alert>
           )}
 
-          <Tabs value={activeTab} onValueChange={(value) => {
-            setActiveTab(value)
-            setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
-          }}>
+          <Tabs
+            value={activeTab}
+            onValueChange={value => {
+              setActiveTab(value)
+              setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
+            }}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Sign Up</TabsTrigger>
@@ -261,7 +258,8 @@ export function LoginForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password">Password
+                  </Label>
                   <div className="relative">
                     <Input
                       id="login-password"
@@ -307,9 +305,7 @@ export function LoginForm() {
             <TabsContent value="register" className="space-y-4">
               {autoSwitchedToRegister && (
                 <Alert className="border-blue-200 bg-blue-50">
-                  <AlertDescription className="text-blue-800">
-                    No account found with that email address. Please create a new account below.
-                  </AlertDescription>
+                  <AlertDescription className="text-blue-800">No account found with that email address. Please create a new account below.</AlertDescription>
                 </Alert>
               )}
               <form onSubmit={handleRegister} className="space-y-4">

@@ -662,6 +662,82 @@
   background: hsl(var(--primary) / 0.5);
 }
 
+.toastui-editor-defaultUI .toastui-editor-toolbar {
+  background: hsl(var(--secondary));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.toastui-editor-toolbar-icons {
+  background-color: transparent !important;
+}
+
+.toastui-editor-toolbar-icons:hover {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.toastui-editor-contents {
+  color: hsl(var(--foreground));
+}
+
+.toastui-editor-defaultUI .ProseMirror {
+  background: transparent;
+}
+
+.toastui-editor-defaultUI .toastui-editor-main {
+  border-top: 0;
+}
+
+.toastui-editor-defaultUI .toastui-editor-md-tab-container,
+.toastui-editor-defaultUI .toastui-editor-tabs {
+  background: hsl(var(--secondary));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.toastui-editor-defaultUI .tab-item {
+  color: hsl(var(--muted-foreground));
+}
+
+.toastui-editor-defaultUI .tab-item.active {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--primary));
+}
+
+.toastui-editor-defaultUI .toastui-editor-mode-switch {
+  display: none; /* we hide mode switch in our config */
+}
+
+.toastui-editor-defaultUI .toastui-editor-statusbar {
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Headings and code to match our prose */
+.toastui-editor-contents h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.toastui-editor-contents h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.toastui-editor-contents h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.toastui-editor-contents code {
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+.toastui-editor-contents pre {
+  background: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+/* Dark mode adjustments */
+
 /*
  * ACCESSIBILITY UTILITIES - IMPLEMENTED
  * ====================================

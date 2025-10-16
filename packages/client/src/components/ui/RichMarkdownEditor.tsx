@@ -61,7 +61,8 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: cn('tiptap-content focus:outline-none'),
+        // Align editor content typography with conversation/body text
+        class: cn('tiptap-content focus:outline-none text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none break-words'),
       },
     },
     onUpdate: ({ editor }) => {
@@ -96,7 +97,7 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
   if (!editor) return null
 
   return (
-    <div className={cn('bg-transparent rounded-none border-none px-1', className)}>
+    <div className={cn('bg-transparent rounded-none border-none px-0', className)}>
       <BubbleMenu editor={editor}>
         <div className="flex items-center gap-1 rounded-md bg-popover border border-border p-1 shadow-sm">
           <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={cn(editor.isActive('bold') && 'bg-muted')}>
@@ -174,7 +175,7 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
           </Button>
         </div>
       </FloatingMenu>
-      <EditorContent editor={editor} className="min-h-[200px] px-0 py-3" style={{ minHeight: `${minHeightPx}px` }} />
+      <EditorContent editor={editor} className="min-h-[200px] px-0 py-2 text-sm leading-relaxed" style={{ minHeight: `${minHeightPx}px` }} />
     </div>
   )
 }

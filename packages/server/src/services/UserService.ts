@@ -765,9 +765,6 @@ export class UserService {
    */
   static async createUserFromOAuth(provider: string, authCode: string): Promise<{
     user: UserModel;
-    waitlisted?: boolean;
-    status?: 'pending' | 'approved';
-    message?: string;
   }> {
     const userService = new UserService();
     return userService.createUserFromOAuth(provider, authCode);

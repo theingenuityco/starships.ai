@@ -53,17 +53,32 @@ export class RegistrationOrchestrator {
   async registerUser(userData: RegisterUserData): Promise<RegistrationResult> {
     const userService = ServiceFactory.createUserService();
 
-    // Check if user already exists - handle gracefully without throwing errors
+    // Check if user already exists - throw proper error for API consistency
     const existingUser = await userService.getUserByEmail(userData.email);
     if (existingUser) {
-      // Simply return a friendly message without throwing errors
-      return {
-        emailVerificationSent: false,
-        message: 'An account with this email already exists. Please sign in instead.'
-      };
+      // Check if they just need to verify their email
+      if (!existingUser.emailVerified) {
+        // Resend verification email for unverified users
+        try {
+          await userService.sendEmailVerification(existingUser.id, existingUser.email!);
+          return {
+            emailVerificationSent: true,
+            message: 'A verification email has been resent to your email address.'
+          };
+        } catch {
+          logger.error('[RegistrationOrchestrator] Failed to resend verification email', {
+            userId: existingUser.id,
+            operation: 'resend_verification'
+          });
+          // Fall through to conflict error
+        }
+      }
+      
+      // User exists and is verified - throw conflict
+      throw new ConflictError('An account with this email already exists');
     }
 
-    // Create user with email unverified (password will be automatically hashed)
+    // Create user with email unverified (password is hashed in UserService.createUser)
     const displayName = userData.name || userData.email.split('@')[0];
     const user = await userService.createUser({
       email: userData.email,

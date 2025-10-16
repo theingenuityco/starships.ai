@@ -2,7 +2,7 @@
  * Authentication Types
  *
  * Clean authentication type definitions for protocol contract,
- * including waitlist integration response types.
+ * including email verification response types.
  */
 
 // ============================================================================
@@ -28,20 +28,6 @@ export interface AuthUser {
 }
 
 // ============================================================================
-// WAITLIST RESPONSE TYPES
-// ============================================================================
-
-/**
- * Waitlist status in auth responses
- */
-export interface AuthWaitlistResponse {
-  waitlisted: boolean;
-  status: 'pending' | 'approved';
-  message: string;
-  email?: string;
-}
-
-// ============================================================================
 // AUTH RESPONSE TYPES
 // ============================================================================
 
@@ -61,8 +47,6 @@ export interface AuthRegisterResponse {
     name: string;
     description: string;
   };
-  waitlisted?: boolean;
-  status?: 'pending' | 'approved';
   message?: string;
   // Email verification fields
   emailVerificationSent?: boolean;
@@ -79,8 +63,6 @@ export interface AuthLoginResponse {
     slug: string;
     name: string;
   };
-  waitlisted?: boolean;
-  status?: 'pending' | 'approved';
   message?: string;
   // Email verification fields
   emailNotVerified?: boolean;
@@ -148,8 +130,7 @@ export type AuthErrorCode =
   | 'USER_EXISTS'
   | 'INVALID_TOKEN'
   | 'TOKEN_EXPIRED'
-  | 'WAITLISTED'
-  | 'NOT_APPROVED'
+  | 'EMAIL_NOT_VERIFIED'
   | 'VALIDATION_ERROR';
 
 /**
@@ -229,7 +210,5 @@ export interface OAuthCallbackResponse {
     avatar?: string;
   };
   token: string;
-  waitlisted?: boolean;
-  status?: 'pending' | 'approved';
   message?: string;
 }

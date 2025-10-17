@@ -32,7 +32,6 @@ interface BlueprintVisualizationProps {
   blueprint: Blueprint
   className?: string
   transparent?: boolean
-  title?: string
   nodesDraggable?: boolean
 }
 
@@ -800,7 +799,7 @@ const NodeDetailsPanel: React.FC<{
   )
 }
 
-function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }: { blueprint: Blueprint; transparent?: boolean; title?: string; nodesDraggable?: boolean }) {
+function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blueprint: Blueprint; transparent?: boolean; nodesDraggable?: boolean }) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
   const [nodes, setNodes] = useState<Node[]>([])
@@ -889,14 +888,6 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
         defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="rgba(156, 163, 175, 0.4)" />
-        {title && (
-          <Panel position="top-left" className="m-4">
-            <div className="flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg">
-              <Icon name="wrench" className="w-5 h-5 text-primary" />
-              <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">{title}</span>
-            </div>
-          </Panel>
-        )}
       </ReactFlow>
 
       {/* Node Details Panel */}
@@ -905,7 +896,7 @@ function BlueprintFlow({ blueprint, transparent, title, nodesDraggable = false }
   )
 }
 
-export function BlueprintVisualization({ blueprint, className = '', transparent = false, title, nodesDraggable = false }: BlueprintVisualizationProps) {
+export function BlueprintVisualization({ blueprint, className = '', transparent = false, nodesDraggable = false }: BlueprintVisualizationProps) {
   if (!blueprint?.nodes || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
@@ -917,7 +908,7 @@ export function BlueprintVisualization({ blueprint, className = '', transparent 
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <BlueprintFlow blueprint={blueprint} transparent={transparent} title={title} nodesDraggable={nodesDraggable} />
+        <BlueprintFlow blueprint={blueprint} transparent={transparent} nodesDraggable={nodesDraggable} />
       </div>
     </ReactFlowProvider>
   )

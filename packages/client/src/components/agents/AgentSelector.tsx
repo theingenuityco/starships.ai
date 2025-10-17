@@ -293,7 +293,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
-            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} />
+            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} onChat={() => onAgentSelect(agent)} />
           ))}
         </div>
       )}

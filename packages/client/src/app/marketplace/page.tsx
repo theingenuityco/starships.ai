@@ -102,10 +102,16 @@ export default function MarketplacePage() {
             </div>
 
             {/* Search and Filters */}
-            <div className="mb-8">
+            <div className="mb-8 sticky top-6 z-30">
               <div className="relative max-w-md mb-6 mx-auto">
-                <Icon name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <Input type="text" placeholder="Search Agent & Tools..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
+                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                <Input
+                  type="text"
+                  placeholder="Search Agent & Tools..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
+                />
               </div>
             </div>
 

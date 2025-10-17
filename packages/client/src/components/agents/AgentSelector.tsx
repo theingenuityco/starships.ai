@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
 import { AgentCard } from '@/components/agents/AgentCard'
+import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 import { AgentForm } from '@/components/agents/AgentForm'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import { AgentTester } from '@/components/agents/AgentTester'
@@ -290,19 +291,9 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
           <p className="text-base text-muted-foreground mb-3">{filters.searchQuery || filters.category ? 'No agents match your filters' : AGENT_TEXT.NO_AGENTS_AVAILABLE}</p>
         </div>
       ) : (
-        <div className="space-y-3 mt-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              isSelected={selectedAgent?.id === agent.id}
-              onClick={() => onAgentSelect(agent)}
-              onEdit={handleEditAgent}
-              onDelete={handleDeleteAgent}
-              onTest={handleTestAgent}
-              onAnalytics={handleAnalyticsAgent}
-              showActions={true}
-            />
+            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} />
           ))}
         </div>
       )}

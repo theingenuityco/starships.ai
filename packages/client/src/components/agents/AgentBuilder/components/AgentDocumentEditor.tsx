@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -17,6 +16,7 @@ import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { AGENT_CATEGORIES, DEFAULT_MODELS } from '../constants'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -51,10 +51,10 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pt-14 pb-28">
       {/* Title */}
       <div className="space-y-4">
-        <div className="space-y-4">
+        <div className="space-y-6">
           <AgentAvatar seed={value.name || 'agent'} size={64} className="rounded-md overflow-hidden" />
           <div className="space-y-1">
             <input
@@ -107,7 +107,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             <span className="text-xs font-semibold w-24">Model</span>
           </div>
           <Select value={value.model} onValueChange={m => onChange({ ...value, model: m })}>
-            <SelectTrigger className="h-7 w-[220px] text-xs">
+            <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
             <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
@@ -143,6 +143,30 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             placeholder="Define the agent's character, mission, and behavior..."
             minHeightPx={200}
           />
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Blueprint */}
+      <Collapsible defaultOpen={true} className="space-y-2">
+        <CollapsibleTrigger className="p-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground">Blueprint</Label>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-2">
+            <BlueprintVisualization
+              blueprint={(() => {
+                try {
+                  return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                } catch {
+                  return { nodes: [], edges: [] } as any
+                }
+              })()}
+              className="h-[320px]"
+              transparent
+              title="Agent Blueprint"
+              nodesDraggable={false}
+            />
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
@@ -221,20 +245,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       </div>
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
-
-      {/* Blueprint JSON */}
-      <div className="space-y-2">
-        <Label htmlFor="agent-blueprint-json" className="text-xs font-medium">
-          Blueprint JSON
-        </Label>
-        <Textarea
-          id="agent-blueprint-json"
-          placeholder="Paste blueprint JSON here"
-          value={value.blueprint}
-          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...value, blueprint: e.target.value })}
-          className="text-xs font-mono min-h-[200px]"
-        />
-      </div>
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-2">

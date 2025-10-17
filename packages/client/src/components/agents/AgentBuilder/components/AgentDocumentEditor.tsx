@@ -91,12 +91,12 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       </div>
 
       {/* Quick selectors: Category and Model */}
-      <div className="grid grid-cols-1 gap-3">
+      <div className="grid grid-cols-1 gap-2">
         {/* Category quick picker */}
-        <div className="flex items-center justify-between rounded-md border border-border/40 bg-muted/10 px-2 h-9">
+        <div className="inline-flex items-center justify-between gap-2 px-2 h-9 w-fit">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="tag" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Category</span>
+            <span className="text-xs font-semibold w-24">Category</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -123,10 +123,10 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
         </div>
 
         {/* Model quick picker */}
-        <div className="flex items-center justify-between rounded-md border border-border/40 bg-muted/10 px-2 h-9">
+        <div className="inline-flex items-center justify-between gap-2 px-2 h-9 w-fit">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="cpu" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Model</span>
+            <span className="text-xs font-semibold w-24">Model</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

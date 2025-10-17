@@ -62,12 +62,15 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
           </>
         ) : (
           <>
-            <div className="text-2xl font-bold mb-1">—</div>
-            <div className="text-xs text-muted-foreground mb-4">Deploy agents to start chatting</div>
+            <div className="flex justify-center mb-2">
+              <Icon name="help-circle" className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="text-sm font-medium text-muted-foreground text-center">No conversations yet</div>
+            <div className="text-xs text-muted-foreground mb-4 text-center">Start a conversation with your agents to see recent activity</div>
             <Button asChild size="sm" className="w-full">
               <Link href={`/ship/${starshipSlug}/conversations`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
-                Get Started
+                Start a Conversation
               </Link>
             </Button>
           </>

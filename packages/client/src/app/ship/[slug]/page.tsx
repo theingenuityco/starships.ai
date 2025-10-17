@@ -125,7 +125,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               {/* Ship Tab - existing overview content */}
               <TabsContent value="ship">
                 {/* Hero Section */}
-                <ShipHero starshipName={starship?.name} slug={slug} starshipId={starshipId} className="mb-6" />
+                <ShipHero slug={slug} starshipId={starshipId} className="mb-6" />
                 {/* Top Row - 4 Column Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Conversation Activity Card */}

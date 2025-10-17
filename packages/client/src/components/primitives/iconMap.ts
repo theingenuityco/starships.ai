@@ -8,6 +8,8 @@ const map: Record<string, ResolvedIcon> = {
   'chevron-up': { type: 'radix', component: 'ChevronUpIcon' },
   'arrow-right': { type: 'radix', component: 'ArrowRightIcon' },
   'arrow-left': { type: 'radix', component: 'ArrowLeftIcon' },
+  // Caret (filled supported via weight)
+  'caret-right': { type: 'phosphor', component: 'CaretRight' },
 
   // Common → Phosphor
   search: { type: 'phosphor', component: 'MagnifyingGlass' },

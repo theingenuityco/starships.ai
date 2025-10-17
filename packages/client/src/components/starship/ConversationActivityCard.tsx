@@ -37,28 +37,15 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
   }
 
   return (
-    <Card
-      className={cn(
-        'frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg border-2 !border-primary/30 hover:!border-primary/70 group relative overflow-hidden transition-all duration-300',
-        className
-      )}
-    >
-      {/* Frosted glass gradient with visible tint that expands on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-30 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-      {/* Sparkle decoration */}
-      <div className="absolute top-2 right-2 opacity-30 group-hover:opacity-60 transition-opacity duration-300">
-        <Icon name="sparkles" className="h-6 w-6 text-primary animate-pulse" />
-      </div>
-
-      <CardHeader className="relative z-10 pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
+    <Card className={cn('frosted-glass-card shadow-frosted-lg', className)}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Icon name="message-square" className="h-4 w-4" />
           {hasConversations ? 'Recent Conversation' : 'Start Conversations'}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="relative z-10 pt-0">
+      <CardContent className="pt-0">
         {hasConversations ? (
           <>
             <div className="text-base font-semibold mb-1 line-clamp-1">{recentConversation.title || 'Untitled'}</div>

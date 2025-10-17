@@ -31,9 +31,13 @@ export const emailVerificationRateLimit = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
-  // Use IP address as the key
+  // Use IP address as the key - fail secure if IP unavailable
   keyGenerator: (req: Request): string => {
-    return req.ip || req.connection.remoteAddress || 'unknown';
+    const ip = req.ip || req.connection.remoteAddress;
+    if (!ip) {
+      throw new Error('Cannot determine client IP address for rate limiting');
+    }
+    return ip;
   },
   // Custom handler for rate limit exceeded
   handler: (req: Request, res: Response) => {
@@ -72,7 +76,11 @@ export const resendVerificationRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    return req.ip || req.connection.remoteAddress || 'unknown';
+    const ip = req.ip || req.connection.remoteAddress;
+    if (!ip) {
+      throw new Error('Cannot determine client IP address for rate limiting');
+    }
+    return ip;
   },
   handler: (req: Request, res: Response) => {
     res.status(429).json({
@@ -108,7 +116,11 @@ export const registrationRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    return req.ip || req.connection.remoteAddress || 'unknown';
+    const ip = req.ip || req.connection.remoteAddress;
+    if (!ip) {
+      throw new Error('Cannot determine client IP address for rate limiting');
+    }
+    return ip;
   },
   handler: (req: Request, res: Response) => {
     res.status(429).json({

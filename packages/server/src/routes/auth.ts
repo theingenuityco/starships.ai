@@ -56,7 +56,7 @@ const SetPasswordSchema = z.object({
 
 // Zod schema for email verification
 const EmailVerificationSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
 });
 
 // Helper function for Zod validation
@@ -287,7 +287,9 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
 router.get('/auth/verify-email', async (req: Request, res: Response) => {
   try {
     // Validate query parameters using Zod
-    const queryValidation = validateData(z.object({ token: z.string().min(1, 'Token is required') }), req.query, res, 'verification token');
+    const queryValidation = validateData(z.object({ 
+      token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format') 
+    }), req.query, res, 'verification token');
     if (!queryValidation) return;
 
     const { token } = queryValidation;

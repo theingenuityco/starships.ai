@@ -21,6 +21,8 @@ const map: Record<string, ResolvedIcon> = {
   wallet: { type: 'phosphor', component: 'Wallet' },
   mail: { type: 'radix', component: 'EnvelopeClosedIcon' },
   'user-cog': { type: 'phosphor', component: 'UserGear' },
+  tag: { type: 'phosphor', component: 'Tag' },
+  cpu: { type: 'phosphor', component: 'Brain' },
 
   // Navbar / UI common
   store: { type: 'phosphor', component: 'Storefront' },

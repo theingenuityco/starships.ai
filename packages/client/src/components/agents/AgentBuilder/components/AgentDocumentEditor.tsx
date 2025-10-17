@@ -88,16 +88,28 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
                 </Badge>
               </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
+            <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
               <div className="flex flex-col gap-0">
-                {AGENT_CATEGORIES.map(cat => (
-                  <DropdownMenuItem key={cat} className="px-0.5 py-1 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
-                    <Badge variant="outline" className={cn('m-0 inline-flex w-auto max-w-max items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(cat))}>
-                      {getCategoryIcon(cat)}
-                      <span className="capitalize">{cat}</span>
-                    </Badge>
-                  </DropdownMenuItem>
-                ))}
+                {AGENT_CATEGORIES.map(cat => {
+                  const isSelected = value.category === cat
+                  return (
+                    <DropdownMenuItem key={cat} className="px-1.5 py-0.5 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
+                      <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
+                        {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'm-0 inline-flex w-auto max-w-max items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
+                            isSelected ? getCategoryColor(cat) : 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
+                          )}
+                        >
+                          {getCategoryIcon(cat)}
+                          <span className="capitalize">{cat}</span>
+                        </Badge>
+                      </div>
+                    </DropdownMenuItem>
+                  )
+                })}
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -115,7 +127,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             </SelectTrigger>
             <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
               {DEFAULT_MODELS.map(m => (
-                <SelectItem key={m} value={m} className="text-xs">
+                <SelectItem key={m} value={m} className="text-xs px-2 py-1">
                   {m}
                 </SelectItem>
               ))}
@@ -152,7 +164,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
                     <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
                   </div>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[420px] p-0 frosted-glass-card rounded-xl shadow-frosted-lg">
+                <PopoverContent align="start" className="w-[420px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
                   <Command className="bg-transparent">
                     <CommandInput placeholder="Search tools..." />
                     <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
@@ -167,15 +179,21 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
                                 const next = isSelected ? selected.filter(s => s !== slug) : [...selected, slug]
                                 onChange({ ...value, assignedToolSlugs: next })
                               }}
-                              className="text-xs"
+                              className="text-xs px-2 py-1"
                             >
-                              <Badge
-                                variant="outline"
-                                className={`m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3 ${isSelected ? 'ring-1 ring-primary/40' : ''}`}
-                              >
-                                <Icon name="wrench" />
-                                <span className="font-mono">{slug}</span>
-                              </Badge>
+                              <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
+                                {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'm-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
+                                    !isSelected && 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
+                                  )}
+                                >
+                                  <Icon name="wrench" />
+                                  <span className="font-mono">{slug}</span>
+                                </Badge>
+                              </div>
                             </CommandItem>
                           )
                         })}

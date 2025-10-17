@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { ModelSelector } from './ModelSelector'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
@@ -47,17 +48,20 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Title */}
       <div className="space-y-4">
-        <div className="space-y-1">
-          <input
-            className="w-full bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
-            placeholder="Untitled Agent"
-            value={value.name}
-            onChange={e => handleNameChange(e.target.value)}
-          />
-          <div className="text-xs text-muted-foreground font-mono">/{value.slug || generatedSlug}</div>
+        <div className="space-y-4">
+          <AgentAvatar seed={value.name || 'agent'} size={64} className="rounded-md overflow-hidden" />
+          <div className="space-y-1">
+            <input
+              className="w-full bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
+              placeholder="Untitled Agent"
+              value={value.name}
+              onChange={e => handleNameChange(e.target.value)}
+            />
+            <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
+          </div>
         </div>
 
         <DropdownMenu>
@@ -87,7 +91,18 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       {/* Description */}
       <div className="space-y-2">
         <Label className="text-xs font-medium">Description</Label>
-        <RichMarkdownEditor value={value.description} onChange={val => onChange({ ...value, description: val })} placeholder="Write a clear description. Markdown supported." minHeightPx={140} />
+        <RichMarkdownEditor value={value.description} onChange={val => onChange({ ...value, description: val })} placeholder="Write a clear description. Markdown supported." noMinHeight />
+      </div>
+
+      {/* System Prompt */}
+      <div className="space-y-2">
+        <Label className="text-xs font-medium">System Prompt</Label>
+        <RichMarkdownEditor
+          value={value.systemPrompt}
+          onChange={val => onChange({ ...value, systemPrompt: val })}
+          placeholder="Define the agent's character, mission, and behavior..."
+          minHeightPx={200}
+        />
       </div>
 
       {/* Model & generation settings */}
@@ -124,17 +139,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             />
           </div>
         </div>
-      </div>
-
-      {/* System Prompt */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium">System Prompt</Label>
-        <RichMarkdownEditor
-          value={value.systemPrompt}
-          onChange={val => onChange({ ...value, systemPrompt: val })}
-          placeholder="Define the agent's character, mission, and behavior..."
-          minHeightPx={200}
-        />
       </div>
 
       {/* Tools */}

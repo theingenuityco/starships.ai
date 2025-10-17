@@ -96,7 +96,7 @@ export default function MarketplacePage() {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="store" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Agent Marketplace</h1>
+                <h1 className="text-2xl font-bold">Marketplace</h1>
               </div>
               <p className="text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship&apos;s capabilities.</p>
             </div>

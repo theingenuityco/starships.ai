@@ -225,51 +225,39 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header with better visual hierarchy */}
-      <div className="p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-6">
-        <div className="flex items-center gap-4">
-          <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
-            <Icon name="user-cog" className="h-6 w-6 text-primary" />
-          </span>
-          <div className="flex-1 min-w-0 space-y-1">
-            <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
-            <p className="text-sm text-muted-foreground">Manage your starship&apos;s AI crew members</p>
-          </div>
+      {showCreateButton && (
+        <div className="flex items-center gap-2 justify-end">
+          <AgentTemplateSelector
+            onSelectTemplate={template => {
+              // Handle template selection if needed
+            }}
+            onCreateFromTemplate={handleCreateFromTemplate}
+            trigger={
+              <Button
+                variant="default"
+                size="sm"
+                disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
+                className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={!starshipId ? 'No starship available for agent deployment' : undefined}
+              >
+                <Icon name="sparkles" className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span>From Template</span>
+              </Button>
+            }
+          />
+          <Button
+            onClick={handleCreateAgent}
+            size="sm"
+            variant="outline"
+            disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
+            className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!starshipId ? 'No starship available for agent deployment' : undefined}
+          >
+            <Icon name="plus" className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span>Create Agent</span>
+          </Button>
         </div>
-        {showCreateButton && (
-          <div className="flex items-center gap-2 justify-end">
-            <AgentTemplateSelector
-              onSelectTemplate={template => {
-                // Handle template selection if needed
-              }}
-              onCreateFromTemplate={handleCreateFromTemplate}
-              trigger={
-                <Button
-                  variant="default"
-                  size="sm"
-                  disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
-                  className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!starshipId ? 'No starship available for agent deployment' : undefined}
-                >
-                  <Icon name="sparkles" className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span>From Template</span>
-                </Button>
-              }
-            />
-            <Button
-              onClick={handleCreateAgent}
-              size="sm"
-              variant="outline"
-              disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
-              className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!starshipId ? 'No starship available for agent deployment' : undefined}
-            >
-              <Icon name="plus" className="w-4 h-4 mr-2 flex-shrink-0" />
-              <span>Create Agent</span>
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       {showFilters && (
         <div className="space-y-4">

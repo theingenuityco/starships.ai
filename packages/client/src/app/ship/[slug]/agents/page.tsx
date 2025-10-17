@@ -64,6 +64,7 @@ export default function StarshipAgentsPage(): React.JSX.Element {
                       setSelectedAgent(agent)
                       router.push(`/ship/${slug}/agent/${agent.slug}`)
                     }}
+                    onAgentsCountChange={() => {}}
                     showCreateButton={false}
                     showFilters={true}
                     starshipId={starshipId}

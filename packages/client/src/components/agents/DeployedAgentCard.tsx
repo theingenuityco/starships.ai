@@ -9,13 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 interface DeployedAgentCardProps {
   agent: AgentModel
   onClick: () => void
+  onChat?: (agent: AgentModel) => void
 }
 
-export function DeployedAgentCard({ agent, onClick }: DeployedAgentCardProps) {
+export function DeployedAgentCard({ agent, onClick, onChat }: DeployedAgentCardProps) {
   return (
     <Card className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer" onClick={onClick}>
       <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -33,10 +35,25 @@ export function DeployedAgentCard({ agent, onClick }: DeployedAgentCardProps) {
           <Badge variant="secondary" className="text-xs">
             {agent.model || 'N/A'}
           </Badge>
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Icon name="fingerprint" className="h-3.5 w-3.5" />
-            <span className="text-[10px]">{agent.id.slice(0, 6)}</span>
-          </div>
+          {onChat ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8"
+              onClick={e => {
+                e.stopPropagation()
+                onChat(agent)
+              }}
+            >
+              <Icon name="message-square" className="mr-1 h-3.5 w-3.5" />
+              Chat
+            </Button>
+          ) : (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Icon name="fingerprint" className="h-3.5 w-3.5" />
+              <span className="text-[10px]">{agent.id.slice(0, 6)}</span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -40,6 +40,9 @@ export function Navigation(props: NavigationProps) {
   // Smooth height animation (conversations)
   const [conversationSubnavHeight, setConversationSubnavHeight] = useState(0)
   const conversationSubnavContentRef = useRef<HTMLDivElement>(null)
+  // Smooth height animation (overview submenu)
+  const [overviewSubnavHeight, setOverviewSubnavHeight] = useState(0)
+  const overviewSubnavContentRef = useRef<HTMLDivElement>(null)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -110,6 +113,11 @@ export function Navigation(props: NavigationProps) {
   const isSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings`) : false
   const isUsageSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/usage`) : false
   const isEnvironmentSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/environment`) : false
+  const isAgentsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agents`) : false
+  const isAgentBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agent/`) : false
+  const isToolsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tools`) : false
+  const isToolBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tool/`) : false
+  const overviewExpanded = isOverviewRoute || isAgentsRoute || isAgentBuilderRoute || isToolsRoute || isToolBuilderRoute
 
   // Get starship data to access starship ID
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
@@ -152,6 +160,22 @@ export function Navigation(props: NavigationProps) {
     }
     return () => window.removeEventListener('resize', measure)
   }, [isConversationRoute, starshipSlug])
+
+  // Measure overview subnav content height
+  useEffect(() => {
+    const measure = () => {
+      const el = overviewSubnavContentRef.current
+      if (!el) return
+      setOverviewSubnavHeight(el.offsetHeight)
+    }
+    if (overviewExpanded) {
+      requestAnimationFrame(measure)
+      window.addEventListener('resize', measure)
+    } else {
+      setOverviewSubnavHeight(0)
+    }
+    return () => window.removeEventListener('resize', measure)
+  }, [overviewExpanded])
 
   // Conversation action handlers
   const deleteConversationMutation = useDeleteConversation()
@@ -247,56 +271,117 @@ export function Navigation(props: NavigationProps) {
               items={mainNavigationItems}
               pathname={pathname}
               renderAfter={item => {
-                const isConversations = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}/conversations`
-                if (!isConversations) return null
-
-                return (
-                  isConversationRoute && (
+                const isOverviewItem = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}`
+                const isConversationsItem = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}/conversations`
+                if (isOverviewItem) {
+                  return (
                     <motion.div
                       initial={false}
-                      animate={{ height: isConversationRoute ? conversationSubnavHeight : 0, opacity: isConversationRoute ? 1 : 0, y: isConversationRoute ? 0 : 4 }}
+                      animate={{ height: overviewExpanded ? overviewSubnavHeight : 0, opacity: overviewExpanded ? 1 : 0, y: overviewExpanded ? 0 : 4 }}
                       transition={{ duration: 0.24, ease: 'easeInOut' }}
                       className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
                       style={{ willChange: 'height, opacity, transform' }}
                     >
-                      <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
-                        {/* New Conversation Icon */}
+                      <div ref={overviewSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-2">
+                        {/* Agents */}
                         <Tooltip delayDuration={300}>
                           <TooltipTrigger asChild>
                             <button
-                              onClick={handleNewConversation}
-                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              onClick={() => {
+                                if (!starshipSlug) return
+                                router.push(`/ship/${starshipSlug}/agents`)
+                              }}
+                              className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
+                                isAgentsRoute || isAgentBuilderRoute
+                                  ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
+                                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                              }`}
                             >
-                              <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('agents')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                            New Conversation
+                            Agents
                           </TooltipContent>
                         </Tooltip>
 
-                        {/* Conversation History Toggle Icon */}
+                        {/* Tools */}
                         <Tooltip delayDuration={300}>
                           <TooltipTrigger asChild>
                             <button
-                              onClick={handleToggleConversationHistory}
-                              className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              onClick={() => {
+                                if (!starshipSlug) return
+                                router.push(`/ship/${starshipSlug}/tools`)
+                              }}
+                              className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
+                                isToolsRoute || isToolBuilderRoute
+                                  ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
+                                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                              }`}
                             >
-                              {showConversationList ? (
-                                <LordIcon src={getLordiconUrl('x')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
-                              ) : (
-                                <LordIcon src={getLordiconUrl('history')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
-                              )}
+                              <LordIcon src={getLordiconUrl('tools')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                            {showConversationList ? 'Hide' : 'Show'} History
+                            Tools
                           </TooltipContent>
                         </Tooltip>
                       </div>
                     </motion.div>
                   )
-                )
+                }
+
+                if (isConversationsItem) {
+                  return (
+                    isConversationRoute && (
+                      <motion.div
+                        initial={false}
+                        animate={{ height: isConversationRoute ? conversationSubnavHeight : 0, opacity: isConversationRoute ? 1 : 0, y: isConversationRoute ? 0 : 4 }}
+                        transition={{ duration: 0.24, ease: 'easeInOut' }}
+                        className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
+                        style={{ willChange: 'height, opacity, transform' }}
+                      >
+                        <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
+                          {/* New Conversation Icon */}
+                          <Tooltip delayDuration={300}>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={handleNewConversation}
+                                className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              >
+                                <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                              New Conversation
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Conversation History Toggle Icon */}
+                          <Tooltip delayDuration={300}>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={handleToggleConversationHistory}
+                                className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                              >
+                                {showConversationList ? (
+                                  <LordIcon src={getLordiconUrl('x')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
+                                ) : (
+                                  <LordIcon src={getLordiconUrl('history')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
+                                )}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                              {showConversationList ? 'Hide' : 'Show'} History
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </motion.div>
+                    )
+                  )
+                }
+
+                return null
               }}
             />
           </div>
@@ -312,7 +397,7 @@ export function Navigation(props: NavigationProps) {
             className="rounded-tl-xl rounded-tr-xl mx-1.5 overflow-hidden mb-2 bg-muted/40"
             style={{ willChange: 'height, opacity, transform' }}
           >
-            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
+            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-2">
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <motion.button

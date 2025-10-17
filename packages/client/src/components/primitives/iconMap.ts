@@ -8,6 +8,8 @@ const map: Record<string, ResolvedIcon> = {
   'chevron-up': { type: 'radix', component: 'ChevronUpIcon' },
   'arrow-right': { type: 'radix', component: 'ArrowRightIcon' },
   'arrow-left': { type: 'radix', component: 'ArrowLeftIcon' },
+  // Caret (filled supported via weight)
+  'caret-right': { type: 'phosphor', component: 'CaretRight' },
 
   // Common → Phosphor
   search: { type: 'phosphor', component: 'MagnifyingGlass' },
@@ -24,6 +26,8 @@ const map: Record<string, ResolvedIcon> = {
   'user-cog': { type: 'phosphor', component: 'UserGear' },
   tag: { type: 'phosphor', component: 'Tag' },
   cpu: { type: 'phosphor', component: 'Brain' },
+  // Use Iconify for head-circuit to support broader versions
+  'head-circuit': { type: 'iconify', icon: 'ph:head-circuit' },
 
   // Navbar / UI common
   store: { type: 'phosphor', component: 'Storefront' },

@@ -27,6 +27,7 @@ import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbP
 import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { ConversationActivityCard } from '@/components/starship/ConversationActivityCard'
+import { TopAgentCard } from '@/components/starship/TopAgentCard'
 import { ShipHero } from '@/components/starship/ShipHero'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
@@ -132,8 +133,11 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                     starshipSlug={slug}
                     recentConversation={conversations.length > 0 ? conversations[0] : null}
                     conversationCount={conversations.length}
-                    className="lg:col-span-2"
+                    className="lg:col-span-1"
                   />
+
+                  {/* Top Agent Card */}
+                  <TopAgentCard starshipSlug={slug} recentConversationId={conversations.length > 0 ? conversations[0].id : null} className="lg:col-span-1" />
 
                   <Card className="frosted-glass-card shadow-frosted-lg lg:col-span-2">
                     <CardHeader className="pb-3">

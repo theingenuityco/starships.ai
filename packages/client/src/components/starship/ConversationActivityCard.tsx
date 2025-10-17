@@ -53,7 +53,7 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
               <Icon name="clock" className="h-3 w-3" />
               {formatTimeAgo(recentConversation.updatedAt)}
             </div>
-            <Button asChild size="sm" className="w-full">
+            <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations/${recentConversation.id}`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Continue Chat
@@ -67,7 +67,7 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
               <div className="text-sm font-medium text-muted-foreground">No conversations yet</div>
               <div className="text-xs text-muted-foreground mb-4">Start a conversation with your agents to see recent activity</div>
             </div>
-            <Button asChild size="sm" className="w-full">
+            <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Start a Conversation

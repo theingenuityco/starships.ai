@@ -38,9 +38,10 @@ type RichMarkdownEditorProps = {
   placeholder?: string
   className?: string
   minHeightPx?: number
+  noMinHeight?: boolean
 }
 
-export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with Markdown…', className, minHeightPx = 200 }: RichMarkdownEditorProps) {
+export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with Markdown…', className, minHeightPx = 200, noMinHeight = false }: RichMarkdownEditorProps) {
   const suppressUpdateRef = useRef<boolean>(true)
   const editor = useEditor({
     extensions: [
@@ -175,7 +176,7 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
           </Button>
         </div>
       </FloatingMenu>
-      <EditorContent editor={editor} className="min-h-[200px] px-0 py-2 text-sm leading-relaxed" style={{ minHeight: `${minHeightPx}px` }} />
+      <EditorContent editor={editor} className={cn('px-0 py-2 text-sm leading-relaxed')} style={noMinHeight ? undefined : { minHeight: `${minHeightPx}px` }} />
     </div>
   )
 }

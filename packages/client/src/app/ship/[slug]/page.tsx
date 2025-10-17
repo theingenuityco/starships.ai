@@ -22,11 +22,8 @@ import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AgentSelector } from '@/components/agents/AgentSelector'
-import { useQuery } from '@tanstack/react-query'
-import api from '@/lib/api'
 
-import type { AgentModel, ToolModel } from '@starships/protocol'
+import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { ConversationActivityCard } from '@/components/starship/ConversationActivityCard'
 import { ShipHero } from '@/components/starship/ShipHero'
@@ -54,17 +51,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
   // Fetch tools for the selected agent
   const { data: agentTools = [], isLoading: toolsLoading } = useAgentTools(selectedAgent?.id || '', starshipId || '', !!selectedAgent?.id && !!starshipId && isDetailsModalOpen)
 
-  // Fetch tools for starship (Tools tab)
-  const { data: starshipTools = [], isLoading: starshipToolsLoading } = useQuery({
-    queryKey: ['starship-tools', starshipId] as const,
-    queryFn: async (): Promise<ToolModel[]> => {
-      if (!starshipId) return []
-      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`)
-      return response.data.data || []
-    },
-    enabled: !!starshipId,
-    staleTime: 30 * 1000,
-  })
+  // Route-based tabs: no local tools list here; handled in /tools route
 
   const {
     isLoading: usageLoading,
@@ -96,8 +83,16 @@ export default function StarshipOverviewPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Overview and quick controls for your starship</p>
             </div>
 
-            {/* Tabs: Ship - Agents - Tools */}
-            <Tabs defaultValue="ship" className="space-y-6">
+            {/* Tabs: Ship - Agents - Tools (route-based) */}
+            <Tabs
+              value="ship"
+              onValueChange={value => {
+                if (value === 'ship') router.push(`/ship/${slug}`)
+                else if (value === 'agents') router.push(`/ship/${slug}/agents`)
+                else if (value === 'tools') router.push(`/ship/${slug}/tools`)
+              }}
+              className="space-y-6"
+            >
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
                   <TabsTrigger value="ship" className="gap-2 rounded-xl px-3 py-1">
@@ -319,81 +314,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 )}
               </TabsContent>
 
-              {/* Agents Tab */}
-              <TabsContent value="agents">
-                <section aria-labelledby="agents-list">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 id="agents-list" className="text-lg font-semibold flex items-center gap-2">
-                        <Icon name="user-cog" className="h-5 w-5 text-primary" />
-                        Agents
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-1">Manage and view all agents in this starship</p>
-                    </div>
-                  </div>
-
-                  <AgentSelector
-                    selectedAgent={selectedAgent}
-                    onAgentSelect={agent => {
-                      router.push(`/ship/${slug}/agent/${agent.slug}`)
-                    }}
-                    showCreateButton={true}
-                    showFilters={true}
-                    starshipId={starshipId}
-                  />
-                </section>
-              </TabsContent>
-
-              {/* Tools Tab */}
-              <TabsContent value="tools">
-                <section aria-labelledby="tools-list">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 id="tools-list" className="text-lg font-semibold flex items-center gap-2">
-                        <Icon name="wrench" className="h-5 w-5 text-primary" />
-                        Tools
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-1">Installed tools available to your agents</p>
-                    </div>
-                  </div>
-
-                  {starshipToolsLoading ? (
-                    <div className="space-y-2">
-                      {[1, 2, 3].map(i => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                      ))}
-                    </div>
-                  ) : starshipTools.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {starshipTools.map(tool => (
-                        <Card
-                          key={tool.id}
-                          className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
-                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
-                        >
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs">
-                                {tool.slug}
-                              </Badge>
-                              <CardTitle className="text-base font-semibold truncate">{tool.name}</CardTitle>
-                            </div>
-                            {tool.description && <CardDescription className="text-xs line-clamp-2">{tool.description}</CardDescription>}
-                          </CardHeader>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
-                      <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Icon name="wrench" className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-base text-muted-foreground mb-3">No tools installed</p>
-                      <p className="text-sm text-muted-foreground">Install tools from the Marketplace to get started.</p>
-                    </div>
-                  )}
-                </section>
-              </TabsContent>
+              {/* Agents and Tools moved to their own routes */}
             </Tabs>
           </div>
         </div>

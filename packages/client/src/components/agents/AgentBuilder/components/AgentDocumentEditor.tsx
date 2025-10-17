@@ -150,7 +150,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
                 <PopoverTrigger asChild>
                   <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
                     {selected.length === 0 ? (
-                      <span className="text-xs text-muted-foreground">Select tools</span>
+                      <span className="pl-1.5 text-xs text-muted-foreground">Select tools</span>
                     ) : (
                       <div className="flex items-center gap-1 flex-wrap">
                         {selected.map(slug => (

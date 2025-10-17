@@ -50,16 +50,10 @@ const SystemCard = memo(({ icon, title, description, accent = false, imageConten
 
 SystemCard.displayName = 'SystemCard'
 
-export default function HomePage() {
+// Component to handle URL parameters with Suspense boundary
+function UrlParamHandler() {
   const [mounted, setMounted] = useState(false)
-  const [launching, setLaunching] = useState(false)
-  const { isAuthenticated, isLoading, userName, userId } = useAuth()
   const searchParams = useSearchParams()
-
-  // Use TanStack Query to fetch starships - only when authenticated
-  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(userId || '', !!userId && isAuthenticated)
-
-  const hasExistingStarships = starships.length > 0
 
   useEffect(() => {
     setMounted(true)
@@ -89,6 +83,23 @@ export default function HomePage() {
     }
   }, [mounted, searchParams])
 
+  return null
+}
+
+export default function HomePage() {
+  const [mounted, setMounted] = useState(false)
+  const [launching, setLaunching] = useState(false)
+  const { isAuthenticated, isLoading, userId } = useAuth()
+
+  // Use TanStack Query to fetch starships - only when authenticated
+  const { data: starships = [] } = useUserStarships(userId || '', !!userId && isAuthenticated)
+
+  const hasExistingStarships = starships.length > 0
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   if (!mounted || isLoading) return null
 
   const handleLaunch = () => {
@@ -116,6 +127,9 @@ export default function HomePage() {
   return (
     <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden">
+        <Suspense fallback={null}>
+          <UrlParamHandler />
+        </Suspense>
         <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
           <StarfieldBackground launching={launching} density={600} speed={1.5} />
         </Suspense>

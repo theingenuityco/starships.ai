@@ -84,8 +84,8 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
             onSelectTemplate={() => {}}
             onCreateFromTemplate={handleCreateFromTemplate}
             trigger={
-              <Button size="sm" disabled={!starshipId} className="whitespace-nowrap">
-                <Icon name="sparkles" className="h-4 w-4" />
+              <Button size="lg" disabled={!starshipId} className="whitespace-nowrap">
+                <Icon name="sparkles" className="h-5 w-5" />
                 <span className="ml-1">Create with Gaia</span>
               </Button>
             }
@@ -94,8 +94,8 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
             onSelectTemplate={() => {}}
             onCreateFromTemplate={handleCreateFromTemplate}
             trigger={
-              <Button size="sm" variant="outline" disabled={!starshipId} className="whitespace-nowrap">
-                <Icon name="store" className="h-4 w-4" />
+              <Button size="lg" variant="outline" disabled={!starshipId} className="whitespace-nowrap">
+                <Icon name="store" className="h-5 w-5" />
                 <span className="ml-1">Browse agent templates</span>
               </Button>
             }

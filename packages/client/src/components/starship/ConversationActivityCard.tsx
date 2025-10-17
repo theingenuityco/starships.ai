@@ -62,7 +62,7 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
           </>
         ) : (
           <div className="flex flex-col h-full">
-            <div className="flex-1 flex flex-col items-center text-center">
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
               <Icon name="help-circle" className="h-6 w-6 text-muted-foreground mb-2" />
               <div className="text-sm font-medium text-muted-foreground">No conversations yet</div>
               <div className="text-xs text-muted-foreground mb-4">Start a conversation with your agents to see recent activity</div>

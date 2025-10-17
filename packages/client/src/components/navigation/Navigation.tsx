@@ -312,7 +312,7 @@ export function Navigation(props: NavigationProps) {
             className="rounded-tl-xl rounded-tr-xl mx-1.5 overflow-hidden mb-2 bg-muted/40"
             style={{ willChange: 'height, opacity, transform' }}
           >
-            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
+            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-2">
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <motion.button

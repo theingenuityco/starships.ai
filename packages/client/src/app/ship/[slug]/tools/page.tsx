@@ -41,7 +41,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
           <div className="w-full max-w-6xl mx-auto space-y-8">
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Icon name="rocket" className="h-6 w-6 text-primary" />
+                <Icon name="wrench" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Tools</h1>
               </div>
               <div className="flex items-center justify-center gap-2">

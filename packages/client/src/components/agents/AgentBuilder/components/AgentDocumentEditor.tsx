@@ -6,10 +6,15 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
+import { Badge } from '@/components/ui/badge'
 import { ModelSelector } from './ModelSelector'
 import { CategorySelector } from './CategorySelector'
 import { IconSelector } from './IconSelector'
 import type { AgentFormData } from '../types'
+import { cn } from '@/lib/utils'
+import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { AGENT_CATEGORIES } from '../constants'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -46,14 +51,39 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
   return (
     <div className="space-y-8">
       {/* Title */}
-      <div className="space-y-2">
-        <input
-          className="w-full bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
-          placeholder="Untitled Agent"
-          value={value.name}
-          onChange={e => handleNameChange(e.target.value)}
-        />
-        <div className="text-xs text-muted-foreground font-mono">/{value.slug || generatedSlug}</div>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <input
+            className="w-full bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
+            placeholder="Untitled Agent"
+            value={value.name}
+            onChange={e => handleNameChange(e.target.value)}
+          />
+          <div className="text-xs text-muted-foreground font-mono">/{value.slug || generatedSlug}</div>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md px-1 py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+              <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
+                {getCategoryIcon(value.category)}
+                <span className="capitalize">{value.category}</span>
+              </Badge>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
+            <div className="flex flex-col gap-0">
+              {AGENT_CATEGORIES.map(cat => (
+                <DropdownMenuItem key={cat} className="px-0.5 py-1 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
+                  <Badge variant="outline" className={cn('m-0 inline-flex w-auto max-w-max items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(cat))}>
+                    {getCategoryIcon(cat)}
+                    <span className="capitalize">{cat}</span>
+                  </Badge>
+                </DropdownMenuItem>
+              ))}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Description */}
@@ -101,7 +131,12 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       {/* System Prompt */}
       <div className="space-y-2">
         <Label className="text-xs font-medium">System Prompt</Label>
-        <RichMarkdownEditor value={value.systemPrompt} onChange={val => onChange({ ...value, systemPrompt: val })} placeholder="Define the agent's character, mission, and behavior..." minHeightPx={200} />
+        <RichMarkdownEditor
+          value={value.systemPrompt}
+          onChange={val => onChange({ ...value, systemPrompt: val })}
+          placeholder="Define the agent's character, mission, and behavior..."
+          minHeightPx={200}
+        />
       </div>
 
       {/* Tools */}

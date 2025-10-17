@@ -40,6 +40,13 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
     [value.name]
   )
 
+  const { data: toolTemplates } = useToolTemplates(undefined, true)
+  const selectedToolSlugs = value.assignedToolSlugs || []
+  const allToolOptions = useMemo(() => {
+    const fetchedSlugs = Array.isArray(toolTemplates) ? Array.from(new Set(toolTemplates.map((t: any) => t.slug).filter(Boolean))) : []
+    return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
+  }, [toolTemplates, selectedToolSlugs])
+
   const handleNameChange = (name: string) => {
     const shouldUpdateSlug = !value.slug || value.slug === generatedSlug
     const next: AgentFormData = { ...value, name }
@@ -140,70 +147,62 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             <Icon name="wrench" className="w-4 h-4" />
             <span className="text-xs font-semibold w-36">Assigned Tools</span>
           </div>
-          {(() => {
-            const { data: toolTemplates } = useToolTemplates(undefined, true)
-            const fetchedSlugs = Array.isArray(toolTemplates) ? Array.from(new Set(toolTemplates.map((t: any) => t.slug).filter(Boolean))) : []
-            const selected = value.assignedToolSlugs || []
-            const allOptions = Array.from(new Set([...(selected as string[]), ...fetchedSlugs]))
-            return (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
-                    {selected.length === 0 ? (
-                      <span className="pl-1.5 text-xs text-muted-foreground">Select tools</span>
-                    ) : (
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {selected.map(slug => (
-                          <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
-                            <Icon name="wrench" />
-                            <span className="font-mono truncate max-w-[140px]">{slug}</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
+          <Popover>
+            <PopoverTrigger asChild>
+              <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+                {selectedToolSlugs.length === 0 ? (
+                  <span className="pl-1.5 text-xs text-muted-foreground">Select tools</span>
+                ) : (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {selectedToolSlugs.map(slug => (
+                      <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
+                        <Icon name="wrench" />
+                        <span className="font-mono truncate max-w-[140px]">{slug}</span>
+                      </Badge>
+                    ))}
                   </div>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-[420px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-                  <Command className="bg-transparent">
-                    <CommandInput placeholder="Search tools..." />
-                    <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {allOptions.map(slug => {
-                          const isSelected = selected.includes(slug)
-                          return (
-                            <CommandItem
-                              key={slug}
-                              onSelect={() => {
-                                const next = isSelected ? selected.filter(s => s !== slug) : [...selected, slug]
-                                onChange({ ...value, assignedToolSlugs: next })
-                              }}
-                              className="text-xs px-2 py-1"
+                )}
+                <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[420px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
+              <Command className="bg-transparent">
+                <CommandInput placeholder="Search tools..." />
+                <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
+                <CommandList>
+                  <CommandGroup>
+                    {allToolOptions.map(slug => {
+                      const isSelected = selectedToolSlugs.includes(slug)
+                      return (
+                        <CommandItem
+                          key={slug}
+                          onSelect={() => {
+                            const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
+                            onChange({ ...value, assignedToolSlugs: next })
+                          }}
+                          className="text-xs px-2 py-1"
+                        >
+                          <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
+                            {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'm-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
+                                !isSelected && 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
+                              )}
                             >
-                              <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
-                                {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    'm-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
-                                    !isSelected && 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
-                                  )}
-                                >
-                                  <Icon name="wrench" />
-                                  <span className="font-mono">{slug}</span>
-                                </Badge>
-                              </div>
-                            </CommandItem>
-                          )
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )
-          })()}
+                              <Icon name="wrench" />
+                              <span className="font-mono">{slug}</span>
+                            </Badge>
+                          </div>
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

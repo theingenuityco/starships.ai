@@ -62,7 +62,7 @@
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
-    "docs#build": {
+    "@starships/docs#build": {
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": [".next/**", "build/**"]
     },
@@ -86,7 +86,7 @@
       "cache": false,
       "persistent": true
     },
-    "docs#dev": {
+    "@starships/docs#dev": {
       "cache": false,
       "persistent": true
     },
@@ -124,7 +124,7 @@
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
-    "docs#lint": {
+    "@starships/docs#lint": {
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -184,7 +184,7 @@
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**"],
       "outputs": []
     },
-    "docs#type-check": {
+    "@starships/docs#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },

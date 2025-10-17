@@ -311,16 +311,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       </Collapsible>
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
-
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-2">
-        {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
-        {onSave && <Button onClick={onSave}>Save</Button>}
-      </div>
     </div>
   )
 }

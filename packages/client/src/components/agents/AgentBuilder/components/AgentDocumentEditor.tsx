@@ -71,14 +71,14 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       {/* Quick selectors: Category and Model */}
       <div className="grid grid-cols-1 gap-2">
         {/* Category quick picker */}
-        <div className="inline-flex items-center justify-between gap-2 px-2 h-9 w-fit">
+        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="tag" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-24">Category</span>
+            <span className="text-xs font-semibold w-36">Category</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md px-1 py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+              <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
                 <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
                   {getCategoryIcon(value.category)}
                   <span className="capitalize">{value.category}</span>
@@ -101,10 +101,10 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
         </div>
 
         {/* Model quick picker */}
-        <div className="inline-flex items-center justify-between gap-2 px-2 h-9 w-fit">
+        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="cpu" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-24">Model</span>
+            <span className="text-xs font-semibold w-36">Model</span>
           </div>
           <Select value={value.model} onValueChange={m => onChange({ ...value, model: m })}>
             <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
@@ -118,6 +118,26 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
               ))}
             </SelectContent>
           </Select>
+        </div>
+        {/* Assigned tools */}
+        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Icon name="wrench" className="w-4 h-4" />
+            <span className="text-xs font-semibold w-36">Assigned Tools</span>
+          </div>
+          <Input
+            id="agent-tools"
+            placeholder="tool-a, tool-b, tool-c"
+            value={(value.assignedToolSlugs || []).join(', ')}
+            onChange={e => {
+              const list = e.target.value
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean)
+              onChange({ ...value, assignedToolSlugs: list })
+            }}
+            className="h-7 text-xs font-mono w-[320px] rounded-xl"
+          />
         </div>
       </div>
 
@@ -223,26 +243,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
           </div>
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Tools */}
-      <div className="space-y-2">
-        <Label htmlFor="agent-tools" className="text-xs font-medium">
-          Assigned Tools (comma separated slugs)
-        </Label>
-        <Input
-          id="agent-tools"
-          placeholder="tool-a, tool-b, tool-c"
-          value={(value.assignedToolSlugs || []).join(', ')}
-          onChange={e => {
-            const list = e.target.value
-              .split(',')
-              .map(s => s.trim())
-              .filter(Boolean)
-            onChange({ ...value, assignedToolSlugs: list })
-          }}
-          className="text-xs font-mono"
-        />
-      </div>
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
 

@@ -1,0 +1,6 @@
+{
+  "title": "Core Concepts",
+  "icon": "Boxes",
+  "defaultOpen": true,
+  "pages": ["agents", "models", "tools", "memory", "workflows", "prompts"]
+}

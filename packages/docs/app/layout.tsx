@@ -28,21 +28,19 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Starships.ai' }],
   creator: 'Starships.ai',
-  metadataBase: new URL('https://docs.starships.ai'),
+  metadataBase: new URL('https://starships.ai/docs'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://docs.starships.ai',
+    url: 'https://starships.ai/docs',
     title: 'Starships.ai Documentation',
-    description:
-      'Build the future of AI-powered applications with Starships.ai',
+    description: 'Build the future of AI-powered applications with Starships.ai',
     siteName: 'Starships.ai',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Starships.ai Documentation',
-    description:
-      'Build the future of AI-powered applications with Starships.ai',
+    description: 'Build the future of AI-powered applications with Starships.ai',
     creator: '@starshipsai',
   },
   robots: {

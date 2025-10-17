@@ -19,6 +19,7 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
 export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_CLIENT_PORT = 3000;
   const DEFAULT_SERVER_PORT = 4000;
+  const DEFAULT_DOCS_PORT = 3001;
   const DEFAULT_PROXY_PORT = 8080;
 
   // Validate critical environment variables for production safety
@@ -26,6 +27,7 @@ export function getEnvConfig(): EnvironmentConfig {
     PUBLIC_URL: process.env.PUBLIC_URL,
     CLIENT_URL: process.env.CLIENT_URL,
     SERVER_URL: process.env.SERVER_URL,
+    DOCS_URL: process.env.DOCS_URL,
     POSTGRES_HOST: process.env.POSTGRES_HOST,
     POSTGRES_USER: process.env.POSTGRES_USER,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
@@ -49,6 +51,7 @@ export function getEnvConfig(): EnvironmentConfig {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
     CLIENT_PORT: parseInt(process.env.CLIENT_PORT || `${DEFAULT_CLIENT_PORT}`, 10),
+    DOCS_PORT: parseInt(process.env.DOCS_PORT || `${DEFAULT_DOCS_PORT}`, 10),
     PROXY_PORT: parseInt(process.env.PROXY_PORT || `${DEFAULT_PROXY_PORT}`, 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
@@ -57,6 +60,7 @@ export function getEnvConfig(): EnvironmentConfig {
     PUBLIC_URL: requiredEnvVars.PUBLIC_URL!,
     CLIENT_URL: requiredEnvVars.CLIENT_URL!,
     SERVER_URL: requiredEnvVars.SERVER_URL!,
+    DOCS_URL: requiredEnvVars.DOCS_URL!,
 
     // PostgreSQL Database Configuration - Required, no localhost fallbacks
     POSTGRES_HOST: requiredEnvVars.POSTGRES_HOST!,

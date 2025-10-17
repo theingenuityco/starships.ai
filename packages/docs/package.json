@@ -1,11 +1,11 @@
 {
-  "name": "docs.starships.ai",
+  "name": "docs",
   "version": "0.0.0",
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --turbo",
-    "start": "next start",
+    "dev": "next dev --turbo -p 3001",
+    "start": "next start -p 3001",
     "postinstall": "fumadocs-mdx",
     "lint": "eslint"
   },

@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
+import { getMarkdownComponents } from '@/components/markdown/markdownComponents'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 
@@ -214,90 +215,10 @@ export function ConversationMessageContent({
     }
   }
 
-  // Memoized ReactMarkdown components for optimal streaming performance
+  // Shared markdown components for consistent rendering across app
   const markdownComponents = useMemo(
-    () => ({
-      // Enhanced paragraph rendering
-      p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-
-      // Enhanced link rendering with external indicator
-      a: ({ href, children }: any) => (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 inline-flex items-center gap-1">
-          {children}
-          {enableLinkPreview && <Icon name="external-link" className="w-3 h-3" />}
-        </a>
-      ),
-
-      // Enhanced code block rendering - unified for streaming + completed
-      code: ({ node, className: codeClassName, children, ...props }: any) => {
-        const match = /language-(\w+)/.exec(codeClassName || '')
-        const language = match ? match[1] : ''
-        const blockId = `${messageId}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
-        const isCodeBlock = Boolean(language)
-
-        if (isCodeBlock) {
-          const codeContent = String(children).replace(/\n$/, '')
-
-          return (
-            <div className="relative rounded-lg border bg-muted/30 my-2">
-              {/* Code block header with language and copy button */}
-              <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20">
-                <span className="text-xs font-medium text-muted-foreground uppercase">{language}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(codeContent, blockId)}>
-                  {copiedStates[blockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                </Button>
-              </div>
-
-              {/* Syntax highlighted code content */}
-              <SyntaxHighlighter
-                style={theme === 'dark' ? oneDark : oneLight}
-                language={language}
-                PreTag="div"
-                className="!m-0 !bg-transparent code-block-enhanced"
-                customStyle={{
-                  margin: 0,
-                  background: 'transparent',
-                  fontSize: '0.875rem',
-                  padding: '1rem',
-                  lineHeight: '1.5',
-                }}
-              >
-                {codeContent}
-              </SyntaxHighlighter>
-            </div>
-          )
-        }
-
-        // Inline code
-        return (
-          <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-            {children}
-          </code>
-        )
-      },
-
-      // Enhanced blockquote
-      blockquote: ({ children }: any) => <blockquote className="border-l-4 border-primary/20 pl-4 py-2 bg-muted/20 rounded-r-lg my-2">{children}</blockquote>,
-
-      // Enhanced list styling
-      ul: ({ children }: any) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
-      ol: ({ children }: any) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
-
-      // Enhanced table styling
-      table: ({ children }: any) => (
-        <div className="overflow-x-auto my-2">
-          <table className="min-w-full border-collapse border border-border rounded-lg">{children}</table>
-        </div>
-      ),
-      th: ({ children }: any) => <th className="border border-border bg-muted/50 px-3 py-2 text-left font-medium">{children}</th>,
-      td: ({ children }: any) => <td className="border border-border px-3 py-2">{children}</td>,
-
-      // Enhanced heading styles
-      h1: ({ children }: any) => <h1 className="text-xl font-bold mt-4 mb-2 first:mt-0">{children}</h1>,
-      h2: ({ children }: any) => <h2 className="text-lg font-semibold mt-3 mb-2 first:mt-0">{children}</h2>,
-      h3: ({ children }: any) => <h3 className="text-base font-medium mt-3 mb-2 first:mt-0">{children}</h3>,
-    }),
-    [messageId, theme, copiedStates, enableLinkPreview]
+    () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock }),
+    [theme, enableLinkPreview, messageId, copiedStates]
   )
 
   // Fallback for non-markdown content (rare cases)

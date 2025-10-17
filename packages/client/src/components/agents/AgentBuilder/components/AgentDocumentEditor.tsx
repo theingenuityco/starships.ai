@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { AGENT_CATEGORIES, DEFAULT_MODELS } from '../constants'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -50,7 +51,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Title */}
       <div className="space-y-4">
         <div className="space-y-4">
@@ -65,29 +66,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
           </div>
         </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md px-1 py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
-              <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
-                {getCategoryIcon(value.category)}
-                <span className="capitalize">{value.category}</span>
-              </Badge>
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
-            <div className="flex flex-col gap-0">
-              {AGENT_CATEGORIES.map(cat => (
-                <DropdownMenuItem key={cat} className="px-0.5 py-1 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
-                  <Badge variant="outline" className={cn('m-0 inline-flex w-auto max-w-max items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(cat))}>
-                    {getCategoryIcon(cat)}
-                    <span className="capitalize">{cat}</span>
-                  </Badge>
-                </DropdownMenuItem>
-              ))}
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* Quick selectors: Category and Model */}
@@ -128,23 +106,18 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             <Icon name="cpu" className="w-4 h-4" />
             <span className="text-xs font-semibold w-24">Model</span>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="inline-flex items-center gap-1 text-xs rounded-md border border-border/40 px-2 py-0.5 hover:bg-muted/30 transition-colors">
-                <span className="truncate max-w-[160px]">{value.model}</span>
-                <Icon name="chevron-down" className="w-3 h-3 opacity-60" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="p-1 w-64 frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
-              <div className="flex flex-col gap-0">
-                {DEFAULT_MODELS.map(m => (
-                  <DropdownMenuItem key={m} className="px-2 py-1 text-xs" onSelect={() => onChange({ ...value, model: m })}>
-                    {m}
-                  </DropdownMenuItem>
-                ))}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Select value={value.model} onValueChange={m => onChange({ ...value, model: m })}>
+            <SelectTrigger className="h-7 w-[220px] text-xs">
+              <SelectValue placeholder="Select a model" />
+            </SelectTrigger>
+            <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
+              {DEFAULT_MODELS.map(m => (
+                <SelectItem key={m} value={m} className="text-xs">
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -173,40 +146,59 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Generation settings */}
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="agent-temperature" className="text-xs font-medium">
-              Temperature
-            </Label>
-            <Input
-              id="agent-temperature"
-              type="number"
-              min="0"
-              max="2"
-              step="0.1"
-              value={value.temperature}
-              onChange={e => onChange({ ...value, temperature: parseFloat(e.target.value) || 0 })}
-              className="text-xs"
-            />
+      {/* Advanced options */}
+      <Collapsible defaultOpen={false} className="space-y-2">
+        <CollapsibleTrigger className="p-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground">Advanced options</Label>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="agent-temperature" className="text-xs font-medium">
+                Temperature
+              </Label>
+              <Input
+                id="agent-temperature"
+                type="number"
+                min="0"
+                max="2"
+                step="0.1"
+                value={value.temperature}
+                onChange={e => onChange({ ...value, temperature: parseFloat(e.target.value) || 0 })}
+                className="text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="agent-max-tokens" className="text-xs font-medium">
+                Max Tokens
+              </Label>
+              <Input
+                id="agent-max-tokens"
+                type="number"
+                min="1"
+                step="1"
+                value={value.maxTokens}
+                onChange={e => onChange({ ...value, maxTokens: parseInt(e.target.value, 10) || 2048 })}
+                className="text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="agent-timeout" className="text-xs font-medium">
+                Timeout (ms)
+              </Label>
+              <Input
+                id="agent-timeout"
+                type="number"
+                min="1000"
+                step="1000"
+                value={value.timeout}
+                onChange={e => onChange({ ...value, timeout: parseInt(e.target.value, 10) || 60000 })}
+                className="text-xs"
+              />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="agent-max-tokens" className="text-xs font-medium">
-              Max Tokens
-            </Label>
-            <Input
-              id="agent-max-tokens"
-              type="number"
-              min="1"
-              step="1"
-              value={value.maxTokens}
-              onChange={e => onChange({ ...value, maxTokens: parseInt(e.target.value, 10) || 2048 })}
-              className="text-xs"
-            />
-          </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Tools */}
       <div className="space-y-2">
@@ -229,22 +221,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       </div>
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
-
-      {/* Timeout */}
-      <div className="space-y-1.5">
-        <Label htmlFor="agent-timeout" className="text-xs font-medium">
-          Timeout (ms)
-        </Label>
-        <Input
-          id="agent-timeout"
-          type="number"
-          min="1000"
-          step="1000"
-          value={value.timeout}
-          onChange={e => onChange({ ...value, timeout: parseInt(e.target.value, 10) || 60000 })}
-          className="text-xs"
-        />
-      </div>
 
       {/* Blueprint JSON */}
       <div className="space-y-2">

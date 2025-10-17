@@ -18,6 +18,7 @@ import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { registrationRateLimit, resendVerificationRateLimit } from '@/middleware/rate-limit';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -86,8 +87,9 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 /**
  * Register new user
  * POST /auth/register
+ * Rate limited to prevent registration spam
  */
-router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/register', registrationRateLimit, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
     const bodyValidation = validateData(RegisterSchema, req.body, res, 'registration data');
@@ -308,9 +310,9 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
 /**
  * Resend verification email using established patterns
  * POST /auth/resend-verification
- * Follows established route patterns with Zod validation
+ * Rate limited to prevent email bombing attacks
  */
-router.post('/auth/resend-verification', async (req: Request, res: Response) => {
+router.post('/auth/resend-verification', resendVerificationRateLimit, async (req: Request, res: Response) => {
   try {
     // Validate request body using Zod
     const bodyValidation = validateData(EmailVerificationSchema, req.body, res, 'resend verification data');

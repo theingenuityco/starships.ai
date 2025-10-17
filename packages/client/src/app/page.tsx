@@ -63,6 +63,11 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Handle email verification success toast after component is mounted
+  useEffect(() => {
+    if (!mounted) return
     
     // Check for email verification success parameter
     const verification = searchParams?.get('verification')
@@ -82,7 +87,7 @@ export default function HomePage() {
         window.history.replaceState({}, '', url.toString())
       }
     }
-  }, [searchParams])
+  }, [mounted, searchParams])
 
   if (!mounted || isLoading) return null
 

@@ -20,8 +20,13 @@ export class EmailVerificationTokenRepository extends BaseRepository {
    * Generate and store a secure email verification token
    * Returns the generated token for email sending
    */
-  async generateToken(userId: string, email: string): Promise<string> {
+  async generateToken(userId: string, email: string, retryCount: number = 0): Promise<string> {
     return this.executeWithErrorHandling(async () => {
+      // Safety check: prevent infinite recursion from token collisions
+      if (retryCount >= 3) {
+        throw new Error('Failed to generate unique verification token after 3 attempts');
+      }
+      
       // Generate cryptographically secure token (64 hex chars = 32 bytes)
       const token = crypto.randomBytes(32).toString('hex');
       const id = nanoid();
@@ -48,8 +53,8 @@ export class EmailVerificationTokenRepository extends BaseRepository {
         return token;
       } catch (error: unknown) {
         if (error && typeof error === 'object' && 'code' in error && error.code === '23505') { // PostgreSQL unique constraint violation
-          // Extremely rare - retry with new token
-          return this.generateToken(userId, email);
+          // Extremely rare - retry with new token (with incremented retry counter)
+          return this.generateToken(userId, email, retryCount + 1);
         }
         throw error;
       }

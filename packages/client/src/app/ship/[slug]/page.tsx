@@ -78,7 +78,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">{starship?.name || 'Starship'}</h1>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <Badge variant="outline">/{slug}</Badge>
+                <Badge variant="outline">{slug}</Badge>
               </div>
               <p className="text-muted-foreground mt-2">Overview and quick controls for your starship</p>
             </div>

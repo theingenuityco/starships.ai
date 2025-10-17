@@ -6,7 +6,7 @@ import React from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useQuery } from '@tanstack/react-query'
@@ -97,16 +97,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
 
               <TabsContent value="tools">
                 <section aria-labelledby="tools-list">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 id="tools-list" className="text-lg font-semibold flex items-center gap-2">
-                        <Icon name="wrench" className="h-5 w-5 text-primary" />
-                        Tools
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-1">Installed tools available to your agents</p>
-                    </div>
-                  </div>
-
                   {starshipToolsLoading ? (
                     <div className="space-y-2">
                       {[1, 2, 3].map(i => (

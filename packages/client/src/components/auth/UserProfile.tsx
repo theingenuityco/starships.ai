@@ -4,7 +4,7 @@ import { LordIcon } from '@/components/animated/LordIcon'
 import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 
 import { useAuth } from '@/hooks/useAuth'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarImage } from '@/components/ui/avatar'
 
 import { usePathname, useRouter } from 'next/navigation'
 import React from 'react'
@@ -61,7 +61,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
         >
           {userAvatar ? (
             <Avatar className="w-7 h-7">
-              <AvatarFallback className="text-xs">{userAvatar}</AvatarFallback>
+              <AvatarImage src={userAvatar} alt={userName || userEmail || 'User avatar'} />
             </Avatar>
           ) : (
             <LordIcon src={getLordiconUrl('user')} width={28} height={28} className="w-[28px] h-[28px]" trigger="click" />
@@ -86,7 +86,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
         <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
           {userAvatar ? (
             <Avatar className="w-4 h-4">
-              <AvatarFallback className="text-[10px]">{userAvatar}</AvatarFallback>
+              <AvatarImage src={userAvatar} alt={userName || userEmail || 'User avatar'} />
             </Avatar>
           ) : (
             <LordIcon src={getLordiconUrl('user')} width={16} height={16} className="w-4 h-4 text-primary" trigger="click" />

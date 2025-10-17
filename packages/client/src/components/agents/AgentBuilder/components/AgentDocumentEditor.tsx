@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
@@ -89,21 +90,29 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
       </div>
 
       {/* Description */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium">Description</Label>
-        <RichMarkdownEditor value={value.description} onChange={val => onChange({ ...value, description: val })} placeholder="Write a clear description. Markdown supported." noMinHeight />
-      </div>
+      <Collapsible defaultOpen={true} className="space-y-2">
+        <CollapsibleTrigger className="p-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <RichMarkdownEditor value={value.description} onChange={val => onChange({ ...value, description: val })} placeholder="Write a clear description. Markdown supported." noMinHeight />
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* System Prompt */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium">System Prompt</Label>
-        <RichMarkdownEditor
-          value={value.systemPrompt}
-          onChange={val => onChange({ ...value, systemPrompt: val })}
-          placeholder="Define the agent's character, mission, and behavior..."
-          minHeightPx={200}
-        />
-      </div>
+      <Collapsible defaultOpen={true} className="space-y-2">
+        <CollapsibleTrigger className="p-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <RichMarkdownEditor
+            value={value.systemPrompt}
+            onChange={val => onChange({ ...value, systemPrompt: val })}
+            placeholder="Define the agent's character, mission, and behavior..."
+            minHeightPx={200}
+          />
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Model & generation settings */}
       <div className="space-y-4">

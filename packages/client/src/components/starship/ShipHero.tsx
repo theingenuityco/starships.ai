@@ -6,7 +6,7 @@ import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import { Outfit } from 'next/font/google'
 
@@ -20,17 +20,9 @@ const heroHeadingFont = Outfit({ subsets: ['latin'], weight: ['600', '700'] })
 
 export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.JSX.Element {
   const router = useRouter()
+  const { data: agents = [] } = useStarshipAgents(starshipId || '', !!starshipId)
 
-  const handleCreateFromTemplate = async (templateId: string) => {
-    if (!starshipId) return
-    try {
-      const { templateAPI } = await import('@/lib/api')
-      const newAgent = await templateAPI.createAgentFromTemplate(templateId, starshipId)
-      router.push(`/ship/${slug}/conversations?agent=${newAgent.id}`)
-    } catch (err) {
-      // Swallow error; AgentTemplateSelector already logs, and toast is handled in hooks
-    }
-  }
+  const gaiaAgentId = Array.isArray(agents) ? agents.find(a => (a?.name || '').toLowerCase().includes('gaia'))?.id || null : null
   return (
     <section aria-labelledby="ship-hero" className={cn('relative overflow-hidden rounded-2xl frosted-glass-card shadow-frosted-lg border border-border/80 p-7 md:p-8', className)}>
       {/* Decorative gradient overlay */}
@@ -76,16 +68,12 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
 
         {/* Gaia-focused actions */}
         <div className="flex flex-col items-stretch gap-3 sm:w-64">
-          <AgentTemplateSelector
-            onSelectTemplate={() => {}}
-            onCreateFromTemplate={handleCreateFromTemplate}
-            trigger={
-              <Button size="lg" disabled={!starshipId} className="whitespace-nowrap">
-                <Icon name="sparkles" className="h-5 w-5" />
-                <span className="ml-1">Create with Gaia</span>
-              </Button>
-            }
-          />
+          <Button asChild size="lg" disabled={!starshipId} className="whitespace-nowrap">
+            <Link href={`/ship/${slug}/conversations${gaiaAgentId ? `?agent=${gaiaAgentId}` : ''}`}>
+              <Icon name="sparkles" className="h-5 w-5" />
+              <span className="ml-1">Create with Gaia</span>
+            </Link>
+          </Button>
           <Button asChild size="lg" variant="outline" className="whitespace-nowrap">
             <Link href="/marketplace">
               <Icon name="store" className="h-5 w-5" />

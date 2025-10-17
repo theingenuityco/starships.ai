@@ -117,5 +117,4 @@ export interface StarshipDetailsResponse extends StarshipResponse {
  */
 export interface CreateStarshipRequest {
   name: string;
-  slug?: string; // Optional - will be auto-generated if not provided
 }

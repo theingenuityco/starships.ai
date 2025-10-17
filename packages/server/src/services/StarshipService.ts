@@ -8,7 +8,6 @@ import { WalletService } from './WalletService';
 export interface CreateStarshipData {
   ownerId: string;
   name: string;
-  slug?: string;
   maxAgents?: number;
 }
 
@@ -40,7 +39,6 @@ export class StarshipService {
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
-      slug: data.slug,
       maxAgents: data.maxAgents ?? 3,
       status: 'active',
     });

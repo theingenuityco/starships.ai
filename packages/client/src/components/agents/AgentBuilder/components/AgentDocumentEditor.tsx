@@ -152,8 +152,8 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
                     <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
                   </div>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[420px] p-0">
-                  <Command>
+                <PopoverContent align="start" className="w-[420px] p-0 frosted-glass-card rounded-xl shadow-frosted-lg">
+                  <Command className="bg-transparent">
                     <CommandInput placeholder="Search tools..." />
                     <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
                     <CommandList>

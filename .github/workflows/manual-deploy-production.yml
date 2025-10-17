@@ -197,6 +197,11 @@ jobs:
             --from-literal=DEFAULT_LLM_PROVIDER="${{ vars.DEFAULT_LLM_PROVIDER }}" \
             --from-literal=DEFAULT_CHAT_MODEL="${{ vars.DEFAULT_CHAT_MODEL }}" \
             --from-literal=GA_MEASUREMENT_ID="${{ vars.GA_MEASUREMENT_ID }}" \
+            --from-literal=EMAIL_FROM_ADDRESS="${{ secrets.EMAIL_FROM_ADDRESS }}" \
+            --from-literal=EMAIL_FROM_NAME="${{ secrets.EMAIL_FROM_NAME }}" \
+            --from-literal=AWS_SES_REGION="${{ secrets.AWS_SES_REGION }}" \
+            --from-literal=AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            --from-literal=AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             -n starships-prod
 
           # Create GHCR pull secret using persistent PAT

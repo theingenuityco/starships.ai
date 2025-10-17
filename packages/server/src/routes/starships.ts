@@ -76,16 +76,11 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
 
     const starshipService = new StarshipService();
 
-    console.log('[STARSHIP-CREATE] Generating unique slug...');
-    const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
-    console.log('[STARSHIP-CREATE] Generated slug:', slug);
-
     console.log('[STARSHIP-CREATE] Creating starship in database...');
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
       maxAgents,
-      slug,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 

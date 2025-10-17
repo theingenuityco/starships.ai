@@ -66,14 +66,14 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> & { slug?: string; maxAgents?: number }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> & { maxAgents?: number }
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
 
-        // Generate unique slug if not provided
-        const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
+        // Always generate a unique slug from the name
+        const slug = await this.generateUniqueSlug(entity.name, entity.ownerId);
 
         const starshipData = {
           ...entity,
@@ -307,32 +307,21 @@ export class StarshipRepository extends BaseRepository {
     const baseSlug = this.createSlugFromName(name);
     console.log('[STARSHIP-SLUG] Base slug created:', baseSlug);
 
-    // Check if base slug is available
-    console.log('[STARSHIP-SLUG] Checking if base slug is available...');
-    if (await this.isSlugAvailable(baseSlug, ownerId)) {
-      console.log('[STARSHIP-SLUG] Base slug is available, returning:', baseSlug);
-      return baseSlug;
+    // Always append a short unique suffix to enforce format "xxx-yyy"
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const randomSuffix = Math.random().toString(36).substring(2, 8); // 6 random chars
+      const candidate = `${baseSlug}-${randomSuffix}`;
+      if (await this.isSlugAvailable(candidate, ownerId)) {
+        console.log('[STARSHIP-SLUG] Candidate slug available:', candidate);
+        return candidate;
+      }
     }
 
-    console.log('[STARSHIP-SLUG] Base slug not available, using optimized generation...');
-
-    // OPTIMIZED: Use random suffix instead of sequential to avoid collisions
-    const timestamp = Date.now().toString(36); // Base36 timestamp
-    const randomSuffix = Math.random().toString(36).substring(2, 8); // 6 random chars
-    const optimizedSlug = `${baseSlug}-${timestamp}-${randomSuffix}`;
-
-    // Double-check the optimized slug is available
-    if (await this.isSlugAvailable(optimizedSlug, ownerId)) {
-      console.log('[STARSHIP-SLUG] Optimized slug available:', optimizedSlug);
-      return optimizedSlug;
-    }
-
-    // FALLBACK: If somehow still collides, use timestamp-based fallback
-    const fallbackSuffix = `${timestamp}-${Math.random().toString(36).substring(2, 12)}`;
-    const fallbackSlug = `${baseSlug}-${fallbackSuffix}`;
-
-    console.log('[STARSHIP-SLUG] Using fallback slug:', fallbackSlug);
-    return fallbackSlug;
+    // Fallback: timestamp-based suffix if random attempts collide
+    const fallback = `${baseSlug}-${Date.now().toString(36)}`;
+    console.log('[STARSHIP-SLUG] Using fallback slug:', fallback);
+    return fallback;
   }
 
   async isSlugAvailable(slug: string, ownerId: string, excludeId?: string): Promise<boolean> {

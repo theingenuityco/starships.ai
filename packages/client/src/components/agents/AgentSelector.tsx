@@ -4,10 +4,12 @@ import Icon from '@/components/primitives/Icon'
 
 import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
 import { AgentCard } from '@/components/agents/AgentCard'
+import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 import { AgentForm } from '@/components/agents/AgentForm'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import { AgentTester } from '@/components/agents/AgentTester'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
@@ -51,7 +53,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   const [analyticsAgent, setAnalyticsAgent] = useState<AgentModel | null>(null)
 
   // Filter state
-  const [filters] = useState<FilterState>({
+  const [filters, setFilters] = useState<FilterState>({
     searchQuery: '',
   })
 
@@ -225,86 +227,51 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header with better visual hierarchy */}
-      <div className="p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-6">
-        <div className="flex items-center gap-4">
-          <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
-            <Icon name="user-cog" className="h-6 w-6 text-primary" />
-          </span>
-          <div className="flex-1 min-w-0 space-y-1">
-            <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
-            <p className="text-sm text-muted-foreground">Manage your starship&apos;s AI crew members</p>
-          </div>
+      {showCreateButton && (
+        <div className="flex items-center gap-2 justify-end">
+          <AgentTemplateSelector
+            onSelectTemplate={template => {
+              // Handle template selection if needed
+            }}
+            onCreateFromTemplate={handleCreateFromTemplate}
+            trigger={
+              <Button
+                variant="default"
+                size="sm"
+                disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
+                className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={!starshipId ? 'No starship available for agent deployment' : undefined}
+              >
+                <Icon name="sparkles" className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span>From Template</span>
+              </Button>
+            }
+          />
+          <Button
+            onClick={handleCreateAgent}
+            size="sm"
+            variant="outline"
+            disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
+            className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!starshipId ? 'No starship available for agent deployment' : undefined}
+          >
+            <Icon name="plus" className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span>Create Agent</span>
+          </Button>
         </div>
-        {showCreateButton && (
-          <div className="flex items-center gap-2 justify-end">
-            <AgentTemplateSelector
-              onSelectTemplate={template => {
-                // Handle template selection if needed
-              }}
-              onCreateFromTemplate={handleCreateFromTemplate}
-              trigger={
-                <Button
-                  variant="default"
-                  size="sm"
-                  disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
-                  className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!starshipId ? 'No starship available for agent deployment' : undefined}
-                >
-                  <Icon name="sparkles" className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span>From Template</span>
-                </Button>
-              }
-            />
-            <Button
-              onClick={handleCreateAgent}
-              size="sm"
-              variant="outline"
-              disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
-              className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!starshipId ? 'No starship available for agent deployment' : undefined}
-            >
-              <Icon name="plus" className="w-4 h-4 mr-2 flex-shrink-0" />
-              <span>Create Agent</span>
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       {showFilters && (
-        <div className="space-y-4">
-          {/* Enhanced Search & Filter Section */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-1">
-              <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
-              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">ACTIVE AGENTS</h4>
-              <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
-            </div>
-
-            {/* Search and Filters Side by Side - COMMENTED OUT FOR NOW */}
-            {/* <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search Input */}
-            {/* <div className="flex-1 relative">
-                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
-                  <Icon name="search" className="w-4 h-4" />
-                </div>
-                <Input
-                  placeholder="Search agents..."
-                  value={filters.searchQuery}
-                  onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                  className="pl-12 pr-4 h-12 bg-background border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
-                />
-              </div> */}
-
-            {/* Filters */}
-            {/* <div className="lg:flex-shrink-0">
-                <AgentFilters
-                  filters={filters}
-                  onFiltersChange={setFilters}
-                  availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
-                />
-              </div> */}
-            {/* </div> */}
+        <div className="mb-8 sticky top-6 z-30">
+          <div className="relative max-w-md mb-6 mx-auto">
+            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search agents..."
+              value={filters.searchQuery}
+              onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+              className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
+            />
           </div>
         </div>
       )}
@@ -324,19 +291,9 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
           <p className="text-base text-muted-foreground mb-3">{filters.searchQuery || filters.category ? 'No agents match your filters' : AGENT_TEXT.NO_AGENTS_AVAILABLE}</p>
         </div>
       ) : (
-        <div className="space-y-3 mt-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              isSelected={selectedAgent?.id === agent.id}
-              onClick={() => onAgentSelect(agent)}
-              onEdit={handleEditAgent}
-              onDelete={handleDeleteAgent}
-              onTest={handleTestAgent}
-              onAnalytics={handleAnalyticsAgent}
-              showActions={true}
-            />
+            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} onChat={() => onAgentSelect(agent)} />
           ))}
         </div>
       )}

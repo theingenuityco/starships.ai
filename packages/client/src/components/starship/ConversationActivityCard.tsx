@@ -37,36 +37,25 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
   }
 
   return (
-    <Card
-      className={cn(
-        'frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg border-2 !border-primary/30 hover:!border-primary/70 group relative overflow-hidden transition-all duration-300',
-        className
-      )}
-    >
-      {/* Frosted glass gradient with visible tint that expands on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-30 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-      {/* Sparkle decoration */}
-      <div className="absolute top-2 right-2 opacity-30 group-hover:opacity-60 transition-opacity duration-300">
-        <Icon name="sparkles" className="h-6 w-6 text-primary animate-pulse" />
-      </div>
-
-      <CardHeader className="relative z-10 pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
+    <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col h-full', className)}>
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Icon name="message-square" className="h-4 w-4" />
           {hasConversations ? 'Recent Conversation' : 'Start Conversations'}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="relative z-10 pt-0">
+      <CardContent className="pt-0 flex-1 flex flex-col justify-between gap-4">
         {hasConversations ? (
           <>
-            <div className="text-base font-semibold mb-1 line-clamp-1">{recentConversation.title || 'Untitled'}</div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-4">
-              <Icon name="clock" className="h-3 w-3" />
-              {formatTimeAgo(recentConversation.updatedAt)}
+            <div>
+              <div className="text-lg font-semibold leading-tight mb-2 line-clamp-2">{recentConversation.title || 'Untitled'}</div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Icon name="clock" className="h-3 w-3" />
+                {formatTimeAgo(recentConversation.updatedAt)}
+              </div>
             </div>
-            <Button asChild size="sm" className="w-full">
+            <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations/${recentConversation.id}`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Continue Chat
@@ -74,16 +63,19 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
             </Button>
           </>
         ) : (
-          <>
-            <div className="text-2xl font-bold mb-1">—</div>
-            <div className="text-xs text-muted-foreground mb-4">Deploy agents to start chatting</div>
-            <Button asChild size="sm" className="w-full">
+          <div className="flex flex-col h-full">
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <Icon name="help-circle" className="h-6 w-6 text-muted-foreground mb-2" />
+              <div className="text-sm font-medium text-muted-foreground">No conversations yet</div>
+              <div className="text-xs text-muted-foreground mb-4">Start a conversation with your agents to see recent activity</div>
+            </div>
+            <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
-                Get Started
+                Start a Conversation
               </Link>
             </Button>
-          </>
+          </div>
         )}
       </CardContent>
     </Card>

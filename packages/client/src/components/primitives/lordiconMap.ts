@@ -11,6 +11,9 @@ export const LORDICON_URLS: Record<string, string> = {
   key: '/lordicon/key.json',
   user: '/lordicon/user.json',
   logout: '/lordicon/logout.json',
+  // New submenu icons (drop the JSON files into packages/client/public/lordicon)
+  agents: '/lordicon/agents.json',
+  tools: '/lordicon/tools.json',
 }
 
 export function getLordiconUrl(name: string): string | undefined {

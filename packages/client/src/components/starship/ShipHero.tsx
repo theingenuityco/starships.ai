@@ -7,22 +7,18 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
-import type { WalletModel } from '@starships/protocol'
 import { cn } from '@/lib/utils'
 import { Outfit } from 'next/font/google'
 
 export interface ShipHeroProps {
-  starshipName?: string | null
   slug: string
   starshipId?: string
-  wallet?: WalletModel | null
-  walletLoading?: boolean
   className?: string
 }
 
 const heroHeadingFont = Outfit({ subsets: ['latin'], weight: ['600', '700'] })
 
-export function ShipHero({ starshipName, slug, starshipId, className }: ShipHeroProps): React.JSX.Element {
+export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.JSX.Element {
   const router = useRouter()
 
   const handleCreateFromTemplate = async (templateId: string) => {
@@ -90,16 +86,12 @@ export function ShipHero({ starshipName, slug, starshipId, className }: ShipHero
               </Button>
             }
           />
-          <AgentTemplateSelector
-            onSelectTemplate={() => {}}
-            onCreateFromTemplate={handleCreateFromTemplate}
-            trigger={
-              <Button size="lg" variant="outline" disabled={!starshipId} className="whitespace-nowrap">
-                <Icon name="store" className="h-5 w-5" />
-                <span className="ml-1">Browse agent templates</span>
-              </Button>
-            }
-          />
+          <Button asChild size="lg" variant="outline" className="whitespace-nowrap">
+            <Link href="/marketplace">
+              <Icon name="store" className="h-5 w-5" />
+              <span className="ml-1">Browse Marketplace</span>
+            </Link>
+          </Button>
         </div>
       </div>
     </section>

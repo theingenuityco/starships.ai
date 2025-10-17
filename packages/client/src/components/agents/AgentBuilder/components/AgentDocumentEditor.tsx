@@ -10,11 +10,12 @@ import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { ModelSelector } from './ModelSelector'
+import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { AGENT_CATEGORIES } from '../constants'
+import { AGENT_CATEGORIES, DEFAULT_MODELS } from '../constants'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -89,6 +90,64 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
         </DropdownMenu>
       </div>
 
+      {/* Quick selectors: Category and Model */}
+      <div className="grid grid-cols-1 gap-3">
+        {/* Category quick picker */}
+        <div className="flex items-center justify-between rounded-md border border-border/40 bg-muted/10 px-2 h-9">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Icon name="tag" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Category</span>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md px-1 py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+                <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
+                  {getCategoryIcon(value.category)}
+                  <span className="capitalize">{value.category}</span>
+                </Badge>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
+              <div className="flex flex-col gap-0">
+                {AGENT_CATEGORIES.map(cat => (
+                  <DropdownMenuItem key={cat} className="px-0.5 py-1 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
+                    <Badge variant="outline" className={cn('m-0 inline-flex w-auto max-w-max items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(cat))}>
+                      {getCategoryIcon(cat)}
+                      <span className="capitalize">{cat}</span>
+                    </Badge>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Model quick picker */}
+        <div className="flex items-center justify-between rounded-md border border-border/40 bg-muted/10 px-2 h-9">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Icon name="cpu" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Model</span>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="inline-flex items-center gap-1 text-xs rounded-md border border-border/40 px-2 py-0.5 hover:bg-muted/30 transition-colors">
+                <span className="truncate max-w-[160px]">{value.model}</span>
+                <Icon name="chevron-down" className="w-3 h-3 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="p-1 w-64 frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
+              <div className="flex flex-col gap-0">
+                {DEFAULT_MODELS.map(m => (
+                  <DropdownMenuItem key={m} className="px-2 py-1 text-xs" onSelect={() => onChange({ ...value, model: m })}>
+                    {m}
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
       {/* Description */}
       <Collapsible defaultOpen={true} className="space-y-2">
         <CollapsibleTrigger className="p-1.5">
@@ -114,9 +173,8 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Model & generation settings */}
+      {/* Generation settings */}
       <div className="space-y-4">
-        <ModelSelector selectedModel={value.model} onModelChange={model => onChange({ ...value, model })} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="agent-temperature" className="text-xs font-medium">

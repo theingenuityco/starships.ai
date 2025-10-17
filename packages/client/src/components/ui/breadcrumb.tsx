@@ -2,7 +2,6 @@ import Icon from '@/components/primitives/Icon'
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 
-
 import { cn } from '@/lib/utils'
 
 const Breadcrumb = React.forwardRef<
@@ -42,7 +41,7 @@ BreadcrumbPage.displayName = 'BreadcrumbPage'
 
 const BreadcrumbSeparator = ({ children, className, ...props }: React.ComponentProps<'li'>) => (
   <li role="presentation" aria-hidden="true" className={cn('[&>svg]:w-3.5 [&>svg]:h-3.5', className)} {...props}>
-    {children ?? <Icon name="chevron-right"  />}
+    {children ?? <Icon name="caret-right" weight="fill" className="text-foreground" />}
   </li>
 )
 BreadcrumbSeparator.displayName = 'BreadcrumbSeparator'

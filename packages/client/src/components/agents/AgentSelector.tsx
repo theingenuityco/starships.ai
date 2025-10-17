@@ -8,6 +8,7 @@ import { AgentForm } from '@/components/agents/AgentForm'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import { AgentTester } from '@/components/agents/AgentTester'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
@@ -51,7 +52,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   const [analyticsAgent, setAnalyticsAgent] = useState<AgentModel | null>(null)
 
   // Filter state
-  const [filters] = useState<FilterState>({
+  const [filters, setFilters] = useState<FilterState>({
     searchQuery: '',
   })
 
@@ -260,33 +261,16 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       )}
 
       {showFilters && (
-        <div className="space-y-4">
-          {/* Enhanced Search & Filter Section */}
-          <div className="space-y-3">
-            {/* Search and Filters Side by Side - COMMENTED OUT FOR NOW */}
-            {/* <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search Input */}
-            {/* <div className="flex-1 relative">
-                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
-                  <Icon name="search" className="w-4 h-4" />
-                </div>
-                <Input
-                  placeholder="Search agents..."
-                  value={filters.searchQuery}
-                  onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                  className="pl-12 pr-4 h-12 bg-background border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
-                />
-              </div> */}
-
-            {/* Filters */}
-            {/* <div className="lg:flex-shrink-0">
-                <AgentFilters
-                  filters={filters}
-                  onFiltersChange={setFilters}
-                  availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
-                />
-              </div> */}
-            {/* </div> */}
+        <div className="mb-8">
+          <div className="relative max-w-md mb-6 mx-auto">
+            <Icon name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search agents..."
+              value={filters.searchQuery}
+              onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+              className="pl-10 pr-4 py-2 w-full"
+            />
           </div>
         </div>
       )}

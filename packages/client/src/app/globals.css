@@ -435,11 +435,18 @@
   }
 
   .tiptap-content ul {
-    @apply list-disc list-inside space-y-1 my-2;
+    /* Use outside markers to keep text on the same line as the bullet */
+    @apply list-disc list-outside pl-5 space-y-1 my-2;
   }
 
   .tiptap-content ol {
-    @apply list-decimal list-inside space-y-1 my-2;
+    /* Use outside markers to keep text on the same line as the number */
+    @apply list-decimal list-outside pl-5 space-y-1 my-2;
+  }
+
+  /* Tiptap wraps list contents in <p>; remove default margins to prevent odd breaks */
+  .tiptap-content li p {
+    @apply m-0;
   }
 
   .tiptap-content table {

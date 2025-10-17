@@ -297,7 +297,7 @@ export function Navigation(props: NavigationProps) {
                                   : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
                               }`}
                             >
-                              <LordIcon src={getLordiconUrl('user')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('agents')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -319,7 +319,7 @@ export function Navigation(props: NavigationProps) {
                                   : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
                               }`}
                             >
-                              <LordIcon src={getLordiconUrl('hub')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
+                              <LordIcon src={getLordiconUrl('tools')} width={18} height={18} className="w-[18px] h-[18px]" trigger="hover" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>

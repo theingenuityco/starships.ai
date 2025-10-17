@@ -1,15 +1,13 @@
 'use client'
 
-import Icon from '@/components/primitives/Icon'
 import { LordIcon } from '@/components/animated/LordIcon'
 import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 import { usePathname, useRouter } from 'next/navigation'
-import React, { useState } from 'react'
-import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover'
+import React from 'react'
 
 interface UserProfileProps {
   mode?: 'collapsed' | 'expanded'
@@ -86,7 +84,13 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     >
       <div className="relative">
         <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
-          <LordIcon src={getLordiconUrl('user')} width={16} height={16} className="w-4 h-4 text-primary" trigger="click" />
+          {userAvatar ? (
+            <Avatar className="w-4 h-4">
+              <AvatarFallback className="text-[10px]">{userAvatar}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <LordIcon src={getLordiconUrl('user')} width={16} height={16} className="w-4 h-4 text-primary" trigger="click" />
+          )}
         </div>
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-background animate-pulse"></div>
       </div>

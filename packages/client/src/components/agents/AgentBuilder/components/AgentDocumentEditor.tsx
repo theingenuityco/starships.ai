@@ -17,6 +17,9 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { AGENT_CATEGORIES, DEFAULT_MODELS } from '../constants'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { useToolTemplates } from '@/hooks/useTemplates'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -125,19 +128,64 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
             <Icon name="wrench" className="w-4 h-4" />
             <span className="text-xs font-semibold w-36">Assigned Tools</span>
           </div>
-          <Input
-            id="agent-tools"
-            placeholder="tool-a, tool-b, tool-c"
-            value={(value.assignedToolSlugs || []).join(', ')}
-            onChange={e => {
-              const list = e.target.value
-                .split(',')
-                .map(s => s.trim())
-                .filter(Boolean)
-              onChange({ ...value, assignedToolSlugs: list })
-            }}
-            className="h-7 text-xs font-mono w-[320px] rounded-xl"
-          />
+          {(() => {
+            const { data: toolTemplates } = useToolTemplates(undefined, true)
+            const fetchedSlugs = Array.isArray(toolTemplates) ? Array.from(new Set(toolTemplates.map((t: any) => t.slug).filter(Boolean))) : []
+            const selected = value.assignedToolSlugs || []
+            const allOptions = Array.from(new Set([...(selected as string[]), ...fetchedSlugs]))
+            return (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+                    {selected.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">Select tools</span>
+                    ) : (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {selected.map(slug => (
+                          <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
+                            <Icon name="wrench" />
+                            <span className="font-mono truncate max-w-[140px]">{slug}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[420px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search tools..." />
+                    <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {allOptions.map(slug => {
+                          const isSelected = selected.includes(slug)
+                          return (
+                            <CommandItem
+                              key={slug}
+                              onSelect={() => {
+                                const next = isSelected ? selected.filter(s => s !== slug) : [...selected, slug]
+                                onChange({ ...value, assignedToolSlugs: next })
+                              }}
+                              className="text-xs"
+                            >
+                              <Badge
+                                variant="outline"
+                                className={`m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3 ${isSelected ? 'ring-1 ring-primary/40' : ''}`}
+                              >
+                                <Icon name="wrench" />
+                                <span className="font-mono">{slug}</span>
+                              </Badge>
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )
+          })()}
         </div>
       </div>
 

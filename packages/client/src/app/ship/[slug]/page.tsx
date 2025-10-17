@@ -111,7 +111,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                     <span>Ship</span>
                   </TabsTrigger>
                   <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="user-cog" className="h-4 w-4" />
+                    <Icon name="head-circuit" className="h-4 w-4" />
                     <span>Agents</span>
                   </TabsTrigger>
                   <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">

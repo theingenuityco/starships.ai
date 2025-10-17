@@ -25,7 +25,7 @@ export default function StarshipAgentsPage(): React.JSX.Element {
           <div className="w-full max-w-6xl mx-auto space-y-8">
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Icon name="rocket" className="h-6 w-6 text-primary" />
+                <Icon name="head-circuit" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Agents</h1>
               </div>
               <div className="flex items-center justify-center gap-2">
@@ -69,7 +69,7 @@ export default function StarshipAgentsPage(): React.JSX.Element {
                     <span>Ship</span>
                   </TabsTrigger>
                   <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="user-cog" className="h-4 w-4" />
+                    <Icon name="head-circuit" className="h-4 w-4" />
                     <span>Agents</span>
                   </TabsTrigger>
                   <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">

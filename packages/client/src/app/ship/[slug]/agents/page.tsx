@@ -33,7 +33,7 @@ export default function StarshipAgentsPage(): React.JSX.Element {
                   <BreadcrumbList>
                     <BreadcrumbItem>
                       <BreadcrumbLink href={`/ship/${slug}`} className="font-mono">
-                        <Badge variant="outline" className="font-mono">
+                        <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
                           {slug}
                         </Badge>
                       </BreadcrumbLink>
@@ -41,7 +41,9 @@ export default function StarshipAgentsPage(): React.JSX.Element {
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       <BreadcrumbPage>
-                        <Badge variant="outline">Agents</Badge>
+                        <Badge variant="outline" className="text-foreground">
+                          Agents
+                        </Badge>
                       </BreadcrumbPage>
                     </BreadcrumbItem>
                   </BreadcrumbList>

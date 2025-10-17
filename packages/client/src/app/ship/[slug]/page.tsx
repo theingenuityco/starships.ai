@@ -22,6 +22,7 @@ import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 
 import type { AgentModel } from '@starships/protocol'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
@@ -78,7 +79,17 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">{starship?.name || 'Starship'}</h1>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <Badge variant="outline">{slug}</Badge>
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbPage className="font-mono">
+                        <Badge variant="outline" className="font-mono">
+                          {slug}
+                        </Badge>
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
               </div>
               <p className="text-muted-foreground mt-2">Overview and quick controls for your starship</p>
             </div>

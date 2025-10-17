@@ -18,9 +18,12 @@ const map: Record<string, ResolvedIcon> = {
   sparkles: { type: 'phosphor', component: 'Sparkle' },
   wrench: { type: 'phosphor', component: 'Wrench' },
   'check-circle': { type: 'phosphor', component: 'CheckCircle' },
+  check: { type: 'phosphor', component: 'Check' },
   wallet: { type: 'phosphor', component: 'Wallet' },
   mail: { type: 'radix', component: 'EnvelopeClosedIcon' },
   'user-cog': { type: 'phosphor', component: 'UserGear' },
+  tag: { type: 'phosphor', component: 'Tag' },
+  cpu: { type: 'phosphor', component: 'Brain' },
 
   // Navbar / UI common
   store: { type: 'phosphor', component: 'Storefront' },

@@ -409,6 +409,69 @@
  * - Honors light/dark via CSS vars
  */
 @layer components {
+  /* Tiptap content typography aligned with conversation renderer */
+  .tiptap-content {
+    @apply leading-relaxed text-foreground;
+  }
+
+  .tiptap-content p {
+    @apply mb-2 last:mb-0;
+  }
+
+  .tiptap-content a {
+    @apply text-primary underline hover:text-primary/80 inline-flex items-center gap-1;
+  }
+
+  .tiptap-content code:not(pre code) {
+    @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  .tiptap-content pre code {
+    @apply text-sm leading-6;
+  }
+
+  .tiptap-content blockquote {
+    @apply border-l-4 border-primary/20 pl-4 py-2 bg-muted/20 rounded-r-lg my-2;
+  }
+
+  .tiptap-content ul {
+    /* Use outside markers to keep text on the same line as the bullet */
+    @apply list-disc list-outside pl-5 space-y-1 my-2;
+  }
+
+  .tiptap-content ol {
+    /* Use outside markers to keep text on the same line as the number */
+    @apply list-decimal list-outside pl-5 space-y-1 my-2;
+  }
+
+  /* Tiptap wraps list contents in <p>; remove default margins to prevent odd breaks */
+  .tiptap-content li p {
+    @apply m-0;
+  }
+
+  .tiptap-content table {
+    @apply min-w-full border-collapse border border-border rounded-lg my-2;
+  }
+
+  .tiptap-content th {
+    @apply border border-border bg-muted/50 px-3 py-2 text-left font-medium;
+  }
+
+  .tiptap-content td {
+    @apply border border-border px-3 py-2;
+  }
+
+  .tiptap-content h1 {
+    @apply text-xl font-bold mt-4 mb-2 first:mt-0;
+  }
+
+  .tiptap-content h2 {
+    @apply text-lg font-semibold mt-3 mb-2 first:mt-0;
+  }
+
+  .tiptap-content h3 {
+    @apply text-base font-medium mt-3 mb-2 first:mt-0;
+  }
   .app-textured-bg {
     /* Base color */
     background-color: hsl(var(--background));
@@ -661,6 +724,82 @@
 .message-scroll-area::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary) / 0.5);
 }
+
+.toastui-editor-defaultUI .toastui-editor-toolbar {
+  background: hsl(var(--secondary));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.toastui-editor-toolbar-icons {
+  background-color: transparent !important;
+}
+
+.toastui-editor-toolbar-icons:hover {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.toastui-editor-contents {
+  color: hsl(var(--foreground));
+}
+
+.toastui-editor-defaultUI .ProseMirror {
+  background: transparent;
+}
+
+.toastui-editor-defaultUI .toastui-editor-main {
+  border-top: 0;
+}
+
+.toastui-editor-defaultUI .toastui-editor-md-tab-container,
+.toastui-editor-defaultUI .toastui-editor-tabs {
+  background: hsl(var(--secondary));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.toastui-editor-defaultUI .tab-item {
+  color: hsl(var(--muted-foreground));
+}
+
+.toastui-editor-defaultUI .tab-item.active {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--primary));
+}
+
+.toastui-editor-defaultUI .toastui-editor-mode-switch {
+  display: none; /* we hide mode switch in our config */
+}
+
+.toastui-editor-defaultUI .toastui-editor-statusbar {
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Headings and code to match our prose */
+.toastui-editor-contents h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.toastui-editor-contents h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.toastui-editor-contents h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.toastui-editor-contents code {
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+.toastui-editor-contents pre {
+  background: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+/* Dark mode adjustments */
 
 /*
  * ACCESSIBILITY UTILITIES - IMPLEMENTED

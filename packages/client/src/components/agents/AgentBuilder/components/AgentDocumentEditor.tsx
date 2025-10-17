@@ -8,8 +8,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
 import { ModelSelector } from './ModelSelector'
-import { CategorySelector } from './CategorySelector'
-import { IconSelector } from './IconSelector'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
@@ -159,11 +157,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
         />
       </div>
 
-      {/* Category & Icon */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <CategorySelector selectedCategory={value.category} onCategoryChange={category => onChange({ ...value, category })} />
-        <IconSelector selectedIcon={value.icon} onIconChange={icon => onChange({ ...value, icon })} />
-      </div>
+      {/* Category & Icon removed: now controlled via the badge selector above */}
 
       {/* Timeout */}
       <div className="space-y-1.5">

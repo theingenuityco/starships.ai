@@ -332,7 +332,15 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                     </div>
                   </div>
 
-                  <AgentSelector selectedAgent={selectedAgent} onAgentSelect={setSelectedAgent} showCreateButton={true} showFilters={true} starshipId={starshipId} />
+                  <AgentSelector
+                    selectedAgent={selectedAgent}
+                    onAgentSelect={agent => {
+                      router.push(`/ship/${slug}/agent/${agent.slug}`)
+                    }}
+                    showCreateButton={true}
+                    showFilters={true}
+                    starshipId={starshipId}
+                  />
                 </section>
               </TabsContent>
 
@@ -358,7 +366,11 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   ) : starshipTools.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {starshipTools.map(tool => (
-                        <Card key={tool.id} className="frosted-glass-card shadow-frosted-lg">
+                        <Card
+                          key={tool.id}
+                          className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
+                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
+                        >
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-2 mb-1">
                               <Badge variant="outline" className="text-xs">

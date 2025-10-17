@@ -1,6 +1,5 @@
 'use client'
 
-
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -41,7 +40,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   return (
     <div className="h-screen w-full">
-      <ConversationInterface starshipId={starshipData.id} conversationId={routeParams.conversationId || null} onConversationChange={handleConversationChange} initialAgentId={routeParams.agentId} />
+      <ConversationInterface
+        starshipId={starshipData.id}
+        conversationId={routeParams.conversationId || null}
+        onConversationChange={handleConversationChange}
+        initialAgentId={routeParams.agentId}
+        starshipSlug={routeParams.slug}
+      />
       {/* Hide children since ConversationInterface now handles everything */}
       <div style={{ display: 'none' }}>{children}</div>
     </div>

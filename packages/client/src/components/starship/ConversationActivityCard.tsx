@@ -37,7 +37,7 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
   }
 
   return (
-    <Card className={cn('frosted-glass-card shadow-frosted-lg', className)}>
+    <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col', className)}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Icon name="message-square" className="h-4 w-4" />
@@ -45,7 +45,7 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 flex-1 flex flex-col">
         {hasConversations ? (
           <>
             <div className="text-base font-semibold mb-1 line-clamp-1">{recentConversation.title || 'Untitled'}</div>

@@ -7,18 +7,15 @@
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { getEnvConfig } from '@starships/env';
-import { EmailVerificationTokenRepository } from '@starships/models';
 import { logger } from '@/utils/logger';
 
 export class EmailService {
   private sesClient: SESClient;
   private env: ReturnType<typeof getEnvConfig>;
-  private emailVerificationTokenRepo: EmailVerificationTokenRepository;
 
   constructor() {
     // Follow exact UserService constructor pattern (no parameters)
     this.env = getEnvConfig();
-    this.emailVerificationTokenRepo = new EmailVerificationTokenRepository();
     this.sesClient = new SESClient({
       region: this.env.AWS_SES_REGION,
     });
@@ -46,12 +43,12 @@ export class EmailService {
     try {
       await this.sesClient.send(command);
       logger.info('[EmailService] Verification email sent', { email });
-    } catch (error: any) {
+    } catch (error) {
       logger.error('[EmailService] Failed to send verification email', { 
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         email 
       });
-      throw new Error(`Failed to send verification email: ${error.message}`);
+      throw new Error(`Failed to send verification email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

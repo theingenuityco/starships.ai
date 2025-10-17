@@ -23,6 +23,7 @@ const router: Router = Router();
 const env = getEnvConfig();
 
 
+
 // Zod schemas for validation
 const RegisterSchema = z.object({
   email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
@@ -99,7 +100,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     const result = await registrationOrchestrator.registerUser({ email, password, name });
 
     sendSuccess(res, result, 201);
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'user registration');
   }
 });
@@ -147,7 +148,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
-      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0] || null;
 
       // If user has no starship, create one now
       if (!firstStarship) {
@@ -161,19 +162,24 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
               await StarshipService.createDefaultAgent(user.id, firstStarship.id);
               logger.info(`[AUTH] Created default agent for user ${user.email}`);
             } catch (agentError) {
-              logger.error(`[AUTH] Failed to create default agent for user ${user.id}:`, {
+              logger.error('[AUTH] Failed to create default agent', {
+                userId: user.id,
                 error: agentError instanceof Error ? agentError.message : 'Unknown error',
               });
             }
           }
         } catch (createError) {
-          logger.error(`[AUTH] Failed to create default starship for newly approved user ${user.id}:`, {
+          logger.error('[AUTH] Failed to create default starship for newly approved user', {
+            userId: user.id,
             error: createError instanceof Error ? createError.message : 'Unknown error',
           });
         }
       }
     } catch (error) {
-      console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);
+      logger.error('[AUTH] Failed to fetch starships for user', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Continue with login even if starship fetch fails
     }
 
@@ -200,8 +206,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
           }
         : null,
     });
-  } catch (error: any) {
-    console.error('[AUTH] Login error:', error);
+  } catch (error) {
     handleError(error, res, 'user login');
   }
 });
@@ -240,14 +245,16 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password'
     });
-  } catch (error: any) {
-    console.error('[AUTH] Me endpoint error:', error);
+  } catch (error) {
+    logger.error('[AUTH] Me endpoint error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
 
-    if (error?.name === 'JWTExpired') {
+    if (error instanceof Error && error.name === 'JWTExpired') {
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
       return;
     }
-    if (error?.name === 'JWTInvalid') {
+    if (error instanceof Error && error.name === 'JWTInvalid') {
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid token', 401);
       return;
     }
@@ -286,12 +293,12 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
 
     // Use RegistrationOrchestrator for clean business logic separation
     const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
-    const result = await registrationOrchestrator.completeEmailVerification(token);
+    await registrationOrchestrator.completeEmailVerification(token);
 
     // Redirect to home page with success parameter for toast notification
     const redirectUrl = `${env.PUBLIC_URL}/?verification=success`;
     return res.redirect(redirectUrl);
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[EMAIL-VERIFY] Error:', { error });
     const env = getEnvConfig();
     return res.redirect(`${env.PUBLIC_URL}/login?verification=error`);
@@ -328,7 +335,7 @@ router.post('/auth/resend-verification', async (req: Request, res: Response) => 
     sendSuccess(res, {
       message: 'Verification email sent successfully.',
     });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'resend verification email');
   }
 });
@@ -383,7 +390,7 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     }
 
     res.redirect(authUrl);
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'OAuth initiation');
   }
 });
@@ -444,21 +451,23 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
         try {
           const starshipRepo = new StarshipRepository();
           const userStarships = await starshipRepo.findByOwner(userId);
-          const firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0];
+          const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
           
           if (firstStarship) {
             redirectPath = `/ship/${firstStarship.slug}/settings/profile`;
           }
         } catch (error) {
-          logger.warn('[OAUTH-LINKING] Failed to get starship for redirect, using default profile page', { error });
+          logger.warn('[OAUTH-LINKING] Failed to get starship for redirect, using default profile page', { 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
         }
         
         return res.redirect(`${env.PUBLIC_URL}${redirectPath}?oauth_link=success&provider=${provider}`);
-      } catch (error: any) {
+      } catch (error) {
         logger.error('[OAUTH-LINKING] Failed to link account', { 
           userId, 
           provider,
-          errorType: error.constructor.name
+          errorType: error instanceof Error ? error.constructor.name : 'Unknown'
         });
         
         // Get user's first starship for error redirect too
@@ -466,13 +475,15 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
         try {
           const starshipRepo = new StarshipRepository();
           const userStarships = await starshipRepo.findByOwner(userId);
-          const firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0];
+          const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
           
           if (firstStarship) {
             errorRedirectPath = `/ship/${firstStarship.slug}/settings/profile`;
           }
         } catch (error) {
-          logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', { error });
+          logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', { 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
         }
         
         return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=linking_failed`);
@@ -488,11 +499,11 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
 
     // Redirect with secure authorization code (short-lived, single-use)
     return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}`);
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[AUTH] OAuth callback error:', {
       provider: req.params.provider,
-      error: error.message,
-      stack: error.stack,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
       hasCode: !!req.query.code,
       hasState: !!req.query.state,
     });
@@ -507,7 +518,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
  */
 router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
 
     // Delegate to service layer (Layer 4)
     const userService = ServiceFactory.createUserService();
@@ -521,7 +532,7 @@ router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: 
         linkedAt: account.createdAt,
       })),
     });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'get OAuth accounts');
   }
 });
@@ -536,7 +547,7 @@ router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Req
     const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
     if (!paramValidation) return;
 
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     const { provider } = paramValidation;
 
     // Delegate to service layer (Layer 4) - includes business rule validation
@@ -544,7 +555,7 @@ router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Req
     await userService.unlinkOAuthAccount(userId, provider);
 
     sendSuccess(res, { message: `${provider} account unlinked successfully` });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'unlink OAuth account');
   }
 });
@@ -559,7 +570,7 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     const validation = validateData(SetPasswordSchema, req.body, res, 'set password');
     if (!validation) return;
 
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
@@ -567,8 +578,8 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     const user = await userService.setPasswordForOAuthUser(userId, validation);
 
     sendSuccess(res, { user, message: 'Password set successfully' });
-  } catch (error: any) {
-    handleError(res, error, 'Setting password failed');
+  } catch (error) {
+    handleError(error, res, 'Setting password failed');
   }
 });
 
@@ -578,7 +589,7 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
  */
 router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
@@ -592,8 +603,8 @@ router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Respons
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password'
     });
-  } catch (error: any) {
-    handleError(res, error, 'Getting auth methods failed');
+  } catch (error) {
+    handleError(error, res, 'Getting auth methods failed');
   }
 });
 
@@ -638,7 +649,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
-      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0] || null;
     } catch (error) {
       console.error(`[OAUTH-EXCHANGE] Failed to fetch starships for user ${user.id}:`, error);
     }
@@ -661,10 +672,10 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         name: firstStarship.name,
       } : null,
     });
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {
-      error: error.message,
-      stack: error.stack,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
     });
     
     return sendError(res, 'INTERNAL_SERVER_ERROR', 'Token exchange failed', 500);
@@ -677,7 +688,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
  */
 router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
@@ -688,8 +699,8 @@ router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: R
       user,
       message: 'Authentication methods initialized successfully'
     });
-  } catch (error: any) {
-    handleError(res, error, 'Initializing auth methods failed');
+  } catch (error) {
+    handleError(error, res, 'Initializing auth methods failed');
   }
 });
 
@@ -704,7 +715,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
     if (!paramValidation) return;
 
     const { provider } = paramValidation;
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
     const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
     
@@ -733,7 +744,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
 
     // Return the OAuth URL instead of redirecting
     sendSuccess(res, { authUrl });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'OAuth linking initiation');
   }
 });

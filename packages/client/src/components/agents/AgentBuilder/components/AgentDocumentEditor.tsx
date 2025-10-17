@@ -249,7 +249,6 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
               })()}
               className="h-[320px]"
               transparent
-              title="Agent Blueprint"
               nodesDraggable={false}
             />
           </div>

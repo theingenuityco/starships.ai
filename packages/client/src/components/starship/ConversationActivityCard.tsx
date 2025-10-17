@@ -37,21 +37,23 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
   }
 
   return (
-    <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col', className)}>
-      <CardHeader className="pb-3">
+    <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col h-full', className)}>
+      <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Icon name="message-square" className="h-4 w-4" />
           {hasConversations ? 'Recent Conversation' : 'Start Conversations'}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="pt-0 flex-1 flex flex-col">
+      <CardContent className="pt-0 flex-1 flex flex-col justify-between gap-4">
         {hasConversations ? (
           <>
-            <div className="text-base font-semibold mb-1 line-clamp-1">{recentConversation.title || 'Untitled'}</div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-4">
-              <Icon name="clock" className="h-3 w-3" />
-              {formatTimeAgo(recentConversation.updatedAt)}
+            <div>
+              <div className="text-lg font-semibold leading-tight mb-2 line-clamp-2">{recentConversation.title || 'Untitled'}</div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Icon name="clock" className="h-3 w-3" />
+                {formatTimeAgo(recentConversation.updatedAt)}
+              </div>
             </div>
             <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations/${recentConversation.id}`}>

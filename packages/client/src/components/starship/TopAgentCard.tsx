@@ -23,22 +23,22 @@ export function TopAgentCard({ starshipSlug, recentConversationId, className }: 
   const topAgent = Array.isArray(convAgents) && convAgents.length > 0 ? convAgents[0] : null
 
   return (
-    <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col', className)}>
-      <CardHeader className="pb-3">
+    <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col h-full', className)}>
+      <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Icon name="head-circuit" className="h-4 w-4" />
           Top Agent
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 flex-1 flex flex-col">
+      <CardContent className="pt-0 flex-1 flex flex-col justify-between gap-4">
         {topAgent ? (
           <>
-            <div className="flex items-center gap-2 mb-2">
-              <Avatar className="h-7 w-7 ring-1 ring-border/40">
-                <AgentAvatar seed={topAgent.name} size={28} />
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10 ring-1 ring-border/40">
+                <AgentAvatar seed={topAgent.name} size={40} />
               </Avatar>
               <div className="min-w-0">
-                <div className="text-base font-semibold leading-none truncate">{topAgent.name}</div>
+                <div className="text-lg font-semibold leading-tight truncate">{topAgent.name}</div>
                 {topAgent.model && (
                   <div className="mt-1">
                     <Badge variant="secondary" className="text-[10px]">

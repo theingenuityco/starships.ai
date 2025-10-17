@@ -7,6 +7,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentSelector } from '@/components/agents/AgentSelector'
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { Badge } from '@/components/ui/badge'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 
 export default function StarshipAgentsPage(): React.JSX.Element {
@@ -25,6 +27,25 @@ export default function StarshipAgentsPage(): React.JSX.Element {
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="rocket" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Agents</h1>
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href={`/ship/${slug}`} className="font-mono">
+                        <Badge variant="outline" className="font-mono">
+                          {slug}
+                        </Badge>
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>
+                        <Badge variant="outline">Agents</Badge>
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
               </div>
               <p className="text-muted-foreground mt-2">Manage and view all agents in this starship</p>
             </div>

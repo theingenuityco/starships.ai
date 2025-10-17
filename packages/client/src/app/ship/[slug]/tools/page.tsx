@@ -15,6 +15,7 @@ import type { ApiResponse } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import type { ToolModel } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -42,6 +43,25 @@ export default function StarshipToolsPage(): React.JSX.Element {
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="rocket" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Tools</h1>
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href={`/ship/${slug}`} className="font-mono">
+                        <Badge variant="outline" className="font-mono">
+                          {slug}
+                        </Badge>
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>
+                        <Badge variant="outline">Tools</Badge>
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
               </div>
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
             </div>

@@ -58,14 +58,13 @@ export default function StarshipAgentsPage(): React.JSX.Element {
 
               <TabsContent value="agents">
                 <section aria-label="Agents list">
-
                   <AgentSelector
                     selectedAgent={selectedAgent}
                     onAgentSelect={agent => {
                       setSelectedAgent(agent)
                       router.push(`/ship/${slug}/agent/${agent.slug}`)
                     }}
-                    showCreateButton={true}
+                    showCreateButton={false}
                     showFilters={true}
                     starshipId={starshipId}
                   />

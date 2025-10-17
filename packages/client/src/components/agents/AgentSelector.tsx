@@ -263,12 +263,6 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
         <div className="space-y-4">
           {/* Enhanced Search & Filter Section */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2 px-1">
-              <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
-              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">ACTIVE AGENTS</h4>
-              <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
-            </div>
-
             {/* Search and Filters Side by Side - COMMENTED OUT FOR NOW */}
             {/* <div className="flex flex-col lg:flex-row gap-4">
               {/* Search Input */}

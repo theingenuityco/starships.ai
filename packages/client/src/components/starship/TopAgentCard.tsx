@@ -48,7 +48,7 @@ export function TopAgentCard({ starshipSlug, recentConversationId, className }: 
                 )}
               </div>
             </div>
-            <Button asChild size="sm" className="w-full">
+            <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations${topAgent.id ? `?agent=${topAgent.id}` : ''}`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Message Agent
@@ -62,7 +62,7 @@ export function TopAgentCard({ starshipSlug, recentConversationId, className }: 
               <div className="text-sm font-medium text-muted-foreground">No top agent yet</div>
               <div className="text-xs text-muted-foreground mb-4">Chat with agents and your most active one will appear here</div>
             </div>
-            <Button asChild size="sm" className="w-full">
+            <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <Link href={`/ship/${starshipSlug}/conversations`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Start a Conversation

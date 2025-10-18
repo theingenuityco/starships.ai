@@ -4,21 +4,14 @@ import Icon from '@/components/primitives/Icon'
 
 import { LoginButton } from '@/components/auth/LoginButton'
 import { StarTheme } from '@/components/theme-context'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { toast } from '@/hooks/useToast'
 import { motion } from 'motion/react'
-import { lazy, memo, Suspense, useEffect, useState } from 'react'
+import { memo, Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-const StarfieldBackground = lazy(() =>
-  import('@/components/StarfieldBackground').then(module => ({
-    default: module.StarfieldBackground,
-  }))
-)
 
 // System component cards
 const SystemCard = memo(({ icon, title, description, accent = false, imageContent }: { icon: string; title: string; description: string; accent?: boolean; imageContent?: React.ReactNode }) => (
@@ -88,7 +81,6 @@ function UrlParamHandler() {
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
-  const [launching, setLaunching] = useState(false)
   const { isAuthenticated, isLoading, userId } = useAuth()
 
   // Use TanStack Query to fetch starships - only when authenticated
@@ -103,7 +95,6 @@ export default function HomePage() {
   if (!mounted || isLoading) return null
 
   const handleLaunch = () => {
-    setLaunching(true)
     // Don't reset launching state - let it continue until page unloads
     setTimeout(() => {
       if (isAuthenticated) {
@@ -112,14 +103,11 @@ export default function HomePage() {
           window.location.href = `/ship/${starships[0].slug}/conversations`
         } else {
           // Stay on current page - they can create a starship here
-          setLaunching(false)
         }
       } else {
         // Trigger login
         const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement
         if (loginButton) loginButton.click()
-        // Reset launching state after login trigger
-        setTimeout(() => setLaunching(false), 3000)
       }
     }, 1000)
   }
@@ -129,9 +117,6 @@ export default function HomePage() {
       <div className="min-h-screen bg-background relative overflow-hidden">
         <Suspense fallback={null}>
           <UrlParamHandler />
-        </Suspense>
-        <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
-          <StarfieldBackground launching={launching} density={600} speed={1.5} />
         </Suspense>
 
         {/* Top Navigation Bar */}
@@ -154,105 +139,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-
-        {/* Hero Section */}
-        <motion.section className="relative min-h-screen flex flex-col items-center justify-center px-4 pb-20">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 pointer-events-none" />
-
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.85 }}
-            whileInView={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -30, scale: 0.9 }}
-            transition={{
-              duration: 0.8,
-              ease: [0.25, 0.1, 0.25, 1],
-            }}
-            viewport={{ once: false, margin: '-10%' }}
-            className="relative z-10 w-full px-8"
-          >
-            <div className="flex items-center justify-center gap-8">
-              {/* Rocket Logo on the left */}
-              <motion.div initial={{ scale: 0, x: -50 }} animate={{ scale: 1, x: 0 }} transition={{ delay: 0.5, duration: 0.8, type: 'spring', stiffness: 80 }} className="relative flex-shrink-0">
-                <Icon name="star" shipsLogo width={120} height={120} gradientId="gradient" animationDelay={2} repeatDelay={10} />
-              </motion.div>
-
-              {/* Title and Tagline on the right */}
-              <div className="flex flex-col items-center">
-                <motion.h1 initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8, duration: 1, type: 'spring' }} className="text-5xl md:text-7xl font-bold mb-3">
-                  <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">Starships.ai</span>
-                </motion.h1>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.1, duration: 0.8 }}
-                  className="flex items-center gap-3 text-sm text-muted-foreground/60"
-                >
-                  <div className="h-px w-12 bg-gradient-to-r from-transparent to-muted-foreground/30" />
-                  <span>Where ideas meet intelligence</span>
-                  <div className="h-px w-12 bg-gradient-to-l from-transparent to-muted-foreground/30" />
-                </motion.div>
-              </div>
-            </div>
-
-            {/* Hero CTA Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.4, duration: 0.8 }}
-              className="mt-12 flex flex-col sm:flex-row gap-4 justify-center items-center"
-            >
-              {/* Launch Button - Always visible */}
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  size="lg"
-                  onClick={handleLaunch}
-                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
-                >
-                  <span className="relative z-10">
-                    <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
-                    {isAuthenticated ? (hasExistingStarships ? 'Enter Command Deck' : 'Launch Your Starship') : 'Begin Your Journey'}
-                  </span>
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    initial={{ x: '-100%' }}
-                    whileHover={{ x: '100%' }}
-                    transition={{ duration: 0.6 }}
-                  />
-                </Button>
-              </motion.div>
-
-              {/* Login Button - Only for unauthenticated users */}
-              {!isAuthenticated && (
-                <LoginButton size="lg" variant="outline" className="px-8 py-4 text-lg rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10">
-                  Sign In
-                </LoginButton>
-              )}
-            </motion.div>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1 }} className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-            <div className="flex flex-col items-center space-y-1">
-              {[0, 1, 2].map(index => (
-                <motion.div
-                  key={index}
-                  animate={{
-                    opacity: [0.3, 1, 0.3],
-                    scale: [0.8, 1, 0.8],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    delay: index * 0.2,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                >
-                  <Icon name="chevron-down" className="w-6 h-6 text-white/70" />
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </motion.section>
 
         {/* System Flow Section */}
         <section className="py-20 px-4 relative">

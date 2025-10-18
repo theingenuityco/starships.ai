@@ -143,6 +143,11 @@ if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
     echo "  - PostgreSQL at: $POSTGRES_HOST:$POSTGRES_PORT_DISPLAY"
 fi
 
+# Ensure pnpm is available before starting concurrent processes
+# This prevents race conditions where multiple processes try to download pnpm simultaneously
+echo "Ensuring pnpm is ready..."
+pnpm --version > /dev/null 2>&1
+
 exec npx concurrently \
     --names "client,server,docs" \
     --prefix-colors "blue,green,yellow" \

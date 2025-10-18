@@ -62,7 +62,7 @@ function UrlParamHandler() {
   // Handle email verification success toast after component is mounted
   useEffect(() => {
     if (!mounted) return
-    
+
     // Check for email verification success parameter
     const verification = searchParams?.get('verification')
     if (verification === 'success') {
@@ -71,9 +71,9 @@ function UrlParamHandler() {
         title: 'Email Verified Successfully!',
         description: 'Your email address has been verified. You can now access your account.',
         variant: 'success',
-        duration: 8000
+        duration: 5000,
       })
-      
+
       // Clean up the URL parameter without triggering a page reload
       if (typeof window !== 'undefined') {
         const url = new URL(window.location.href)
@@ -147,12 +147,7 @@ export default function HomePage() {
                   Login
                 </LoginButton>
               )}
-              <Button
-                variant="outline"
-                size="default"
-                className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
-                onClick={() => window.open('/docs', '_blank')}
-              >
+              <Button variant="outline" size="default" className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10" onClick={() => window.open('/docs', '_blank')}>
                 <Icon name="book" className="w-4 h-4 mr-2" />
                 View Documentation
               </Button>

@@ -69,10 +69,11 @@ export function LoginForm() {
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
 
-  // OAuth callback handling - SECURE authorization code exchange
+  // OAuth callback and verification error handling
   useEffect(() => {
     const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
+    const verificationError = searchParams?.get('verification')
 
     // Prevent duplicate handling (synchronous check with ref)
     if (oauthHandledRef.current) {
@@ -85,6 +86,8 @@ export function LoginForm() {
       oauthLogin(authCode)
     } else if (oauthError) {
       setFormError(getOAuthErrorMessage(oauthError))
+    } else if (verificationError === 'error') {
+      setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
     }
   }, [searchParams, oauthLogin])
 

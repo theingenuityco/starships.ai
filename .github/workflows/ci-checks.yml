@@ -76,6 +76,9 @@ jobs:
     needs: [lint, type-check, test]
     environment: ci
     env:
+      # Node.js Memory Configuration - Applied to all child processes
+      NODE_OPTIONS: --max-old-space-size=1800
+
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
       SERVER_PORT: ${{ vars.SERVER_PORT }}
@@ -122,17 +125,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check system resources before build
-        run: |
-          echo "=== Memory ==="
-          free -h
-          echo "=== Disk ==="
-          df -h
-          echo "=== CPU ==="
-          nproc
-
       - name: Build all packages
-        env:
-          NODE_OPTIONS: --max-old-space-size=1200
         run: |
           pnpm run build --concurrency=1

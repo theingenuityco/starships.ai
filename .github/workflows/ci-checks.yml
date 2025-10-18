@@ -72,14 +72,10 @@ jobs:
   build:
     name: Build Check
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [lint, type-check, test]
     environment: ci
     env:
-      # Turborepo Configuration
-      TURBO_TELEMETRY_DISABLED: 1
-      FORCE_COLOR: 1
-
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
       SERVER_PORT: ${{ vars.SERVER_PORT }}
@@ -90,6 +86,7 @@ jobs:
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       CLIENT_URL: ${{ vars.CLIENT_URL }}
       SERVER_URL: ${{ vars.SERVER_URL }}
+      DOCS_URL: ${{ vars.DOCS_URL }}
 
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -125,8 +122,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Clean Turbo cache
-        run: rm -rf .turbo
+      - name: Check system resources before build
+        run: |
+          echo "=== Memory ==="
+          free -h
+          echo "=== Disk ==="
+          df -h
+          echo "=== CPU ==="
+          nproc
 
       - name: Build all packages
-        run: pnpm run build
+        run: |
+          echo "Build started at: $(date)"
+          pnpm run build
+          echo "Build completed at: $(date)"

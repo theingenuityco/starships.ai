@@ -257,6 +257,16 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url):
             'Name': RUNNER_INSTANCE_PROFILE_NAME
         },
         'SecurityGroupIds': [RUNNER_SECURITY_GROUP_ID],
+        'BlockDeviceMappings': [
+            {
+                'DeviceName': '/dev/sda1',
+                'Ebs': {
+                    'VolumeSize': 20,  # 20GB instead of default 8GB
+                    'VolumeType': 'gp3',
+                    'DeleteOnTermination': True
+                }
+            }
+        ],
         'InstanceMarketOptions': {
             'MarketType': 'spot',
             'SpotOptions': {

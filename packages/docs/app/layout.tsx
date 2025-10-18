@@ -54,6 +54,11 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
         <RootProvider
+          search={{
+            options: {
+              api: '/docs/api/search',
+            },
+          }}
           theme={{
             enabled: true,
             defaultTheme: 'system',

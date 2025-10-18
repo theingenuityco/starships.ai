@@ -38,20 +38,6 @@ spec:
     - host: dev.starships.ai
       http:
         paths:
-          - path: /api/search
-            pathType: Prefix
-            backend:
-              service:
-                name: starships-app
-                port:
-                  name: docs
-          - path: /docs/api
-            pathType: Prefix
-            backend:
-              service:
-                name: starships-app
-                port:
-                  name: docs
           - path: /docs
             pathType: Prefix
             backend:

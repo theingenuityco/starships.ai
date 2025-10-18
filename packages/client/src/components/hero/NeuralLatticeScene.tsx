@@ -25,6 +25,9 @@ export default function NeuralLatticeScene({
     renderer.setPixelRatio(dpr)
     renderer.setSize(container.clientWidth, container.clientHeight)
     renderer.setClearColor('#02040a')
+    renderer.domElement.style.pointerEvents = 'none'
+    renderer.domElement.style.position = 'absolute'
+    renderer.domElement.style.inset = '0'
     container.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
@@ -108,5 +111,5 @@ export default function NeuralLatticeScene({
     }
   }, [intensityPreset])
 
-  return <div ref={mountRef} className="absolute inset-0 -z-10" />
+  return <div ref={mountRef} className="absolute inset-0 z-0" />
 }

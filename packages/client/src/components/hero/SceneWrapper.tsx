@@ -28,7 +28,7 @@ export default function SceneWrapper({ palette = 'deep-space', intensity = 'cine
   }, [])
 
   return (
-    <div className="absolute inset-0 -z-10">
+    <div className="absolute inset-0 z-0">
       {prefersReducedMotion ? (
         <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#071022] via-[#050a16] to-[#02040a]" />
       ) : (
@@ -39,5 +39,3 @@ export default function SceneWrapper({ palette = 'deep-space', intensity = 'cine
     </div>
   )
 }
-
-

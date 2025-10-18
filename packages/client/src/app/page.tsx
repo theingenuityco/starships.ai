@@ -12,6 +12,9 @@ import { toast } from '@/hooks/useToast'
 import { motion } from 'motion/react'
 import { memo, Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
+
+const NeuralLattice = dynamic(() => import('@/components/hero/SceneWrapper'), { ssr: false })
 
 // System component cards
 const SystemCard = memo(({ icon, title, description, accent = false, imageContent }: { icon: string; title: string; description: string; accent?: boolean; imageContent?: React.ReactNode }) => (
@@ -112,13 +115,25 @@ export default function HomePage() {
     }, 1000)
   }
 
+  const triggerWarpThenLaunch = () => {
+    const btn = document.querySelector('[data-warp-trigger]') as HTMLButtonElement | null
+    if (btn) {
+      btn.click()
+    } else {
+      handleLaunch()
+    }
+  }
+
   return (
     <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden">
         <Suspense fallback={null}>
           <UrlParamHandler />
         </Suspense>
-
+        {/* Neural Lattice background (progressive enhancement) */}
+        <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
+          <NeuralLattice palette="deep-space" intensity="cinematic" onWarpDone={handleLaunch} />
+        </Suspense>
         {/* Top Navigation Bar */}
         <div className="absolute top-0 left-0 right-0 z-50 p-6">
           <div className="flex justify-between items-center">
@@ -288,7 +303,6 @@ export default function HomePage() {
                   description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
                   imageContent={
                     <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm flex items-center justify-center">
-                      <div className="absolute inset-0 bg-grid-white/10 bg-[size:20px_20px] opacity-30" />
                       <div className="relative flex items-center space-x-4">
                         <motion.div
                           animate={{
@@ -564,16 +578,16 @@ export default function HomePage() {
               <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
                 Your journey awaits. Build your Starship, assemble your Crew, and embark on the journey that transforms intention into reality.
               </p>
-              {isAuthenticated ? (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button
                     size="lg"
-                    onClick={handleLaunch}
+                    onClick={triggerWarpThenLaunch}
                     className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
                   >
                     <span className="relative z-10">
                       <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
-                      Enter Command Deck
+                      {isAuthenticated ? 'Enter Command Deck' : 'Begin Your Journey'}
                     </span>
                     <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
@@ -583,26 +597,11 @@ export default function HomePage() {
                     />
                   </Button>
                 </motion.div>
-              ) : (
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button
-                    onClick={handleLaunch}
-                    size="lg"
-                    className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
-                  >
-                    <span className="relative z-10">
-                      <Icon name="rocket" className="w-5 h-5 mr-2 inline" />
-                      Begin Your Journey
-                    </span>
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                      initial={{ x: '-100%' }}
-                      whileHover={{ x: '100%' }}
-                      transition={{ duration: 0.6 }}
-                    />
-                  </Button>
-                </motion.div>
-              )}
+                <Button variant="outline" size="lg" className="px-8 py-4 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10" onClick={() => window.open('/docs', '_blank')}>
+                  <Icon name="book" className="w-5 h-5 mr-2" />
+                  Explore Docs
+                </Button>
+              </div>
             </motion.div>
           </div>
         </section>

@@ -76,6 +76,10 @@ jobs:
     needs: [lint, type-check, test]
     environment: ci
     env:
+      # Turborepo Configuration
+      TURBO_TELEMETRY_DISABLED: 1
+      FORCE_COLOR: 1
+
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
       SERVER_PORT: ${{ vars.SERVER_PORT }}
@@ -120,6 +124,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Clean Turbo cache
+        run: rm -rf .turbo
 
       - name: Build all packages
         run: pnpm run build

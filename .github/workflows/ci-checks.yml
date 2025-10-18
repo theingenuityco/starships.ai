@@ -122,6 +122,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Clean up disk space
+        run: |
+          echo "Cleaning up disk space..."
+          # Remove old build artifacts
+          rm -rf node_modules/.cache
+          rm -rf packages/*/node_modules/.cache
+          rm -rf packages/*/.next/cache
+          rm -rf packages/*/dist
+          rm -rf .turbo
+          # Clean pnpm cache
+          pnpm store prune || true
+          # Clean system
+          docker system prune -af || true
+          sudo apt-get clean || true
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Check system resources before build
         run: |
           echo "=== Memory ==="
@@ -132,7 +149,11 @@ jobs:
           nproc
 
       - name: Build all packages
+        env:
+          # Limit memory per Node process
+          NODE_OPTIONS: --max-old-space-size=1536
         run: |
           echo "Build started at: $(date)"
-          pnpm run build
+          # Build with limited concurrency to avoid OOM
+          pnpm run build --concurrency=1
           echo "Build completed at: $(date)"

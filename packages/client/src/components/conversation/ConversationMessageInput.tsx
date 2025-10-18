@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
-import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
@@ -80,8 +80,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
-    const [isRecording, setIsRecording] = useState(false)
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    // Provide editor operations without referencing the editor before initialization
+    const clearEditorRef = useRef<() => void>(() => {})
+
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
     const MINIMUM_THRESHOLD = 0.05
@@ -109,39 +111,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Mention UI state (custom dropdown styled like AgentSelector)
     const [isMentionOpen, setIsMentionOpen] = useState(false)
-    const [mentionQuery, setMentionQuery] = useState('')
-    const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null)
-    const [mentionActiveIndex, setMentionActiveIndex] = useState(0)
 
-    // Consolidated focus management - handles all focus scenarios
-    useEffect(() => {
-      const shouldFocus = () => {
-        // Don't focus if disabled, streaming, or sending
-        if (disabled || isStreamingEffective || sending) return false
-
-        // Always focus on component mount or navigation changes
-        return true
-      }
-
-      // Handle streaming completion focus
-      const wasStreaming = prevIsStreamingRef.current
-      const streamingCompleted = wasStreaming && !isStreamingEffective
-
-      if (textareaRef.current && shouldFocus()) {
-        const delay = streamingCompleted ? 50 : 100 // Faster focus after streaming completes
-        const timer = setTimeout(() => {
-          textareaRef.current?.focus()
-        }, delay)
-
-        // Update streaming ref
-        prevIsStreamingRef.current = isStreamingEffective
-
-        return () => clearTimeout(timer)
-      }
-
-      // Always update the streaming ref
-      prevIsStreamingRef.current = isStreamingEffective
-    }, [disabled, isStreamingEffective, sending, selectedAgent, conversationId])
+    // Consolidated focus management - handles all focus scenarios (moved below tiptap init)
 
     // Sync local 'sending' with streaming completion to avoid stuck disabled/loading state
     useEffect(() => {
@@ -179,9 +150,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // If message becomes empty after removing mention, do not send
       if (!contentToSend) {
         setMessage('')
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-        }
+        try {
+          clearEditorRef.current()
+        } catch {}
         return
       }
 
@@ -215,9 +186,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         // Clear input and reset UI immediately for better UX
         setMessage('')
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-        }
+        try {
+          clearEditorRef.current()
+        } catch {}
 
         /* optimistic append skipped (server-SSE will add user message) */
 
@@ -325,68 +296,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
     )
 
-    const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (isMentionOpen) return
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        handleSubmit()
-      }
-    }
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (!isMentionOpen) return
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setMentionActiveIndex(prev => (prev + 1) % Math.max(uiMentionOptions.length || 1, 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setMentionActiveIndex(prev => (prev - 1 + Math.max(uiMentionOptions.length || 1, 1)) % Math.max(uiMentionOptions.length || 1, 1))
-      } else if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
-        const choice = uiMentionOptions[mentionActiveIndex]
-        if (choice) applyMentionChoice(choice)
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        setIsMentionOpen(false)
-      }
-    }
-
-    const handleMentionsChange = (e: any, newValue: string) => {
-      setMessage(newValue)
-
-      // Auto-resize underlying textarea via ref (event may be null in react-mentions)
-      const textarea = textareaRef.current
-      if (textarea) {
-        textarea.style.height = 'auto'
-        textarea.style.height = `${Math.min(textarea.scrollHeight, minimal ? 80 : 120)}px`
-      }
-
-      // Mention detection near caret
-      try {
-        const caret = (textarea as HTMLTextAreaElement | null)?.selectionStart ?? newValue.length
-        const before = newValue.slice(0, caret)
-        const match = before.match(/(^|\s)@([A-Za-z0-9_-]*)$/)
-        if (match) {
-          const query = match[2] ?? ''
-          setMentionQuery(query)
-          setMentionStartIndex(caret - (query.length + 1))
-          setIsMentionOpen(true)
-          setMentionActiveIndex(0)
-        } else {
-          setIsMentionOpen(false)
-          setMentionQuery('')
-          setMentionStartIndex(null)
-        }
-      } catch {
-        // ignore caret errors
-      }
-    }
-
-    const handleVoiceToggle = () => {
-      setIsRecording(!isRecording)
-      // TODO: Implement voice recording
-    }
-
     const getPlaceholder = () => {
       if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
       if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
@@ -397,33 +306,55 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
-    const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
 
-    const MentionList = ({ items, command, clientRect }: any) => {
-      const [active, setActive] = useState(0)
-      useEffect(() => {
-        setMentionActiveIndex(0)
-      }, [items])
-      useEffect(() => {
-        setActive(mentionActiveIndex)
-      }, [mentionActiveIndex])
-      const style: React.CSSProperties = clientRect
+    const MentionList = ({
+      items,
+      command,
+      anchorRect,
+      active,
+      onHover,
+    }: {
+      items: AgentModel[]
+      command: (agent: AgentModel) => void
+      anchorRect: DOMRect | null
+      active: number
+      onHover: (i: number) => void
+    }) => {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 768
+      const menuWidth = Math.min(420, vw - 40)
+      const maxH = 256
+      const rect = anchorRect
+      const top = rect
         ? (() => {
-            const rect = clientRect()
-            return { position: 'fixed', left: rect.left, top: rect.bottom + 6, zIndex: 1000 }
+            const spaceBelow = vh - rect.bottom
+            if (spaceBelow < maxH + 12) {
+              return Math.max(8, rect.top - 6 - maxH)
+            }
+            return Math.min(vh - 8, rect.bottom + 6)
           })()
-        : { position: 'fixed', left: 0, top: 0, zIndex: 1000 }
+        : 0
+      const left = rect ? Math.min(Math.max(8, rect.left), vw - menuWidth - 8) : 0
+      const style: React.CSSProperties = { position: 'fixed', left, top, zIndex: 1000, width: menuWidth }
       return (
-        <div style={style} className="w-[min(420px,calc(100vw-40px))] max-h-64 overflow-auto rounded-lg border border-border/40 bg-popover/95 backdrop-blur-md shadow-frosted-lg p-1">
+        <div
+          style={style}
+          className="w-[min(420px,calc(100vw-40px))] max-h-64 overflow-auto rounded-lg border border-border/40 bg-popover/95 backdrop-blur-md shadow-frosted-lg p-1"
+          role="listbox"
+          aria-label="Agent suggestions"
+        >
           {(Array.isArray(items) ? items : []).map((agent: AgentModel, idx: number) => (
             <button
               key={agent.id}
+              id={`mention-option-${agent.id}`}
               type="button"
+              role="option"
+              aria-selected={idx === active}
               className={cn(
                 'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
                 idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
               )}
-              onMouseEnter={() => setMentionActiveIndex(idx)}
+              onMouseEnter={() => onHover(idx)}
               onMouseDown={e => {
                 e.preventDefault()
                 command(agent)
@@ -455,20 +386,93 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       render: () => {
         let root: ReturnType<typeof createRoot> | null = null
         let container: HTMLDivElement | null = null
+        let currentItems: AgentModel[] = []
+        let active = 0
+        let anchorRect: DOMRect | null = null
+
+        const rerender = (props: any) => {
+          if (!root) return
+          currentItems = Array.isArray(props.items) ? (props.items as AgentModel[]) : []
+          root.render(
+            <MentionList
+              items={currentItems}
+              active={active}
+              onHover={(i: number) => {
+                active = i
+                rerender(props)
+              }}
+              command={(agent: AgentModel) => props.command({ id: agent.id, label: agent.name })}
+              anchorRect={anchorRect}
+            />
+          )
+        }
         return {
           onStart: (props: any) => {
             container = document.createElement('div')
             document.body.appendChild(container)
             root = createRoot(container)
-            root.render(<MentionList items={props.items} command={(agent: AgentModel) => props.command({ id: agent.id, label: agent.name })} clientRect={props.clientRect} />)
+            setIsMentionOpen(true)
+            active = 0
+            anchorRect = props.clientRect ? props.clientRect() : null
+            rerender(props)
           },
           onUpdate(props: any) {
-            if (!root) return
-            root.render(<MentionList items={props.items} command={(agent: AgentModel) => props.command({ id: agent.id, label: agent.name })} clientRect={props.clientRect} />)
+            // Keep anchor updated as the user types
+            anchorRect = props.clientRect ? props.clientRect() : anchorRect
+            rerender(props)
           },
           onKeyDown(props: any) {
-            if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'].includes(props.event.key)) {
-              handleKeyDown(props.event)
+            const event = props.event
+            const key = event.key
+            if (!currentItems || currentItems.length === 0) return false
+
+            const pageSize = Math.max(1, Math.min(5, currentItems.length))
+
+            // Slack-like navigation
+            if (key === 'ArrowDown' || (key.toLowerCase() === 'n' && (event.ctrlKey || event.metaKey))) {
+              event.preventDefault()
+              active = (active + 1) % currentItems.length
+              rerender(props)
+              return true
+            }
+            if (key === 'ArrowUp' || (key.toLowerCase() === 'p' && (event.ctrlKey || event.metaKey))) {
+              event.preventDefault()
+              active = (active - 1 + currentItems.length) % currentItems.length
+              rerender(props)
+              return true
+            }
+            if (key === 'PageDown') {
+              event.preventDefault()
+              active = Math.min(currentItems.length - 1, active + pageSize)
+              rerender(props)
+              return true
+            }
+            if (key === 'PageUp') {
+              event.preventDefault()
+              active = Math.max(0, active - pageSize)
+              rerender(props)
+              return true
+            }
+            if (key === 'Home') {
+              event.preventDefault()
+              active = 0
+              rerender(props)
+              return true
+            }
+            if (key === 'End') {
+              event.preventDefault()
+              active = currentItems.length - 1
+              rerender(props)
+              return true
+            }
+            if (key === 'Enter' || key === 'Tab') {
+              event.preventDefault()
+              const choice = currentItems[active]
+              if (choice) props.command({ id: choice.id, label: choice.name })
+              return true
+            }
+            if (key === 'Escape') {
+              event.preventDefault()
               return true
             }
             return false
@@ -478,6 +482,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             root = null
             if (container && container.parentNode) container.parentNode.removeChild(container)
             container = null
+            setIsMentionOpen(false)
           },
         }
       },
@@ -492,6 +497,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           HTMLAttributes: {
             class: 'inline-flex items-center gap-1 align-baseline bg-primary/10 text-primary rounded-full px-1.5 py-0.5 border border-primary/20',
           },
+          deleteTriggerWithBackspace: true,
+          renderText: ({ options, node }: any) => `${options.suggestion.char}${node.attrs.label ?? node.attrs.id}`,
           suggestion: mentionSuggestion,
         }),
       ],
@@ -507,7 +514,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           ),
         },
         handleKeyDown: (_view, event) => {
-          if (isMentionOpen) return false
+          if (isMentionOpen && ['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'].includes(event.key)) {
+            // Let TipTap suggestion handle navigation/selection keys
+            return false
+          }
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault()
             handleSubmit()
@@ -520,144 +530,49 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setMessage(editor.getText())
       },
     })
-    editorRef.current = tiptap
-
-    // Styling for react-mentions to match our textarea theme
-    const inputMinHeight = minimal ? 20 : 24
-    const inputMaxHeight = minimal ? 80 : 120
-    const mentionsStyles = {
-      control: {
-        backgroundColor: 'transparent',
-        color: 'hsl(var(--foreground))',
-        font: 'inherit',
-      },
-      highlighter: {
-        padding: 0,
-        border: 0,
-        backgroundColor: 'transparent',
-        color: 'hsl(var(--foreground))',
-        font: 'inherit',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        minHeight: `${inputMinHeight}px`,
-        maxHeight: `${inputMaxHeight}px`,
-        overflowY: 'auto',
-      },
-      input: {
-        padding: 0,
-        border: 0,
-        outline: 0,
-        backgroundColor: 'transparent',
-        color: 'hsl(var(--foreground))',
-        caretColor: 'hsl(var(--foreground))',
-        font: 'inherit',
-        whiteSpace: 'pre-wrap' as const,
-        wordBreak: 'break-word' as const,
-        minHeight: `${inputMinHeight}px`,
-        maxHeight: `${inputMaxHeight}px`,
-        overflowY: 'auto' as const,
-        resize: 'none' as const,
-      },
-      suggestions: {
-        list: {
-          backgroundColor: 'hsl(var(--popover))',
-          color: 'hsl(var(--popover-foreground))',
-          border: '1px solid hsl(var(--border))',
-          borderRadius: '0.5rem',
-          boxShadow: '0 10px 25px -10px rgba(0,0,0,0.25)',
-          padding: '0.25rem',
-          zIndex: 50,
-          maxHeight: '16rem',
-          overflowY: 'auto' as const,
-          backdropFilter: 'blur(6px)',
-        },
-        item: {
-          padding: '0.375rem 0.5rem',
-          borderRadius: '0.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          cursor: 'pointer',
-          '&focused': {
-            backgroundColor: 'hsl(var(--accent))',
-            color: 'hsl(var(--accent-foreground))',
-          },
-        },
-      },
-    }
-
-    // =========================
-    // Mention chip highlighter
-    // =========================
-    const escapeHtml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-
-    const highlightedHtml = useMemo(() => {
-      const escaped = escapeHtml(message)
-      // Wrap @mentions with a chip span. We keep a data-mention attribute for click handling.
-      const withChips = escaped.replace(/(^|\s)(@[A-Za-z0-9_-]+)/g, (_m: string, p1: string, p2: string) => {
-        const mentionText = p2
-        const raw = mentionText.slice(1)
-        return `${p1}<span data-mention="${raw}" class=\"inline-flex items-center gap-1 align-baseline bg-primary/10 text-primary rounded-full px-1.5 py-0.5 pointer-events-auto cursor-pointer border border-primary/20\">${mentionText}</span>`
-      })
-      return withChips.replace(/\n$/, '\n ')
-    }, [message])
-
-    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement
-      const chip = target.closest('[data-mention]') as HTMLElement | null
-      if (!chip) return
-      const token = chip.getAttribute('data-mention') || ''
-      if (!token) return
-      const lower = token.toLowerCase()
-      const agent = (starshipAgents as AgentModel[]).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
-      if (agent && onAgentChange) onAgentChange(agent)
-    }
-
-    const filteredMentionAgents = (query: string) => {
-      const q = (query || '').toLowerCase()
-      return (starshipAgents as AgentModel[]).filter(a => !q || a.slug.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 8)
-    }
-
-    const uiMentionOptions = useMemo(() => (isMentionOpen ? filteredMentionAgents(mentionQuery) : []), [isMentionOpen, mentionQuery, starshipAgents])
-
-    const applyMentionChoice = (agent: AgentModel) => {
-      if (mentionStartIndex == null) return
-      const atIndex = mentionStartIndex
-      const textarea = textareaRef.current
-      const caret = textarea?.selectionStart ?? message.length
-      const before = message.slice(0, atIndex)
-      const after = message.slice(caret)
-      // Complete the mention token with selected @slug and a trailing space
-      const insertion = `@${agent.slug} `
-      const next = `${before}${insertion}${after}`
-      setMessage(next)
-      setIsMentionOpen(false)
-      setMentionQuery('')
-      setMentionStartIndex(null)
-      setTimeout(() => {
+    // Wire editor-dependent helpers
+    useEffect(() => {
+      clearEditorRef.current = () => {
         try {
-          if (textarea) {
-            const newCaret = before.length + insertion.length
-            textarea.focus()
-            textarea.selectionStart = newCaret
-            textarea.selectionEnd = newCaret
-          }
-        } catch {
-          // ignore
-        }
-      }, 0)
-    }
-
+          tiptap?.commands.setContent('')
+        } catch {}
+      }
+      return () => {
+        clearEditorRef.current = () => {}
+      }
+    }, [tiptap])
+    // Consolidated focus management - handles all focus scenarios (requires tiptap)
+    useEffect(() => {
+      const shouldFocus = () => {
+        if (disabled || isStreamingEffective || sending) return false
+        return true
+      }
+      const wasStreaming = prevIsStreamingRef.current
+      const streamingCompleted = wasStreaming && !isStreamingEffective
+      if (tiptap && shouldFocus()) {
+        const delay = streamingCompleted ? 50 : 100
+        const timer = setTimeout(() => {
+          try {
+            tiptap.commands.focus('end')
+          } catch {}
+        }, delay)
+        prevIsStreamingRef.current = isStreamingEffective
+        return () => clearTimeout(timer)
+      }
+      prevIsStreamingRef.current = isStreamingEffective
+    }, [tiptap, disabled, isStreamingEffective, sending, selectedAgent, conversationId])
     // Expose methods to parent component via ref
     useImperativeHandle(
       ref,
       () => ({
         handleSuggestionSubmit,
         focusInput: () => {
-          textareaRef.current?.focus()
+          try {
+            tiptap?.commands.focus('end')
+          } catch {}
         },
       }),
-      [handleSuggestionSubmit]
+      [handleSuggestionSubmit, tiptap]
     )
 
     return (

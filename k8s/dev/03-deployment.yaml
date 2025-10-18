@@ -212,6 +212,21 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GOOGLE_CLIENT_SECRET
+            - name: EMAIL_FROM_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: EMAIL_FROM_ADDRESS
+            - name: EMAIL_FROM_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: EMAIL_FROM_NAME
+            - name: AWS_SES_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_SES_REGION
             - name: PGDATA
               value: '/var/lib/postgresql/data/pgdata'
 

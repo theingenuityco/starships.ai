@@ -5,7 +5,7 @@
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates, seedWaitlist } from '@starships/models';
+import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -143,14 +143,6 @@ httpServer.listen(PORT, async () => {
       await seedAgentTemplates();
     } catch (error) {
       console.error('⚠️ Failed to seed agent templates:', error);
-      // Continue - seeding is not critical for startup
-    }
-
-    // Initialize Waitlist (seeds approved emails)
-    try {
-      await seedWaitlist();
-    } catch (error) {
-      console.error('⚠️ Failed to seed waitlist:', error);
       // Continue - seeding is not critical for startup
     }
   } catch (error) {

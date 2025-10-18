@@ -9,4 +9,3 @@ export { ToolRepository } from './ToolRepository';
 export { ToolTemplateRepository } from './ToolTemplateRepository';
 export { UsageRepository } from './UsageRepository';
 export { UserRepository } from './UserRepository';
-export { WaitlistRepository } from './WaitlistRepository';

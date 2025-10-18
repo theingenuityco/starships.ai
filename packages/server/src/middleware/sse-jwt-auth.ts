@@ -10,6 +10,7 @@ import { sendError } from '@/utils/responseHelpers';
 import { getEnvConfig } from '@starships/env';
 import { NextFunction, Request, Response } from 'express';
 import { jwtVerify } from 'jose';
+import { logger } from '@/utils/logger';
 
 const env = getEnvConfig();
 
@@ -60,8 +61,11 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
     try {
       user = await UserService.getUserById(payload.sub as string);
     } catch (dbError: any) {
-      console.error(`[SSE-JWT-AUTH] Database error when looking up user: ${payload.sub}`);
-      console.error(`[SSE-JWT-AUTH] Error message: ${dbError?.message}`);
+      logger.error('[SSE-JWT-AUTH] Database error during user lookup', {
+        userId: payload.sub,
+        error: dbError?.message,
+        operation: 'user_lookup'
+      });
       sendError(res, 'DATABASE_ERROR', 'Database error during authentication', 500);
       return;
     }
@@ -76,7 +80,10 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
 
     next();
   } catch (error: any) {
-    console.error('[SSE-JWT-AUTH] Token validation failed:', error);
+    logger.error('[SSE-JWT-AUTH] Token validation failed', {
+      error: error?.message,
+      operation: 'token_validation'
+    });
 
     // Provide more specific error messages
     if (error?.name === 'JWTExpired') {

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { StarshipRepository } from '@starships/models';
+import { logger } from '@/utils/logger';
 
 export interface StarshipRequest extends Request {
   starship?: any;
@@ -37,7 +38,12 @@ export async function checkStarshipAccess(req: StarshipRequest, res: Response, n
     req.starship = starship;
     next();
   } catch (error) {
-    console.error('Access check error:', error);
+    logger.error('[STARSHIP-ACCESS] Access check failed', {
+      starshipId: req.params.starshipId,
+      userId: req.user?.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      operation: 'starship_access_check'
+    });
     res.status(500).json({ error: 'Failed to verify access' });
   }
 }

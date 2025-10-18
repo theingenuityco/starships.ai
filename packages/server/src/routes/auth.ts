@@ -23,8 +23,6 @@ import { registrationRateLimit, resendVerificationRateLimit } from '@/middleware
 const router: Router = Router();
 const env = getEnvConfig();
 
-
-
 // Zod schemas for validation
 const RegisterSchema = z.object({
   email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
@@ -46,13 +44,15 @@ const OAuthCallbackSchema = z.object({
 });
 
 // Zod schema for setting password
-const SetPasswordSchema = z.object({
-  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
-  confirmPassword: z.string().min(1, 'Password confirmation is required'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
+const SetPasswordSchema = z
+  .object({
+    newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+    confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 // Zod schema for email verification
 const EmailVerificationSchema = z.object({
@@ -107,7 +107,6 @@ router.post('/auth/register', registrationRateLimit, async (req: Request, res: R
   }
 });
 
-
 /**
  * Login user
  * POST /auth/login
@@ -158,13 +157,13 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
         try {
           firstStarship = await StarshipService.createDefaultStarship(user.id);
 
-          // Also create default Daedalus agent and host tools
+          // Also create initial agents (Daedalus, Gaia) and host tools
           if (firstStarship) {
             try {
-              await StarshipService.createDefaultAgent(user.id, firstStarship.id);
-              logger.info(`[AUTH] Created default agent for user ${user.email}`);
+              await StarshipService.createInitialAgents(user.id, firstStarship.id);
+              logger.info(`[AUTH] Created initial agents for user ${user.email}`);
             } catch (agentError) {
-              logger.error('[AUTH] Failed to create default agent', {
+              logger.error('[AUTH] Failed to create initial agents', {
                 userId: user.id,
                 error: agentError instanceof Error ? agentError.message : 'Unknown error',
               });
@@ -180,7 +179,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     } catch (error) {
       logger.error('[AUTH] Failed to fetch starships for user', {
         userId: user.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       // Continue with login even if starship fetch fails
     }
@@ -245,11 +244,11 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       avatar: user.avatar,
       hasPassword: user.hasPassword || false,
       authMethods: user.authMethods || [],
-      primaryAuthMethod: user.primaryAuthMethod || 'password'
+      primaryAuthMethod: user.primaryAuthMethod || 'password',
     });
   } catch (error) {
     logger.error('[AUTH] Me endpoint error', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     if (error instanceof Error && error.name === 'JWTExpired') {
@@ -287,9 +286,17 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
 router.get('/auth/verify-email', async (req: Request, res: Response) => {
   try {
     // Validate query parameters using Zod
-    const queryValidation = validateData(z.object({ 
-      token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format') 
-    }), req.query, res, 'verification token');
+    const queryValidation = validateData(
+      z.object({
+        token: z
+          .string()
+          .length(64, 'Invalid token format')
+          .regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+      }),
+      req.query,
+      res,
+      'verification token'
+    );
     if (!queryValidation) return;
 
     const { token } = queryValidation;
@@ -361,16 +368,16 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     const { provider } = paramValidation;
     // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
     const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
-    
+
     // Check if this is a linking request (user already logged in)
     const isLinking = req.query.link === 'true';
-    
+
     // SECURITY: Block direct linking attempts without proper authentication
     if (isLinking) {
       // Return error for unauthenticated linking attempts
       return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=unauthorized_linking`);
     }
-    
+
     const state = await generateOAuthState(isLinking);
 
     let authUrl: string;
@@ -435,61 +442,61 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       if (!userId) {
         return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=invalid_state`);
       }
-      
+
       // Implement actual account linking logic
       try {
         // Get OAuth profile from provider using the authorization code
         const userService = ServiceFactory.createUserService();
         const profile = await userService.getOAuthProfile(provider, code);
-        
+
         // Link the OAuth account to the existing authenticated user
         await userService.linkOAuthAccount(userId, profile);
-        
-        logger.info('[OAUTH-LINKING] Successfully linked account', { 
-          userId, 
-          provider
+
+        logger.info('[OAUTH-LINKING] Successfully linked account', {
+          userId,
+          provider,
         });
-        
+
         // Get user's first starship to redirect back to the proper context
         let redirectPath = '/profile';
         try {
           const starshipRepo = new StarshipRepository();
           const userStarships = await starshipRepo.findByOwner(userId);
           const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
-          
+
           if (firstStarship) {
             redirectPath = `/ship/${firstStarship.slug}/settings/profile`;
           }
         } catch (error) {
-          logger.warn('[OAUTH-LINKING] Failed to get starship for redirect, using default profile page', { 
-            error: error instanceof Error ? error.message : 'Unknown error' 
+          logger.warn('[OAUTH-LINKING] Failed to get starship for redirect, using default profile page', {
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
-        
+
         return res.redirect(`${env.PUBLIC_URL}${redirectPath}?oauth_link=success&provider=${provider}`);
       } catch (error) {
-        logger.error('[OAUTH-LINKING] Failed to link account', { 
-          userId, 
+        logger.error('[OAUTH-LINKING] Failed to link account', {
+          userId,
           provider,
-          errorType: error instanceof Error ? error.constructor.name : 'Unknown'
+          errorType: error instanceof Error ? error.constructor.name : 'Unknown',
         });
-        
+
         // Get user's first starship for error redirect too
         let errorRedirectPath = '/profile';
         try {
           const starshipRepo = new StarshipRepository();
           const userStarships = await starshipRepo.findByOwner(userId);
           const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
-          
+
           if (firstStarship) {
             errorRedirectPath = `/ship/${firstStarship.slug}/settings/profile`;
           }
         } catch (error) {
-          logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', { 
-            error: error instanceof Error ? error.message : 'Unknown error' 
+          logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', {
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
-        
+
         return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=linking_failed`);
       }
     }
@@ -605,7 +612,7 @@ router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Respons
     sendSuccess(res, {
       hasPassword: user.hasPassword || false,
       authMethods: user.authMethods || [],
-      primaryAuthMethod: user.primaryAuthMethod || 'password'
+      primaryAuthMethod: user.primaryAuthMethod || 'password',
     });
   } catch (error) {
     handleError(error, res, 'Getting auth methods failed');
@@ -619,35 +626,35 @@ router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Respons
 router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
   try {
     const { authCode } = req.body;
-    
+
     if (!authCode) {
       return sendError(res, 'VALIDATION_ERROR', 'Authorization code is required', 400);
     }
-    
+
     // Validate and consume the authorization code (one-time use)
     logger.info('[OAUTH-EXCHANGE] Attempting to validate auth code');
     const codeData = await validateAndConsumeAuthCode(authCode);
-    
+
     if (!codeData) {
       logger.error('[OAUTH-EXCHANGE] Auth code validation failed - likely already consumed or expired');
       return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code. Please try logging in again.', 400);
     }
-    
+
     logger.info('[OAUTH-EXCHANGE] Auth code validated successfully', { userId: codeData.userId });
-    
+
     // Get full user data
     const user = await UserService.getUserById(codeData.userId);
     if (!user) {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
     }
-    
+
     // Generate JWT token (returned in response body, NOT URL)
     const token = await generateJWT({
       id: user.id,
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
     });
-    
+
     // Get user's first starship for redirect
     let firstStarship = null;
     try {
@@ -657,7 +664,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     } catch (error) {
       console.error(`[OAUTH-EXCHANGE] Failed to fetch starships for user ${user.id}:`, error);
     }
-    
+
     // Return secure response with JWT in body
     sendSuccess(res, {
       user: {
@@ -667,21 +674,23 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         avatar: user.avatar,
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
-        primaryAuthMethod: user.primaryAuthMethod || 'oauth'
+        primaryAuthMethod: user.primaryAuthMethod || 'oauth',
       },
       token,
-      starship: firstStarship ? {
-        id: firstStarship.id,
-        slug: firstStarship.slug,
-        name: firstStarship.name,
-      } : null,
+      starship: firstStarship
+        ? {
+            id: firstStarship.id,
+            slug: firstStarship.slug,
+            name: firstStarship.name,
+          }
+        : null,
     });
   } catch (error) {
     logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     });
-    
+
     return sendError(res, 'INTERNAL_SERVER_ERROR', 'Token exchange failed', 500);
   }
 });
@@ -699,9 +708,9 @@ router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: R
     const userService = ServiceFactory.createUserService();
     const user = await userService.initializeUserAuthMethods(userId);
 
-    sendSuccess(res, { 
+    sendSuccess(res, {
       user,
-      message: 'Authentication methods initialized successfully'
+      message: 'Authentication methods initialized successfully',
     });
   } catch (error) {
     handleError(error, res, 'Initializing auth methods failed');
@@ -722,7 +731,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
     const userId = req.user!.id;
     // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
     const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
-    
+
     // Generate secure state with authenticated user ID
     const state = await generateOAuthState(true, userId);
 

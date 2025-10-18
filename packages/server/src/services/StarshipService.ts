@@ -356,4 +356,57 @@ export class StarshipService {
       return null;
     }
   }
+
+  /**
+   * Create initial agents for a new starship: Daedalus (toolwright) and Gaia (agent creator)
+   * - Deploys default tools once
+   * - Creates Daedalus if available
+   * - Creates Gaia if available
+   * Returns a map of created agents by name when created
+   */
+  static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, any>> {
+    const created: Record<string, any> = {};
+    try {
+      const templateService = new AgentTemplateService();
+
+      // Ensure default tools are deployed once so agents relying on them have what they need
+      await StarshipService.createDefaultTools(starshipId);
+
+      // Fetch templates relevant to initial agents
+      const daedalusTemplates = await templateService.searchTemplates('Daedalus');
+      const gaiaTemplates = await templateService.searchTemplates('Gaia');
+
+      const daedalusTemplate = daedalusTemplates.find((t) => t.name === 'Daedalus');
+      const gaiaTemplate = gaiaTemplates.find((t) => t.name === 'Gaia');
+
+      // Create Daedalus if present
+      if (daedalusTemplate) {
+        try {
+          const daedalus = await templateService.createAgentFromTemplate(daedalusTemplate.id, starshipId);
+          created['Daedalus'] = daedalus;
+        } catch (err) {
+          console.error('[STARSHIP-SERVICE] Failed to create Daedalus agent:', err);
+        }
+      } else {
+        console.warn('[STARSHIP-SERVICE] Daedalus template not found - skipping Daedalus creation');
+      }
+
+      // Create Gaia if present
+      if (gaiaTemplate) {
+        try {
+          const gaia = await templateService.createAgentFromTemplate(gaiaTemplate.id, starshipId);
+          created['Gaia'] = gaia;
+        } catch (err) {
+          console.error('[STARSHIP-SERVICE] Failed to create Gaia agent:', err);
+        }
+      } else {
+        console.warn('[STARSHIP-SERVICE] Gaia template not found - skipping Gaia creation');
+      }
+
+      return created;
+    } catch (error) {
+      console.error('[STARSHIP-SERVICE] Failed to create initial agents:', error);
+      return created;
+    }
+  }
 }

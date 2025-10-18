@@ -5,6 +5,7 @@ export interface EnvironmentConfig {
   // Server Configuration
   SERVER_PORT: number;
   CLIENT_PORT: number;
+  DOCS_PORT: number;
   PROXY_PORT: number;
   NODE_ENV: string;
   LOG_LEVEL: string;
@@ -13,6 +14,7 @@ export interface EnvironmentConfig {
   PUBLIC_URL: string;
   CLIENT_URL: string;
   SERVER_URL: string;
+  DOCS_URL: string;
 
   // PostgreSQL Database Configuration
   POSTGRES_HOST: string;

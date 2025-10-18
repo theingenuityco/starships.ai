@@ -82,7 +82,7 @@ RUN mkdir -p data/sessions data/starships data/docker && \
 # based on whether POSTGRES_EXTERNAL_HOST is set
 
 # Expose all ports
-EXPOSE 3000 4000 5432
+EXPOSE 3000 3001 4000 5432
 
 # Health check for all services
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \

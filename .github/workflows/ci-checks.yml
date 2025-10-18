@@ -72,10 +72,13 @@ jobs:
   build:
     name: Build Check
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [lint, type-check, test]
     environment: ci
     env:
+      # Node.js Memory Configuration - Applied to all child processes
+      NODE_OPTIONS: --max-old-space-size=1800
+
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
       SERVER_PORT: ${{ vars.SERVER_PORT }}
@@ -86,6 +89,7 @@ jobs:
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       CLIENT_URL: ${{ vars.CLIENT_URL }}
       SERVER_URL: ${{ vars.SERVER_URL }}
+      DOCS_URL: ${{ vars.DOCS_URL }}
 
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -122,4 +126,5 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        run: pnpm run build
+        run: |
+          pnpm run build --concurrency=1

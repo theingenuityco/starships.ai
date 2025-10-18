@@ -36,11 +36,32 @@ spec:
         app: starships-ai
         environment: dev
     spec:
-      
       terminationGracePeriodSeconds: 120
       imagePullSecrets:
         - name: ghcr-pull-secret
       initContainers:
+        - name: fix-permissions
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "🔧 Fixing permissions for /app/packages/docs..."
+              mkdir -p /app/packages/docs/.source
+              chmod -R 777 /app/packages/docs || true
+              echo "✅ Permissions fixed for /app/packages/docs"
+          volumeMounts:
+            - name: starships-data
+              mountPath: /var/lib/postgresql
+              subPath: postgres
+            - name: starships-data
+              mountPath: /app/data
+              subPath: app-data
+            - name: starships-data
+              mountPath: /app/packages/docs/.source
+              subPath: docs-source
+
+        # 2️⃣ Your existing init container for mounting app data
         - name: init-starships-data
           image: busybox:1.36
           command:
@@ -58,6 +79,8 @@ spec:
           ports:
             - containerPort: 3000
               name: frontend
+            - containerPort: 3001
+              name: docs
             - containerPort: 4000
               name: backend
             - containerPort: 5432
@@ -94,6 +117,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SERVER_URL
+            - name: DOCS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DOCS_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -212,6 +240,9 @@ spec:
             - name: starships-data
               mountPath: /app/data
               subPath: app-data
+            - name: starships-data
+              mountPath: /app/packages/docs/.source
+              subPath: docs-source
 
           resources:
             requests:

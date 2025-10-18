@@ -144,8 +144,9 @@ if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
 fi
 
 exec npx concurrently \
-    --names "client,server" \
-    --prefix-colors "blue,green" \
+    --names "client,server,docs" \
+    --prefix-colors "blue,green,yellow" \
     --kill-others \
     "pnpm --filter @starships/client start" \
-    "pnpm --filter @starships/server start"
+    "pnpm --filter @starships/server start" \
+    "pnpm --filter @starships/docs start"

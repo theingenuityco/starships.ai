@@ -72,13 +72,12 @@ jobs:
   build:
     name: Build Check
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [lint, type-check, test]
     environment: ci
     env:
-      # Turborepo Configuration
-      TURBO_TELEMETRY_DISABLED: 1
-      FORCE_COLOR: 1
+      # Node.js Memory Configuration - Applied to all child processes
+      NODE_OPTIONS: --max-old-space-size=1800
 
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
@@ -90,6 +89,7 @@ jobs:
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       CLIENT_URL: ${{ vars.CLIENT_URL }}
       SERVER_URL: ${{ vars.SERVER_URL }}
+      DOCS_URL: ${{ vars.DOCS_URL }}
 
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -125,8 +125,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Clean Turbo cache
-        run: rm -rf .turbo
-
       - name: Build all packages
-        run: pnpm run build
+        run: |
+          pnpm run build --concurrency=1

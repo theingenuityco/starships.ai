@@ -41,6 +41,13 @@ spec:
                 name: starships-app
                 port:
                   name: backend
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app
+                port:
+                  name: docs
           - path: /
             pathType: Prefix
             backend:

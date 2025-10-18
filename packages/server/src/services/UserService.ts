@@ -6,14 +6,13 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { OAuthAccountRepository, UserRepository } from '@starships/models';
+import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository } from '@starships/models';
 import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest, AuthMethod } from '@starships/protocol';
-import { WaitlistService } from '@/services/WaitlistService';
-import { WaitlistRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
 import { StarshipService } from '@/services/StarshipService';
+import { logger } from '@/utils/logger';
 
 export interface UserOptions {
   includePassword?: boolean;
@@ -30,6 +29,7 @@ export interface CreateUserWithPasswordRequest {
   password: string;
   displayName?: string;
   name?: string; // Legacy support
+  emailVerified?: boolean;
 }
 
 export interface UpdateUserProfileRequest extends UpdateUserRequest {
@@ -65,12 +65,18 @@ export class UserService {
       }
     }
 
+    // SECURITY: Hash password if provided to prevent plain text storage
+    let hashedPassword = request.password;
+    if (request.password) {
+      hashedPassword = await bcrypt.hash(request.password, 10);
+    }
+
     // Transform CreateUserRequest to UserModel format with required fields
     const userData: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'> = {
       email: request.email,
       displayName: request.displayName,
       avatar: request.avatar,
-      password: request.password,
+      password: hashedPassword,
       emailVerified: request.emailVerified || false,
       stripeCustomerId: request.stripeCustomerId,
       hasPassword: !!request.password,
@@ -275,31 +281,11 @@ export class UserService {
    */
   async createUserFromOAuth(provider: string, authCode: string): Promise<{
     user: UserModel;
-    waitlisted?: boolean;
-    status?: 'pending' | 'approved';
-    message?: string;
   }> {
     // Get OAuth profile from provider
     const profile = await this.getOAuthProfile(provider, authCode);
 
-    // Check waitlist status using existing service
-    const waitlistRepository = new WaitlistRepository();
-    const waitlistService = new WaitlistService(waitlistRepository);
-    const waitlistStatus = await waitlistService.getDetailedStatus(profile.email);
-
-    // Handle waitlist logic (EXISTING PATTERN)
-    if (!waitlistStatus.exists) {
-      await waitlistService.addToPendingWaitlist(profile.email);
-    }
-
-    if (waitlistStatus.status === 'pending') {
-      return {
-        user: { email: profile.email } as UserModel,
-        waitlisted: true,
-        status: 'pending',
-        message: 'Thanks for signing up! Please wait for approval to access the app.',
-      };
-    }
+    // All users are now approved automatically
 
     // Check if user exists by email (for account linking)
     let user = await this.getUserByEmail(profile.email);
@@ -779,11 +765,100 @@ export class UserService {
    */
   static async createUserFromOAuth(provider: string, authCode: string): Promise<{
     user: UserModel;
-    waitlisted?: boolean;
-    status?: 'pending' | 'approved';
-    message?: string;
   }> {
     const userService = new UserService();
     return userService.createUserFromOAuth(provider, authCode);
+  }
+
+  // ============================================================================
+  // EMAIL VERIFICATION METHODS
+  // ============================================================================
+
+  /**
+   * Send email verification (business logic layer)
+   * Orchestrates repository and email service calls
+   */
+  async sendEmailVerification(userId: string, email: string): Promise<void> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found', 'userId');
+    }
+
+    // Business rule: User must not already be verified
+    if (user.emailVerified) {
+      throw new ValidationError('User email is already verified', 'emailVerified');
+    }
+
+    // Generate token using dedicated repository
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const token = await emailVerificationTokenRepo.generateToken(userId, email);
+
+    // Send email using email service - use ServiceFactory for consistent instantiation
+    const { ServiceFactory } = await import('./ServiceFactory');
+    const emailService = ServiceFactory.createEmailService();
+    await emailService.sendVerificationEmail(email, token);
+    
+    logger.info('[UserService] Email verification sent', { userId, email });
+  }
+
+  /**
+   * Get verification token info for redirect logic
+   * Business logic: Determine appropriate redirect based on token and user state
+   */
+  async getVerificationTokenInfo(token: string): Promise<{
+    tokenInfo: { userId: string; email: string; consumed: boolean; expired: boolean; valid: boolean } | null;
+    userAlreadyVerified: boolean;
+    shouldRedirectToStarship: boolean;
+  }> {
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const tokenInfo = await emailVerificationTokenRepo.getTokenInfo(token);
+    
+    if (!tokenInfo) {
+      return { tokenInfo: null, userAlreadyVerified: false, shouldRedirectToStarship: false };
+    }
+    
+    // Check if user is already verified
+    const user = await this.getUserById(tokenInfo.userId);
+    const userAlreadyVerified = user?.emailVerified || false;
+    
+    // If user is verified and has access, should redirect to starship
+    let shouldRedirectToStarship = false;
+    if (userAlreadyVerified) {
+      // All verified users get starship access
+      shouldRedirectToStarship = true;
+    }
+    
+    return { tokenInfo, userAlreadyVerified, shouldRedirectToStarship };
+  }
+
+  /**
+   * Verify email address (business logic layer)
+   * Validates token and marks user email as verified
+   */
+  async verifyEmailAddress(token: string): Promise<{
+    userId: string;
+    email: string;
+  }> {
+    // Validate and consume token
+    const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    const verification = await emailVerificationTokenRepo.validateAndConsumeToken(token);
+
+    if (!verification) {
+      throw new ValidationError('Invalid or expired verification token', 'token');
+    }
+
+    // Mark user as verified - this is the single responsibility of this method
+    await this.updateUserProfile(verification.userId, { emailVerified: true });
+
+    logger.info('[UserService] Email verified successfully', { 
+      userId: verification.userId,
+      email: verification.email
+    });
+
+    return {
+      userId: verification.userId,
+      email: verification.email
+    };
   }
 }

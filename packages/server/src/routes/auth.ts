@@ -6,26 +6,24 @@
 
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
-import { WaitlistService } from '@/services/WaitlistService';
+import { ServiceFactory } from '@/services/ServiceFactory';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { getEnvConfig } from '@starships/env';
-import { getConnection, StarshipRepository, WaitlistRepository } from '@starships/models';
+import { StarshipRepository } from '@starships/models';
+import type { AuthLoginResponse } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { registrationRateLimit, resendVerificationRateLimit } from '@/middleware/rate-limit';
 
 const router: Router = Router();
 const env = getEnvConfig();
 
-// Initialize waitlist service
-const initWaitlistService = () => {
-  const waitlistRepo = new WaitlistRepository();
-  return new WaitlistService(waitlistRepo);
-};
+
 
 // Zod schemas for validation
 const RegisterSchema = z.object({
@@ -56,6 +54,11 @@ const SetPasswordSchema = z.object({
   path: ['confirmPassword'],
 });
 
+// Zod schema for email verification
+const EmailVerificationSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+});
+
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
   try {
@@ -84,8 +87,9 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 /**
  * Register new user
  * POST /auth/register
+ * Rate limited to prevent registration spam
  */
-router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/register', registrationRateLimit, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
     const bodyValidation = validateData(RegisterSchema, req.body, res, 'registration data');
@@ -93,113 +97,16 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
 
     const { email, password, name } = bodyValidation;
 
-    // Check if user already exists
-    const existingUser = await UserService.getUserByEmail(email);
-    if (existingUser) {
-      sendError(res, 'RESOURCE_CONFLICT', 'User already exists', 409);
-      return;
-    }
+    // Use RegistrationOrchestrator for clean business logic separation
+    const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
+    const result = await registrationOrchestrator.registerUser({ email, password, name });
 
-    // Initialize waitlist service
-    const waitlistService = initWaitlistService();
-
-    // Check waitlist status
-    const waitlistStatus = await waitlistService.getDetailedStatus(email);
-
-    // If not in waitlist, add as pending
-    if (!waitlistStatus.exists) {
-      await waitlistService.addToPendingWaitlist(email);
-    }
-
-    // Create user regardless of waitlist status (stores credentials for future)
-    // User creation happens for both pending and approved users
-
-    // Create user (password will be hashed in UserService)
-    const user = await UserService.createUser({
-      email,
-      password, // Pass plain password - UserService will hash it
-      name,
-      displayName: name,
-    });
-
-    // Check final waitlist status to determine response
-    const finalStatus = await waitlistService.getDetailedStatus(email);
-
-    // If user is pending, return waitlist message (don't provide token)
-    if (finalStatus.status === 'pending') {
-      return sendSuccess(
-        res,
-        {
-          waitlisted: true,
-          status: 'pending',
-          message: 'Thanks for signing up! Please wait for approval to access the app.',
-        },
-        200
-      );
-    }
-
-    // Only create starship and provide token for approved users
-    let defaultStarship;
-    let defaultAgent;
-
-    if (finalStatus.status === 'approved') {
-      try {
-        defaultStarship = await StarshipService.createDefaultStarship(user.id);
-
-        // Create default Daedalus agent and host tools from template
-        if (defaultStarship) {
-          try {
-            defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
-          } catch (agentError) {
-            console.error(`[AUTH] Failed to create default agent for user ${user.id}:`, agentError);
-            // Continue even if agent creation fails
-          }
-        }
-      } catch (error) {
-        console.error(`[AUTH] Failed to create default starship for user ${user.id}:`, error);
-        // Continue with registration even if starship creation fails
-      }
-    }
-
-    // Generate JWT token only for approved users
-    const token = await generateJWT({
-      id: user.id,
-      email: user.email,
-      name: user.displayName || user.email?.split('@')[0],
-    });
-
-    sendSuccess(
-      res,
-      {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.displayName || user.email?.split('@')[0],
-          avatar: user.avatar,
-        },
-        token,
-        starship: defaultStarship
-          ? {
-              id: defaultStarship.id,
-              slug: defaultStarship.slug,
-              name: defaultStarship.name,
-            }
-          : null,
-        agent: defaultAgent
-          ? {
-              id: defaultAgent.id,
-              name: defaultAgent.name,
-              description: defaultAgent.description,
-            }
-          : null,
-      },
-      201
-    );
-  } catch (error: any) {
-    logger.error('[AUTH] Registration error:', error);
+    sendSuccess(res, result, 201);
+  } catch (error) {
     handleError(error, res, 'user registration');
   }
 });
+
 
 /**
  * Login user
@@ -216,30 +123,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     // Get user with password
     const user = await UserService.getUserByEmailWithPassword(email);
     if (!user || !user.password) {
-      // Check waitlist status when user doesn't exist
-      const waitlistService = initWaitlistService();
-      const waitlistStatus = await waitlistService.getDetailedStatus(email);
-
-      if (!waitlistStatus.exists) {
-        // Not in system at all
-        return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
-      }
-
-      if (waitlistStatus.status === 'pending') {
-        // On waitlist but not approved
-        return sendSuccess(
-          res,
-          {
-            waitlisted: true,
-            status: 'pending',
-            message: 'Please wait for approval to access the app.',
-          },
-          200
-        );
-      }
-
-      // Approved but no account - suggest registration
-      return sendError(res, 'AUTHENTICATION_FAILED', 'No account found. Please sign up first.', 401);
+      return sendError(res, 'AUTHENTICATION_FAILED', 'No account found with this email address. Please sign up first.', 401);
     }
 
     // Verify password
@@ -249,57 +133,55 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Check waitlist status for existing user
-    const waitlistService = initWaitlistService();
-    const waitlistStatus = await waitlistService.getDetailedStatus(email);
+    // Add email verification check before proceeding
+    if (!user.emailVerified) {
+      const response: AuthLoginResponse = {
+        emailNotVerified: true,
+        message: 'Please verify your email address before signing in.',
+        canResendVerification: true,
+      };
 
-    // If user exists but is still pending on waitlist, deny access
-    if (waitlistStatus.status === 'pending') {
-      return sendSuccess(
-        res,
-        {
-          waitlisted: true,
-          status: 'pending',
-          message: 'Please wait for approval to access the app.',
-        },
-        200
-      );
+      return sendSuccess(res, response, 200);
     }
 
     // Get user's starships for redirect purpose
     let firstStarship = null;
-    let defaultAgent = null;
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
-      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0] || null;
 
-      // If approved user has no starship (was pending when registered), create one now
-      if (!firstStarship && waitlistStatus.status === 'approved') {
-        logger.info(`[AUTH] Creating starship for newly approved user ${user.email}`);
+      // If user has no starship, create one now
+      if (!firstStarship) {
+        logger.info(`[AUTH] Creating starship for user ${user.email}`);
         try {
           firstStarship = await StarshipService.createDefaultStarship(user.id);
 
           // Also create default Daedalus agent and host tools
           if (firstStarship) {
             try {
-              defaultAgent = await StarshipService.createDefaultAgent(user.id, firstStarship.id);
+              await StarshipService.createDefaultAgent(user.id, firstStarship.id);
               logger.info(`[AUTH] Created default agent for user ${user.email}`);
             } catch (agentError) {
-              logger.error(`[AUTH] Failed to create default agent for user ${user.id}:`, {
+              logger.error('[AUTH] Failed to create default agent', {
+                userId: user.id,
                 error: agentError instanceof Error ? agentError.message : 'Unknown error',
               });
             }
           }
         } catch (createError) {
-          logger.error(`[AUTH] Failed to create default starship for newly approved user ${user.id}:`, {
+          logger.error('[AUTH] Failed to create default starship for newly approved user', {
+            userId: user.id,
             error: createError instanceof Error ? createError.message : 'Unknown error',
           });
         }
       }
     } catch (error) {
-      console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);
+      logger.error('[AUTH] Failed to fetch starships for user', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Continue with login even if starship fetch fails
     }
 
@@ -326,8 +208,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
           }
         : null,
     });
-  } catch (error: any) {
-    console.error('[AUTH] Login error:', error);
+  } catch (error) {
     handleError(error, res, 'user login');
   }
 });
@@ -366,14 +247,16 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password'
     });
-  } catch (error: any) {
-    console.error('[AUTH] Me endpoint error:', error);
+  } catch (error) {
+    logger.error('[AUTH] Me endpoint error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
 
-    if (error?.name === 'JWTExpired') {
+    if (error instanceof Error && error.name === 'JWTExpired') {
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
       return;
     }
-    if (error?.name === 'JWTInvalid') {
+    if (error instanceof Error && error.name === 'JWTInvalid') {
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid token', 401);
       return;
     }
@@ -390,6 +273,75 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
   // With JWT, logout is primarily handled client-side by removing the token
   // Server-side logout would require a token blacklist, which adds complexity
   sendSuccess(res, { message: 'Logged out successfully' });
+});
+
+// ============================================================================
+// EMAIL VERIFICATION ROUTES
+// ============================================================================
+
+/**
+ * Verify email address using verification token
+ * GET /auth/verify-email?token=xxx
+ * Follows established route patterns with Zod validation
+ */
+router.get('/auth/verify-email', async (req: Request, res: Response) => {
+  try {
+    // Validate query parameters using Zod
+    const queryValidation = validateData(z.object({ 
+      token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format') 
+    }), req.query, res, 'verification token');
+    if (!queryValidation) return;
+
+    const { token } = queryValidation;
+    const env = getEnvConfig();
+
+    // Use RegistrationOrchestrator for clean business logic separation
+    const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
+    await registrationOrchestrator.completeEmailVerification(token);
+
+    // Redirect to home page with success parameter for toast notification
+    const redirectUrl = `${env.PUBLIC_URL}/?verification=success`;
+    return res.redirect(redirectUrl);
+  } catch (error) {
+    logger.error('[EMAIL-VERIFY] Error:', { error });
+    const env = getEnvConfig();
+    return res.redirect(`${env.PUBLIC_URL}/login?verification=error`);
+  }
+});
+
+/**
+ * Resend verification email using established patterns
+ * POST /auth/resend-verification
+ * Rate limited to prevent email bombing attacks
+ */
+router.post('/auth/resend-verification', resendVerificationRateLimit, async (req: Request, res: Response) => {
+  try {
+    // Validate request body using Zod
+    const bodyValidation = validateData(EmailVerificationSchema, req.body, res, 'resend verification data');
+    if (!bodyValidation) return;
+
+    const { email } = bodyValidation;
+
+    // Delegate to service layer for business logic
+    const userService = ServiceFactory.createUserService();
+    const user = await UserService.getUserByEmail(email);
+
+    if (!user || user.emailVerified) {
+      // Don't reveal if user exists (security best practice)
+      return sendSuccess(res, {
+        message: 'If an unverified account exists, a verification email has been sent.',
+      });
+    }
+
+    // Send verification email via service layer
+    await userService.sendEmailVerification(user.id, email);
+
+    sendSuccess(res, {
+      message: 'Verification email sent successfully.',
+    });
+  } catch (error) {
+    handleError(error, res, 'resend verification email');
+  }
 });
 
 // ============================================================================
@@ -442,7 +394,7 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     }
 
     res.redirect(authUrl);
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'OAuth initiation');
   }
 });
@@ -487,7 +439,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       // Implement actual account linking logic
       try {
         // Get OAuth profile from provider using the authorization code
-        const userService = new UserService();
+        const userService = ServiceFactory.createUserService();
         const profile = await userService.getOAuthProfile(provider, code);
         
         // Link the OAuth account to the existing authenticated user
@@ -498,15 +450,47 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           provider
         });
         
-        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=success&provider=${provider}`);
-      } catch (error: any) {
+        // Get user's first starship to redirect back to the proper context
+        let redirectPath = '/profile';
+        try {
+          const starshipRepo = new StarshipRepository();
+          const userStarships = await starshipRepo.findByOwner(userId);
+          const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
+          
+          if (firstStarship) {
+            redirectPath = `/ship/${firstStarship.slug}/settings/profile`;
+          }
+        } catch (error) {
+          logger.warn('[OAUTH-LINKING] Failed to get starship for redirect, using default profile page', { 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
+        }
+        
+        return res.redirect(`${env.PUBLIC_URL}${redirectPath}?oauth_link=success&provider=${provider}`);
+      } catch (error) {
         logger.error('[OAUTH-LINKING] Failed to link account', { 
           userId, 
           provider,
-          errorType: error.constructor.name
+          errorType: error instanceof Error ? error.constructor.name : 'Unknown'
         });
         
-        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=linking_failed`);
+        // Get user's first starship for error redirect too
+        let errorRedirectPath = '/profile';
+        try {
+          const starshipRepo = new StarshipRepository();
+          const userStarships = await starshipRepo.findByOwner(userId);
+          const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
+          
+          if (firstStarship) {
+            errorRedirectPath = `/ship/${firstStarship.slug}/settings/profile`;
+          }
+        } catch (error) {
+          logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', { 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
+        }
+        
+        return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=linking_failed`);
       }
     }
 
@@ -514,29 +498,16 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     // Delegate to service layer (Layer 4)
     const result = await UserService.createUserFromOAuth(provider, code);
 
-    if (result.waitlisted) {
-      return res.redirect(`${env.PUBLIC_URL}/login?oauth_waitlist=pending`);
-    }
-
-    // ADD THIS SECURITY FIX:
-    // Re-check waitlist status immediately before token generation
-    const waitlistService = initWaitlistService();
-    const currentStatus = await waitlistService.getDetailedStatus(result.user.email!);
-
-    if (currentStatus.status === 'pending') {
-      return res.redirect(`${env.PUBLIC_URL}/login?oauth_waitlist=pending`);
-    }
-
     // ✅ SECURITY FIX: Generate secure authorization code instead of JWT token
     const authCode = await generateAuthCode(result.user.id, result.user.email!);
 
     // Redirect with secure authorization code (short-lived, single-use)
     return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}`);
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[AUTH] OAuth callback error:', {
       provider: req.params.provider,
-      error: error.message,
-      stack: error.stack,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
       hasCode: !!req.query.code,
       hasState: !!req.query.state,
     });
@@ -551,10 +522,10 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
  */
 router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
 
     // Delegate to service layer (Layer 4)
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const accounts = await userService.getUserOAuthAccounts(userId);
 
     sendSuccess(res, {
@@ -565,7 +536,7 @@ router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: 
         linkedAt: account.createdAt,
       })),
     });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'get OAuth accounts');
   }
 });
@@ -580,15 +551,15 @@ router.delete('/auth/oauth/unlink/:provider', jwtAuthMiddleware, async (req: Req
     const paramValidation = validateData(z.object({ provider: OAuthProviderSchema }), req.params, res, 'OAuth provider');
     if (!paramValidation) return;
 
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     const { provider } = paramValidation;
 
     // Delegate to service layer (Layer 4) - includes business rule validation
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     await userService.unlinkOAuthAccount(userId, provider);
 
     sendSuccess(res, { message: `${provider} account unlinked successfully` });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'unlink OAuth account');
   }
 });
@@ -603,16 +574,16 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     const validation = validateData(SetPasswordSchema, req.body, res, 'set password');
     if (!validation) return;
 
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await userService.setPasswordForOAuthUser(userId, validation);
 
     sendSuccess(res, { user, message: 'Password set successfully' });
-  } catch (error: any) {
-    handleError(res, error, 'Setting password failed');
+  } catch (error) {
+    handleError(error, res, 'Setting password failed');
   }
 });
 
@@ -622,11 +593,11 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
  */
 router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await userService.getUserById(userId);
 
     if (!user) return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
@@ -636,8 +607,8 @@ router.get('/auth/methods', jwtAuthMiddleware, async (req: Request, res: Respons
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password'
     });
-  } catch (error: any) {
-    handleError(res, error, 'Getting auth methods failed');
+  } catch (error) {
+    handleError(error, res, 'Getting auth methods failed');
   }
 });
 
@@ -670,14 +641,6 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
     }
     
-    // Re-check waitlist status for security (prevent timing attacks)
-    const waitlistService = initWaitlistService();
-    const currentStatus = await waitlistService.getDetailedStatus(user.email!);
-    
-    if (currentStatus.status === 'pending') {
-      return sendError(res, 'ACCESS_DENIED', 'User is still on waitlist', 403);
-    }
-    
     // Generate JWT token (returned in response body, NOT URL)
     const token = await generateJWT({
       id: user.id,
@@ -690,7 +653,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
-      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0] || null;
     } catch (error) {
       console.error(`[OAUTH-EXCHANGE] Failed to fetch starships for user ${user.id}:`, error);
     }
@@ -713,10 +676,10 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         name: firstStarship.name,
       } : null,
     });
-  } catch (error: any) {
+  } catch (error) {
     logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {
-      error: error.message,
-      stack: error.stack,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
     });
     
     return sendError(res, 'INTERNAL_SERVER_ERROR', 'Token exchange failed', 500);
@@ -729,19 +692,19 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
  */
 router.post('/auth/init-methods', jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     if (!userId) return sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
 
     // Delegate to service layer
-    const userService = new UserService();
+    const userService = ServiceFactory.createUserService();
     const user = await userService.initializeUserAuthMethods(userId);
 
     sendSuccess(res, { 
       user,
       message: 'Authentication methods initialized successfully'
     });
-  } catch (error: any) {
-    handleError(res, error, 'Initializing auth methods failed');
+  } catch (error) {
+    handleError(error, res, 'Initializing auth methods failed');
   }
 });
 
@@ -756,7 +719,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
     if (!paramValidation) return;
 
     const { provider } = paramValidation;
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
     // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
     const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
     
@@ -785,7 +748,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
 
     // Return the OAuth URL instead of redirecting
     sendSuccess(res, { authUrl });
-  } catch (error: any) {
+  } catch (error) {
     handleError(error, res, 'OAuth linking initiation');
   }
 });

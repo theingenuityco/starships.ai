@@ -57,4 +57,9 @@ export interface EnvironmentConfig {
   RUNNER_URL?: string;
   RUNNER_PORT?: number;
   RUNNER_AUTH_TOKEN?: string;
+
+  // Email Service Configuration (Amazon SES)
+  EMAIL_FROM_ADDRESS: string;
+  EMAIL_FROM_NAME: string;
+  AWS_SES_REGION: string;
 }

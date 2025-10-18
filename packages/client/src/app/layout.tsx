@@ -2,6 +2,7 @@ import { ClientLayout } from '@/app/client-layout'
 import '@/app/globals.css'
 import { GoogleAnalytics } from '@/components/analytics/google-analytics'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UI_TEXT } from '@/constants/text'
 import { AuthProvider } from '@/providers/auth-provider'
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <TooltipProvider>
                 <div className="min-h-screen bg-background">
                   <ClientLayout>{children}</ClientLayout>
+                  <Toaster />
                 </div>
               </TooltipProvider>
             </AuthProvider>

@@ -2,6 +2,7 @@
 .kilocode/
 .claude/
 .cursor/
+CLAUDE.md
 
 # Node / pnpm workspace
 node_modules/

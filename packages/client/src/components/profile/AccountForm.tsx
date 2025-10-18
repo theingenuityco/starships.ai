@@ -88,8 +88,6 @@ export default function AccountForm() {
             cancelPasswordEdit={cancelPasswordEdit}
             currentPasswordRef={currentPasswordRef}
             onSetPassword={() => setShowSetPassword(true)}
-            onConnectOAuth={handleConnectOAuth}
-            onManageSessions={handleManageSessions}
           />
 
           <OAuthAccountsSettings />

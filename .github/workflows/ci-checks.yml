@@ -132,5 +132,7 @@ jobs:
           nproc
 
       - name: Build all packages
+        env:
+          NODE_OPTIONS: --max-old-space-size=1200
         run: |
-          pnpm run build --concurrency=2
+          pnpm run build --concurrency=1

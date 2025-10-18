@@ -18,7 +18,7 @@ const apiProxyOptions: Options = {
   target: BACKEND_URL,
   changeOrigin: true,
   ws: true, // Enable WebSocket support
-  pathFilter: '/api', // Match paths starting with /api
+  pathFilter: '/api',
 };
 
 // Proxy options for docs routes
@@ -57,9 +57,9 @@ const docsProxy = createProxyMiddleware(docsProxyOptions);
 const frontendProxy = createProxyMiddleware(frontendProxyOptions);
 
 // Apply proxies - order matters!
-app.use(apiProxy); // Will only proxy requests matching pathFilter: '/api'
-app.use(docsProxy); // Will only proxy requests matching pathFilter: '/docs'
-app.use(frontendProxy); // Will proxy everything else
+app.use(docsProxy); // /docs/* → docs (includes /docs/api/*)
+app.use(apiProxy); // /api/* → backend
+app.use(frontendProxy); // everything else → frontend
 
 // Start the proxy server
 const server = app.listen(PORT, () => {
@@ -73,9 +73,9 @@ Docs URL:      ${DOCS_URL}
 Health Check:  http://localhost:${PORT}/_proxy/health
 
 Routes:
-  /api/*   →  ${BACKEND_URL}/api/*
-  /docs/*  →  ${DOCS_URL}/docs/*
-  /*       →  ${FRONTEND_URL}
+  /docs/*      →  ${DOCS_URL}/docs/*
+  /api/*       →  ${BACKEND_URL}/api/*
+  /*           →  ${FRONTEND_URL}
 ================================
   `);
 });

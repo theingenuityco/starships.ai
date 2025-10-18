@@ -14,8 +14,6 @@ import { memo, Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 
-const NeuralLattice = dynamic(() => import('@/components/hero/SceneWrapper'), { ssr: false })
-
 // System component cards
 const SystemCard = memo(({ icon, title, description, accent = false, imageContent }: { icon: string; title: string; description: string; accent?: boolean; imageContent?: React.ReactNode }) => (
   <motion.div
@@ -130,10 +128,7 @@ export default function HomePage() {
         <Suspense fallback={null}>
           <UrlParamHandler />
         </Suspense>
-        {/* Neural Lattice background (progressive enhancement) */}
-        <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
-          <NeuralLattice palette="deep-space" intensity="cinematic" onWarpDone={handleLaunch} />
-        </Suspense>
+        {/* Background removed */}
         {/* Top Navigation Bar */}
         <div className="absolute top-0 left-0 right-0 z-50 p-6">
           <div className="flex justify-between items-center">

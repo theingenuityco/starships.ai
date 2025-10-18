@@ -1,0 +1,96 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/black.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Starships.ai Premium Theme - Minimal Purple Accents */
+:root {
+  /* Layout */
+  --fd-layout-width: 1400px;
+
+  /* Primary - Purple accent for key actions only */
+  --fd-primary: 270 85% 65%;
+  --fd-primary-foreground: 0 0% 100%;
+
+  /* Background - Pure crisp white */
+  --fd-background: 0 0% 100%;
+  --fd-foreground: 0 0% 9%;
+
+  /* Muted - Neutral grays, no color tint */
+  --fd-muted: 0 0% 96.5%;
+  --fd-muted-foreground: 0 0% 45%;
+
+  /* Popover - Clean white */
+  --fd-popover: 0 0% 100%;
+  --fd-popover-foreground: 0 0% 9%;
+
+  /* Card - Slight gray for depth */
+  --fd-card: 0 0% 99%;
+  --fd-card-foreground: 0 0% 9%;
+
+  /* Border - Elegant light gray */
+  --fd-border: 0 0% 92%;
+
+  /* Secondary - Neutral gray */
+  --fd-secondary: 0 0% 96%;
+  --fd-secondary-foreground: 0 0% 9%;
+
+  /* Accent - Very subtle gray with hint of cool tone */
+  --fd-accent: 220 8% 95%;
+  --fd-accent-foreground: 0 0% 9%;
+
+  /* Ring - Purple for focus states */
+  --fd-ring: 270 85% 65%;
+}
+
+.dark {
+  /* Primary - Vibrant purple accent */
+  --fd-primary: 270 80% 70%;
+  --fd-primary-foreground: 0 0% 100%;
+
+  /* Background - True deep black with subtle blue-gray undertone */
+  --fd-background: 220 15% 8%;
+  --fd-foreground: 0 0% 98%;
+
+  /* Muted - Dark gray with cool undertone */
+  --fd-muted: 220 12% 15%;
+  --fd-muted-foreground: 0 0% 63%;
+
+  /* Popover - Slightly elevated black */
+  --fd-popover: 220 15% 10%;
+  --fd-popover-foreground: 0 0% 98%;
+
+  /* Card - Elevated surface */
+  --fd-card: 220 14% 11%;
+  --fd-card-foreground: 0 0% 98%;
+
+  /* Border - Subtle definition */
+  --fd-border: 220 12% 18%;
+
+  /* Secondary - Muted surface */
+  --fd-secondary: 220 10% 16%;
+  --fd-secondary-foreground: 0 0% 98%;
+
+  /* Accent - Purple hint for interactive elements */
+  --fd-accent: 270 30% 18%;
+  --fd-accent-foreground: 270 80% 85%;
+
+  /* Ring - Bright purple focus */
+  --fd-ring: 270 80% 70%;
+}
+
+/* Additional premium touches */
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle gradient for depth */
+:root {
+  --gradient-premium: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+.dark {
+  --gradient-premium: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(0, 0, 0, 0) 100%);
+}

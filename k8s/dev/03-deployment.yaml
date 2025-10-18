@@ -36,7 +36,6 @@ spec:
         app: starships-ai
         environment: dev
     spec:
-      
       terminationGracePeriodSeconds: 120
       imagePullSecrets:
         - name: ghcr-pull-secret
@@ -58,6 +57,8 @@ spec:
           ports:
             - containerPort: 3000
               name: frontend
+            - containerPort: 3001
+              name: docs
             - containerPort: 4000
               name: backend
             - containerPort: 5432
@@ -94,6 +95,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SERVER_URL
+            - name: DOCS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DOCS_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

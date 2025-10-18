@@ -27,7 +27,6 @@ spec:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '3000'
     spec:
-      
       # Security Context - Temporarily disabled due to supervisor permission issues
       # TODO: Fix Docker image to work with non-root user
       # securityContext:
@@ -47,6 +46,9 @@ spec:
           ports:
             - containerPort: 3000
               name: frontend
+              protocol: TCP
+            - containerPort: 3001
+              name: docs
               protocol: TCP
             - containerPort: 4000
               name: backend
@@ -107,6 +109,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SERVER_URL
+            - name: DOCS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DOCS_URL
 
             # Authentication
             - name: JWT_SECRET

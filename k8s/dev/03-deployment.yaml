@@ -40,6 +40,25 @@ spec:
       imagePullSecrets:
         - name: ghcr-pull-secret
       initContainers:
+        - name: fix-permissions
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "🔧 Fixing permissions for /app/packages/docs..."
+              mkdir -p /app/packages/docs/.source
+              chmod -R 777 /app/packages/docs || true
+              echo "✅ Permissions fixed for /app/packages/docs"
+          volumeMounts:
+            - name: starships-data
+              mountPath: /var/lib/postgresql
+              subPath: postgres
+            - name: starships-data
+              mountPath: /app/data
+              subPath: app-data
+
+        # 2️⃣ Your existing init container for mounting app data
         - name: init-starships-data
           image: busybox:1.36
           command:

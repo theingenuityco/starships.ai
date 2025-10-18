@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
@@ -496,7 +495,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onConversationStart={handleConversationStart}
               onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={false}
-              disabled={!selectedAgent}
+              disabled={false}
               minimal={showMessagesArea}
               onFocus={() => {}}
               onBlur={() => {}}
@@ -504,10 +503,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               showExpandableOverlay={false}
               isOverlayExpanded={false}
               budgetTokens={budgetTokens}
-            >
-              {/* Footer Content - Agent Selector */}
-              <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
-            </ConversationMessageInput>
+              onAgentChange={handleAgentChange}
+            ></ConversationMessageInput>
           </div>
         </div>
       </div>

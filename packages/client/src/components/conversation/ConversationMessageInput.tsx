@@ -12,11 +12,21 @@ import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
-import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Mention from '@tiptap/extension-mention'
+import Placeholder from '@tiptap/extension-placeholder'
+import { createRoot } from 'react-dom/client'
+// Removed tippy.js; using our own anchored container with fixed positioning
+// Using native textarea again; react-mentions kept internal mention state we no longer use
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 import TopupButton from '@/components/billing/TopupButton'
 import { toast } from 'sonner'
+import { useStarshipAgents } from '@/hooks/useAgents'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -36,6 +46,7 @@ interface ConversationMessageInputProps {
   showExpandableOverlay?: boolean
   isOverlayExpanded?: boolean
   budgetTokens?: number
+  onAgentChange?: (agent: AgentModel | null) => void
 }
 
 export interface ConversationMessageInputRef {
@@ -62,6 +73,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       showExpandableOverlay = false,
       isOverlayExpanded = false,
       budgetTokens,
+      onAgentChange,
     },
     ref
   ) => {
@@ -75,6 +87,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const MINIMUM_THRESHOLD = 0.05
     const hasFunds = Number(wallet?.balance ?? '0') >= MINIMUM_THRESHOLD
 
+    // Load agents for @mention parsing
+    const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
+    const agentsRef = useRef<AgentModel[]>([])
+    useEffect(() => {
+      agentsRef.current = (starshipAgents as AgentModel[]) || []
+    }, [starshipAgents])
+
     // Use streamedQuery-based conversation hook
     const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null, starshipId)
     const isStreamingEffective = isResponding
@@ -87,6 +106,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const hardLimitActive = !!conversationId && contextLimit > 0
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
+
+    // Mention UI state (custom dropdown styled like AgentSelector)
+    const [isMentionOpen, setIsMentionOpen] = useState(false)
+    const [mentionQuery, setMentionQuery] = useState('')
+    const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null)
+    const [mentionActiveIndex, setMentionActiveIndex] = useState(0)
 
     // Consolidated focus management - handles all focus scenarios
     useEffect(() => {
@@ -129,9 +154,34 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const messageToSend = message.trim()
       if (!messageToSend || sending || disabled) return
 
+      // Support leading @agent mention to switch/select agent
+      let effectiveAgent: AgentModel | null | undefined = selectedAgent
+      let contentToSend = messageToSend
+      const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
+      if (mentionMatch && starshipAgents.length > 0) {
+        const handle = mentionMatch[1]
+        const lower = handle.toLowerCase()
+        const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
+        if (matched) {
+          effectiveAgent = matched
+          // Remove the leading mention token from the message text
+          contentToSend = messageToSend.replace(mentionMatch[0], '').trimStart()
+          if (onAgentChange) onAgentChange(matched)
+        }
+      }
+
       // Validation for agent and starship
-      if (!selectedAgent) {
+      if (!effectiveAgent) {
         toast.error('Select an agent', { description: 'Please select an agent to chat.' })
+        return
+      }
+
+      // If message becomes empty after removing mention, do not send
+      if (!contentToSend) {
+        setMessage('')
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+        }
         return
       }
 
@@ -151,9 +201,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let currentConversationId = conversationId
         if (!currentConversationId) {
           const newConversation = await createConversation.mutateAsync({
-            title: `Chat with ${selectedAgent.name}`,
+            title: `Chat with ${effectiveAgent.name}`,
             starshipId: starshipId,
-            agentId: selectedAgent.id,
+            agentId: effectiveAgent.id,
           })
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)
@@ -161,7 +211,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         // Set agent information in store
         const { setConversationAgent } = useStarshipUIStore.getState()
-        setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
+        setConversationAgent(currentConversationId!, effectiveAgent.id, effectiveAgent.name)
 
         // Clear input and reset UI immediately for better UX
         setMessage('')
@@ -179,8 +229,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
         void sendMessageFn({
           conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-          content: messageToSend,
+          agentId: effectiveAgent!.id,
+          content: contentToSend,
           role: 'user',
           starshipId: starshipId!,
           messageType: 'user_input',
@@ -202,7 +252,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setMessage(messageToSend)
         setSending(false)
       }
-    }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId])
+    }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, onAgentChange, starshipAgents])
 
     // Handle suggestion clicks
     const handleSuggestionSubmit = useCallback(
@@ -276,19 +326,60 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     )
 
     const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (isMentionOpen) return
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         handleSubmit()
       }
     }
 
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setMessage(e.target.value)
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!isMentionOpen) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionActiveIndex(prev => (prev + 1) % Math.max(uiMentionOptions.length || 1, 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionActiveIndex(prev => (prev - 1 + Math.max(uiMentionOptions.length || 1, 1)) % Math.max(uiMentionOptions.length || 1, 1))
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        const choice = uiMentionOptions[mentionActiveIndex]
+        if (choice) applyMentionChoice(choice)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setIsMentionOpen(false)
+      }
+    }
 
-      // Auto-resize textarea
-      const textarea = e.target
-      textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, minimal ? 80 : 120)}px`
+    const handleMentionsChange = (e: any, newValue: string) => {
+      setMessage(newValue)
+
+      // Auto-resize underlying textarea via ref (event may be null in react-mentions)
+      const textarea = textareaRef.current
+      if (textarea) {
+        textarea.style.height = 'auto'
+        textarea.style.height = `${Math.min(textarea.scrollHeight, minimal ? 80 : 120)}px`
+      }
+
+      // Mention detection near caret
+      try {
+        const caret = (textarea as HTMLTextAreaElement | null)?.selectionStart ?? newValue.length
+        const before = newValue.slice(0, caret)
+        const match = before.match(/(^|\s)@([A-Za-z0-9_-]*)$/)
+        if (match) {
+          const query = match[2] ?? ''
+          setMentionQuery(query)
+          setMentionStartIndex(caret - (query.length + 1))
+          setIsMentionOpen(true)
+          setMentionActiveIndex(0)
+        } else {
+          setIsMentionOpen(false)
+          setMentionQuery('')
+          setMentionStartIndex(null)
+        }
+      } catch {
+        // ignore caret errors
+      }
     }
 
     const handleVoiceToggle = () => {
@@ -304,6 +395,258 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent && hasFunds
+
+    // TipTap editor with Mention extension to treat mentions as atomic units
+    const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
+
+    const MentionList = ({ items, command, clientRect }: any) => {
+      const [active, setActive] = useState(0)
+      useEffect(() => {
+        setMentionActiveIndex(0)
+      }, [items])
+      useEffect(() => {
+        setActive(mentionActiveIndex)
+      }, [mentionActiveIndex])
+      const style: React.CSSProperties = clientRect
+        ? (() => {
+            const rect = clientRect()
+            return { position: 'fixed', left: rect.left, top: rect.bottom + 6, zIndex: 1000 }
+          })()
+        : { position: 'fixed', left: 0, top: 0, zIndex: 1000 }
+      return (
+        <div style={style} className="w-[min(420px,calc(100vw-40px))] max-h-64 overflow-auto rounded-lg border border-border/40 bg-popover/95 backdrop-blur-md shadow-frosted-lg p-1">
+          {(Array.isArray(items) ? items : []).map((agent: AgentModel, idx: number) => (
+            <button
+              key={agent.id}
+              type="button"
+              className={cn(
+                'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
+                idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
+              )}
+              onMouseEnter={() => setMentionActiveIndex(idx)}
+              onMouseDown={e => {
+                e.preventDefault()
+                command(agent)
+              }}
+            >
+              <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
+                <AgentAvatar seed={agent.name} size={28} />
+              </Avatar>
+              <div className="min-w-0">
+                <div className="font-medium leading-5">{agent.name}</div>
+                {agent.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div>}
+              </div>
+            </button>
+          ))}
+        </div>
+      )
+    }
+
+    const mentionSuggestion = {
+      char: '@',
+      allowSpaces: false,
+      items: ({ query }: any) =>
+        (agentsRef.current || [])
+          .filter(a => {
+            const q = String(query || '').toLowerCase()
+            return !q || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
+          })
+          .slice(0, 8),
+      render: () => {
+        let root: ReturnType<typeof createRoot> | null = null
+        let container: HTMLDivElement | null = null
+        return {
+          onStart: (props: any) => {
+            container = document.createElement('div')
+            document.body.appendChild(container)
+            root = createRoot(container)
+            root.render(<MentionList items={props.items} command={(agent: AgentModel) => props.command({ id: agent.id, label: agent.name })} clientRect={props.clientRect} />)
+          },
+          onUpdate(props: any) {
+            if (!root) return
+            root.render(<MentionList items={props.items} command={(agent: AgentModel) => props.command({ id: agent.id, label: agent.name })} clientRect={props.clientRect} />)
+          },
+          onKeyDown(props: any) {
+            if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'].includes(props.event.key)) {
+              handleKeyDown(props.event)
+              return true
+            }
+            return false
+          },
+          onExit() {
+            if (root) root.unmount()
+            root = null
+            if (container && container.parentNode) container.parentNode.removeChild(container)
+            container = null
+          },
+        }
+      },
+    }
+
+    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const tiptap = useEditor({
+      extensions: [
+        StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
+        Placeholder.configure({ placeholder: placeholderText }),
+        Mention.configure({
+          HTMLAttributes: {
+            class: 'inline-flex items-center gap-1 align-baseline bg-primary/10 text-primary rounded-full px-1.5 py-0.5 border border-primary/20',
+          },
+          suggestion: mentionSuggestion,
+        }),
+      ],
+      content: message,
+      immediatelyRender: false,
+      editorProps: {
+        attributes: {
+          class: cn(
+            'w-full bg-transparent outline-none',
+            minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
+            'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+            minimal && 'text-sm'
+          ),
+        },
+        handleKeyDown: (_view, event) => {
+          if (isMentionOpen) return false
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            handleSubmit()
+            return true
+          }
+          return false
+        },
+      },
+      onUpdate: ({ editor }) => {
+        setMessage(editor.getText())
+      },
+    })
+    editorRef.current = tiptap
+
+    // Styling for react-mentions to match our textarea theme
+    const inputMinHeight = minimal ? 20 : 24
+    const inputMaxHeight = minimal ? 80 : 120
+    const mentionsStyles = {
+      control: {
+        backgroundColor: 'transparent',
+        color: 'hsl(var(--foreground))',
+        font: 'inherit',
+      },
+      highlighter: {
+        padding: 0,
+        border: 0,
+        backgroundColor: 'transparent',
+        color: 'hsl(var(--foreground))',
+        font: 'inherit',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        minHeight: `${inputMinHeight}px`,
+        maxHeight: `${inputMaxHeight}px`,
+        overflowY: 'auto',
+      },
+      input: {
+        padding: 0,
+        border: 0,
+        outline: 0,
+        backgroundColor: 'transparent',
+        color: 'hsl(var(--foreground))',
+        caretColor: 'hsl(var(--foreground))',
+        font: 'inherit',
+        whiteSpace: 'pre-wrap' as const,
+        wordBreak: 'break-word' as const,
+        minHeight: `${inputMinHeight}px`,
+        maxHeight: `${inputMaxHeight}px`,
+        overflowY: 'auto' as const,
+        resize: 'none' as const,
+      },
+      suggestions: {
+        list: {
+          backgroundColor: 'hsl(var(--popover))',
+          color: 'hsl(var(--popover-foreground))',
+          border: '1px solid hsl(var(--border))',
+          borderRadius: '0.5rem',
+          boxShadow: '0 10px 25px -10px rgba(0,0,0,0.25)',
+          padding: '0.25rem',
+          zIndex: 50,
+          maxHeight: '16rem',
+          overflowY: 'auto' as const,
+          backdropFilter: 'blur(6px)',
+        },
+        item: {
+          padding: '0.375rem 0.5rem',
+          borderRadius: '0.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          cursor: 'pointer',
+          '&focused': {
+            backgroundColor: 'hsl(var(--accent))',
+            color: 'hsl(var(--accent-foreground))',
+          },
+        },
+      },
+    }
+
+    // =========================
+    // Mention chip highlighter
+    // =========================
+    const escapeHtml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
+    const highlightedHtml = useMemo(() => {
+      const escaped = escapeHtml(message)
+      // Wrap @mentions with a chip span. We keep a data-mention attribute for click handling.
+      const withChips = escaped.replace(/(^|\s)(@[A-Za-z0-9_-]+)/g, (_m: string, p1: string, p2: string) => {
+        const mentionText = p2
+        const raw = mentionText.slice(1)
+        return `${p1}<span data-mention="${raw}" class=\"inline-flex items-center gap-1 align-baseline bg-primary/10 text-primary rounded-full px-1.5 py-0.5 pointer-events-auto cursor-pointer border border-primary/20\">${mentionText}</span>`
+      })
+      return withChips.replace(/\n$/, '\n ')
+    }, [message])
+
+    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      const chip = target.closest('[data-mention]') as HTMLElement | null
+      if (!chip) return
+      const token = chip.getAttribute('data-mention') || ''
+      if (!token) return
+      const lower = token.toLowerCase()
+      const agent = (starshipAgents as AgentModel[]).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
+      if (agent && onAgentChange) onAgentChange(agent)
+    }
+
+    const filteredMentionAgents = (query: string) => {
+      const q = (query || '').toLowerCase()
+      return (starshipAgents as AgentModel[]).filter(a => !q || a.slug.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)).slice(0, 8)
+    }
+
+    const uiMentionOptions = useMemo(() => (isMentionOpen ? filteredMentionAgents(mentionQuery) : []), [isMentionOpen, mentionQuery, starshipAgents])
+
+    const applyMentionChoice = (agent: AgentModel) => {
+      if (mentionStartIndex == null) return
+      const atIndex = mentionStartIndex
+      const textarea = textareaRef.current
+      const caret = textarea?.selectionStart ?? message.length
+      const before = message.slice(0, atIndex)
+      const after = message.slice(caret)
+      // Complete the mention token with selected @slug and a trailing space
+      const insertion = `@${agent.slug} `
+      const next = `${before}${insertion}${after}`
+      setMessage(next)
+      setIsMentionOpen(false)
+      setMentionQuery('')
+      setMentionStartIndex(null)
+      setTimeout(() => {
+        try {
+          if (textarea) {
+            const newCaret = before.length + insertion.length
+            textarea.focus()
+            textarea.selectionStart = newCaret
+            textarea.selectionEnd = newCaret
+          }
+        } catch {
+          // ignore
+        }
+      }, 0)
+    }
 
     // Expose methods to parent component via ref
     useImperativeHandle(
@@ -352,7 +695,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         {/* Input Container with Expandable Overlay */}
         <div
           className={cn(
-            'relative transition-all overflow-hidden',
+            'relative transition-all overflow-visible',
             minimal
               ? 'frosted-glass-card rounded-xl shadow-frosted-lg focus-within:ring-1 focus-within:ring-primary/15'
               : 'frosted-glass-card rounded-2xl shadow-frosted-lg focus-within:ring-2 focus-within:ring-primary/20',
@@ -366,37 +709,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           <div className={cn('flex items-end', minimal ? 'p-3' : 'p-4')}>
             {/* Removed tool builder button */}
 
-            {/* Text Input */}
+            {/* Text Input (TipTap) */}
             <div className="flex-1 min-w-0">
-              <textarea
-                ref={textareaRef}
-                value={message}
-                onChange={handleTextareaChange}
-                onKeyPress={handleKeyPress}
-                onFocus={onFocus}
-                onBlur={onBlur}
-                onClick={e => {
-                  // When input is disabled (streaming), allow clicking to toggle overlay
-                  if ((disabled || sending || isStreamingEffective) && onToggleOverlay) {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onToggleOverlay()
-                  }
-                }}
-                placeholder={getPlaceholder()}
-                disabled={disabled || sending || isStreamingEffective}
-                className={cn(
-                  'w-full bg-transparent resize-none',
-                  minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
-                  'text-foreground placeholder-muted-foreground',
-                  'border-0 outline-none focus:ring-0',
-                  'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
-                  minimal && 'text-sm',
-                  // Add cursor pointer when disabled and overlay toggle is available
-                  (disabled || sending || isStreamingEffective) && onToggleOverlay && 'cursor-pointer pointer-events-auto'
-                )}
-                rows={1}
-              />
+              <EditorContent editor={tiptap} />
             </div>
 
             {/* Minimal mode: Send button on right */}

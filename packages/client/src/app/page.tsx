@@ -107,7 +107,12 @@ export default function HomePage() {
                   Login
                 </LoginButton>
               )}
-              <Button variant="outline" size="default" className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10">
+              <Button
+                variant="outline"
+                size="default"
+                className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
+                onClick={() => window.open('/docs', '_blank')}
+              >
                 <Icon name="book" className="w-4 h-4 mr-2" />
                 View Documentation
               </Button>
@@ -697,7 +702,7 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flex space-x-6">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => window.open('/docs', '_blank')}>
                   <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation
                 </Button>

@@ -1,17 +1,14 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
-
 import { motion } from 'motion/react'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -38,7 +35,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  * JWT-based login and registration form
  */
 export function LoginForm() {
-  const { login, register, oauthLogin, isLoading, error } = useAuth()
+  const { login, register, oauthLogin, resendVerification, isLoading, error } = useAuth()
   const searchParams = useSearchParams()
 
   // OAuth initiation function - uses relative URL like regular auth
@@ -62,8 +59,9 @@ export function LoginForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
   const [formError, setFormError] = useState<string | null>(null)
-  const [waitlistStatus, setWaitlistStatus] = useState<{
-    isWaitlisted: boolean
+  const [emailVerificationStatus, setEmailVerificationStatus] = useState<{
+    needsVerification: boolean
+    email: string
     message: string
   } | null>(null)
   const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
@@ -71,38 +69,32 @@ export function LoginForm() {
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
 
-  // OAuth callback handling - SECURE authorization code exchange
+  // OAuth callback and verification error handling
   useEffect(() => {
     const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
-    const oauthWaitlist = searchParams?.get('oauth_waitlist')
-
+    const verificationError = searchParams?.get('verification')
 
     // Prevent duplicate handling (synchronous check with ref)
     if (oauthHandledRef.current) {
-      console.log('[OAuth] Already handled, skipping')
       return
     }
 
     if (authCode) {
       oauthHandledRef.current = true
-      console.log('[OAuth] Exchanging authorization code for JWT token (secure)')
       // ✅ SECURE: Exchange authorization code for JWT via POST request
       oauthLogin(authCode)
     } else if (oauthError) {
       setFormError(getOAuthErrorMessage(oauthError))
-    } else if (oauthWaitlist) {
-      setWaitlistStatus({
-        isWaitlisted: true,
-        message: 'Thanks for signing up! Please wait for approval to access the app.',
-      })
+    } else if (verificationError === 'error') {
+      setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
     }
   }, [searchParams, oauthLogin])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
-    setWaitlistStatus(null)
+    setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
 
     if (!loginData.email || !loginData.password) {
@@ -112,18 +104,19 @@ export function LoginForm() {
 
     const result = await login(loginData.email, loginData.password)
 
-    // Check if waitlisted response
-    if (result.waitlisted) {
-      setWaitlistStatus({
-        isWaitlisted: true,
-        message: result.message || 'You are on our waitlist. Stay tuned!',
+    // Check if email verification required
+    if (result.emailNotVerified) {
+      setEmailVerificationStatus({
+        needsVerification: true,
+        email: loginData.email,
+        message: result.message || 'Please verify your email address to continue.',
       })
       return
     }
 
     if (!result.success) {
       const errorMessage = result.error || 'Login failed'
-      
+
       // Check if user doesn't exist - offer to switch to registration
       if (errorMessage.includes('No account found') || errorMessage.includes('Please sign up first')) {
         setFormError(null) // Clear error since we're handling it gracefully
@@ -134,7 +127,7 @@ export function LoginForm() {
         setAutoSwitchedToRegister(true)
         return
       }
-      
+
       setFormError(errorMessage)
     }
   }
@@ -142,7 +135,7 @@ export function LoginForm() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
-    setWaitlistStatus(null)
+    setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
 
     if (!registerData.email || !registerData.password || !registerData.name) {
@@ -162,13 +155,30 @@ export function LoginForm() {
 
     const result = await register(registerData.email, registerData.password, registerData.name)
 
-    // Check if waitlisted response
-    if (result.waitlisted) {
-      setWaitlistStatus({
-        isWaitlisted: true,
-        message: result.message || 'You have been added to the waitlist!',
+    // Check if email verification sent
+    if (result.emailVerificationSent) {
+      setEmailVerificationStatus({
+        needsVerification: false,
+        email: registerData.email,
+        message: result.message || 'Please check your email to verify your account.',
       })
-      // Optionally clear form
+      // Clear form following established UX patterns
+      setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
+      return
+    }
+
+    // Handle "user already exists" case gracefully
+    if (result.message && result.message.includes('already exists')) {
+      // Switch to login tab and pre-fill email
+      setActiveTab('login')
+      setLoginData(prev => ({ ...prev, email: registerData.email }))
+      // Show as informational message, not error
+      setFormError(null)
+      setEmailVerificationStatus({
+        needsVerification: true,
+        email: registerData.email,
+        message: result.message,
+      })
       setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
       return
     }
@@ -176,6 +186,11 @@ export function LoginForm() {
     if (!result.success) {
       setFormError(result.error || 'Registration failed')
     }
+  }
+
+  // Resend verification handler following established patterns
+  const handleResendVerification = async (email: string) => {
+    await resendVerification(email)
   }
 
   return (
@@ -188,18 +203,42 @@ export function LoginForm() {
 
         <CardContent>
           {/* OAuth buttons ABOVE existing tabs */}
-          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading || !!waitlistStatus} />
+          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
-          {waitlistStatus && (
-            <div className="mb-4">
-              <WaitlistMessage message={waitlistStatus.message} onClose={() => setWaitlistStatus(null)} />
-            </div>
+          {emailVerificationStatus && (
+            <Alert className="mb-3 border-emerald-200 bg-emerald-50/50 backdrop-blur-sm text-center">
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-center space-x-2 flex-wrap">
+                  <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
+                  <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
+                  <span className="font-medium text-gray-900 text-sm break-all">{emailVerificationStatus.email}</span>
+                </div>
+                <AlertDescription>
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResendVerification(emailVerificationStatus.email)}
+                      disabled={isLoading}
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      <Icon name="mail" className="h-4 w-4 mr-2" />
+                      {isLoading ? 'Sending...' : 'Resend Email'}
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </div>
+            </Alert>
           )}
 
-          <Tabs value={activeTab} onValueChange={(value) => {
-            setActiveTab(value)
-            setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
-          }}>
+          <Tabs
+            value={activeTab}
+            onValueChange={value => {
+              setActiveTab(value)
+              setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
+              setFormError(null) // Clear form errors when switching tabs
+            }}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Sign Up</TabsTrigger>
@@ -217,11 +256,13 @@ export function LoginForm() {
                     placeholder="captain@starships.ai"
                     disabled={isLoading}
                     required
+                    className="h-12"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password">Password
+                  </Label>
                   <div className="relative">
                     <Input
                       id="login-password"
@@ -231,6 +272,7 @@ export function LoginForm() {
                       placeholder="Enter your password"
                       disabled={isLoading}
                       required
+                      className="h-12"
                     />
                     <Button
                       type="button"
@@ -245,13 +287,13 @@ export function LoginForm() {
                   </div>
                 </div>
 
-                {(formError || error) && (
+                {(formError || (error && !autoSwitchedToRegister)) && (
                   <Alert variant="destructive">
                     <AlertDescription>{formError || error}</AlertDescription>
                   </Alert>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Signing in...</>
                   ) : (
@@ -265,13 +307,6 @@ export function LoginForm() {
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4">
-              {autoSwitchedToRegister && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertDescription className="text-blue-800">
-                    No account found with that email address. Please create a new account below.
-                  </AlertDescription>
-                </Alert>
-              )}
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>
@@ -283,6 +318,7 @@ export function LoginForm() {
                     placeholder="Captain Starship"
                     disabled={isLoading}
                     required
+                    className="h-12"
                   />
                 </div>
 
@@ -296,6 +332,7 @@ export function LoginForm() {
                     placeholder="captain@starships.ai"
                     disabled={isLoading}
                     required
+                    className="h-12"
                   />
                 </div>
 
@@ -311,6 +348,7 @@ export function LoginForm() {
                       disabled={isLoading}
                       required
                       minLength={8}
+                      className="h-12"
                     />
                     <Button
                       type="button"
@@ -336,6 +374,7 @@ export function LoginForm() {
                       placeholder="Confirm your password"
                       disabled={isLoading}
                       required
+                      className="h-12"
                     />
                     <Button
                       type="button"
@@ -356,7 +395,7 @@ export function LoginForm() {
                   </Alert>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Creating account...</>
                   ) : (

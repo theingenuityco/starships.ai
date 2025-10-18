@@ -10,9 +10,10 @@ import { Card } from '@/components/ui/card'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
-
+import { toast } from '@/hooks/useToast'
 import { motion } from 'motion/react'
 import { lazy, memo, Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 const StarfieldBackground = lazy(() =>
   import('@/components/StarfieldBackground').then(module => ({
     default: module.StarfieldBackground,
@@ -49,13 +50,49 @@ const SystemCard = memo(({ icon, title, description, accent = false, imageConten
 
 SystemCard.displayName = 'SystemCard'
 
+// Component to handle URL parameters with Suspense boundary
+function UrlParamHandler() {
+  const [mounted, setMounted] = useState(false)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Handle email verification success toast after component is mounted
+  useEffect(() => {
+    if (!mounted) return
+
+    // Check for email verification success parameter
+    const verification = searchParams?.get('verification')
+    if (verification === 'success') {
+      // Show success toast notification
+      toast({
+        title: 'Email Verified Successfully!',
+        description: 'Your email address has been verified. You can now access your account.',
+        variant: 'success',
+        duration: 5000,
+      })
+
+      // Clean up the URL parameter without triggering a page reload
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('verification')
+        window.history.replaceState({}, '', url.toString())
+      }
+    }
+  }, [mounted, searchParams])
+
+  return null
+}
+
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   const [launching, setLaunching] = useState(false)
-  const { isAuthenticated, isLoading, userName, userId } = useAuth()
+  const { isAuthenticated, isLoading, userId } = useAuth()
 
   // Use TanStack Query to fetch starships - only when authenticated
-  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(userId || '', !!userId && isAuthenticated)
+  const { data: starships = [] } = useUserStarships(userId || '', !!userId && isAuthenticated)
 
   const hasExistingStarships = starships.length > 0
 
@@ -90,6 +127,9 @@ export default function HomePage() {
   return (
     <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden">
+        <Suspense fallback={null}>
+          <UrlParamHandler />
+        </Suspense>
         <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
           <StarfieldBackground launching={launching} density={600} speed={1.5} />
         </Suspense>
@@ -107,12 +147,7 @@ export default function HomePage() {
                   Login
                 </LoginButton>
               )}
-              <Button
-                variant="outline"
-                size="default"
-                className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
-                onClick={() => window.open('/docs', '_blank')}
-              >
+              <Button variant="outline" size="default" className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10" onClick={() => window.open('/docs', '_blank')}>
                 <Icon name="book" className="w-4 h-4 mr-2" />
                 View Documentation
               </Button>

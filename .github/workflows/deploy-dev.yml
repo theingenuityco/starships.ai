@@ -111,6 +111,9 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           RUNNER_AUTH_TOKEN: ${{ secrets.RUNNER_AUTH_TOKEN }}
+          EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
+          EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION }}
         run: |
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
@@ -137,6 +140,9 @@ jobs:
             --from-literal=DOCS_URL="$DOCS_URL" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
             --from-literal=RUNNER_AUTH_TOKEN="$RUNNER_AUTH_TOKEN" \
+            --from-literal=EMAIL_FROM_ADDRESS="$EMAIL_FROM_ADDRESS" \
+            --from-literal=EMAIL_FROM_NAME="$EMAIL_FROM_NAME" \
+            --from-literal=AWS_SES_REGION="$AWS_SES_REGION" \
             -n ${{ env.NAMESPACE }}
 
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true

@@ -58,7 +58,7 @@ export default function Hero() {
         </div>
 
         {/* Mock desktop - wallpaper container with centered app window */}
-        <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+        <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl h-[720px]">
           {/* Wallpaper layer */}
           <div
             className="absolute inset-0"
@@ -67,9 +67,9 @@ export default function Hero() {
                 'radial-gradient(circle at 20% 20%, rgba(59,130,246,0.14) 0%, transparent 40%), radial-gradient(circle at 80% 80%, rgba(168,85,247,0.14) 0%, transparent 40%), linear-gradient(135deg, rgba(17,24,39,0.85) 0%, rgba(2,6,23,0.85) 100%)',
             }}
           />
-          <div className="relative p-4 md:p-8">
+          <div className="relative p-4 md:p-8 h-full">
             <div className="mx-auto max-w-5xl">
-              <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
+              <div className="relative rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
                 {/* Window top bar */}
                 <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-white/10">
                   <div className="flex items-center gap-2">
@@ -113,14 +113,13 @@ export default function Hero() {
                         nodesDraggable={false}
                         borderless
                       />
-
-                      {/* Floating input overlay (like ConversationInterface) */}
-                      <div className="pointer-events-none absolute left-0 right-0 bottom-3 px-4">
-                        <div className="max-w-2xl mx-auto pointer-events-auto">
-                          <ConversationMessageInput starshipId="" minimal disabled />
-                        </div>
-                      </div>
                     </div>
+                  </div>
+                </div>
+                {/* Floating input overlay (like ConversationInterface) inside window */}
+                <div className="pointer-events-none absolute left-0 right-0 bottom-6 md:bottom-8 p-4 md:p-6">
+                  <div className="max-w-2xl mx-auto pointer-events-auto">
+                    <ConversationMessageInput starshipId="" minimal disabled />
                   </div>
                 </div>
               </div>

@@ -601,20 +601,116 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     // React NodeView for mention rendering using our avatar component
-    const MentionNodeView = ({ node }: any) => {
+    const MentionNodeView = ({ node, updateAttributes }: any) => {
       const id = node?.attrs?.id
       const label = node?.attrs?.label
       const agent = (agentsRef.current || []).find(a => a.id === id)
       const display = agent?.name || label || id || ''
+      const anchorRef = useRef<HTMLSpanElement | null>(null)
+      const popupRef = useRef<any>(null)
+      const rendererRef = useRef<ReactRenderer | null>(null)
+
+      const openSwitcher = () => {
+        try {
+          const anchorEl = anchorRef.current
+          if (!anchorEl) return
+          // Destroy any existing
+          try {
+            popupRef.current?.destroy()
+          } catch {}
+          try {
+            rendererRef.current?.destroy()
+          } catch {}
+
+          const items = (agentsRef.current || []) as AgentModel[]
+          const currentIndex = Math.max(
+            0,
+            items.findIndex(a => a.id === id)
+          )
+
+          rendererRef.current = new ReactRenderer(MentionList as any, {
+            props: {
+              items,
+              active: currentIndex,
+              onHover: (i: number) => {
+                rendererRef.current?.updateProps({ ...rendererRef.current.props, active: i })
+              },
+              command: (newAgent: AgentModel) => {
+                try {
+                  updateAttributes({ id: newAgent.id, label: newAgent.name })
+                } catch {}
+                try {
+                  onAgentChange?.(newAgent)
+                } catch {}
+                try {
+                  popupRef.current?.destroy()
+                } catch {}
+                try {
+                  rendererRef.current?.destroy()
+                } catch {}
+              },
+              anchorRect: null,
+            },
+            editor: tiptap!,
+          })
+
+          popupRef.current = tippy(anchorEl, {
+            content: rendererRef.current.element,
+            appendTo: () => document.body,
+            showOnCreate: true,
+            interactive: true,
+            trigger: 'manual',
+            placement: 'bottom-start',
+            zIndex: 1000,
+          })
+          try {
+            popupRef.current.show()
+          } catch {}
+        } catch {}
+      }
+
+      useEffect(() => {
+        return () => {
+          try {
+            popupRef.current?.destroy()
+          } catch {}
+          try {
+            rendererRef.current?.destroy()
+          } catch {}
+        }
+      }, [])
       return (
-        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline gap-1 leading-none text-foreground">
-          <span className="relative top-0.5 inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden">
-            <AgentAvatar seed={display} size={16} />
+        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline leading-none text-foreground">
+          <span
+            className="inline-flex items-baseline align-baseline gap-1 cursor-pointer hover:opacity-90"
+            contentEditable={false}
+            style={{ pointerEvents: 'auto' }}
+            ref={anchorRef}
+            role="button"
+            tabIndex={0}
+            onPointerDownCapture={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              openSwitcher()
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                openSwitcher()
+              }
+            }}
+          >
+            <span className="relative top-0.5 inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden">
+              <AgentAvatar seed={display} size={16} />
+            </span>
+            <strong className="font-semibold">@{display}</strong>
           </span>
-          <strong className="font-semibold">@{display}</strong>
         </NodeViewWrapper>
       )
     }
+
+    // Removed global capture listeners to avoid swallowing mention click events
 
     const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
     const tiptap = useEditor({

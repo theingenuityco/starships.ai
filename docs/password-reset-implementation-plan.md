@@ -76,10 +76,11 @@ The implementation will follow the established 6-layer architecture:
 
 #### Task 1.1: Add Password Reset Database Table 🔴 Not Started
 **Action**: Create password reset tokens table following email verification pattern
-**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
+**Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/2 complete):
-- [ ] 🔴 Create new migration file `006_add_password_reset_tokens.sql`
+**Sub-tasks** (0/3 complete):
+- [ ] 🔴 Fix migration numbering: Rename `002_add_email_verification_tokens.sql` to `004_add_email_verification_tokens.sql`
+- [ ] 🔴 Create new migration file `005_add_password_reset_tokens.sql`
 - [ ] 🔴 Copy email verification table structure with these changes:
   - Table name: `password_reset_tokens`
   - Expiry: `DEFAULT (NOW() + INTERVAL '1 hour')` (instead of 24 hours)
@@ -281,11 +282,11 @@ If issues arise during deployment:
 
 ## 📈 Simplified Time Estimates
 
-### Total Estimated Time: **7.5 hours** in 1-1.5 days
+### Total Estimated Time: **7.75 hours** in 1-1.5 days
 
 | Phase | Tasks | Est. Time | 
 |-------|-------|-----------|
-| **Phase 1** | 3 tasks | 1.75 hours |
+| **Phase 1** | 3 tasks | 2 hours |
 | **Phase 2** | 3 tasks | 2 hours |
 | **Phase 3** | 2 tasks | 1.25 hours |
 | **Phase 4** | 4 tasks | 2 hours |
@@ -294,7 +295,7 @@ If issues arise during deployment:
 ### Focused Timeline
 
 ```
-Day 1 (7.5h): Database table, Entity/Repository copy, Service methods, API endpoints, Frontend forms, Pages
+Day 1 (7.75h): Fix migration numbering, Database table, Entity/Repository copy, Service methods, API endpoints, Frontend forms, Pages
 ```
 
 **Key Benefits**:

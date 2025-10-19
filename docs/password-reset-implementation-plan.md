@@ -11,7 +11,7 @@ This document outlines the implementation plan for adding password reset functio
 
 ## 📊 Live Progress Tracker
 
-**Overall Progress**: 0% Complete (0/7 phases)
+**Overall Progress**: 0% Complete (0/6 phases)
 
 | Phase | Status | Progress | Completion |
 |-------|--------|----------|------------|
@@ -21,7 +21,6 @@ This document outlines the implementation plan for adding password reset functio
 | **Phase 3** - API Routes & Middleware | 🔴 Not Started | 0/2 tasks | 0% |
 | **Phase 4** - Frontend Components | 🔴 Not Started | 0/4 tasks | 0% |
 | **Phase 5** - Pages & Routing | 🔴 Not Started | 0/2 tasks | 0% |
-| **Phase 6** - Testing & Documentation | 🔴 Not Started | 0/3 tasks | 0% |
 
 **Legend**: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⚠️ Blocked
 
@@ -291,36 +290,19 @@ The implementation will follow the established 6-layer architecture:
 - [ ] 🔴 Handle token from searchParams (Next.js 13+ pattern)
 - [ ] 🔴 Add redirect logic after successful reset
 
-### Phase 6: Testing & Documentation (Day 3) 🔴 Not Started
+### Phase 6: Documentation (Day 3) 🔴 Not Started
 
-**Phase Progress**: 0/3 tasks complete (0%)
+**Phase Progress**: 0/1 task complete (0%)
 
-#### Task 6.1: Follow Existing Test Patterns 🔴 Not Started
-**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
-
-**Sub-tasks** (0/5 complete):
-- [ ] 🔴 **PREREQUISITE**: Write missing EmailVerificationTokenRepository tests first
-- [ ] 🔴 Copy new email verification test structure for password reset tests
-- [ ] 🔴 Test repository methods (follow EmailVerificationTokenRepository test patterns)
-- [ ] 🔴 Test service methods (follow UserService test patterns)
-- [ ] 🔴 Test API endpoints (follow auth route test patterns)
-
-#### Task 6.2: Integration Testing 🔴 Not Started
-**Assignee**: TBD | **Estimated**: 1.5 hours | **Started**: - | **Completed**: -
-
-**Sub-tasks** (0/4 complete):
-- [ ] 🔴 Test complete forgot password flow (email → token → reset → login)
-- [ ] 🔴 Test token expiry and cleanup
-- [ ] 🔴 Test rate limiting triggers and recovery
-- [ ] 🔴 Test OAuth user restrictions (hasPassword check)
-
-#### Task 6.3: Documentation Updates 🔴 Not Started
+#### Task 6.1: Documentation Updates 🔴 Not Started
 **Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/3 complete):
 - [ ] 🔴 Update existing API documentation (add 3 new endpoints)
 - [ ] 🔴 Add password reset section to existing auth documentation
 - [ ] 🔴 Update CHANGELOG.md with new feature
+
+**Note**: Testing will be handled in a separate PR
 
 ## Security Considerations
 
@@ -397,11 +379,7 @@ export const SECURE_MESSAGES = {
 - [ ] Password validation works
 - [ ] Email arrives within reasonable time
 
-### Automated Testing
-- Unit tests for all new methods
-- Integration tests for complete flows
-- Load testing for rate limiters
-- Security testing for token validation
+**Note**: Automated testing will be implemented in a separate PR
 
 ## Rollback Plan
 
@@ -445,7 +423,7 @@ If issues arise during deployment:
 
 ## 📈 Detailed Time Estimates
 
-### Total Estimated Time: **20.5 hours** across 3 days
+### Total Estimated Time: **17.75 hours** across 3 days
 
 | Phase | Tasks | Est. Time | Day |
 |-------|-------|-----------|-----|
@@ -455,18 +433,19 @@ If issues arise during deployment:
 | **Phase 3** | 2 tasks | 3 hours | Day 2 |
 | **Phase 4** | 4 tasks | 4 hours | Day 2-3 |
 | **Phase 5** | 2 tasks | 1.25 hours | Day 3 |
-| **Phase 6** | 3 tasks | 2.75 hours | Day 3 |
+| **Phase 6** | 1 task | 0.75 hours | Day 3 |
 
 ### Refined Timeline
 
 ```
 Day 1 (9.25h): Architectural cleanup, Database migration fix, Entity/Repository (copy existing), Error extension, Start services
 Day 2 (7h): Complete services, Email templates, API routes, Protocol types, Start frontend
-Day 3 (4.25h): Complete frontend, Pages, Testing, Documentation
+Day 3 (1.5h): Complete frontend, Pages, Documentation
 ```
 
 **Time Added**: 2 hours for architectural cleanup (worthwhile investment for code quality)
 **Time Saved**: 6+ hours due to elegant extensions rather than new implementations
+**Testing**: Deferred to separate PR (saves ~3 hours from this implementation)
 
 ## 🎯 Progress Tracking Instructions
 
@@ -527,7 +506,7 @@ This implementation not only adds password reset functionality but also **improv
 1. **Service Injection**: Email verification now follows constructor injection pattern consistently
 2. **Type Duplication**: Client hooks now import types from protocol layer (removes 4 duplicate interfaces)
 3. **Security Gaps**: Added token invalidation and secure error messages
-4. **Missing Tests**: Email verification tests written as prerequisite (enables test-driven password reset development)
+4. **Testing Strategy**: Deferred to separate PR for focused implementation
 5. **Database Performance**: Optimized indexes with conditional WHERE clauses
 
 ### Enhanced Security
@@ -556,9 +535,9 @@ During final review, 4 critical gaps were identified and addressed:
 **Issue**: Newer migrations use `IF NOT EXISTS` but plan wasn't consistent  
 **Resolution**: Standardized `IF NOT EXISTS` pattern for all database objects
 
-### Gap #3: Missing Test Infrastructure
-**Issue**: Plan referenced "email verification test patterns" but **no email verification tests exist**  
-**Resolution**: Added prerequisite task to write email verification tests first (enables TDD approach)
+### Gap #3: Testing Strategy Optimization
+**Issue**: Plan included extensive testing requirements that would expand scope  
+**Resolution**: Deferred testing to separate PR for focused implementation and better test coverage planning
 
 ### Gap #4: OAuth User Edge Cases
 **Issue**: Simple `hasPassword` check doesn't handle edge cases properly  
@@ -570,10 +549,11 @@ These gaps would have caused implementation issues and security vulnerabilities.
 
 ---
 
-**Document Version**: 3.1.0 (Gap Analysis Complete)  
+**Document Version**: 3.2.0 (Testing Scope Optimized)  
 **Created**: 2025-01-19  
 **Refined**: 2025-01-19  
 **Security Enhanced**: 2025-01-19  
 **Gap Analysis**: 2025-01-19  
+**Scope Optimized**: 2025-01-19  
 **Author**: System Architecture Team  
-**Status**: Production Ready (all gaps identified and resolved)
+**Status**: Ready for Implementation (testing deferred to separate PR)

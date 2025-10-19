@@ -17,7 +17,7 @@ export default function Hero() {
 
   return (
     <section className="pt-28 pb-20 px-4">
-      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-center">
+      <div className="max-w-6xl mx-auto flex flex-col gap-10">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
             {(() => {
@@ -57,7 +57,7 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* Mock desktop window with blueprint (top) and chat (bottom) */}
+        {/* Mock desktop window with blueprint (top) and chat (bottom) in separate row */}
         <div className="relative">
           <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
             {/* Window top bar */}
@@ -75,7 +75,7 @@ export default function Hero() {
             <div className="relative">
               <div className="p-4 bg-black/20 border-b border-white/10">
                 <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Blueprint</div>
-                <div className="relative rounded-lg bg黑/30 border border-white/10 p-2">
+                <div className="relative rounded-lg bg-black/30 border border-white/10 p-2">
                   <BlueprintVisualization
                     blueprint={{
                       nodes: [

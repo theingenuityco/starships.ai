@@ -25,14 +25,13 @@ This document outlines the implementation plan for adding password reset functio
 
 ## ⚡ Key Design Decisions
 
-- **Clean Architecture** - Fix inconsistent patterns while implementing password reset
-- **Proper Dependency Injection** - Create ServiceContainer for consistent service instantiation
-- **Dedicated AuthenticationService** - Extract authentication logic from bloated UserService
-- **Unified Token Management** - Create TokenManagementService for all token types
-- **Standardized Rate Limiting** - Consistent time windows and patterns
-- **No Backward Compatibility** - Clean implementation since no production users
-- **Fix Migration Numbering** - Resolve duplicate 002 migration files
-- **Elegant Foundation** - Create maintainable patterns for future features
+- **Fix Repository Anti-Patterns** - Add EmailVerificationTokenRepository as UserService class property (not inline instantiation)
+- **Consistent Service Dependencies** - Services own their repositories as class properties (following ConversationService pattern)
+- **Simple ServiceFactory Usage** - Keep existing ServiceFactory pattern, no complex DI needed
+- **Add Password Reset Repository** - PasswordResetTokenRepository as UserService class property
+- **Standardized Rate Limiting** - Add password reset rate limit following existing patterns
+- **Fix Migration Numbering** - Simple sequential renaming of duplicate 002 files
+- **Minimal Architectural Changes** - Fix only what's broken, don't over-engineer
 
 ## Background
 
@@ -70,12 +69,12 @@ The implementation will follow the established 6-layer architecture:
 
 ## Implementation Phases
 
-### Phase 1: Foundation & Migration Fix (Day 1) 🔴 Not Started
+### Phase 1: Foundation & Migration Fix (30 minutes) 🔴 Not Started
 
 **Phase Progress**: 0/3 tasks complete (0%)
 
-#### Task 1.1: Fix Migration Numbering Crisis 🔴 Not Started
-**Action**: Resolve duplicate 002 migration files
+#### Task 1.1: Fix Migration Numbering 🔴 Not Started
+**Action**: Simple sequential renaming of duplicate 002 migration files
 **Assignee**: TBD | **Estimated**: 5 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/3 complete):
@@ -83,154 +82,146 @@ The implementation will follow the established 6-layer architecture:
 - [ ] 🔴 Rename `003_remove_waitlist_table.sql` to `004_remove_waitlist_table.sql`
 - [ ] 🔴 Keep `002_add_email_verification_tokens.sql` as is
 
-#### Task 1.2: Enhance ServiceFactory with Proper Dependency Injection 🔴 Not Started
-**File**: `packages/server/src/services/ServiceFactory.ts`
-**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
+#### Task 1.2: Fix UserService Repository Anti-Patterns 🔴 Not Started
+**File**: `packages/server/src/services/UserService.ts`
+**Assignee**: TBD | **Estimated**: 15 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/3 complete):
-- [ ] 🔴 Add repository factory methods to ServiceFactory
-- [ ] 🔴 Update service creation methods to use proper DI
-- [ ] 🔴 Ensure AuthenticationService gets all required dependencies
+- [ ] 🔴 Add `emailVerificationTokenRepository` as class property
+- [ ] 🔴 Add `emailService` as class property  
+- [ ] 🔴 Remove inline repository instantiation and dynamic imports
 
 #### Task 1.3: Create Password Reset Database Table 🔴 Not Started
 **File**: `005_add_password_reset_tokens.sql`
-**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
+**Assignee**: TBD | **Estimated**: 10 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/2 complete):
 - [ ] 🔴 Create migration file `005_add_password_reset_tokens.sql`
 - [ ] 🔴 Copy email verification table structure with 1-hour expiry
 
-### Phase 2: Service Architecture Refactor (Day 1-2) 🔴 Not Started
+### Phase 2: Password Reset Implementation (2 hours) 🔴 Not Started
 
 **Phase Progress**: 0/4 tasks complete (0%)
 
 #### Task 2.1: Add Protocol Layer Types 🔴 Not Started
 **File**: `packages/protocol/src/domains/auth.ts`
-**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
+**Assignee**: TBD | **Estimated**: 10 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/2 complete):
-- [ ] 🔴 Add AuthPasswordResetResponse and AuthPasswordResetConfirmResponse interfaces
-- [ ] 🔴 Add TokenType enum and TokenConfig interface (if needed for client/server sharing)
+- [ ] 🔴 Add AuthPasswordResetResponse interface
+- [ ] 🔴 Add AuthPasswordResetConfirmResponse interface
 
-#### Task 2.2: Create AuthenticationService 🔴 Not Started
-**File**: `packages/server/src/services/AuthenticationService.ts`
-**Assignee**: TBD | **Estimated**: 3 hours | **Started**: - | **Completed**: -
+#### Task 2.2: Create PasswordResetTokenEntity 🔴 Not Started
+**File**: `packages/models/src/entities/PasswordResetTokenEntity.ts`
+**Assignee**: TBD | **Estimated**: 20 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/4 complete):
-- [ ] 🔴 Extract email verification logic from UserService
-- [ ] 🔴 Implement password reset methods
-- [ ] 🔴 Use proper dependency injection
-- [ ] 🔴 Add comprehensive error handling
+**Sub-tasks** (0/2 complete):
+- [ ] 🔴 Copy EmailVerificationTokenEntity pattern exactly
+- [ ] 🔴 Update for 1-hour expiry instead of 24 hours
 
 #### Task 2.3: Create PasswordResetTokenRepository 🔴 Not Started
 **File**: `packages/models/src/repositories/PasswordResetTokenRepository.ts`
-**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
-
-**Sub-tasks** (0/2 complete):
-- [ ] 🔴 Copy EmailVerificationTokenRepository pattern
-- [ ] 🔴 Update for password_reset_tokens table
-
-#### Task 2.4: Refactor UserService 🔴 Not Started
-**File**: `packages/server/src/services/UserService.ts`
-**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
-
-**Sub-tasks** (0/3 complete):
-- [ ] 🔴 Remove inline repository instantiations
-- [ ] 🔴 Delegate authentication operations to AuthenticationService
-- [ ] 🔴 Use proper dependency injection pattern
-
-### Phase 3: Token Management System (Day 2) 🔴 Not Started
-
-**Phase Progress**: 0/3 tasks complete (0%)
-
-#### Task 3.1: Create PasswordResetTokenEntity 🔴 Not Started
-**File**: `packages/models/src/entities/PasswordResetTokenEntity.ts`
 **Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/2 complete):
-- [ ] 🔴 Copy EmailVerificationTokenEntity pattern
-- [ ] 🔴 Update for 1-hour expiry and password reset context
+- [ ] 🔴 Copy EmailVerificationTokenRepository pattern exactly
+- [ ] 🔴 Update table name to password_reset_tokens
 
-#### Task 3.2: Integrate TokenManagementService 🔴 Not Started
-**File**: Multiple files
+#### Task 2.4: Add Password Reset to UserService 🔴 Not Started
+**File**: `packages/server/src/services/UserService.ts`
 **Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/3 complete):
-- [ ] 🔴 Register TokenManagementService in ServiceContainer
-- [ ] 🔴 Register PasswordResetTokenRepository in container
-- [ ] 🔴 Update AuthenticationService to use TokenManagementService
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Add `passwordResetTokenRepository` as class property
+- [ ] 🔴 Add `sendPasswordReset(email: string)` method
+- [ ] 🔴 Add `resetPassword(token: string, newPassword: string)` method
+- [ ] 🔴 Follow exact pattern of email verification methods
 
-#### Task 3.3: Standardize Rate Limiting 🔴 Not Started
-**File**: `packages/server/src/middleware/unified-rate-limit.ts`
-**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
-
-**Sub-tasks** (0/3 complete):
-- [ ] 🔴 Create AuthRateLimits with SENSITIVE, REGISTRATION, GENERAL tiers
-- [ ] 🔴 Standardize time windows (5min, 15min, 1hour)
-- [ ] 🔴 Update existing rate limits to use new system
-
-### Phase 4: Password Reset Implementation (Day 3) 🔴 Not Started
+### Phase 3: API Routes & Email Service (1.5 hours) 🔴 Not Started
 
 **Phase Progress**: 0/3 tasks complete (0%)
 
-#### Task 4.1: API Routes Implementation 🔴 Not Started
+#### Task 3.1: Add Password Reset API Routes 🔴 Not Started
 **File**: `packages/server/src/routes/auth.ts`
-**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
-
-**Sub-tasks** (0/4 complete):
-- [ ] 🔴 Add Zod schemas for password reset requests
-- [ ] 🔴 Add `POST /auth/forgot-password` endpoint with proper rate limiting
-- [ ] 🔴 Add `POST /auth/reset-password` endpoint
-- [ ] 🔴 Use AuthenticationService instead of UserService
-
-#### Task 4.2: Email Service Extension 🔴 Not Started
-**File**: `packages/server/src/services/EmailService.ts`
 **Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/3 complete):
-- [ ] 🔴 Add sendPasswordResetEmail() method following sendVerificationEmail() pattern
-- [ ] 🔴 Add generatePasswordResetTemplate() method mirroring existing template style
-- [ ] 🔴 Include 1-hour expiry warning in templates
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Add Zod schema for password reset request
+- [ ] 🔴 Add `POST /auth/forgot-password` endpoint
+- [ ] 🔴 Add `POST /auth/reset-password` endpoint  
+- [ ] 🔴 Add password reset rate limiting middleware
 
-#### Task 4.3: Update ServiceFactory Registration 🔴 Not Started
-**File**: `packages/server/src/services/ServiceFactory.ts`
+#### Task 3.2: Extend EmailService 🔴 Not Started
+**File**: `packages/server/src/services/EmailService.ts`
+**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/2 complete):
+- [ ] 🔴 Add `sendPasswordResetEmail()` method
+- [ ] 🔴 Create password reset email template (copy verification template pattern)
+
+#### Task 3.3: Add Password Reset Rate Limiting 🔴 Not Started
+**File**: `packages/server/src/middleware/rate-limit.ts`
 **Assignee**: TBD | **Estimated**: 15 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/2 complete):
-- [ ] 🔴 Add createAuthenticationService() method to ServiceFactory
-- [ ] 🔴 Ensure routes can access AuthenticationService via ServiceFactory
+- [ ] 🔴 Add `passwordResetRateLimit` (5 requests per 15 minutes)
+- [ ] 🔴 Follow existing rate limit patterns exactly
 
-### Phase 5: Frontend & Integration (Day 3-4) 🔴 Not Started
+### Phase 4: Frontend Implementation (1 hour) 🔴 Not Started
 
 **Phase Progress**: 0/3 tasks complete (0%)
 
-#### Task 5.1: Frontend Hooks & Forms 🔴 Not Started
-**Files**: `useAuth.ts`, `ForgotPasswordForm.tsx`, `ResetPasswordForm.tsx`
-**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
+#### Task 4.1: Create Password Reset Forms 🔴 Not Started
+**Files**: `ForgotPasswordForm.tsx`, `ResetPasswordForm.tsx`
+**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/4 complete):
-- [ ] 🔴 Add password reset mutations to useAuth hook
+**Sub-tasks** (0/3 complete):
 - [ ] 🔴 Create ForgotPasswordForm component
-- [ ] 🔴 Create ResetPasswordForm component
+- [ ] 🔴 Create ResetPasswordForm component with token handling
 - [ ] 🔴 Add "Forgot Password?" link to LoginForm
 
-#### Task 5.2: Pages & Routing 🔴 Not Started
+#### Task 4.2: Create Password Reset Pages 🔴 Not Started
 **Files**: `forgot-password/page.tsx`, `reset-password/page.tsx`
-**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
+**Assignee**: TBD | **Estimated**: 20 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/2 complete):
 - [ ] 🔴 Create forgot password page
-- [ ] 🔴 Create reset password page with token handling
+- [ ] 🔴 Create reset password page with token from URL
 
-#### Task 5.3: Integration Testing & Cleanup 🔴 Not Started
-**File**: Multiple files
-**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
+#### Task 4.3: Add Password Reset to useAuth Hook 🔴 Not Started
+**File**: `packages/client/src/hooks/useAuth.ts`
+**Assignee**: TBD | **Estimated**: 10 minutes | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/2 complete):
+- [ ] 🔴 Add `useForgotPassword` mutation
+- [ ] 🔴 Add `useResetPassword` mutation
+
+### Phase 5: Testing & Cleanup (30 minutes) 🔴 Not Started
+
+**Phase Progress**: 0/3 tasks complete (0%)
+
+#### Task 5.1: Manual Testing 🔴 Not Started
+**Assignee**: TBD | **Estimated**: 15 minutes | **Started**: - | **Completed**: -
 
 **Sub-tasks** (0/4 complete):
-- [ ] 🔴 Test complete password reset flow
-- [ ] 🔴 Verify all services use proper DI
-- [ ] 🔴 Remove any remaining anti-patterns
-- [ ] 🔴 Run lint and type-check
+- [ ] 🔴 Test forgot password flow end-to-end
+- [ ] 🔴 Test expired token handling
+- [ ] 🔴 Test rate limiting triggers
+- [ ] 🔴 Verify email delivery
+
+#### Task 5.2: Code Quality Checks 🔴 Not Started
+**Assignee**: TBD | **Estimated**: 10 minutes | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/2 complete):
+- [ ] 🔴 Run `pnpm lint`
+- [ ] 🔴 Run `pnpm type-check`
+
+#### Task 5.3: Documentation Update 🔴 Not Started
+**Assignee**: TBD | **Estimated**: 5 minutes | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/2 complete):
+- [ ] 🔴 Update API documentation if needed
+- [ ] 🔴 Mark implementation as complete in this document
 
 **Note**: Documentation and testing will be handled in a separate PR to keep this implementation focused
 
@@ -299,29 +290,28 @@ If issues arise during deployment:
 
 ## 📈 Simplified Time Estimates
 
-### Total Estimated Time: **18 hours** in 2-3 days
+### Total Estimated Time: **5.5 hours** (vs original 18 hours)
 
 | Phase | Tasks | Est. Time | 
 |-------|-------|-----------|
-| **Phase 1** | 3 tasks | 1.5 hours |
-| **Phase 2** | 4 tasks | 6 hours |
-| **Phase 3** | 3 tasks | 2.5 hours |
-| **Phase 4** | 3 tasks | 3 hours |
-| **Phase 5** | 3 tasks | 5 hours |
+| **Phase 1** - Foundation | 3 tasks | 30 minutes |
+| **Phase 2** - Password Reset Core | 4 tasks | 2 hours |
+| **Phase 3** - API & Email | 3 tasks | 1.5 hours |
+| **Phase 4** - Frontend | 3 tasks | 1 hour |
+| **Phase 5** - Testing | 3 tasks | 30 minutes |
 
-### Clean Architecture Timeline
+### Realistic Timeline
 
 ```
-Day 1 (7h): Migration fix, ServiceFactory enhancement, AuthenticationService, password reset table
-Day 2 (6h): Complete service refactoring, PasswordResetTokenRepository, rate limiting standardization  
-Day 3 (5h): API implementation, email service extension, frontend components, testing
+Morning (2.5h): Foundation fixes, password reset entity/repository, UserService updates
+Afternoon (3h): API routes, email templates, frontend components, testing
 ```
 
 **Key Benefits**:
-- **Clean Architecture**: Proper dependency injection and service separation
-- **Future-Proof**: Extensible foundation for authentication features
-- **Maintainable**: Consistent patterns across the entire codebase
-- **No Technical Debt**: Fix existing inconsistencies while adding new feature
+- **Follows Existing Patterns**: Uses established service patterns from ConversationService, AgentService
+- **Fixes Anti-Patterns**: Removes inline repository instantiation in UserService
+- **Minimal Changes**: Only fixes what's broken, doesn't over-engineer
+- **Quick Implementation**: 5.5 hours instead of 18 hours
 
 ## 🎯 Progress Tracking Instructions
 
@@ -350,31 +340,29 @@ Day 3 (5h): API implementation, email service extension, frontend components, te
 
 ## 🎯 Simplified Implementation Summary
 
-### ✅ **Clean Architecture Approach**
+### ✅ **Implementation Approach**
 
-| Component | Approach |
-|-----------|----------|
-| **Foundation** | Enhanced ServiceFactory with proper dependency injection |
-| **Services** | AuthenticationService in existing services/ folder |
-| **Database** | Password reset table + fix migration numbering |
-| **Repositories** | PasswordResetTokenRepository following existing patterns |
-| **Rate Limiting** | Standardized AuthRateLimits with consistent time windows |
-| **Email** | Extend existing EmailService with password reset methods |
-| **Routes** | Clean API endpoints using AuthenticationService via ServiceFactory |
-| **Frontend** | Password reset forms and pages |
+| Component | Current Issue | Fix |
+|-----------|--------------|-----|
+| **UserService** | Inline repository instantiation | Add repositories as class properties |
+| **Email Verification** | Creates repos on-the-fly | Use class property pattern |
+| **Password Reset** | Doesn't exist | Copy email verification pattern exactly |
+| **Migrations** | Duplicate 002 files | Simple rename to sequential numbers |
+| **Rate Limiting** | Missing password reset | Add following existing patterns |
+| **ServiceFactory** | Works fine | Keep as-is, no changes needed |
 
-### 🎯 **Key Benefits**
+### 🎯 **Key Principles**
 
-- **Clean Architecture** - Proper separation of concerns and DI
-- **Future-Proof** - Extensible foundation for 2FA, magic links, etc.
-- **Maintainable** - Consistent patterns that scale
-- **No Technical Debt** - Fix existing issues while adding features
-- **Professional Codebase** - Architecture that new developers can understand
+- **Follow Existing Patterns** - ConversationService, AgentService show the way
+- **Don't Over-Engineer** - No new abstractions or complex DI
+- **Fix What's Broken** - Address specific anti-patterns only
+- **Copy What Works** - Email verification pattern works, just needs consistency
+- **Quick Win** - 5.5 hour implementation, not 18 hours
 
 ---
 
-**Document Version**: 5.0.0 (Clean Architecture Implementation)  
+**Document Version**: 6.0.0 (Simplified Pattern-Following Implementation)  
 **Created**: 2025-01-19  
-**Refactored**: 2025-01-19  
-**Author**: System Architecture Team  
-**Status**: Ready for Implementation (clean architecture approach)
+**Last Updated**: 2025-01-19  
+**Author**: Engineering Team  
+**Status**: Ready for Implementation (follows existing patterns, fixes anti-patterns)

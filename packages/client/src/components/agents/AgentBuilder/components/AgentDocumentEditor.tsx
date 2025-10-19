@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -21,8 +21,9 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import type { ToolModel, ApiResponse } from '@starships/protocol'
+import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
+import { toast } from 'sonner'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -59,6 +60,52 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
     const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
+
+  // Resolve current agentId by slug within this starship (if editing existing)
+  const [agentId, setAgentId] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!starshipId || !value?.slug || value.slug === 'new') {
+        setAgentId(null)
+        return
+      }
+      try {
+        const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/starships/${starshipId}/agents/${value.slug}`)
+        const agent = res.data.data
+        if (!cancelled) setAgentId(agent?.id || null)
+      } catch {
+        if (!cancelled) setAgentId(null)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [starshipId, value?.slug])
+
+  // Toggle tool assignment with optimistic UI and server persistence when possible
+  const handleToggleTool = async (slug: string, isSelected: boolean) => {
+    const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
+    // Optimistic update
+    onChange({ ...value, assignedToolSlugs: next })
+
+    // Persist if agent exists; otherwise keep local-only (new agent case)
+    if (!agentId) return
+
+    try {
+      if (isSelected) {
+        await api.delete(`/api/v1/agents/${agentId}/tools/${slug}`)
+      } else {
+        await api.post(`/api/v1/agents/${agentId}/tools/${slug}`)
+      }
+    } catch (err: any) {
+      // Revert on error
+      onChange({ ...value, assignedToolSlugs: selectedToolSlugs })
+      const message = err?.response?.data?.error || err?.message || 'Failed to update tools'
+      toast.error('Tool update failed', { description: message })
+    }
+  }
 
   const handleNameChange = (name: string) => {
     const shouldUpdateSlug = !value.slug || value.slug === generatedSlug
@@ -190,8 +237,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
                         <CommandItem
                           key={slug}
                           onSelect={() => {
-                            const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
-                            onChange({ ...value, assignedToolSlugs: next })
+                            void handleToggleTool(slug, isSelected)
                           }}
                           className="text-xs px-2 py-1"
                         >

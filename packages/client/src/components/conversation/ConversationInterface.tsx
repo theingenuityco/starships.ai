@@ -367,6 +367,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Detect special UI action responses from assistant messages (back-compat path)
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length) return
+    // Only handle back-compat UI actions during active streaming of the current turn
+    if (!uiStreaming) return
+    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+    if (!hasStreamingAssistant) return
 
     const lastMessage = liveMessages[liveMessages.length - 1]
     if (lastMessage?.role === 'assistant' && lastMessage?.content) {
@@ -415,12 +419,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Consume SSE 'ui_action' events directly (clean channel)
   useEffect(() => {
     if (!currentConversationId || !lastUIAction) return
+    // Only react to UI actions while actively streaming/responding in this conversation
+    if (!uiStreaming) return
+    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+    if (!hasStreamingAssistant) return
     try {
       handleUIPayload(lastUIAction as any)
     } catch {
       // ignore
     }
-  }, [currentConversationId, lastUIAction, handleUIPayload])
+  }, [currentConversationId, lastUIAction, handleUIPayload, uiStreaming, liveMessages])
 
   // Removed overlay UI effects
 

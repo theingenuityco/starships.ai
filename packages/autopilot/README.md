@@ -1,576 +1,81 @@
 # @starships/autopilot
 
-Lean workflow execution engine for starships.ai - executes blueprint-based workflows with AI model integration and dynamic state management.
+Workflow engine library for building and executing DAGs with LLM/tool/HTTP nodes. Used by the API server and UI.
 
-## Overview
-
-Autopilot executes workflows defined as node graphs (blueprints) with support for:
-
-- **Dynamic Node Loading** - AI agents, LLM calls, HTTP requests, conditionals, transforms, mutations
-- **Template Expressions** - `{{ jsExpression }}` JavaScript expression syntax for dynamic parameters
-- **State Management** - JSON Patch transforms for workflow state mutations
-- **Credential Management** - Secure API key handling
-- **Error Handling** - Configurable failure modes with resilient execution options
-
-## Quick Start
+## Quick start
 
 ```bash
-pnpm install @starships/autopilot
+pnpm add @starships/autopilot
 ```
 
-### Basic Usage
+Minimal blueprint (start → llm → end):
 
 ```typescript
-import { Engine, Agent, config } from '@starships/autopilot';
+import { Engine, ExecutionItemUtils } from '@starships/autopilot';
 
-// Note: Credentials are typically managed at the application level
-// The autopilot package focuses on workflow execution
-
-// Create and configure an agent
-const agent = new Agent({
-  name: 'Assistant',
-  model: 'anthropic/claude-3.5-sonnet',
-});
-
-// Add nodes to the agent's blueprint
-agent
-  .addNode('llm', 'Greeting', {
-    model: 'anthropic/claude-3.5-sonnet',
-    messages: [{ role: 'user', content: 'Hello!' }],
-  })
-  .addNode('transform', 'Store Result', {
-    transforms: [{ operation: 'add', path: '/state/greeting', value: '{{ $lastOutputOf("llm_1") }}' }],
-  });
-
-// Execute agent
-const execution = await agent.execute();
-console.log('Results:', execution);
-```
-
-### Engine Usage
-
-```typescript
-// Create workflow blueprint directly
 const blueprint = {
   nodes: [
     { ref: 'start', type: 'start', name: 'Begin', parameters: {} },
     {
       ref: 'llm',
       type: 'llm',
-      name: 'AI Response',
-      parameters: {
-        model: 'anthropic/claude-3.5-sonnet',
-        messages: [{ role: 'user', content: 'Hello!' }],
-      },
+      name: 'Respond',
+      parameters: { model: 'anthropic/claude-3.5-sonnet', messages: [{ role: 'user', content: 'Hello' }] },
     },
-    { ref: 'end', type: 'end', name: 'Complete', parameters: {} },
+    { ref: 'end', type: 'end', name: 'Done', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
   ],
   edges: [
-    { ref: 'edge-1', from: 'start', to: 'llm' },
-    { ref: 'edge-2', from: 'llm', to: 'end' },
-  ],
-  metadata: {},
-};
-
-// Execute workflow with Engine
-const engine = new Engine({
-  eventCallback: (event) => console.log(event.type),
-});
-
-const execution = ExecutionItemUtils.createExecution();
-await engine.executeBlueprint(blueprint, execution);
-console.log('Results:', execution.results);
-```
-
-### Blueprint Builder Usage
-
-Use the `BlueprintBuilder` to programmatically construct blueprints with explicit node references:
-
-```typescript
-import { BlueprintBuilder, Engine, ExecutionItemUtils } from '@starships/autopilot';
-
-// Create builder and add nodes with complete type checking
-const builder = new BlueprintBuilder();
-
-const startRef = builder.addNode({
-  type: 'start',
-  name: 'Begin',
-  description: 'Start node',
-  parameters: {},
-});
-
-const llmRef = builder.addNode({
-  type: 'llm',
-  name: 'AI Response',
-  description: 'LLM node',
-  parameters: {
-    model: 'anthropic/claude-3.5-sonnet',
-    messages: [{ role: 'user', content: 'Hello!' }],
-  },
-});
-
-const endRef = builder.addNode({
-  type: 'end',
-  name: 'Complete',
-  description: 'End node',
-  parameters: {},
-});
-
-// Connect nodes using the returned references
-const blueprint = builder.addEdge(startRef, llmRef).addEdge(llmRef, endRef).setMetadata('version', '1.0').build();
-
-// Execute with Engine
-const engine = new Engine();
-const execution = ExecutionItemUtils.createExecution();
-await engine.executeBlueprint(blueprint, execution);
-```
-
-**Key Features:**
-
-- **Full Type Safety**: Pass complete node objects with compile-time type checking
-- **Explicit References**: `addNode()` returns the generated node reference
-- **Parameter Validation**: TypeScript validates node parameters based on node type
-- **Clean & Maintainable**: Easy to read and modify
-
-**Builder Methods:**
-
-- `addNode(node)` - Add a complete node object (without ref), returns generated node reference
-- `addEdge(from, to, condition?)` - Connect nodes, returns this for chaining
-- `setMetadata(key, value)` - Set blueprint metadata, returns this for chaining
-- `build()` - Build and return the complete blueprint
-- `reset()` - Reset builder, returns this for chaining
-- `getNodeCount()` - Get current node count
-- `getEdgeCount()` - Get current edge count
-
-### End Node Output
-
-You can optionally specify an `output` parameter on the End node. If present, the engine will resolve it (supports `{{ ... }}` template expressions) and return that value wrapped as an `ExecutionItem[]` from `executeBlueprint`, instead of the entire `execution.results`.
-
-Example:
-
-```typescript
-const blueprint = {
-  nodes: [
-    { ref: 'start', type: 'start', name: 'Begin', parameters: {} },
-    {
-      ref: 'llm',
-      type: 'llm',
-      name: 'AI Response',
-      parameters: {
-        model: 'anthropic/claude-3.5-sonnet',
-        messages: [{ role: 'user', content: 'Hello!' }],
-      },
-    },
-    {
-      ref: 'end',
-      type: 'end',
-      name: 'Complete',
-      parameters: {
-        // Static or template expression. Resolved with full execution context.
-        output: '{{ $lastOutputOf("llm")?.[0]?.json }}',
-      },
-    },
-  ],
-  edges: [
-    { ref: 'edge-1', from: 'start', to: 'llm' },
-    { ref: 'edge-2', from: 'llm', to: 'end' },
+    { ref: 'e1', from: 'start', to: 'llm' },
+    { ref: 'e2', from: 'llm', to: 'end' },
   ],
 };
 
 const engine = new Engine();
 const exec = ExecutionItemUtils.createExecution();
 const final = await engine.executeBlueprint(blueprint, exec);
-// When End.parameters.output is set, `final` contains that resolved value as a single ExecutionItem[].
 ```
 
-## Error Handling
-
-The Engine supports configurable error handling through the `failOnNodeError` flag:
+Blueprint Builder example:
 
 ```typescript
-// Default behavior: fail execution on any node error (failOnNodeError: true)
-const strictEngine = new Engine({
-  eventCallback: (event) => console.log(event.type),
-  // failOnNodeError defaults to true
+import { BlueprintBuilder, Engine, ExecutionItemUtils } from '@starships/autopilot';
+
+const b = new BlueprintBuilder();
+const s = b.addNode({ type: 'start', name: 'Begin', parameters: {} });
+const l = b.addNode({
+  type: 'llm',
+  name: 'AI',
+  parameters: { model: 'anthropic/claude-3.5-sonnet', messages: [{ role: 'user', content: 'Hi' }] },
 });
+const e = b.addNode({ type: 'end', name: 'End', parameters: {} });
+const bp = b.addEdge(s, l).addEdge(l, e).build();
 
-// Continue execution even when individual nodes fail
-const resilientEngine = new Engine({
-  eventCallback: (event) => console.log(event.type),
-  failOnNodeError: false,
-});
+const engine = new Engine();
+const exec = ExecutionItemUtils.createExecution();
+await engine.executeBlueprint(bp, exec);
 ```
 
-**Configuration Options:**
+## Error handling
 
-- `failOnNodeError: true` (default) - Workflow execution stops immediately when any node fails
-- `failOnNodeError: false` - Workflow continues execution despite individual node failures
+- Default: fail on first node error
+- Resilient mode: `new Engine({ failOnNodeError: false })`
+- All errors still recorded in `execution.results`
 
-When `failOnNodeError` is false:
+## Tool calling
 
-- Failed nodes still record errors in `execution.results` (as error items per node)
-- The engine does not set `execution.error` and does not emit `workflow_failed` for individual node failures
-- Execution status is reset to 'running' and continues to the next node
-- Overall workflow completes normally with `workflow_completed` event
-- All error information is preserved in the final execution results
+Use the `tool` node to expose functions (calculator, get_current_time, echo). See `README-TOOLS.md`.
 
-Note:
+## Events & streaming
 
-- Agents execute with `failOnNodeError: false` by default to keep conversations flowing even when tools or steps fail.
-- Tool executions always emit a `tool_complete` event. On success, the result is included; on failure, the error is included. Downstream services should persist both as `tool_result` messages.
+Subscribe via `eventCallback` for `workflow_*`, `node_*`, and `content_chunk` events.
 
-## Node Types
+## Integration notes
 
-| Type           | Description              | Key Parameters                                             |
-| -------------- | ------------------------ | ---------------------------------------------------------- |
-| `start/end`    | Flow control             | `{}`                                                       |
-| `llm`          | LLM API calls            | `model`, `messages`, `temperature`                         |
-| `agent`        | AI agent with memory     | `name`, `model`, `systemPrompt`, `state` (messages, tools) |
-| `http_request` | HTTP API calls           | `url`, `method`, `headers`, `body`                         |
-| `conditional`  | Branch workflows         | `condition` (JavaScript expression)                        |
-| `transform`    | Input transformations    | `transforms` (JSON Patch operations)                       |
-| `mutate`       | State mutations          | `mutations` (JSON Patch operations)                        |
-| `tool`         | Function calling support | `name`, `description`, `parameters`                        |
-| `workflow`     | Nested workflows         | `blueprint`                                                |
-| `user_prompt`  | User interaction         | Platform-specific                                          |
+- Credentials (OpenAI/Anthropic) are provided by host app; Autopilot focuses on execution
+- Used by `@starships/server` conversation pipeline; no standalone HTTP `/workflows/execute` route in server
 
-## Template Expressions
+## Links
 
-Use `{{ }}` syntax for JavaScript expressions:
-
-```typescript
-{
-  ref: 'api-call',
-  type: 'http_request',
-  parameters: {
-    url: 'https://api.example.com/users/{{ state.userId }}',
-    headers: {
-      Authorization: 'Bearer {{ state.auth.token }}'
-    },
-    body: {
-      timestamp: '{{ $now() }}',
-      data: '{{ $lastOutputOf("input") }}'
-    }
-  }
-}
-```
-
-**Available Context:**
-
-- `state` - Current workflow state
-- `outputs` - All previous node results (array format)
-- `status` - Current execution status
-- `input` - Current input data
-- `$lastOutputOf(nodeRef)` - Get latest result from specific node
-- `$input(path)` - Extract data from input using dot notation
-- `$random()` - Generate random number
-- `$exists(value)` - Check if value exists
-
-## State Management
-
-### Inline Operations
-
-Any node can include inline operations for processing:
-
-```typescript
-{
-  ref: 'api-call',
-  type: 'http_request',
-  parameters: {
-    url: 'https://api.example.com/data',
-    // Inline input transformation
-    transforms: [
-      { operation: 'add', path: '/processedAt', value: '{{ $now() }}' }
-    ],
-    // Inline state mutation
-    mutations: [
-      { operation: 'replace', path: '/state/apiCalls', value: '{{ (state.apiCalls || 0) + 1 }}' },
-      { operation: 'add', path: '/state/lastCall', value: '{{ $now() }}' }
-    ],
-    // Inline conditional logic
-    condition: 'state.retryCount < 3'
-  }
-}
-```
-
-### Transform vs Mutate Operations
-
-- **Transform** - Processes input data before passing to the node
-- **Mutate** - Modifies global workflow state after node execution
-
-```typescript
-// Transform: modify input data
-{ operation: 'add', path: '/userId', value: '{{ state.currentUser.id }}' }
-
-// Mutate: modify workflow state
-{ operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' }
-```
-
-## Agent API
-
-### Creating and Configuring Agents
-
-```typescript
-import { Agent } from '@starships/autopilot';
-
-// Create agent with required parameters
-const agent = new Agent({
-  name: 'MyAgent',
-  model: 'anthropic/claude-3-haiku',
-  temperature: 0.7,
-  maxTokens: 1024,
-});
-
-// Add nodes to build the agent's workflow
-agent
-  .addNode('llm', 'Think', {
-    model: 'anthropic/claude-3-haiku',
-    messages: [
-      { role: 'system', content: 'You are a helpful assistant.' },
-      { role: 'user', content: 'What can you help me with?' },
-    ],
-    temperature: 0.8,
-  })
-  .addNode('transform', 'Store Response', {
-    transforms: [{ operation: 'add', path: '/lastResponse', value: '{{ $lastOutputOf("llm_1") }}' }],
-  });
-
-// Execute the agent
-const execution = await agent.execute();
-```
-
-### Agent Error Handling
-
-Agents run their internal engine with `failOnNodeError: false`. This means:
-
-- A failing node (e.g., a tool) does not stop the agent; errors are recorded and execution continues.
-- Tool runs emit `tool_complete` with either `result` or `error`, and downstream can persist both as `tool_result` messages.
-
-### Agent State Management
-
-Agents manage their state directly using the `state` parameter:
-
-```typescript
-const agent = new Agent({
-  name: 'Sarah',
-  model: 'anthropic/claude-3-haiku',
-  systemPrompt: 'You are a helpful support agent.',
-  state: {
-    messages: [
-      { role: 'user', content: 'I need help' },
-      { role: 'assistant', content: "I'm here to help! What can I assist you with?" },
-    ],
-    tools: [],
-  },
-});
-```
-
-## Events & Streaming
-
-```typescript
-const eventCallback = async (event) => {
-  switch (event.type) {
-    case 'workflow_started':
-    case 'workflow_completed':
-    case 'workflow_failed':
-    case 'workflow_paused':
-    case 'workflow_resumed':
-    case 'node_started':
-    case 'node_completed':
-    case 'node_failed':
-    case 'content_chunk': // LLM streaming
-      console.log(event.type, event.data);
-  }
-};
-
-const engine = new Engine({ eventCallback });
-```
-
-## Extending with BaseNode
-
-Create custom nodes by extending BaseNode:
-
-```typescript
-import { BaseNode } from '@starships/autopilot';
-import { ExecutionItem, ValidationResult, NodeHandlerOptions } from '@starships/autopilot';
-
-interface CustomParams extends BaseParams {
-  operation: string;
-  value: number;
-}
-
-export class CustomNode extends BaseNode<CustomParams> {
-  constructor(params: CustomParams, options?: NodeHandlerOptions) {
-    super(params, options);
-  }
-
-  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    const params = this.getParams();
-    const inputValue = ExecutionItemUtils.unwrapSingle(input);
-
-    // Your custom logic here
-    const result = { operation: params.operation, result: inputValue + params.value };
-
-    return ExecutionItemUtils.wrapSingle(result, input?.[0]);
-  }
-
-  validate(): ValidationResult {
-    const errors = [];
-    const params = this.getParams();
-
-    // Use BaseNode validation helpers
-    const operationError = this.validateRequiredField(params.operation, 'Operation');
-    if (operationError) errors.push(operationError);
-
-    const valueError = this.validateRequiredField(params.value, 'Value');
-    if (valueError) errors.push(valueError);
-
-    return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
-  }
-}
-```
-
-## API Reference
-
-### Main Exports
-
-```typescript
-// Core classes
-export { Engine, Agent, BaseNode, BlueprintBuilder } from '@starships/autopilot';
-
-// Node handlers
-export { LLM, HttpRequest, Tool, Workflow, Conditional, Transform, Mutate } from '@starships/autopilot';
-
-// Evaluation engine
-export { Eval } from '@starships/autopilot';
-
-// Configuration and utilities
-export { config, ExecutionItemUtils } from '@starships/autopilot';
-
-// Types
-export type {
-  Blueprint,
-  Node,
-  Edge,
-  Execution,
-  ExecutionItem,
-  ConditionalResult,
-  TransformOperation,
-  AgentParams,
-  AgentState,
-  ValidationResult,
-  NodeParameters,
-} from '@starships/autopilot';
-```
-
-### Configuration
-
-```typescript
-import { config } from '@starships/autopilot';
-
-// Access configuration constants
-console.log('Max nodes:', config.MAX_NODES);
-console.log('Execution timeout:', config.EXECUTION_TIMEOUT);
-
-// Built-in timeouts and limits
-const limits = {
-  approvalTimeout: config.APPROVAL_TIMEOUT,
-  executionTimeout: config.EXECUTION_TIMEOUT,
-  userPromptTimeout: config.USER_PROMPT_TIMEOUT,
-  agentExecutionTimeout: config.AGENT_EXECUTION_TIMEOUT,
-  maxNodes: config.MAX_NODES,
-  maxEdges: config.MAX_EDGES,
-};
-```
-
-## Tool Calling Support
-
-The [`Tool`](./src/nodes/Tool.ts) node provides built-in function calling capabilities:
-
-```typescript
-// Built-in tools available
-const supportedTools = [
-  'calculator', // Mathematical expressions
-  'get_current_time', // Current timestamp with timezone support
-  'echo', // Echo arguments (for testing)
-];
-
-// Tool node example
-const toolNode = {
-  ref: 'calc-tool',
-  type: 'tool',
-  name: 'Calculator Tool',
-  parameters: {
-    name: 'calculator',
-    description: 'Perform mathematical calculations',
-    parameters: {
-      type: 'object',
-      properties: {
-        expression: {
-          type: 'string',
-          description: 'Mathematical expression to evaluate',
-        },
-      },
-      required: ['expression'],
-    },
-  },
-};
-```
-
-Note on arguments parsing:
-
-- The LLM layer is authoritative for tool_call argument parsing.
-- Tools assume pre-parsed function.arguments_json and will not attempt to parse string arguments.
-- If arguments_json is missing, Tool execution fails with an explicit error so the conversation can proceed with diagnostics.
-
-### Tool Usage Examples
-
-```typescript
-// Calculator tool
-const calcResult = await toolNode.execute([
-  {
-    json: { expression: '2 + 3 * 4' },
-    nodeRef: 'input',
-  },
-]);
-
-// Current time tool
-const timeResult = await toolNode.execute([
-  {
-    json: { timezone: 'America/New_York', format: 'locale' },
-    nodeRef: 'input',
-  },
-]);
-```
-
-## LLM Models
-
-Supports various LLM providers and models:
-
-- `anthropic/claude-3.5-sonnet`
-- `openai/gpt-4-turbo`
-- `google/gemini-pro-1.5`
-- `meta-llama/llama-3.1-405b-instruct`
-
-## Development
-
-```bash
-pnpm run build        # Build package
-pnpm run type-check   # Type checking
-pnpm run lint         # Lint code
-pnpm run test         # Run tests
-```
-
-## Dependencies
-
-- **fast-json-patch** - JSON Patch operations for transforms/mutations
-- **nanoid** - Unique ID generation
-
-## Additional Documentation
-
-- **[Tool Calling Guide](./README-TOOLS.md)** - Complete guide to implementing and using function calling with LLMs
-- **[Template Expressions & Eval Engine](./README-EVAL.md)** - Comprehensive guide to `{{ jsExpression }}` syntax, context variables, helper functions, and evaluation patterns
-
----
-
-Part of the [starships.ai](/) monorepo.
+- Tools guide: `./README-TOOLS.md`
+- Template expressions: `./README-EVAL.md`
+- Root: `../../README.md`

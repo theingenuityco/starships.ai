@@ -12,8 +12,8 @@ import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ParametersPanel } from './components/ParametersPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
 
-export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave }, ref) => {
-  const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })
+export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, persistenceKey }, ref) => {
+  const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave, persistenceKey })
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {

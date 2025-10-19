@@ -123,6 +123,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             await streamingService.broadcastMessage(conversationId, message);
           }
         }
+
+        // Also replay critical lifecycle events (like 'complete') that may have occurred
+        // during client navigation gaps even when no resume token is present.
+        // We intentionally skip 'message' and 'delta' here to avoid duplicating content.
+        await streamingService.replayBufferedEvents(conversationId, (evt) => evt.type === 'complete');
       }
 
       // Connection stays open for live updates via StreamingService

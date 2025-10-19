@@ -607,8 +607,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const agent = (agentsRef.current || []).find(a => a.id === id)
       const display = agent?.name || label || id || ''
       return (
-        <NodeViewWrapper as="span" className="inline-flex items-center gap-1 align-middle leading-none text-foreground">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden align-middle">
+        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline gap-1 leading-none text-foreground">
+          <span className="relative top-0.5 inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden">
             <AgentAvatar seed={display} size={16} />
           </span>
           <strong className="font-semibold">@{display}</strong>

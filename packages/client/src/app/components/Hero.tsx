@@ -5,6 +5,8 @@ import Icon from '@/components/primitives/Icon'
 import { useCallback } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant, getCtaVariant } from '@/lib/flags'
+import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 
 export default function Hero() {
   const handleLaunchDemo = useCallback(() => {
@@ -69,44 +71,44 @@ export default function Hero() {
               <div className="w-10" />
             </div>
 
-            {/* Content area: blueprint on top, chat below */}
-            <div className="grid grid-rows-[1fr_auto] md:grid-rows-[320px_240px]">
-              {/* Blueprint panel */}
-              <div className="p-4 bg-black/20 border-b border-white/10 overflow-auto">
+            {/* Content area: blueprint with floating input overlay */}
+            <div className="relative">
+              <div className="p-4 bg-black/20 border-b border-white/10">
                 <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Blueprint</div>
-                <div className="rounded-lg bg-black/30 border border-white/10 p-3 font-mono text-xs leading-relaxed text-white/90">
-                  <div>// agent: Data Enrichment</div>
-                  <div>goals:</div>
-                  <div className="pl-4">- fetch recent news for company</div>
-                  <div className="pl-4">- extract partners and funding</div>
-                  <div className="pl-4">- write normalized profile</div>
-                  <div>tools:</div>
-                  <div className="pl-4">- web.search(q)</div>
-                  <div className="pl-4">- db.enrich(entity)</div>
-                  <div>guardrails:</div>
-                  <div className="pl-4">- PII-check: pass required</div>
-                  <div className="pl-4">- retry-policy: 2 attempts</div>
-                </div>
-              </div>
+                <div className="relative rounded-lg bg黑/30 border border-white/10 p-2">
+                  <BlueprintVisualization
+                    blueprint={{
+                      nodes: [
+                        { ref: 's', type: 'start', name: 'Start', description: '', parameters: {} },
+                        { ref: 'n1', type: 'user_prompt', name: 'User prompt', description: '', parameters: {} },
+                        { ref: 'n2', type: 'llm', name: 'Plan', description: '', parameters: {} },
+                        { ref: 'n3', type: 'http_request', name: 'web.search', description: '', parameters: {} },
+                        { ref: 'n4', type: 'transform', name: 'PII-check', description: '', parameters: {} },
+                        { ref: 'n5', type: 'tool', name: 'db.enrich', description: '', parameters: {} },
+                        { ref: 'n6', type: 'output', name: 'Write profile', description: '', parameters: {} },
+                        { ref: 'e', type: 'end', name: 'End', description: '', parameters: {} },
+                      ],
+                      edges: [
+                        { ref: 'e0', from: 's', to: 'n1' },
+                        { ref: 'e1', from: 'n1', to: 'n2' },
+                        { ref: 'e2', from: 'n2', to: 'n3' },
+                        { ref: 'e3', from: 'n3', to: 'n4' },
+                        { ref: 'e4', from: 'n4', to: 'n5' },
+                        { ref: 'e5', from: 'n5', to: 'n6' },
+                        { ref: 'e6', from: 'n6', to: 'e' },
+                      ],
+                    }}
+                    className="h-[320px] md:h-[360px]"
+                    transparent
+                    nodesDraggable={false}
+                  />
 
-              {/* Chat panel */}
-              <div className="p-4 bg-black/10">
-                <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Chat</div>
-                <div className="space-y-2 max-h-56 overflow-auto pr-1">
-                  <div className="flex gap-2">
-                    <div className="shrink-0 w-6 h-6 rounded-full bg-white/20" />
-                    <div className="rounded-lg bg-white/10 px-3 py-2 text-sm">Can you enrich Acme and list recent partners?</div>
+                  {/* Floating input overlay (like ConversationInterface) */}
+                  <div className="pointer-events-none absolute left-0 right-0 bottom-3 px-4">
+                    <div className="max-w-2xl mx-auto pointer-events-auto">
+                      <ConversationMessageInput starshipId="" minimal disabled />
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <div className="shrink-0 w-6 h-6 rounded-full bg-primary/40" />
-                    <div className="rounded-lg bg-primary/15 px-3 py-2 text-sm">Sure — I will search the web, extract entities, apply guardrails, and update the profile.</div>
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <input placeholder="Ask about this blueprint..." className="flex-1 rounded-md bg-black/20 border border-white/10 px-3 py-2 text-sm outline-none" />
-                  <Button size="sm" className="px-4">
-                    <Icon name="paper-plane-right" className="w-4 h-4" />
-                  </Button>
                 </div>
               </div>
             </div>

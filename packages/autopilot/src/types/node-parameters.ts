@@ -27,7 +27,10 @@ export interface TransformOperation {
  */
 export interface BaseParams {
   transforms?: TransformOperation[];
+  // Deprecated for Mutate node; kept for backward-compat template validation on non-mutate nodes
   mutations?: TransformOperation[];
+  // New reducers support (for Mutate node and inline usage)
+  reducers?: ReducerSpec[];
   condition?: string; // JavaScript expression for conditional evaluation
 }
 
@@ -274,9 +277,10 @@ export type TransformParams = BaseParams;
 /**
  * Mutate node parameters for state mutation operations
  */
-export type MutateParams = BaseParams;
-// Inherits mutations?: TransformOperation[] from BaseParams
-// No additional parameters needed
+export type MutateParams = Omit<BaseParams, 'mutations' | 'transforms'> & {
+  reducers: ReducerSpec[];
+};
+// Pure reducers-only API for Mutate node
 
 /**
  * Code node parameters for JavaScript function execution
@@ -302,3 +306,15 @@ export type NodeParameters =
   | TransformParams
   | MutateParams
   | CodeParams;
+
+/**
+ * Reducer specification for Mutate node (pure-return only)
+ */
+export type ReducerSpec =
+  | string
+  | {
+      name?: string;
+      if?: string; // template expression guard
+      code: string; // (state, ctx) => newState
+      timeoutMs?: number;
+    };

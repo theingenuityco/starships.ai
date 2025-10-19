@@ -13,7 +13,7 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react'
+import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -296,7 +296,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
       if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return selectedAgent ? `Context limit reached for ${selectedAgent.name}` : 'Context limit reached'
-      return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
+      return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Type @ to choose an agent, then ask your question'
     }
 
     const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent && hasFunds
@@ -448,7 +448,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             e.preventDefault()
             e.stopPropagation()
             const choice = items[active]
-            if (choice) lastProps.command(choice)
+            if (choice) {
+              try {
+                lastProps.command(choice)
+              } catch (err) {
+                try {
+                  const label = (choice as any)?.label || ''
+                  lastProps.editor?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                } catch {}
+              }
+            }
             return
           }
           if (key === 'Escape') {
@@ -557,7 +566,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             if (key === 'Enter' || key === 'Tab') {
               event.preventDefault()
               const choice = items[active]
-              if (choice) props.command(choice)
+              if (choice) {
+                try {
+                  props.command(choice)
+                } catch (err) {
+                  try {
+                    const label = (choice as any)?.label || ''
+                    props.editor?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                  } catch {}
+                }
+              }
               return true
             }
             if (key === 'Escape') {
@@ -582,15 +600,32 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       },
     }
 
+    // React NodeView for mention rendering using our avatar component
+    const MentionNodeView = ({ node }: any) => {
+      const id = node?.attrs?.id
+      const label = node?.attrs?.label
+      const agent = (agentsRef.current || []).find(a => a.id === id)
+      const display = agent?.name || label || id || ''
+      return (
+        <NodeViewWrapper as="span" className="inline-flex items-center gap-1 align-middle leading-none text-foreground">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden align-middle">
+            <AgentAvatar seed={display} size={16} />
+          </span>
+          <strong className="font-semibold">@{display}</strong>
+        </NodeViewWrapper>
+      )
+    }
+
     const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
     const tiptap = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
         Placeholder.configure({ placeholder: placeholderText }),
-        Mention.configure({
-          HTMLAttributes: {
-            class: 'inline-flex items-center gap-1 align-baseline bg-primary/10 text-primary rounded-full px-1.5 py-0.5 border border-primary/20',
+        Mention.extend({
+          addNodeView() {
+            return ReactNodeViewRenderer(MentionNodeView as any)
           },
+        }).configure({
           deleteTriggerWithBackspace: true,
           // Force display as @name by resolving the agent name from id if needed
           renderText: ({ options, node }: any) => {
@@ -608,7 +643,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       editorProps: {
         attributes: {
           class: cn(
-            'w-full bg-transparent outline-none',
+            'tiptap w-full bg-transparent outline-none',
             minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             minimal && 'text-sm'
@@ -678,6 +713,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+            .tiptap p.is-editor-empty:first-child::before,
+            .ProseMirror p.is-editor-empty:first-child::before {
+              content: attr(data-placeholder);
+              float: left;
+              height: 0;
+              pointer-events: none;
+              color: hsl(var(--muted-foreground));
+              opacity: 0.7;
+            }
+          `,
+          }}
+        />
         {/* Professional insufficient balance indicator - Show when there is conversation ID */}
         {!hasFunds && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
@@ -787,3 +837,25 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 )
 
 ConversationMessageInput.displayName = 'ConversationMessageInput'
+
+// Global placeholder styling for TipTap Placeholder extension
+// Ensures the placeholder text is rendered when editor is empty
+export function PlaceholderStyles() {
+  return (
+    <style
+      // styled-jsx global to avoid scoping issues
+      dangerouslySetInnerHTML={{
+        __html: `
+        .tiptap p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          height: 0;
+          pointer-events: none;
+          color: hsl(var(--muted-foreground));
+          opacity: 0.7;
+        }
+      `,
+      }}
+    />
+  )
+}

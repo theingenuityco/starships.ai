@@ -603,13 +603,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const display = agent?.name || label || id || ''
             return `${options.suggestion.char}${display}`
           },
-          renderLabel: ({ options, node }: any) => {
-            const id = node?.attrs?.id
-            const label = node?.attrs?.label
-            const agent = (agentsRef.current || []).find(a => a.id === id)
-            const display = agent?.name || label || id || ''
-            return `${options.suggestion.char}${display}`
-          },
           suggestion: mentionSuggestion,
         }),
       ],

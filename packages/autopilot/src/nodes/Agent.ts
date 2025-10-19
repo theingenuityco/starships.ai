@@ -81,35 +81,36 @@ export class Agent implements NodeHandler {
         ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
         ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
         ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
-        mutations: [
-          {
-            operation: 'add' as const,
-            path: '/state/messages/-',
-            value: `{{ (() => {
-            const msg = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
-            const content = typeof msg.content === "string" ? msg.content : "";
+        reducers: [
+          `
+          (state, ctx) => {
+            const msg = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
+            const content = typeof msg.content === 'string' ? msg.content : '';
             const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
-            const reasoning = typeof msg.reasoning === "string" ? msg.reasoning : undefined;
+            const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;
+            let out;
             if (calls.length > 0) {
               const toolCalls = calls.map(tc => ({
-                id: tc?.id ?? "",
-                type: "function",
+                id: tc?.id ?? '',
+                type: 'function',
                 function: {
-                  name: tc?.function?.name ?? "",
-                  arguments: (() => {
-                    try {
-                      const a = tc?.function?.arguments;
-                      if (typeof a === "string") { try { return JSON.parse(a); } catch { return {}; } }
-                      return a ?? {};
-                    } catch { return {}; }
+                  name: tc?.function?.name ?? '',
+                  arguments: (function() {
+                    const a = tc?.function?.arguments;
+                    if (typeof a === 'string') { try { return JSON.parse(a); } catch { return {}; } }
+                    return a ?? {};
                   })()
                 }
               }));
-              return { role: "assistant", content, ...(reasoning ? { reasoning } : {}), toolCalls };
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), toolCalls };
+            } else {
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}) };
             }
-            return { role: "assistant", content, ...(reasoning ? { reasoning } : {}) };
-          })() }}`,
-          },
+            const next = { ...(state || {}) };
+            next.messages = [...(state?.messages ?? []), out];
+            return next;
+          }
+          `,
         ],
       },
     });
@@ -163,21 +164,17 @@ export class Agent implements NodeHandler {
       name: 'Add Tool Result',
       description: 'Add tool result message to conversation state',
       parameters: {
-        mutations: [
-          {
-            operation: 'add' as const,
-            path: '/state/messages/-',
-            value: `{{ (() => {
-            const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
-            const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
-            const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
-            return {
-              role: "tool",
-              toolCallId: toolCallId,
-              content: content
-            };
-          })() }}`,
-          },
+        reducers: [
+          `
+          (state, ctx) => {
+            const toolCallId = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
+            const toolResult = ctx.$lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+            const content = (typeof toolResult === 'string') ? toolResult : JSON.stringify(toolResult);
+            const next = { ...(state || {}) };
+            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            return next;
+          }
+          `,
         ],
       },
     });

@@ -1,4 +1,5 @@
 import { Blueprint, BlueprintBuilder } from '@starships/autopilot';
+import type { NodeParameters } from '@starships/autopilot';
 
 /**
  * Configuration for creating a focused entity management blueprint
@@ -77,37 +78,38 @@ export function createFocusedEntityBlueprint(config: FocusedEntityConfig): Bluep
       model: 'anthropic/claude-sonnet-4.5',
       messages: '{{ state.messages }}',
       tools: '{{ state.tools }}',
-      mutations: [
-        {
-          operation: 'add' as const,
-          path: '/state/messages/-',
-          value: `{{ (() => {
-            const msg = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
-            const content = typeof msg.content === "string" ? msg.content : "";
-            const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
-            const reasoning = typeof msg.reasoning === "string" ? msg.reasoning : undefined;
-            if (calls.length > 0) {
-              const toolCalls = calls.map(tc => ({
-                id: tc?.id ?? "",
-                type: "function",
-                function: {
-                  name: tc?.function?.name ?? "",
-                  arguments: (() => {
-                    try {
-                      const a = tc?.function?.arguments;
-                      if (typeof a === "string") { try { return JSON.parse(a); } catch { return {}; } }
-                      return a ?? {};
-                    } catch { return {}; }
-                  })()
-                }
-              }));
-              return { role: "assistant", content, ...(reasoning ? { reasoning } : {}), toolCalls };
-            }
-            return { role: "assistant", content, ...(reasoning ? { reasoning } : {}) };
-          })() }}`,
-        },
+      reducers: [
+        `
+        (state, ctx) => {
+          const msg = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
+          const content = typeof msg.content === 'string' ? msg.content : '';
+          const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+          const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;
+          let out;
+          if (calls.length > 0) {
+            const toolCalls = calls.map(tc => ({
+              id: tc?.id ?? '',
+              type: 'function',
+              function: {
+                name: tc?.function?.name ?? '',
+                arguments: (function() {
+                  const a = tc?.function?.arguments;
+                  if (typeof a === 'string') { try { return JSON.parse(a); } catch { return {}; } }
+                  return a ?? {};
+                })()
+              }
+            }));
+            out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), toolCalls };
+          } else {
+            out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}) };
+          }
+          const next = { ...(state || {}) };
+          next.messages = [...(state?.messages ?? []), out];
+          return next;
+        }
+        `,
       ],
-    },
+    } as unknown as NodeParameters,
   });
 
   // Conditional node for tool call detection
@@ -162,14 +164,30 @@ export function createFocusedEntityBlueprint(config: FocusedEntityConfig): Bluep
     name: 'Add Tool Result',
     description: 'Add tool result message to conversation state',
     parameters: {
-      mutations: [
-        {
-          operation: 'add' as const,
-          path: '/state/messages/-',
-          value: `{{ (() => { const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? ""; const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const toolSlug = calls?.[0]?.function?.name; const http = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {}; const modifyOps = ${toolSlugsJson}; let content; if (modifyOps.includes(toolSlug)) { const status = http.status || http.body?.status || 200; const success = status >= 200 && status < 300; const slug = http.body?.data?.slug || http.body?.slug || 'unknown'; content = JSON.stringify({ success, message: success ? 'Entity updated successfully' : 'Entity operation failed', slug }); } else { content = typeof http === 'string' ? http : JSON.stringify(http); } return { role: "tool", toolCallId, content }; })() }}`,
-        },
+      reducers: [
+        `
+        (state, ctx) => {
+          const toolCallId = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
+          const calls = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
+          const toolSlug = calls?.[0]?.function?.name;
+          const http = ctx.$lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+          const modifyOps = ${toolSlugsJson};
+          let content;
+          if (modifyOps.includes(toolSlug)) {
+            const status = http.status || http.body?.status || 200;
+            const success = status >= 200 && status < 300;
+            const slug = http.body?.data?.slug || http.body?.slug || 'unknown';
+            content = JSON.stringify({ success, message: success ? 'Entity updated successfully' : 'Entity operation failed', slug });
+          } else {
+            content = typeof http === 'string' ? http : JSON.stringify(http);
+          }
+          const next = { ...(state || {}) };
+          next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+          return next;
+        }
+        `,
       ],
-    },
+    } as unknown as NodeParameters,
   });
 
   // Conditional node to check if focused entity exists (pre-LLM)
@@ -188,23 +206,19 @@ export function createFocusedEntityBlueprint(config: FocusedEntityConfig): Bluep
     name: 'Add Focused Entity Context',
     description: 'Add focused entity as system message',
     parameters: {
-      mutations: [
-        {
-          operation: 'add' as const,
-          path: '/state/messages/1',
-          value: `{{ {
-            role: 'system',
-            content: \`<${contextTag}>
-${contextFields}
-</${contextTag}>
-
-<instructions>
-${instructions}
-</instructions>\`
-          } }}`,
-        },
+      reducers: [
+        `
+        (state) => {
+          const next = { ...(state || {}) };
+          const msg = { role: 'system', content: '<${contextTag}>\n${contextFields}\n</${contextTag}>\n\n<instructions>\n${instructions}\n</instructions>' };
+          const msgs = Array.isArray(state?.messages) ? state.messages.slice() : [];
+          msgs[1] = msg;
+          next.messages = msgs;
+          return next;
+        }
+        `,
       ],
-    },
+    } as unknown as NodeParameters,
   });
 
   // Update Focused Entity after tool execution
@@ -213,25 +227,26 @@ ${instructions}
     name: 'Update Focused Entity',
     description: `Update ${stateFieldName} in state after tool execution`,
     parameters: {
-      mutations: [
-        {
-          operation: 'replace' as const,
-          path: `/state/${stateFieldName}`,
-          value: `{{ (() => {
-            const calls = $lastOutputOf("ai_assistant")[0]?.json?.choices?.[0]?.message?.toolCalls;
-            const toolSlug = calls?.[0]?.function?.name;
-            const updateTools = ${toolSlugsJson};
-            if (updateTools.includes(toolSlug)) {
-              const httpResponse = $lastOutputOf("execute_tool")[0]?.json ?? {};
-              const entityData = httpResponse.body?.data || httpResponse.body;
-              if (!entityData || !entityData.name) return state.${stateFieldName} || null;
-              return entityData;
-            }
-            return null;
-          })() }}`,
-        },
+      reducers: [
+        `
+        (state, ctx) => {
+          const calls = ctx.$lastOutputOf('ai_assistant')[0]?.json?.choices?.[0]?.message?.toolCalls;
+          const toolSlug = calls?.[0]?.function?.name;
+          const updateTools = ${toolSlugsJson};
+          const next = { ...(state || {}) };
+          if (updateTools.includes(toolSlug)) {
+            const httpResponse = ctx.$lastOutputOf('execute_tool')[0]?.json ?? {};
+            const entityData = httpResponse.body?.data || httpResponse.body;
+            if (!entityData || !entityData.name) { next['${stateFieldName}'] = state['${stateFieldName}'] || null; return next; }
+            next['${stateFieldName}'] = entityData;
+            return next;
+          }
+          next['${stateFieldName}'] = null;
+          return next;
+        }
+        `,
       ],
-    },
+    } as unknown as NodeParameters,
   });
 
   // Post-tool check for context insertion
@@ -250,23 +265,19 @@ ${instructions}
     name: 'Add Focused Entity Context (After Tool)',
     description: 'Add focused entity context before appending tool result',
     parameters: {
-      mutations: [
-        {
-          operation: 'add' as const,
-          path: '/state/messages/1',
-          value: `{{ {
-            role: 'system',
-            content: \`<${contextTag}>
-${contextFields}
-</${contextTag}>
-
-<instructions>
-${instructions}
-</instructions>\`
-          } }}`,
-        },
+      reducers: [
+        `
+        (state) => {
+          const next = { ...(state || {}) };
+          const msg = { role: 'system', content: '<${contextTag}>\n${contextFields}\n</${contextTag}>\n\n<instructions>\n${instructions}\n</instructions>' };
+          const msgs = Array.isArray(state?.messages) ? state.messages.slice() : [];
+          msgs[1] = msg;
+          next.messages = msgs;
+          return next;
+        }
+        `,
       ],
-    },
+    } as unknown as NodeParameters,
   });
 
   // Connect all nodes

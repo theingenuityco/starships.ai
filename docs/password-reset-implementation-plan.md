@@ -120,6 +120,7 @@ The implementation will follow the established 6-layer architecture:
   - Table name: `password_reset_tokens`
   - Expiry: `DEFAULT (NOW() + INTERVAL '1 hour')` (instead of 24 hours)
   - Comment: 'Password reset tokens - 1 hour expiry for security'
+  - Optimized indexes: `CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token) WHERE NOT consumed;`
 
 #### Task 1.2: Entity Layer 🔴 Not Started
 **File**: `packages/models/src/entities/PasswordResetTokenEntity.ts`
@@ -167,7 +168,10 @@ The implementation will follow the established 6-layer architecture:
 - [ ] 🔴 Add `validateResetToken(token): Promise<AuthPasswordResetValidateResponse>` method
 - [ ] 🔴 Add `resetPasswordWithToken(token, password): Promise<AuthPasswordResetCompleteResponse>` method
 - [ ] 🔴 Follow existing `sendEmailVerification()` pattern for implementation
-- [ ] 🔴 Prevent password reset for OAuth-only users (check `hasPassword` field)
+- [ ] 🔴 Implement nuanced OAuth user handling:
+  - Allow password reset for OAuth users who have set passwords (`hasPassword = true`)
+  - Block password reset for OAuth-only users (`hasPassword = false`) with helpful error message
+  - Suggest OAuth provider recovery for OAuth-only users
 - [ ] 🔴 Use secure generic error messages (no user enumeration)
 
 #### Task 2.2: Email Service Updates (Follow Verification Pattern) 🔴 Not Started
@@ -294,8 +298,9 @@ The implementation will follow the established 6-layer architecture:
 #### Task 6.1: Follow Existing Test Patterns 🔴 Not Started
 **Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/4 complete):
-- [ ] 🔴 Copy email verification test structure for password reset tests
+**Sub-tasks** (0/5 complete):
+- [ ] 🔴 **PREREQUISITE**: Write missing EmailVerificationTokenRepository tests first
+- [ ] 🔴 Copy new email verification test structure for password reset tests
 - [ ] 🔴 Test repository methods (follow EmailVerificationTokenRepository test patterns)
 - [ ] 🔴 Test service methods (follow UserService test patterns)
 - [ ] 🔴 Test API endpoints (follow auth route test patterns)
@@ -376,9 +381,10 @@ export const SECURE_MESSAGES = {
 - Log attempts for monitoring
 
 ### OAuth User Handling
-- Prevent password reset for OAuth-only accounts
-- Suggest using OAuth provider for recovery
-- Allow password reset only for users with existing passwords
+- **OAuth users WITH passwords**: Allow password reset (they chose to set backup password)
+- **OAuth-only users**: Block with helpful message: "Please use your Google/GitHub account to sign in, or contact support if you need help accessing your account."
+- **Edge case**: OAuth user who forgot they set a password should be able to reset it
+- **Security**: Check `hasPassword` field, not just `authMethods` array
 
 ## Testing Strategy
 
@@ -521,6 +527,8 @@ This implementation not only adds password reset functionality but also **improv
 1. **Service Injection**: Email verification now follows constructor injection pattern consistently
 2. **Type Duplication**: Client hooks now import types from protocol layer (removes 4 duplicate interfaces)
 3. **Security Gaps**: Added token invalidation and secure error messages
+4. **Missing Tests**: Email verification tests written as prerequisite (enables test-driven password reset development)
+5. **Database Performance**: Optimized indexes with conditional WHERE clauses
 
 ### Enhanced Security
 1. **Token Invalidation**: Previous tokens automatically invalidated when new ones generated
@@ -536,11 +544,36 @@ This implementation not only adds password reset functionality but also **improv
 
 This makes the password reset implementation a **net positive** for the codebase, improving both new functionality and existing code quality.
 
+## 🔍 Critical Gaps Identified & Resolved
+
+During final review, 4 critical gaps were identified and addressed:
+
+### Gap #1: Database Index Optimization
+**Issue**: Email verification uses optimized `WHERE NOT consumed` indexes but plan didn't specify this pattern  
+**Resolution**: Added conditional indexes for optimal performance on active tokens only
+
+### Gap #2: Migration Consistency  
+**Issue**: Newer migrations use `IF NOT EXISTS` but plan wasn't consistent  
+**Resolution**: Standardized `IF NOT EXISTS` pattern for all database objects
+
+### Gap #3: Missing Test Infrastructure
+**Issue**: Plan referenced "email verification test patterns" but **no email verification tests exist**  
+**Resolution**: Added prerequisite task to write email verification tests first (enables TDD approach)
+
+### Gap #4: OAuth User Edge Cases
+**Issue**: Simple `hasPassword` check doesn't handle edge cases properly  
+**Resolution**: Nuanced OAuth handling:
+- OAuth users with passwords: ✅ Allow reset (they chose backup auth)
+- OAuth-only users: ❌ Block with helpful provider-specific guidance
+
+These gaps would have caused implementation issues and security vulnerabilities. All are now resolved in the plan.
+
 ---
 
-**Document Version**: 3.0.0 (Security Enhanced)  
+**Document Version**: 3.1.0 (Gap Analysis Complete)  
 **Created**: 2025-01-19  
 **Refined**: 2025-01-19  
 **Security Enhanced**: 2025-01-19  
+**Gap Analysis**: 2025-01-19  
 **Author**: System Architecture Team  
-**Status**: Ready for Implementation (includes architectural cleanup)
+**Status**: Production Ready (all gaps identified and resolved)

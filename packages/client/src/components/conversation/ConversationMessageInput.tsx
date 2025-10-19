@@ -83,6 +83,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Provide editor operations without referencing the editor before initialization
     const clearEditorRef = useRef<() => void>(() => {})
+    // Guard to avoid recursive update loops when enforcing leading mention
+    const enforcingMentionRef = useRef(false)
 
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
@@ -93,12 +95,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
     const agentsRef = useRef<AgentModel[]>([])
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
+    // Track the most current agent immediately on local changes to avoid one-tick lag
+    const currentAgentRef = useRef<AgentModel | null>(selectedAgent ?? null)
     useEffect(() => {
       const latest = (starshipAgents as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
         agentsRef.current = latest
       }
     }, [starshipAgents])
+    useEffect(() => {
+      currentAgentRef.current = selectedAgent ?? null
+    }, [selectedAgent])
 
     // Use streamedQuery-based conversation hook
     const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null, starshipId)
@@ -515,6 +522,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   // Update selected agent without altering editor text
                   try {
                     const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
+                    // Update local ref immediately to avoid UI lag
+                    currentAgentRef.current = selected
                     onAgentChange?.(selected)
                   } catch {}
                   props.command(realItem)
@@ -674,6 +683,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     updateAttributes({ id: newAgent.id, label: newAgent.name })
                   } catch {}
                   try {
+                    // Update local ref immediately so enforcement logic sees the new agent
+                    currentAgentRef.current = newAgent
                     onAgentChange?.(newAgent)
                   } catch {}
                   try {
@@ -823,6 +834,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         },
       },
       onUpdate: ({ editor }) => {
+        // Enforce leading mention on every update (deferred to next tick to avoid flushSync during lifecycle)
+        try {
+          if (!enforcingMentionRef.current) {
+            // Schedule to avoid synchronous mutations during TipTap update lifecycle
+            setTimeout(() => {
+              try {
+                ensureLeadingAgentMention()
+              } catch {}
+            }, 0)
+          }
+        } catch {}
         setMessage(editor.getText())
       },
     })
@@ -837,6 +859,76 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         clearEditorRef.current = () => {}
       }
     }, [tiptap])
+
+    // Build a TipTap JSON mention node for the given agent
+    function buildMentionNodeForAgent(agent: AgentModel | null | undefined) {
+      if (!agent) return null
+      return { type: 'mention', attrs: { id: agent.id, label: agent.name } }
+    }
+
+    // Schedule a safe setContent outside of React lifecycle to avoid flushSync errors
+    const scheduleSetContent = useCallback(
+      (content: any) => {
+        if (!tiptap) return
+        enforcingMentionRef.current = true
+        setTimeout(() => {
+          try {
+            tiptap?.commands.setContent(content)
+          } finally {
+            enforcingMentionRef.current = false
+          }
+        }, 0)
+      },
+      [tiptap]
+    )
+
+    // Ensure the first inline node is the selected agent mention followed by a space
+    const ensureLeadingAgentMention = useCallback(() => {
+      if (!tiptap) return
+      try {
+        const json: any = tiptap.getJSON()
+        const docContent = Array.isArray(json?.content) ? json.content : []
+        const firstBlock = docContent[0]
+        const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        const first = blockContent[0]
+
+        // If a mention already exists at the start, do not replace its id; only ensure spacing
+        if (first && first.type === 'mention' && first.attrs && first.attrs.id) {
+          const second = blockContent[1]
+          const needsSpace = !(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
+          if (!needsSpace) return
+          const newParagraph = {
+            type: 'paragraph',
+            content: [first, { type: 'text', text: ' ' }, ...blockContent.slice(2)],
+          }
+          const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+          scheduleSetContent(newDoc)
+          return
+        }
+
+        // Otherwise, insert the current agent mention if available
+        const currentAgent = currentAgentRef.current
+        const desiredMention = buildMentionNodeForAgent(currentAgent)
+        if (!desiredMention) return
+        const newParagraph = {
+          type: 'paragraph',
+          content: [desiredMention, { type: 'text', text: ' ' }, ...blockContent],
+        }
+        const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+        scheduleSetContent(newDoc)
+      } catch {}
+    }, [tiptap, scheduleSetContent])
+
+    // Insert or update the leading mention whenever the editor or selected agent changes
+    useEffect(() => {
+      if (!tiptap) return
+      // Defer enforcement to avoid synchronous mutations during mount/prop change lifecycles
+      setTimeout(() => {
+        try {
+          ensureLeadingAgentMention()
+        } catch {}
+      }, 0)
+    }, [tiptap, selectedAgent, ensureLeadingAgentMention])
     // Consolidated focus management - handles all focus scenarios (requires tiptap)
     useEffect(() => {
       const shouldFocus = () => {

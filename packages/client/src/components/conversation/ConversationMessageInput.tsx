@@ -139,8 +139,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
         if (matched) {
           effectiveAgent = matched
-          // Remove the leading mention token from the message text
-          contentToSend = messageToSend.replace(mentionMatch[0], '').trimStart()
+          // Do NOT strip the leading mention; keep it in the message content
           if (onAgentChange) onAgentChange(matched)
         }
       }
@@ -151,14 +150,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         return
       }
 
-      // If message becomes empty after removing mention, do not send
-      if (!contentToSend) {
-        setMessage('')
-        try {
-          clearEditorRef.current()
-        } catch {}
-        return
-      }
+      // contentToSend already validated via messageToSend trim
 
       if (!starshipId) {
         toast.error('No starship selected', { description: 'Please select a ship before chatting.' })
@@ -481,6 +473,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 },
                 command: (agent: AgentModel) => {
                   const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: agent.name }
+                  // Update selected agent without altering editor text
+                  try {
+                    const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
+                    onAgentChange?.(selected)
+                  } catch {}
                   props.command(realItem)
                 },
                 anchorRect: null,

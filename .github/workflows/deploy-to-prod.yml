@@ -58,7 +58,7 @@ jobs:
       - name: Validate manifests
         run: |
           kubectl apply --dry-run=client -f k8s/prod/00-namespace.yaml
-          kubectl apply --dry-run=client -f k8s/prod/02-pvc.yaml
+          kubectl apply --dry-run=client -f k8s/prod/01-storage-class.yaml
           kubectl apply --dry-run=client -f k8s/prod/03-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/04-service.yaml
           kubectl apply --dry-run=client -f k8s/prod/05-ingress.yaml
@@ -71,7 +71,7 @@ jobs:
       - name: Apply manifests
         run: |
           kubectl apply -f k8s/prod/00-namespace.yaml
-          kubectl apply -f k8s/prod/02-pvc.yaml
+          kubectl apply -f k8s/prod/01-storage-class.yaml
           kubectl apply -f k8s/prod/03-deployment.yaml
           kubectl apply -f k8s/prod/04-service.yaml
           kubectl apply -f k8s/prod/05-ingress.yaml

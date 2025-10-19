@@ -69,7 +69,7 @@ export default function Hero() {
           />
           <div className="relative p-4 md:p-8 h-full">
             <div className="mx-auto max-w-5xl">
-              <div className="relative rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
+              <div className="relative rounded-xl border border-white/10 bg-white/5 overflow-hidden shadow-lg">
                 {/* Window top bar */}
                 <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-white/10">
                   <div className="flex items-center gap-2">
@@ -119,7 +119,7 @@ export default function Hero() {
                 {/* Floating input overlay (like ConversationInterface) inside window */}
                 <div className="pointer-events-none absolute left-0 right-0 bottom-6 md:bottom-8 p-4 md:p-6">
                   <div className="max-w-2xl mx-auto pointer-events-auto">
-                    <ConversationMessageInput starshipId="" minimal disabled />
+                    <ConversationMessageInput starshipId="" minimal disabled={false} />
                   </div>
                 </div>
               </div>

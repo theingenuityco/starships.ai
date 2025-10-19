@@ -1,32 +1,23 @@
 import { AgentState, Blueprint } from '@starships/autopilot';
+import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
+/**
+ * Create Gaia default blueprint using the standard Agent constructor
+ */
+function createGaiaDefaultBlueprint(): Blueprint {
+  return createDefaultAgentBlueprint({
+    name: 'Gaia',
+    model: 'anthropic/claude-sonnet-4.5',
+    temperature: 0.4,
+    maxTokens: 3000,
+  });
+}
+
 import type { AgentTemplateModel } from '@starships/protocol';
-import { createFocusedEntityBlueprint } from './createFocusedEntityBlueprint';
 
 /**
  * Create Gaia agent creator blueprint
  * Uses shared focused entity pattern with agent-specific configuration
  */
-function createGaiaBlueprint(): Blueprint {
-  return createFocusedEntityBlueprint({
-    stateFieldName: 'focusedAgent',
-    contextTag: 'focused-agent',
-    contextFields: `id: \${state.focusedAgent.id}
-name: \${state.focusedAgent.name}
-slug: \${state.focusedAgent.slug}
-description: \${state.focusedAgent.description}
-model: \${state.focusedAgent.model}
-systemPrompt: \${state.focusedAgent.systemPrompt}
-temperature: \${state.focusedAgent.temperature}
-maxTokens: \${state.focusedAgent.maxTokens}
-assignedToolSlugs: \${JSON.stringify(state.focusedAgent.assignedToolSlugs ?? [])}
-blueprint: \${JSON.stringify(state.focusedAgent.blueprint ?? null)}
-status: \${state.focusedAgent.status}`,
-    updateTriggerTools: ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'],
-    instructions:
-      'The complete agent details are now available in state.focusedAgent. All agent properties (id, systemPrompt, blueprint, assignedToolSlugs, etc.) are accessible without additional API calls. Agent responses only confirm success - use state.focusedAgent for actual data. Focus on completing this agent before proceeding with other tasks.',
-    metadata: { creator: 'Gaia seeder' },
-  });
-}
 
 /**
  * Create Gaia-specific memory configuration
@@ -166,7 +157,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'Help me build an agent for data analysis tasks',
     "Create an agent that can manage other agents' tool assignments",
   ],
-  blueprint: createGaiaBlueprint(),
+  blueprint: createGaiaDefaultBlueprint(),
   ...createGaiaConfig(),
   timeout: 60000,
 };

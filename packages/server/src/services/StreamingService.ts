@@ -33,7 +33,8 @@ interface ConnectionInfo {
  */
 export class StreamingService {
   private static instance: StreamingService | null = null;
-  private connections: Map<string, ConnectionInfo> = new Map();
+  // Allow multiple concurrent connections per stream (e.g., chat view and builder overlay)
+  private connections: Map<string, Set<ConnectionInfo>> = new Map();
 
   // Resume ring buffer: store recent logical events per conversation (no per-event IDs)
   private eventBuffers: Map<string, Array<{ type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action'; payload: any }>> = new Map();
@@ -67,8 +68,7 @@ export class StreamingService {
    * Add new streaming connection (supports multiple concurrent connections)
    */
   addConnection(streamId: string, res: Response, opts?: { baseLength?: number }): void {
-    // Close any existing connection for this streamId
-    this.closeConnection(streamId);
+    // Do not close existing connections; support multiple listeners per stream
 
     // Set up SSE headers
     res.writeHead(200, {
@@ -104,24 +104,30 @@ export class StreamingService {
     }, 30000);
 
     // Store connection info with sync baseline
-    this.connections.set(streamId, {
+    const info: ConnectionInfo = {
       res,
       heartbeatInterval,
       connectedAt: new Date(),
       baseLength: typeof opts?.baseLength === 'number' && opts.baseLength >= 0 ? opts.baseLength : 0,
       runningAdds: 0,
       placeholderStack: [],
-    });
+    };
+    const existing = this.connections.get(streamId);
+    if (existing) {
+      existing.add(info);
+    } else {
+      this.connections.set(streamId, new Set([info]));
+    }
 
     // Handle connection close
     res.on('close', () => {
       console.log(`[StreamingService] <<CLOSED BY CLOSE EVENT>> streamId=${streamId}`);
-      this.cleanupConnection(streamId);
+      this.cleanupConnection(streamId, info);
     });
 
     res.on('error', (error) => {
       console.error(`[StreamingService] Streaming errored ${streamId}`, error);
-      this.cleanupConnection(streamId);
+      this.cleanupConnection(streamId, info);
     });
 
     console.log(`[StreamingService] New connection added: ${streamId}`);
@@ -132,15 +138,20 @@ export class StreamingService {
    * Normalizes paths to concrete numeric indexes using per-connection sync context.
    */
   async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
-    const connection = this.connections.get(streamId);
-    if (connection && !connection.res.destroyed) {
-      // Buffer logical (pre-normalization) delta
-      this.bufferLogicalEvent(streamId, 'delta', delta);
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
 
-      // Normalize for this connection and send
-      const normalized = this.normalizeDelta(streamId, delta);
-      this.sendEventToStream(streamId, connection.res, 'delta', normalized);
-    }
+    // Buffer logical (pre-normalization) delta once per stream
+    this.bufferLogicalEvent(streamId, 'delta', delta);
+
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          const normalized = this.normalizeDelta(streamId, delta, connection);
+          this.sendEventToStream(streamId, connection.res, 'delta', normalized);
+        }
+      })
+    );
   }
 
   /**
@@ -155,11 +166,16 @@ export class StreamingService {
    * Broadcast complete message object to a specific stream
    */
   async broadcastMessage(streamId: string, message: any): Promise<void> {
-    const connection = this.connections.get(streamId);
-    if (connection && !connection.res.destroyed) {
-      this.bufferLogicalEvent(streamId, 'message', message);
-      this.sendEventToStream(streamId, connection.res, 'message', message);
-    }
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    this.bufferLogicalEvent(streamId, 'message', message);
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'message', message);
+        }
+      })
+    );
   }
 
   /**
@@ -174,11 +190,16 @@ export class StreamingService {
    * Broadcast UI action payload to a specific stream
    */
   async broadcastUIAction(streamId: string, payload: any): Promise<void> {
-    const connection = this.connections.get(streamId);
-    if (connection && !connection.res.destroyed) {
-      this.bufferLogicalEvent(streamId, 'ui_action', payload);
-      this.sendEventToStream(streamId, connection.res, 'ui_action', payload);
-    }
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    this.bufferLogicalEvent(streamId, 'ui_action', payload);
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'ui_action', payload);
+        }
+      })
+    );
   }
 
   /**
@@ -193,9 +214,9 @@ export class StreamingService {
    * Normalize a JSON-Patch operation to use concrete numeric indexes for the messages array
    * based on per-connection synchronization context.
    */
-  private normalizeDelta(streamId: string, delta: Operation): Operation {
-    const connection = this.connections.get(streamId);
-    if (!connection) return delta;
+  private normalizeDelta(streamId: string, delta: Operation, connection?: ConnectionInfo): Operation {
+    // When broadcasting to multiple connections, a specific connection must be provided
+    if (!connection) return delta as any;
 
     const raw = delta as any;
     const op: string = raw.op;
@@ -266,11 +287,16 @@ export class StreamingService {
    * and allow additional messages in the same SSE session if needed.
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
-    const connection = this.connections.get(streamId);
-    if (connection && !connection.res.destroyed) {
-      this.bufferLogicalEvent(streamId, 'complete', finalResponse);
-      this.sendEventToStream(streamId, connection.res, 'complete', finalResponse);
-    }
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    this.bufferLogicalEvent(streamId, 'complete', finalResponse);
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'complete', finalResponse);
+        }
+      })
+    );
   }
 
   /**
@@ -278,11 +304,16 @@ export class StreamingService {
    * Note: Keep the connection open. Client may decide to retry or continue.
    */
   async broadcastError(streamId: string, error: StreamingError): Promise<void> {
-    const connection = this.connections.get(streamId);
-    if (connection && !connection.res.destroyed) {
-      this.bufferLogicalEvent(streamId, 'error', error);
-      this.sendEventToStream(streamId, connection.res, 'error', error);
-    }
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    this.bufferLogicalEvent(streamId, 'error', error);
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'error', error);
+        }
+      })
+    );
   }
 
   /**
@@ -321,10 +352,14 @@ export class StreamingService {
 
   /** Emit a resume_token event */
   sendResumeToken(streamId: string, token: string): void {
-    const connection = this.connections.get(streamId);
-    if (!connection || connection.res.destroyed) return;
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
     // Do not buffer tokens; they are ephemeral hints
-    this.sendEventToStream(streamId, connection.res, 'resume_token', token);
+    for (const connection of conns) {
+      if (!connection.res.destroyed) {
+        this.sendEventToStream(streamId, connection.res, 'resume_token', token);
+      }
+    }
   }
 
   /**
@@ -333,8 +368,8 @@ export class StreamingService {
    * replays the entire buffer.
    */
   async replayBufferedEvents(streamId: string, filter?: (evt: { type: string; payload: any }) => boolean): Promise<void> {
-    const connection = this.connections.get(streamId);
-    if (!connection || connection.res.destroyed) return;
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
 
     const buffer = this.eventBuffers.get(streamId) || [];
     if (buffer.length === 0) return;
@@ -342,29 +377,32 @@ export class StreamingService {
     // Suppress buffering while replaying to avoid duplicating into the buffer
     this.suppressBuffering = true;
     try {
-      for (const evt of buffer) {
-        if (filter && !filter(evt)) continue;
-        switch (evt.type) {
-          case 'delta': {
-            const normalized = this.normalizeDelta(streamId, evt.payload as Operation);
-            this.sendEventToStream(streamId, connection.res, 'delta', normalized);
-            break;
-          }
-          case 'message': {
-            this.sendEventToStream(streamId, connection.res, 'message', evt.payload);
-            break;
-          }
-          case 'complete': {
-            this.sendEventToStream(streamId, connection.res, 'complete', evt.payload);
-            break;
-          }
-          case 'error': {
-            this.sendEventToStream(streamId, connection.res, 'error', evt.payload);
-            break;
-          }
-          case 'ui_action': {
-            this.sendEventToStream(streamId, connection.res, 'ui_action', evt.payload);
-            break;
+      for (const connection of conns) {
+        if (connection.res.destroyed) continue;
+        for (const evt of buffer) {
+          if (filter && !filter(evt)) continue;
+          switch (evt.type) {
+            case 'delta': {
+              const normalized = this.normalizeDelta(streamId, evt.payload as Operation, connection);
+              this.sendEventToStream(streamId, connection.res, 'delta', normalized);
+              break;
+            }
+            case 'message': {
+              this.sendEventToStream(streamId, connection.res, 'message', evt.payload);
+              break;
+            }
+            case 'complete': {
+              this.sendEventToStream(streamId, connection.res, 'complete', evt.payload);
+              break;
+            }
+            case 'error': {
+              this.sendEventToStream(streamId, connection.res, 'error', evt.payload);
+              break;
+            }
+            case 'ui_action': {
+              this.sendEventToStream(streamId, connection.res, 'ui_action', evt.payload);
+              break;
+            }
           }
         }
       }
@@ -392,16 +430,19 @@ export class StreamingService {
    */
   closeConnection(streamId?: string): void {
     if (streamId) {
-      // Close specific connection
-      const connection = this.connections.get(streamId);
-      if (connection && !connection.res.destroyed) {
-        try {
-          connection.res.end();
-        } catch (error) {
-          // Ignore errors when closing
+      const conns = this.connections.get(streamId);
+      if (conns && conns.size > 0) {
+        for (const connection of conns) {
+          if (!connection.res.destroyed) {
+            try {
+              connection.res.end();
+            } catch {
+              // ignore
+            }
+          }
+          this.cleanupConnection(streamId, connection);
         }
       }
-      this.cleanupConnection(streamId);
     } else {
       // Close all connections
       this.closeAllConnections();
@@ -412,25 +453,43 @@ export class StreamingService {
    * Close all connections
    */
   closeAllConnections(): void {
-    for (const streamId of this.connections.keys()) {
-      this.closeConnection(streamId);
+    for (const [streamId, conns] of this.connections.entries()) {
+      for (const connection of conns) {
+        if (!connection.res.destroyed) {
+          try {
+            connection.res.end();
+          } catch {
+            // ignore
+          }
+        }
+        this.cleanupConnection(streamId, connection);
+      }
     }
   }
 
   /**
    * Cleanup specific connection state
    */
-  private cleanupConnection(streamId: string): void {
-    const connection = this.connections.get(streamId);
+  private cleanupConnection(streamId: string, connection?: ConnectionInfo): void {
+    const set = this.connections.get(streamId);
+    if (!set) return;
 
     if (connection) {
       if (connection.heartbeatInterval) {
         clearInterval(connection.heartbeatInterval);
       }
-
+      set.delete(connection);
+      if (set.size === 0) {
+        this.connections.delete(streamId);
+      }
+    } else {
+      // Cleanup all for this stream
+      for (const conn of set) {
+        if (conn.heartbeatInterval) clearInterval(conn.heartbeatInterval);
+      }
       this.connections.delete(streamId);
-      console.log(`[StreamingService] Cleaned up connection: ${streamId}`);
     }
+    console.log(`[StreamingService] Cleaned up connection for stream: ${streamId}. Remaining=${this.connections.get(streamId)?.size ?? 0}`);
   }
 
   /**
@@ -438,12 +497,21 @@ export class StreamingService {
    */
   isActive(streamId?: string): boolean {
     if (streamId) {
-      const connection = this.connections.get(streamId);
-      return connection !== undefined && !connection.res.destroyed && !connection.res.writableEnded;
+      const set = this.connections.get(streamId);
+      if (!set) return false;
+      for (const c of set) {
+        if (!c.res.destroyed && !c.res.writableEnded) return true;
+      }
+      return false;
     }
 
     // Check if any connection is active
-    return Array.from(this.connections.values()).some((connection) => !connection.res.destroyed && !connection.res.writableEnded);
+    for (const set of this.connections.values()) {
+      for (const c of set) {
+        if (!c.res.destroyed && !c.res.writableEnded) return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -457,18 +525,19 @@ export class StreamingService {
    * Get connection count
    */
   getConnectionCount(): number {
-    return this.connections.size;
+    let count = 0;
+    for (const set of this.connections.values()) count += set.size;
+    return count;
   }
 
   /**
    * Get connection info for a specific stream
    */
   getConnectionInfo(streamId: string): { connectedAt: Date; active: boolean } | null {
-    const connection = this.connections.get(streamId);
-    if (!connection) {
-      return null;
-    }
-
+    const set = this.connections.get(streamId);
+    if (!set || set.size === 0) return null;
+    // Return info for the first connection
+    const connection = Array.from(set)[0];
     return {
       connectedAt: connection.connectedAt,
       active: !connection.res.destroyed && !connection.res.writableEnded,

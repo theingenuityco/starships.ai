@@ -108,8 +108,8 @@ export class AgentRepository extends BaseRepository {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { assignedToolSlugs: _, ...dataWithoutToolSlugs } = data;
 
-        // Validate using cleaned data
-        await AgentEntity.validate(dataWithoutToolSlugs, 'create');
+        // Validate using cleaned data and include starshipId which is required on create
+        await AgentEntity.validate({ ...dataWithoutToolSlugs, starshipId }, 'create');
 
         const now = new Date().toISOString();
 

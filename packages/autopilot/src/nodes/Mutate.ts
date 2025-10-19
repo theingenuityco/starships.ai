@@ -1,14 +1,14 @@
 /**
  * Mutate Node
  *
- * Dedicated node for execution state mutations using JSON Patch operations.
+ * Dedicated node for execution state mutations using reducers (pure-return functions).
  * Handles only state changes, not input->output transformations.
  */
 
-import { applyPatch, deepClone, Operation } from 'fast-json-patch';
+import { deepClone } from 'fast-json-patch';
 import { NodeHandler } from '@/types/node-handler';
 import { ValidationResult, ValidationError, Execution, ExecutionState, ExecutionItem } from '@/types';
-import type { TransformOperation, MutateParams } from '@/types/node-parameters';
+import type { MutateParams, ReducerSpec } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -65,68 +65,175 @@ export class Mutate implements NodeHandler {
   }
 
   /**
-   * Execute state mutation operations on execution state
+   * Execute reducers on execution state
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    if (!this.params.mutations || this.params.mutations.length === 0) {
-      return input || ExecutionItemUtils.wrapSingle({ mutationsApplied: 0, operations: [] });
+    const reducers = this.normalizeReducers(this.params.reducers);
+    if (!reducers.length) {
+      return input || ExecutionItemUtils.wrapSingle({ reducersApplied: 0, names: [], changedKeys: [] });
     }
 
     if (!this.options?.execution) {
       throw new Error('Mutate node requires execution context');
     }
 
-    // Apply mutations to execution state
-    await this.applyTransforms(this.params.mutations, this.options.execution);
+    const execution = this.options.execution;
+    const snapshot = this.safetyManager.createExecutionSnapshot(execution);
 
-    // Return summary of what was mutated
-    const operations = this.params.mutations.map((t) => `${t.operation} ${t.path}`);
-    return ExecutionItemUtils.wrapSingle({
-      mutationsApplied: this.params.mutations.length,
-      operations,
-    });
-  }
-
-  /**
-   * Apply transform operations to execution state
-   */
-  private async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
-    if (!transforms || transforms.length === 0) return;
-
-    // Create execution snapshot for rollback
-    const executionSnapshot = this.safetyManager.createExecutionSnapshot(execution);
+    const names: string[] = [];
+    const timingsMs: number[] = [];
 
     try {
-      // Apply transforms one at a time so each can see the updated state
-      for (const transform of transforms) {
-        // For 'add' operations, ensure intermediate paths exist
-        if (transform.operation === 'add') {
-          this.ensureIntermediatePaths(execution.state, transform.path);
+      for (let i = 0; i < reducers.length; i++) {
+        const r = reducers[i];
+        const name = r.name || `reducer_${i + 1}`;
+
+        // Evaluate guard (if present)
+        if (typeof r.if === 'string' && r.if.trim().length > 0) {
+          const guardResolved = (await this.eval.resolveTemplates(r.if, execution, undefined, {
+            stringEvaluationMode: 'full-only',
+          })) as unknown;
+          if (!guardResolved) {
+            continue; // skip
+          }
         }
 
-        // Convert single transform to JSON Patch operation with current state
-        // Force fresh evaluation by creating a new Eval instance each time
-        const freshEval = new Eval();
-        const patchOperations = await this.convertSingleTransformToJsonPatch(transform, execution, freshEval);
+        const started = Date.now();
+        const nextState = await this.runReducer(r.code, execution.state, this.buildReducerContext(input));
+        timingsMs.push(Date.now() - started);
 
-        // Apply patch to a wrapper object to handle the root state correctly
-        const stateWrapper = { state: execution.state };
-        const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
-
-        // Update execution state immediately so next transform can see the changes
-        execution.state = patchedWrapper.state;
+        if (!nextState || typeof nextState !== 'object' || Array.isArray(nextState)) {
+          throw new Error(`Reducer '${name}' must return an object state`);
+        }
+        execution.state = nextState as Record<string, unknown>;
+        names.push(name);
       }
 
-      // Validate final state changes
-      const validation = this.safetyManager.validateStateChanges(executionSnapshot.state, execution.state);
+      // Validate final state
+      const validation = this.safetyManager.validateStateChanges(snapshot.state, execution.state);
       if (!validation.valid) {
         throw new Error(`State validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);
       }
     } catch (error) {
-      // Rollback state on any failure
-      this.safetyManager.rollbackExecution(execution, executionSnapshot);
+      this.safetyManager.rollbackExecution(execution, snapshot);
       throw error;
     }
+
+    // simple changed root keys
+    const changedKeys = this.diffRootKeys(snapshot.state as Record<string, unknown>, execution.state as Record<string, unknown>);
+
+    return ExecutionItemUtils.wrapSingle({ reducersApplied: names.length, names, changedKeys, timingsMs });
+  }
+
+  private normalizeReducers(specs?: ReducerSpec[]): Array<{ name?: string; if?: string; code: string; timeoutMs?: number }> {
+    if (!Array.isArray(specs)) return [];
+    return specs
+      .map((s) => (typeof s === 'string' ? { code: s } : s))
+      .filter(
+        (s): s is { name?: string; if?: string; code: string; timeoutMs?: number } =>
+          typeof (s as Record<string, unknown>).code === 'string'
+      );
+  }
+
+  private buildReducerContext(input?: ExecutionItem[]): Record<string, unknown> {
+    const execution = this.options?.execution;
+    const secureEnv = this.options?.secureEnv || {};
+
+    // Helper to access last output of a node within current execution
+    const $lastOutputOf = (ref: string): ExecutionItem[] => {
+      try {
+        if (!execution?.results || !ref) return [];
+        for (let i = execution.results.length - 1; i >= 0; i--) {
+          const entry = execution.results[i];
+          if (entry?.nodeRef === ref) {
+            return entry.items ?? [];
+          }
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    };
+
+    const inputData = ExecutionItemUtils.unwrapSingle(input);
+
+    const ctx = {
+      input: inputData,
+      $input: () => inputData,
+      $lastOutputOf,
+      state: execution?.state || {},
+      env: (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined),
+      envAll: () => ({ ...secureEnv }),
+      // Utilities and safe builtins
+      JSON: JSON,
+      Math: Math,
+      Date: Date,
+      // Console shims
+      console: {
+        log: (...args: unknown[]) => console.log('[Mutate Reducer]:', ...args),
+        error: (...args: unknown[]) => console.error('[Mutate Reducer]:', ...args),
+        warn: (...args: unknown[]) => console.warn('[Mutate Reducer]:', ...args),
+      },
+      // Hard disables for security
+      setTimeout: undefined,
+      setInterval: undefined,
+      require: undefined,
+      process: undefined,
+      global: undefined,
+      eval: undefined,
+      Function: undefined,
+    } as Record<string, unknown>;
+
+    return ctx;
+  }
+
+  private async runReducer(
+    code: string,
+    currentState: Record<string, unknown>,
+    ctx: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const timeoutMs = 1000;
+    return await new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => reject(new Error(`Reducer execution timeout after ${timeoutMs}ms`)), timeoutMs);
+      try {
+        // Build function that evaluates reducer expression and invokes it
+        const wrapped = `
+          const __reducer = ${code};
+          if (typeof __reducer !== 'function') { throw new Error('Reducer did not evaluate to a function'); }
+          const __result = __reducer(state, ctx);
+          return __result;
+        `;
+        const context: Record<string, unknown> = { state: currentState, ctx, ...ctx };
+        const keys = Object.keys(context);
+        const values = Object.values(context);
+        const fn = new Function(...keys, wrapped);
+        const result = fn.apply(null, values);
+        const finish = (val: unknown) => {
+          clearTimeout(timeoutId);
+          resolve(val as Record<string, unknown>);
+        };
+        if (result && typeof (result as Promise<unknown>).then === 'function') {
+          (result as Promise<unknown>).then(finish).catch((e) => {
+            clearTimeout(timeoutId);
+            reject(e);
+          });
+        } else {
+          finish(result);
+        }
+      } catch (e) {
+        clearTimeout(timeoutId);
+        reject(e);
+      }
+    });
+  }
+
+  private diffRootKeys(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+    const keys = new Set<string>([...Object.keys(before || {}), ...Object.keys(after || {})]);
+    const changed: string[] = [];
+    for (const k of keys) {
+      if ((before as Record<string, unknown>)[k] !== (after as Record<string, unknown>)[k]) changed.push(k);
+    }
+    return changed;
   }
 
   /**
@@ -155,218 +262,41 @@ export class Mutate implements NodeHandler {
     }
   }
 
-  /**
-   * Convert single transform to JSON Patch Operation with fresh evaluation
-   */
-  private async convertSingleTransformToJsonPatch(
-    transform: TransformOperation,
-    _execution: Execution,
-    _evalInstance: Eval
-  ): Promise<Operation[]> {
-    // Silence unused parameter warnings explicitly
-    void _execution;
-    void _evalInstance;
-
-    // Values are expected to be resolved by the Engine prior to Mutate execution
-    // (both for dedicated Mutate nodes and inline_mutate). Avoid re-resolving here
-    // to prevent double template expansion, which can mistakenly evaluate nested
-    // {{ ... }} inside serialized JSON payloads.
-    const resolvedValue = transform.value;
-    const resolvedFrom = transform.from;
-
-    // Create JSON Patch operation based on operation type
-    let operation: Operation;
-
-    switch (transform.operation) {
-      case 'add':
-        operation = {
-          op: 'add',
-          path: transform.path,
-          value: resolvedValue,
-        };
-        break;
-      case 'replace':
-        operation = {
-          op: 'replace',
-          path: transform.path,
-          value: resolvedValue,
-        };
-        break;
-      case 'test':
-        operation = {
-          op: 'test',
-          path: transform.path,
-          value: resolvedValue,
-        };
-        break;
-      case 'remove':
-        operation = {
-          op: 'remove',
-          path: transform.path,
-        };
-        break;
-      case 'copy':
-        if (!resolvedFrom) {
-          throw new Error(`Copy operation requires "from" path for transform at ${transform.path}`);
-        }
-        operation = {
-          op: 'copy',
-          path: transform.path,
-          from: resolvedFrom,
-        };
-        break;
-      case 'move':
-        if (!resolvedFrom) {
-          throw new Error(`Move operation requires "from" path for transform at ${transform.path}`);
-        }
-        operation = {
-          op: 'move',
-          path: transform.path,
-          from: resolvedFrom,
-        };
-        break;
-      default:
-        throw new Error(`Unsupported transform operation: ${transform.operation}`);
-    }
-
-    return [operation];
-  }
+  // Removed JSON Patch conversion logic
 
   /**
-   * Validate mutate operations
+   * Validate reducers configuration
    */
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Check if mutations are provided
-    if (!this.params.mutations || this.params.mutations.length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Mutate node requires at least one mutation operation',
-      });
-      return {
-        valid: false,
-        errors,
-      };
+    const reducers = this.normalizeReducers(this.params.reducers);
+    if (!reducers.length) {
+      errors.push({ code: 'MISSING_REQUIRED_FIELD', message: 'Mutate node requires at least one reducer' });
+      return { valid: false, errors };
     }
 
-    // Validate mutation operations
-    const validation = this.validateTransforms(this.params.mutations);
-    if (!validation.valid) {
-      errors.push(...(validation.errors || []));
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined,
-    };
-  }
-
-  /**
-   * Validate transform operations
-   */
-  private validateTransforms(transforms: TransformOperation[]): ValidationResult {
-    const errors: ValidationError[] = [];
-
-    for (let i = 0; i < transforms.length; i++) {
-      const transform = transforms[i];
-      const validation = this.validateTransformOperation(transform, `transforms[${i}]`);
-      if (!validation.valid) {
-        errors.push(...(validation.errors || []));
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * Validate a single transform operation
-   */
-  private validateTransformOperation(transform: TransformOperation, path = ''): ValidationResult {
-    const errors: ValidationError[] = [];
-
-    // Validate operation type
-    const validOperations = ['add', 'replace', 'remove', 'copy', 'move', 'test'];
-    if (!validOperations.includes(transform.operation)) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: `Invalid transform operation "${transform.operation}" at ${path}`,
-      });
-    }
-
-    // Validate path
-    if (!transform.path || typeof transform.path !== 'string') {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: `Transform path is required and must be a string at ${path}`,
-      });
-    } else if (!transform.path.startsWith('/state')) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: `Transform path must start with "/state" at ${path}`,
-      });
-    }
-
-    // Validate operation-specific requirements
-    switch (transform.operation) {
-      case 'add':
-      case 'replace':
-      case 'test':
-        if (transform.value === undefined) {
-          errors.push({
-            code: 'MISSING_REQUIRED_FIELD',
-            message: `Transform operation "${transform.operation}" requires a value at ${path}`,
-          });
+    // Validate guards and compile code
+    for (let i = 0; i < reducers.length; i++) {
+      const r = reducers[i];
+      if (typeof r.if === 'string') {
+        const guardValidation = this.eval.validateTemplateExpressions(r.if, { stringEvaluationMode: 'full-only' });
+        if (!guardValidation.valid) {
+          (guardValidation.errors || []).forEach((e) => errors.push({ code: e.code, message: `reducers[${i}].if: ${e.message}` }));
         }
-        break;
-      case 'copy':
-      case 'move':
-        if (!transform.from || typeof transform.from !== 'string') {
-          errors.push({
-            code: 'MISSING_REQUIRED_FIELD',
-            message: `Transform operation "${transform.operation}" requires a "from" path at ${path}`,
-          });
-        } else if (!transform.from.startsWith('/state')) {
-          errors.push({
-            code: 'INVALID_PARAMETERS',
-            message: `Transform "from" path must start with "/state" at ${path}`,
-          });
-        }
-        break;
-    }
-
-    // Validate template expressions in value if present
-    if (transform.value !== undefined) {
-      const templateValidation = this.eval.validateTemplateExpressions(transform.value);
-      if (!templateValidation.valid) {
-        const templateErrors =
-          templateValidation.errors?.map((e: ValidationError) => ({
-            ...e,
-            message: `${path}.value: ${e.message}`,
-          })) || [];
-        errors.push(...templateErrors);
+      }
+      // Basic syntax validation for reducer code
+      try {
+        // We only check that it parses and evaluates to a function at runtime; here do a light parse
+        new Function('state', 'ctx', `const __reducer = ${r.code}; return typeof __reducer;`);
+      } catch (syntaxError) {
+        errors.push({
+          code: 'INVALID_PARAMETERS',
+          message: `reducers[${i}].code syntax error: ${syntaxError instanceof Error ? syntaxError.message : 'Unknown'}`,
+        });
       }
     }
 
-    // Validate template expressions in from path if present
-    if (transform.from !== undefined) {
-      const templateValidation = this.eval.validateTemplateExpressions(transform.from);
-      if (!templateValidation.valid) {
-        const templateErrors =
-          templateValidation.errors?.map((e: ValidationError) => ({
-            ...e,
-            message: `${path}.from: ${e.message}`,
-          })) || [];
-        errors.push(...templateErrors);
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
+    return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
   }
 }

@@ -1,11 +1,11 @@
 /**
  * Registration Orchestrator Service
- * 
+ *
  * Orchestrates registration workflows including:
  * - User registration with email verification
  * - Email verification and account activation
  * - Starship creation for verified users
- * 
+ *
  * This service follows the orchestration pattern to coordinate multiple services
  * while maintaining clear separation of concerns.
  */
@@ -13,11 +13,7 @@
 import { ServiceFactory } from './ServiceFactory';
 import { StarshipService } from './StarshipService';
 import { logger } from '@starships/models';
-import {
-  InvalidTokenError,
-  EmailVerificationSendError,
-  ConflictError
-} from '../errors';
+import { InvalidTokenError, EmailVerificationSendError, ConflictError } from '../errors';
 
 export interface RegisterUserData {
   email: string;
@@ -44,7 +40,7 @@ export interface VerificationResult {
 export class RegistrationOrchestrator {
   /**
    * Register a new user with email verification
-   * 
+   *
    * Coordinates:
    * 1. User existence check
    * 2. User creation
@@ -63,17 +59,17 @@ export class RegistrationOrchestrator {
           await userService.sendEmailVerification(existingUser.id, existingUser.email!);
           return {
             emailVerificationSent: true,
-            message: 'A verification email has been resent to your email address.'
+            message: 'A verification email has been resent to your email address.',
           };
         } catch {
           logger.error('[RegistrationOrchestrator] Failed to resend verification email', {
             userId: existingUser.id,
-            operation: 'resend_verification'
+            operation: 'resend_verification',
           });
           // Fall through to conflict error
         }
       }
-      
+
       // User exists and is verified - throw conflict
       throw new ConflictError('An account with this email already exists');
     }
@@ -84,7 +80,7 @@ export class RegistrationOrchestrator {
       email: userData.email,
       password: userData.password,
       displayName,
-      emailVerified: false
+      emailVerified: false,
     });
 
     // Send email verification
@@ -93,20 +89,20 @@ export class RegistrationOrchestrator {
     } catch (error) {
       logger.error('[RegistrationOrchestrator] Failed to send verification email', {
         userId: user.id,
-        operation: 'email_verification'
+        operation: 'email_verification',
       });
       throw new EmailVerificationSendError('Failed to send verification email', undefined, error as Error);
     }
 
     return {
       emailVerificationSent: true,
-      message: 'Registration successful! Please check your email to verify your account.'
+      message: 'Registration successful! Please check your email to verify your account.',
     };
   }
 
   /**
    * Complete email verification process
-   * 
+   *
    * Coordinates:
    * 1. Token validation and user verification
    * 2. Starship creation for verified users
@@ -130,7 +126,7 @@ export class RegistrationOrchestrator {
         email: tokenInfo.tokenInfo.email,
         verified: false, // Already verified before
         starshipCreated,
-        redirectPath: '' // Not used - redirect handled by endpoint
+        redirectPath: '', // Not used - redirect handled by endpoint
       };
     }
 
@@ -149,7 +145,7 @@ export class RegistrationOrchestrator {
       email: verificationResult.email,
       verified: true,
       starshipCreated,
-      redirectPath: '' // Not used - redirect handled by endpoint
+      redirectPath: '', // Not used - redirect handled by endpoint
     };
   }
 
@@ -159,23 +155,23 @@ export class RegistrationOrchestrator {
   private async createStarshipForUser(userId: string): Promise<boolean> {
     try {
       const defaultStarship = await StarshipService.createDefaultStarship(userId);
-      
+
       if (defaultStarship) {
-        await StarshipService.createDefaultAgent(userId, defaultStarship.id);
-        
+        await StarshipService.createInitialAgents(userId, defaultStarship.id);
+
         logger.info('[RegistrationOrchestrator] Starship created for verified user', {
           userId,
           starshipId: defaultStarship.id,
-          operation: 'email_verification'
+          operation: 'email_verification',
         });
-        
+
         return true;
       }
     } catch (error) {
       logger.error('[RegistrationOrchestrator] Failed to create starship during verification', {
         userId,
         operation: 'starship_creation',
-        error: { message: error instanceof Error ? error.message : 'Unknown error' }
+        error: { message: error instanceof Error ? error.message : 'Unknown error' },
       });
       // Don't throw - user can create starship later
     }
@@ -194,7 +190,7 @@ export class RegistrationOrchestrator {
     } catch (error) {
       logger.error('[RegistrationOrchestrator] Failed to check user starships', {
         userId,
-        error: { message: error instanceof Error ? error.message : 'Unknown error' }
+        error: { message: error instanceof Error ? error.message : 'Unknown error' },
       });
       return false;
     }

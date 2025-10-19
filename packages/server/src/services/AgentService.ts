@@ -48,6 +48,18 @@ export class AgentService {
     this.messageService = new MessageService();
   }
 
+  /** Safely get starshipId from agent */
+  private async getAgentStarshipIdOrThrow(agentId: string): Promise<string> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    if (!agent.starshipId) {
+      throw new Error('Agent has no starship assigned');
+    }
+    return agent.starshipId;
+  }
+
   // ============================================================================
   // AGENT MANAGEMENT APIs
   // ============================================================================
@@ -260,6 +272,18 @@ export class AgentService {
   }
 
   /**
+   * Get tools assigned to an agent, deriving starship from agent and validating access
+   */
+  async getAgentToolsForAgent(agentId: string, userId: string): Promise<import('@starships/protocol').ToolModel[]> {
+    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+    return await this.getAgentTools(agentId, starshipId);
+  }
+
+  /**
    * Assign multiple tools to an agent via relationships (replaces existing assignments)
    */
   async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
@@ -272,6 +296,18 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
     return updatedAgent;
+  }
+
+  /**
+   * Assign multiple tools by deriving starship from agent and validating access
+   */
+  async assignToolSlugsDerived(agentId: string, userId: string, toolSlugs: string[]): Promise<AgentModel> {
+    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+    return await this.assignToolSlugs(agentId, toolSlugs, starshipId);
   }
 
   /**
@@ -299,6 +335,18 @@ export class AgentService {
   }
 
   /**
+   * Add a single tool by deriving starship from agent and validating access
+   */
+  async addToolSlugDerived(agentId: string, userId: string, toolSlug: string): Promise<AgentModel> {
+    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+    return await this.addToolSlug(agentId, toolSlug, starshipId);
+  }
+
+  /**
    * Remove a single tool from an agent's assignments via relationships
    */
   async removeToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
@@ -320,6 +368,18 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
     return updatedAgent;
+  }
+
+  /**
+   * Remove a single tool by deriving starship from agent and validating access
+   */
+  async removeToolSlugDerived(agentId: string, userId: string, toolSlug: string): Promise<AgentModel> {
+    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+    return await this.removeToolSlug(agentId, toolSlug, starshipId);
   }
 
   // ============================================================================

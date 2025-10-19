@@ -19,7 +19,7 @@ export interface AgentBuilderViewProps {
   onSave?: (data: AgentFormData) => void
   onCancel?: () => void
   starshipId?: string
-  persistenceKey?: string
+  initialSlug?: string
 }
 
 export interface AgentBuilderViewRef {

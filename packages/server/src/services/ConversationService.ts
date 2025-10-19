@@ -64,6 +64,10 @@ export class ConversationService {
   private streamingReasoning: Map<string, string> = new Map();
   // Track last persisted message index to avoid re-persisting on workflow loops
   private lastPersistedIndex: Map<string, number> = new Map();
+  // Suppress broadcasting 'complete' for conversations during multi-agent orchestration
+  private suppressCompleteFor: Set<string> = new Set();
+  // Track which agent is currently producing streamed content for a conversation (for attribution)
+  private currentAgentForConversation: Map<string, string> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -256,12 +260,30 @@ export class ConversationService {
       await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
     }
 
-    const agentModels = await this.getConversationAgents(data.conversationId);
-    if (agentModels.length < 1) {
+    const conversationAgents = await this.getConversationAgents(data.conversationId);
+    if (conversationAgents.length < 1) {
       throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
     }
-    // only first agent for now
-    const agentModel = agentModels[0];
+    // Build initial target agents from @mentions in the incoming message; fallback to first agent
+    // Resolve against starship agents and auto-link any newly mentioned agents
+    const starship = await this.getConversationStarship(data.conversationId);
+    if (!starship) {
+      throw new NotFoundError('Starship', 'for conversation');
+    }
+    const allStarshipAgents = await this.agentRepository.findByStarship(starship.id);
+    const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
+    // Auto-link mentioned agents not yet linked
+    for (const a of initialTargetsUnlinked) {
+      if (!conversationAgents.find((x) => x.id === a.id)) {
+        await this.conversationRepository.linkToAgent(data.conversationId, a.id);
+      }
+    }
+    const initialTargets =
+      initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
+    const agentQueue: AgentModel[] = initialTargets.length > 0 ? initialTargets.slice() : [conversationAgents[0]];
+    const processedAgents: Set<string> = new Set();
+    const maxHops = 5; // prevent infinite handoffs per turn
+    let hops = 0;
 
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {
@@ -269,99 +291,114 @@ export class ConversationService {
     }
 
     // Get conversation messages from database
-    const messages = await this.getConversationMessages(data.conversationId);
+    let messages = await this.getConversationMessages(data.conversationId);
 
     // Load conversation state for context
     const conversationState = conversation.state || {};
 
+    // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
+    this.suppressCompleteFor.add(data.conversationId);
+
     try {
-      // Get starship for context
-      const starship = await this.getConversationStarship(data.conversationId);
-      if (!starship) {
-        throw new NotFoundError('Starship', 'for conversation');
-      }
+      // starship already resolved above
 
-      // Get deployed tools for this agent using ToolService
-      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
-      // console.log('>>>Resolved tools', { resolvedTools });
-
-      // Build Agent to materialize blueprint (tools, nodes, etc.)
       const env = getEnvConfig();
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const rawAuth = ctx?.authorization ?? '';
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
       const openRouterKey = env.OPENROUTER_API_KEY || '';
-
-      // Get user-defined encrypted environment variables for this starship
       const starshipEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
-
       const secureEnv: Record<string, string> = {
-        // System variables (read-only)
         STARSHIP_ID: starship.id,
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
         ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
-        // User-defined variables (from encrypted storage)
         ...starshipEnv,
       };
 
-      // Guard against NULL/undefined persisted JSONB state (now nullable)
-      const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
+      // Orchestrate sequentially with mention-based handoffs
+      while (agentQueue.length > 0 && hops < maxHops) {
+        const agentModel = agentQueue.shift()!;
+        if (processedAgents.has(agentModel.id)) {
+          continue;
+        }
+        processedAgents.add(agentModel.id);
+        hops += 1;
 
-      const agentWithTools: AgentParams = {
-        ...agentModel,
-        state: {
-          ...baseState,
-          ...conversationState, // ← Merge conversation state (takes precedence)
-          tools: resolvedTools,
-          // Do not inject secrets into state
-          starshipId: starship.id,
-        },
-      };
+        // Get deployed tools for this agent
+        const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
-      // Create Agent with secureEnv for eval across all nodes
-      const agent = new Agent(agentWithTools, {
-        eventCallback: (event) => this.eventCallback(data.conversationId, event),
-        secureEnv,
-      });
+        // Guard against NULL/undefined persisted JSONB state
+        const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
 
-      // Prepare messages for Agent input in canonical format (camelCase, parsed toolCalls)
-      const llmMessages: LlmMessage[] = messages.map((msg): LlmMessage => {
-        const baseMessage: LlmMessage = {
-          role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-          content: msg.content,
-          ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
+        const agentWithTools: AgentParams = {
+          ...agentModel,
+          state: {
+            ...baseState,
+            ...conversationState,
+            tools: resolvedTools,
+            starshipId: starship.id,
+          },
         };
 
-        // Keep canonical toolCalls as-is
-        if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
-          (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
+        // Prepare input messages snapshot for this agent
+        const llmMessages: LlmMessage[] = messages.map((msg): LlmMessage => {
+          const baseMessage: LlmMessage = {
+            role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+            content: msg.content,
+            ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
+          };
+          if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+            (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
+          }
+          if (msg.role === 'tool' && typeof msg.toolCallId === 'string') {
+            (baseMessage as LlmMessage).toolCallId = msg.toolCallId;
+          }
+          return baseMessage;
+        });
+        const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
+
+        // Attribute streamed content to the current agent
+        this.currentAgentForConversation.set(data.conversationId, agentModel.id);
+
+        const agent = new Agent(agentWithTools, {
+          eventCallback: (event) => this.eventCallback(data.conversationId, event),
+          secureEnv,
+        });
+
+        const baselineCount = messages.length;
+        await agent.execute(input);
+
+        // Refresh messages after this agent's turn and discover mentions in new assistant messages
+        const after = await this.getConversationMessages(data.conversationId);
+        const newMessages = after.slice(baselineCount);
+        messages = after; // advance baseline
+
+        const combinedAssistantText = newMessages
+          .filter((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.length > 0)
+          .map((m) => m.content)
+          .join('\n');
+
+        // Resolve handoffs against starship agents and auto-link dynamically
+        const handoffTargets = this.extractMentionedAgents(combinedAssistantText, allStarshipAgents);
+        for (const t of handoffTargets) {
+          if (!conversationAgents.find((x) => x.id === t.id)) {
+            await this.conversationRepository.linkToAgent(data.conversationId, t.id);
+            conversationAgents.push(t);
+          }
         }
-
-        // Keep canonical toolCallId for tool messages
-        if (msg.role === 'tool' && typeof msg.toolCallId === 'string') {
-          (baseMessage as LlmMessage).toolCallId = msg.toolCallId;
+        for (const target of handoffTargets) {
+          if (!processedAgents.has(target.id) && !agentQueue.find((a) => a.id === target.id)) {
+            agentQueue.push(target);
+          }
         }
-
-        return baseMessage;
-      });
-
-      // Prepare input for agent execution - Agent will handle memory state and ordering internally
-      const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
-
-      // Execute via agent - runner and event callback are configured in the Agent constructor
-      await agent.execute(input);
-
-      // Note: broadcastComplete is now called at the end of content_complete event handler
-      // to ensure all delta operations are sent before the complete event
+      }
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
-        agentId: agentModel.id,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Send error via streaming if available
       if (this.streamingService) {
         await this.streamingService.broadcastError(data.conversationId, {
           streamId: data.conversationId,
@@ -373,6 +410,113 @@ export class ConversationService {
       }
 
       throw error;
+    } finally {
+      // Clear attribution and suppression, emit a single completion
+      this.currentAgentForConversation.delete(data.conversationId);
+      const wasSuppressed = this.suppressCompleteFor.delete(data.conversationId);
+      if (wasSuppressed && this.streamingService && this.streamingService.isActive(data.conversationId)) {
+        await this.streamingService.broadcastComplete(data.conversationId, {
+          source: 'agent',
+          content: 'Turn completed',
+          agentId: 'multi',
+          scope: 'workflow',
+          conversationId: data.conversationId,
+        });
+      }
+    }
+  }
+
+  /** Extract @mentions from text and resolve against available conversation agents */
+  private extractMentionedAgents(text: string, availableAgents: AgentModel[]): AgentModel[] {
+    try {
+      if (typeof text !== 'string' || text.length === 0) return [];
+      // Mentions:
+      // - Plain: @slug_or_name (no spaces)
+      // - Quoted: @"Display Name With Spaces"
+      // - Bracketed: @[Display Name With Spaces]
+      // - Special: @all
+      const mentionRe = /@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|(all)|([a-z0-9._-]{1,100}))/gi;
+      const seen: Set<string> = new Set();
+      const out: AgentModel[] = [];
+
+      const normalize = (s: string): string => s.toLowerCase().trim().replace(/\s+/g, '').replace(/[_.-]/g, '');
+      type Entry = { id: string; agent: AgentModel; nameKey: string; slugKey: string };
+      const entries: Entry[] = availableAgents.map((a) => ({
+        id: a.id,
+        agent: a,
+        nameKey: normalize((a as any).name || ''),
+        slugKey: normalize((a as any).slug || ''),
+      }));
+
+      let m: RegExpExecArray | null;
+      const resolvedLog: Array<{ raw: string; matchedId?: string; strategy?: string }> = [];
+      while ((m = mentionRe.exec(text)) !== null) {
+        const token = (m[1] || m[2] || m[3] || m[4] || '').toLowerCase();
+        const raw = token;
+        if (!raw) continue;
+        if (raw === 'all') {
+          for (const a of availableAgents) {
+            if (!seen.has(a.id)) {
+              seen.add(a.id);
+              out.push(a);
+            }
+          }
+          resolvedLog.push({ raw, strategy: 'all' });
+          continue;
+        }
+        const key = raw.replace(/\s+/g, '').replace(/[_.-]/g, '');
+        // 1) Exact match on name or slug
+        let candidates = entries.filter((e) => e.nameKey === key || e.slugKey === key);
+        let chosen: Entry | undefined = undefined;
+        let strategy = 'exact';
+        if (candidates.length === 1) {
+          chosen = candidates[0];
+        }
+        // 2) Prefix match if not found
+        if (!chosen) {
+          candidates = entries.filter((e) => e.nameKey.startsWith(key) || e.slugKey.startsWith(key));
+          if (candidates.length === 1) {
+            chosen = candidates[0];
+            strategy = 'prefix';
+          } else if (candidates.length > 1) {
+            // choose shortest key length for better specificity
+            chosen = candidates.sort(
+              (a, b) => Math.min(a.nameKey.length, a.slugKey.length) - Math.min(b.nameKey.length, b.slugKey.length)
+            )[0];
+            strategy = 'prefix-heuristic';
+          }
+        }
+        // 3) Contains match
+        if (!chosen) {
+          candidates = entries.filter((e) => e.nameKey.includes(key) || e.slugKey.includes(key));
+          if (candidates.length === 1) {
+            chosen = candidates[0];
+            strategy = 'contains';
+          } else if (candidates.length > 1) {
+            chosen = candidates.sort(
+              (a, b) => Math.min(a.nameKey.length, a.slugKey.length) - Math.min(b.nameKey.length, b.slugKey.length)
+            )[0];
+            strategy = 'contains-heuristic';
+          }
+        }
+        if (chosen && !seen.has(chosen.id)) {
+          seen.add(chosen.id);
+          out.push(chosen.agent);
+          resolvedLog.push({ raw, matchedId: chosen.id, strategy });
+        } else {
+          resolvedLog.push({ raw });
+        }
+      }
+      if (resolvedLog.length > 0) {
+        try {
+          console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
+        } catch {
+          void 0;
+        }
+      }
+      return out;
+    } catch {
+      return [];
     }
   }
 
@@ -540,6 +684,7 @@ export class ConversationService {
                 path: '/messages/-',
                 value: {
                   ...assistantMessage,
+                  agentId: this.currentAgentForConversation.get(conversationId) || 'agent',
                   streaming: true,
                   chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                   reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
@@ -1102,7 +1247,6 @@ export class ConversationService {
               path: '/messages/-1/streaming',
               value: false,
             });
-            // Let the streaming=false patch flush before 'complete'
             await new Promise<void>((resolve) => {
               if (typeof setImmediate !== 'undefined') {
                 setImmediate(resolve);
@@ -1114,28 +1258,29 @@ export class ConversationService {
             /* non-fatal */
           }
 
-          // Emit stream completion for the entire workflow (top-level only)
-          await this.streamingService.broadcastComplete(conversationId, {
-            source: 'agent',
-            content: 'Workflow completed',
-            agentId: 'agent', // agent id not critical for client-side terminal handling
-            scope: 'workflow',
-            conversationId,
-          });
-          // Emit final resume token with terminal position (persist id not known here)
-          try {
-            const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-            const svc = ResumeTokenService.getInstance();
-            const token = svc.sign({
-              c: conversationId,
-              g: this.generationId.get(conversationId) || 'g',
-              p: this.accumulatedLength.get(conversationId) || 0,
-              m: '0',
-              exp: Math.floor(Date.now() / 1000) + 600,
+          // If this conversation is under multi-agent suppression, skip broadcasting 'complete' here
+          if (!this.suppressCompleteFor.has(conversationId)) {
+            await this.streamingService.broadcastComplete(conversationId, {
+              source: 'agent',
+              content: 'Workflow completed',
+              agentId: 'agent',
+              scope: 'workflow',
+              conversationId,
             });
-            this.streamingService.sendResumeToken(conversationId, token);
-          } catch {
-            /* non-fatal: final resume token emission failed */
+            try {
+              const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+              const svc = ResumeTokenService.getInstance();
+              const token = svc.sign({
+                c: conversationId,
+                g: this.generationId.get(conversationId) || 'g',
+                p: this.accumulatedLength.get(conversationId) || 0,
+                m: '0',
+                exp: Math.floor(Date.now() / 1000) + 600,
+              });
+              this.streamingService.sendResumeToken(conversationId, token);
+            } catch {
+              /* non-fatal: final resume token emission failed */
+            }
           }
         }
         break;

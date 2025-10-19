@@ -89,7 +89,6 @@ Automatically inferred from agent state (do not pass manually):
                 description: (input && input.description) || '',
                 model: (input && input.model) || 'anthropic/claude-sonnet-4.5',
                 systemPrompt: (input && input.systemPrompt) || '',
-                status: 'draft'
               };
               
               // Add optional numeric fields if provided

@@ -1,18 +1,17 @@
-import { AgentState, Blueprint, Agent } from '@starships/autopilot';
+import { AgentState, Blueprint } from '@starships/autopilot';
+import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
 import type { AgentTemplateModel } from '@starships/protocol';
 
 /**
  * Create Research Agent blueprint using Agent class
  */
 function createResearchBlueprint(): Blueprint {
-  const agent = new Agent({
+  return createDefaultAgentBlueprint({
     name: 'Research Assistant',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.3,
     maxTokens: 4000,
   });
-
-  return agent.getCurrentBlueprint();
 }
 
 /**
@@ -91,8 +90,8 @@ IMPORTANT: DuckDuckGo works best with SIMPLE queries - just the entity name!
 Remember: You have two complementary tools - use them wisely to provide the best possible research assistance.`,
     state: {
       messages: [],
-      tools: []
-    }
+      tools: [],
+    },
   };
 }
 
@@ -102,16 +101,17 @@ Remember: You have two complementary tools - use them wisely to provide the best
 export const researchTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Research Assistant',
   slug: 'research-assistant',
-  description: 'Expert research agent that combines Wikipedia depth with DuckDuckGo instant answers for comprehensive, accurate information on any topic.',
+  description:
+    'Expert research agent that combines Wikipedia depth with DuckDuckGo instant answers for comprehensive, accurate information on any topic.',
   category: 'analysis',
-  
+
   model: 'anthropic/claude-3.5-sonnet',
   temperature: 0.3,
   maxTokens: 4000,
-  
+
   // Tool assignment - reference both Wikipedia and DuckDuckGo tools by slug
   assignedToolSlugs: ['wikipedia-search', 'duckduckgo-instant'],
-  
+
   icon: '🔬',
   previewPrompts: [
     'Tell me about the history of quantum computing',
@@ -119,9 +119,9 @@ export const researchTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'Explain how CRISPR gene editing works',
     'Research the economic impact of artificial intelligence',
     'What were the key events of the French Revolution?',
-    'How do vaccines work and why are they important?'
+    'How do vaccines work and why are they important?',
   ],
   blueprint: createResearchBlueprint(),
   ...createResearchConfig(),
-  timeout: 90000
+  timeout: 90000,
 };

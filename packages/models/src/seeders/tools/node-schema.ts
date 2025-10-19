@@ -348,36 +348,30 @@ Returns comprehensive schema with:
               },
               mutate: {
                 type: 'mutate',
-                description: 'Execution state mutations using JSON Patch operations',
+                description: 'Execution state mutations using reducers (pure-return functions)',
                 parameters: {
-                  mutations: {
+                  reducers: {
                     type: 'array',
                     required: true,
-                    description: 'Array of TransformOperation for state mutation',
+                    description: 'Sequential reducers executed against execution.state',
                     schema: {
-                      operation: {
-                        type: 'string',
-                        enum: ['add', 'replace', 'remove', 'copy', 'move', 'test']
-                      },
-                      path: {
-                        type: 'string',
-                        description: 'JSON Pointer path starting with /state'
-                      },
-                      value: { type: 'any', description: 'Value to apply (pre-resolved by Engine)' },
-                      from: { type: 'string', description: 'Source path (must start with /state)' }
+                      name: { type: 'string', required: false },
+                      if: { type: 'string', required: false, description: 'Template guard; truthy to run' },
+                      code: { type: 'string', required: true, description: '(state, ctx) => newState' },
+                      timeoutMs: { type: 'number', required: false }
                     }
                   }
                 },
                 behavior: {
-                  input: 'Ignored - operates on execution.state directly',
-                  output: '{ mutationsApplied: count, operations: string[] }',
-                  safety: 'Creates snapshot, validates changes, can rollback on error',
-                  pathCreation: 'Auto-creates intermediate paths for add operations'
+                  input: 'Optional - available as ctx.input for reducers',
+                  output: '{ reducersApplied, names, changedKeys, timingsMs }',
+                  safety: 'Creates snapshot, validates final state, rolls back on error',
+                  execution: 'Sequential reducers; each sees the latest state'
                 },
                 validation: [
-                  'At least one mutation required',
-                  'All paths must start with /state',
-                  'State must remain valid object after mutations'
+                  'At least one reducer required',
+                  'Reducer code must compile to a function (state, ctx) => newState',
+                  'State must remain a valid object after reducers'
                 ]
               },
               tool: {
@@ -520,17 +514,17 @@ Returns comprehensive schema with:
                   type: 'TransformOperation[]',
                   description: 'Input transformations - runs AFTER main handler on output'
                 },
-                mutations: {
-                  type: 'TransformOperation[]', 
-                  description: 'State mutations - runs AFTER transforms'
+                reducers: {
+                  type: 'ReducerSpec[]', 
+                  description: 'State reducers - runs AFTER transforms'
                 },
                 condition: {
                   type: 'string',
                   description: 'Conditional expression - evaluated AFTER mutations for edge routing'
                 }
               },
-              execution: 'Handler -> inline transforms -> inline mutations -> inline condition',
-              note: 'Dedicated transform/mutate/conditional nodes skip their inline counterparts'
+              execution: 'Handler -> inline transforms -> inline reducers -> inline condition',
+              note: 'Dedicated transform/mutate/conditional nodes skip their respective inline counterparts'
             };
             
             // Build response based on query

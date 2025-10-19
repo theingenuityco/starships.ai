@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
@@ -32,6 +31,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const lastAutoSelectedAgentIdRef = useRef<string | null>(null)
   const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model)
   const budgetTokens = agentContextLength
 
@@ -58,6 +58,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Track pending tool calls for completion detection
   const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
+  // Track toolCallIds we've already navigated for to avoid duplicate route pushes
+  const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
 
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
@@ -144,30 +146,55 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent])
 
-  // Restore selected agent from conversation data
+  // Restore selected agent from conversation data (with stable guard to avoid loops)
   useEffect(() => {
-    if (!currentConversationId) return
-
-    if (conversationAgents.length > 0) {
+    // Priority 1: first linked conversation agent
+    if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
       const conversationAgent = conversationAgents[0]
-      if (conversationAgent && (!selectedAgent || selectedAgent.id !== conversationAgent.id)) {
-        setSelectedAgent(conversationAgent)
-        return
+      if (conversationAgent && typeof conversationAgent.id === 'string') {
+        const currentId = selectedAgent?.id || null
+        const targetId = conversationAgent.id
+        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(conversationAgent)
+          return
+        }
       }
     }
 
-    if (conversationData?.agentId && starshipAgentsData.length > 0) {
-      const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId)
-      if (storedAgent && (!selectedAgent || selectedAgent.id !== storedAgent.id)) {
-        setSelectedAgent(storedAgent)
-        return
+    // Priority 2: agent id from conversation store
+    if (conversationData?.agentId && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
+      const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId) || null
+      if (storedAgent) {
+        const currentId = selectedAgent?.id || null
+        const targetId = storedAgent.id
+        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(storedAgent)
+          return
+        }
       }
     }
 
-    if (!selectedAgent && starshipAgentsData.length > 0) {
-      setSelectedAgent(starshipAgentsData[0])
+    // Priority 3: fallback to first starship agent when none selected
+    if (!selectedAgent && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
+      const fallback = starshipAgentsData[0]
+      if (fallback && typeof fallback.id === 'string') {
+        const targetId = fallback.id
+        if (lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(fallback)
+        }
+      }
     }
-  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData, selectedAgent])
+  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData])
+
+  // Keep guard ref in sync with user-driven agent changes
+  useEffect(() => {
+    if (selectedAgent?.id) {
+      lastAutoSelectedAgentIdRef.current = selectedAgent.id
+    }
+  }, [selectedAgent?.id])
 
   // Keep view mode ref in sync to avoid stale closure issues
   useEffect(() => {
@@ -342,6 +369,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Detect special UI action responses from assistant messages (back-compat path)
   useEffect(() => {
     if (!currentConversationId || !liveMessages.length) return
+    // Only handle back-compat UI actions during active streaming of the current turn
+    if (!uiStreaming) return
+    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+    if (!hasStreamingAssistant) return
 
     const lastMessage = liveMessages[liveMessages.length - 1]
     if (lastMessage?.role === 'assistant' && lastMessage?.content) {
@@ -353,6 +384,73 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
   }, [currentConversationId, liveMessages, handleUIPayload])
+
+  // Proactively navigate when assistant tool calls are detected (without waiting for ui_action)
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length || !starshipSlug) return
+    // Only react during active streaming to avoid replays causing navigation
+    if (!uiStreaming) return
+    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+    if (!hasStreamingAssistant) return
+
+    // Scan the most recent assistant messages for new tool calls
+    const recent = (liveMessages as any[]).slice(-10)
+    for (let i = recent.length - 1; i >= 0; i--) {
+      const msg = recent[i] as any
+      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+      for (const tc of msg.toolCalls as any[]) {
+        const id = tc?.id as string | undefined
+        if (!id || navigatedToolCallIdsRef.current.has(id)) continue
+        const name = tc?.function?.name as string | undefined
+        if (!name) continue
+
+        // Define which calls should trigger navigation
+        const openToolBuilderSlugs = new Set([
+          'tool-open',
+          'tool-edit',
+          'tool-add-blueprint-node',
+          'tool-add-blueprint-edge',
+          'tool-blueprint-edit-node',
+          'tool-blueprint-remove-node',
+          'tool-blueprint-edit-edge',
+          'tool-blueprint-remove-edge',
+        ])
+        const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+
+        // Parse args if present to extract slug
+        let args: any = tc?.function?.arguments
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args)
+          } catch {
+            // keep as-is
+          }
+        }
+
+        if (openToolBuilderSlugs.has(name) || name.startsWith?.('tool-blueprint-')) {
+          const toolSlug = args?.slug || args?.toolSlug || 'new'
+          const convId = currentConversationIdRef.current || externalConversationId || null
+          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+          try {
+            router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+          } catch {}
+          navigatedToolCallIdsRef.current.add(id)
+          return
+        }
+
+        if (openAgentBuilderSlugs.has(name)) {
+          const agentSlug = args?.slug || args?.agentSlug || 'new'
+          const convId = currentConversationIdRef.current || externalConversationId || null
+          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+          try {
+            router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+          } catch {}
+          navigatedToolCallIdsRef.current.add(id)
+          return
+        }
+      }
+    }
+  }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
 
   // Detect tool completion from streaming messages
   useEffect(() => {
@@ -390,12 +488,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Consume SSE 'ui_action' events directly (clean channel)
   useEffect(() => {
     if (!currentConversationId || !lastUIAction) return
+    // Only react to UI actions while actively streaming/responding in this conversation
+    if (!uiStreaming) return
+    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+    if (!hasStreamingAssistant) return
     try {
       handleUIPayload(lastUIAction as any)
     } catch {
       // ignore
     }
-  }, [currentConversationId, lastUIAction, handleUIPayload])
+  }, [currentConversationId, lastUIAction, handleUIPayload, uiStreaming, liveMessages])
 
   // Removed overlay UI effects
 
@@ -496,7 +598,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onConversationStart={handleConversationStart}
               onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={false}
-              disabled={!selectedAgent}
+              disabled={false}
               minimal={showMessagesArea}
               onFocus={() => {}}
               onBlur={() => {}}
@@ -504,10 +606,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               showExpandableOverlay={false}
               isOverlayExpanded={false}
               budgetTokens={budgetTokens}
-            >
-              {/* Footer Content - Agent Selector */}
-              <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
-            </ConversationMessageInput>
+              onAgentChange={handleAgentChange}
+            ></ConversationMessageInput>
           </div>
         </div>
       </div>

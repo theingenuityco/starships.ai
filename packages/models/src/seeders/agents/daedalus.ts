@@ -1,37 +1,21 @@
 import { AgentState, Blueprint } from '@starships/autopilot';
+import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
+/**
+ * Create Daedalus default blueprint using the standard Agent constructor
+ */
+function createDaedalusDefaultBlueprint(): Blueprint {
+  return createDefaultAgentBlueprint({
+    name: 'Daedalus',
+    model: 'anthropic/claude-sonnet-4.5',
+  });
+}
+
 import type { AgentTemplateModel } from '@starships/protocol';
-import { createFocusedEntityBlueprint } from './createFocusedEntityBlueprint';
 
 /**
  * Create Daedalus tool creator blueprint
  * Uses shared focused entity pattern with tool-specific configuration
  */
-function createDaedalusBlueprint(): Blueprint {
-  return createFocusedEntityBlueprint({
-    stateFieldName: 'focusedTool',
-    contextTag: 'focused-tool',
-    contextFields: `id: \${state.focusedTool.id}
-name: \${state.focusedTool.name}
-slug: \${state.focusedTool.slug}
-description: \${state.focusedTool.description}
-status: \${state.focusedTool.status}
-parameters: \${JSON.stringify(state.focusedTool.parameters ?? null)}
-blueprint: \${JSON.stringify(state.focusedTool.blueprint ?? null)}`,
-    updateTriggerTools: [
-      'tool-open',
-      'tool-edit',
-      'tool-add-blueprint-node',
-      'tool-add-blueprint-edge',
-      'tool-blueprint-edit-node',
-      'tool-blueprint-remove-node',
-      'tool-blueprint-edit-edge',
-      'tool-blueprint-remove-edge',
-    ],
-    instructions:
-      'The complete tool details are now available in state.focusedTool. All tool properties (id, parameters, blueprint, etc.) are accessible without additional API calls. The tool responses only confirm success - use state.focusedTool for actual data. Focus on completing this tool before proceeding with other tasks.',
-    metadata: { creator: 'Daedalus seeder' },
-  });
-}
 
 /**
  * Create Daedalus-specific memory configuration
@@ -49,20 +33,23 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 <protocol>
 Design tools collaboratively using the available toolset (List Tools, blueprint_lint, Open Tool, Get Tool, Test Tool, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-blueprint-edit-node, tool-blueprint-remove-node, tool-blueprint-edit-edge, tool-blueprint-remove-edge).
 
+Preference:
+- Use "Edit Tool" (tool-edit) for multi-node/edge updates, batch edits, or when placing a new scaffold blueprint to iterate on.
+- Use blueprint CRUD tools (tool-add-blueprint-*, tool-blueprint-*-*, tool-blueprint-remove-*) only for surgical, single node/edge adjustments.
+- When more than one node or edge will change, prefer a single "Edit Tool" call with the full blueprint.
+
 Workflow:
 1. Use "Open Tool" (with name and slug) to scaffold a draft (optional description)
-2. Use "Add Tool Blueprint Node" to add individual nodes (start, llm, code, http_request, etc.)
-3. Use "Add Tool Blueprint Edge" to connect nodes with proper workflow flow
-4. Use "Edit Tool Blueprint Node" to refine node properties (name, parameters, etc.)
-5. Use "Edit Tool Blueprint Edge" to adjust connections and conditions
-6. Use blueprint_lint to validate the blueprint structure at any time
-7. Use "Remove Tool Blueprint Node" or "Remove Tool Blueprint Edge" to clean up as needed
-8. Use "Edit Tool" to complete the draft with final blueprint
-9. Use Test Tool to validate the completed tool
+2. For multi-step scaffolds or bulk changes, prefer "Edit Tool" with a complete blueprint draft; otherwise use "Add Tool Blueprint Node/Edge" for surgical changes.
+3. Use "Edit Tool Blueprint Node/Edge" to tweak a single node or edge as needed.
+4. Use blueprint_lint to validate the blueprint structure at any time
+5. Use "Remove Tool Blueprint Node/Edge" to clean up surgically
+6. Use "Edit Tool" to apply final or batch updates to the blueprint
+7. Use Test Tool to validate the completed tool
 
 Alternative Workflow for Existing Tools:
 1. Use "Open Tool" to fetch and focus on an existing tool by slug
-2. Use tool blueprint manipulation tools to modify incrementally (add/edit/remove nodes/edges)
+2. Prefer "Edit Tool" for batch updates or refactors; use blueprint CRUD tools only for precise single-node/edge surgery
 3. Use blueprint_lint to validate changes at each step
 4. Use "Edit Tool" to apply the final blueprint updates
 5. Use Test Tool to validate changes
@@ -96,12 +83,6 @@ Partial evaluation is forbidden. Only evaluate when the entire string equals a s
 - For URLs, headers, JSON bodies, and any strings, compute the entire value inside one full template or pre-shape data with transform/mutate/code.
 - Available context: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env(key).
 </templates>
-
-<ops-notes>
-- transform: apply JSON Patch ops to the current input payload.
-- mutate: apply JSON Patch ops to execution.state only (paths start with /state).
-- code: sandboxed JS; no require/process/import/eval; timeout enforced. Prefer transform/mutate for data shaping.
-</ops-notes>
 
 <environment>
 - Use env('KEY') for all configuration and secrets, including any new variables you introduce.
@@ -168,7 +149,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'Create a Slack webhook sender tool with configuration fields',
     'Help me scaffold a tool that validates and formats addresses',
   ],
-  blueprint: createDaedalusBlueprint(),
+  blueprint: createDaedalusDefaultBlueprint(),
   ...createDaedalusConfig(),
   timeout: 60000,
 };

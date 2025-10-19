@@ -8,7 +8,7 @@
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
-import type { TransformOperation } from '@/types/node-parameters';
+import type { TransformOperation, ReducerSpec } from '@/types/node-parameters';
 import type { Runner } from '@/runner/Runner';
 import { Eval } from './Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -118,13 +118,13 @@ export class Engine {
     return items;
   }
 
-  private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<ExecutionItem[]> {
+  private async executeInlineMutate(reducers: ReducerSpec[], execution: Execution): Promise<ExecutionItem[]> {
     // Resolve templates at execution time using the current state
-    const resolved = (await this.eval.resolveTemplates({ mutations: transforms }, execution, undefined, {
+    const resolved = (await this.eval.resolveTemplates({ reducers }, execution, undefined, {
       stringEvaluationMode: 'full-only',
-    })) as { mutations: TransformOperation[] };
+    })) as { reducers: ReducerSpec[] };
 
-    const params = { mutations: resolved.mutations };
+    const params = { reducers: resolved.reducers } as unknown as NodeParameters;
     const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, params);
     const handler = await this.createHandler(virtualNode, params, execution);
     const items = await handler.execute();
@@ -158,8 +158,8 @@ export class Engine {
     const raw = node?.parameters;
     const nodeParams =
       raw && typeof raw === 'object'
-        ? (raw as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string })
-        : ({} as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string });
+        ? (raw as { transforms?: TransformOperation[]; reducers?: ReducerSpec[]; mutations?: unknown; condition?: string })
+        : ({} as { transforms?: TransformOperation[]; reducers?: ReducerSpec[]; mutations?: unknown; condition?: string });
 
     if (Array.isArray(nodeParams.transforms) && nodeParams.transforms.length) {
       const transformHandler = await this.createVirtualHandler('transform', { transforms: nodeParams.transforms });
@@ -170,8 +170,13 @@ export class Engine {
       }
     }
 
+    // Reject legacy mutations inline usage
     if (Array.isArray(nodeParams.mutations) && nodeParams.mutations.length) {
-      const mutateHandler = await this.createVirtualHandler('mutate', { mutations: nodeParams.mutations });
+      validationErrors.push(`${node.ref}: inline 'mutations' is no longer supported; use 'reducers'`);
+    }
+
+    if (Array.isArray(nodeParams.reducers) && nodeParams.reducers.length) {
+      const mutateHandler = await this.createVirtualHandler('mutate', { reducers: nodeParams.reducers } as unknown as NodeParameters);
       const mutateValidation = mutateHandler.validate();
       if (!mutateValidation.valid) {
         const errorMessages = mutateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
@@ -417,7 +422,7 @@ export class Engine {
         currentNode.parameters && typeof currentNode.parameters === 'object'
           ? (currentNode.parameters as {
               transforms?: TransformOperation[];
-              mutations?: TransformOperation[];
+              reducers?: ReducerSpec[];
               condition?: string;
             })
           : undefined;
@@ -460,11 +465,11 @@ export class Engine {
         outputItems = await this.executeInlineTransform(inlineParams.transforms, execution, outputItems);
       }
 
-      // Execute inline mutations if present (mutations can use lastOutputOf/current state).
+      // Execute inline reducers if present (can use lastOutputOf/current state).
       // IMPORTANT: Skip when the current node IS the dedicated mutate node to avoid double-processing.
-      if (inlineParams?.mutations?.length && currentNode.type !== 'mutate') {
+      if (inlineParams?.reducers?.length && currentNode.type !== 'mutate') {
         try {
-          await this.executeInlineMutate(inlineParams.mutations, execution);
+          await this.executeInlineMutate(inlineParams.reducers, execution);
         } catch (error) {
           console.error('[ERROR Engine.executeNode] inline_mutations_failed', {
             nodeRef: currentNode.ref,

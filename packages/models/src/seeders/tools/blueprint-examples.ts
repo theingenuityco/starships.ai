@@ -242,16 +242,8 @@ Returns complete, executable blueprints with:
                           messages: '{{ state.messages }}',
                           tools: '{{ state.tools }}',
                           temperature: 0.7,
-                          mutations: [
-                            {
-                              operation: 'add',
-                              path: '/state/messages/-',
-                              value: {
-                                role: 'assistant',
-                                content: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.content }}',
-                                toolCalls: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls }}'
-                              }
-                            }
+                          reducers: [
+                            "(state, ctx) => ({ ...state, messages: [...(state?.messages ?? []), { role: 'assistant', content: ctx.$lastOutputOf('llm_1')[0].json.choices[0].message.content, toolCalls: ctx.$lastOutputOf('llm_1')[0].json.choices[0].message.toolCalls }] })"
                           ]
                         }
                       },
@@ -284,17 +276,8 @@ Returns complete, executable blueprints with:
                           description: 'Dynamic tool execution',
                           parameters: '{{ (() => { const tools = state.tools; const name = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name; return tools.find(t => t.name === name)?.parameters || { type: "object", properties: {} }; })() }}',
                           blueprint: '{{ (() => { const tools = state.tools; const name = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name; return tools.find(t => t.name === name)?.blueprint; })() }}',
-                          mutations: [
-                            {
-                              operation: 'add',
-                              path: '/state/messages/-',
-                              value: {
-                                role: 'tool',
-                                toolCallId: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].id }}',
-                                name: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name }}',
-                                content: '{{ JSON.stringify($lastOutputOf("tool_1")[0].json) }}'
-                              }
-                            }
+                          reducers: [
+                            "(state, ctx) => ({ ...state, messages: [...(state?.messages ?? []), { role: 'tool', toolCallId: ctx.$lastOutputOf('llm_1')[0].json.choices[0].message.toolCalls[0].id, name: ctx.$lastOutputOf('llm_1')[0].json.choices[0].message.toolCalls[0].function.name, content: JSON.stringify(ctx.$lastOutputOf('tool_1')[0].json) }] })"
                           ]
                         }
                       },
@@ -367,10 +350,9 @@ Returns complete, executable blueprints with:
                         type: 'mutate',
                         name: 'Update State',
                         parameters: {
-                          mutations: [
-                            { operation: 'replace', path: '/state/items', value: '{{ $lastOutputOf("process_items")[0].json.items }}' },
-                            { operation: 'replace', path: '/state/total', value: '{{ $lastOutputOf("process_items")[0].json.total }}' },
-                            { operation: 'add', path: '/state/metadata/itemCount', value: '{{ $lastOutputOf("process_items")[0].json.items.length }}' }
+                          reducers: [
+                            "(state, ctx) => ({ ...state, items: ctx.$lastOutputOf('process_items')[0].json.items, total: ctx.$lastOutputOf('process_items')[0].json.total })",
+                            "(state, ctx) => { const next = { ...(state || {}) }; const count = ctx.$lastOutputOf('process_items')[0].json.items.length; const md = { ...(state?.metadata || {}) }; md.itemCount = count; next.metadata = md; return next; }"
                           ]
                         }
                       },

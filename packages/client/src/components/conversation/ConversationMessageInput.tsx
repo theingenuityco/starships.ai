@@ -902,7 +902,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
           {/* Main Input Section - Only Text Input */}
-          <div className={cn('flex items-end', minimal ? 'p-3' : 'p-4')}>
+          <div className={cn('flex', minimal ? 'items-center p-3' : 'items-end p-4')}>
             {/* Removed tool builder button */}
 
             {/* Text Input (TipTap) */}

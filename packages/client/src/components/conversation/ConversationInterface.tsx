@@ -146,10 +146,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Restore selected agent from conversation data (with stable guard to avoid loops)
   useEffect(() => {
-    if (!currentConversationId) return
-
     // Priority 1: first linked conversation agent
-    if (Array.isArray(conversationAgents) && conversationAgents.length > 0) {
+    if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
       const conversationAgent = conversationAgents[0]
       if (conversationAgent && typeof conversationAgent.id === 'string') {
         const currentId = selectedAgent?.id || null

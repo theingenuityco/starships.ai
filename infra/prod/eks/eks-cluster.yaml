@@ -21,7 +21,7 @@ managedNodeGroups:
     desiredCapacity: 1 # Single node
     minSize: 1
     maxSize: 2
-    volumeSize: 30
+    volumeSize: 50
     volumeType: gp3
     privateNetworking: false # Public subnet - saves $35/mo on NAT
     labels:

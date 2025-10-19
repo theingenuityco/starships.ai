@@ -7,13 +7,23 @@ import { useAgentForm } from './hooks/useAgentForm'
 import { Button } from '@/components/ui/button'
 import { AgentDocumentEditor } from './components/AgentDocumentEditor'
 
-export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId }, ref) => {
+export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId, initialSlug }, ref) => {
   const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave })
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
-    updateField,
-    getFormData: () => formData,
+    updateField: (field, value) => {
+      try {
+        console.debug('[AgentBuilderView] ref.updateField', { field, value })
+      } catch {}
+      updateField(field, value)
+    },
+    getFormData: () => {
+      try {
+        console.debug('[AgentBuilderView] ref.getFormData')
+      } catch {}
+      return formData
+    },
     resetForm,
   }))
 
@@ -24,15 +34,16 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
           <AgentDocumentEditor
             value={formData}
             onChange={next => {
-              // sync doc into form state
               ;(Object.keys(next) as Array<keyof typeof next>).forEach(key => {
-                // reuse handleFieldChange for validation clearing
                 handleFieldChange(key as keyof typeof formData, next[key])
               })
             }}
+            onFieldChange={(field, value) => handleFieldChange(field, value)}
             onSave={handleSave}
             onCancel={onCancel}
             starshipId={starshipId}
+            // If editor mounts with empty slug, pre-seed from props
+            key={`agent-editor-${initialSlug || 'none'}`}
           />
         </div>
       </div>

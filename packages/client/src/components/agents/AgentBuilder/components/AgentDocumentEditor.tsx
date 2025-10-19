@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -28,12 +28,13 @@ import { toast } from 'sonner'
 interface AgentDocumentEditorProps {
   value: AgentFormData
   onChange: (next: AgentFormData) => void
+  onFieldChange?: (field: keyof AgentFormData, value: string | boolean | number | string[]) => void
   onSave?: () => void
   onCancel?: () => void
   starshipId?: string
 }
 
-export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
   const generatedSlug = useMemo(
     () =>
       value.name
@@ -67,14 +68,17 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
     let cancelled = false
     const load = async () => {
       if (!starshipId || !value?.slug || value.slug === 'new') {
+        console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
         setAgentId(null)
         return
       }
       try {
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/starships/${starshipId}/agents/${value.slug}`)
         const agent = res.data.data
+        console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
         if (!cancelled) setAgentId(agent?.id || null)
       } catch {
+        console.warn('[AgentDocEditor] Failed to resolve agentId', { starshipId, slug: value.slug })
         if (!cancelled) setAgentId(null)
       }
     }
@@ -87,21 +91,13 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
   // Toggle tool assignment with optimistic UI and server persistence when possible
   const handleToggleTool = async (slug: string, isSelected: boolean) => {
     const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
-    // Optimistic update
-    onChange({ ...value, assignedToolSlugs: next })
-
-    // Persist if agent exists; otherwise keep local-only (new agent case)
+    onFieldChange?.('assignedToolSlugs', next)
     if (!agentId) return
-
     try {
-      if (isSelected) {
-        await api.delete(`/api/v1/agents/${agentId}/tools/${slug}`)
-      } else {
-        await api.post(`/api/v1/agents/${agentId}/tools/${slug}`)
-      }
+      if (isSelected) await api.delete(`/api/v1/agents/${agentId}/tools/${slug}`)
+      else await api.post(`/api/v1/agents/${agentId}/tools/${slug}`)
     } catch (err: any) {
-      // Revert on error
-      onChange({ ...value, assignedToolSlugs: selectedToolSlugs })
+      onFieldChange?.('assignedToolSlugs', selectedToolSlugs)
       const message = err?.response?.data?.error || err?.message || 'Failed to update tools'
       toast.error('Tool update failed', { description: message })
     }
@@ -109,16 +105,86 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
 
   const handleNameChange = (name: string) => {
     const shouldUpdateSlug = !value.slug || value.slug === generatedSlug
-    const next: AgentFormData = { ...value, name }
-    if (shouldUpdateSlug)
-      next.slug = name
+    onFieldChange?.('name', name)
+    if (shouldUpdateSlug) {
+      const slugified = name
         .toLowerCase()
         .trim()
         .replace(/[^\w\s-]/g, '')
         .replace(/[\s_]+/g, '-')
         .replace(/^-+|-+$/g, '')
-    onChange(next)
+      onFieldChange?.('slug', slugified)
+    }
   }
+
+  // If slug is empty but we can infer it from window.location, set it once as a last resort
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (value.slug && value.slug.trim() !== '') return
+    try {
+      const parts = window.location.pathname.split('/')
+      // Expect /ship/:slug/agent/:agentSlug
+      const idx = parts.findIndex(p => p === 'agent')
+      const routeSlug = idx >= 0 ? parts[idx + 1] : ''
+      if (routeSlug && routeSlug !== 'new') {
+        onFieldChange?.('slug', routeSlug)
+      }
+    } catch {}
+  }, [])
+
+  // Initial sync of assigned tools for existing agents on load
+  const hasSyncedAssignedRef = useRef<boolean>(false)
+  useEffect(() => {
+    const syncAssigned = async () => {
+      if (!agentId || hasSyncedAssignedRef.current) return
+      try {
+        const res: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/agents/${agentId}/tools`)
+        const tools = res.data.data || []
+        const slugs = Array.from(new Set((tools || []).map(t => t.slug).filter(Boolean))) as string[]
+        // Only update if form has no assignments yet to avoid clobbering in-flight edits
+        const cur = value.assignedToolSlugs || []
+        if (cur.length === 0 && slugs.length > 0) {
+          console.debug('[AgentDocEditor] Sync assigned tools', { slugs })
+          onFieldChange?.('assignedToolSlugs', slugs)
+        }
+        hasSyncedAssignedRef.current = true
+      } catch {
+        console.warn('[AgentDocEditor] Failed to load assigned tools', { agentId })
+        // ignore
+      }
+    }
+    void syncAssigned()
+  }, [agentId, value, onChange])
+
+  // Initial sync of core agent fields for existing agents on load (non-tools)
+  const hasSyncedAgentRef = useRef<boolean>(false)
+  useEffect(() => {
+    const syncAgent = async () => {
+      if (!agentId || hasSyncedAgentRef.current) return
+      try {
+        const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agentId}`)
+        const agent = res.data.data
+        if (!agent) return
+        if (!value.name && agent.name) onFieldChange?.('name', agent.name)
+        if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
+        if (!value.description && agent.description) onFieldChange?.('description', agent.description)
+        if (!value.model && agent.model) onFieldChange?.('model', agent.model)
+        if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
+        if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
+        if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
+        if (value.timeout == null && agent.timeout != null) onFieldChange?.('timeout', agent.timeout as any)
+        if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
+          onFieldChange?.('blueprint', JSON.stringify(agent.blueprint, null, 2))
+        }
+        console.debug('[AgentDocEditor] Sync agent fields', { id: agentId })
+        hasSyncedAgentRef.current = true
+      } catch {
+        console.warn('[AgentDocEditor] Failed to load agent fields', { agentId })
+        // ignore
+      }
+    }
+    void syncAgent()
+  }, [agentId, value, onChange])
 
   return (
     <div className="space-y-4 pt-14 pb-28">
@@ -188,7 +254,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
             <Icon name="cpu" className="w-4 h-4" />
             <span className="text-xs font-semibold w-36">Model</span>
           </div>
-          <Select value={value.model} onValueChange={m => onChange({ ...value, model: m })}>
+          <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)}>
             <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
@@ -271,7 +337,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
           <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <RichMarkdownEditor value={value.description} onChange={val => onChange({ ...value, description: val })} placeholder="Write a clear description. Markdown supported." noMinHeight />
+          <RichMarkdownEditor value={value.description} onChange={val => onFieldChange?.('description', val)} placeholder="Write a clear description. Markdown supported." noMinHeight />
         </CollapsibleContent>
       </Collapsible>
 
@@ -283,7 +349,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
         <CollapsibleContent>
           <RichMarkdownEditor
             value={value.systemPrompt}
-            onChange={val => onChange({ ...value, systemPrompt: val })}
+            onChange={val => onFieldChange?.('systemPrompt', val)}
             placeholder="Define the agent's character, mission, and behavior..."
             minHeightPx={200}
           />
@@ -331,7 +397,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
                 max="2"
                 step="0.1"
                 value={value.temperature}
-                onChange={e => onChange({ ...value, temperature: parseFloat(e.target.value) || 0 })}
+                onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
                 className="text-xs"
               />
             </div>
@@ -345,7 +411,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
                 min="1"
                 step="1"
                 value={value.maxTokens}
-                onChange={e => onChange({ ...value, maxTokens: parseInt(e.target.value, 10) || 2048 })}
+                onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
                 className="text-xs"
               />
             </div>
@@ -359,7 +425,7 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshi
                 min="1000"
                 step="1000"
                 value={value.timeout}
-                onChange={e => onChange({ ...value, timeout: parseInt(e.target.value, 10) || 60000 })}
+                onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
                 className="text-xs"
               />
             </div>

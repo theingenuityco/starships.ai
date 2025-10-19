@@ -84,12 +84,6 @@ Partial evaluation is forbidden. Only evaluate when the entire string equals a s
 - Available context: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env(key).
 </templates>
 
-<ops-notes>
-- transform: apply JSON Patch ops to the current input payload.
-- mutate: apply JSON Patch ops to execution.state only (paths start with /state).
-- code: sandboxed JS; no require/process/import/eval; timeout enforced. Prefer transform/mutate for data shaping.
-</ops-notes>
-
 <environment>
 - Use env('KEY') for all configuration and secrets, including any new variables you introduce.
 - Do not attempt to read from process.env, code nodes, or fetch secrets yourself; the runtime provides env('KEY') at execution time.

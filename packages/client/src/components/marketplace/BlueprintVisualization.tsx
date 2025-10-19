@@ -33,6 +33,7 @@ interface BlueprintVisualizationProps {
   className?: string
   transparent?: boolean
   nodesDraggable?: boolean
+  borderless?: boolean
 }
 
 interface ReactFlowNode extends Node {
@@ -799,7 +800,7 @@ const NodeDetailsPanel: React.FC<{
   )
 }
 
-function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blueprint: Blueprint; transparent?: boolean; nodesDraggable?: boolean }) {
+function BlueprintFlow({ blueprint, transparent, nodesDraggable = false, borderless = false }: { blueprint: Blueprint; transparent?: boolean; nodesDraggable?: boolean; borderless?: boolean }) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
   const [nodes, setNodes] = useState<Node[]>([])
@@ -857,7 +858,7 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
 
   return (
     <div
-      className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
+      className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg overflow-hidden relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
     >
       <ReactFlow
         nodes={nodesWithSelection}
@@ -896,7 +897,7 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
   )
 }
 
-export function BlueprintVisualization({ blueprint, className = '', transparent = false, nodesDraggable = false }: BlueprintVisualizationProps) {
+export function BlueprintVisualization({ blueprint, className = '', transparent = false, nodesDraggable = false, borderless = false }: BlueprintVisualizationProps) {
   if (!blueprint?.nodes || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
@@ -908,7 +909,7 @@ export function BlueprintVisualization({ blueprint, className = '', transparent 
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <BlueprintFlow blueprint={blueprint} transparent={transparent} nodesDraggable={nodesDraggable} />
+        <BlueprintFlow blueprint={blueprint} transparent={transparent} nodesDraggable={nodesDraggable} borderless={borderless} />
       </div>
     </ReactFlowProvider>
   )

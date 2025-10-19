@@ -57,56 +57,69 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* Mock desktop window with blueprint (top) and chat (bottom) in separate row */}
-        <div className="relative">
-          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
-            {/* Window top bar */}
-            <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500/80" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              </div>
-              <div className="text-xs text-white/70">Starships • Blueprint & Chat</div>
-              <div className="w-10" />
-            </div>
+        {/* Mock desktop - wallpaper container with centered app window */}
+        <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+          {/* Wallpaper layer */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(circle at 20% 20%, rgba(59,130,246,0.14) 0%, transparent 40%), radial-gradient(circle at 80% 80%, rgba(168,85,247,0.14) 0%, transparent 40%), linear-gradient(135deg, rgba(17,24,39,0.85) 0%, rgba(2,6,23,0.85) 100%)',
+            }}
+          />
+          <div className="relative p-4 md:p-8">
+            <div className="mx-auto max-w-5xl">
+              <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
+                {/* Window top bar */}
+                <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500/80" />
+                    <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                    <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                  </div>
+                  <div className="text-xs text-white/70">Starships • Blueprint & Chat</div>
+                  <div className="w-10" />
+                </div>
 
-            {/* Content area: blueprint with floating input overlay */}
-            <div className="relative">
-              <div className="p-4 bg-black/20 border-b border-white/10">
-                <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Blueprint</div>
-                <div className="relative rounded-lg bg-black/30 border border-white/10 p-2">
-                  <BlueprintVisualization
-                    blueprint={{
-                      nodes: [
-                        { ref: 's', type: 'start', name: 'Start', description: '', parameters: {} },
-                        { ref: 'n1', type: 'user_prompt', name: 'User prompt', description: '', parameters: {} },
-                        { ref: 'n2', type: 'llm', name: 'Plan', description: '', parameters: {} },
-                        { ref: 'n3', type: 'http_request', name: 'web.search', description: '', parameters: {} },
-                        { ref: 'n4', type: 'transform', name: 'PII-check', description: '', parameters: {} },
-                        { ref: 'n5', type: 'tool', name: 'db.enrich', description: '', parameters: {} },
-                        { ref: 'n6', type: 'output', name: 'Write profile', description: '', parameters: {} },
-                        { ref: 'e', type: 'end', name: 'End', description: '', parameters: {} },
-                      ],
-                      edges: [
-                        { ref: 'e0', from: 's', to: 'n1' },
-                        { ref: 'e1', from: 'n1', to: 'n2' },
-                        { ref: 'e2', from: 'n2', to: 'n3' },
-                        { ref: 'e3', from: 'n3', to: 'n4' },
-                        { ref: 'e4', from: 'n4', to: 'n5' },
-                        { ref: 'e5', from: 'n5', to: 'n6' },
-                        { ref: 'e6', from: 'n6', to: 'e' },
-                      ],
-                    }}
-                    className="h-[320px] md:h-[360px]"
-                    transparent
-                    nodesDraggable={false}
-                  />
+                {/* Content area: blueprint with floating input overlay */}
+                <div className="relative">
+                  <div className="p-4 bg-black/20 border-b border-white/10">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Blueprint</div>
+                    <div className="relative rounded-lg bg-black/30 border border-white/10 p-2">
+                      <BlueprintVisualization
+                        blueprint={{
+                          nodes: [
+                            { ref: 's', type: 'start', name: 'Start', description: '', parameters: {} },
+                            { ref: 'n1', type: 'user_prompt', name: 'User prompt', description: '', parameters: {} },
+                            { ref: 'n2', type: 'llm', name: 'Plan', description: '', parameters: {} },
+                            { ref: 'n3', type: 'http_request', name: 'web.search', description: '', parameters: {} },
+                            { ref: 'n4', type: 'transform', name: 'PII-check', description: '', parameters: {} },
+                            { ref: 'n5', type: 'tool', name: 'db.enrich', description: '', parameters: {} },
+                            { ref: 'n6', type: 'output', name: 'Write profile', description: '', parameters: {} },
+                            { ref: 'e', type: 'end', name: 'End', description: '', parameters: {} },
+                          ],
+                          edges: [
+                            { ref: 'e0', from: 's', to: 'n1' },
+                            { ref: 'e1', from: 'n1', to: 'n2' },
+                            { ref: 'e2', from: 'n2', to: 'n3' },
+                            { ref: 'e3', from: 'n3', to: 'n4' },
+                            { ref: 'e4', from: 'n4', to: 'n5' },
+                            { ref: 'e5', from: 'n5', to: 'n6' },
+                            { ref: 'e6', from: 'n6', to: 'e' },
+                          ],
+                        }}
+                        className="h-[420px] md:h-[520px]"
+                        transparent
+                        nodesDraggable={false}
+                        borderless
+                      />
 
-                  {/* Floating input overlay (like ConversationInterface) */}
-                  <div className="pointer-events-none absolute left-0 right-0 bottom-3 px-4">
-                    <div className="max-w-2xl mx-auto pointer-events-auto">
-                      <ConversationMessageInput starshipId="" minimal disabled />
+                      {/* Floating input overlay (like ConversationInterface) */}
+                      <div className="pointer-events-none absolute left-0 right-0 bottom-3 px-4">
+                        <div className="max-w-2xl mx-auto pointer-events-auto">
+                          <ConversationMessageInput starshipId="" minimal disabled />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

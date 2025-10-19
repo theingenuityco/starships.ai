@@ -166,36 +166,7 @@ export function createFocusedEntityBlueprint(config: FocusedEntityConfig): Bluep
         {
           operation: 'add' as const,
           path: '/state/messages/-',
-          value: `{{ (() => {
-            const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "";
-            const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls;
-            const toolSlug = calls?.[0]?.function?.name;
-            const toolResult = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
-            
-            // For entity-modifying operations, return minimal confirmation to reduce token bloat
-            const modifyOps = ${toolSlugsJson};
-            
-            let content;
-            if (modifyOps.includes(toolSlug)) {
-              // Minimal response - full data is in state.${stateFieldName}
-              const status = toolResult.status || toolResult.body?.status || 200;
-              const success = status >= 200 && status < 300;
-              content = JSON.stringify({
-                success: success,
-                message: success ? 'Entity updated successfully' : 'Entity operation failed',
-                slug: toolResult.body?.data?.slug || toolResult.body?.slug || 'unknown'
-              });
-            } else {
-              // Full response for other tools
-              content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
-            }
-            
-            return {
-              role: "tool",
-              toolCallId: toolCallId,
-              content: content
-            };
-          })() }}`,
+          value: `{{ (() => { const toolCallId = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? ""; const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const toolSlug = calls?.[0]?.function?.name; const http = $lastOutputOf("${toolNodeRef}")[0]?.json ?? {}; const modifyOps = ${toolSlugsJson}; let content; if (modifyOps.includes(toolSlug)) { const status = http.status || http.body?.status || 200; const success = status >= 200 && status < 300; const slug = http.body?.data?.slug || http.body?.slug || 'unknown'; content = JSON.stringify({ success, message: success ? 'Entity updated successfully' : 'Entity operation failed', slug }); } else { content = typeof http === 'string' ? http : JSON.stringify(http); } return { role: "tool", toolCallId, content }; })() }}`,
         },
       ],
     },

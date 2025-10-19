@@ -1,4 +1,5 @@
-import { AgentState, Blueprint, Agent } from '@starships/autopilot';
+import { AgentState, Blueprint } from '@starships/autopilot';
+import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
 import type { AgentTemplateModel } from '@starships/protocol';
 
 /**
@@ -6,15 +7,12 @@ import type { AgentTemplateModel } from '@starships/protocol';
  * Tools will be resolved at runtime via assignedToolSlugs
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
-  const agent = new Agent({
+  return createDefaultAgentBlueprint({
     name: 'Sybil Navigator',
     model: 'anthropic/claude-sonnet-4.5',
     temperature: 0.4,
     maxTokens: 2000,
   });
-
-  // Use the single default LLM chain created by Agent constructor
-  return agent.getCurrentBlueprint();
 }
 
 /**

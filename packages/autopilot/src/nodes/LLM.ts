@@ -90,7 +90,7 @@ export class LLM extends BaseNode<LlmParams> {
         requestOptions.parallel_tool_calls = false;
       }
 
-      // console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
+      console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
       // Stream with OpenAI SDK (handles all accumulation reliably)
       const stream = await client.chat.completions.create(requestOptions);
       const llmResponse = await this.processOpenAIStream(stream);

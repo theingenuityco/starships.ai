@@ -7,7 +7,15 @@
 
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository } from '@starships/models';
-import type { CreateUserRequest, UpdateUserRequest, UserModel, OAuthAccountModel, OAuthProfileModel, SetPasswordRequest, AuthMethod } from '@starships/protocol';
+import type {
+  CreateUserRequest,
+  UpdateUserRequest,
+  UserModel,
+  OAuthAccountModel,
+  OAuthProfileModel,
+  SetPasswordRequest,
+  AuthMethod,
+} from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
@@ -81,7 +89,7 @@ export class UserService {
       stripeCustomerId: request.stripeCustomerId,
       hasPassword: !!request.password,
       authMethods: request.password ? ['password' as AuthMethod] : [],
-      primaryAuthMethod: request.password ? 'password' : 'oauth'
+      primaryAuthMethod: request.password ? 'password' : 'oauth',
     };
 
     const user = await this.userRepository.create(userData);
@@ -279,7 +287,10 @@ export class UserService {
    * Create or link user from OAuth profile
    * CRITICAL: NO LAYER JUMPING - Uses proper service methods only
    */
-  async createUserFromOAuth(provider: string, authCode: string): Promise<{
+  async createUserFromOAuth(
+    provider: string,
+    authCode: string
+  ): Promise<{
     user: UserModel;
   }> {
     // Get OAuth profile from provider
@@ -307,13 +318,13 @@ export class UserService {
     if (isNewUser) {
       try {
         const defaultStarship = await StarshipService.createDefaultStarship(user.id);
-        
-        // Create default agent for the starship
+
+        // Create initial agents for the starship (Daedalus, Gaia)
         if (defaultStarship) {
           try {
-            await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
+            await StarshipService.createInitialAgents(user.id, defaultStarship.id);
           } catch (agentError) {
-            console.error(`[OAUTH] Failed to create default agent for user ${user.id}:`, agentError);
+            console.error(`[OAUTH] Failed to create initial agents for user ${user.id}:`, agentError);
             // Continue even if agent creation fails
           }
         }
@@ -336,19 +347,19 @@ export class UserService {
       email: profile.email,
       displayName: profile.name,
       avatar: profile.avatar,
-      emailVerified: true // OAuth providers verify emails
+      emailVerified: true, // OAuth providers verify emails
     };
 
     // Create user using proper service layer method
     const user = await this.createUser(userData);
-    
+
     // After creating user, update additional OAuth-specific fields that aren't in CreateUserRequest
     await this.userRepository.update(user.id, {
       hasPassword: false, // OAuth users start without password
       authMethods: [profile.provider as AuthMethod],
-      primaryAuthMethod: 'oauth'
+      primaryAuthMethod: 'oauth',
     });
-    
+
     // Return updated user
     const updatedUser = await this.getUserById(user.id);
     return updatedUser!;
@@ -436,16 +447,12 @@ export class UserService {
    */
   private async getGoogleProfile(authCode: string): Promise<OAuthProfileModel> {
     const env = getEnvConfig();
-    
+
     try {
       const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/google/callback`;
-      
+
       // Create OAuth2 client
-      const oauth2Client = new google.auth.OAuth2(
-        env.GOOGLE_CLIENT_ID,
-        env.GOOGLE_CLIENT_SECRET,
-        redirectUri
-      );
+      const oauth2Client = new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, redirectUri);
 
       // Exchange authorization code for tokens
       const { tokens } = await oauth2Client.getToken(authCode);
@@ -481,18 +488,18 @@ export class UserService {
    */
   private async getGitHubProfile(authCode: string): Promise<OAuthProfileModel> {
     const env = getEnvConfig();
-    
+
     try {
       // Step 1: Construct redirect URI (same pattern as Google)
       const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/github/callback`;
-      
+
       // Step 2: Exchange authorization code for access token
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
-          'User-Agent': 'starships.ai/1.0',  // Required by GitHub API
+          'User-Agent': 'starships.ai/1.0', // Required by GitHub API
         },
         body: JSON.stringify({
           client_id: env.GH_OAUTH_CLIENT_ID,
@@ -506,8 +513,8 @@ export class UserService {
         throw new ValidationError(`GitHub token exchange failed: ${tokenResponse.status}`, 'oauth');
       }
 
-      const tokenData = await tokenResponse.json() as any;
-      
+      const tokenData = (await tokenResponse.json()) as any;
+
       if (tokenData.error) {
         throw new ValidationError(`GitHub OAuth error: ${tokenData.error_description || tokenData.error}`, 'oauth');
       }
@@ -521,8 +528,8 @@ export class UserService {
       // Step 3: Get user profile information
       const userResponse = await fetch('https://api.github.com/user', {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,  // GitHub supports Bearer tokens
-          'Accept': 'application/vnd.github.v3+json',
+          Authorization: `Bearer ${accessToken}`, // GitHub supports Bearer tokens
+          Accept: 'application/vnd.github.v3+json',
           'User-Agent': 'starships.ai/1.0',
         },
       });
@@ -531,22 +538,22 @@ export class UserService {
         throw new ValidationError(`GitHub profile fetch failed: ${userResponse.status}`, 'oauth');
       }
 
-      const userData = await userResponse.json() as any;
+      const userData = (await userResponse.json()) as any;
 
       // Step 4: Get user email (might be private, requiring separate API call)
       let primaryEmail = userData.email;
-      
+
       if (!primaryEmail) {
         const emailResponse = await fetch('https://api.github.com/user/emails', {
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/vnd.github.v3+json',
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/vnd.github.v3+json',
             'User-Agent': 'starships.ai/1.0',
           },
         });
 
         if (emailResponse.ok) {
-          const emails = await emailResponse.json() as any[];
+          const emails = (await emailResponse.json()) as any[];
           const primaryEmailObj = emails.find((email: any) => email.primary && email.verified);
           primaryEmail = primaryEmailObj?.email;
         }
@@ -562,7 +569,7 @@ export class UserService {
         provider: 'github',
         providerId: userData.id.toString(),
         email: primaryEmail,
-        name: userData.name || userData.login,  // Fallback to username if name is null
+        name: userData.name || userData.login, // Fallback to username if name is null
         avatar: userData.avatar_url || undefined,
       };
     } catch (error: any) {
@@ -593,7 +600,7 @@ export class UserService {
     }
 
     // Business rule: User must have OAuth authentication
-    if (!user.authMethods || !user.authMethods.some(method => ['google', 'github'].includes(method))) {
+    if (!user.authMethods || !user.authMethods.some((method) => ['google', 'github'].includes(method))) {
       throw new ValidationError('User must have OAuth authentication to set password', 'auth');
     }
 
@@ -615,7 +622,7 @@ export class UserService {
       password: hashedPassword,
       hasPassword: true,
       authMethods: [...user.authMethods, 'password'],
-      primaryAuthMethod: 'password' // User chose to set password, make it primary
+      primaryAuthMethod: 'password', // User chose to set password, make it primary
     });
 
     if (!updatedUser) {
@@ -645,7 +652,7 @@ export class UserService {
 
     const updatedUser = await this.userRepository.update(userId, {
       authMethods,
-      primaryAuthMethod
+      primaryAuthMethod,
     });
 
     if (!updatedUser) {
@@ -671,15 +678,15 @@ export class UserService {
 
     // Get user's OAuth accounts
     const oauthAccounts = await this.getUserOAuthAccounts(userId);
-    
+
     // Build auth methods array
     const authMethods: string[] = [];
-    
+
     if (user.password) {
       authMethods.push('password');
     }
-    
-    oauthAccounts.forEach(account => {
+
+    oauthAccounts.forEach((account) => {
       if (!authMethods.includes(account.provider)) {
         authMethods.push(account.provider);
       }
@@ -692,7 +699,7 @@ export class UserService {
     const updatedUser = await this.userRepository.update(userId, {
       hasPassword,
       authMethods: authMethods as AuthMethod[],
-      primaryAuthMethod
+      primaryAuthMethod,
     });
 
     if (!updatedUser) {
@@ -763,7 +770,10 @@ export class UserService {
   /**
    * Static method for API routes compatibility
    */
-  static async createUserFromOAuth(provider: string, authCode: string): Promise<{
+  static async createUserFromOAuth(
+    provider: string,
+    authCode: string
+  ): Promise<{
     user: UserModel;
   }> {
     const userService = new UserService();
@@ -798,7 +808,7 @@ export class UserService {
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
     await emailService.sendVerificationEmail(email, token);
-    
+
     logger.info('[UserService] Email verification sent', { userId, email });
   }
 
@@ -813,22 +823,22 @@ export class UserService {
   }> {
     const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
     const tokenInfo = await emailVerificationTokenRepo.getTokenInfo(token);
-    
+
     if (!tokenInfo) {
       return { tokenInfo: null, userAlreadyVerified: false, shouldRedirectToStarship: false };
     }
-    
+
     // Check if user is already verified
     const user = await this.getUserById(tokenInfo.userId);
     const userAlreadyVerified = user?.emailVerified || false;
-    
+
     // If user is verified and has access, should redirect to starship
     let shouldRedirectToStarship = false;
     if (userAlreadyVerified) {
       // All verified users get starship access
       shouldRedirectToStarship = true;
     }
-    
+
     return { tokenInfo, userAlreadyVerified, shouldRedirectToStarship };
   }
 
@@ -851,14 +861,14 @@ export class UserService {
     // Mark user as verified - this is the single responsibility of this method
     await this.updateUserProfile(verification.userId, { emailVerified: true });
 
-    logger.info('[UserService] Email verified successfully', { 
+    logger.info('[UserService] Email verified successfully', {
       userId: verification.userId,
-      email: verification.email
+      email: verification.email,
     });
 
     return {
       userId: verification.userId,
-      email: verification.email
+      email: verification.email,
     };
   }
 }

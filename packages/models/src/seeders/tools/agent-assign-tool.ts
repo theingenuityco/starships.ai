@@ -8,7 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentAssignToolTool: ToolParams = {
   name: 'Assign Agent Tool',
   slug: 'agent-assign-tool',
-  description: `Assign a tool to an agent by adding it to the agent's assignedToolSlugs array.
+  description: `Assign a tool to an agent by creating an Agent→Tool relationship.
 
 ## Purpose
 Grant an agent access to a specific tool by its slug. The tool must exist on the starship before assignment.
@@ -19,10 +19,8 @@ Grant an agent access to a specific tool by its slug. The tool must exist on the
 
 ## Behavior
 1. Fetches current agent by slug
-2. Checks if tool is already assigned (idempotent - won't duplicate)
-3. Adds toolSlug to assignedToolSlugs array if not present
-4. Updates agent with new tool assignment
-5. Returns updated agent model
+2. Calls POST /agents/:id/tools/:toolSlug with { starshipId } to create relationship
+3. Returns server response
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
@@ -31,11 +29,10 @@ Automatically inferred from agent state (do not pass manually):
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response
-Returns updated agent with tool added to assignedToolSlugs array.
+Returns server response indicating success.
 
 ## Common Failures
-- Agent not found (404)
-- Tool does not exist (validation error)
+- Agent or Tool not found (404)
 - Missing environment variables
 - Invalid slugs`,
   parameters: {
@@ -101,8 +98,8 @@ Returns updated agent with tool added to assignedToolSlugs array.
       {
         ref: 'update_tools',
         type: 'code',
-        name: 'Update Tool Assignment',
-        description: 'Add tool to assignedToolSlugs if not already present',
+        name: 'Create Tool Relationship',
+        description: 'POST /agents/:id/tools/:toolSlug with starshipId',
         parameters: {
           code: `
             const fetchResponse = $lastOutputOf('fetch_agent')[0]?.json ?? {};
@@ -115,25 +112,14 @@ Returns updated agent with tool added to assignedToolSlugs array.
             const ctx = $lastOutputOf('prepare')[0].json;
             const toolSlug = ctx.toolSlug;
 
-            // Get current assignedToolSlugs or initialize empty array
-            let assignedToolSlugs = agentData.assignedToolSlugs || [];
-            if (!Array.isArray(assignedToolSlugs)) {
-              assignedToolSlugs = [];
-            }
-
-            // Add tool if not already present (idempotent)
-            if (!assignedToolSlugs.includes(toolSlug)) {
-              assignedToolSlugs.push(toolSlug);
-            }
-
             return {
-              url: \`\${ctx.baseUrl}/agents/\${agentData.id}\`,
-              method: 'PUT',
+              url: \`${'${'}ctx.baseUrl}/agents/${'${'}agentData.id}/tools/${'${'}toolSlug}\`,
+              method: 'POST',
               headers: ctx.headers,
               body: {
-                assignedToolSlugs
+                starshipId: ctx.starshipId
               },
-              toolAdded: !assignedToolSlugs.includes(toolSlug)
+              timeout: 10000
             };
           `,
           timeout: 3000,
@@ -142,14 +128,14 @@ Returns updated agent with tool added to assignedToolSlugs array.
       {
         ref: 'http_update',
         type: 'http_request',
-        name: 'Update Agent',
-        description: 'PUT /agents/:id with updated assignedToolSlugs',
+        name: 'Assign Tool',
+        description: 'POST /agents/:id/tools/:toolSlug',
         parameters: {
           url: '{{ $lastOutputOf("update_tools")[0].json.url }}',
           method: '{{ $lastOutputOf("update_tools")[0].json.method }}',
           headers: '{{ $lastOutputOf("update_tools")[0].json.headers }}',
           body: '{{ $lastOutputOf("update_tools")[0].json.body }}',
-          timeout: 10000,
+          timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
         },
       },
       {

@@ -58,6 +58,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Track pending tool calls for completion detection
   const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
+  // Track toolCallIds we've already navigated for to avoid duplicate route pushes
+  const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
 
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
@@ -382,6 +384,73 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
   }, [currentConversationId, liveMessages, handleUIPayload])
+
+  // Proactively navigate when assistant tool calls are detected (without waiting for ui_action)
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length || !starshipSlug) return
+    // Only react during active streaming to avoid replays causing navigation
+    if (!uiStreaming) return
+    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+    if (!hasStreamingAssistant) return
+
+    // Scan the most recent assistant messages for new tool calls
+    const recent = (liveMessages as any[]).slice(-10)
+    for (let i = recent.length - 1; i >= 0; i--) {
+      const msg = recent[i] as any
+      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+      for (const tc of msg.toolCalls as any[]) {
+        const id = tc?.id as string | undefined
+        if (!id || navigatedToolCallIdsRef.current.has(id)) continue
+        const name = tc?.function?.name as string | undefined
+        if (!name) continue
+
+        // Define which calls should trigger navigation
+        const openToolBuilderSlugs = new Set([
+          'tool-open',
+          'tool-edit',
+          'tool-add-blueprint-node',
+          'tool-add-blueprint-edge',
+          'tool-blueprint-edit-node',
+          'tool-blueprint-remove-node',
+          'tool-blueprint-edit-edge',
+          'tool-blueprint-remove-edge',
+        ])
+        const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+
+        // Parse args if present to extract slug
+        let args: any = tc?.function?.arguments
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args)
+          } catch {
+            // keep as-is
+          }
+        }
+
+        if (openToolBuilderSlugs.has(name) || name.startsWith?.('tool-blueprint-')) {
+          const toolSlug = args?.slug || args?.toolSlug || 'new'
+          const convId = currentConversationIdRef.current || externalConversationId || null
+          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+          try {
+            router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+          } catch {}
+          navigatedToolCallIdsRef.current.add(id)
+          return
+        }
+
+        if (openAgentBuilderSlugs.has(name)) {
+          const agentSlug = args?.slug || args?.agentSlug || 'new'
+          const convId = currentConversationIdRef.current || externalConversationId || null
+          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+          try {
+            router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+          } catch {}
+          navigatedToolCallIdsRef.current.add(id)
+          return
+        }
+      }
+    }
+  }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
 
   // Detect tool completion from streaming messages
   useEffect(() => {

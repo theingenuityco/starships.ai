@@ -28,10 +28,9 @@ export class AgentEntity implements AgentModel {
 
   // Foreign key relationships
   @Expose()
-  @IsOptional()
   @IsString()
   @Length(1, 255)
-  starshipId?: string;
+  starshipId!: string;
 
   @Expose()
   @IsOptional()
@@ -113,7 +112,7 @@ export class AgentEntity implements AgentModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        starshipId: dataRecord.starshipId,
+        starshipId: dataRecord.starshipId || '',
         templateId: dataRecord.templateId,
         name: dataRecord.name || '',
         description: dataRecord.description,

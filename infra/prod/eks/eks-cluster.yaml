@@ -1,0 +1,49 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: starships-prod
+  region: ap-south-1
+  version: '1.34'
+
+vpc:
+  cidr: 10.0.0.0/16
+  nat:
+    gateway: Disable # No NAT needed - nodes in public subnet (saves $35/mo)
+
+availabilityZones:
+  - ap-south-1a
+  - ap-south-1b
+
+managedNodeGroups:
+  - name: starships-nodes
+    instanceType: m7i-flex.large # 2 vCPU, 8GB RAM - Production M-series
+    desiredCapacity: 1 # Single node
+    minSize: 1
+    maxSize: 2
+    volumeSize: 30
+    volumeType: gp3
+    privateNetworking: false # Public subnet - saves $35/mo on NAT
+    labels:
+      role: application
+      environment: production
+    tags:
+      Environment: production
+      Project: starships
+    iam:
+      withAddonPolicies:
+        ebs: true
+        albIngress: true
+        cloudWatch: true
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: aws-ebs-csi-driver
+    wellKnownPolicies:
+      ebsCSIController: true
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: [] # Disable to save cost

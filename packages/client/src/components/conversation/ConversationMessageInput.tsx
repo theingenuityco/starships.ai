@@ -299,7 +299,37 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Type @ to choose an agent, then ask your question'
     }
 
-    const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent && hasFunds
+    // Require balance; server also enforces funds. Reverted per request.
+    const canSend = Boolean(message.trim()) && !disabled && !sending && !isStreamingEffective && Boolean(selectedAgent) && hasFunds
+
+    // Debug why the send button is disabled (dev-only)
+    useEffect(() => {
+      if (typeof window === 'undefined') return
+      const reasons: string[] = []
+      if (!Boolean(message.trim())) reasons.push('empty_message')
+      if (disabled) reasons.push('input_disabled_prop')
+      if (sending) reasons.push('sending_true')
+      if (isStreamingEffective) reasons.push('streaming_active')
+      if (!Boolean(selectedAgent)) reasons.push('no_selected_agent')
+      if (!hasFunds) reasons.push('insufficient_funds')
+      const summary = {
+        canSend,
+        reasons,
+        flags: {
+          hasMessage: Boolean(message.trim()),
+          disabled,
+          sending,
+          isStreamingEffective,
+          hasSelectedAgent: Boolean(selectedAgent),
+          hasFunds,
+          conversationId: conversationId || null,
+        },
+      }
+      try {
+        // Only log when disabled to reduce noise
+        if (!canSend) console.debug('[MessageInput] send disabled:', summary)
+      } catch {}
+    }, [canSend, message, disabled, sending, isStreamingEffective, selectedAgent, hasFunds, conversationId])
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 

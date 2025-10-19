@@ -31,6 +31,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const lastAutoSelectedAgentIdRef = useRef<string | null>(null)
   const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model)
   const budgetTokens = agentContextLength
 
@@ -143,30 +144,57 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent])
 
-  // Restore selected agent from conversation data
+  // Restore selected agent from conversation data (with stable guard to avoid loops)
   useEffect(() => {
     if (!currentConversationId) return
 
-    if (conversationAgents.length > 0) {
+    // Priority 1: first linked conversation agent
+    if (Array.isArray(conversationAgents) && conversationAgents.length > 0) {
       const conversationAgent = conversationAgents[0]
-      if (conversationAgent && (!selectedAgent || selectedAgent.id !== conversationAgent.id)) {
-        setSelectedAgent(conversationAgent)
-        return
+      if (conversationAgent && typeof conversationAgent.id === 'string') {
+        const currentId = selectedAgent?.id || null
+        const targetId = conversationAgent.id
+        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(conversationAgent)
+          return
+        }
       }
     }
 
-    if (conversationData?.agentId && starshipAgentsData.length > 0) {
-      const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId)
-      if (storedAgent && (!selectedAgent || selectedAgent.id !== storedAgent.id)) {
-        setSelectedAgent(storedAgent)
-        return
+    // Priority 2: agent id from conversation store
+    if (conversationData?.agentId && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
+      const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId) || null
+      if (storedAgent) {
+        const currentId = selectedAgent?.id || null
+        const targetId = storedAgent.id
+        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(storedAgent)
+          return
+        }
       }
     }
 
-    if (!selectedAgent && starshipAgentsData.length > 0) {
-      setSelectedAgent(starshipAgentsData[0])
+    // Priority 3: fallback to first starship agent when none selected
+    if (!selectedAgent && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
+      const fallback = starshipAgentsData[0]
+      if (fallback && typeof fallback.id === 'string') {
+        const targetId = fallback.id
+        if (lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(fallback)
+        }
+      }
     }
-  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData, selectedAgent])
+  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData])
+
+  // Keep guard ref in sync with user-driven agent changes
+  useEffect(() => {
+    if (selectedAgent?.id) {
+      lastAutoSelectedAgentIdRef.current = selectedAgent.id
+    }
+  }, [selectedAgent?.id])
 
   // Keep view mode ref in sync to avoid stale closure issues
   useEffect(() => {

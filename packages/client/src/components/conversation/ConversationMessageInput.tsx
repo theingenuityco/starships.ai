@@ -13,12 +13,12 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
 import Placeholder from '@tiptap/extension-placeholder'
-import { createRoot } from 'react-dom/client'
-// Removed tippy.js; using our own anchored container with fixed positioning
+import tippy from 'tippy.js'
+// Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -93,7 +93,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
     const agentsRef = useRef<AgentModel[]>([])
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
-    const suggestionSelectRef = useRef<() => void>(() => {})
     useEffect(() => {
       const latest = (starshipAgents as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
@@ -340,7 +339,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })()
         : 0
       const left = rect ? Math.min(Math.max(8, rect.left), vw - menuWidth - 8) : 0
-      const style: React.CSSProperties = { position: 'fixed', left, top, zIndex: 1000, width: menuWidth, willChange: 'transform' }
+      const style: React.CSSProperties | undefined = anchorRect ? { position: 'fixed', left, top, zIndex: 1000, width: menuWidth, willChange: 'transform' } : undefined
       return (
         <div
           style={style}
@@ -353,6 +352,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               key={agent.id}
               id={`mention-option-${agent.id}`}
               type="button"
+              tabIndex={-1}
               role="option"
               aria-selected={idx === active}
               className={cn(
@@ -362,6 +362,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onMouseEnter={() => onHover(idx)}
               onMouseDown={e => {
                 e.preventDefault()
+                e.stopPropagation()
+                command(agent)
+              }}
+              onPointerDown={e => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              onClick={e => {
+                e.preventDefault()
+                e.stopPropagation()
                 command(agent)
               }}
             >
@@ -387,167 +397,170 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const q = String(query || '').toLowerCase()
             return !q || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
           })
-          .slice(0, 8),
+          .slice(0, 8)
+          .map((a: AgentModel) => ({ id: a.id, label: a.name, agent: a })),
       render: () => {
-        let root: ReturnType<typeof createRoot> | null = null
-        let container: HTMLDivElement | null = null
-        let currentItems: AgentModel[] = []
+        let component: ReactRenderer | null = null
+        let popup: any = null
         let active = 0
-        let anchorRect: DOMRect | null = null
-
-        const rerender = (props: any) => {
-          if (!root) return
-          const nextItems = Array.isArray(props.items) ? (props.items as AgentModel[]) : currentItems
-          currentItems = nextItems
-          // Provide a fallback selection function in case key events don't reach onKeyDown
-          suggestionSelectRef.current = () => {
-            const choice = currentItems[active]
-            if (!choice) return
-            try {
-              if (typeof props.command === 'function') {
-                props.command({ id: choice.id, label: choice.slug })
-              } else if (props?.editor && props?.range) {
-                props.editor
-                  .chain()
-                  .focus()
-                  .insertContentAt(props.range, {
-                    type: 'mention',
-                    attrs: { id: choice.id, label: choice.slug },
-                  })
-                  .run()
-                if (root) root.unmount()
-                root = null
-                if (container && container.parentNode) container.parentNode.removeChild(container)
-                container = null
-                isSuggestionActiveRef.current = false
-                mentionAgentsSnapshotRef.current = null
-              }
-            } catch {}
+        let lastProps: any = null
+        const handleDocKeyDown = (e: KeyboardEvent) => {
+          if (!lastProps) return
+          const items = (lastProps.items as Array<{ id: string; label: string; agent?: AgentModel }>) || []
+          if (!items.length) return
+          const pageSize = Math.max(1, Math.min(5, items.length))
+          const key = e.key
+          if (key === 'ArrowDown' || (key.toLowerCase() === 'n' && (e.ctrlKey || e.metaKey))) {
+            e.preventDefault()
+            e.stopPropagation()
+            active = (active + 1) % items.length
+            component?.updateProps({ ...component?.props, active })
+            return
           }
-          root.render(
-            <MentionList
-              items={currentItems}
-              active={active}
-              onHover={(i: number) => {
-                active = i
-                rerender(props)
-              }}
-              command={(agent: AgentModel) => {
-                try {
-                  if (typeof props.command === 'function') {
-                    props.command({ id: agent.id, label: agent.slug })
-                  } else if (props?.editor && props?.range) {
-                    props.editor
-                      .chain()
-                      .focus()
-                      .insertContentAt(props.range, {
-                        type: 'mention',
-                        attrs: { id: agent.id, label: agent.slug },
-                      })
-                      .run()
-                    // Manually close if we inserted ourselves
-                    if (root) root.unmount()
-                    root = null
-                    if (container && container.parentNode) container.parentNode.removeChild(container)
-                    container = null
-                    isSuggestionActiveRef.current = false
-                    mentionAgentsSnapshotRef.current = null
-                  }
-                } catch {}
-              }}
-              anchorRect={anchorRect}
-            />
-          )
+          if (key === 'ArrowUp' || (key.toLowerCase() === 'p' && (e.ctrlKey || e.metaKey))) {
+            e.preventDefault()
+            e.stopPropagation()
+            active = (active - 1 + items.length) % items.length
+            component?.updateProps({ ...component?.props, active })
+            return
+          }
+          if (key === 'PageDown') {
+            e.preventDefault()
+            e.stopPropagation()
+            active = Math.min(items.length - 1, active + pageSize)
+            component?.updateProps({ ...component?.props, active })
+            return
+          }
+          if (key === 'PageUp') {
+            e.preventDefault()
+            e.stopPropagation()
+            active = Math.max(0, active - pageSize)
+            component?.updateProps({ ...component?.props, active })
+            return
+          }
+          if (key === 'Home') {
+            e.preventDefault()
+            e.stopPropagation()
+            active = 0
+            component?.updateProps({ ...component?.props, active })
+            return
+          }
+          if (key === 'End') {
+            e.preventDefault()
+            e.stopPropagation()
+            active = items.length - 1
+            component?.updateProps({ ...component?.props, active })
+            return
+          }
+          if (key === 'Enter' || key === 'Tab') {
+            e.preventDefault()
+            e.stopPropagation()
+            const choice = items[active]
+            if (choice) lastProps.command(choice)
+            return
+          }
+          if (key === 'Escape') {
+            e.preventDefault()
+            e.stopPropagation()
+            lastProps.exit?.()
+          }
         }
         return {
           onStart: (props: any) => {
-            container = document.createElement('div')
-            document.body.appendChild(container)
-            root = createRoot(container)
             isSuggestionActiveRef.current = true
-            // Snapshot the current agents list for stable suggestions during menu lifetime
             mentionAgentsSnapshotRef.current = Array.isArray(agentsRef.current) ? [...agentsRef.current] : []
-            active = 0
-            anchorRect = props.clientRect ? props.clientRect() : null
-            rerender(props)
+            lastProps = props
+
+            component = new ReactRenderer(MentionList as any, {
+              props: {
+                items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
+                active,
+                onHover: (i: number) => {
+                  active = i
+                  component?.updateProps({ ...component.props, active })
+                },
+                command: (agent: AgentModel) => {
+                  const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: agent.name }
+                  props.command(realItem)
+                },
+                anchorRect: null,
+              },
+              editor: props.editor,
+            })
+
+            // Keep editor focused; Suggestion plugin handles keys
+
+            popup = tippy('body', {
+              getReferenceClientRect: props.clientRect,
+              appendTo: () => document.body,
+              content: component.element,
+              showOnCreate: true,
+              interactive: true,
+              trigger: 'manual',
+              placement: 'bottom-start',
+              zIndex: 1000,
+            })
+
+            // Capture keyboard navigation globally while menu is open
+            try {
+              document.addEventListener('keydown', handleDocKeyDown, true)
+            } catch {}
           },
           onUpdate(props: any) {
-            // Keep anchor updated as the user types; guard nulls
-            const maybeRect = props.clientRect ? props.clientRect() : null
-            if (maybeRect) anchorRect = maybeRect
-            rerender(props)
+            lastProps = props
+            component?.updateProps({
+              ...component.props,
+              items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
+            })
+            popup?.[0]?.setProps({ getReferenceClientRect: props.clientRect })
           },
           onKeyDown(props: any) {
             const event = props.event
             const key = event.key
-            if (!currentItems || currentItems.length === 0) return false
+            const items = props.items as Array<{ id: string; label: string; agent?: AgentModel }>
+            if (!items || items.length === 0) return false
 
-            const pageSize = Math.max(1, Math.min(5, currentItems.length))
-
-            // Slack-like navigation
+            const pageSize = Math.max(1, Math.min(5, items.length))
             if (key === 'ArrowDown' || (key.toLowerCase() === 'n' && (event.ctrlKey || event.metaKey))) {
               event.preventDefault()
-              active = (active + 1) % currentItems.length
-              rerender(props)
+              active = (active + 1) % items.length
+              component?.updateProps({ ...component.props, active })
               return true
             }
             if (key === 'ArrowUp' || (key.toLowerCase() === 'p' && (event.ctrlKey || event.metaKey))) {
               event.preventDefault()
-              active = (active - 1 + currentItems.length) % currentItems.length
-              rerender(props)
+              active = (active - 1 + items.length) % items.length
+              component?.updateProps({ ...component.props, active })
               return true
             }
             if (key === 'PageDown') {
               event.preventDefault()
-              active = Math.min(currentItems.length - 1, active + pageSize)
-              rerender(props)
+              active = Math.min(items.length - 1, active + pageSize)
+              component?.updateProps({ ...component.props, active })
               return true
             }
             if (key === 'PageUp') {
               event.preventDefault()
               active = Math.max(0, active - pageSize)
-              rerender(props)
+              component?.updateProps({ ...component.props, active })
               return true
             }
             if (key === 'Home') {
               event.preventDefault()
               active = 0
-              rerender(props)
+              component?.updateProps({ ...component.props, active })
               return true
             }
             if (key === 'End') {
               event.preventDefault()
-              active = currentItems.length - 1
-              rerender(props)
+              active = items.length - 1
+              component?.updateProps({ ...component.props, active })
               return true
             }
             if (key === 'Enter' || key === 'Tab') {
               event.preventDefault()
-              event.stopPropagation()
-              const choice = currentItems[active]
-              if (choice) {
-                try {
-                  if (typeof props.command === 'function') {
-                    props.command({ id: choice.id, label: choice.slug })
-                  } else if (props?.editor && props?.range) {
-                    props.editor
-                      .chain()
-                      .focus()
-                      .insertContentAt(props.range, {
-                        type: 'mention',
-                        attrs: { id: choice.id, label: choice.slug },
-                      })
-                      .run()
-                    // Manually close if we inserted ourselves
-                    if (root) root.unmount()
-                    root = null
-                    if (container && container.parentNode) container.parentNode.removeChild(container)
-                    container = null
-                    isSuggestionActiveRef.current = false
-                    mentionAgentsSnapshotRef.current = null
-                  }
-                } catch {}
-              }
+              const choice = items[active]
+              if (choice) props.command(choice)
               return true
             }
             if (key === 'Escape') {
@@ -557,14 +570,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             return false
           },
           onExit() {
-            if (root) root.unmount()
-            root = null
-            if (container && container.parentNode) container.parentNode.removeChild(container)
-            container = null
+            popup?.[0]?.destroy()
+            try {
+              document.removeEventListener('keydown', handleDocKeyDown, true)
+            } catch {}
+            component?.destroy()
+            component = null
+            popup = null
             isSuggestionActiveRef.current = false
-            // Clear the snapshot so future menus use fresh data
             mentionAgentsSnapshotRef.current = null
-            suggestionSelectRef.current = () => {}
+            // Editor remains focused naturally
           },
         }
       },
@@ -580,7 +595,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             class: 'inline-flex items-center gap-1 align-baseline bg-primary/10 text-primary rounded-full px-1.5 py-0.5 border border-primary/20',
           },
           deleteTriggerWithBackspace: true,
-          renderText: ({ options, node }: any) => `${options.suggestion.char}${node.attrs.label ?? node.attrs.id}`,
+          // Force display as @name by resolving the agent name from id if needed
+          renderText: ({ options, node }: any) => {
+            const id = node?.attrs?.id
+            const label = node?.attrs?.label
+            const agent = (agentsRef.current || []).find(a => a.id === id)
+            const display = agent?.name || label || id || ''
+            return `${options.suggestion.char}${display}`
+          },
+          renderLabel: ({ options, node }: any) => {
+            const id = node?.attrs?.id
+            const label = node?.attrs?.label
+            const agent = (agentsRef.current || []).find(a => a.id === id)
+            const display = agent?.name || label || id || ''
+            return `${options.suggestion.char}${display}`
+          },
           suggestion: mentionSuggestion,
         }),
       ],
@@ -596,17 +625,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           ),
         },
         handleKeyDown: (_view, event) => {
-          if (isSuggestionActiveRef.current && ['ArrowUp', 'ArrowDown', 'Escape', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
-            // Let TipTap Suggestion handle navigation keys entirely
+          if (isSuggestionActiveRef.current) {
+            // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
-          }
-          if (isSuggestionActiveRef.current && (event.key === 'Enter' || event.key === 'Tab')) {
-            // Fallback: if Suggestion onKeyDown didn't catch, perform selection ourselves
-            event.preventDefault()
-            try {
-              suggestionSelectRef.current()
-            } catch {}
-            return true
           }
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault()

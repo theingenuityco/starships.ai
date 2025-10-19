@@ -13,8 +13,20 @@ import { Inter } from 'next/font/google'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: `${UI_TEXT.APP_TITLE} - ${UI_TEXT.APP_DESCRIPTION}`,
-  description: 'Connect with AI agents to boost your productivity and creativity',
+  title: 'Starships.ai – Ship production AI agents fast',
+  description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
+  openGraph: {
+    title: 'Starships.ai – Ship production AI agents fast',
+    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
+    url: 'https://starships.ai',
+    images: [{ url: '/og.png', width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Starships.ai – Ship production AI agents fast',
+    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
+    images: ['/og.png'],
+  },
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',

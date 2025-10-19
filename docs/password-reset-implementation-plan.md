@@ -111,21 +111,77 @@ The implementation will follow the established 6-layer architecture:
 - [ ] 🔴 Add AuthPasswordResetResponse interface
 - [ ] 🔴 Add AuthPasswordResetConfirmResponse interface
 
+**Implementation Details**:
+```typescript
+// Response for forgot password request
+export interface AuthPasswordResetResponse {
+  success: boolean;
+  message: string;
+  emailSent: boolean;
+}
+
+// Response for password reset confirmation
+export interface AuthPasswordResetConfirmResponse {
+  success: boolean;
+  message: string;
+  redirectUrl: string; // '/login?reset=success'
+}
+
+// Update existing interface to include confirmPassword
+export interface AuthPasswordResetConfirm {
+  token: string;
+  newPassword: string;
+  confirmPassword: string; // Added for validation
+}
+```
+
 #### Task 2.2: Create PasswordResetTokenEntity 🔴 Not Started
 **File**: `packages/models/src/entities/PasswordResetTokenEntity.ts`
 **Assignee**: TBD | **Estimated**: 20 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/2 complete):
+**Sub-tasks** (0/3 complete):
 - [ ] 🔴 Copy EmailVerificationTokenEntity pattern exactly
 - [ ] 🔴 Update for 1-hour expiry instead of 24 hours
+- [ ] 🔴 Update `packages/models/src/entities/index.ts` to export new entity
+
+**Key Implementation Note**:
+```typescript
+// In createFromUserData method, change expiry from 24 hours to 1 hour:
+const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+```
 
 #### Task 2.3: Create PasswordResetTokenRepository 🔴 Not Started
 **File**: `packages/models/src/repositories/PasswordResetTokenRepository.ts`
 **Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/2 complete):
+**Sub-tasks** (0/4 complete):
 - [ ] 🔴 Copy EmailVerificationTokenRepository pattern exactly
 - [ ] 🔴 Update table name to password_reset_tokens
+- [ ] 🔴 Add token cleanup method for expired tokens
+- [ ] 🔴 Update `packages/models/src/repositories/index.ts` to export new repository
+
+**Token Cleanup Implementation**:
+```typescript
+/**
+ * Clean up expired password reset tokens (called before generating new ones)
+ * Simple strategy: clean expired tokens for the user when generating new token
+ */
+async generateToken(userId: string, email: string): Promise<string> {
+  // Clean expired tokens for this user first
+  await this.cleanupExpiredTokensForUser(userId);
+  
+  // Then generate new token (existing logic)
+  // ...
+}
+
+private async cleanupExpiredTokensForUser(userId: string): Promise<void> {
+  await connection.query(
+    `DELETE FROM password_reset_tokens 
+     WHERE user_id = $1 AND expires_at <= NOW()`,
+    [userId]
+  );
+}
+```
 
 #### Task 2.4: Add Password Reset to UserService 🔴 Not Started
 **File**: `packages/server/src/services/UserService.ts`
@@ -133,9 +189,80 @@ The implementation will follow the established 6-layer architecture:
 
 **Sub-tasks** (0/4 complete):
 - [ ] 🔴 Add `passwordResetTokenRepository` as class property
-- [ ] 🔴 Add `sendPasswordReset(email: string)` method
-- [ ] 🔴 Add `resetPassword(token: string, newPassword: string)` method
+- [ ] 🔴 Add `sendPasswordReset(email: string)` method with user validation
+- [ ] 🔴 Add `resetPassword(token: string, newPassword: string, confirmPassword: string)` method
 - [ ] 🔴 Follow exact pattern of email verification methods
+
+**User Validation Logic**:
+```typescript
+/**
+ * Send password reset email (with user validation)
+ */
+async sendPasswordReset(email: string): Promise<void> {
+  // Find user by email
+  const user = await this.getUserByEmail(email);
+  
+  // SECURITY: Always return success message (prevent user enumeration)
+  if (!user) {
+    logger.info('[UserService] Password reset requested for non-existent email', { email });
+    return; // Silent success
+  }
+  
+  // BUSINESS RULE: Only users with passwords can reset passwords
+  if (!user.hasPassword) {
+    logger.info('[UserService] Password reset requested for OAuth-only user', { 
+      userId: user.id, 
+      email,
+      authMethods: user.authMethods 
+    });
+    return; // Silent success (OAuth users should use "Set Password" instead)
+  }
+  
+  // Generate and send reset token
+  const token = await this.passwordResetTokenRepository.generateToken(user.id, email);
+  await this.emailService.sendPasswordResetEmail(email, token);
+  
+  logger.info('[UserService] Password reset email sent', { userId: user.id, email });
+}
+
+/**
+ * Reset password using token
+ */
+async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<{
+  userId: string;
+  email: string;
+}> {
+  // Validate passwords match
+  if (newPassword !== confirmPassword) {
+    throw new ValidationError('Passwords do not match', 'confirmPassword');
+  }
+  
+  // Validate password strength
+  if (newPassword.length < 8) {
+    throw new ValidationError('Password must be at least 8 characters long', 'newPassword');
+  }
+  
+  // Validate and consume token
+  const tokenData = await this.passwordResetTokenRepository.validateAndConsumeToken(token);
+  if (!tokenData) {
+    throw new ValidationError('Invalid or expired reset token', 'token');
+  }
+  
+  // Hash new password and update user
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await this.userRepository.update(tokenData.userId, { password: hashedPassword });
+  
+  logger.info('[UserService] Password reset successful', { 
+    userId: tokenData.userId,
+    email: tokenData.email 
+  });
+  
+  return {
+    userId: tokenData.userId,
+    email: tokenData.email
+  };
+}
+```
 
 ### Phase 3: API Routes & Email Service (1.5 hours) 🔴 Not Started
 
@@ -150,6 +277,66 @@ The implementation will follow the established 6-layer architecture:
 - [ ] 🔴 Add `POST /auth/forgot-password` endpoint
 - [ ] 🔴 Add `POST /auth/reset-password` endpoint  
 - [ ] 🔴 Add password reset rate limiting middleware
+
+**API Implementation with Error Handling**:
+```typescript
+// Zod schemas
+const ForgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+});
+
+const ResetPasswordSchema = z.object({
+  token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+// Forgot password endpoint
+router.post('/auth/forgot-password', passwordResetRateLimit, async (req: Request, res: Response) => {
+  try {
+    const bodyValidation = validateData(ForgotPasswordSchema, req.body, res, 'forgot password data');
+    if (!bodyValidation) return;
+
+    const { email } = bodyValidation;
+    const userService = ServiceFactory.createUserService();
+    
+    await userService.sendPasswordReset(email);
+    
+    // SECURITY: Always return same message (prevent user enumeration)
+    sendSuccess(res, {
+      success: true,
+      message: 'If an account exists with this email, a password reset link has been sent.',
+      emailSent: true
+    } as AuthPasswordResetResponse);
+  } catch (error) {
+    handleError(error, res, 'password reset request');
+  }
+});
+
+// Reset password endpoint
+router.post('/auth/reset-password', async (req: Request, res: Response) => {
+  try {
+    const bodyValidation = validateData(ResetPasswordSchema, req.body, res, 'reset password data');
+    if (!bodyValidation) return;
+
+    const { token, newPassword, confirmPassword } = bodyValidation;
+    const userService = ServiceFactory.createUserService();
+    
+    await userService.resetPassword(token, newPassword, confirmPassword);
+    
+    sendSuccess(res, {
+      success: true,
+      message: 'Password reset successful. You can now log in with your new password.',
+      redirectUrl: '/login?reset=success'
+    } as AuthPasswordResetConfirmResponse);
+  } catch (error) {
+    handleError(error, res, 'password reset confirmation');
+  }
+});
+```
 
 #### Task 3.2: Extend EmailService 🔴 Not Started
 **File**: `packages/server/src/services/EmailService.ts`
@@ -180,6 +367,47 @@ The implementation will follow the established 6-layer architecture:
 - [ ] 🔴 Create ResetPasswordForm component with token handling
 - [ ] 🔴 Add "Forgot Password?" link to LoginForm
 
+**Frontend Error State Handling**:
+```typescript
+// In ResetPasswordForm component
+const ResetPasswordForm = ({ token }: { token: string }) => {
+  const [error, setError] = useState<string | null>(null);
+  const [isValidToken, setIsValidToken] = useState(true);
+  
+  const resetPassword = useResetPassword({
+    onSuccess: () => {
+      toast.success('Password reset successful!');
+      router.push('/login?reset=success');
+    },
+    onError: (error) => {
+      if (error.message.includes('Invalid or expired')) {
+        setIsValidToken(false);
+        setError('This password reset link has expired or is invalid.');
+      } else if (error.message.includes('do not match')) {
+        setError('Passwords do not match.');
+      } else {
+        setError(error.message || 'Failed to reset password. Please try again.');
+      }
+    }
+  });
+  
+  // Show error state for invalid token
+  if (!isValidToken) {
+    return (
+      <div className="text-center">
+        <h2>Invalid Reset Link</h2>
+        <p>{error}</p>
+        <Button onClick={() => router.push('/forgot-password')}>
+          Request New Reset Link
+        </Button>
+      </div>
+    );
+  }
+  
+  // Rest of form implementation...
+};
+```
+
 #### Task 4.2: Create Password Reset Pages 🔴 Not Started
 **Files**: `forgot-password/page.tsx`, `reset-password/page.tsx`
 **Assignee**: TBD | **Estimated**: 20 minutes | **Started**: - | **Completed**: -
@@ -192,9 +420,62 @@ The implementation will follow the established 6-layer architecture:
 **File**: `packages/client/src/hooks/useAuth.ts`
 **Assignee**: TBD | **Estimated**: 10 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/2 complete):
+**Sub-tasks** (0/3 complete):
 - [ ] 🔴 Add `useForgotPassword` mutation
 - [ ] 🔴 Add `useResetPassword` mutation
+- [ ] 🔴 Add password reset query keys to AUTH_QUERY_KEYS
+
+**Hook Implementation**:
+```typescript
+// Add to AUTH_QUERY_KEYS
+export const AUTH_QUERY_KEYS = {
+  all: ['auth'] as const,
+  user: () => [...AUTH_QUERY_KEYS.all, 'user'] as const,
+  me: () => [...AUTH_QUERY_KEYS.user(), 'me'] as const,
+  emailVerification: () => [...AUTH_QUERY_KEYS.all, 'email-verification'] as const,
+  passwordReset: () => [...AUTH_QUERY_KEYS.all, 'password-reset'] as const,
+} as const;
+
+// Forgot password mutation
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: async (data: { email: string }) => {
+      const response = await api.post('/api/v1/auth/forgot-password', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Password reset link sent! Check your email.');
+    },
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.error?.message || 
+        'Failed to send reset email. Please try again.'
+      );
+    },
+  });
+}
+
+// Reset password mutation
+export function useResetPassword() {
+  const router = useRouter();
+  
+  return useMutation({
+    mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
+      const response = await api.post('/api/v1/auth/reset-password', data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Password reset successful!');
+      router.push('/login?reset=success');
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error?.message || 'Failed to reset password';
+      toast.error(message);
+      throw error; // Re-throw for component error handling
+    },
+  });
+}
+```
 
 ### Phase 5: Testing & Cleanup (30 minutes) 🔴 Not Started
 
@@ -203,11 +484,13 @@ The implementation will follow the established 6-layer architecture:
 #### Task 5.1: Manual Testing 🔴 Not Started
 **Assignee**: TBD | **Estimated**: 15 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/4 complete):
+**Sub-tasks** (0/6 complete):
 - [ ] 🔴 Test forgot password flow end-to-end
 - [ ] 🔴 Test expired token handling
 - [ ] 🔴 Test rate limiting triggers
 - [ ] 🔴 Verify email delivery
+- [ ] 🔴 Test OAuth-only user cannot reset (silent success)
+- [ ] 🔴 Test non-existent email (silent success)
 
 #### Task 5.2: Code Quality Checks 🔴 Not Started
 **Assignee**: TBD | **Estimated**: 10 minutes | **Started**: - | **Completed**: -
@@ -235,6 +518,14 @@ The implementation will follow the established 6-layer architecture:
 - **Error Messages**: Generic messages to prevent user enumeration
 - **User Validation**: Allow password reset for users with `hasPassword = true`
 
+### Specific Error Handling
+- **Non-existent user**: Silent success (same message as valid user)
+- **OAuth-only user**: Silent success (logs for monitoring, but no error to user)
+- **Already consumed token**: "Invalid or expired reset token"
+- **Expired token**: "Invalid or expired reset token"
+- **Password mismatch**: "Passwords do not match"
+- **Weak password**: "Password must be at least 8 characters long"
+
 ## Testing Strategy
 
 ### Manual Testing Checklist
@@ -242,9 +533,13 @@ The implementation will follow the established 6-layer architecture:
 - [ ] Expired token handling
 - [ ] Invalid token handling
 - [ ] Rate limiting triggers correctly
-- [ ] OAuth-only users cannot reset
-- [ ] Password validation works
+- [ ] OAuth-only users cannot reset (silent success)
+- [ ] Non-existent email (silent success)
+- [ ] Password validation works (length, confirmation match)
 - [ ] Email arrives within reasonable time
+- [ ] Frontend error states display correctly
+- [ ] Redirect to login page works after successful reset
+- [ ] Toast messages appear correctly
 
 **Note**: Automated testing will be implemented in a separate PR
 
@@ -290,12 +585,12 @@ If issues arise during deployment:
 
 ## 📈 Simplified Time Estimates
 
-### Total Estimated Time: **5.5 hours** (vs original 18 hours)
+### Total Estimated Time: **6 hours** (includes all gap fixes)
 
 | Phase | Tasks | Est. Time | 
 |-------|-------|-----------|
 | **Phase 1** - Foundation | 3 tasks | 30 minutes |
-| **Phase 2** - Password Reset Core | 4 tasks | 2 hours |
+| **Phase 2** - Password Reset Core | 4 tasks | 2.5 hours |
 | **Phase 3** - API & Email | 3 tasks | 1.5 hours |
 | **Phase 4** - Frontend | 3 tasks | 1 hour |
 | **Phase 5** - Testing | 3 tasks | 30 minutes |
@@ -303,15 +598,15 @@ If issues arise during deployment:
 ### Realistic Timeline
 
 ```
-Morning (2.5h): Foundation fixes, password reset entity/repository, UserService updates
-Afternoon (3h): API routes, email templates, frontend components, testing
+Morning (3h): Foundation fixes, password reset entity/repository, UserService updates with validation
+Afternoon (3h): API routes, email templates, frontend components with error handling, testing
 ```
 
 **Key Benefits**:
 - **Follows Existing Patterns**: Uses established service patterns from ConversationService, AgentService
 - **Fixes Anti-Patterns**: Removes inline repository instantiation in UserService
-- **Minimal Changes**: Only fixes what's broken, doesn't over-engineer
-- **Quick Implementation**: 5.5 hours instead of 18 hours
+- **Complete Implementation**: Addresses all security, validation, and error handling concerns
+- **Elegant Solution**: 6 hours for full-featured implementation vs 18 hours over-engineered
 
 ## 🎯 Progress Tracking Instructions
 
@@ -361,8 +656,55 @@ Afternoon (3h): API routes, email templates, frontend components, testing
 
 ---
 
-**Document Version**: 6.0.0 (Simplified Pattern-Following Implementation)  
+**Document Version**: 7.0.0 (Complete Implementation with Gap Fixes)  
 **Created**: 2025-01-19  
 **Last Updated**: 2025-01-19  
 **Author**: Engineering Team  
-**Status**: Ready for Implementation (follows existing patterns, fixes anti-patterns)
+**Status**: Ready for Implementation (addresses all identified gaps, follows existing patterns)
+
+## 🔧 **Gaps Addressed in v7.0.0**
+
+### **1. Response Type Definitions** ✅
+- Added complete `AuthPasswordResetResponse` and `AuthPasswordResetConfirmResponse` interfaces
+- Includes `redirectUrl` field for post-reset navigation
+
+### **2. User Validation Logic** ✅  
+- Only users with `hasPassword = true` can reset passwords
+- OAuth-only users get silent success (logged for monitoring)
+- Non-existent users get silent success (security best practice)
+
+### **3. Password Confirmation Field** ✅
+- Updated `AuthPasswordResetConfirm` to include `confirmPassword` field
+- Added client-side and server-side password matching validation
+
+### **4. Error Handling Specifics** ✅
+- Defined exact error messages for all scenarios
+- Frontend error state handling for invalid/expired tokens
+- Graceful error recovery with "Request New Reset Link" option
+
+### **5. Token Cleanup Strategy** ✅
+- Simple cleanup: remove expired tokens for user when generating new token
+- No complex background jobs needed - cleanup on-demand
+
+### **6. Redirect Logic After Reset** ✅
+- Redirect to `/login?reset=success` with toast message
+- Simple and elegant user experience
+
+### **7. Repository & Entity Index Updates** ✅
+- Added tasks to update `packages/models/src/repositories/index.ts`
+- Added tasks to update `packages/models/src/entities/index.ts`
+
+### **8. Frontend Error States** ✅
+- Invalid token detection and error UI
+- Network error handling in mutations
+- Password validation error display
+
+### **9. Complete API Error Handling** ✅
+- Comprehensive Zod validation schemas
+- Consistent error response format
+- Rate limiting integration
+
+### **10. Testing Coverage** ✅
+- Expanded manual testing checklist
+- OAuth-only user testing
+- Frontend error state testing

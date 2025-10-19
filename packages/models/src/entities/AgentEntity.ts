@@ -112,7 +112,8 @@ export class AgentEntity implements AgentModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        starshipId: dataRecord.starshipId || '',
+        // Require starshipId for creation
+        starshipId: (dataRecord.starshipId as string) || '',
         templateId: dataRecord.templateId,
         name: dataRecord.name || '',
         description: dataRecord.description,

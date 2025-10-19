@@ -19,7 +19,7 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint src --ext .ts",
-    "test": "echo 'No tests yet' && exit 0"
+    "test": "echo 'No tests yet' && :"
   },
   "devDependencies": {
     "@types/node": "^24.0.10",

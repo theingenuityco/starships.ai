@@ -601,7 +601,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     // React NodeView for mention rendering using our avatar component
-    const MentionNodeView = ({ node, updateAttributes }: any) => {
+    const MentionNodeView = ({ node, updateAttributes, editor }: any) => {
       const id = node?.attrs?.id
       const label = node?.attrs?.label
       const agent = (agentsRef.current || []).find(a => a.id === id)
@@ -611,6 +611,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const rendererRef = useRef<ReactRenderer | null>(null)
 
       const openSwitcher = () => {
+        try {
+          console.debug('[mention] openSwitcher:start', { hasAnchor: !!anchorRef.current, display })
+        } catch {}
         try {
           const anchorEl = anchorRef.current
           if (!anchorEl) return
@@ -628,31 +631,41 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             items.findIndex(a => a.id === id)
           )
 
-          rendererRef.current = new ReactRenderer(MentionList as any, {
-            props: {
-              items,
-              active: currentIndex,
-              onHover: (i: number) => {
-                rendererRef.current?.updateProps({ ...rendererRef.current.props, active: i })
+          try {
+            rendererRef.current = new ReactRenderer(MentionList as any, {
+              props: {
+                items,
+                active: currentIndex,
+                onHover: (i: number) => {
+                  rendererRef.current?.updateProps({ ...rendererRef.current.props, active: i })
+                },
+                command: (newAgent: AgentModel) => {
+                  try {
+                    updateAttributes({ id: newAgent.id, label: newAgent.name })
+                  } catch {}
+                  try {
+                    onAgentChange?.(newAgent)
+                  } catch {}
+                  try {
+                    popupRef.current?.destroy()
+                  } catch {}
+                  try {
+                    rendererRef.current?.destroy()
+                  } catch {}
+                },
+                anchorRect: null,
               },
-              command: (newAgent: AgentModel) => {
-                try {
-                  updateAttributes({ id: newAgent.id, label: newAgent.name })
-                } catch {}
-                try {
-                  onAgentChange?.(newAgent)
-                } catch {}
-                try {
-                  popupRef.current?.destroy()
-                } catch {}
-                try {
-                  rendererRef.current?.destroy()
-                } catch {}
-              },
-              anchorRect: null,
-            },
-            editor: tiptap!,
-          })
+              editor,
+            })
+          } catch (err) {
+            try {
+              console.error('[mention] openSwitcher:renderer error', err)
+            } catch {}
+            return
+          }
+          try {
+            console.debug('[mention] openSwitcher:renderer ready', { items: items.length, currentIndex })
+          } catch {}
 
           popupRef.current = tippy(anchorEl, {
             content: rendererRef.current.element,
@@ -664,8 +677,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             zIndex: 1000,
           })
           try {
-            popupRef.current.show()
+            console.debug('[mention] openSwitcher:tippy created')
           } catch {}
+          try {
+            popupRef.current.show()
+            console.debug('[mention] openSwitcher:tippy shown')
+          } catch (err) {
+            try {
+              console.error('[mention] openSwitcher:show error', err)
+            } catch {}
+          }
         } catch {}
       }
 
@@ -688,13 +709,25 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             ref={anchorRef}
             role="button"
             tabIndex={0}
-            onPointerDownCapture={e => {
+            onMouseDown={e => {
+              try {
+                console.debug('[mention] onMouseDown', { isTrusted: (e as any)?.isTrusted, button: e.button, phase: e.eventPhase })
+              } catch {}
               e.preventDefault()
               e.stopPropagation()
-              openSwitcher()
+              // Defer to avoid ProseMirror selection interfering
+              setTimeout(() => {
+                try {
+                  console.debug('[mention] onMouseDown:deferred open')
+                } catch {}
+                openSwitcher()
+              }, 0)
             }}
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
+                try {
+                  console.debug('[mention] onKeyDown', { key: e.key })
+                } catch {}
                 e.preventDefault()
                 e.stopPropagation()
                 openSwitcher()
@@ -710,7 +743,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       )
     }
 
-    // Removed global capture listeners to avoid swallowing mention click events
+    // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
     const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
     const tiptap = useEditor({
@@ -718,6 +751,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
         Placeholder.configure({ placeholder: placeholderText }),
         Mention.extend({
+          selectable: true,
           addNodeView() {
             return ReactNodeViewRenderer(MentionNodeView as any)
           },

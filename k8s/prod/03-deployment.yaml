@@ -264,7 +264,7 @@ spec:
           # Production health checks (updated to use /api/health)
           readinessProbe:
             httpGet:
-              path: /api/health # Better endpoint
+              path: /api/v1/health
               port: 4000
             initialDelaySeconds: 20
             periodSeconds: 5
@@ -274,7 +274,7 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /api/v1/health
               port: 4000
             initialDelaySeconds: 60
             periodSeconds: 30
@@ -283,7 +283,7 @@ spec:
 
           startupProbe:
             httpGet:
-              path: /api/health
+              path: /api/v1/health
               port: 4000
             initialDelaySeconds: 0
             periodSeconds: 10
@@ -314,4 +314,4 @@ spec:
         storageClassName: gp3
         resources:
           requests:
-            storage: 20Gi # Reduced from 50Gi (cost optimization)
+            storage: 30Gi

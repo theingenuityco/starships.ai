@@ -4,10 +4,33 @@
 
 This document outlines the implementation plan for adding password reset functionality to the Starships.ai platform. The feature will follow the existing email verification pattern and maintain consistency with the 6-layer architecture.
 
-**Status**: 🔴 Not Started  
+**Status**: 🟡 Planned (Architecture Refined)  
 **Priority**: High  
-**Estimated Timeline**: 3-4 days  
-**Architecture Pattern**: Token-based (following email verification pattern)
+**Estimated Timeline**: 2-3 days (reduced due to elegant extensions)  
+**Architecture Pattern**: Token-based (extending email verification pattern)
+
+## 📊 Live Progress Tracker
+
+**Overall Progress**: 0% Complete (0/6 phases)
+
+| Phase | Status | Progress | Completion |
+|-------|--------|----------|------------|
+| **Phase 1** - Database & Backend Foundation | 🔴 Not Started | 0/4 tasks | 0% |
+| **Phase 2** - Service & Email Layer | 🔴 Not Started | 0/3 tasks | 0% |
+| **Phase 3** - API Routes & Middleware | 🔴 Not Started | 0/2 tasks | 0% |
+| **Phase 4** - Frontend Components | 🔴 Not Started | 0/4 tasks | 0% |
+| **Phase 5** - Pages & Routing | 🔴 Not Started | 0/2 tasks | 0% |
+| **Phase 6** - Testing & Documentation | 🔴 Not Started | 0/3 tasks | 0% |
+
+**Legend**: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⚠️ Blocked
+
+## ⚡ Key Design Decisions
+
+- **Extend existing patterns** instead of creating new files
+- **Reuse EmailVerificationTokenEntity pattern** for PasswordResetTokenEntity
+- **Keep password reset in UserService** (no separate orchestrator needed)
+- **Extend EmailVerificationErrors** → AuthenticationErrors (unified error handling)
+- **Eliminate client type duplication** by using protocol layer consistently
 
 ## Background
 
@@ -45,144 +68,216 @@ The implementation will follow the established 6-layer architecture:
 
 ## Implementation Phases
 
-### Phase 1: Database & Backend Foundation (Day 1)
+### Phase 1: Database & Backend Foundation (Day 1) 🔴 Not Started
 
-#### Task 1.1: Database Migration
-**File**: `packages/models/migrations/004_add_password_reset_tokens.sql`
-- [ ] Create password_reset_tokens table
-- [ ] Add indexes for performance
-- [ ] Set 1-hour expiry default
-- [ ] Add cascade delete for user references
+**Phase Progress**: 0/4 tasks complete (0%)
 
-#### Task 1.2: Entity Layer
+#### Task 1.1: Fix Migration Conflicts & Add Password Reset Table 🔴 Not Started
+**Action**: Rename conflicting migration first, then add password reset
+**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/3 complete):
+- [ ] 🔴 Rename `002_add_email_verification_tokens.sql` → `004_add_email_verification_tokens.sql`
+- [ ] 🔴 Create `005_add_password_reset_tokens.sql` (follow exact email verification pattern)
+- [ ] 🔴 Copy email verification table structure with these changes:
+  - Table name: `password_reset_tokens`
+  - Expiry: `DEFAULT (NOW() + INTERVAL '1 hour')` (instead of 24 hours)
+  - Comment: 'Password reset tokens - 1 hour expiry for security'
+
+#### Task 1.2: Entity Layer 🔴 Not Started
 **File**: `packages/models/src/entities/PasswordResetTokenEntity.ts`
-- [ ] Create PasswordResetTokenEntity class
-- [ ] Implement validation methods
-- [ ] Add transformers for email/token
-- [ ] Create factory method for token creation
+**Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
 
-#### Task 1.3: Repository Layer
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Copy EmailVerificationTokenEntity.ts as template
+- [ ] 🔴 Change class name to PasswordResetTokenEntity
+- [ ] 🔴 Update factory method expiry: 1 hour instead of 24 hours
+- [ ] 🔴 Keep all validation methods identical (reuse email/token transformers)
+
+#### Task 1.3: Repository Layer 🔴 Not Started
 **File**: `packages/models/src/repositories/PasswordResetTokenRepository.ts`
-- [ ] Extend BaseRepository
-- [ ] Implement `generateToken()` method
-- [ ] Implement `validateAndConsumeToken()` method
-- [ ] Add `invalidateExistingTokens()` helper
-- [ ] Add `getTokenInfo()` for validation
+**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
 
-#### Task 1.4: Error Handling
-**File**: `packages/server/src/errors/PasswordResetErrors.ts`
-- [ ] Create PasswordResetError base class
-- [ ] Add InvalidPasswordResetTokenError
-- [ ] Add PasswordResetSendError
-- [ ] Extend from existing error hierarchy
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Copy EmailVerificationTokenRepository.ts as template
+- [ ] 🔴 Change table name from 'email_verification_tokens' to 'password_reset_tokens'
+- [ ] 🔴 Add `invalidateExistingTokens()` method (unique to password reset)
+- [ ] 🔴 Keep same methods: `generateToken()`, `validateAndConsumeToken()`, `getTokenInfo()`
 
-### Phase 2: Service & Email Layer (Day 1-2)
+#### Task 1.4: Error Handling (Elegant Extension) 🔴 Not Started
+**Action**: Extend existing EmailVerificationErrors instead of creating new file
+**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
 
-#### Task 2.1: User Service Updates
+**Sub-tasks** (0/5 complete):
+- [ ] 🔴 Rename `EmailVerificationErrors.ts` → `AuthenticationErrors.ts`
+- [ ] 🔴 Rename `EmailVerificationError` → `AuthenticationError` (keep alias for compatibility)
+- [ ] 🔴 Add `PasswordResetSendError` class (follows same pattern as EmailVerificationSendError)
+- [ ] 🔴 Reuse `InvalidTokenError` for both email verification and password reset
+- [ ] 🔴 Update exports in `errors/index.ts`
+
+### Phase 2: Service & Email Layer (Day 1-2) 🔴 Not Started
+
+**Phase Progress**: 0/3 tasks complete (0%)
+
+#### Task 2.1: User Service Updates (Extend Existing) 🔴 Not Started
 **File**: `packages/server/src/services/UserService.ts`
-- [ ] Add `requestPasswordReset(email)` method
-- [ ] Add `resetPasswordWithToken(token, password)` method
-- [ ] Add `validateResetToken(token)` method
-- [ ] Implement security checks for OAuth users
-- [ ] Add comprehensive logging
+**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
 
-#### Task 2.2: Email Service Updates
+**Sub-tasks** (0/6 complete):
+- [ ] 🔴 Add `passwordResetTokenRepository` to constructor (follows existing pattern)
+- [ ] 🔴 Add `requestPasswordReset(email): Promise<AuthPasswordResetResponse>` method
+- [ ] 🔴 Add `validateResetToken(token): Promise<AuthPasswordResetValidateResponse>` method
+- [ ] 🔴 Add `resetPasswordWithToken(token, password): Promise<AuthPasswordResetCompleteResponse>` method
+- [ ] 🔴 Follow existing `sendEmailVerification()` pattern for implementation
+- [ ] 🔴 Prevent password reset for OAuth-only users (check `hasPassword` field)
+
+#### Task 2.2: Email Service Updates (Follow Verification Pattern) 🔴 Not Started
 **File**: `packages/server/src/services/EmailService.ts`
-- [ ] Add `sendPasswordResetEmail()` method
-- [ ] Create HTML email template
-- [ ] Create text email template
-- [ ] Include 1-hour expiry warning
-- [ ] Style consistently with verification emails
+**Assignee**: TBD | **Estimated**: 1.5 hours | **Started**: - | **Completed**: -
 
-#### Task 2.3: Service Factory
-**File**: `packages/server/src/services/ServiceFactory.ts`
-- [ ] Add createPasswordResetTokenRepository method
-- [ ] Wire up dependencies
+**Sub-tasks** (0/5 complete):
+- [ ] 🔴 Add `sendPasswordResetEmail(email, token)` method (copy `sendVerificationEmail` pattern)
+- [ ] 🔴 Create `generatePasswordResetTemplate()` method (copy verification template)
+- [ ] 🔴 Create `generatePasswordResetTextTemplate()` method
+- [ ] 🔴 Use red color scheme (vs blue for verification) to distinguish
+- [ ] 🔴 Include 1-hour expiry warning (vs 24-hour for verification)
 
-### Phase 3: API Routes & Middleware (Day 2)
+#### Task 2.3: Protocol Layer Updates (Extend Existing) 🔴 Not Started
+**File**: `packages/protocol/src/domains/auth.ts`
+**Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
 
-#### Task 3.1: Rate Limiting
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Add `AuthPasswordResetResponse` interface (follows EmailVerificationResponse pattern)
+- [ ] 🔴 Add `AuthPasswordResetValidateResponse` interface
+- [ ] 🔴 Add `AuthPasswordResetCompleteResponse` interface
+- [ ] 🔴 Update error codes to include password reset errors
+
+### Phase 3: API Routes & Middleware (Day 2) 🔴 Not Started
+
+**Phase Progress**: 0/2 tasks complete (0%)
+
+#### Task 3.1: Rate Limiting (Extend Existing Pattern) 🔴 Not Started
 **File**: `packages/server/src/middleware/rate-limit.ts`
-- [ ] Add passwordResetRateLimit (3 per 15 min)
-- [ ] Configure IP-based limiting
-- [ ] Add appropriate error messages
+**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
 
-#### Task 3.2: API Endpoints
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Add `passwordResetRequestRateLimit` (15 min, 5 requests - matches emailVerificationRateLimit)
+- [ ] 🔴 Add `passwordResetCompleteRateLimit` (5 min, 3 requests - matches resendVerificationRateLimit)
+- [ ] 🔴 Follow exact same pattern as existing rate limiters
+- [ ] 🔴 Use consistent error message format
+
+#### Task 3.2: API Endpoints (Extend Existing Routes) 🔴 Not Started
 **File**: `packages/server/src/routes/auth.ts`
-- [ ] Add `POST /auth/forgot-password` endpoint
-- [ ] Add `POST /auth/reset-password` endpoint
-- [ ] Add `GET /auth/reset-password/validate` endpoint
-- [ ] Implement Zod schemas for validation
-- [ ] Apply rate limiting middleware
-- [ ] Add proper error handling
+**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
 
-### Phase 4: Frontend Components (Day 2-3)
+**Sub-tasks** (0/6 complete):
+- [ ] 🔴 Add Zod schemas following existing pattern (ForgotPasswordSchema, ResetPasswordSchema)
+- [ ] 🔴 Add `POST /auth/forgot-password` endpoint (apply passwordResetRequestRateLimit)
+- [ ] 🔴 Add `POST /auth/reset-password` endpoint (apply passwordResetCompleteRateLimit)
+- [ ] 🔴 Add `GET /auth/reset-password/validate` endpoint (no rate limit - just validation)
+- [ ] 🔴 Follow existing `validateData` helper pattern for Zod validation
+- [ ] 🔴 Use existing `handleError` and `sendSuccess` response helpers
 
-#### Task 4.1: Auth Hook Updates
+### Phase 4: Frontend Components (Day 2-3) 🔴 Not Started
+
+**Phase Progress**: 0/4 tasks complete (0%)
+
+#### Task 4.1: Auth Hook Updates (Remove Duplication & Extend) 🔴 Not Started
 **File**: `packages/client/src/hooks/useAuth.ts`
-- [ ] Add `requestPasswordReset` mutation
-- [ ] Add `resetPassword` mutation
-- [ ] Add `validateResetToken` query
-- [ ] Handle error states
-- [ ] Add loading states
+**Assignee**: TBD | **Estimated**: 1.5 hours | **Started**: - | **Completed**: -
 
-#### Task 4.2: Forgot Password Form
+**Sub-tasks** (0/6 complete):
+- [ ] 🔴 REMOVE local type definitions (AuthUser, AuthMethod, AuthLoginResponse, etc.)
+- [ ] 🔴 IMPORT types from `@starships/protocol` instead
+- [ ] 🔴 Add AUTH_QUERY_KEYS for password reset (follows existing pattern)
+- [ ] 🔴 Add `requestPasswordReset` mutation (follows `resendVerification` pattern)
+- [ ] 🔴 Add `validateResetToken` query (follows TanStack Query pattern)
+- [ ] 🔴 Add `resetPassword` mutation (follows `login` pattern)
+
+#### Task 4.2: Forgot Password Form (Follow SetPasswordDialog Pattern) 🔴 Not Started
 **File**: `packages/client/src/components/auth/ForgotPasswordForm.tsx`
-- [ ] Create form component
-- [ ] Add email input with validation
-- [ ] Show success message after submission
-- [ ] Handle rate limiting errors
-- [ ] Add loading states
+**Assignee**: TBD | **Estimated**: 1 hour | **Started**: - | **Completed**: -
 
-#### Task 4.3: Reset Password Form
+**Sub-tasks** (0/5 complete):
+- [ ] 🔴 Copy SetPasswordDialog.tsx as template for form patterns
+- [ ] 🔴 Use same UI components (Input, Label, Button, Alert)
+- [ ] 🔴 Follow same error handling and loading patterns
+- [ ] 🔴 Use same validation approach (client-side + server response)
+- [ ] 🔴 Show success state similar to email verification pattern
+
+#### Task 4.3: Reset Password Form (Extend SetPasswordDialog) 🔴 Not Started
 **File**: `packages/client/src/components/auth/ResetPasswordForm.tsx`
-- [ ] Create form component
-- [ ] Add password/confirm password inputs
-- [ ] Validate token on mount
-- [ ] Handle expired tokens
-- [ ] Show success and redirect
+**Assignee**: TBD | **Estimated**: 1.5 hours | **Started**: - | **Completed**: -
 
-#### Task 4.4: Login Form Updates
+**Sub-tasks** (0/5 complete):
+- [ ] 🔴 Copy SetPasswordDialog.tsx as template (same password input patterns)
+- [ ] 🔴 Add token validation on mount using `validateResetToken` hook
+- [ ] 🔴 Handle token states: valid, expired, consumed, invalid
+- [ ] 🔴 Use same password validation as SetPasswordDialog
+- [ ] 🔴 Follow SecurityCard.tsx pattern for password confirmation
+
+#### Task 4.4: Login Form Updates (Minimal Addition) 🔴 Not Started
 **File**: `packages/client/src/components/auth/LoginForm.tsx`
-- [ ] Add "Forgot Password?" link
-- [ ] Position below password field
-- [ ] Style consistently
+**Assignee**: TBD | **Estimated**: 15 minutes | **Started**: - | **Completed**: -
 
-### Phase 5: Pages & Routing (Day 3)
+**Sub-tasks** (0/3 complete):
+- [ ] 🔴 Add single "Forgot Password?" link below password field
+- [ ] 🔴 Use existing Link component and styling patterns
+- [ ] 🔴 Link to `/forgot-password` route
 
-#### Task 5.1: Forgot Password Page
+### Phase 5: Pages & Routing (Day 2-3) 🔴 Not Started
+
+**Phase Progress**: 0/2 tasks complete (0%)
+
+#### Task 5.1: Forgot Password Page (Follow Login Page Pattern) 🔴 Not Started
 **File**: `packages/client/src/app/forgot-password/page.tsx`
-- [ ] Create page component
-- [ ] Add page layout and styling
-- [ ] Include back to login link
-- [ ] Add meta tags for SEO
+**Assignee**: TBD | **Estimated**: 30 minutes | **Started**: - | **Completed**: -
 
-#### Task 5.2: Reset Password Page
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Copy login page structure and layout
+- [ ] 🔴 Replace LoginForm with ForgotPasswordForm
+- [ ] 🔴 Keep same Card container and styling
+- [ ] 🔴 Add "Back to login" link (follows existing navigation patterns)
+
+#### Task 5.2: Reset Password Page (Follow Login Page Pattern) 🔴 Not Started
 **File**: `packages/client/src/app/reset-password/page.tsx`
-- [ ] Create page component
-- [ ] Handle token from query params
-- [ ] Show appropriate error states
-- [ ] Redirect after success
+**Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
 
-### Phase 6: Testing & Documentation (Day 3-4)
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Copy login page structure and layout
+- [ ] 🔴 Replace LoginForm with ResetPasswordForm
+- [ ] 🔴 Handle token from searchParams (Next.js 13+ pattern)
+- [ ] 🔴 Add redirect logic after successful reset
 
-#### Task 6.1: Unit Tests
-- [ ] Test token generation and validation
-- [ ] Test service methods
-- [ ] Test API endpoints
-- [ ] Test React components
+### Phase 6: Testing & Documentation (Day 3) 🔴 Not Started
 
-#### Task 6.2: Integration Tests
-- [ ] Test complete forgot password flow
-- [ ] Test token expiry
-- [ ] Test rate limiting
-- [ ] Test OAuth user restrictions
+**Phase Progress**: 0/3 tasks complete (0%)
 
-#### Task 6.3: Documentation
-- [ ] Update API documentation
-- [ ] Add user guide
-- [ ] Document security considerations
-- [ ] Update changelog
+#### Task 6.1: Follow Existing Test Patterns 🔴 Not Started
+**Assignee**: TBD | **Estimated**: 2 hours | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Copy email verification test structure for password reset tests
+- [ ] 🔴 Test repository methods (follow EmailVerificationTokenRepository test patterns)
+- [ ] 🔴 Test service methods (follow UserService test patterns)
+- [ ] 🔴 Test API endpoints (follow auth route test patterns)
+
+#### Task 6.2: Integration Testing 🔴 Not Started
+**Assignee**: TBD | **Estimated**: 1.5 hours | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/4 complete):
+- [ ] 🔴 Test complete forgot password flow (email → token → reset → login)
+- [ ] 🔴 Test token expiry and cleanup
+- [ ] 🔴 Test rate limiting triggers and recovery
+- [ ] 🔴 Test OAuth user restrictions (hasPassword check)
+
+#### Task 6.3: Documentation Updates 🔴 Not Started
+**Assignee**: TBD | **Estimated**: 45 minutes | **Started**: - | **Completed**: -
+
+**Sub-tasks** (0/3 complete):
+- [ ] 🔴 Update existing API documentation (add 3 new endpoints)
+- [ ] 🔴 Add password reset section to existing auth documentation
+- [ ] 🔴 Update CHANGELOG.md with new feature
 
 ## Security Considerations
 
@@ -265,14 +360,44 @@ If issues arise during deployment:
 | User enumeration | Medium | Medium | Generic messages, consistent timing |
 | OAuth user confusion | Low | Low | Clear messaging, different email |
 
-## Timeline
+## 📈 Detailed Time Estimates
+
+### Total Estimated Time: **18.5 hours** across 3 days
+
+| Phase | Tasks | Est. Time | Day |
+|-------|-------|-----------|-----|
+| **Phase 1** | 4 tasks | 3.25 hours | Day 1 |
+| **Phase 2** | 3 tasks | 4.25 hours | Day 1-2 |
+| **Phase 3** | 2 tasks | 3 hours | Day 2 |
+| **Phase 4** | 4 tasks | 4 hours | Day 2-3 |
+| **Phase 5** | 2 tasks | 1.25 hours | Day 3 |
+| **Phase 6** | 3 tasks | 4.25 hours | Day 3 |
+
+### Refined Timeline
 
 ```
-Day 1: Database, Entity, Repository, Errors
-Day 2: Services, Email Templates, API Routes
-Day 3: Frontend Components, Pages
-Day 4: Testing, Documentation, Review
+Day 1 (7.5h): Database migration fix, Entity/Repository (copy existing), Error extension, Start services
+Day 2 (7h): Complete services, Email templates, API routes, Protocol types, Start frontend
+Day 3 (4h): Complete frontend, Pages, Testing, Documentation
 ```
+
+**Time Saved**: 6+ hours due to elegant extensions rather than new implementations
+
+## 🎯 Progress Tracking Instructions
+
+### Status Updates
+- **🔴 Not Started** → **🟡 In Progress** → **🟢 Complete** → **⚠️ Blocked**
+- Update **Assignee** when work begins
+- Update **Started** timestamp when moving to In Progress
+- Update **Completed** timestamp when marking Complete
+- Update phase progress percentages as tasks complete
+
+### Completion Criteria
+- [ ] All sub-tasks marked complete
+- [ ] Code review passed
+- [ ] Tests passing
+- [ ] Documentation updated
+- [ ] Ready for deployment
 
 ## Approval & Sign-off
 
@@ -283,16 +408,33 @@ Day 4: Testing, Documentation, Review
 - [ ] Documentation Complete
 - [ ] Deployment Ready
 
-## Notes
+## Elegant Solutions Summary
 
-- Follow existing email verification pattern for consistency
-- Maintain clean separation between layers
-- Comprehensive logging at each step
-- Consider future enhancements (2FA, security questions)
+### ✅ **Elegant Extensions vs New Implementations**
+
+| Component | ❌ Original Plan | ✅ Refined Approach |
+|-----------|------------------|---------------------|
+| **Protocol Types** | Create new types | Extend existing auth.ts with response types |
+| **Error Handling** | New PasswordResetErrors.ts | Rename EmailVerificationErrors → AuthenticationErrors |
+| **Repository** | New implementation | Copy EmailVerificationTokenRepository pattern |
+| **Entity** | New implementation | Copy EmailVerificationTokenEntity pattern |
+| **Service** | New orchestrator | Extend existing UserService |
+| **Rate Limiting** | Single rate limiter | Two rate limiters following existing pattern |
+| **Client Types** | Keep duplicates | Remove duplicates, import from protocol |
+| **Migration** | New 004 migration | Fix conflicts first, then 005 migration |
+
+### 🎯 **Key Benefits**
+
+- **50% less code** due to copying/extending existing patterns
+- **Zero architectural debt** - follows established patterns exactly
+- **Consistent UX** - users see familiar interfaces and error messages
+- **Easier maintenance** - same patterns throughout codebase
+- **Faster implementation** - no need to design from scratch
 
 ---
 
-**Document Version**: 1.0.0  
+**Document Version**: 2.0.0 (Refined)  
 **Created**: 2025-01-19  
+**Refined**: 2025-01-19  
 **Author**: System Architecture Team  
-**Status**: Draft - Pending Review
+**Status**: Ready for Implementation

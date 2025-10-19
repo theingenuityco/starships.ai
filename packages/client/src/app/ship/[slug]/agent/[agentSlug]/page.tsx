@@ -41,6 +41,14 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // After tool execution completes, fetch and sync agent data once
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
 
+  // Ensure slug is present in form ASAP so downstream effects can resolve agentId
+  useEffect(() => {
+    if (!agentBuilderRef.current) return
+    if (agentSlug && agentSlug !== 'new') {
+      agentBuilderRef.current.updateField('slug', String(agentSlug))
+    }
+  }, [agentSlug])
+
   // Stream agent arguments into builder as they arrive
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
@@ -242,9 +250,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             if (agent && agentBuilderRef.current) {
               agentBuilderRef.current.updateField('name', agent.name || '')
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
-              if (agent.description) agentBuilderRef.current.updateField('description', agent.description)
-              if (agent.model) agentBuilderRef.current.updateField('model', agent.model)
-              if (agent.systemPrompt) agentBuilderRef.current.updateField('systemPrompt', agent.systemPrompt)
+              agentBuilderRef.current.updateField('description', agent.description || '')
+              agentBuilderRef.current.updateField('model', agent.model || '')
+              agentBuilderRef.current.updateField('systemPrompt', agent.systemPrompt || '')
               if (agent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', agent.temperature as any)
               if (agent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', agent.maxTokens as any)
               if (agent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', agent.timeout as any)
@@ -273,8 +281,10 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     const doPrefill = async () => {
       if (!agentSlug || agentSlug === 'new') return
       try {
+        console.debug('[AgentBuilder] Prefill start', { agentSlug })
         const agent = await agentAPI.getBySlug(agentSlug)
         if (agent && agentBuilderRef.current) {
+          console.debug('[AgentBuilder] Prefill fetched agent', { id: agent.id, slug: agent.slug })
           agentBuilderRef.current.updateField('name', agent.name || '')
           if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
           if (agent.description) agentBuilderRef.current.updateField('description', agent.description)
@@ -288,6 +298,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           if ((agent as any).icon) agentBuilderRef.current.updateField('icon', (agent as any).icon)
         }
       } catch {
+        console.warn('[AgentBuilder] Prefill failed', { agentSlug })
         // If fetch fails, keep an empty/new form
       }
     }
@@ -341,7 +352,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
+      <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined} />
       {conversationId && (
         <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
           <div className="max-w-2xl mx-auto pointer-events-auto">

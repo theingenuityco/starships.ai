@@ -55,43 +55,59 @@ export default function Hero() {
           </div>
         </div>
 
+        {/* Mock desktop window with blueprint (top) and chat (bottom) */}
         <div className="relative">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Autopilot Runner</span>
+          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden shadow-lg">
+            {/* Window top bar */}
+            <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-red-500/80" />
+                <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
               </div>
-              <span className="text-xs text-muted-foreground">Observability</span>
+              <div className="text-xs text-white/70">Starships • Blueprint & Chat</div>
+              <div className="w-10" />
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between p-2 rounded bg-black/20">
-                <div className="flex items-center gap-2">
-                  <Icon name="workflow" className="w-4 h-4 text-white/60" />
-                  Plan generated
+
+            {/* Content area: blueprint on top, chat below */}
+            <div className="grid grid-rows-[1fr_auto] md:grid-rows-[320px_240px]">
+              {/* Blueprint panel */}
+              <div className="p-4 bg-black/20 border-b border-white/10 overflow-auto">
+                <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Blueprint</div>
+                <div className="rounded-lg bg-black/30 border border-white/10 p-3 font-mono text-xs leading-relaxed text-white/90">
+                  <div>// agent: Data Enrichment</div>
+                  <div>goals:</div>
+                  <div className="pl-4">- fetch recent news for company</div>
+                  <div className="pl-4">- extract partners and funding</div>
+                  <div className="pl-4">- write normalized profile</div>
+                  <div>tools:</div>
+                  <div className="pl-4">- web.search(q)</div>
+                  <div className="pl-4">- db.enrich(entity)</div>
+                  <div>guardrails:</div>
+                  <div className="pl-4">- PII-check: pass required</div>
+                  <div className="pl-4">- retry-policy: 2 attempts</div>
                 </div>
-                <span className="text-xs text-white/50">42ms</span>
               </div>
-              <div className="flex items-center justify-between p-2 rounded bg-black/20">
-                <div className="flex items-center gap-2">
-                  <Icon name="globe" className="w-4 h-4 text-white/60" />
-                  web.search("acme partners")
+
+              {/* Chat panel */}
+              <div className="p-4 bg-black/10">
+                <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Chat</div>
+                <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                  <div className="flex gap-2">
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-white/20" />
+                    <div className="rounded-lg bg-white/10 px-3 py-2 text-sm">Can you enrich Acme and list recent partners?</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-primary/40" />
+                    <div className="rounded-lg bg-primary/15 px-3 py-2 text-sm">Sure — I will search the web, extract entities, apply guardrails, and update the profile.</div>
+                  </div>
                 </div>
-                <span className="text-xs text-white/50">1.2s</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-black/20">
-                <div className="flex items-center gap-2">
-                  <Icon name="shield-check" className="w-4 h-4 text-emerald-400" />
-                  Guardrail: PII-check passed
+                <div className="mt-3 flex items-center gap-2">
+                  <input placeholder="Ask about this blueprint..." className="flex-1 rounded-md bg-black/20 border border-white/10 px-3 py-2 text-sm outline-none" />
+                  <Button size="sm" className="px-4">
+                    <Icon name="paper-plane-right" className="w-4 h-4" />
+                  </Button>
                 </div>
-                <span className="text-xs text-white/50">0ms</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-black/20">
-                <div className="flex items-center gap-2">
-                  <Icon name="database" className="w-4 h-4 text-white/60" />
-                  db.enrich(company)
-                </div>
-                <span className="text-xs text-white/50">840ms</span>
               </div>
             </div>
           </div>

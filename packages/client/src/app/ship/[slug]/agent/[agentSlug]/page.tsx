@@ -341,7 +341,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} persistenceKey={`${slug}:${agentSlug || 'new'}:${conversationId || 'no-conv'}`} />
+      <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (
         <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
           <div className="max-w-2xl mx-auto pointer-events-auto">

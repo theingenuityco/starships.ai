@@ -7,8 +7,8 @@ import { useAgentForm } from './hooks/useAgentForm'
 import { Button } from '@/components/ui/button'
 import { AgentDocumentEditor } from './components/AgentDocumentEditor'
 
-export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, persistenceKey, starshipId }, ref) => {
-  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave, persistenceKey })
+export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId }, ref) => {
+  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave })
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({

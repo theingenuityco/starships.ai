@@ -1,27 +1,14 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import type { ToolFormData, FormErrors } from '../types'
 import { INITIAL_FORM_DATA } from '../constants'
 
 interface UseToolFormProps {
   onSave?: (data: ToolFormData) => void
-  persistenceKey?: string
 }
 
-export const useToolForm = ({ onSave, persistenceKey }: UseToolFormProps) => {
-  // Initialize from localStorage draft if available
-  const [formData, setFormData] = useState<ToolFormData>(() => {
-    if (typeof window === 'undefined' || !persistenceKey) return INITIAL_FORM_DATA
-    try {
-      const raw = window.localStorage.getItem(`toolBuilder:draft:${persistenceKey}`)
-      if (!raw) return INITIAL_FORM_DATA
-      const parsed = JSON.parse(raw)
-      return { ...INITIAL_FORM_DATA, ...(parsed as Partial<ToolFormData>) }
-    } catch {
-      return INITIAL_FORM_DATA
-    }
-  })
+export const useToolForm = ({ onSave }: UseToolFormProps) => {
+  const [formData, setFormData] = useState<ToolFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<FormErrors>({})
-  const saveTimerRef = useRef<number | null>(null)
 
   const handleFieldChange = useCallback((field: keyof ToolFormData, value: string | boolean) => {
     setFormData(prev => {
@@ -77,24 +64,13 @@ export const useToolForm = ({ onSave, persistenceKey }: UseToolFormProps) => {
   const handleSave = useCallback(() => {
     if (validateForm()) {
       onSave?.(formData)
-      // Clear draft on successful save
-      if (typeof window !== 'undefined' && persistenceKey) {
-        try {
-          window.localStorage.removeItem(`toolBuilder:draft:${persistenceKey}`)
-        } catch {}
-      }
     }
-  }, [validateForm, onSave, formData, persistenceKey])
+  }, [validateForm, onSave, formData])
 
   const resetForm = useCallback(() => {
     setFormData(INITIAL_FORM_DATA)
     setErrors({})
-    if (typeof window !== 'undefined' && persistenceKey) {
-      try {
-        window.localStorage.removeItem(`toolBuilder:draft:${persistenceKey}`)
-      } catch {}
-    }
-  }, [persistenceKey])
+  }, [])
 
   const updateField = useCallback((field: keyof ToolFormData, value: string | boolean) => {
     setFormData(prev => {
@@ -118,28 +94,6 @@ export const useToolForm = ({ onSave, persistenceKey }: UseToolFormProps) => {
       return newErrors
     })
   }, [])
-
-  // Debounced persistence of formData to localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined' || !persistenceKey) return
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = null
-    }
-    const isEmptyInitial = formData.name === '' && formData.description === '' && formData.parameters === INITIAL_FORM_DATA.parameters && formData.blueprint === INITIAL_FORM_DATA.blueprint
-    if (isEmptyInitial) return
-    saveTimerRef.current = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(`toolBuilder:draft:${persistenceKey}`, JSON.stringify(formData))
-      } catch {}
-    }, 300)
-    return () => {
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current)
-        saveTimerRef.current = null
-      }
-    }
-  }, [formData, persistenceKey])
 
   return {
     formData,

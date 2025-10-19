@@ -435,7 +435,7 @@ export class ConversationService {
       // - Quoted: @"Display Name With Spaces"
       // - Bracketed: @[Display Name With Spaces]
       // - Special: @all
-      const mentionRe = /@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|(all)|([a-z0-9._\-]{1,100}))/gi;
+      const mentionRe = /@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|(all)|([a-z0-9._-]{1,100}))/gi;
       const seen: Set<string> = new Set();
       const out: AgentModel[] = [];
 
@@ -510,7 +510,9 @@ export class ConversationService {
       if (resolvedLog.length > 0) {
         try {
           console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
-        } catch {}
+        } catch {
+          void 0;
+        }
       }
       return out;
     } catch {

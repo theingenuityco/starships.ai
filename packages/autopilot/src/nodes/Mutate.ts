@@ -93,7 +93,7 @@ export class Mutate implements NodeHandler {
           const guardResolved = (await this.eval.resolveTemplates(r.if, execution, undefined, {
             stringEvaluationMode: 'full-only',
           })) as unknown;
-          if (!Boolean(guardResolved)) {
+          if (!guardResolved) {
             continue; // skip
           }
         }
@@ -129,7 +129,10 @@ export class Mutate implements NodeHandler {
     if (!Array.isArray(specs)) return [];
     return specs
       .map((s) => (typeof s === 'string' ? { code: s } : s))
-      .filter((s): s is { name?: string; if?: string; code: string; timeoutMs?: number } => !!s && typeof (s as any).code === 'string');
+      .filter(
+        (s): s is { name?: string; if?: string; code: string; timeoutMs?: number } =>
+          typeof (s as Record<string, unknown>).code === 'string'
+      );
   }
 
   private buildReducerContext(input?: ExecutionItem[]): Record<string, unknown> {
@@ -184,7 +187,11 @@ export class Mutate implements NodeHandler {
     return ctx;
   }
 
-  private async runReducer(code: string, currentState: Record<string, unknown>, ctx: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async runReducer(
+    code: string,
+    currentState: Record<string, unknown>,
+    ctx: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     const timeoutMs = 1000;
     return await new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => reject(new Error(`Reducer execution timeout after ${timeoutMs}ms`)), timeoutMs);
@@ -224,7 +231,7 @@ export class Mutate implements NodeHandler {
     const keys = new Set<string>([...Object.keys(before || {}), ...Object.keys(after || {})]);
     const changed: string[] = [];
     for (const k of keys) {
-      if ((before as any)[k] !== (after as any)[k]) changed.push(k);
+      if ((before as Record<string, unknown>)[k] !== (after as Record<string, unknown>)[k]) changed.push(k);
     }
     return changed;
   }

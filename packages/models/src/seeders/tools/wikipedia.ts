@@ -135,14 +135,8 @@ export const wikipediaTool: ToolParams = {
             };
           `,
           timeout: 5000,
-          // Store metadata in state for later nodes
-          mutations: [
-            {
-              operation: 'add',
-              path: '/state/wikipedia_metadata',
-              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}',
-            },
-          ],
+          // Store metadata in state for later nodes using reducers
+          reducers: ["(state, ctx) => ({ ...state, wikipedia_metadata: ctx.$lastOutputOf('prepare_request')[0].json.metadata })"],
         },
       },
       {

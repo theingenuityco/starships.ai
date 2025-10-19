@@ -87,13 +87,7 @@ export const duckduckgoTool: ToolParams = {
             };
           `,
           timeout: 5000,
-          mutations: [
-            {
-              operation: 'add',
-              path: '/state/duckduckgo_metadata',
-              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}',
-            },
-          ],
+          reducers: ["(state, ctx) => ({ ...state, duckduckgo_metadata: ctx.$lastOutputOf('prepare_request')[0].json.metadata })"],
         },
       },
       {

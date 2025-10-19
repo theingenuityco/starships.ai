@@ -19,16 +19,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { useToolTemplates } from '@/hooks/useTemplates'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/lib/api'
+import type { ToolModel, ApiResponse } from '@starships/protocol'
+import type { FetchResponse } from '@/lib/types'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
   onChange: (next: AgentFormData) => void
   onSave?: () => void
   onCancel?: () => void
+  starshipId?: string
 }
 
-export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({ value, onChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
   const generatedSlug = useMemo(
     () =>
       value.name
@@ -40,12 +44,21 @@ export function AgentDocumentEditor({ value, onChange, onSave, onCancel }: Agent
     [value.name]
   )
 
-  const { data: toolTemplates } = useToolTemplates(undefined, true)
+  const { data: starshipTools = [] } = useQuery({
+    queryKey: ['starship-tools', starshipId] as const,
+    queryFn: async (): Promise<ToolModel[]> => {
+      if (!starshipId) return []
+      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`)
+      return response.data.data || []
+    },
+    enabled: !!starshipId,
+    staleTime: 30 * 1000,
+  })
   const selectedToolSlugs = value.assignedToolSlugs || []
   const allToolOptions = useMemo(() => {
-    const fetchedSlugs = Array.isArray(toolTemplates) ? Array.from(new Set(toolTemplates.map((t: any) => t.slug).filter(Boolean))) : []
+    const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
-  }, [toolTemplates, selectedToolSlugs])
+  }, [starshipTools, selectedToolSlugs])
 
   const handleNameChange = (name: string) => {
     const shouldUpdateSlug = !value.slug || value.slug === generatedSlug

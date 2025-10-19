@@ -8,7 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentUnassignToolTool: ToolParams = {
   name: 'Unassign Agent Tool',
   slug: 'agent-unassign-tool',
-  description: `Remove a tool from an agent by removing it from the agent's assignedToolSlugs array.
+  description: `Remove a tool from an agent by deleting the Agent→Tool relationship.
 
 ## Purpose
 Revoke an agent's access to a specific tool by its slug.
@@ -19,9 +19,8 @@ Revoke an agent's access to a specific tool by its slug.
 
 ## Behavior
 1. Fetches current agent by slug
-2. Removes toolSlug from assignedToolSlugs array if present (idempotent - safe if already removed)
-3. Updates agent with new tool assignment
-4. Returns updated agent model
+2. Calls DELETE /agents/:id/tools/:toolSlug?starshipId=... to remove relationship
+3. Returns server response
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
@@ -30,7 +29,7 @@ Automatically inferred from agent state (do not pass manually):
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response
-Returns updated agent with tool removed from assignedToolSlugs array.
+Returns server response.
 
 ## Common Failures
 - Agent not found (404)
@@ -99,8 +98,8 @@ Returns updated agent with tool removed from assignedToolSlugs array.
       {
         ref: 'update_tools',
         type: 'code',
-        name: 'Update Tool Assignment',
-        description: 'Remove tool from assignedToolSlugs if present',
+        name: 'Remove Tool Relationship',
+        description: 'DELETE /agents/:id/tools/:toolSlug?starshipId=...',
         parameters: {
           code: `
             const fetchResponse = $lastOutputOf('fetch_agent')[0]?.json ?? {};
@@ -113,22 +112,14 @@ Returns updated agent with tool removed from assignedToolSlugs array.
             const ctx = $lastOutputOf('prepare')[0].json;
             const toolSlug = ctx.toolSlug;
 
-            // Get current assignedToolSlugs or initialize empty array
-            let assignedToolSlugs = agentData.assignedToolSlugs || [];
-            if (!Array.isArray(assignedToolSlugs)) {
-              assignedToolSlugs = [];
-            }
-
-            // Remove tool if present (idempotent - safe even if not present)
-            assignedToolSlugs = assignedToolSlugs.filter(slug => slug !== toolSlug);
+            const url = new URL(\`${'${'}ctx.baseUrl}/agents/${'${'}agentData.id}/tools/${'${'}toolSlug}\`);
+            url.searchParams.set('starshipId', String(ctx.starshipId));
 
             return {
-              url: \`\${ctx.baseUrl}/agents/\${agentData.id}\`,
-              method: 'PUT',
+              url: url.toString(),
+              method: 'DELETE',
               headers: ctx.headers,
-              body: {
-                assignedToolSlugs
-              }
+              timeout: 10000
             };
           `,
           timeout: 3000,
@@ -137,14 +128,13 @@ Returns updated agent with tool removed from assignedToolSlugs array.
       {
         ref: 'http_update',
         type: 'http_request',
-        name: 'Update Agent',
-        description: 'PUT /agents/:id with updated assignedToolSlugs',
+        name: 'Unassign Tool',
+        description: 'DELETE /agents/:id/tools/:toolSlug',
         parameters: {
           url: '{{ $lastOutputOf("update_tools")[0].json.url }}',
           method: '{{ $lastOutputOf("update_tools")[0].json.method }}',
           headers: '{{ $lastOutputOf("update_tools")[0].json.headers }}',
-          body: '{{ $lastOutputOf("update_tools")[0].json.body }}',
-          timeout: 10000,
+          timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
         },
       },
       {

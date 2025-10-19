@@ -25,6 +25,8 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   slug: string;
   createdAt: string;
   updatedAt: string;
+  // Starship ownership (FK)
+  starshipId: string;
 }
 
 // ============================================================================

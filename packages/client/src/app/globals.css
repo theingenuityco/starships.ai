@@ -288,7 +288,7 @@
     --foreground: 0 0% 8%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 8%;
-    --primary: 38 92% 50%; /* Amber primary in light */
+    --primary: 224 99% 53%; /* Ultramarine primary in light */
     --primary-foreground: 0 0% 98%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 0 0% 8%;
@@ -298,7 +298,7 @@
     --accent-foreground: 0 0% 8%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 38 92% 50%;
+    --ring: 224 99% 53%;
     --radius: 0.5rem;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
@@ -306,9 +306,9 @@
     --popover-foreground: 0 0% 8%;
 
     /* Command Deck Light - Gradient backgrounds */
-    --command-bg: linear-gradient(135deg, hsl(38 30% 95%), hsl(38 20% 98%));
-    --starship-accent: hsl(38 92% 50%);
-    --primary-rgb: 245 158 11;
+    --command-bg: linear-gradient(135deg, hsl(224 30% 95%), hsl(224 20% 98%));
+    --starship-accent: hsl(224 99% 53%);
+    --primary-rgb: 15 98 254;
 
     /* Shadow colors for light mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
@@ -328,8 +328,8 @@
     --foreground: 0 0% 95%;
     --card: 220 15% 10%;
     --card-foreground: 0 0% 95%;
-    --primary: 38 92% 55%; /* Amber primary in dark */
-    --primary-foreground: 220 15% 8%;
+    --primary: 224 99% 58%; /* Ultramarine primary in dark */
+    --primary-foreground: 0 0% 100%;
     --secondary: 220 15% 15%;
     --secondary-foreground: 0 0% 95%;
     --muted: 220 15% 15%;
@@ -338,16 +338,16 @@
     --accent-foreground: 0 0% 95%;
     --border: 220 15% 20%;
     --input: 220 15% 20%;
-    --ring: 38 92% 55%;
+    --ring: 224 99% 58%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
     --popover: 220 15% 12%;
     --popover-foreground: 0 0% 95%;
 
     /* Command Deck Dark - Deep space gradients */
-    --command-bg: linear-gradient(135deg, hsl(38 20% 12%), hsl(38 10% 8%));
-    --starship-accent: hsl(38 92% 55%);
-    --primary-rgb: 245 158 11;
+    --command-bg: linear-gradient(135deg, hsl(224 20% 12%), hsl(224 10% 8%));
+    --starship-accent: hsl(224 99% 58%);
+    --primary-rgb: 15 98 254;
 
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
@@ -627,7 +627,7 @@
   --foreground: 0 0% 100%;
   --card: 220 15% 5%;
   --card-foreground: 0 0% 95%;
-  --primary: 38 92% 55%;
+  --primary: 224 99% 58%;
   --primary-foreground: 0 0% 0%;
   --secondary: 220 15% 10%;
   --secondary-foreground: 0 0% 95%;
@@ -637,8 +637,8 @@
   --accent-foreground: 0 0% 95%;
   --border: 220 15% 20%;
   --input: 220 15% 20%;
-  --ring: 38 92% 55%;
-  --primary-rgb: 245 158 11;
+  --ring: 224 99% 58%;
+  --primary-rgb: 15 98 254;
 
   /* Ensure text color is applied */
   color: hsl(var(--foreground));
@@ -653,7 +653,7 @@
   --foreground: 0 0% 0%;
   --card: 0 0% 100%;
   --card-foreground: 0 0% 8%;
-  --primary: 38 92% 50%;
+  --primary: 224 99% 53%;
   --primary-foreground: 0 0% 98%;
   --secondary: 220 14% 96%;
   --secondary-foreground: 0 0% 8%;
@@ -663,8 +663,8 @@
   --accent-foreground: 0 0% 8%;
   --border: 220 13% 91%;
   --input: 220 13% 91%;
-  --ring: 38 92% 50%;
-  --primary-rgb: 245 158 11;
+  --ring: 224 99% 53%;
+  --primary-rgb: 15 98 254;
 }
 
 /*

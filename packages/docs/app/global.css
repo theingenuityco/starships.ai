@@ -7,8 +7,8 @@
   /* Layout */
   --fd-layout-width: 1400px;
 
-  /* Primary - Purple accent for key actions only */
-  --fd-primary: 270 85% 65%;
+  /* Primary - Ultramarine for key actions */
+  --fd-primary: 224 99% 53%;
   --fd-primary-foreground: 0 0% 100%;
 
   /* Background - Pure crisp white */
@@ -38,13 +38,13 @@
   --fd-accent: 220 8% 95%;
   --fd-accent-foreground: 0 0% 9%;
 
-  /* Ring - Purple for focus states */
-  --fd-ring: 270 85% 65%;
+  /* Ring - Ultramarine for focus states */
+  --fd-ring: 224 99% 53%;
 }
 
 .dark {
-  /* Primary - Vibrant purple accent */
-  --fd-primary: 270 80% 70%;
+  /* Primary - Vibrant ultramarine accent */
+  --fd-primary: 224 99% 58%;
   --fd-primary-foreground: 0 0% 100%;
 
   /* Background - True deep black with subtle blue-gray undertone */
@@ -74,8 +74,8 @@
   --fd-accent: 270 30% 18%;
   --fd-accent-foreground: 270 80% 85%;
 
-  /* Ring - Bright purple focus */
-  --fd-ring: 270 80% 70%;
+  /* Ring - Bright ultramarine focus */
+  --fd-ring: 224 99% 58%;
 }
 
 /* Additional premium touches */

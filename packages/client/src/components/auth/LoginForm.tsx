@@ -12,6 +12,8 @@ import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { motion } from 'motion/react'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { toast } from 'sonner'
 
 /**
  * OAuth error handling helper
@@ -69,11 +71,17 @@ export function LoginForm() {
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
 
-  // OAuth callback and verification error handling
+  // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
     const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
     const oauthError = searchParams?.get('oauth_error')
     const verificationError = searchParams?.get('verification')
+    const resetSuccess = searchParams?.get('reset')
+
+    // Handle password reset success message
+    if (resetSuccess === 'success') {
+      toast.success('Password reset successful! You can now log in with your new password.')
+    }
 
     // Prevent duplicate handling (synchronous check with ref)
     if (oauthHandledRef.current) {
@@ -303,6 +311,15 @@ export function LoginForm() {
                     </>
                   )}
                 </Button>
+                
+                <div className="text-center">
+                  <Link 
+                    href="/forgot-password" 
+                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
               </form>
             </TabsContent>
 

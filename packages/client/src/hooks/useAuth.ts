@@ -45,6 +45,7 @@ export const AUTH_QUERY_KEYS = {
   user: () => [...AUTH_QUERY_KEYS.all, 'user'] as const,
   me: () => [...AUTH_QUERY_KEYS.user(), 'me'] as const,
   emailVerification: () => [...AUTH_QUERY_KEYS.all, 'email-verification'] as const,
+  passwordReset: () => [...AUTH_QUERY_KEYS.all, 'password-reset'] as const,
 } as const
 
 // Token storage utilities
@@ -311,6 +312,62 @@ export function useResendVerification() {
     onError: (error: any) => {
       console.error('[AUTH] Resend verification error:', error)
       toast.error('Failed to send verification email. Please try again.')
+    },
+  })
+}
+
+// Forgot password mutation
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: async (data: { email: string }) => {
+      const response = await fetch('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to send reset email')
+      }
+      return result.data
+    },
+    onSuccess: () => {
+      toast.success('Password reset link sent! Check your email.')
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to send reset email. Please try again.')
+    },
+  })
+}
+
+// Reset password mutation
+export function useResetPassword(options?: { onSuccess?: (data: any) => void; onError?: (error: any) => void }) {
+  const router = useRouter()
+  return useMutation({
+    mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
+      const response = await fetch('/api/v1/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to reset password')
+      }
+      return result.data
+    },
+    onSuccess: (data) => {
+      toast.success('Password reset successful!')
+      router.push('/login?reset=success')
+      options?.onSuccess?.(data)
+    },
+    onError: (error: any) => {
+      const message = error.message || 'Failed to reset password'
+      toast.error(message)
+      options?.onError?.(error)
+      throw error // Re-throw for component error handling
     },
   })
 }

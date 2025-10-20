@@ -115,6 +115,25 @@ export interface AuthPasswordResetRequest {
 export interface AuthPasswordResetConfirm {
   token: string;
   newPassword: string;
+  confirmPassword: string;
+}
+
+/**
+ * Response for forgot password request
+ */
+export interface AuthPasswordResetResponse {
+  success: boolean;
+  message: string;
+  emailSent: boolean;
+}
+
+/**
+ * Response for password reset confirmation
+ */
+export interface AuthPasswordResetConfirmResponse {
+  success: boolean;
+  message: string;
+  redirectUrl: string; // '/login?reset=success'
 }
 
 // ============================================================================

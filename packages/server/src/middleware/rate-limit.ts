@@ -134,3 +134,43 @@ export const registrationRateLimit = rateLimit({
   skipSuccessfulRequests: false,
   skipFailedRequests: false,
 });
+
+/**
+ * Password reset rate limit
+ * Prevents email bombing attacks on password reset endpoint
+ * 
+ * Configuration:
+ * - 5 requests per 15 minutes per IP for password reset attempts
+ * - 429 status code with descriptive error message
+ */
+export const passwordResetRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per window per IP
+  message: {
+    error: {
+      message: 'Too many password reset attempts. Please try again in 15 minutes.',
+      code: 'PASSWORD_RESET_RATE_LIMIT_EXCEEDED',
+      type: 'RATE_LIMIT_ERROR'
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => {
+    const ip = req.ip || req.connection.remoteAddress;
+    if (!ip) {
+      throw new Error('Cannot determine client IP address for rate limiting');
+    }
+    return ip;
+  },
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      error: {
+        message: 'Too many password reset attempts. Please try again in 15 minutes.',
+        code: 'PASSWORD_RESET_RATE_LIMIT_EXCEEDED',
+        type: 'RATE_LIMIT_ERROR'
+      }
+    });
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});

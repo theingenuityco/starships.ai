@@ -11,14 +11,14 @@ import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository } from '@starships/models';
-import type { AuthLoginResponse } from '@starships/protocol';
+import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { registrationRateLimit, resendVerificationRateLimit } from '@/middleware/rate-limit';
+import { registrationRateLimit, resendVerificationRateLimit, passwordResetRateLimit } from '@/middleware/rate-limit';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -57,6 +57,20 @@ const SetPasswordSchema = z.object({
 // Zod schema for email verification
 const EmailVerificationSchema = z.object({
   email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+});
+
+// Zod schemas for password reset
+const ForgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+});
+
+const ResetPasswordSchema = z.object({
+  token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 // Helper function for Zod validation
@@ -750,6 +764,54 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
     sendSuccess(res, { authUrl });
   } catch (error) {
     handleError(error, res, 'OAuth linking initiation');
+  }
+});
+
+/**
+ * Forgot password - Request password reset
+ * POST /auth/forgot-password
+ * Rate limited to prevent email bombing attacks
+ */
+router.post('/auth/forgot-password', passwordResetRateLimit, async (req: Request, res: Response) => {
+  try {
+    const bodyValidation = validateData(ForgotPasswordSchema, req.body, res, 'forgot password data');
+    if (!bodyValidation) return;
+
+    const { email } = bodyValidation;
+    const userService = ServiceFactory.createUserService();
+    await userService.sendPasswordReset(email);
+
+    // SECURITY: Always return same message (prevent user enumeration)
+    sendSuccess(res, {
+      success: true,
+      message: 'If an account exists with this email, a password reset link has been sent.',
+      emailSent: true,
+    } as AuthPasswordResetResponse);
+  } catch (error) {
+    handleError(error, res, 'password reset request');
+  }
+});
+
+/**
+ * Reset password - Confirm password reset with token
+ * POST /auth/reset-password
+ */
+router.post('/auth/reset-password', async (req: Request, res: Response) => {
+  try {
+    const bodyValidation = validateData(ResetPasswordSchema, req.body, res, 'reset password data');
+    if (!bodyValidation) return;
+
+    const { token, newPassword, confirmPassword } = bodyValidation;
+    const userService = ServiceFactory.createUserService();
+    await userService.resetPassword(token, newPassword, confirmPassword);
+
+    sendSuccess(res, {
+      success: true,
+      message: 'Password reset successful. You can now log in with your new password.',
+      redirectUrl: '/login?reset=success',
+    } as AuthPasswordResetConfirmResponse);
+  } catch (error) {
+    handleError(error, res, 'password reset confirmation');
   }
 });
 

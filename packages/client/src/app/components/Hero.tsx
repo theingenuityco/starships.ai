@@ -103,8 +103,7 @@ export default function Hero() {
             className="absolute inset-0 rounded-2xl shadow-2xl"
             containerClassName="rounded-lg bg-black/30 border border-white/10"
             containerStyle={{
-              background:
-                'radial-gradient(circle at 20% 20%, hsl(var(--primary) / 0.18) 0%, transparent 42%), radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.10) 0%, transparent 40%), linear-gradient(135deg, rgba(17,24,39,0.85) 0%, rgba(2,6,23,0.85) 100%)',
+              background: 'radial-gradient(circle at 20% 20%, hsl(var(--primary) / 0.18) 0%, transparent 42%), radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.10) 0%, transparent 40%)',
             }}
             transparent
             nodesDraggable={false}

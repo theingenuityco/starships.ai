@@ -69,39 +69,24 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* Mock desktop - wallpaper container (window wrapper removed) */}
-        <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl h-[720px]">
-          {/* Wallpaper layer */}
-          <div
-            className="absolute inset-0"
-            style={{
+        {/* Visualization: viewport removed; styles moved into visualization */}
+        <div className="relative h-[720px]">
+          <BlueprintVisualization
+            blueprint={popularBlueprints[blueprintIndex]?.blueprint || { nodes: [], edges: [] }}
+            className="absolute inset-0 rounded-2xl shadow-2xl"
+            containerClassName="rounded-lg bg-black/30 border border-white/10"
+            containerStyle={{
               background:
                 'radial-gradient(circle at 20% 20%, rgba(59,130,246,0.14) 0%, transparent 40%), radial-gradient(circle at 80% 80%, rgba(168,85,247,0.14) 0%, transparent 40%), linear-gradient(135deg, rgba(17,24,39,0.85) 0%, rgba(2,6,23,0.85) 100%)',
             }}
+            transparent
+            nodesDraggable={false}
+            borderless
           />
-          <div className="relative h-full flex items-center justify-center">
-            <div className="mx-auto max-w-5xl w-full">
-              {/* Content area: blueprint with wrapper and no padding */}
-              <div className="relative rounded-lg bg-black/30 border border-white/10 w-full overflow-hidden">
-                <div className="relative">
-                  <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full text-xs bg-black/40 border border-white/15 text-white/90">
-                    {popularBlueprints[blueprintIndex]?.name}
-                  </div>
-                  <BlueprintVisualization
-                    blueprint={popularBlueprints[blueprintIndex]?.blueprint || { nodes: [], edges: [] }}
-                    className="w-full h-[520px] md:h-[600px]"
-                    transparent
-                    nodesDraggable={false}
-                    borderless
-                  />
-                </div>
-                {/* Floating input overlay (scoped to wrapper to avoid overflow) */}
-                <div className="pointer-events-none absolute left-0 right-0 bottom-6 md:bottom-8 p-4 md:p-6">
-                  <div className="max-w-2xl mx-auto pointer-events-auto">
-                    <ConversationMessageInput starshipId="" minimal disabled={false} />
-                  </div>
-                </div>
-              </div>
+          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full text-xs bg-black/40 border border-white/15 text-white/90">{popularBlueprints[blueprintIndex]?.name}</div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 p-0">
+            <div className="w-full pointer-events-auto">
+              <ConversationMessageInput starshipId="" minimal disabled={false} />
             </div>
           </div>
         </div>

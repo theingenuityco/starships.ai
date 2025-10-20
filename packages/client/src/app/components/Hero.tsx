@@ -115,7 +115,7 @@ export default function Hero() {
             containerClassName="rounded-lg bg-black/30 border border-white/10"
             containerStyle={{
               background:
-                'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.22) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(168, 85, 247, 0.20) 0%, transparent 56%)',
+                'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
             }}
             transparent
             nodesDraggable={false}

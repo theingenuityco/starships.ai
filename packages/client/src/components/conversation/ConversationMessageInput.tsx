@@ -742,9 +742,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
       }, [])
       return (
-        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline leading-none text-foreground">
+        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground">
           <span
-            className="inline-flex items-baseline align-baseline gap-1 cursor-pointer hover:opacity-90"
+            className="inline whitespace-nowrap align-baseline cursor-pointer rounded-md px-2 py-0.5 bg-white/90 hover:bg-white dark:bg-white/20 dark:hover:bg-white/25 ring-1 ring-border/60 shadow-sm transition-colors"
             contentEditable={false}
             style={{ pointerEvents: 'auto' }}
             ref={anchorRef}
@@ -775,8 +775,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               }
             }}
           >
-            <span className="relative top-0.5 inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden">
-              <AgentAvatar seed={display} size={16} />
+            <span className="inline-block align-text-bottom mr-1 h-5 w-5 rounded-[3px] overflow-hidden">
+              <AgentAvatar seed={display} size={20} />
             </span>
             <strong className="font-semibold">@{display}</strong>
           </span>
@@ -815,7 +815,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
+            minimal ? 'min-h-[28px] max-h-[100px]' : 'min-h-[64px] max-h-[220px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             minimal && 'text-sm'
           ),
@@ -977,6 +977,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               color: hsl(var(--muted-foreground));
               opacity: 0.7;
             }
+            .tiptap { line-height: 1.5; }
+            .tiptap p { margin: 0; }
           `,
           }}
         />
@@ -1023,58 +1025,31 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         >
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
-          {/* Main Input Section - Only Text Input */}
-          <div className={cn('flex', minimal ? 'items-center p-3' : 'items-end p-4')}>
-            {/* Removed tool builder button */}
+          {/* Main Input Section - Text input with bottom-right action */}
+          <div className={cn('flex relative', minimal ? 'items-center p-3' : 'items-center p-4')}>
+            {/* Optional left-side controls in expanded mode */}
+            {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-12">
               <EditorContent editor={tiptap} />
             </div>
 
-            {/* Minimal mode: Send button on right */}
-            {minimal && (
+            {/* Bottom-right Send Button */}
+            <div className={cn('absolute', minimal ? 'bottom-3 right-3' : 'bottom-4 right-4')}>
               <Button
                 onClick={handleSubmit}
                 disabled={!canSend}
                 size="icon"
                 className={cn(
-                  'h-8 w-8 rounded-full shrink-0 transition-all ml-2',
+                  'h-8 w-8 rounded-full shrink-0 transition-all',
                   canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                 )}
               >
                 {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
               </Button>
-            )}
-          </div>
-
-          {/* Footer Section - Selectors and Action Buttons */}
-          {!minimal && (
-            <div className="border-t border-border/20 bg-muted/10 px-4 py-3">
-              <div className="flex items-center justify-between">
-                {/* Left Side - Selectors and Tool Button */}
-                <div className="flex items-center gap-3">
-                  {children}
-                  {/* Removed tool builder button */}
-                </div>
-
-                {/* Right Side - Send Button */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!canSend}
-                    size="icon"
-                    className={cn(
-                      'h-8 w-8 rounded-full shrink-0 transition-all',
-                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
-                    )}
-                  >
-                    {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Agent Indicator - Only show in non-minimal mode */}

@@ -116,9 +116,9 @@ export function ForgotPasswordForm() {
         
         <CardContent>
           {formError && (
-            <Alert className="mb-4 border-red-200 bg-red-50/50 backdrop-blur-sm">
-              <Icon name="alert-circle" className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-900">{formError}</AlertDescription>
+            <Alert className="mb-4 border-amber-200 bg-amber-50/50 backdrop-blur-sm">
+              <Icon name="alert-circle" className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-900">{formError}</AlertDescription>
             </Alert>
           )}
 

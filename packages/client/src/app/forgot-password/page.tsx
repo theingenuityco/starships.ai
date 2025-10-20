@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
               className="mb-6"
             >
               <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
-                Reset Password
+                Reset Your Password
               </h1>
               <p className="text-muted-foreground mt-2">
                 Get back to your starship journey
@@ -42,16 +42,6 @@ export default function ForgotPasswordPage() {
 
           <ForgotPasswordForm />
 
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            transition={{ delay: 0.8, duration: 0.6 }} 
-            className="mt-8 text-center"
-          >
-            <Link href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-              ← Back to home
-            </Link>
-          </motion.div>
         </div>
       </div>
     </StarTheme>

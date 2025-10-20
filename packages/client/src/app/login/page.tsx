@@ -14,7 +14,7 @@ export default function LoginPage() {
   // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <StarTheme theme="dark">
+      <StarTheme theme="light">
         <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
           <div className="animate-pulse">
             <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />

@@ -7,7 +7,9 @@ import hashlib
 import time
 import jwt
 import requests
+import random
 from datetime import datetime, timedelta
+from botocore.exceptions import ClientError
 
 # AWS clients
 ec2 = boto3.client('ec2', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
@@ -293,10 +295,31 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url):
     # Add subnet if specified
     if RUNNER_SUBNET_ID:
         instance_params['SubnetId'] = RUNNER_SUBNET_ID
-    
-    # Launch instance
-    response = ec2.run_instances(**instance_params)
-    
-    instance_id = response['Instances'][0]['InstanceId']
-    
-    return instance_id
+
+    # Launch instance with retry logic for rate limiting
+    max_retries = 5
+    base_delay = 2  # Start with 2 seconds
+
+    for attempt in range(max_retries):
+        try:
+            response = ec2.run_instances(**instance_params)
+            instance_id = response['Instances'][0]['InstanceId']
+            print(f"Successfully launched instance {instance_id} for job {job_id}")
+            return instance_id
+
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+
+            # Retry on throttling errors
+            if error_code in ['RequestLimitExceeded', 'Throttling']:
+                if attempt < max_retries - 1:
+                    # Exponential backoff with jitter
+                    delay = min(base_delay * (2 ** attempt) + random.uniform(0, 1), 30)
+                    print(f"Rate limited on attempt {attempt + 1}/{max_retries}, retrying in {delay:.2f}s...")
+                    time.sleep(delay)
+                else:
+                    print(f"Failed after {max_retries} attempts due to rate limiting")
+                    raise
+            else:
+                # Don't retry on other errors
+                raise

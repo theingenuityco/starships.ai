@@ -4,10 +4,10 @@
 
 This document outlines the implementation plan for adding password reset functionality to the Starships.ai platform. The feature will follow the existing email verification pattern and maintain consistency with the 6-layer architecture.
 
-**Status**: 🟡 Planned (Clean Architecture)  
+**Status**: 🟡 Planned  
 **Priority**: High  
-**Estimated Timeline**: 3-4 days (clean architectural implementation)  
-**Architecture Pattern**: Proper dependency injection with dedicated services
+**Estimated Timeline**: 6 hours (following existing patterns)  
+**Architecture Pattern**: Fix repository anti-patterns while adding password reset
 
 ## 📊 Live Progress Tracker
 
@@ -16,10 +16,10 @@ This document outlines the implementation plan for adding password reset functio
 | Phase | Status | Progress | Completion |
 |-------|--------|----------|------------|
 | **Phase 1** - Foundation & Migration Fix | 🔴 Not Started | 0/3 tasks | 0% |
-| **Phase 2** - Service Architecture Refactor | 🔴 Not Started | 0/4 tasks | 0% |
-| **Phase 3** - Token Management System | 🔴 Not Started | 0/3 tasks | 0% |
-| **Phase 4** - Password Reset Implementation | 🔴 Not Started | 0/3 tasks | 0% |
-| **Phase 5** - Frontend & Integration | 🔴 Not Started | 0/3 tasks | 0% |
+| **Phase 2** - Password Reset Implementation | 🔴 Not Started | 0/4 tasks | 0% |
+| **Phase 3** - API Routes & Email Service | 🔴 Not Started | 0/3 tasks | 0% |
+| **Phase 4** - Frontend Implementation | 🔴 Not Started | 0/3 tasks | 0% |
+| **Phase 5** - Testing & Cleanup | 🔴 Not Started | 0/3 tasks | 0% |
 
 **Legend**: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⚠️ Blocked
 
@@ -98,6 +98,38 @@ The implementation will follow the established 6-layer architecture:
 **Sub-tasks** (0/2 complete):
 - [ ] 🔴 Create migration file `005_add_password_reset_tokens.sql`
 - [ ] 🔴 Copy email verification table structure with 1-hour expiry
+
+**Complete SQL Migration**:
+```sql
+-- Migration: Add password reset tokens table
+-- Description: Add password reset tokens table for password recovery functionality
+-- Author: Engineering Team
+-- Version: 1.0.0
+-- Date: 2025-01-19
+
+-- ============================================================================
+-- PASSWORD RESET TOKENS TABLE
+-- ============================================================================
+
+CREATE TABLE password_reset_tokens (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    token VARCHAR(64) UNIQUE NOT NULL,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    consumed BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (NOW() + INTERVAL '1 hour')
+);
+
+-- Password reset token indexes (same pattern as email verification)
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token) WHERE NOT consumed;
+CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+CREATE INDEX idx_password_reset_tokens_email ON password_reset_tokens(email);
+
+-- Comment for documentation
+COMMENT ON TABLE password_reset_tokens IS 'Password reset tokens for account recovery - 1 hour expiry for security';
+```
 
 ### Phase 2: Password Reset Implementation (2 hours) 🔴 Not Started
 
@@ -195,6 +227,21 @@ private async cleanupExpiredTokensForUser(userId: string): Promise<void> {
 
 **User Validation Logic**:
 ```typescript
+// Add to imports at top of UserService.ts:
+import { ValidationError } from '@starships/errors';
+import bcrypt from 'bcrypt';
+import { PasswordResetTokenRepository } from '@starships/models';
+import { logger } from '@/utils/logger';
+import { EmailService } from './EmailService';
+
+// Add as class properties:
+private passwordResetTokenRepository: PasswordResetTokenRepository;
+private emailService: EmailService;
+
+// In constructor, add:
+this.passwordResetTokenRepository = new PasswordResetTokenRepository();
+this.emailService = new EmailService(); // Or use ServiceFactory.createEmailService() if needed
+
 /**
  * Send password reset email (with user validation)
  */
@@ -286,7 +333,7 @@ const ForgotPasswordSchema = z.object({
 });
 
 const ResetPasswordSchema = z.object({
-  token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+  token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'), // 32 bytes as hex = 64 chars
   newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
 }).refine((data) => data.newPassword === data.confirmPassword, {
@@ -345,6 +392,83 @@ router.post('/auth/reset-password', async (req: Request, res: Response) => {
 **Sub-tasks** (0/2 complete):
 - [ ] 🔴 Add `sendPasswordResetEmail()` method
 - [ ] 🔴 Create password reset email template (copy verification template pattern)
+
+**Email Template Implementation**:
+```typescript
+/**
+ * Send password reset email following sendVerificationEmail pattern
+ */
+async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+  const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
+  
+  const command = new SendEmailCommand({
+    Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
+    Destination: { ToAddresses: [email] },
+    Message: {
+      Subject: { Data: 'Reset your Starship password' },
+      Body: {
+        Html: { Data: this.generatePasswordResetTemplate(resetUrl) },
+        Text: { Data: this.generatePasswordResetTextTemplate(resetUrl) },
+      },
+    },
+  });
+  
+  try {
+    await this.sesClient.send(command);
+    logger.info('[EmailService] Password reset email sent', { email });
+  } catch (error) {
+    logger.error('[EmailService] Failed to send password reset email', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      email 
+    });
+    throw new Error(`Failed to send password reset email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+private generatePasswordResetTemplate(resetUrl: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head><meta charset="utf-8"><title>Reset Your Starship Password</title></head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #1a202c;">🔐 Password Reset Request</h1>
+        </div>
+        <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="margin-top: 0; color: #2d3748;">Reset Your Password</h2>
+          <p>You requested to reset your password. Click the button below to create a new password:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="background: #e53e3e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              Reset Password
+            </a>
+          </div>
+          <p style="font-size: 14px; color: #718096;">
+            If the button doesn't work, copy and paste this link: <br>
+            <a href="${resetUrl}">${resetUrl}</a>
+          </p>
+        </div>
+        <div style="font-size: 12px; color: #a0aec0; text-align: center;">
+          <p style="color: #e53e3e; font-weight: bold;">This reset link expires in 1 hour.</p>
+          <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+private generatePasswordResetTextTemplate(resetUrl: string): string {
+  return `
+    Password Reset Request
+    
+    You requested to reset your password. Click this link to create a new password:
+    ${resetUrl}
+    
+    This link expires in 1 hour.
+    
+    If you didn't request a password reset, please ignore this email or contact support if you have concerns.
+  `;
+}
 
 #### Task 3.3: Add Password Reset Rate Limiting 🔴 Not Started
 **File**: `packages/server/src/middleware/rate-limit.ts`
@@ -409,12 +533,37 @@ const ResetPasswordForm = ({ token }: { token: string }) => {
 ```
 
 #### Task 4.2: Create Password Reset Pages 🔴 Not Started
-**Files**: `forgot-password/page.tsx`, `reset-password/page.tsx`
+**Files**: `forgot-password/page.tsx`, `reset-password/page.tsx`, `login/page.tsx` update
 **Assignee**: TBD | **Estimated**: 20 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/2 complete):
+**Sub-tasks** (0/3 complete):
 - [ ] 🔴 Create forgot password page
 - [ ] 🔴 Create reset password page with token from URL
+- [ ] 🔴 Update login page to handle `?reset=success` query param
+
+**Login Page Integration**:
+```typescript
+// In login/page.tsx, add after imports:
+import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+
+// Inside LoginPage component:
+const searchParams = useSearchParams();
+
+useEffect(() => {
+  // Show success message if redirected after password reset
+  if (searchParams.get('reset') === 'success') {
+    toast.success('Password reset successful! You can now log in with your new password.');
+  }
+}, [searchParams]);
+```
+
+**Auto-Login Decision**: 
+- **NO auto-login after password reset** - Follow security best practice
+- Users must manually log in with new password
+- This verifies they remember the new password
+- Consistent with most secure applications
 
 #### Task 4.3: Add Password Reset to useAuth Hook 🔴 Not Started
 **File**: `packages/client/src/hooks/useAuth.ts`
@@ -554,6 +703,9 @@ If issues arise during deployment:
 
 ## Success Metrics
 
+**Note**: Metrics tracking to be implemented in a future iteration. Initial implementation focuses on core functionality.
+
+Future metrics to track:
 - **Adoption Rate**: % of users using password reset
 - **Success Rate**: % of initiated resets completed
 - **Time to Complete**: Average time from request to login
@@ -656,11 +808,27 @@ Afternoon (3h): API routes, email templates, frontend components with error hand
 
 ---
 
-**Document Version**: 7.0.0 (Complete Implementation with Gap Fixes)  
+**Document Version**: 8.0.0 (Final Implementation Plan - All Gaps Resolved)  
 **Created**: 2025-01-19  
-**Last Updated**: 2025-01-19  
+**Last Updated**: 2025-01-20  
 **Author**: Engineering Team  
-**Status**: Ready for Implementation (addresses all identified gaps, follows existing patterns)
+**Status**: Ready for Implementation (all gaps addressed, fully detailed implementation plan)
+
+## 🔧 **Gaps Addressed in v8.0.0**
+
+### **v8.0.0 Updates** (All Remaining Gaps Fixed)
+1. **Executive Summary** - Updated timeline to 6 hours and correct approach
+2. **Progress Tracker** - Fixed to show actual 5 phases
+3. **Email Templates** - Added complete implementation code
+4. **Orchestrator Decision** - Documented: not needed for simple flow
+5. **Missing Imports** - Added all required imports to code snippets
+6. **Login Page Integration** - Added query param handling for success message
+7. **Auto-Login Decision** - Clarified: NO auto-login for security
+8. **ServiceFactory** - Confirmed createEmailService() exists
+9. **SQL Migration** - Added complete CREATE TABLE statement
+10. **ValidationError** - Confirmed from @starships/errors
+11. **Token Format** - Confirmed 64-char hex (32 bytes)
+12. **Success Metrics** - Deferred to future iteration
 
 ## 🔧 **Gaps Addressed in v7.0.0**
 

@@ -31,7 +31,6 @@ export default function LoginPage() {
 
   return (
     <StarTheme theme="dark">
-    <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
         {/* Overlay for better text readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/60 pointer-events-none" />

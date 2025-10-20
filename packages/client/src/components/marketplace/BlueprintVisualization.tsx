@@ -52,6 +52,10 @@ interface ReactFlowNode extends Node {
   }
 }
 
+// Unified node type used across state, instance, and ReactFlow generics
+type FlowNodeData = ReactFlowNode['data'] & { isSelected?: boolean }
+type FlowNode = Node<FlowNodeData>
+
 // Get icon component for node type
 const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
   const className = 'w-6 h-6'
@@ -821,10 +825,10 @@ function BlueprintFlow({
 }) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
-  const [nodes, setNodes] = useState<Node[]>([])
+  const [nodes, setNodes] = useState<FlowNode[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const layoutVersion = useRef(0)
-  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null)
+  const reactFlowInstanceRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null)
 
   // Convert blueprint and apply layout (async)
   // Use serialized blueprint to detect changes during streaming
@@ -842,7 +846,7 @@ function BlueprintFlow({
   }, [JSON.stringify(blueprint.nodes), JSON.stringify(blueprint.edges), nodesDraggable])
 
   // Add selection state to node data
-  const nodesWithSelection = useMemo(() => {
+  const nodesWithSelection: FlowNode[] = useMemo(() => {
     return nodes.map(node => ({
       ...node,
       data: {
@@ -853,7 +857,7 @@ function BlueprintFlow({
   }, [nodes, selectedNode])
 
   // Handle node position changes for dragging
-  const onNodesChange: OnNodesChange = useCallback(changes => {
+  const onNodesChange: OnNodesChange<FlowNode> = useCallback(changes => {
     setNodes(nds => applyNodeChanges(changes, nds))
   }, [])
 
@@ -862,7 +866,7 @@ function BlueprintFlow({
   }, [])
 
   const handleNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: FlowNode) => {
       const blueprintNode = blueprint.nodes.find(n => n.ref === node.id)
       if (blueprintNode) {
         setSelectedNode(blueprintNode)
@@ -903,7 +907,7 @@ function BlueprintFlow({
       className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg relative ${transparent ? 'bg-transparent' : 'blueprint-container-bg'} ${containerClassName}`}
       style={computedContainerStyle}
     >
-      <ReactFlow
+      <ReactFlow<FlowNode, Edge>
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}

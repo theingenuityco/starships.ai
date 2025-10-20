@@ -2,13 +2,25 @@
 
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant, getCtaVariant } from '@/lib/flags'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import POPULAR_BLUEPRINTS from '@/components/marketplace/popularBlueprints'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 
 export default function Hero() {
+  const [blueprintIndex, setBlueprintIndex] = useState(0)
+  const popularBlueprints = useMemo(() => POPULAR_BLUEPRINTS, [])
+
+  useEffect(() => {
+    if (!popularBlueprints.length) return
+    const interval = setInterval(() => {
+      setBlueprintIndex(prev => (prev + 1) % popularBlueprints.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [popularBlueprints.length])
+
   const handleLaunchDemo = useCallback(() => {
     track({ type: 'hero_cta_clicked' })
     const el = document.getElementById('interactive-demo')
@@ -71,33 +83,18 @@ export default function Hero() {
             <div className="mx-auto max-w-5xl w-full">
               {/* Content area: blueprint with wrapper and no padding */}
               <div className="relative rounded-lg bg-black/30 border border-white/10 w-full overflow-hidden">
-                <BlueprintVisualization
-                  blueprint={{
-                    nodes: [
-                      { ref: 's', type: 'start', name: 'Start', description: '', parameters: {} },
-                      { ref: 'n1', type: 'user_prompt', name: 'User prompt', description: '', parameters: {} },
-                      { ref: 'n2', type: 'llm', name: 'Plan', description: '', parameters: {} },
-                      { ref: 'n3', type: 'http_request', name: 'web.search', description: '', parameters: {} },
-                      { ref: 'n4', type: 'transform', name: 'PII-check', description: '', parameters: {} },
-                      { ref: 'n5', type: 'tool', name: 'db.enrich', description: '', parameters: {} },
-                      { ref: 'n6', type: 'output', name: 'Write profile', description: '', parameters: {} },
-                      { ref: 'e', type: 'end', name: 'End', description: '', parameters: {} },
-                    ],
-                    edges: [
-                      { ref: 'e0', from: 's', to: 'n1' },
-                      { ref: 'e1', from: 'n1', to: 'n2' },
-                      { ref: 'e2', from: 'n2', to: 'n3' },
-                      { ref: 'e3', from: 'n3', to: 'n4' },
-                      { ref: 'e4', from: 'n4', to: 'n5' },
-                      { ref: 'e5', from: 'n5', to: 'n6' },
-                      { ref: 'e6', from: 'n6', to: 'e' },
-                    ],
-                  }}
-                  className="w-full h-[520px] md:h-[600px]"
-                  transparent
-                  nodesDraggable={false}
-                  borderless
-                />
+                <div className="relative">
+                  <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full text-xs bg-black/40 border border-white/15 text-white/90">
+                    {popularBlueprints[blueprintIndex]?.name}
+                  </div>
+                  <BlueprintVisualization
+                    blueprint={popularBlueprints[blueprintIndex]?.blueprint || { nodes: [], edges: [] }}
+                    className="w-full h-[520px] md:h-[600px]"
+                    transparent
+                    nodesDraggable={false}
+                    borderless
+                  />
+                </div>
                 {/* Floating input overlay (scoped to wrapper to avoid overflow) */}
                 <div className="pointer-events-none absolute left-0 right-0 bottom-6 md:bottom-8 p-4 md:p-6">
                   <div className="max-w-2xl mx-auto pointer-events-auto">

@@ -13,35 +13,16 @@ import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
 import FinalCTA from '@/app/components/FinalCTA'
 
-import { LoginButton } from '@/components/auth/LoginButton'
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/hooks/useAuth'
 
 // Legacy components removed for a cleaner landing
 
 export default function HomePage() {
-  const { isAuthenticated } = useAuth()
-
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
-        {/* Minimal top bar; removed legacy background/handlers */}
-        {/* Top Navigation Bar */}
-        <div className="absolute top-0 left-0 right-0 z-50 p-6">
-          <div className="flex justify-between items-center">
-            <div></div>
-
-            {/* Right side buttons */}
-            <div className="flex gap-4">
-              {!isAuthenticated && (
-                <LoginButton size="default" className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full">
-                  Login
-                </LoginButton>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Top bar removed per design update */}
 
         {/* New Landing Sections */}
         <Hero />

@@ -51,6 +51,12 @@ export class StripeService {
       const session = await stripe.checkout.sessions.create(
         {
           mode: 'payment',
+          // Enable automatic tax calculation
+          automatic_tax: {
+            enabled: true,
+          },
+          // Require billing address for tax calculation
+          billing_address_collection: 'required',
           line_items: [
             {
               price_data: {

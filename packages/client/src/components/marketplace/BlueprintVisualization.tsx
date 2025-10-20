@@ -890,10 +890,18 @@ function BlueprintFlow({
     })
   }, [nodesWithSelection.length])
 
+  // Default amber-suited gradient if no explicit background is provided and not transparent
+  const computedContainerStyle: React.CSSProperties | undefined = useMemo(() => {
+    if (transparent) return containerStyle
+    const hasCustomBackground = containerStyle && typeof containerStyle.background === 'string' && containerStyle.background.length > 0
+    if (hasCustomBackground) return containerStyle
+    return containerStyle
+  }, [transparent, containerStyle])
+
   return (
     <div
-      className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'} ${containerClassName}`}
-      style={containerStyle}
+      className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg relative ${transparent ? 'bg-transparent' : 'blueprint-container-bg'} ${containerClassName}`}
+      style={computedContainerStyle}
     >
       <ReactFlow
         nodes={nodesWithSelection}

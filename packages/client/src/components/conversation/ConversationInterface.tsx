@@ -116,13 +116,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [onConversationChange]
   )
 
-  // Handle suggestion click
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    if (messageInputRef.current?.handleSuggestionSubmit) {
-      messageInputRef.current.handleSuggestionSubmit(suggestion)
-    }
-  }, [])
-
   // Overlay disabled; keep a no-op for prop compatibility
   const handleToggleOverlay = useCallback(() => {}, [])
 
@@ -563,22 +556,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
               {/* Spacer for floating input */}
               <div className="h-32 mb-8"></div>
-
-              {/* Suggestions */}
-              <div className="space-y-3 max-w-2xl w-full opacity-100">
-                {AGENT_SUGGESTIONS.map((suggestion, index) => (
-                  <button
-                    key={suggestion}
-                    className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                  >
-                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                      <Icon name="sparkles" className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
-                    </div>
-                    <span className="flex-1">{suggestion}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </>
@@ -614,6 +591,3 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     </div>
   )
 }
-
-// Suggestion examples
-const AGENT_SUGGESTIONS = ['Help me plan a project timeline with milestones', 'Analyze this data set and find patterns', 'Write code for a responsive navigation component']

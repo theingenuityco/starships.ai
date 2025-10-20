@@ -26,7 +26,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
   return (
     <section aria-labelledby="ship-hero" className={cn('relative overflow-hidden rounded-2xl frosted-glass-card shadow-frosted-lg border border-border/80 p-7 md:p-8', className)}>
       {/* Decorative gradient overlay */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.15),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(168,85,247,0.12),transparent_35%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.28),transparent_50%),radial-gradient(circle_at_80%_0%,rgba(168,85,247,0.24),transparent_45%)]" />
 
       <div className="relative z-10 flex flex-col gap-8 md:flex-row md:items-center md:justify-between md:gap-10">
         {/* Gaia marketing content */}

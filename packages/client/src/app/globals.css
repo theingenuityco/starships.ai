@@ -351,7 +351,7 @@
 
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
-    --frosted-border: 1px solid rgba(255, 255, 255, 0.06);
+    --frosted-border: 1px solid rgba(255, 255, 255, 0.12);
 
     /* App gradient variables (dark) */
     --app-tint: hsl(220 12% 20%); /* adjust for darker theme tint */
@@ -642,6 +642,9 @@
 
   /* Ensure text color is applied */
   color: hsl(var(--foreground));
+
+  /* Match frosted border tone in StarTheme dark wrapper */
+  --frosted-border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* Star Light Theme - If needed */
@@ -1124,6 +1127,6 @@
   /* Neutral frosted glass in dark mode (no primary tint) */
   .dark .frosted-glass-card {
     background: linear-gradient(135deg, hsl(var(--card) / 0.3) 0%, hsl(var(--card) / 0.2) 100%);
-    border-color: hsl(var(--border));
+    border: var(--frosted-border);
   }
 }

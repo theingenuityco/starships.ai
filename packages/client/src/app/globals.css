@@ -396,8 +396,6 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    /* Performance: Enable hardware acceleration for smooth animations */
-    transform: translateZ(0);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <AuthProvider>
               <TooltipProvider>
-                <div className="min-h-screen bg-background">
+                <div className="min-h-[100dvh] bg-background">
                   <ClientLayout>{children}</ClientLayout>
                   <Toaster />
                 </div>

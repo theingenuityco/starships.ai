@@ -86,10 +86,11 @@ The implementation will follow the established 6-layer architecture:
 **File**: `packages/server/src/services/UserService.ts`
 **Assignee**: TBD | **Estimated**: 15 minutes | **Started**: - | **Completed**: -
 
-**Sub-tasks** (0/3 complete):
+**Sub-tasks** (0/4 complete):
 - [ ] 🔴 Add `emailVerificationTokenRepository` as class property
 - [ ] 🔴 Add `emailService` as class property  
-- [ ] 🔴 Remove inline repository instantiation and dynamic imports
+- [ ] 🔴 Remove inline repository instantiation and dynamic imports from email verification methods
+- [ ] 🔴 Update constructor to instantiate all dependencies consistently
 
 #### Task 1.3: Create Password Reset Database Table 🔴 Not Started
 **File**: `005_add_password_reset_tokens.sql`
@@ -235,12 +236,18 @@ import { logger } from '@/utils/logger';
 import { EmailService } from './EmailService';
 
 // Add as class properties:
+private emailVerificationTokenRepository: EmailVerificationTokenRepository;
 private passwordResetTokenRepository: PasswordResetTokenRepository;
 private emailService: EmailService;
 
-// In constructor, add:
-this.passwordResetTokenRepository = new PasswordResetTokenRepository();
-this.emailService = new EmailService(); // Consistent with other service constructors
+// Update constructor to include all dependencies:
+constructor() {
+  this.userRepository = new UserRepository();
+  this.oauthRepository = new OAuthAccountRepository();
+  this.emailVerificationTokenRepository = new EmailVerificationTokenRepository();
+  this.passwordResetTokenRepository = new PasswordResetTokenRepository();
+  this.emailService = new EmailService();
+}
 
 /**
  * Send password reset email (with user validation)
@@ -481,6 +488,53 @@ private generatePasswordResetTextTemplate(resetUrl: string): string {
 - [ ] 🔴 Add `passwordResetRateLimit` (5 requests per 15 minutes)
 - [ ] 🔴 Follow existing rate limit patterns exactly
 
+**Rate Limit Implementation**:
+```typescript
+/**
+ * Password reset rate limit
+ * Prevents email bombing attacks on password reset endpoint
+ * 
+ * Configuration:
+ * - 5 requests per 15 minutes per IP for password reset attempts
+ * - 429 status code with descriptive error message
+ */
+export const passwordResetRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per window per IP
+  message: {
+    error: {
+      message: 'Too many password reset attempts. Please try again in 15 minutes.',
+      code: 'PASSWORD_RESET_RATE_LIMIT_EXCEEDED',
+      type: 'RATE_LIMIT_ERROR'
+    }
+  },
+  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false, // Disable `X-RateLimit-*` headers
+  // Use IP address as the key - fail secure if IP unavailable
+  keyGenerator: (req: Request): string => {
+    const ip = req.ip || req.connection.remoteAddress;
+    if (!ip) {
+      throw new Error('Cannot determine client IP address for rate limiting');
+    }
+    return ip;
+  },
+  // Custom handler for rate limit exceeded
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      error: {
+        message: 'Too many password reset attempts. Please try again in 15 minutes.',
+        code: 'PASSWORD_RESET_RATE_LIMIT_EXCEEDED',
+        type: 'RATE_LIMIT_ERROR'
+      }
+    });
+  },
+  // Skip successful requests (only count failed attempts)
+  skipSuccessfulRequests: false,
+  // Skip failed requests to not double-penalize
+  skipFailedRequests: false,
+});
+```
+
 ### Phase 4: Frontend Implementation (1 hour) 🔴 Not Started
 
 **Phase Progress**: 0/3 tasks complete (0%)
@@ -579,6 +633,11 @@ useEffect(() => {
 
 **Hook Implementation**:
 ```typescript
+// Add required imports at top of useAuth.ts:
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { useMutation } from '@tanstack/react-query'
+
 // Add to AUTH_QUERY_KEYS
 export const AUTH_QUERY_KEYS = {
   all: ['auth'] as const,
@@ -592,16 +651,28 @@ export const AUTH_QUERY_KEYS = {
 export function useForgotPassword() {
   return useMutation({
     mutationFn: async (data: { email: string }) => {
-      const response = await api.post('/api/v1/auth/forgot-password', data);
-      return response.data;
+      const response = await fetch('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to send reset email');
+      }
+
+      return result.data;
     },
     onSuccess: () => {
       toast.success('Password reset link sent! Check your email.');
     },
     onError: (error: any) => {
       toast.error(
-        error?.response?.data?.error?.message || 
-        'Failed to send reset email. Please try again.'
+        error.message || 'Failed to send reset email. Please try again.'
       );
     },
   });
@@ -616,8 +687,21 @@ export function useResetPassword(options?: {
   
   return useMutation({
     mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
-      const response = await api.post('/api/v1/auth/reset-password', data);
-      return response.data;
+      const response = await fetch('/api/v1/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to reset password');
+      }
+
+      return result.data;
     },
     onSuccess: (data) => {
       toast.success('Password reset successful!');
@@ -625,7 +709,7 @@ export function useResetPassword(options?: {
       options?.onSuccess?.(data);
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.error?.message || 'Failed to reset password';
+      const message = error.message || 'Failed to reset password';
       toast.error(message);
       options?.onError?.(error);
       throw error; // Re-throw for component error handling
@@ -816,11 +900,19 @@ Afternoon (3h): API routes, email templates, frontend components with error hand
 
 ---
 
-**Document Version**: 8.1.0 (Final Implementation Plan - All Gaps Resolved + Consistency Updates)  
+**Document Version**: 8.2.0 (Final Implementation Plan - Complete Pattern Consistency)  
 **Created**: 2025-01-19  
 **Last Updated**: 2025-01-20  
 **Author**: Engineering Team  
-**Status**: Ready for Implementation (all gaps addressed, consistency fixes applied)
+**Status**: Ready for Implementation (all gaps addressed, complete pattern consistency achieved)
+
+## 🔧 **Gaps Addressed in v8.2.0**
+
+### **v8.2.0 Updates** (Final Pattern Consistency)
+1. **Frontend API Calls** - Fixed to use `fetch()` pattern instead of `api.post()` to match existing useAuth hooks
+2. **Frontend Hook Imports** - Added missing import statements for `useRouter`, `toast`, and `useMutation`
+3. **Rate Limit Implementation** - Added complete `passwordResetRateLimit` implementation following existing rate limit patterns
+4. **UserService Constructor** - Added complete constructor showing all class property instantiation including email verification fix
 
 ## 🔧 **Gaps Addressed in v8.1.0**
 

@@ -68,7 +68,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // Regular pages with conditional navigation sidebar
   return (
     <JwtAuthGate>
-      <div className="relative h-screen flex overflow-hidden">
+      <div className="relative h-[100dvh] flex overflow-hidden">
         {/* Floating Navigation - conditionally rendered */}
         {!shouldHideNavigation && (
           <div className="fixed top-6 left-6 z-[1000]">

@@ -25,7 +25,7 @@ export default function HomePage() {
 
   return (
     <StarTheme theme="dark">
-      <div className="min-h-screen bg-background relative overflow-hidden">
+      <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         {/* Minimal top bar; removed legacy background/handlers */}
         {/* Top Navigation Bar */}
         <div className="absolute top-0 left-0 right-0 z-50 p-6">

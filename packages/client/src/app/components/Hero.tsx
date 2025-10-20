@@ -89,7 +89,7 @@ export default function Hero() {
                   key={item.name || idx}
                   onClick={() => setBlueprintIndex(idx)}
                   className={`px-3 py-1.5 rounded-full text-xs transition-colors duration-200 whitespace-nowrap shadow-frosted-lg frosted-glass-card ${
-                    isActive ? 'bg-primary/15 ring-2 ring-primary/30 text-white font-semibold shadow-[0_6px_28px_rgba(59,130,246,0.35)]' : 'text-white/90 hover:bg-white/5'
+                    isActive ? 'bg-primary/15 ring-2 ring-primary/30 text-white font-semibold shadow-[0_6px_28px_rgba(var(--primary-rgb),0.35)]' : 'text-white/90 hover:bg-white/5'
                   }`}
                 >
                   {item.name || `Blueprint ${idx + 1}`}
@@ -104,7 +104,7 @@ export default function Hero() {
             containerClassName="rounded-lg bg-black/30 border border-white/10"
             containerStyle={{
               background:
-                'radial-gradient(circle at 20% 20%, rgba(59,130,246,0.14) 0%, transparent 40%), radial-gradient(circle at 80% 80%, rgba(168,85,247,0.14) 0%, transparent 40%), linear-gradient(135deg, rgba(17,24,39,0.85) 0%, rgba(2,6,23,0.85) 100%)',
+                'radial-gradient(circle at 20% 20%, hsl(var(--primary) / 0.18) 0%, transparent 42%), radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.10) 0%, transparent 40%), linear-gradient(135deg, rgba(17,24,39,0.85) 0%, rgba(2,6,23,0.85) 100%)',
             }}
             transparent
             nodesDraggable={false}

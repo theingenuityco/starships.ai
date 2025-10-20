@@ -30,7 +30,6 @@ export default function HomePage() {
         {/* Top Navigation Bar */}
         <div className="absolute top-0 left-0 right-0 z-50 p-6">
           <div className="flex justify-between items-center">
-            {/* Logo/Brand (empty div for spacing) */}
             <div></div>
 
             {/* Right side buttons */}

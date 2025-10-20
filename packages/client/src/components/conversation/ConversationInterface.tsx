@@ -6,7 +6,7 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationStreamed, useStarshipConversations } from '@/hooks/useConversations'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { agentAPI, toolAPI } from '@/lib/api'
@@ -72,6 +72,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Get agents data from starship and conversation
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
   const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
+  const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
 
   // Derive message presence and UI gating from streamed query (not store)
@@ -232,6 +233,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
     router.push(`/ship/${starshipSlug}/tool/new${q}`)
   }, [router, starshipSlug, externalConversationId])
+
+  // Navigate/select recent conversation from starter state
+  const handleRecentConversationSelect = useCallback(
+    (conversationId: string) => {
+      try {
+        if (starshipSlug) {
+          router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(conversationId)}`)
+        }
+      } catch {}
+      setCurrentConversationId(conversationId)
+      onConversationChange?.(conversationId)
+    },
+    [router, starshipSlug, onConversationChange]
+  )
 
   // Removed manual agent builder toggle (route-based only)
 
@@ -582,6 +597,33 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               budgetTokens={budgetTokens}
               onAgentChange={handleAgentChange}
             ></ConversationMessageInput>
+
+            {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
+              <div className="mt-4 opacity-100 px-4">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent conversations</div>
+                <div className="space-y-1">
+                  {starshipConversationsData!.conversations
+                    .slice()
+                    .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+                    .slice(0, 5)
+                    .map((conv: any) => {
+                      const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
+                      return (
+                        <button
+                          key={conv.id}
+                          className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
+                          onClick={() => handleRecentConversationSelect(conv.id)}
+                        >
+                          <div className="w-6 h-6 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
+                            <Icon name="message-square" className="w-3.5 h-3.5 text-primary/80 group-hover:text-primary transition-colors" />
+                          </div>
+                          <span className="flex-1 truncate text-foreground group-hover:text-foreground">{title}</span>
+                        </button>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -54,7 +54,7 @@ export function ForgotPasswordForm() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle>Check Your Email</CardTitle>
-            <CardDescription>We've sent password reset instructions to your email</CardDescription>
+            <CardDescription>Password reset request processed</CardDescription>
           </CardHeader>
           
           <CardContent>
@@ -62,12 +62,14 @@ export function ForgotPasswordForm() {
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-900 font-medium text-sm">Password reset email sent to:</span>
-                  <span className="font-medium text-gray-900 text-sm break-all">{email}</span>
+                  <span className="text-emerald-900 font-medium text-sm">Request processed</span>
                 </div>
                 <AlertDescription>
+                  <p className="text-sm text-gray-600 font-medium mb-2">
+                    We'll send reset instructions to <span className="font-semibold text-gray-600">{email}</span> if an account exists.
+                  </p>
                   <p className="text-sm text-gray-600">
-                    Check your email and click the reset link. The link expires in 1 hour.
+                    The link expires in 1 hour.
                   </p>
                 </AlertDescription>
               </div>

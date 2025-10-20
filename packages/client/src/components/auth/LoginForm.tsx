@@ -219,7 +219,7 @@ export function LoginForm() {
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
                   <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-gray-900 text-sm break-all">{emailVerificationStatus.email}</span>
+                  <span className="font-medium text-gray-600 text-sm break-all">{emailVerificationStatus.email}</span>
                 </div>
                 <AlertDescription>
                   <div className="flex justify-center">

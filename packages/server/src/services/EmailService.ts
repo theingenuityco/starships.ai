@@ -142,7 +142,7 @@ export class EmailService {
             <p>You requested to reset your password. Click the button below to create a new password:</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${resetUrl}" 
-                 style="background: #e53e3e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                 style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
                 Reset Password
               </a>
             </div>

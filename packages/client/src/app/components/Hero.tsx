@@ -16,6 +16,7 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 export default function Hero() {
   const [blueprintIndex, setBlueprintIndex] = useState(0)
   const popularBlueprints = useMemo(() => POPULAR_BLUEPRINTS, [])
+  const [logoTrigger, setLogoTrigger] = useState(0)
 
   useEffect(() => {
     if (!popularBlueprints.length) return
@@ -35,8 +36,8 @@ export default function Hero() {
     <section className="pt-28 pb-20 px-4">
       <div className="max-w-6xl mx-auto flex flex-col gap-10">
         <div>
-          <div className="mb-6 flex items-center gap-3">
-            <StarshipsLogo width={56} height={56} className="text-foreground" playOnMountOnce />
+          <div className="mb-6 flex items-center gap-3 cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
+            <StarshipsLogo width={56} height={56} className="text-foreground" idleLoop={false} playOnMountOnce triggerAnimation={logoTrigger} />
             <span className={`${orbitron.className} text-3xl md:text-4xl font-normal tracking-tight`}>starships.ai</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
@@ -78,7 +79,7 @@ export default function Hero() {
         </div>
 
         {/* Visualization: viewport removed; styles moved into visualization */}
-        <div className="relative h-[720px]">
+        <div className="relative h-[560px]">
           <BlueprintVisualization
             blueprint={popularBlueprints[blueprintIndex]?.blueprint || { nodes: [], edges: [] }}
             className="absolute inset-0 rounded-2xl shadow-2xl"

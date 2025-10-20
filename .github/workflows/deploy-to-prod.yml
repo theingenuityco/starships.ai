@@ -155,6 +155,8 @@ jobs:
           kubectl set image statefulset/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
             -n ${{ env.NAMESPACE }}
+          # Force rollout restart to pull latest image (needed when using 'latest' tag)
+          kubectl rollout restart statefulset/starships-app -n ${{ env.NAMESPACE }}
           kubectl rollout status statefulset/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 

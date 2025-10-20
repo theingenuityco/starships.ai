@@ -20,6 +20,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react'
+import type { ReactFlowInstance } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
 import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
@@ -33,6 +34,10 @@ interface BlueprintVisualizationProps {
   className?: string
   transparent?: boolean
   nodesDraggable?: boolean
+  borderless?: boolean
+  // Applies to the inner container that holds the canvas (for transferring viewport styles)
+  containerClassName?: string
+  containerStyle?: React.CSSProperties
 }
 
 interface ReactFlowNode extends Node {
@@ -47,9 +52,13 @@ interface ReactFlowNode extends Node {
   }
 }
 
+// Unified node type used across state, instance, and ReactFlow generics
+type FlowNodeData = ReactFlowNode['data'] & { isSelected?: boolean }
+type FlowNode = Node<FlowNodeData>
+
 // Get icon component for node type
 const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
-  const className = 'w-5 h-5'
+  const className = 'w-6 h-6'
   switch (nodeType) {
     case 'start':
       return <Icon name="play" className={className} />
@@ -194,7 +203,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
         {/* Main node body */}
         <div
           className={`
-            relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
+            relative flex items-center gap-4 px-5 py-4 min-w-[220px] max-w-[280px]
             backdrop-blur-[20px] backdrop-saturate-[180%] border-2
             ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-border/40'}
             rounded-xl shadow-frosted-lg transition-all duration-300
@@ -210,7 +219,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               id={`${data.nodeId}-in-0`}
               type="target"
               position={Position.Left}
-              className="!w-2 !h-2 !rounded-full"
+              className="!w-3 !h-3 !rounded-full"
               style={{ left: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
             />
           )}
@@ -224,14 +233,14 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                   id={`${data.nodeId}-in-${i}`}
                   type="target"
                   position={Position.Left}
-                  className="!w-2 !h-2 !rounded-full"
+                  className="!w-3 !h-3 !rounded-full"
                   style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
                 />
               )
             })}
           {/* Circular icon container */}
           <div
-            className="flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 shadow-sm"
+            className="flex items-center justify-center w-12 h-12 rounded-full flex-shrink-0 shadow-sm"
             style={{
               backgroundColor: colors.handle + '15',
               color: colors.handle,
@@ -243,8 +252,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
 
           {/* Node content */}
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-sm text-foreground truncate leading-tight">{data.label}</div>
-            {data.type && <div className="text-xs text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
+            <div className="font-semibold text-base text-foreground truncate leading-tight">{data.label}</div>
+            {data.type && <div className="text-sm text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
           </div>
         </div>
 
@@ -256,7 +265,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               return (
                 <div
                   key={uniqueKey}
-                  className="relative backdrop-blur-[20px] backdrop-saturate-[180%] border-2 border-border/40 rounded-xl px-3 py-2 text-xs font-medium text-foreground shadow-frosted-lg hover:border-border/60 transition-all duration-300"
+                  className="relative backdrop-blur-[20px] backdrop-saturate-[180%] border-2 border-border/40 rounded-xl px-3.5 py-2.5 text-sm font-medium text-foreground shadow-frosted-lg hover:border-border/60 transition-all duration-300"
                   style={{
                     background: `linear-gradient(135deg, ${colors.handle}${branchPrimaryOpacity} 0%, ${colors.handle}${branchSecondaryOpacity} 100%)`,
                   }}
@@ -267,7 +276,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                     type="source"
                     position={Position.Right}
                     id={edge?.ref}
-                    className="!w-2 !h-2 !rounded-full"
+                    className="!w-3 !h-3 !rounded-full"
                     style={{
                       right: -6,
                       top: '50%',
@@ -288,7 +297,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
           <Handle
             type="source"
             position={Position.Right}
-            className="!w-2 !h-2 !rounded-full"
+            className="!w-3 !h-3 !rounded-full"
             style={{ right: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
           />
         )}
@@ -321,8 +330,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
           id={`${data.nodeId}-in-0`}
           type="target"
           position={Position.Left}
-          className="!w-2 !h-2 !rounded-full"
-          style={{ left: -4, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+          className="!w-3 !h-3 !rounded-full"
+          style={{ left: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
         />
       )}
       {data.type !== 'start' &&
@@ -336,15 +345,15 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
               id={`${data.nodeId}-in-${i}`}
               type="target"
               position={Position.Left}
-              className="!w-2 !h-2 !rounded-full"
-              style={{ left: -4, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+              className="!w-3 !h-3 !rounded-full"
+              style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
             />
           )
         })}
 
       <div
         className={`
-          relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
+          relative flex items-center gap-4 px-5 py-4 min-w-[220px] max-w-[280px]
           backdrop-blur-[20px] backdrop-saturate-[180%] border-2
           ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-border/40'}
           rounded-xl shadow-frosted-lg transition-all duration-300
@@ -356,7 +365,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
       >
         {/* Circular icon container with better styling */}
         <div
-          className="flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 shadow-sm"
+          className="flex items-center justify-center w-12 h-12 rounded-full flex-shrink-0 shadow-sm"
           style={{
             backgroundColor: colors.handle + '15',
             color: colors.handle,
@@ -368,8 +377,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 
         {/* Node content with better typography */}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm text-foreground truncate leading-tight">{data.label}</div>
-          {data.type && <div className="text-xs text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
+          <div className="font-semibold text-base text-foreground truncate leading-tight">{data.label}</div>
+          {data.type && <div className="text-sm text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
         </div>
       </div>
 
@@ -378,8 +387,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
         <Handle
           type="source"
           position={Position.Right}
-          className="!w-2 !h-2 !rounded-full"
-          style={{ right: -4, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+          className="!w-3 !h-3 !rounded-full"
+          style={{ right: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
         />
       )}
     </>
@@ -483,8 +492,8 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
 
       return {
         id: node.id,
-        width: 220,
-        height: 80,
+        width: 280,
+        height: 96,
         ports: [...targetPorts, ...sourcePorts],
       }
     }),
@@ -601,13 +610,13 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       animated: false,
       style: {
         stroke: '#94a3b8',
-        strokeWidth: 2,
+        strokeWidth: 1.25,
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: '#94a3b8',
-        width: 16,
-        height: 16,
+        width: 10,
+        height: 10,
       },
       label: edge.label,
       // Higher z-index for back edges will be set after layout
@@ -704,7 +713,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       zIndex: -1, // All edges render behind nodes
       style: {
         ...edge.style,
-        strokeWidth: 2, // Consistent width for all edges
+        strokeWidth: 1.25, // Consistent thinner width for all edges
       },
       data: {
         ...edge.data,
@@ -799,12 +808,27 @@ const NodeDetailsPanel: React.FC<{
   )
 }
 
-function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blueprint: Blueprint; transparent?: boolean; nodesDraggable?: boolean }) {
+function BlueprintFlow({
+  blueprint,
+  transparent,
+  nodesDraggable = false,
+  borderless = false,
+  containerClassName = '',
+  containerStyle,
+}: {
+  blueprint: Blueprint
+  transparent?: boolean
+  nodesDraggable?: boolean
+  borderless?: boolean
+  containerClassName?: string
+  containerStyle?: React.CSSProperties
+}) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
 
-  const [nodes, setNodes] = useState<Node[]>([])
+  const [nodes, setNodes] = useState<FlowNode[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const layoutVersion = useRef(0)
+  const reactFlowInstanceRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null)
 
   // Convert blueprint and apply layout (async)
   // Use serialized blueprint to detect changes during streaming
@@ -822,7 +846,7 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
   }, [JSON.stringify(blueprint.nodes), JSON.stringify(blueprint.edges), nodesDraggable])
 
   // Add selection state to node data
-  const nodesWithSelection = useMemo(() => {
+  const nodesWithSelection: FlowNode[] = useMemo(() => {
     return nodes.map(node => ({
       ...node,
       data: {
@@ -833,7 +857,7 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
   }, [nodes, selectedNode])
 
   // Handle node position changes for dragging
-  const onNodesChange: OnNodesChange = useCallback(changes => {
+  const onNodesChange: OnNodesChange<FlowNode> = useCallback(changes => {
     setNodes(nds => applyNodeChanges(changes, nds))
   }, [])
 
@@ -842,7 +866,7 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
   }, [])
 
   const handleNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: FlowNode) => {
       const blueprintNode = blueprint.nodes.find(n => n.ref === node.id)
       if (blueprintNode) {
         setSelectedNode(blueprintNode)
@@ -855,11 +879,35 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
     setSelectedNode(null)
   }, [])
 
+  // Fit the view once nodes are rendered, clamped to zoom bounds
+  useEffect(() => {
+    if (!reactFlowInstanceRef.current) return
+    if (nodesWithSelection.length === 0) return
+    // Allow the DOM to paint nodes before fitting
+    requestAnimationFrame(() => {
+      reactFlowInstanceRef.current?.fitView({
+        padding: 0.25,
+        includeHiddenNodes: true,
+        minZoom: 0.35,
+        maxZoom: 1.2,
+      })
+    })
+  }, [nodesWithSelection.length])
+
+  // Default amber-suited gradient if no explicit background is provided and not transparent
+  const computedContainerStyle: React.CSSProperties | undefined = useMemo(() => {
+    if (transparent) return containerStyle
+    const hasCustomBackground = containerStyle && typeof containerStyle.background === 'string' && containerStyle.background.length > 0
+    if (hasCustomBackground) return containerStyle
+    return containerStyle
+  }, [transparent, containerStyle])
+
   return (
     <div
-      className={`h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden relative ${transparent ? 'bg-transparent' : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'}`}
+      className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg relative ${transparent ? 'bg-transparent' : 'blueprint-container-bg'} ${containerClassName}`}
+      style={computedContainerStyle}
     >
-      <ReactFlow
+      <ReactFlow<FlowNode, Edge>
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -867,12 +915,10 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
-        fitView
-        fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.4,
-          maxZoom: 1.0,
-          includeHiddenNodes: true,
+        minZoom={0.35}
+        maxZoom={1.2}
+        onInit={instance => {
+          reactFlowInstanceRef.current = instance
         }}
         nodesDraggable={nodesDraggable}
         nodesConnectable={false}
@@ -885,7 +931,7 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
         zoomOnDoubleClick={true}
         preventScrolling={false}
         proOptions={{ hideAttribution: true }}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
+        // Initial viewport is set by programmatic fitView above
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="rgba(156, 163, 175, 0.4)" />
       </ReactFlow>
@@ -896,7 +942,15 @@ function BlueprintFlow({ blueprint, transparent, nodesDraggable = false }: { blu
   )
 }
 
-export function BlueprintVisualization({ blueprint, className = '', transparent = false, nodesDraggable = false }: BlueprintVisualizationProps) {
+export function BlueprintVisualization({
+  blueprint,
+  className = '',
+  transparent = false,
+  nodesDraggable = false,
+  borderless = false,
+  containerClassName = '',
+  containerStyle,
+}: BlueprintVisualizationProps) {
   if (!blueprint?.nodes || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
@@ -908,7 +962,14 @@ export function BlueprintVisualization({ blueprint, className = '', transparent 
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <BlueprintFlow blueprint={blueprint} transparent={transparent} nodesDraggable={nodesDraggable} />
+        <BlueprintFlow
+          blueprint={blueprint}
+          transparent={transparent}
+          nodesDraggable={nodesDraggable}
+          borderless={borderless}
+          containerClassName={containerClassName}
+          containerStyle={containerStyle}
+        />
       </div>
     </ReactFlowProvider>
   )

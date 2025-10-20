@@ -258,7 +258,7 @@ export function Navigation(props: NavigationProps) {
               repeatDelay={20}
               triggerAnimation={animationTrigger}
               idleLoop={false}
-              playOnMountOnce={true}
+              playOnMountOnce={false}
             />
           </div>
         </div>

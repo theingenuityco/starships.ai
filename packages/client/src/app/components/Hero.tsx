@@ -4,16 +4,24 @@ import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { track } from '@/lib/analytics'
-import { getHeadlineVariant, getCtaVariant } from '@/lib/flags'
+import { getHeadlineVariant } from '@/lib/flags'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import POPULAR_BLUEPRINTS from '@/components/marketplace/popularBlueprints'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Orbitron } from 'next/font/google'
+import { useAuth } from '@/hooks/useAuth'
+import { useUserStarships } from '@/hooks/useStarships'
+import { useRouter } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 export default function Hero() {
+  const router = useRouter()
+  const { isAuthenticated, user } = useAuth()
+  const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
+  const primaryStarship = starships[0]
+
   const [blueprintIndex, setBlueprintIndex] = useState(0)
   const popularBlueprints = useMemo(() => POPULAR_BLUEPRINTS, [])
   const [logoTrigger, setLogoTrigger] = useState(0)
@@ -26,18 +34,27 @@ export default function Hero() {
     return () => clearInterval(interval)
   }, [popularBlueprints.length])
 
-  const handleLaunchDemo = useCallback(() => {
-    track({ type: 'hero_cta_clicked' })
-    const el = document.getElementById('interactive-demo')
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Trigger a one-off logo entry animation after a short delay while keeping default static state
+  useEffect(() => {
+    const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
+    return () => clearTimeout(t)
   }, [])
+
+  const handlePrimaryClick = useCallback(() => {
+    track({ type: 'hero_cta_clicked' })
+    if (isAuthenticated && primaryStarship?.slug) {
+      router.push(`/ship/${primaryStarship.slug}/conversations`)
+      return
+    }
+    router.push('/login')
+  }, [isAuthenticated, primaryStarship?.slug, router])
 
   return (
     <section className="pt-28 pb-20 px-4">
       <div className="max-w-6xl mx-auto flex flex-col gap-10">
         <div>
           <div className="mb-6 flex items-center gap-3 cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
-            <StarshipsLogo width={56} height={56} className="text-foreground" idleLoop={false} playOnMountOnce triggerAnimation={logoTrigger} />
+            <StarshipsLogo width={56} height={56} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
             <span className={`${orbitron.className} text-3xl md:text-4xl font-normal tracking-tight`}>starships.ai</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
@@ -50,26 +67,20 @@ export default function Hero() {
           </h1>
           <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.</p>
           <div className="flex flex-col sm:flex-row gap-3">
-            {(() => {
-              const c = getCtaVariant()
-              const label = c === 'B' ? 'See it run' : 'Launch interactive demo'
-              return (
-                <Button size="lg" className="px-7" onClick={handleLaunchDemo}>
-                  <Icon name="play" className="w-4 h-4 mr-2" />
-                  {label}
-                </Button>
-              )
-            })()}
+            <Button size="lg" className="px-7" onClick={handlePrimaryClick}>
+              <Icon name={isAuthenticated ? 'rocket' : 'user-plus'} className="w-4 h-4 mr-2" />
+              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Sign up'}
+            </Button>
             <Button
               size="lg"
               variant="outline"
               className="px-7"
               onClick={() => {
-                window.open('mailto:team@starships.ai?subject=Walkthrough%20request', '_blank')
+                window.open('/docs', '_blank')
               }}
             >
-              <Icon name="calendar" className="w-4 h-4 mr-2" />
-              Book a walkthrough
+              <Icon name="book" className="w-4 h-4 mr-2" />
+              View Docs
             </Button>
           </div>
 

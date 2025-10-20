@@ -174,7 +174,7 @@ export interface AuthPasswordResetConfirm {
 **Sub-tasks** (0/3 complete):
 - [ ] 🔴 Copy EmailVerificationTokenEntity pattern exactly
 - [ ] 🔴 Update for 1-hour expiry instead of 24 hours
-- [ ] 🔴 Update `packages/models/src/entities/index.ts` to export new entity
+- [ ] 🔴 Update `packages/models/src/index.ts` to export new entity
 
 **Key Implementation Note**:
 ```typescript
@@ -190,7 +190,7 @@ const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
 - [ ] 🔴 Copy EmailVerificationTokenRepository pattern exactly
 - [ ] 🔴 Update table name to password_reset_tokens
 - [ ] 🔴 Add token cleanup method for expired tokens
-- [ ] 🔴 Update `packages/models/src/repositories/index.ts` to export new repository
+- [ ] 🔴 Update `packages/models/src/index.ts` to export new repository
 
 **Token Cleanup Implementation**:
 ```typescript
@@ -240,7 +240,7 @@ private emailService: EmailService;
 
 // In constructor, add:
 this.passwordResetTokenRepository = new PasswordResetTokenRepository();
-this.emailService = new EmailService(); // Or use ServiceFactory.createEmailService() if needed
+this.emailService = new EmailService(); // Consistent with other service constructors
 
 /**
  * Send password reset email (with user validation)
@@ -327,6 +327,9 @@ async resetPassword(token: string, newPassword: string, confirmPassword: string)
 
 **API Implementation with Error Handling**:
 ```typescript
+// Add to imports at top of auth.ts:
+import { registrationRateLimit, resendVerificationRateLimit, passwordResetRateLimit } from '@/middleware/rate-limit';
+
 // Zod schemas
 const ForgotPasswordSchema = z.object({
   email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
@@ -605,7 +608,10 @@ export function useForgotPassword() {
 }
 
 // Reset password mutation
-export function useResetPassword() {
+export function useResetPassword(options?: {
+  onSuccess?: (data: any) => void;
+  onError?: (error: any) => void;
+}) {
   const router = useRouter();
   
   return useMutation({
@@ -616,10 +622,12 @@ export function useResetPassword() {
     onSuccess: (data) => {
       toast.success('Password reset successful!');
       router.push('/login?reset=success');
+      options?.onSuccess?.(data);
     },
     onError: (error: any) => {
       const message = error?.response?.data?.error?.message || 'Failed to reset password';
       toast.error(message);
+      options?.onError?.(error);
       throw error; // Re-throw for component error handling
     },
   });
@@ -808,11 +816,20 @@ Afternoon (3h): API routes, email templates, frontend components with error hand
 
 ---
 
-**Document Version**: 8.0.0 (Final Implementation Plan - All Gaps Resolved)  
+**Document Version**: 8.1.0 (Final Implementation Plan - All Gaps Resolved + Consistency Updates)  
 **Created**: 2025-01-19  
 **Last Updated**: 2025-01-20  
 **Author**: Engineering Team  
-**Status**: Ready for Implementation (all gaps addressed, fully detailed implementation plan)
+**Status**: Ready for Implementation (all gaps addressed, consistency fixes applied)
+
+## 🔧 **Gaps Addressed in v8.1.0**
+
+### **v8.1.0 Updates** (Consistency & Pattern Fixes)
+1. **Entity/Repository Exports** - Fixed incorrect references to `packages/models/src/entities/index.ts` and `packages/models/src/repositories/index.ts` to correct `packages/models/src/index.ts`
+2. **ServiceFactory Consistency** - Removed confusing comment about ServiceFactory vs direct instantiation, clarified to use `new EmailService()` for consistency
+3. **Rate Limiting Import** - Added missing import statement for `passwordResetRateLimit` in auth routes implementation
+4. **Frontend Hook Options** - Enhanced `useResetPassword` hook to accept options parameter for `onSuccess` and `onError` callbacks, matching pattern of other auth hooks
+5. **Protocol Interface Completeness** - Ensured `AuthPasswordResetConfirm` interface includes `confirmPassword` field as specified
 
 ## 🔧 **Gaps Addressed in v8.0.0**
 
@@ -859,8 +876,7 @@ Afternoon (3h): API routes, email templates, frontend components with error hand
 - Simple and elegant user experience
 
 ### **7. Repository & Entity Index Updates** ✅
-- Added tasks to update `packages/models/src/repositories/index.ts`
-- Added tasks to update `packages/models/src/entities/index.ts`
+- Added tasks to update `packages/models/src/index.ts` for both entity and repository exports
 
 ### **8. Frontend Error States** ✅
 - Invalid token detection and error UI

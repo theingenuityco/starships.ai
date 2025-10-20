@@ -9,7 +9,7 @@ import { AgentModel } from '@starships/protocol';
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().min(1, 'ID is required');
+const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),

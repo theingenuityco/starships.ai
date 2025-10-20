@@ -13,7 +13,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
+const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {

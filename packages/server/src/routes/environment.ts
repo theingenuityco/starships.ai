@@ -13,7 +13,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Validation schemas
-const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
+const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const EnvironmentKeySchema = z
   .string()
   .regex(/^[A-Z][A-Z0-9_]*$/, 'Environment key must be uppercase letters, numbers, and underscores only');

@@ -815,7 +815,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            minimal ? 'min-h-[28px] max-h-[100px]' : 'min-h-[64px] max-h-[220px]',
+            minimal ? 'min-h-[36px] max-h-[120px]' : 'min-h-[80px] max-h-[260px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             minimal && 'text-sm'
           ),

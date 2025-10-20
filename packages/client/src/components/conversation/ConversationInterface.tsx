@@ -547,16 +547,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
-              {/* Welcome Section */}
-              <div className="text-center mb-8 max-w-2xl opacity-100">
-                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-              </div>
-
-              {/* Spacer for floating input */}
-              <div className="h-32 mb-8"></div>
-            </div>
+            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>
           )}
         </>
 
@@ -564,9 +555,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         <div
           ref={inputContainerRef}
           className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
-          style={{ bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)' }}
+          style={showMessagesArea ? { bottom: '0px' } : { top: '50%', transform: 'translateY(-50%)', marginTop: '-64px' }}
         >
           <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
+            {!showMessagesArea && (
+              <div className="text-center mb-6 opacity-100">
+                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+              </div>
+            )}
             <ConversationMessageInput
               ref={messageInputRef}
               selectedAgent={selectedAgent}

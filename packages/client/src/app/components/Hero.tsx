@@ -8,6 +8,10 @@ import { getHeadlineVariant, getCtaVariant } from '@/lib/flags'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import POPULAR_BLUEPRINTS from '@/components/marketplace/popularBlueprints'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { Orbitron } from 'next/font/google'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 export default function Hero() {
   const [blueprintIndex, setBlueprintIndex] = useState(0)
@@ -31,6 +35,10 @@ export default function Hero() {
     <section className="pt-28 pb-20 px-4">
       <div className="max-w-6xl mx-auto flex flex-col gap-10">
         <div>
+          <div className="mb-6 flex items-center gap-3">
+            <StarshipsLogo width={56} height={56} className="text-foreground" playOnMountOnce />
+            <span className={`${orbitron.className} text-3xl md:text-4xl font-normal tracking-tight`}>starships.ai</span>
+          </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
             {(() => {
               const v = getHeadlineVariant()
@@ -84,8 +92,8 @@ export default function Hero() {
             borderless
           />
           <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full text-xs bg-black/40 border border-white/15 text-white/90">{popularBlueprints[blueprintIndex]?.name}</div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 p-0">
-            <div className="w-full pointer-events-auto">
+          <div className="pointer-events-none absolute inset-x-0 bottom-6 md:bottom-8 px-4 md:px-6 z-40">
+            <div className="max-w-2xl mx-auto pointer-events-auto">
               <ConversationMessageInput starshipId="" minimal disabled={false} />
             </div>
           </div>

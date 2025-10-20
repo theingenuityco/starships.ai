@@ -79,7 +79,25 @@ export default function Hero() {
         </div>
 
         {/* Visualization: viewport removed; styles moved into visualization */}
-        <div className="relative h-[560px]">
+        <div className="relative h-[560px] overflow-visible">
+          {/* Tabs for switching blueprints */}
+          <div className="absolute top-3 left-3 right-3 z-30 flex items-center gap-2 overflow-x-visible overflow-y-visible py-1 pointer-events-auto">
+            {popularBlueprints.map((item, idx) => {
+              const isActive = idx === blueprintIndex
+              return (
+                <button
+                  key={item.name || idx}
+                  onClick={() => setBlueprintIndex(idx)}
+                  className={`px-3 py-1.5 rounded-full text-xs transition-colors duration-200 whitespace-nowrap shadow-frosted-lg frosted-glass-card ${
+                    isActive ? 'bg-primary/15 ring-2 ring-primary/30 text-white font-semibold shadow-[0_6px_28px_rgba(59,130,246,0.35)]' : 'text-white/90 hover:bg-white/5'
+                  }`}
+                >
+                  {item.name || `Blueprint ${idx + 1}`}
+                </button>
+              )
+            })}
+          </div>
+
           <BlueprintVisualization
             blueprint={popularBlueprints[blueprintIndex]?.blueprint || { nodes: [], edges: [] }}
             className="absolute inset-0 rounded-2xl shadow-2xl"
@@ -92,7 +110,6 @@ export default function Hero() {
             nodesDraggable={false}
             borderless
           />
-          <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full text-xs bg-black/40 border border-white/15 text-white/90">{popularBlueprints[blueprintIndex]?.name}</div>
           <div className="pointer-events-none absolute inset-x-0 bottom-6 md:bottom-8 px-4 md:px-6 z-40">
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <ConversationMessageInput starshipId="" minimal disabled={false} />

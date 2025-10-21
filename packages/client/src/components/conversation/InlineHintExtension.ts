@@ -18,8 +18,8 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
     return {
       getPrompts: () => [],
       getEnabled: () => true,
-      typingSpeedMs: 35,
-      pauseMs: 900,
+      typingSpeedMs: 70,
+      pauseMs: 1200,
       debug: false,
     }
   },
@@ -148,9 +148,9 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
           const tick = () => {
             // Trigger re-apply to advance animation
             editorView.dispatch(editorView.state.tr)
-            raf = window.setTimeout(tick, 60)
+            raf = window.setTimeout(tick, 75)
           }
-          raf = window.setTimeout(tick, 60)
+          raf = window.setTimeout(tick, 75)
           return {
             destroy() {
               if (raf) {

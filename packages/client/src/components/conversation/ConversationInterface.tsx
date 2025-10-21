@@ -9,7 +9,9 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed, useStarshipConversations } from '@/hooks/useConversations'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
-import { agentAPI, toolAPI } from '@/lib/api'
+import api, { agentAPI, toolAPI } from '@/lib/api'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -75,9 +77,46 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
 
+  // Cache of participants by conversation id (agents involved)
+  const [conversationParticipants, setConversationParticipants] = useState<Record<string, any[]>>({})
+
+  // Prefetch participants for top 5 recent conversations when on starter state
+  const prefetchRecentParticipants = useCallback(async () => {
+    try {
+      const list = starshipConversationsData?.conversations || []
+      if (!Array.isArray(list) || list.length === 0) return
+      const recent = list
+        .slice()
+        .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+        .slice(0, 3)
+      for (const conv of recent) {
+        const cid = conv?.id
+        if (!cid || conversationParticipants[cid]) continue
+        try {
+          const res = await api.get(`/api/v1/conversations/${cid}/messages`, { params: { limit: 1, page: 1 } })
+          const agents = (res as any)?.data?.data?.agents || []
+          if (Array.isArray(agents)) {
+            setConversationParticipants(prev => ({ ...prev, [cid]: agents }))
+          }
+        } catch {}
+      }
+    } catch {}
+  }, [starshipConversationsData, conversationParticipants])
+
+  // Kick off prefetch after showMessagesArea is computed
+  const shouldPrefetchParticipantsRef = useRef<boolean | null>(null)
+
   // Derive message presence and UI gating from streamed query (not store)
   const hasMessages = Array.isArray(liveMessages) && liveMessages.length > 0
   const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiStreaming)
+
+  useEffect(() => {
+    // Initialize ref after showMessagesArea is available
+    shouldPrefetchParticipantsRef.current = !showMessagesArea
+    if (shouldPrefetchParticipantsRef.current) {
+      void prefetchRecentParticipants()
+    }
+  }, [showMessagesArea, prefetchRecentParticipants])
 
   // Measure input container after showMessagesArea is known (prevents TS error and ensures correct layout)
   useEffect(() => {
@@ -599,15 +638,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             ></ConversationMessageInput>
 
             {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
-              <div className="mt-4 opacity-100 px-4">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent conversations</div>
+              <div className="mt-6 opacity-100">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
                 <div className="space-y-1">
                   {starshipConversationsData!.conversations
                     .slice()
                     .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
-                    .slice(0, 5)
+                    .slice(0, 3)
                     .map((conv: any) => {
                       const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
+                      const participants = conversationParticipants?.[conv?.id] || []
                       return (
                         <button
                           key={conv.id}
@@ -617,7 +657,27 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                           <div className="w-6 h-6 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
                             <Icon name="message-square" className="w-3.5 h-3.5 text-primary/80 group-hover:text-primary transition-colors" />
                           </div>
-                          <span className="flex-1 truncate text-foreground group-hover:text-foreground">{title}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
+                            {participants.length > 0 && (
+                              <div className="flex items-center gap-2 mt-1 min-w-0">
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {participants.slice(0, 3).map((agent: any) => (
+                                    <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
+                                      <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
+                                    </Avatar>
+                                  ))}
+                                </div>
+                                <span className="text-[12px] text-muted-foreground truncate">
+                                  {participants
+                                    .slice(0, 3)
+                                    .map((a: any) => a?.name || a?.slug || 'Agent')
+                                    .join(', ')}
+                                </span>
+                                {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
+                              </div>
+                            )}
+                          </div>
                         </button>
                       )
                     })}

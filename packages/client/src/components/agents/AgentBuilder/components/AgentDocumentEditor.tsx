@@ -20,7 +20,7 @@ import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisual
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { useQuery } from '@tanstack/react-query'
-import api from '@/lib/api'
+import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -62,27 +62,44 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
 
-  // Resolve current agentId by slug within this starship (if editing existing)
+  // Resolve current agentId by slug within this starship (if editing existing) - starship-only
   const [agentId, setAgentId] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
+    const safeGet = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
+      try {
+        const token = await getCurrentToken()
+        const res = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          method: 'GET',
+        } as RequestInit)
+        if (!res.ok) return { ok: false, data: null }
+        const json = await res.json()
+        return { ok: true, data: (json?.data as T) ?? null }
+      } catch {
+        return { ok: false, data: null }
+      }
+    }
     const load = async () => {
       if (!starshipId || !value?.slug || value.slug === 'new') {
         console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
         setAgentId(null)
         return
       }
-      try {
-        const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/starships/${starshipId}/agents/${value.slug}`)
-        const agent = res.data.data
+      const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
+      const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
+      if (result.ok && (result.data as any)?.id) {
+        const agent: any = result.data as any
         console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
         if (!cancelled) setAgentId(agent?.id || null)
-      } catch {
-        console.warn('[AgentDocEditor] Failed to resolve agentId', { starshipId, slug: value.slug })
+      } else {
         if (!cancelled) setAgentId(null)
       }
     }
-    load()
+    void load()
     return () => {
       cancelled = true
     }

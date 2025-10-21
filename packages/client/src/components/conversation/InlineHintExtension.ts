@@ -124,7 +124,11 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
             const caret = document.createElement('span')
             caret.className = 'inline-block align-baseline ml-0.5 animate-pulse'
             caret.style.width = '1px'
-            caret.style.height = '1em'
+            // Slightly taller than the line height and nudged down to mimic native caret descent
+            caret.style.height = '1.2em'
+            caret.style.position = 'relative'
+            caret.style.top = '0em'
+            caret.style.verticalAlign = 'text-bottom'
             caret.style.background = 'currentColor'
             span.appendChild(caret)
 

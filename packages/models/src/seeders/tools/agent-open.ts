@@ -11,7 +11,7 @@ export const agentOpenTool: ToolParams = {
   description: `Creates or opens an agent on the current starship.
 
 ## Modes
-- Create new draft: provide "name" and "slug" (optional: description, model, systemPrompt, temperature, maxTokens)
+- Create new draft: provide "name" and "slug" (optional: description, model, systemPrompt, temperature, maxTokens, previewPrompts)
 - Open existing: provide only "slug"
 
 ## Environment Dependencies
@@ -57,6 +57,11 @@ Automatically inferred from agent state (do not pass manually):
         type: 'number',
         description: 'Max response tokens (default: 2048)',
       },
+      previewPrompts: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Optional example prompts to show in chat (max 10)',
+      },
     },
     required: ['slug'],
   },
@@ -97,6 +102,10 @@ Automatically inferred from agent state (do not pass manually):
               }
               if (typeof input.maxTokens === 'number') {
                 body.maxTokens = input.maxTokens;
+              }
+              if (Array.isArray(input.previewPrompts)) {
+                const prompts = input.previewPrompts.filter(p => typeof p === 'string' && p.trim()).slice(0, 10);
+                if (prompts.length > 0) body.previewPrompts = prompts;
               }
               
               return {
@@ -172,7 +181,7 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   slug: 'agent-open',
   category: 'automation',
   exampleUsage:
-    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "slug": "support-agent", "description": "Helps users", "systemPrompt": "You are a helpful support agent" } // create draft',
+    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "slug": "support-agent", "description": "Helps users", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["Help me build an onboarding agent", "Design a research agent for Wikipedia"] } // create draft',
   requiresApiKey: false,
   configurationFields: [],
 };

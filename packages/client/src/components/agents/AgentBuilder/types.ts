@@ -9,6 +9,7 @@ export interface AgentFormData {
   temperature: number
   maxTokens: number
   systemPrompt: string
+  previewPrompts?: string[]
   assignedToolSlugs: string[] // Array of tool slugs
   blueprint: string // JSON string for the blueprint
   timeout: number

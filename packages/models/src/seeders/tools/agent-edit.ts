@@ -25,6 +25,7 @@ Apply partial updates to any agent by providing its slug. Supports updating indi
 - **maxTokens**: Update max tokens
 - **blueprint**: Update Autopilot blueprint
 - **timeout**: Update execution timeout
+- **previewPrompts**: Update preview/example prompts (max 10)
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
@@ -76,6 +77,11 @@ Automatically inferred from agent state (do not pass manually):
         type: 'number',
         description: 'New execution timeout in ms',
       },
+      previewPrompts: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'New preview/example prompts (max 10)',
+      },
     },
     required: ['slug'],
   },
@@ -110,18 +116,22 @@ Automatically inferred from agent state (do not pass manually):
             if (input.maxTokens !== undefined) body.maxTokens = input.maxTokens;
             if (input.blueprint !== undefined) body.blueprint = input.blueprint;
             if (input.timeout !== undefined) body.timeout = input.timeout;
+            if (Array.isArray(input.previewPrompts)) {
+              const prompts = input.previewPrompts.filter(p => typeof p === 'string' && p.trim()).slice(0, 10);
+              body.previewPrompts = prompts;
+            }
 
             if (Object.keys(body).length === 0) {
               throw new Error('At least one field must be provided for update');
             }
 
             return {
-              baseUrl,
-              starshipId,
+              baseUrl: baseUrl,
+              starshipId: starshipId,
               slug: input.slug,
-              body,
+              body: body,
               headers: {
-                'Authorization': \`Bearer \${authToken}\`,
+                'Authorization': 'Bearer ' + authToken,
                 'Content-Type': 'application/json'
               }
             };
@@ -158,7 +168,7 @@ Automatically inferred from agent state (do not pass manually):
             const ctx = $lastOutputOf('prepare')[0].json;
 
             return {
-              url: \`\${ctx.baseUrl}/agents/\${agentData.id}\`,
+              url: ctx.baseUrl + '/agents/' + agentData.id,
               method: 'PUT',
               headers: ctx.headers,
               body: ctx.body
@@ -212,7 +222,8 @@ export const agentEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
 
   slug: 'agent-edit',
   category: 'automation',
-  exampleUsage: '{ "slug": "support-agent", "systemPrompt": "Updated instructions" } // partial updates by slug',
+  exampleUsage:
+    '{ "slug": "support-agent", "systemPrompt": "Updated instructions", "previewPrompts": ["New example 1", "New example 2"] } // partial updates by slug',
   requiresApiKey: false,
   configurationFields: [],
 };

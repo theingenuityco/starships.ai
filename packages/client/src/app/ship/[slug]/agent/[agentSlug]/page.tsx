@@ -125,6 +125,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       temperature: undefined as undefined | number,
       maxTokens: undefined as undefined | number,
       systemPrompt: undefined as undefined | string,
+      previewPrompts: undefined as undefined | string[],
       assignedToolSlugs: undefined as undefined | string[],
       icon: undefined as undefined | string,
       timeout: undefined as undefined | number,
@@ -147,6 +148,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (args?.temperature !== undefined) compose.temperature = args.temperature
         if (args?.maxTokens !== undefined) compose.maxTokens = args.maxTokens
         if (args?.systemPrompt !== undefined) compose.systemPrompt = args.systemPrompt
+        if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as any[]).filter(p => typeof p === 'string' && p.trim()).slice(0, 10) as string[]
         if (args?.icon !== undefined) compose.icon = args.icon
         if (args?.timeout !== undefined) compose.timeout = args.timeout
         if (args?.assignedToolSlugs !== undefined) {
@@ -199,6 +201,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (compose.icon !== undefined) agentBuilderRef.current?.updateField('icon', compose.icon)
     if (compose.timeout !== undefined) agentBuilderRef.current?.updateField('timeout', compose.timeout as any)
     if (compose.assignedToolSlugs !== undefined) agentBuilderRef.current?.updateField('assignedToolSlugs', compose.assignedToolSlugs as any)
+    if (compose.previewPrompts !== undefined) agentBuilderRef.current?.updateField('previewPrompts', compose.previewPrompts as any)
     if (compose.blueprintChanged) {
       const bpStr = JSON.stringify(bp, null, 2)
       agentBuilderRef.current?.updateField('blueprint', bpStr)

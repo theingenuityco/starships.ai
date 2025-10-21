@@ -409,15 +409,15 @@ const MemoizedMessageBubble = memo(
     const isUser = message.role === 'user'
 
     if (isUser) {
-      // User message: Blue bubble on the right
+      // User message: Neutral bubble on the right
       return (
         <div className="flex justify-end">
           <div className="mb-4 mt-6 flex items-end gap-3 max-w-[70%]">
-            <div className={`bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
+            <div className={`bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
               {message.sending && (
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary border-2 border-background rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-primary-foreground rounded-full animate-pulse" />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[hsl(var(--accent))] border-2 border-background rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-[hsl(var(--accent-foreground))] rounded-full animate-pulse" />
                 </div>
               )}
             </div>

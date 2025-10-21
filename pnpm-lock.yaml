@@ -227,6 +227,9 @@ importers:
       '@tanstack/react-query-devtools':
         specifier: 5.81.5
         version: 5.81.5(@tanstack/react-query@5.81.5(react@19.2.0))(react@19.2.0)
+      '@tiptap/core':
+        specifier: ^3.7.2
+        version: 3.7.2(@tiptap/pm@3.7.2)
       '@tiptap/extension-code-block-lowlight':
         specifier: ^3.7.1
         version: 3.7.2(@tiptap/core@3.7.2(@tiptap/pm@3.7.2))(@tiptap/extension-code-block@3.7.2(@tiptap/core@3.7.2(@tiptap/pm@3.7.2))(@tiptap/pm@3.7.2))(@tiptap/pm@3.7.2)(highlight.js@11.11.1)(lowlight@3.3.0)
@@ -249,7 +252,7 @@ importers:
         specifier: ^3.7.1
         version: 3.7.2(@tiptap/core@3.7.2(@tiptap/pm@3.7.2))
       '@tiptap/pm':
-        specifier: ^3.7.1
+        specifier: ^3.7.2
         version: 3.7.2
       '@tiptap/react':
         specifier: ^3.7.1

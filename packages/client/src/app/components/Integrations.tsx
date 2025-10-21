@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card'
 
 export default function Integrations() {
-  const items = ['Slack', 'Jira', 'HubSpot', 'Postgres', 'Snowflake', 'HTTP APIs']
+  const items = ['HTTP APIs', 'Webhooks', 'Postgres', 'Adapters']
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
@@ -14,7 +14,7 @@ export default function Integrations() {
               </div>
             ))}
           </div>
-          <div className="text-xs text-muted-foreground mt-3">Bring your own tools via simple adapters.</div>
+          <div className="text-xs text-muted-foreground mt-3">Bring your own tools via tool blueprints and adapters.</div>
         </Card>
       </div>
     </section>

@@ -3,19 +3,19 @@ import { Card } from '@/components/ui/card'
 const QA = [
   {
     q: 'How is this different from a workflow tool?',
-    a: 'Agents decide and act with tools under guardrails; you get replayable traces and a production runner.',
+    a: 'Agents can decide and call tools; runs are executed with process isolation and streamed events.',
   },
   {
     q: 'What happens when the model is wrong?',
-    a: 'Policies, retries, and fallbacks reduce error impact; you can inspect and replay runs.',
+    a: 'You can inspect streamed events and messages; add checks in your blueprints/tools.',
   },
   {
     q: 'Do I need my own LLM keys?',
-    a: 'Use ours to start; bring your own for control and pricing later.',
+    a: 'Bring your own provider keys via environment configuration.',
   },
-  { q: 'Can I connect custom tools?', a: 'Yes, simple adapters expose your APIs or functions as tools.' },
-  { q: 'How do you handle PII?', a: 'Scoped access and optional redaction; audit logs for all tool calls.' },
-  { q: 'Where do agents run?', a: 'On the Autopilot Runner with isolation and predictable latency.' },
+  { q: 'Can I connect custom tools?', a: 'Yes. Define tools with blueprints or adapters to call your APIs.' },
+  { q: 'How do you handle PII?', a: 'Secrets are redacted in emitted events; scope access via your environment.' },
+  { q: 'Where do agents run?', a: 'On a runner with process isolation (child process locally or remote).' },
 ]
 
 export default function FAQ() {

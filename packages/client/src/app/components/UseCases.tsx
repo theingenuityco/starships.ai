@@ -12,7 +12,7 @@ export default function UseCases() {
               <Icon name="search" className="w-5 h-5 mt-1" />
               <div>
                 <h3 className="font-medium mb-1">Data research & enrichment</h3>
-                <p className="text-sm text-muted-foreground">Increase coverage with guardrails; extract, dedupe, and enrich entities.</p>
+                <p className="text-sm text-muted-foreground">Extract, dedupe, and enrich entities with tool-connected agents.</p>
               </div>
             </div>
           </Card>
@@ -21,7 +21,7 @@ export default function UseCases() {
               <Icon name="bot" className="w-5 h-5 mt-1" />
               <div>
                 <h3 className="font-medium mb-1">Internal workflow copilot</h3>
-                <p className="text-sm text-muted-foreground">Reduce manual steps across tools with safe, auditable automations.</p>
+                <p className="text-sm text-muted-foreground">Reduce manual steps across tools with agent-driven automations.</p>
               </div>
             </div>
           </Card>

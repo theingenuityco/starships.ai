@@ -1,13 +1,10 @@
 'use client'
 
-
 import { LoginForm } from '@/components/auth/LoginForm'
-import { StarfieldBackground } from '@/components/StarfieldBackground'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import Link from 'next/link'
-import { Suspense } from 'react'
 
 export default function LoginPage() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -17,15 +14,10 @@ export default function LoginPage() {
   // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <StarTheme theme="dark">
+      <StarTheme theme="light">
         <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
-            <StarfieldBackground launching={false} density={400} speed={0.8} />
-          </Suspense>
-          <div className="relative z-10">
-            <div className="animate-pulse">
-              <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-            </div>
+          <div className="animate-pulse">
+            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
           </div>
         </div>
       </StarTheme>
@@ -40,10 +32,6 @@ export default function LoginPage() {
   return (
     <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-        <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
-          <StarfieldBackground launching={false} density={400} speed={0.8} />
-        </Suspense>
-
         {/* Overlay for better text readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/60 pointer-events-none" />
 

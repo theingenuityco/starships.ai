@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { StarTheme } from '@/components/theme-context'
 
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
@@ -69,35 +70,37 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // Regular pages with conditional navigation sidebar
   return (
     <JwtAuthGate>
-      <div className="relative h-screen flex overflow-hidden">
-        {/* Floating Navigation - conditionally rendered */}
-        {!shouldHideNavigation && (
-          <div className="fixed top-6 left-6 z-[1000]">
-            <aside className="relative" style={{ zIndex: 1000 }}>
-              <Navigation isMobile={isMobile} />
-            </aside>
-          </div>
-        )}
+      <StarTheme theme="dark">
+        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+          {/* Floating Navigation - conditionally rendered */}
+          {!shouldHideNavigation && (
+            <div className="fixed top-6 left-6 z-[1000]">
+              <aside className="relative" style={{ zIndex: 1000 }}>
+                <Navigation isMobile={isMobile} />
+              </aside>
+            </div>
+          )}
 
-        {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
-        {isMobile && !shouldHideNavigation && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={() => setShowMobileMenu(!showMobileMenu)}
-            className="fixed top-4 left-4 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
-            aria-label="Open navigation menu"
-            style={{ zIndex: 999 }}
-          >
-            <Icon name="menu" className="w-5 h-5" />
-          </motion.button>
-        )}
+          {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
+          {isMobile && !shouldHideNavigation && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="fixed top-4 left-4 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+              aria-label="Open navigation menu"
+              style={{ zIndex: 999 }}
+            >
+              <Icon name="menu" className="w-5 h-5" />
+            </motion.button>
+          )}
 
-        {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
-          {children}
-        </main>
-      </div>
+          {/* Main Content Area - Dynamic positioning based on navigation visibility */}
+          <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+            {children}
+          </main>
+        </div>
+      </StarTheme>
     </JwtAuthGate>
   )
 }

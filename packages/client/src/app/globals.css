@@ -184,36 +184,36 @@
 
 /* Single-line property */
 .property-box-single {
-  border: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
   border-radius: 6px !important;
-  background: rgba(59, 130, 246, 0.08) !important;
+  background: rgba(var(--primary-rgb), 0.08) !important;
 }
 
 /* Top line of multi-line property */
 .property-box-top {
-  border-top: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
-  border-left: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
-  border-right: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-top: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
+  border-left: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
+  border-right: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
   border-top-left-radius: 6px !important;
   border-top-right-radius: 6px !important;
-  background: rgba(59, 130, 246, 0.08) !important;
+  background: rgba(var(--primary-rgb), 0.08) !important;
 }
 
 /* Middle lines of multi-line property */
 .property-box-middle {
-  border-left: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
-  border-right: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
-  background: rgba(59, 130, 246, 0.08) !important;
+  border-left: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
+  border-right: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
+  background: rgba(var(--primary-rgb), 0.08) !important;
 }
 
 /* Bottom line of multi-line property */
 .property-box-bottom {
-  border-bottom: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
-  border-left: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
-  border-right: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
+  border-bottom: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
+  border-left: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
+  border-right: 1.5px dashed rgba(var(--primary-rgb), 0.5) !important;
   border-bottom-left-radius: 6px !important;
   border-bottom-right-radius: 6px !important;
-  background: rgba(59, 130, 246, 0.08) !important;
+  background: rgba(var(--primary-rgb), 0.08) !important;
 }
 
 /* Dark mode adjustments */
@@ -221,8 +221,8 @@
 .dark .property-box-top,
 .dark .property-box-middle,
 .dark .property-box-bottom {
-  border-color: rgba(59, 130, 246, 0.6) !important;
-  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(var(--primary-rgb), 0.6) !important;
+  background: rgba(var(--primary-rgb), 0.12) !important;
 }
 
 /* Light mode adjustments */
@@ -237,13 +237,13 @@
 /* Glyph margin indicator */
 .property-group-glyph {
   width: 3px !important;
-  background: rgba(59, 130, 246, 0.7) !important;
+  background: rgba(var(--primary-rgb), 0.7) !important;
   border-radius: 2px !important;
   margin-left: 2px !important;
 }
 
 .dark .property-group-glyph {
-  background: rgba(59, 130, 246, 0.8) !important;
+  background: rgba(var(--primary-rgb), 0.8) !important;
 }
 
 /* Monaco Editor - Prevent scrollbar overlap */
@@ -288,7 +288,7 @@
     --foreground: 0 0% 8%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 8%;
-    --primary: 220 70% 50%; /* Soothing blue - Theme anchor */
+    --primary: 38 92% 50%; /* Amber primary in light */
     --primary-foreground: 0 0% 98%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 0 0% 8%;
@@ -298,7 +298,7 @@
     --accent-foreground: 0 0% 8%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 220 70% 50%;
+    --ring: 38 92% 50%;
     --radius: 0.5rem;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
@@ -306,9 +306,9 @@
     --popover-foreground: 0 0% 8%;
 
     /* Command Deck Light - Gradient backgrounds */
-    --command-bg: linear-gradient(135deg, hsl(220 30% 95%), hsl(220 20% 98%));
-    --starship-accent: hsl(220 70% 50%);
-    --primary-rgb: 59 130 246;
+    --command-bg: linear-gradient(135deg, hsl(38 30% 95%), hsl(38 20% 98%));
+    --starship-accent: hsl(38 92% 50%);
+    --primary-rgb: 245 158 11;
 
     /* Shadow colors for light mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
@@ -328,7 +328,7 @@
     --foreground: 0 0% 95%;
     --card: 220 15% 10%;
     --card-foreground: 0 0% 95%;
-    --primary: 220 70% 60%; /* Brighter blue for dark contrast */
+    --primary: 38 92% 55%; /* Amber primary in dark */
     --primary-foreground: 220 15% 8%;
     --secondary: 220 15% 15%;
     --secondary-foreground: 0 0% 95%;
@@ -338,20 +338,20 @@
     --accent-foreground: 0 0% 95%;
     --border: 220 15% 20%;
     --input: 220 15% 20%;
-    --ring: 220 70% 60%;
+    --ring: 38 92% 55%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
     --popover: 220 15% 12%;
     --popover-foreground: 0 0% 95%;
 
     /* Command Deck Dark - Deep space gradients */
-    --command-bg: linear-gradient(135deg, hsl(220 25% 12%), hsl(220 15% 8%));
-    --starship-accent: hsl(220 70% 60%);
-    --primary-rgb: 59 130 246;
+    --command-bg: linear-gradient(135deg, hsl(38 20% 12%), hsl(38 10% 8%));
+    --starship-accent: hsl(38 92% 55%);
+    --primary-rgb: 245 158 11;
 
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
-    --frosted-border: 1px solid rgba(255, 255, 255, 0.06);
+    --frosted-border: 1px solid rgba(255, 255, 255, 0.12);
 
     /* App gradient variables (dark) */
     --app-tint: hsl(220 12% 20%); /* adjust for darker theme tint */
@@ -396,8 +396,6 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    /* Performance: Enable hardware acceleration for smooth animations */
-    transform: translateZ(0);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -559,18 +557,19 @@
   .app-gradient-bg {
     background-color: hsl(var(--background));
     background-image:
-      /* Light: subtle bluish-gray diagonal + vignettes, no uniform wash */
-      linear-gradient(135deg, #0b12201a 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, #0b122026, transparent 75%),
-      radial-gradient(1600px 1000px at 53% 120%, #0b12201f, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af1f, transparent 60%);
+      /* Light: shift overlays to reflect primary tone subtly */
+      linear-gradient(135deg, hsl(var(--foreground) / 0.06) 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, hsl(var(--primary) / 0.15), transparent 75%),
+      radial-gradient(1600px 1000px at 53% 120%, hsl(var(--primary) / 0.12), transparent 65%), radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.12), transparent 60%);
     backface-visibility: hidden;
     will-change: background;
   }
 
   .dark .app-gradient-bg {
     background-image:
-      /* Dark: lighter near-dark overlays to avoid pure black */
-      linear-gradient(0deg, #0b12204d, #0b12204d), linear-gradient(135deg, #0b122033 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, #0b122040, transparent 75%),
-      radial-gradient(1600px 1000px at 53% 120%, #0b122033, transparent 65%), radial-gradient(900px 500px at 85% 110%, #1e40af33, transparent 60%);
+      /* Dark: warm near-dark overlays tuned by primary */
+      linear-gradient(0deg, hsl(var(--foreground) / 0.3), hsl(var(--foreground) / 0.3)), linear-gradient(135deg, hsl(var(--foreground) / 0.2) 0%, transparent 60%),
+      radial-gradient(1400px 900px at 53% -10%, hsl(var(--primary) / 0.22), transparent 75%), radial-gradient(1600px 1000px at 53% 120%, hsl(var(--primary) / 0.18), transparent 65%),
+      radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.22), transparent 60%);
   }
 }
 
@@ -628,7 +627,7 @@
   --foreground: 0 0% 100%;
   --card: 220 15% 5%;
   --card-foreground: 0 0% 95%;
-  --primary: 220 70% 60%;
+  --primary: 38 92% 55%;
   --primary-foreground: 0 0% 0%;
   --secondary: 220 15% 10%;
   --secondary-foreground: 0 0% 95%;
@@ -638,10 +637,14 @@
   --accent-foreground: 0 0% 95%;
   --border: 220 15% 20%;
   --input: 220 15% 20%;
-  --ring: 220 70% 60%;
+  --ring: 38 92% 55%;
+  --primary-rgb: 245 158 11;
 
   /* Ensure text color is applied */
   color: hsl(var(--foreground));
+
+  /* Match frosted border tone in StarTheme dark wrapper */
+  --frosted-border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* Star Light Theme - If needed */
@@ -650,7 +653,7 @@
   --foreground: 0 0% 0%;
   --card: 0 0% 100%;
   --card-foreground: 0 0% 8%;
-  --primary: 220 70% 50%;
+  --primary: 38 92% 50%;
   --primary-foreground: 0 0% 98%;
   --secondary: 220 14% 96%;
   --secondary-foreground: 0 0% 8%;
@@ -660,7 +663,8 @@
   --accent-foreground: 0 0% 8%;
   --border: 220 13% 91%;
   --input: 220 13% 91%;
-  --ring: 220 70% 50%;
+  --ring: 38 92% 50%;
+  --primary-rgb: 245 158 11;
 }
 
 /*
@@ -773,6 +777,18 @@
   background: hsl(var(--secondary));
   color: hsl(var(--muted-foreground));
   border-top: 1px solid hsl(var(--border));
+}
+
+/* Blueprint visualization container background */
+.blueprint-container-bg {
+  background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--background)));
+}
+
+.dark .blueprint-container-bg {
+  background-image:
+    radial-gradient(1200px 700px at 20% 15%, rgba(0, 0, 0, 0.55), transparent 60%), radial-gradient(1200px 700px at 80% 85%, rgba(2, 6, 23, 0.5), transparent 60%),
+    linear-gradient(135deg, rgba(2, 6, 23, 0.92), rgba(0, 0, 0, 0.92));
+  background-color: #000;
 }
 
 /* Headings and code to match our prose */
@@ -1106,5 +1122,11 @@
     border-bottom: 0;
     border-top-right-radius: 12px;
     border-bottom-left-radius: 12px;
+  }
+
+  /* Neutral frosted glass in dark mode (no primary tint) */
+  .dark .frosted-glass-card {
+    background: linear-gradient(135deg, hsl(var(--card) / 0.3) 0%, hsl(var(--card) / 0.2) 100%);
+    border: var(--frosted-border);
   }
 }

@@ -121,16 +121,6 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
             span.style.wordBreak = 'break-word'
             span.style.maxWidth = '100%'
             span.textContent = shown
-            const caret = document.createElement('span')
-            caret.className = 'inline-block align-baseline ml-0.5 animate-pulse'
-            caret.style.width = '1px'
-            // Slightly taller than the line height and nudged down to mimic native caret descent
-            caret.style.height = '1.2em'
-            caret.style.position = 'relative'
-            caret.style.top = '0em'
-            caret.style.verticalAlign = 'text-bottom'
-            caret.style.background = 'currentColor'
-            span.appendChild(caret)
 
             const deco = Decoration.widget(anchorPos, span, { side: 1 })
             decorations = DecorationSet.empty.add(state.doc, [deco])

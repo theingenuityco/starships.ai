@@ -901,6 +901,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return ['Design an agent that researches topics using Wikipedia', 'Create a customer support agent that can help users with common questions', 'Plan an onboarding workflow for new customers']
     }, [examplePrompts, templatePrompts])
 
+    // Keep animated hint prompts reactive without re-initializing the TipTap extension
+    const promptsRef = useRef<string[]>([])
+    useEffect(() => {
+      promptsRef.current = inlinePrompts
+    }, [inlinePrompts])
+
     // Helper: resolve the agent referenced by the leading @mention in the editor JSON (if any)
     const getLeadingMentionAgentFromEditor = useCallback((editorInstance: typeof tiptap | null): AgentModel | null => {
       const editor = editorInstance as any
@@ -1061,7 +1067,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           suggestion: mentionSuggestion,
         }),
         InlineHintExtension.configure({
-          getPrompts: () => inlinePrompts,
+          getPrompts: () => promptsRef.current,
           getEnabled: () => !minimal && !disabled && !isStreamingEffective && !sending,
           typingSpeedMs: 35,
           pauseMs: 900,

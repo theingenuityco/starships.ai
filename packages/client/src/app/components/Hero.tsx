@@ -62,7 +62,7 @@ export default function Hero() {
               const v = getHeadlineVariant()
               if (v === 'B') return 'From prompt to working agent—without brittle glue'
               if (v === 'C') return 'Design, run, and monitor AI automations'
-              return 'Build and run AI agents with isolation'
+              return 'Build automations at warp speed'
             })()}
           </h1>
           <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Design agent behavior, connect tools, and run on a runtime with isolation and event streaming.</p>

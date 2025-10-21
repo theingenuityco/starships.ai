@@ -638,7 +638,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             ></ConversationMessageInput>
 
             {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
-              <div className="mt-6 opacity-100">
+              <div className="mt-8 opacity-100">
                 <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
                 <div className="space-y-1">
                   {starshipConversationsData!.conversations
@@ -654,8 +654,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                           className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
                           onClick={() => handleRecentConversationSelect(conv.id)}
                         >
-                          <div className="w-6 h-6 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
-                            <Icon name="message-square" className="w-3.5 h-3.5 text-primary/80 group-hover:text-primary transition-colors" />
+                          <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
+                            <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="truncate text-foreground group-hover:text-foreground">{title}</p>

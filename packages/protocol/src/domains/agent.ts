@@ -51,8 +51,6 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
 /**
  * Request to update an agent
  */
-export type UpdateAgentRequest = Partial<AgentParamsWithoutMetadata>;
-// Extend with optional agent metadata for updates
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
   templateId?: string;
   previewPrompts?: string[];

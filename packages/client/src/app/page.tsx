@@ -11,6 +11,7 @@ import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
 import FinalCTA from '@/app/components/FinalCTA'
+import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ export default function HomePage() {
         {/* New Landing Sections */}
         <Hero />
         <UseCases />
+        <MarketplaceTeaser />
         <ProblemOutcome />
         <ProductModel />
         <HowItWorks />

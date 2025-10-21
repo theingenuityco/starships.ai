@@ -2,7 +2,7 @@ import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM } from '@starships/autopilot';
 import type {
   ToolParams,
   ExecutionItem,
@@ -260,6 +260,54 @@ export class ConversationService {
       await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
     }
 
+    // Attempt early title generation before agent gating (so missing agent link doesn't block title updates)
+    try {
+      const convo = await this.getConversationById(data.conversationId);
+      if (convo) {
+        const t = (convo.title || '').trim().toLowerCase();
+        const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
+        try {
+          console.log('[TITLE] Early check:', {
+            conversationId: convo.id,
+            currentTitle: convo.title,
+            needsTitle: needs,
+            contentPreview: String(data.content || '').slice(0, 80),
+          });
+        } catch (err) {
+          console.warn('[TITLE] early-check log failed:', err);
+        }
+        if (needs) {
+          const star = await this.getConversationStarship(data.conversationId);
+          if (star) {
+            const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
+            if (gen && gen.trim()) {
+              await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
+              try {
+                console.log('[TITLE] Updated conversation title:', { conversationId: convo.id, title: gen.trim() });
+              } catch (err) {
+                console.warn('[TITLE] updated-title log failed:', err);
+              }
+              if (this.streamingService && this.streamingService.isActive(convo.id)) {
+                await this.streamingService.broadcastUIAction(convo.id, {
+                  __ui_action: 'conversation_title_updated',
+                  conversationId: convo.id,
+                  title: gen.trim(),
+                });
+              }
+            } else {
+              try {
+                console.warn('[TITLE] Generation returned empty title');
+              } catch (err) {
+                console.warn('[TITLE] ui_action emit failed:', err);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[TITLE] Early generation failed:', err);
+    }
+
     const conversationAgents = await this.getConversationAgents(data.conversationId);
     if (conversationAgents.length < 1) {
       throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
@@ -289,6 +337,8 @@ export class ConversationService {
     if (!conversation) {
       throw new NotFoundError('Conversation', data.conversationId);
     }
+
+    // (late title generation block removed; handled early)
 
     // Get conversation messages from database
     let messages = await this.getConversationMessages(data.conversationId);
@@ -423,6 +473,131 @@ export class ConversationService {
           conversationId: data.conversationId,
         });
       }
+    }
+  }
+
+  /**
+   * Generate a short, descriptive conversation title using a lightweight LLM (autopilot LLM node)
+   * Records usage under the starship/conversation for billing.
+   */
+  private async generateConversationTitle(starshipId: string, conversationId: string, userContent: string): Promise<string | null> {
+    try {
+      const env = getEnvConfig();
+      const openRouterKey = env.OPENROUTER_API_KEY || '';
+      if (!openRouterKey) {
+        console.warn('[TITLE] OPENROUTER_API_KEY missing; skipping title generation');
+        return null;
+      }
+
+      // Hardcode a known, reliable OpenRouter model for titles
+      const model = 'openai/gpt-4o-mini';
+
+      const sys = [
+        'You generate concise, helpful conversation titles.',
+        'Rules:',
+        '- 4-8 words, sentence case, no trailing punctuation.',
+        '- Capture the main user intent/topic from the first message.',
+        '- Avoid quotes, emojis, and personal data. Keep under 60 characters.',
+      ].join('\n');
+
+      const prompt = `User message: "${String(userContent || '')
+        .replace(/\n+/g, ' ')
+        .slice(0, 400)}"\n\nReturn only the title text.`;
+
+      // Use autopilot LLM node directly (no runner/engine). Secure env provides API key.
+      const llm = new LLM(
+        {
+          model,
+          messages: [
+            { role: 'system' as const, content: sys },
+            { role: 'user' as const, content: prompt },
+          ],
+          temperature: 0.3,
+          maxTokens: 32,
+        },
+        { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
+      );
+      try {
+        console.log('[TITLE] Using model:', model);
+      } catch (err) {
+        console.warn('[TITLE] model log failed:', err);
+      }
+      const items = await llm.execute();
+      const res = (items?.[0]?.json || {}) as {
+        model?: string;
+        usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cost?: number };
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      const choice = res?.choices?.[0]?.message?.content || '';
+      const usage = res?.usage || null;
+      const modelUsed = res?.model || model;
+
+      // Record usage if provided by LLM (camelCase fields)
+      try {
+        if (usage && typeof usage.totalTokens === 'number') {
+          await this.usageService
+            .createUsageForTurn({
+              starshipId,
+              conversationId,
+              promptTokens: Number(usage.promptTokens ?? 0),
+              completionTokens: Number(usage.completionTokens ?? 0),
+              totalTokens: Number(usage.totalTokens ?? 0),
+              cost: Number(usage.cost ?? 0),
+              model: String(modelUsed || model),
+            })
+            .then(async (row) => {
+              try {
+                await this.billingService.debitUsage(row);
+              } catch (err) {
+                console.warn('[TITLE] Billing debit failed:', err);
+              }
+            });
+        }
+      } catch (err) {
+        console.warn('[TITLE] Usage recording failed:', err);
+      }
+
+      // If model produced nothing, skip
+      if (!choice || String(choice).trim().length === 0) {
+        try {
+          console.warn('[TITLE] Empty model response; skipping');
+        } catch (err) {
+          console.warn('[TITLE] empty-model log failed:', err);
+        }
+        return null;
+      }
+
+      // Sanitize and trim the title
+      const title = String(choice || '')
+        .trim()
+        .replace(/^"|"$/g, '');
+      if (!title) {
+        try {
+          console.warn('[TITLE] Title empty after sanitize; skipping');
+        } catch (err) {
+          console.warn('[TITLE] sanitize-empty log failed:', err);
+        }
+        return null;
+      }
+      // Remove trailing punctuation like '.' or ':'
+      const cleaned = title.replace(/[\s:。.]+$/g, '');
+      if (!cleaned) {
+        try {
+          console.warn('[TITLE] Title empty after cleanup; skipping');
+        } catch (err) {
+          console.warn('[TITLE] cleanup-empty log failed:', err);
+        }
+        return null;
+      }
+      return cleaned.slice(0, 80);
+    } catch (e) {
+      try {
+        console.warn('[TITLE] Generation error:', e instanceof Error ? e.message : e);
+      } catch {
+        // ignore log failure
+      }
+      return null;
     }
   }
 

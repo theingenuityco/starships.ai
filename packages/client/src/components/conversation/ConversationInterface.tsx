@@ -6,7 +6,8 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useConversationStreamed, useStarshipConversations } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationStreamed, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import api, { agentAPI, toolAPI } from '@/lib/api'
@@ -66,6 +67,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track streaming state for current conversation to focus input on completion
   const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
   const prevStreamingRef = useRef(false)
+  const queryClient = useQueryClient()
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
@@ -302,6 +304,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Builders are route-based now; no in-place form updates
 
       switch (action) {
+        case 'conversation_title_updated': {
+          const cid = (payload as any)?.conversationId
+          try {
+            if (starshipId) {
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
+            }
+            if (cid) {
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+            }
+          } catch {}
+          break
+        }
         case 'tool_call_detected': {
           const toolName = (payload as any).toolName
           const toolCallId = (payload as any).toolCallId
@@ -578,7 +592,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-            <Icon name="user" s className="w-8 h-8 text-muted-foreground" />
+            <Icon name="user" className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </div>

@@ -73,29 +73,39 @@ export function LoginForm() {
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
-    const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
-    const oauthError = searchParams?.get('oauth_error')
-    const verificationError = searchParams?.get('verification')
-    const resetSuccess = searchParams?.get('reset')
-
-    // Handle password reset success message
-    if (resetSuccess === 'success') {
-      toast.success('Password reset successful! You can now log in with your new password.')
-    }
-
-    // Prevent duplicate handling (synchronous check with ref)
-    if (oauthHandledRef.current) {
+    // Add safety check to prevent hydration issues
+    if (typeof window === 'undefined' || !searchParams) {
       return
     }
 
-    if (authCode) {
-      oauthHandledRef.current = true
-      // ✅ SECURE: Exchange authorization code for JWT via POST request
-      oauthLogin(authCode)
-    } else if (oauthError) {
-      setFormError(getOAuthErrorMessage(oauthError))
-    } else if (verificationError === 'error') {
-      setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
+    try {
+      const authCode = searchParams.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
+      const oauthError = searchParams.get('oauth_error')
+      const verificationError = searchParams.get('verification')
+      const resetSuccess = searchParams.get('reset')
+
+      // Handle password reset success message
+      if (resetSuccess === 'success') {
+        console.log('[LoginForm] Showing password reset success toast')
+        toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      // Prevent duplicate handling (synchronous check with ref)
+      if (oauthHandledRef.current) {
+        return
+      }
+
+      if (authCode) {
+        oauthHandledRef.current = true
+        // ✅ SECURE: Exchange authorization code for JWT via POST request
+        oauthLogin(authCode)
+      } else if (oauthError) {
+        setFormError(getOAuthErrorMessage(oauthError))
+      } else if (verificationError === 'error') {
+        setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
+      }
+    } catch (error) {
+      console.error('[LoginForm] Error handling URL parameters:', error)
     }
   }, [searchParams, oauthLogin])
 

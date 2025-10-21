@@ -5,11 +5,10 @@ import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
-export default function LoginPage() {
+function LoginContent() {
   const { isAuthenticated, isLoading } = useAuth()
-
-  // Redirect is handled by useAuth hook - no additional redirect logic needed
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -26,7 +25,15 @@ export default function LoginPage() {
 
   // If already authenticated, don't show login form (redirect will happen in useEffect)
   if (isAuthenticated) {
-    return null
+    return (
+      <StarTheme theme="light">
+        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
+          <div className="animate-pulse">
+            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
+          </div>
+        </div>
+      </StarTheme>
+    )
   }
 
   return (
@@ -48,5 +55,21 @@ export default function LoginPage() {
         </div>
       </div>
     </StarTheme>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <StarTheme theme="light">
+        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
+          <div className="animate-pulse">
+            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
+          </div>
+        </div>
+      </StarTheme>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }

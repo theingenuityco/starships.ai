@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useWallet } from '@/hooks/useWallet'
@@ -112,7 +113,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [selectedAgent])
 
     // Use streamedQuery-based conversation hook
-    const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null, starshipId)
+    const streamCtx = useConversationStreamContextOptional()
+    const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
+    const { sendMessage: sendMessageFn, isSending, isResponding } = streamCtx ?? fallbackStream
     const isStreamingEffective = isResponding
 
     // Usage and context control

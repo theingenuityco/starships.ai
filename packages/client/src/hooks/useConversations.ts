@@ -551,20 +551,16 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       const target = { ...(messages[idx] as any) }
       if (chunk.which === 'content') {
         const chunks = Array.isArray(target.chunks) ? [...target.chunks] : []
-        chunks.push({
-          content: chunk.content,
-          position: typeof chunk.position === 'number' ? chunk.position : chunks.length > 0 ? chunks[chunks.length - 1].position + chunk.content.length : 0,
-          timestamp: typeof chunk.timestamp === 'number' ? chunk.timestamp : Date.now(),
-        })
+        const nextPosition = typeof chunk.position === 'number' ? chunk.position : chunks.length > 0 ? chunks[chunks.length - 1].position + chunk.content.length : 0
+        const nextTimestamp = typeof chunk.timestamp === 'number' ? chunk.timestamp : Date.now()
+        chunks.push({ content: chunk.content, position: nextPosition, timestamp: nextTimestamp })
         target.chunks = chunks
         target.streaming = true
       } else {
         const rChunks = Array.isArray(target.reasoningChunks) ? [...target.reasoningChunks] : []
-        rChunks.push({
-          content: chunk.content,
-          position: typeof chunk.position === 'number' ? chunk.position : rChunks.length > 0 ? rChunks[rChunks.length - 1].position + chunk.content.length : 0,
-          timestamp: typeof chunk.timestamp === 'number' ? chunk.timestamp : Date.now(),
-        })
+        const nextPosition = typeof chunk.position === 'number' ? chunk.position : rChunks.length > 0 ? rChunks[rChunks.length - 1].position + chunk.content.length : 0
+        const nextTimestamp = typeof chunk.timestamp === 'number' ? chunk.timestamp : Date.now()
+        rChunks.push({ content: chunk.content, position: nextPosition, timestamp: nextTimestamp })
         target.reasoningChunks = rChunks
         target.streaming = true
       }
@@ -645,12 +641,14 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
  * Pure TanStack Query streaming hook for a conversation
  * Uses experimental_streamedQuery to manage the SSE lifecycle and cache updates.
  */
-export function useConversationStreamed(conversationId: string | null, starshipId?: string | null) {
+export function useConversationStreamed(conversationId: string | null, starshipId?: string | null, options?: { enabled?: boolean }) {
   const queryClient = useQueryClient()
 
   // Compute baselineLength from cached chunks to let the server replay any missed messages on reconnect
   const cachedChunks = conversationId ? (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) : undefined
   const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
+
+  const enabledFlag = options?.enabled !== false
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -661,7 +659,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       },
       refetchMode: 'append',
     }),
-    enabled: !!conversationId,
+    enabled: !!conversationId && enabledFlag,
     refetchOnWindowFocus: false,
     staleTime: 0,
     gcTime: 2 * 60 * 1000,

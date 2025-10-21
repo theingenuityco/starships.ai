@@ -11,6 +11,7 @@ import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationStreamed, useConversationAgents } from '@/hooks/useConversations'
+import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
@@ -26,7 +27,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
-  const { messages, isResponding: isRespondingHook } = useConversationStreamed(conversationId)
+  const ctx = useConversationStreamContextOptional()
+  const { messages, isResponding: isRespondingHook } = ctx ?? useConversationStreamed(conversationId, undefined, { enabled: true })
 
   // Use stable selectors to avoid returning new objects each render
   // messages are sourced from useConversationStreamed(conversationId)

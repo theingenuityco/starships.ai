@@ -80,17 +80,21 @@ export class StreamingService {
 
     // Immediately flush headers and send a comment prelude to stabilize SSE across proxies
     try {
-      if (typeof (res as any).flushHeaders === 'function') {
-        (res as any).flushHeaders();
+      const maybe = res as unknown as { flushHeaders?: () => void };
+      if (typeof maybe.flushHeaders === 'function') {
+        maybe.flushHeaders();
       }
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      // Non-fatal: some environments do not expose flushHeaders
+      // eslint-disable-next-line no-console
+      console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, e);
     }
     // SSE prelude/comment to ensure the connection is established before first event
     try {
       res.write(':ok\n\n');
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-console
+      console.debug(`[StreamingService] prelude write failed for ${streamId}:`, e);
     }
 
     // Send connection confirmation
@@ -327,10 +331,12 @@ export class StreamingService {
 
       // Ensure headers are sent before first chunk (prevents proxy buffering)
       try {
-        if (!res.headersSent && typeof (res as any).flushHeaders === 'function') {
-          (res as any).flushHeaders();
+        if (!res.headersSent) {
+          const maybe = res as unknown as { flushHeaders?: () => void };
+          if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
         }
-      } catch (flushError) {
+      } catch (flushError: unknown) {
+        // eslint-disable-next-line no-console
         console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
       }
 
@@ -339,10 +345,10 @@ export class StreamingService {
 
       // Best-effort body flush for environments with compression middleware
       try {
-        if (typeof (res as any).flush === 'function') {
-          (res as any).flush();
-        }
-      } catch (flushError) {
+        const maybe = res as unknown as { flush?: () => void };
+        if (typeof maybe.flush === 'function') maybe.flush();
+      } catch (flushError: unknown) {
+        // eslint-disable-next-line no-console
         console.debug(`[StreamingService] flush failed for ${streamId}:`, flushError);
       }
     } catch (error) {
@@ -556,5 +562,61 @@ export class StreamingService {
    */
   static generateChunkId(): string {
     return `chunk_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  }
+
+  /**
+   * Replay buffered events for the current turn only (events that occurred after the last 'complete').
+   * Skips 'message' events to avoid duplicating persisted baseline messages.
+   */
+  async replayCurrentTurn(streamId: string): Promise<void> {
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+
+    const buffer = this.eventBuffers.get(streamId) || [];
+    if (buffer.length === 0) return;
+
+    // Find the last 'complete' event; start replay after it
+    let startIdx = -1;
+    for (let i = buffer.length - 1; i >= 0; i--) {
+      if (buffer[i].type === 'complete') {
+        startIdx = i;
+        break;
+      }
+    }
+
+    const from = Math.max(startIdx + 1, 0);
+    if (from >= buffer.length) return;
+
+    this.suppressBuffering = true;
+    try {
+      for (const connection of conns) {
+        if (connection.res.destroyed) continue;
+        for (let i = from; i < buffer.length; i++) {
+          const evt = buffer[i];
+          if (evt.type === 'message') continue; // avoid duplicating persisted history
+          switch (evt.type) {
+            case 'delta': {
+              const normalized = this.normalizeDelta(streamId, evt.payload as Operation, connection);
+              this.sendEventToStream(streamId, connection.res, 'delta', normalized);
+              break;
+            }
+            case 'complete': {
+              this.sendEventToStream(streamId, connection.res, 'complete', evt.payload);
+              break;
+            }
+            case 'error': {
+              this.sendEventToStream(streamId, connection.res, 'error', evt.payload);
+              break;
+            }
+            case 'ui_action': {
+              this.sendEventToStream(streamId, connection.res, 'ui_action', evt.payload);
+              break;
+            }
+          }
+        }
+      }
+    } finally {
+      this.suppressBuffering = false;
+    }
   }
 }

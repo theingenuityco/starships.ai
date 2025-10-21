@@ -28,24 +28,9 @@ type ExecuteResponse = {
   duration_ms: number;
 };
 
-// Typed chunk for ExecuteStream
-type ExecuteChunk = {
-  type: string; // event | delta | log | completed | error | started
-  data_json: string;
-  request_id: string;
-};
+// (removed unused ExecuteChunk and RequestContext types)
 
-// Minimal handler context typing
-type RequestContext = {
-  requestHeader: { get(name: string): string | null };
-};
-
-type StreamContext = RequestContext & {
-  stream: { send(chunk: ExecuteChunk): Promise<void> };
-};
-
-// Registrar type for server-streaming until real codegen is added
-type StreamingRegistrar = unknown;
+// (placeholders for future codegen removed to satisfy linter)
 
 export class GrpcServer {
   private readonly opts: GrpcServerOptions;
@@ -90,6 +75,27 @@ export class GrpcServer {
               Connection: 'keep-alive',
               'Access-Control-Allow-Origin': '*',
             });
+
+            // Flush headers and send SSE prelude to avoid initial buffering
+            try {
+              const maybe = res as unknown as { flushHeaders?: () => void };
+              if (typeof maybe.flushHeaders === 'function') {
+                maybe.flushHeaders();
+              }
+            } catch (e: unknown) {
+              const err = e as Error;
+              if (process.env.NODE_ENV !== 'test') {
+                console.debug('[GrpcServer] flushHeaders not available or failed', err?.message || e);
+              }
+            }
+            try {
+              res.write(':ok\n\n');
+            } catch (e: unknown) {
+              const err = e as Error;
+              if (process.env.NODE_ENV !== 'test') {
+                console.debug('[GrpcServer] prelude write failed', err?.message || e);
+              }
+            }
 
             // Minimal startup log can be noisy; keep only errors below
 

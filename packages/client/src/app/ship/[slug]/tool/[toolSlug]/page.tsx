@@ -33,7 +33,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   // Control the expandable overlay: expand only while streaming; user can toggle
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
   useEffect(() => {
-    setIsOverlayExpanded(!!isResponding)
+    if (isResponding) setIsOverlayExpanded(true)
   }, [isResponding])
 
   // Track applied tool calls to avoid duplicate writes

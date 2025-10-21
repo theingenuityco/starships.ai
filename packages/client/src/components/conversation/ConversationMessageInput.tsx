@@ -1116,6 +1116,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       },
     })
 
+    // Bridge editor focus/blur to parent callbacks for overlay control
+    useEffect(() => {
+      if (!tiptap) return
+      const handleFocus = () => {
+        try {
+          onFocus?.()
+        } catch {}
+      }
+      const handleBlur = () => {
+        try {
+          onBlur?.()
+        } catch {}
+      }
+      try {
+        ;(tiptap as any).on?.('focus', handleFocus)
+        ;(tiptap as any).on?.('blur', handleBlur)
+      } catch {}
+      return () => {
+        try {
+          ;(tiptap as any).off?.('focus', handleFocus)
+        } catch {}
+        try {
+          ;(tiptap as any).off?.('blur', handleBlur)
+        } catch {}
+      }
+    }, [tiptap, onFocus, onBlur])
+
     // Ensure initial compute and position after editor mounts and when dependencies change
     useEffect(() => {
       if (!tiptap) return

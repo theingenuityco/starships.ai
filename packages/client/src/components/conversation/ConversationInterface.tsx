@@ -7,6 +7,7 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
@@ -65,7 +66,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
 
   // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
+  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId, { enabled: true })
   const prevStreamingRef = useRef(false)
   const queryClient = useQueryClient()
 
@@ -605,7 +606,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
-        <>
+        <ConversationStreamProvider conversationId={currentConversationId} starshipId={starshipId}>
           {/* Messages Area or Welcome Screen */}
           {showMessagesArea ? (
             <>
@@ -617,7 +618,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>
           )}
-        </>
+        </ConversationStreamProvider>
 
         {/* Floating Input Container - Always visible, position changes based on state */}
         <div

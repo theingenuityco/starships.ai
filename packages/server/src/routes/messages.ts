@@ -3,25 +3,22 @@ import { MessageService } from '@/services/MessageService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
+import { validateData } from '@/utils/validation';
+import { IdSchema } from '@/schemas/common';
 
 const router: Router = Router();
 
 // Zod schemas for validation
-const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
-// const PaginationSchema = z.object({
-//   page: z.coerce.number().int().min(1).default(1),
-//   limit: z.coerce.number().int().min(1).max(200).default(50),
-// });
 
 const CreateMessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']),
   content: z.string().min(1, 'Content is required').max(50000, 'Content too long'),
-  starshipId: NanoidSchema,
-  agentId: NanoidSchema.optional(),
-  memoryId: NanoidSchema.optional(),
-  conversationId: NanoidSchema.optional(),
-  parentMessageId: NanoidSchema.optional(),
+  starshipId: IdSchema,
+  agentId: IdSchema.optional(),
+  memoryId: IdSchema.optional(),
+  conversationId: IdSchema.optional(),
+  parentMessageId: IdSchema.optional(),
   threadDepth: z.number().min(0).max(100).optional(),
   processingStatus: z.enum(['pending', 'processing', 'completed', 'failed']).optional(),
   messageType: z.enum(['user_input', 'agent_response', 'system_message', 'workflow_output', 'tool_result']).optional(),
@@ -45,30 +42,6 @@ const checkAuth = (req: Request, res: Response): boolean => {
   return true;
 };
 
-// Helper function for Zod validation
-const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const firstError = error.issues[0];
-      const fieldName = firstError.path.join('.');
-
-      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
-        field: fieldName,
-        context,
-        validationErrors: error.issues.map((err) => ({
-          path: err.path.join('.'),
-          message: err.message,
-          code: err.code,
-        })),
-      });
-    } else {
-      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
-    }
-    return null;
-  }
-};
 
 /**
  * GET /messages/:messageId - Get message by ID
@@ -79,7 +52,7 @@ router.get('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: IdSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     const { messageId } = paramValidation;
@@ -111,7 +84,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: IdSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -147,7 +120,7 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: IdSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     const { messageId } = paramValidation;

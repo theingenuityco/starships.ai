@@ -8,14 +8,16 @@ import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { ServiceFactory } from '@/services/ServiceFactory';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
+import { EmailSchema, PasswordSchema, OAuthProviderSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { registrationRateLimit, resendVerificationRateLimit, passwordResetRateLimit } from '@/middleware/rate-limit';
@@ -27,18 +29,17 @@ const env = getEnvConfig();
 
 // Zod schemas for validation
 const RegisterSchema = z.object({
-  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  email: EmailSchema,
+  password: PasswordSchema,
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional(),
 });
 
 const LoginSchema = z.object({
-  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+  email: EmailSchema,
   password: z.string().min(1, 'Password is required').max(255, 'Password must be less than 255 characters'),
 });
 
-// Zod schemas for OAuth validation
-const OAuthProviderSchema = z.enum(['google', 'github']);
+// OAuth-specific schemas that remain local to auth routes
 const OAuthCallbackSchema = z.object({
   code: z.string().min(1, 'Authorization code is required'),
   state: z.string().min(1, 'State parameter is required'),
@@ -47,7 +48,7 @@ const OAuthCallbackSchema = z.object({
 
 // Zod schema for setting password
 const SetPasswordSchema = z.object({
-  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  newPassword: PasswordSchema,
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: 'Passwords do not match',
@@ -56,47 +57,22 @@ const SetPasswordSchema = z.object({
 
 // Zod schema for email verification
 const EmailVerificationSchema = z.object({
-  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+  email: EmailSchema,
 });
 
 // Zod schemas for password reset
 const ForgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+  email: EmailSchema,
 });
 
 const ResetPasswordSchema = z.object({
   token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
-  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  newPassword: PasswordSchema,
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 });
-
-// Helper function for Zod validation
-const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const firstError = error.issues[0];
-      const fieldName = firstError.path.join('.');
-
-      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
-        field: fieldName,
-        context,
-        validationErrors: error.issues.map((err) => ({
-          path: err.path.join('.'),
-          message: err.message,
-          code: err.code,
-        })),
-      });
-    } else {
-      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
-    }
-    return null;
-  }
-};
 
 /**
  * Register new user

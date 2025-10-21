@@ -66,7 +66,7 @@ export function ForgotPasswordForm() {
                 </div>
                 <AlertDescription>
                   <p className="text-sm text-gray-600 font-medium mb-2">
-                    We'll send reset instructions to <span className="font-semibold text-gray-600">{email}</span> if an account exists.
+                    We&apos;ll send reset instructions to <span className="font-semibold text-gray-600">{email}</span> if an account exists.
                   </p>
                   <p className="text-sm text-gray-600">
                     The link expires in 1 hour.

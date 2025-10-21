@@ -222,39 +222,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             setSending(false)
           })
 
-        // Ensure initial compute and position after editor mounts and when dependencies change
-        useEffect(() => {
-          if (!tiptap) return
-          const compute = () => {
-            try {
-              const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(tiptap as any))
-              setShouldShowInlineHint(next)
-              updateHintPosition()
-            } catch {}
-          }
-          // Initial and delayed recomputes to handle layout/selection timing
-          compute()
-          const t1 = setTimeout(compute, 50)
-          const t2 = setTimeout(compute, 150)
-          const t3 = setTimeout(compute, 300)
-
-          const onSelectionUpdate = () => updateHintPosition()
-          try {
-            ;(tiptap as any).on?.('selectionUpdate', onSelectionUpdate)
-          } catch {}
-          window.addEventListener('resize', onSelectionUpdate)
-
-          return () => {
-            clearTimeout(t1)
-            clearTimeout(t2)
-            clearTimeout(t3)
-            try {
-              ;(tiptap as any).off?.('selectionUpdate', onSelectionUpdate)
-            } catch {}
-            window.removeEventListener('resize', onSelectionUpdate)
-          }
-        }, [tiptap, minimal, disabled, isStreamingEffective, sending, inlinePrompts.length, isOnlyAgentMentionWithSpace, updateHintPosition])
-
         // Exit early to avoid hitting catch/finally paths
         return
       } catch (error) {
@@ -1127,6 +1094,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch {}
       },
     })
+
+    // Ensure initial compute and position after editor mounts and when dependencies change
+    useEffect(() => {
+      if (!tiptap) return
+      const compute = () => {
+        try {
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(tiptap as any))
+          setShouldShowInlineHint(next)
+          updateHintPosition()
+        } catch {}
+      }
+      // Initial and delayed recomputes to handle layout/selection timing
+      compute()
+      const t1 = setTimeout(compute, 50)
+      const t2 = setTimeout(compute, 150)
+      const t3 = setTimeout(compute, 300)
+
+      const onSelectionUpdate = () => updateHintPosition()
+      try {
+        ;(tiptap as any).on?.('selectionUpdate', onSelectionUpdate)
+      } catch {}
+      window.addEventListener('resize', onSelectionUpdate)
+
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+        clearTimeout(t3)
+        try {
+          ;(tiptap as any).off?.('selectionUpdate', onSelectionUpdate)
+        } catch {}
+        window.removeEventListener('resize', onSelectionUpdate)
+      }
+    }, [tiptap, minimal, disabled, isStreamingEffective, sending, inlinePrompts.length, isOnlyAgentMentionWithSpace, updateHintPosition])
     // Wire editor-dependent helpers
     useEffect(() => {
       clearEditorRef.current = () => {

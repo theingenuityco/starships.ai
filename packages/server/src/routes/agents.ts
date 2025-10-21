@@ -15,6 +15,15 @@ const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+// Shared validation for preview prompts
+const PreviewPromptItem = z.string().trim().min(1).max(120);
+const PreviewPromptsSchema = z
+  .array(PreviewPromptItem)
+  .max(10)
+  .refine((arr) => new Set(arr.map((s) => s.toLowerCase())).size === arr.length, {
+    message: 'Preview prompts must be unique (case-insensitive)',
+  });
+
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
@@ -27,9 +36,8 @@ const CreateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  previewPrompts: z.array(z.string()).max(10).optional(),
+  previewPrompts: PreviewPromptsSchema.optional(),
   templateId: z.string().min(1).optional(),
-  previewPrompts: z.array(z.string()).max(10).optional(),
   starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
@@ -45,7 +53,7 @@ const UpdateAgentSchema = z.object({
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
   templateId: z.string().min(1).optional(),
-  previewPrompts: z.array(z.string()).max(10).optional(),
+  previewPrompts: PreviewPromptsSchema.optional(),
   starshipId: z.string().min(1, 'Starship ID is required').optional(),
 });
 

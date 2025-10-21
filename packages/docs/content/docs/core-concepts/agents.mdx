@@ -4,7 +4,278 @@ description: Learn about AI agents and how they work in Starships.ai
 icon: Bot
 ---
 
+import { Bot, Code, Globe, Zap, Settings, Play } from 'lucide-react';
 
-## Coming Soon
+## What are Agents?
 
-Agent documentation will be available here soon.
+Agents are AI-powered specialists that work autonomously within your starship. Starships.ai features two primary agents designed for different enterprise needs: **Daedalus** for development and technical workflows, and **Gaia** for business operations and resource management.
+
+<Cards>
+  <Card
+    icon={<Code />}
+    title="Daedalus - Development Agent"
+    href="#daedalus"
+  >
+    Your coding companion with advanced development tools and workflow automation
+  </Card>
+
+  <Card
+    icon={<Globe />}
+    title="Gaia - Operations Agent"
+    href="#gaia"
+  >
+    Specialized in resource management, optimization, and business operations
+  </Card>
+
+  <Card
+    icon={<Play />}
+    title="Quick Deployment"
+    href="#getting-started"
+  >
+    Deploy agents in minutes from our marketplace
+  </Card>
+
+  <Card
+    icon={<Settings />}
+    title="Customizable"
+    href="#customization"
+  >
+    Tailor agents to your specific business needs
+  </Card>
+</Cards>
+
+## Daedalus - Development Agent
+
+Daedalus is your AI development companion, designed to accelerate software development workflows and automate technical tasks.
+
+### Core Capabilities
+
+<Accordions type="multiple" defaultValue={['development']}>
+  <Accordion title="💻 Code Development & Review" value="development">
+    **What Daedalus can do:**
+    - Review code for bugs, security issues, and best practices
+    - Generate code snippets and complete functions
+    - Refactor existing code for better performance
+    - Create unit tests and documentation
+    - Debug complex issues and suggest fixes
+    
+    **Example tasks:**
+    ```
+    "Review this React component for performance issues"
+    "Generate TypeScript interfaces for this API response"
+    "Help me optimize this database query"
+    "Create unit tests for the user authentication module"
+    ```
+  </Accordion>
+
+  <Accordion title="⚙️ Workflow Automation" value="automation">
+    **What Daedalus can do:**
+    - Set up CI/CD pipelines and deployment workflows
+    - Automate testing and quality assurance processes
+    - Manage Git operations and version control
+    - Create and edit workflow blueprints
+    - Monitor system health and performance
+    
+    **Example tasks:**
+    ```
+    "Set up a GitHub Actions workflow for automated testing"
+    "Create a deployment pipeline for our Node.js app"
+    "Help me configure ESLint and Prettier for the project"
+    "Design a workflow for code review automation"
+    ```
+  </Accordion>
+
+  <Accordion title="🔧 DevOps & Infrastructure" value="devops">
+    **What Daedalus can do:**
+    - Configure Docker containers and orchestration
+    - Set up monitoring and logging systems
+    - Manage cloud infrastructure and deployments
+    - Optimize application performance and scaling
+    - Handle security configurations and updates
+    
+    **Example tasks:**
+    ```
+    "Help me containerize this application with Docker"
+    "Set up monitoring for our production environment"
+    "Configure auto-scaling for high traffic periods"
+    "Review our security configurations and suggest improvements"
+    ```
+  </Accordion>
+</Accordions>
+
+### Available Tools
+- **Code Execution**: Run and test code in sandboxed environments
+- **Git Operations**: Version control and repository management
+- **Blueprint Editor**: Visual workflow creation and editing
+- **API Testing**: HTTP request testing and validation
+- **Documentation Generator**: Automated code documentation
+
+## Gaia - Operations Agent
+
+Gaia specializes in business operations, resource management, and organizational optimization across all business functions.
+
+### Core Capabilities
+
+<Accordions type="multiple" defaultValue={['operations']}>
+  <Accordion title="📊 Business Analysis & Intelligence" value="operations">
+    **What Gaia can do:**
+    - Analyze business metrics and KPIs
+    - Generate reports and insights from data
+    - Track resource utilization and efficiency
+    - Identify optimization opportunities
+    - Monitor project progress and team performance
+    
+    **Example tasks:**
+    ```
+    "Analyze our Q3 sales performance and identify trends"
+    "Create a resource allocation report for the marketing team"
+    "Identify bottlenecks in our customer onboarding process"
+    "Generate a monthly operational efficiency report"
+    ```
+  </Accordion>
+
+  <Accordion title="🎯 Resource Management" value="resources">
+    **What Gaia can do:**
+    - Optimize team assignments and workload distribution
+    - Manage budgets and cost tracking
+    - Plan capacity and resource requirements
+    - Track inventory and asset utilization
+    - Coordinate cross-functional projects
+    
+    **Example tasks:**
+    ```
+    "Help me allocate development resources for Q4 projects"
+    "Analyze our cloud infrastructure costs and suggest optimizations"
+    "Plan resource requirements for the new product launch"
+    "Track project timelines and identify potential delays"
+    ```
+  </Accordion>
+
+  <Accordion title="🔄 Process Optimization" value="optimization">
+    **What Gaia can do:**
+    - Streamline business processes and workflows
+    - Automate repetitive operational tasks
+    - Integrate systems and data sources
+    - Design efficient organizational structures
+    - Implement best practices and standards
+    
+    **Example tasks:**
+    ```
+    "Redesign our customer support workflow for better efficiency"
+    "Automate our monthly reporting process"
+    "Integrate our CRM with the project management system"
+    "Create a standardized onboarding process for new hires"
+    ```
+  </Accordion>
+</Accordions>
+
+### Available Tools
+- **Data Analysis**: Query databases and analyze business metrics
+- **API Integration**: Connect to external systems and services
+- **Workflow Automation**: Create and manage business processes
+- **Report Generation**: Automated reporting and visualization
+- **Resource Planning**: Capacity planning and allocation tools
+
+## Getting Started
+
+Choose the agent that best fits your needs and deploy it to your starship:
+
+<Steps>
+<Step>
+
+### Choose Your Agent
+**For Development Teams**: Deploy **Daedalus** if you need help with:
+- Code review and development
+- DevOps and infrastructure automation
+- Testing and quality assurance
+- Git workflows and CI/CD pipelines
+
+**For Business Teams**: Deploy **Gaia** if you need help with:
+- Data analysis and reporting
+- Resource planning and optimization
+- Process improvement and automation
+- Business intelligence and insights
+
+</Step>
+
+<Step>
+
+### Deploy from Marketplace
+1. Navigate to your starship's marketplace
+2. Find Daedalus or Gaia in the agent templates
+3. Click "Deploy" - the agent will be configured automatically
+4. Start conversing immediately with your new AI team member
+
+</Step>
+
+<Step>
+
+### Start Working Together
+Begin with simple tasks to understand your agent's capabilities:
+
+**For Daedalus:**
+```
+"Review this code for potential issues"
+"Help me set up a testing workflow"
+"Generate documentation for this API"
+```
+
+**For Gaia:**
+```
+"Analyze our team's productivity metrics"
+"Help me plan resource allocation for next quarter"
+"Create a process improvement plan"
+```
+
+</Step>
+</Steps>
+
+## Agent Collaboration
+
+Both Daedalus and Gaia can work together as a team to handle complex projects:
+
+**Development + Operations**: Daedalus handles the technical implementation while Gaia manages project resources, timelines, and team coordination.
+
+**Example Workflow**:
+```
+1. Gaia analyzes project requirements and resource needs
+2. Daedalus creates technical specifications and development plan
+3. Both agents collaborate on implementation and monitoring
+4. Gaia tracks progress while Daedalus handles technical issues
+```
+
+## Customization
+
+Both agents can be customized to fit your specific needs:
+
+### Basic Configuration
+- **Personality**: Adjust communication style (formal, casual, technical)
+- **Tools**: Enable/disable specific capabilities based on your requirements
+- **Performance**: Optimize for speed vs. detailed responses
+
+### Enterprise Features
+- **Access Controls**: Role-based permissions and team management
+- **Integration**: Connect to your APIs, databases, and existing tools
+- **Monitoring**: Track usage, performance, and business impact
+- **Security**: Enterprise-grade encryption and compliance controls
+
+<Callout type="info">
+  **Getting Started**: Both Daedalus and Gaia come pre-configured with optimal settings. You can start using them immediately and customize later as needed.
+</Callout>
+
+## Next Steps
+
+<Cards>
+  <Card title="Deploy Your First Agent" href="/getting-started/quickstart">
+    Get Daedalus or Gaia running in your starship in 5 minutes
+  </Card>
+  <Card title="Learn About Tools" href="/core-concepts/tools">
+    Discover how tools extend agent capabilities
+  </Card>
+  <Card title="Explore Models" href="/core-concepts/models">
+    Choose the right AI models for your needs
+  </Card>
+  <Card title="Advanced Workflows" href="/core-concepts/workflows">
+    Build complex multi-step automation
+  </Card>
+</Cards>

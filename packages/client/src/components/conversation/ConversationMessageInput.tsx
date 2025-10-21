@@ -13,6 +13,7 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
@@ -21,6 +22,7 @@ import tippy from 'tippy.js'
 // Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
 import { Avatar } from '@/components/ui/avatar'
+import { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
@@ -97,6 +99,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
     // Track the most current agent immediately on local changes to avoid one-tick lag
     const currentAgentRef = useRef<AgentModel | null>(selectedAgent ?? null)
+    // Track the agent referenced by the leading @mention in the editor (if any)
+    const [leadingMentionAgent, setLeadingMentionAgent] = useState<AgentModel | null>(null)
     useEffect(() => {
       const latest = (starshipAgents as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
@@ -299,11 +303,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
     )
 
+    // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
+    const promptAgent: AgentModel | null = useMemo(() => {
+      return (leadingMentionAgent as AgentModel | null) ?? selectedAgent ?? null
+    }, [leadingMentionAgent, selectedAgent])
+
     const getPlaceholder = () => {
-      if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
-      if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
-      if (hardLimitActive && tokensUsed >= contextLimit) return selectedAgent ? `Context limit reached for ${selectedAgent.name}` : 'Context limit reached'
-      return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Type @ to choose an agent, then ask your question'
+      if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
+      if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
+      if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
+      return promptAgent ? `Ask ${promptAgent.name}...` : 'Type @ to choose an agent, then ask your question'
     }
 
     // Require balance; server also enforces funds. Reverted per request.
@@ -742,9 +751,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
       }, [])
       return (
-        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline leading-none text-foreground">
+        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground" data-mention-node>
           <span
-            className="inline-flex items-baseline align-baseline gap-1 cursor-pointer hover:opacity-90"
+            className="inline whitespace-nowrap align-baseline cursor-pointer rounded-md px-2 py-0.5 bg-white/90 hover:bg-white dark:bg-white/20 dark:hover:bg-white/25 ring-1 ring-border/60 shadow-sm transition-colors"
             contentEditable={false}
             style={{ pointerEvents: 'auto' }}
             ref={anchorRef}
@@ -775,8 +784,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               }
             }}
           >
-            <span className="relative top-0.5 inline-flex h-4 w-4 items-center justify-center rounded-[3px] overflow-hidden">
-              <AgentAvatar seed={display} size={16} />
+            <span className="inline-block align-text-bottom mr-1 h-5 w-5 rounded-[3px] overflow-hidden">
+              <AgentAvatar seed={display} size={20} />
             </span>
             <strong className="font-semibold">@{display}</strong>
           </span>
@@ -787,6 +796,222 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
     const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+
+    // Inline animated hint (typing) after preselected mention when no other text
+    const editorContainerRef = useRef<HTMLDivElement | null>(null)
+    const [hintPosition, setHintPosition] = useState<{ left: number; top: number } | null>(null)
+    const [animatedHint, setAnimatedHint] = useState<string>('')
+    const [hintPromptIndex, setHintPromptIndex] = useState<number>(0)
+    const [hintCharIndex, setHintCharIndex] = useState<number>(0)
+
+    // Extract example prompts from the prompt agent (leading mention > selected agent) if present
+    const examplePrompts: string[] = useMemo(() => {
+      const a: any = promptAgent as any
+      const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
+      return Array.isArray(list) ? (list as string[]).filter(Boolean) : []
+    }, [promptAgent])
+
+    // Merge with server-fetched agent/template preview prompts if not present
+    const [templatePrompts, setTemplatePrompts] = useState<string[]>([])
+    useEffect(() => {
+      let aborted = false
+      setTemplatePrompts([])
+      const a: any = promptAgent as any
+      // If agent already has prompts, skip
+      if (examplePrompts.length > 0) return
+      ;(async () => {
+        try {
+          // Try fetching full agent by id to hydrate previewPrompts
+          if (a?.id) {
+            const fresh = await agentAPI.getById(a.id)
+            const freshPrompts: string[] = (fresh as any)?.previewPrompts || []
+            if (!aborted && Array.isArray(freshPrompts) && freshPrompts.length > 0) {
+              setTemplatePrompts(freshPrompts.filter(Boolean))
+              return
+            }
+          }
+        } catch {}
+        try {
+          // Fallback to template prompts when templateId exists
+          const templateId = a?.templateId
+          if (templateId) {
+            const tpl = await templateAPI.getById(templateId)
+            const previews = (tpl as any)?.previewPrompts || []
+            if (!aborted && Array.isArray(previews) && previews.length > 0) {
+              setTemplatePrompts(previews.filter(Boolean))
+              return
+            }
+          }
+        } catch {}
+        try {
+          // Last resort: fetch all templates and match by slug/name
+          const all = await templateAPI.getAll()
+          const lowerName = String(a?.name || '').toLowerCase()
+          const lowerSlug = String(a?.slug || '').toLowerCase()
+          const match = (all || []).find((t: any) => String(t?.slug || '').toLowerCase() === lowerSlug || String(t?.name || '').toLowerCase() === lowerName)
+          const previews = (match as any)?.previewPrompts || []
+          if (!aborted && Array.isArray(previews) && previews.length > 0) {
+            setTemplatePrompts(previews.filter(Boolean))
+            return
+          }
+        } catch {}
+      })()
+      return () => {
+        aborted = true
+      }
+    }, [promptAgent, examplePrompts])
+
+    const inlinePrompts: string[] = useMemo(() => {
+      if (examplePrompts.length > 0) return examplePrompts
+      if (templatePrompts.length > 0) return templatePrompts
+      // Final fallback to ensure animated placeholder renders even if backend has no prompts yet
+      return ['Design an agent that researches topics using Wikipedia', 'Create a customer support agent that can help users with common questions', 'Plan an onboarding workflow for new customers']
+    }, [examplePrompts, templatePrompts])
+
+    // Keep animated hint prompts reactive without re-initializing the TipTap extension
+    const promptsRef = useRef<string[]>([])
+    useEffect(() => {
+      promptsRef.current = inlinePrompts
+    }, [inlinePrompts])
+
+    // Helper: resolve the agent referenced by the leading @mention in the editor JSON (if any)
+    const getLeadingMentionAgentFromEditor = useCallback((editorInstance: typeof tiptap | null): AgentModel | null => {
+      const editor = editorInstance as any
+      if (!editor) return null
+      try {
+        const json: any = editor.getJSON()
+        const docContent = Array.isArray(json?.content) ? json.content : []
+        const firstBlock = docContent[0]
+        const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        const first = blockContent[0]
+        if (!first || first.type !== 'mention') return null
+        const id = first?.attrs?.id
+        const label = first?.attrs?.label
+        const agents = (agentsRef.current || []) as AgentModel[]
+        let found = null as AgentModel | null
+        if (id) {
+          found = agents.find(a => a.id === id) || null
+        }
+        if (!found && label) {
+          const norm = (s: string) => String(s).toLowerCase().replace(/\s+/g, '').replace(/[_.-]/g, '')
+          const key = norm(label)
+          found = agents.find(a => norm(a.name) === key) || agents.find(a => norm(a.slug as any) === key) || null
+        }
+        return found
+      } catch {
+        return null
+      }
+    }, [])
+
+    const isOnlyAgentMentionWithSpace = useCallback((editorInstance: typeof tiptap | null) => {
+      const editor = editorInstance
+      if (!editor) return false
+      try {
+        const json: any = editor.getJSON()
+        const docContent = Array.isArray(json?.content) ? json.content : []
+        const firstBlock = docContent[0]
+        const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        if (blockContent.length === 0) return false
+        const first = blockContent[0]
+        const second = blockContent[1]
+        // First node must be mention
+        const firstOk = first && first.type === 'mention'
+        // Optional second node single leading space
+        const secondOk = !second || (second.type === 'text' && typeof second.text === 'string' && second.text.trim() === '')
+        // No other content beyond space
+        const tailEmpty = blockContent.slice(2).every((n: any) => n?.type === 'text' && (!n.text || n.text.trim() === ''))
+        return Boolean(firstOk && secondOk && tailEmpty)
+      } catch {
+        return false
+      }
+    }, [])
+
+    const [shouldShowInlineHint, setShouldShowInlineHint] = useState(false)
+
+    // Compute visual position for hint near cursor (selection end)
+    const updateHintPosition = useCallback(() => {
+      try {
+        if (!editorContainerRef.current || !shouldShowInlineHint) {
+          setHintPosition(null)
+          return
+        }
+        const view = (tiptap as any)?.view
+        const state = view?.state
+        const selPos = state?.selection?.to ?? state?.selection?.from
+        if (!selPos || !view?.coordsAtPos) {
+          setHintPosition(null)
+          return
+        }
+        const coords = view.coordsAtPos(selPos)
+        const hostRect = editorContainerRef.current.getBoundingClientRect()
+        let left = Math.max(0, coords.left - hostRect.left)
+        let top = Math.max(0, coords.top - hostRect.top)
+
+        // Compute baseline adjustment once
+        let baselineAdjust = 0
+        try {
+          const cs = window.getComputedStyle(editorContainerRef.current)
+          const fontSizePx = parseFloat(cs.fontSize || '16') || 16
+          let lineHeightPx = parseFloat(cs.lineHeight || '0')
+          if (!isFinite(lineHeightPx) || lineHeightPx <= 0) {
+            lineHeightPx = fontSizePx * 1.5
+          }
+          baselineAdjust = Math.max(0, (lineHeightPx - fontSizePx) / 2)
+          top = top + baselineAdjust
+        } catch {}
+
+        // Prefer anchoring relative to the mention chip when present, to avoid overlap
+        try {
+          const mentions = Array.from(editorContainerRef.current.querySelectorAll('[data-mention-node]')) as HTMLElement[]
+          const mentionEl = mentions.length ? (mentions[mentions.length - 1] as HTMLElement) : null
+          if (mentionEl) {
+            const mr = mentionEl.getBoundingClientRect()
+            const gap = 8
+            // Always ensure hint starts after chip edge to avoid overlap
+            left = Math.max(left, mr.right - hostRect.left + gap)
+            // Align to chip line visually (use chip box height vs font size for baseline approximation)
+            try {
+              const cs = window.getComputedStyle(editorContainerRef.current)
+              const fontSizePx = parseFloat(cs.fontSize || '16') || 16
+              top = Math.max(0, mr.top - hostRect.top + Math.max(0, (mr.height - fontSizePx) / 2))
+            } catch {}
+          }
+        } catch {}
+        setHintPosition({ left, top })
+      } catch {
+        setHintPosition(null)
+      }
+    }, [shouldShowInlineHint])
+
+    // Typing animation for hint
+    useEffect(() => {
+      if (!shouldShowInlineHint) {
+        setAnimatedHint('')
+        setHintCharIndex(0)
+        return
+      }
+      const prompts = inlinePrompts
+      const idx = hintPromptIndex % Math.max(1, prompts.length)
+      const current = String(prompts[idx] || '')
+      if (!current) return
+
+      const timer = setTimeout(() => {
+        const nextCharIndex = hintCharIndex + 1
+        if (nextCharIndex <= current.length) {
+          setAnimatedHint(current.slice(0, nextCharIndex))
+          setHintCharIndex(nextCharIndex)
+        } else {
+          // Small pause then cycle to next prompt
+          setTimeout(() => {
+            setHintCharIndex(0)
+            setAnimatedHint('')
+            setHintPromptIndex(p => p + 1)
+          }, 900)
+        }
+      }, 35)
+      return () => clearTimeout(timer)
+    }, [shouldShowInlineHint, inlinePrompts, hintPromptIndex, hintCharIndex])
+
     const tiptap = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
@@ -808,6 +1033,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           },
           suggestion: mentionSuggestion,
         }),
+        InlineHintExtension.configure({
+          getPrompts: () => promptsRef.current,
+          getEnabled: () => !minimal && !disabled && !isStreamingEffective && !sending,
+          typingSpeedMs: 35,
+          pauseMs: 900,
+          debug: true,
+        }),
       ],
       content: message,
       immediatelyRender: false,
@@ -815,7 +1047,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
+            minimal ? 'min-h-[36px] max-h-[120px]' : 'min-h-[80px] max-h-[260px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             minimal && 'text-sm'
           ),
@@ -846,8 +1078,55 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
         } catch {}
         setMessage(editor.getText())
+        // Detect and update the leading mention agent used for preview prompts
+        try {
+          const mentioned = getLeadingMentionAgentFromEditor(editor as any)
+          // Only update state if it actually changed
+          const prevId = leadingMentionAgent ? leadingMentionAgent.id : null
+          const nextId = mentioned ? mentioned.id : null
+          if (prevId !== nextId) setLeadingMentionAgent(mentioned)
+        } catch {}
+        // Update hint visibility and position on editor update
+        try {
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(editor as any))
+          setShouldShowInlineHint(next)
+          updateHintPosition()
+        } catch {}
       },
     })
+
+    // Ensure initial compute and position after editor mounts and when dependencies change
+    useEffect(() => {
+      if (!tiptap) return
+      const compute = () => {
+        try {
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(tiptap as any))
+          setShouldShowInlineHint(next)
+          updateHintPosition()
+        } catch {}
+      }
+      // Initial and delayed recomputes to handle layout/selection timing
+      compute()
+      const t1 = setTimeout(compute, 50)
+      const t2 = setTimeout(compute, 150)
+      const t3 = setTimeout(compute, 300)
+
+      const onSelectionUpdate = () => updateHintPosition()
+      try {
+        ;(tiptap as any).on?.('selectionUpdate', onSelectionUpdate)
+      } catch {}
+      window.addEventListener('resize', onSelectionUpdate)
+
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+        clearTimeout(t3)
+        try {
+          ;(tiptap as any).off?.('selectionUpdate', onSelectionUpdate)
+        } catch {}
+        window.removeEventListener('resize', onSelectionUpdate)
+      }
+    }, [tiptap, minimal, disabled, isStreamingEffective, sending, inlinePrompts.length, isOnlyAgentMentionWithSpace, updateHintPosition])
     // Wire editor-dependent helpers
     useEffect(() => {
       clearEditorRef.current = () => {
@@ -965,21 +1244,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-            .tiptap p.is-editor-empty:first-child::before,
-            .ProseMirror p.is-editor-empty:first-child::before {
-              content: attr(data-placeholder);
-              float: left;
-              height: 0;
-              pointer-events: none;
-              color: hsl(var(--muted-foreground));
-              opacity: 0.7;
-            }
-          `,
-          }}
-        />
         {/* Professional insufficient balance indicator - Show when there is conversation ID */}
         {!hasFunds && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
@@ -1023,58 +1287,31 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         >
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
-          {/* Main Input Section - Only Text Input */}
-          <div className={cn('flex', minimal ? 'items-center p-3' : 'items-end p-4')}>
-            {/* Removed tool builder button */}
+          {/* Main Input Section - Text input with bottom-right action */}
+          <div className={cn('flex relative', minimal ? 'items-center p-3' : 'items-center p-4')}>
+            {/* Optional left-side controls in expanded mode */}
+            {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-12 relative z-10" ref={editorContainerRef}>
               <EditorContent editor={tiptap} />
             </div>
 
-            {/* Minimal mode: Send button on right */}
-            {minimal && (
+            {/* Bottom-right Send Button */}
+            <div className={cn('absolute', minimal ? 'bottom-3 right-3' : 'bottom-4 right-4')}>
               <Button
                 onClick={handleSubmit}
                 disabled={!canSend}
                 size="icon"
                 className={cn(
-                  'h-8 w-8 rounded-full shrink-0 transition-all ml-2',
+                  'h-8 w-8 rounded-full shrink-0 transition-all',
                   canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                 )}
               >
                 {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
               </Button>
-            )}
-          </div>
-
-          {/* Footer Section - Selectors and Action Buttons */}
-          {!minimal && (
-            <div className="border-t border-border/20 bg-muted/10 px-4 py-3">
-              <div className="flex items-center justify-between">
-                {/* Left Side - Selectors and Tool Button */}
-                <div className="flex items-center gap-3">
-                  {children}
-                  {/* Removed tool builder button */}
-                </div>
-
-                {/* Right Side - Send Button */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!canSend}
-                    size="icon"
-                    className={cn(
-                      'h-8 w-8 rounded-full shrink-0 transition-all',
-                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
-                    )}
-                  >
-                    {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Agent Indicator - Only show in non-minimal mode */}
@@ -1094,20 +1331,18 @@ ConversationMessageInput.displayName = 'ConversationMessageInput'
 // Ensures the placeholder text is rendered when editor is empty
 export function PlaceholderStyles() {
   return (
-    <style
-      // styled-jsx global to avoid scoping issues
-      dangerouslySetInnerHTML={{
-        __html: `
-        .tiptap p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          height: 0;
-          pointer-events: none;
-          color: hsl(var(--muted-foreground));
-          opacity: 0.7;
-        }
-      `,
-      }}
-    />
+    <style>{`
+      .tiptap p.is-editor-empty:first-child::before,
+      .ProseMirror p.is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        float: left;
+        height: 0;
+        pointer-events: none;
+        color: hsl(var(--muted-foreground));
+        opacity: 0.7;
+      }
+      .tiptap { line-height: 1.5; }
+      .tiptap p { margin: 0; }
+    `}</style>
   )
 }

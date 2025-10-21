@@ -152,11 +152,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const messages = await conversationService.getConversationMessages(
-        conversationId,
-        orderValidation.orderBy,
-        orderValidation.orderDirection
-      );
+      const messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
 
       // Verify conversation exists
       const conversation = await conversationService.getConversationById(conversationId);

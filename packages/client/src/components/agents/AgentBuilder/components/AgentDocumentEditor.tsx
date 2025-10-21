@@ -20,7 +20,7 @@ import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisual
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { useQuery } from '@tanstack/react-query'
-import api from '@/lib/api'
+import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -62,27 +62,44 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
 
-  // Resolve current agentId by slug within this starship (if editing existing)
+  // Resolve current agentId by slug within this starship (if editing existing) - starship-only
   const [agentId, setAgentId] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
+    const safeGet = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
+      try {
+        const token = await getCurrentToken()
+        const res = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          method: 'GET',
+        } as RequestInit)
+        if (!res.ok) return { ok: false, data: null }
+        const json = await res.json()
+        return { ok: true, data: (json?.data as T) ?? null }
+      } catch {
+        return { ok: false, data: null }
+      }
+    }
     const load = async () => {
       if (!starshipId || !value?.slug || value.slug === 'new') {
         console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
         setAgentId(null)
         return
       }
-      try {
-        const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/starships/${starshipId}/agents/${value.slug}`)
-        const agent = res.data.data
+      const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
+      const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
+      if (result.ok && (result.data as any)?.id) {
+        const agent: any = result.data as any
         console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
         if (!cancelled) setAgentId(agent?.id || null)
-      } catch {
-        console.warn('[AgentDocEditor] Failed to resolve agentId', { starshipId, slug: value.slug })
+      } else {
         if (!cancelled) setAgentId(null)
       }
     }
-    load()
+    void load()
     return () => {
       cancelled = true
     }
@@ -172,6 +189,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
+        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
+          onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
+        }
         if (value.timeout == null && agent.timeout != null) onFieldChange?.('timeout', agent.timeout as any)
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
           onFieldChange?.('blueprint', JSON.stringify(agent.blueprint, null, 2))
@@ -353,6 +373,31 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             placeholder="Define the agent's character, mission, and behavior..."
             minHeightPx={200}
           />
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Preview Prompts */}
+      <Collapsible defaultOpen={true} className="space-y-2">
+        <CollapsibleTrigger className="p-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground">Preview Prompts</Label>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-2">
+            <textarea
+              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px]"
+              placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
+              value={(value.previewPrompts || []).join('\n')}
+              onChange={e => {
+                const lines = e.target.value
+                  .split('\n')
+                  .map(s => s.trim())
+                  .filter(Boolean)
+                  .slice(0, 10)
+                onFieldChange?.('previewPrompts', lines)
+              }}
+            />
+            <div className="text-[10px] text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</div>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 

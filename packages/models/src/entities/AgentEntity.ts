@@ -9,7 +9,7 @@ import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
+import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError, IsArray } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
   // Core database fields
@@ -94,6 +94,13 @@ export class AgentEntity implements AgentModel {
   @IsOptional()
   @IsObject()
   blueprint?: Blueprint; // Blueprint - keeping flexible for now
+
+  // Optional example prompts surfaced on agents (usually inherited from template)
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  previewPrompts?: string[];
 
   /**
    * Simple validation function using class-validator

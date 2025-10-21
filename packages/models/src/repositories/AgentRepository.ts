@@ -114,10 +114,10 @@ export class AgentRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Create agent properties for PostgreSQL
-        const agentProps = {
+        const agentProps: Omit<AgentModel, 'id'> & { deployedAt: string } = {
           // Core AgentParams fields
           name: data.name,
-          slug: data.slug, // Include slug field
+          slug: data.slug || (await generateUniqueAgentSlug((data.name || 'agent').toLowerCase().replace(/\s+/g, '-'), this)), // Ensure non-empty slug
           description: data.description,
           model: data.model,
           temperature: data.temperature,
@@ -126,6 +126,7 @@ export class AgentRepository extends BaseRepository {
           systemPrompt: data.systemPrompt,
           state: data.state,
           blueprint: data.blueprint,
+          previewPrompts: data.previewPrompts,
 
           // PostgreSQL specific fields
           starshipId: starshipId, // Direct foreign key
@@ -135,7 +136,7 @@ export class AgentRepository extends BaseRepository {
         };
 
         // Create entity instance from plain object, then serialize
-        const agentEntity = toEntityInstance(AgentEntity, agentProps);
+        const agentEntity = toEntityInstance(AgentEntity, agentProps as unknown as Record<string, unknown>);
         const result = await this.createEntity<Record<string, unknown>>('agents', toDatabase(agentEntity));
         const agent = fromDatabase(AgentEntity, result);
 
@@ -157,8 +158,8 @@ export class AgentRepository extends BaseRepository {
         // Use lean validation from AgentEntity for updates
         await AgentEntity.validate(updates, 'update');
 
-        const updateProps = {
-          ...updates,
+        const updateProps: Partial<AgentModel> = {
+          ...(updates as Partial<AgentModel>),
           updatedAt: new Date().toISOString(),
         };
 
@@ -255,7 +256,7 @@ export class AgentRepository extends BaseRepository {
         const slug = await generateUniqueAgentSlug(template.slug, this);
 
         // Create agent from template with optional customizations
-        const agentData = {
+        const agentData: CreateAgentRequest = {
           name: customizations?.name || template.name,
           slug,
           description: customizations?.description || template.description,
@@ -265,7 +266,10 @@ export class AgentRepository extends BaseRepository {
           timeout: customizations?.timeout ?? template.timeout,
           systemPrompt: customizations?.systemPrompt || template.systemPrompt,
           state: customizations?.state || template.state || { tools: [], messages: [] },
-          blueprint: customizations?.blueprint || template.blueprint || {},
+          blueprint: customizations?.blueprint || template.blueprint,
+          previewPrompts: customizations?.previewPrompts || template.previewPrompts,
+          assignedToolSlugs: customizations?.assignedToolSlugs,
+          templateId,
         };
 
         // Create agent with template_id foreign key

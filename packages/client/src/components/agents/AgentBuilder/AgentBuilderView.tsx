@@ -35,7 +35,9 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
             value={formData}
             onChange={next => {
               ;(Object.keys(next) as Array<keyof typeof next>).forEach(key => {
-                handleFieldChange(key as keyof typeof formData, next[key])
+                const value = next[key]
+                if (value === undefined) return
+                handleFieldChange(key as keyof typeof formData, value)
               })
             }}
             onFieldChange={(field, value) => handleFieldChange(field, value)}

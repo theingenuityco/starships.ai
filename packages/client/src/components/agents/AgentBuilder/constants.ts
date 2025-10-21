@@ -10,6 +10,7 @@ export const INITIAL_FORM_DATA: AgentFormData = {
   temperature: 0.7,
   maxTokens: 2048,
   systemPrompt: '',
+  previewPrompts: [],
   assignedToolSlugs: [],
   blueprint: JSON.stringify(
     {

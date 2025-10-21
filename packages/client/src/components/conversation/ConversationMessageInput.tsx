@@ -99,6 +99,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
     // Track the most current agent immediately on local changes to avoid one-tick lag
     const currentAgentRef = useRef<AgentModel | null>(selectedAgent ?? null)
+    // Track the agent referenced by the leading @mention in the editor (if any)
+    const [leadingMentionAgent, setLeadingMentionAgent] = useState<AgentModel | null>(null)
     useEffect(() => {
       const latest = (starshipAgents as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
@@ -334,11 +336,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
     )
 
+    // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
+    const promptAgent: AgentModel | null = useMemo(() => {
+      return (leadingMentionAgent as AgentModel | null) ?? selectedAgent ?? null
+    }, [leadingMentionAgent, selectedAgent])
+
     const getPlaceholder = () => {
-      if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
-      if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
-      if (hardLimitActive && tokensUsed >= contextLimit) return selectedAgent ? `Context limit reached for ${selectedAgent.name}` : 'Context limit reached'
-      return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Type @ to choose an agent, then ask your question'
+      if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
+      if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
+      if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
+      return promptAgent ? `Ask ${promptAgent.name}...` : 'Type @ to choose an agent, then ask your question'
     }
 
     // Require balance; server also enforces funds. Reverted per request.
@@ -830,19 +837,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [hintPromptIndex, setHintPromptIndex] = useState<number>(0)
     const [hintCharIndex, setHintCharIndex] = useState<number>(0)
 
-    // Extract example prompts from selected agent if present
+    // Extract example prompts from the prompt agent (leading mention > selected agent) if present
     const examplePrompts: string[] = useMemo(() => {
-      const a: any = selectedAgent as any
+      const a: any = promptAgent as any
       const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
       return Array.isArray(list) ? (list as string[]).filter(Boolean) : []
-    }, [selectedAgent])
+    }, [promptAgent])
 
     // Merge with server-fetched agent/template preview prompts if not present
     const [templatePrompts, setTemplatePrompts] = useState<string[]>([])
     useEffect(() => {
       let aborted = false
       setTemplatePrompts([])
-      const a: any = selectedAgent as any
+      const a: any = promptAgent as any
       // If agent already has prompts, skip
       if (examplePrompts.length > 0) return
       ;(async () => {
@@ -885,7 +892,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return () => {
         aborted = true
       }
-    }, [selectedAgent, examplePrompts])
+    }, [promptAgent, examplePrompts])
 
     const inlinePrompts: string[] = useMemo(() => {
       if (examplePrompts.length > 0) return examplePrompts
@@ -893,6 +900,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Final fallback to ensure animated placeholder renders even if backend has no prompts yet
       return ['Design an agent that researches topics using Wikipedia', 'Create a customer support agent that can help users with common questions', 'Plan an onboarding workflow for new customers']
     }, [examplePrompts, templatePrompts])
+
+    // Helper: resolve the agent referenced by the leading @mention in the editor JSON (if any)
+    const getLeadingMentionAgentFromEditor = useCallback((editorInstance: typeof tiptap | null): AgentModel | null => {
+      const editor = editorInstance as any
+      if (!editor) return null
+      try {
+        const json: any = editor.getJSON()
+        const docContent = Array.isArray(json?.content) ? json.content : []
+        const firstBlock = docContent[0]
+        const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        const first = blockContent[0]
+        if (!first || first.type !== 'mention') return null
+        const id = first?.attrs?.id
+        const label = first?.attrs?.label
+        const agents = (agentsRef.current || []) as AgentModel[]
+        let found = null as AgentModel | null
+        if (id) {
+          found = agents.find(a => a.id === id) || null
+        }
+        if (!found && label) {
+          const norm = (s: string) => String(s).toLowerCase().replace(/\s+/g, '').replace(/[_.-]/g, '')
+          const key = norm(label)
+          found = agents.find(a => norm(a.name) === key) || agents.find(a => norm(a.slug as any) === key) || null
+        }
+        return found
+      } catch {
+        return null
+      }
+    }, [])
 
     const isOnlyAgentMentionWithSpace = useCallback((editorInstance: typeof tiptap | null) => {
       const editor = editorInstance
@@ -1069,6 +1105,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
         } catch {}
         setMessage(editor.getText())
+        // Detect and update the leading mention agent used for preview prompts
+        try {
+          const mentioned = getLeadingMentionAgentFromEditor(editor as any)
+          // Only update state if it actually changed
+          const prevId = leadingMentionAgent ? leadingMentionAgent.id : null
+          const nextId = mentioned ? mentioned.id : null
+          if (prevId !== nextId) setLeadingMentionAgent(mentioned)
+        } catch {}
         // Update hint visibility and position on editor update
         try {
           const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(editor as any))

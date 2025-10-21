@@ -266,27 +266,19 @@ export class ConversationService {
       if (convo) {
         const t = (convo.title || '').trim().toLowerCase();
         const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
-        try {
-          console.log('[TITLE] Early check:', {
-            conversationId: convo.id,
-            currentTitle: convo.title,
-            needsTitle: needs,
-            contentPreview: String(data.content || '').slice(0, 80),
-          });
-        } catch (err) {
-          console.warn('[TITLE] early-check log failed:', err);
-        }
+        console.log('[TITLE] Early check:', {
+          conversationId: convo.id,
+          currentTitle: convo.title,
+          needsTitle: needs,
+          contentPreview: String(data.content || '').slice(0, 80),
+        });
         if (needs) {
           const star = await this.getConversationStarship(data.conversationId);
           if (star) {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
             if (gen && gen.trim()) {
               await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
-              try {
-                console.log('[TITLE] Updated conversation title:', { conversationId: convo.id, title: gen.trim() });
-              } catch (err) {
-                console.warn('[TITLE] updated-title log failed:', err);
-              }
+              console.log('[TITLE] Updated conversation title:', { conversationId: convo.id, title: gen.trim() });
               if (this.streamingService && this.streamingService.isActive(convo.id)) {
                 await this.streamingService.broadcastUIAction(convo.id, {
                   __ui_action: 'conversation_title_updated',
@@ -295,11 +287,7 @@ export class ConversationService {
                 });
               }
             } else {
-              try {
-                console.warn('[TITLE] Generation returned empty title');
-              } catch (err) {
-                console.warn('[TITLE] ui_action emit failed:', err);
-              }
+              console.warn('[TITLE] Generation returned empty title');
             }
           }
         }
@@ -517,11 +505,7 @@ export class ConversationService {
         },
         { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
       );
-      try {
-        console.log('[TITLE] Using model:', model);
-      } catch (err) {
-        console.warn('[TITLE] model log failed:', err);
-      }
+      console.log('[TITLE] Using model:', model);
       const items = await llm.execute();
       const res = (items?.[0]?.json || {}) as {
         model?: string;
@@ -560,11 +544,7 @@ export class ConversationService {
 
       // If model produced nothing, skip
       if (!choice || String(choice).trim().length === 0) {
-        try {
-          console.warn('[TITLE] Empty model response; skipping');
-        } catch (err) {
-          console.warn('[TITLE] empty-model log failed:', err);
-        }
+        console.warn('[TITLE] Empty model response; skipping');
         return null;
       }
 
@@ -573,30 +553,18 @@ export class ConversationService {
         .trim()
         .replace(/^"|"$/g, '');
       if (!title) {
-        try {
-          console.warn('[TITLE] Title empty after sanitize; skipping');
-        } catch (err) {
-          console.warn('[TITLE] sanitize-empty log failed:', err);
-        }
+        console.warn('[TITLE] Title empty after sanitize; skipping');
         return null;
       }
       // Remove trailing punctuation like '.' or ':'
       const cleaned = title.replace(/[\s:。.]+$/g, '');
       if (!cleaned) {
-        try {
-          console.warn('[TITLE] Title empty after cleanup; skipping');
-        } catch (err) {
-          console.warn('[TITLE] cleanup-empty log failed:', err);
-        }
+        console.warn('[TITLE] Title empty after cleanup; skipping');
         return null;
       }
       return cleaned.slice(0, 80);
     } catch (e) {
-      try {
-        console.warn('[TITLE] Generation error:', e instanceof Error ? e.message : e);
-      } catch {
-        // ignore log failure
-      }
+      console.warn('[TITLE] Generation error:', e instanceof Error ? e.message : e);
       return null;
     }
   }
@@ -683,11 +651,7 @@ export class ConversationService {
         }
       }
       if (resolvedLog.length > 0) {
-        try {
-          console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
-        } catch {
-          void 0;
-        }
+        console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
       }
       return out;
     } catch {
@@ -1216,21 +1180,17 @@ export class ConversationService {
       }
 
       case 'node_failed': {
-        try {
-          const execEvent = event as ExecutionEvent;
-          const execution: Execution | undefined = execEvent?.data?.execution;
-          const nodeRef = execution?.currentNodeRef;
-          console.error('[STREAMING] Node failed', {
-            nodeRef,
-            depth: execEvent.executionDepth,
-          });
-          // Print execution snapshot for diagnosis
-          console.error('[STREAMING] Execution snapshot (node_failed)', {
-            results: execution?.results[0].items[0],
-          });
-        } catch (e) {
-          console.error('[STREAMING] Node failed (logging error):', e);
-        }
+        const execEvent = event as ExecutionEvent;
+        const execution: Execution | undefined = execEvent?.data?.execution;
+        const nodeRef = execution?.currentNodeRef;
+        console.error('[STREAMING] Node failed', {
+          nodeRef,
+          depth: execEvent.executionDepth,
+        });
+        // Print execution snapshot for diagnosis
+        console.error('[STREAMING] Execution snapshot (node_failed)', {
+          results: execution?.results?.[0]?.items?.[0],
+        });
         break;
       }
 

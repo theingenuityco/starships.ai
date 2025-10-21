@@ -3,7 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -36,7 +36,7 @@ function getOAuthErrorMessage(errorCode: string): string {
 /**
  * JWT-based login and registration form
  */
-export function LoginForm() {
+export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { login, register, oauthLogin, resendVerification, isLoading, error } = useAuth()
   const searchParams = useSearchParams()
 
@@ -144,6 +144,7 @@ export function LoginForm() {
         setRegisterData(prev => ({ ...prev, email: loginData.email }))
         // Automatically switch to registration tab
         setActiveTab('register')
+        onTabChange?.('register') // Notify parent of tab change
         setAutoSwitchedToRegister(true)
         return
       }
@@ -191,6 +192,7 @@ export function LoginForm() {
     if (result.message && result.message.includes('already exists')) {
       // Switch to login tab and pre-fill email
       setActiveTab('login')
+      onTabChange?.('login') // Notify parent of tab change
       setLoginData(prev => ({ ...prev, email: registerData.email }))
       // Show as informational message, not error
       setFormError(null)
@@ -217,8 +219,7 @@ export function LoginForm() {
     <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>Access Your Starship</CardTitle>
-          <CardDescription>Sign in to your starship or create a new account</CardDescription>
+          <CardDescription>Access your starship or create a new account</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -255,6 +256,7 @@ export function LoginForm() {
             value={activeTab}
             onValueChange={value => {
               setActiveTab(value)
+              onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
               setFormError(null) // Clear form errors when switching tabs
             }}

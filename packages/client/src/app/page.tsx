@@ -3,7 +3,6 @@
 import Icon from '@/components/primitives/Icon'
 import Hero from '@/app/components/Hero'
 import ProductModel from '@/app/components/ProductModel'
-import InteractiveDemo from '@/app/components/InteractiveDemo'
 import UseCases from '@/app/components/UseCases'
 import ProblemOutcome from '@/app/components/ProblemOutcome'
 import HowItWorks from '@/app/components/HowItWorks'
@@ -28,7 +27,6 @@ export default function HomePage() {
         <Hero />
         <ProblemOutcome />
         <ProductModel />
-        <InteractiveDemo />
         <UseCases />
         <HowItWorks />
         <Integrations />

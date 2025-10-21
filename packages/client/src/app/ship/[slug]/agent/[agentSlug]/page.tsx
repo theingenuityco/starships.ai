@@ -29,11 +29,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // Keep conversation streaming active and capture live messages/UI actions
   const { messages: liveMessages = [], isResponding } = useConversationStreamed(conversationId, starship?.id || '')
 
-  // Control the expandable overlay: expand only while streaming; user can toggle
+  // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
-  useEffect(() => {
-    if (isResponding) setIsOverlayExpanded(true)
-  }, [isResponding])
 
   // Track applied tool call keys to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
@@ -367,7 +364,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               minimal={true}
               showExpandableOverlay={true}
               isOverlayExpanded={isOverlayExpanded}
-              onFocus={() => setIsOverlayExpanded(true)}
+              onFocus={() => {
+                if (!isResponding) setIsOverlayExpanded(true)
+              }}
               onBlur={() => setIsOverlayExpanded(false)}
               onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
             >

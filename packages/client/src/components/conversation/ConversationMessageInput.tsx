@@ -147,6 +147,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Track whether TipTap Suggestion is active to gate Enter handling
     const isSuggestionActiveRef = useRef(false)
+    // Track editor focus to control overlay visibility/mode
+    const [isEditorFocused, setIsEditorFocused] = useState(false)
 
     // Consolidated focus management - handles all focus scenarios (moved below tiptap init)
 
@@ -1116,16 +1118,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       },
     })
 
-    // Bridge editor focus/blur to parent callbacks for overlay control
+    // Bridge editor focus/blur to parent callbacks for overlay control and local focus state
     useEffect(() => {
       if (!tiptap) return
       const handleFocus = () => {
         try {
+          setIsEditorFocused(true)
           onFocus?.()
         } catch {}
       }
       const handleBlur = () => {
         try {
+          setIsEditorFocused(false)
           onBlur?.()
         } catch {}
       }
@@ -1334,7 +1338,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
         >
           {/* Expandable Message Overlay - Inside the input container */}
-          {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
+          {showExpandableOverlay && conversationId && (
+            <ExpandableMessageOverlay
+              mode={isEditorFocused ? (isOverlayExpanded ? 'expanded' : 'semi') : 'collapsed'}
+              conversationId={conversationId}
+              starshipId={starshipId}
+              budgetTokens={budgetTokens}
+              onExpand={onToggleOverlay}
+              onToggle={onToggleOverlay}
+            />
+          )}
           {/* Main Input Section - Text input with bottom-right action */}
           <div className={cn('flex relative', minimal ? 'items-center p-2' : 'items-center p-4')}>
             {/* Optional left-side controls in expanded mode */}

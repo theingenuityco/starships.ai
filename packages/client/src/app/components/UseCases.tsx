@@ -9,19 +9,37 @@ export default function UseCases() {
         <div className="grid md:grid-cols-2 gap-4">
           <Card className="p-6 bg-white/5 border-white/10">
             <div className="flex items-start gap-3">
-              <Icon name="search" className="w-5 h-5 mt-1" />
+              <Icon name="rocket" className="w-5 h-5 mt-1" />
               <div>
-                <h3 className="font-medium mb-1">Data research & enrichment</h3>
-                <p className="text-sm text-muted-foreground">Extract, dedupe, and enrich entities with tool-connected agents.</p>
+                <h3 className="font-medium mb-1">Ship features from a prompt</h3>
+                <p className="text-sm text-muted-foreground">Describe the goal. Autopilot drafts a PR with code, tests, and preview.</p>
               </div>
             </div>
           </Card>
           <Card className="p-6 bg-white/5 border-white/10">
             <div className="flex items-start gap-3">
-              <Icon name="bot" className="w-5 h-5 mt-1" />
+              <Icon name="check-circle" className="w-5 h-5 mt-1" />
               <div>
-                <h3 className="font-medium mb-1">Internal workflow copilot</h3>
-                <p className="text-sm text-muted-foreground">Reduce manual steps across tools with agent-driven automations.</p>
+                <h3 className="font-medium mb-1">Fix failing tests automatically</h3>
+                <p className="text-sm text-muted-foreground">Detect flaky or failing suites and open a targeted fix PR.</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-6 bg-white/5 border-white/10">
+            <div className="flex items-start gap-3">
+              <Icon name="wrench" className="w-5 h-5 mt-1" />
+              <div>
+                <h3 className="font-medium mb-1">Dependency upgrades & migrations</h3>
+                <p className="text-sm text-muted-foreground">Plan and execute safe, incremental upgrades across services and packages.</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-6 bg-white/5 border-white/10">
+            <div className="flex items-start gap-3">
+              <Icon name="message-square" className="w-5 h-5 mt-1" />
+              <div>
+                <h3 className="font-medium mb-1">Documentation from code</h3>
+                <p className="text-sm text-muted-foreground">Generate READMEs, ADRs, and diagrams that stay current with your repo.</p>
               </div>
             </div>
           </Card>

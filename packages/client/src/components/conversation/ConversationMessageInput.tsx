@@ -13,6 +13,7 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
@@ -21,7 +22,7 @@ import tippy from 'tippy.js'
 // Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
 import { Avatar } from '@/components/ui/avatar'
-import { templateAPI } from '@/lib/api'
+import { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
@@ -776,7 +777,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
       }, [])
       return (
-        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground">
+        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground" data-mention-node>
           <span
             className="inline whitespace-nowrap align-baseline cursor-pointer rounded-md px-2 py-0.5 bg-white/90 hover:bg-white dark:bg-white/20 dark:hover:bg-white/25 ring-1 ring-border/60 shadow-sm transition-colors"
             contentEditable={false}
@@ -836,20 +837,48 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return Array.isArray(list) ? (list as string[]).filter(Boolean) : []
     }, [selectedAgent])
 
-    // Merge with template preview prompts if not present on agent
+    // Merge with server-fetched agent/template preview prompts if not present
     const [templatePrompts, setTemplatePrompts] = useState<string[]>([])
     useEffect(() => {
+      let aborted = false
       setTemplatePrompts([])
       const a: any = selectedAgent as any
-      const templateId = a?.templateId
-      if (examplePrompts.length > 0 || !templateId) return
-      let aborted = false
+      // If agent already has prompts, skip
+      if (examplePrompts.length > 0) return
       ;(async () => {
         try {
-          const tpl = await templateAPI.getById(templateId)
-          const previews = (tpl as any)?.previewPrompts || []
+          // Try fetching full agent by id to hydrate previewPrompts
+          if (a?.id) {
+            const fresh = await agentAPI.getById(a.id)
+            const freshPrompts: string[] = (fresh as any)?.previewPrompts || []
+            if (!aborted && Array.isArray(freshPrompts) && freshPrompts.length > 0) {
+              setTemplatePrompts(freshPrompts.filter(Boolean))
+              return
+            }
+          }
+        } catch {}
+        try {
+          // Fallback to template prompts when templateId exists
+          const templateId = a?.templateId
+          if (templateId) {
+            const tpl = await templateAPI.getById(templateId)
+            const previews = (tpl as any)?.previewPrompts || []
+            if (!aborted && Array.isArray(previews) && previews.length > 0) {
+              setTemplatePrompts(previews.filter(Boolean))
+              return
+            }
+          }
+        } catch {}
+        try {
+          // Last resort: fetch all templates and match by slug/name
+          const all = await templateAPI.getAll()
+          const lowerName = String(a?.name || '').toLowerCase()
+          const lowerSlug = String(a?.slug || '').toLowerCase()
+          const match = (all || []).find((t: any) => String(t?.slug || '').toLowerCase() === lowerSlug || String(t?.name || '').toLowerCase() === lowerName)
+          const previews = (match as any)?.previewPrompts || []
           if (!aborted && Array.isArray(previews) && previews.length > 0) {
             setTemplatePrompts(previews.filter(Boolean))
+            return
           }
         } catch {}
       })()
@@ -859,7 +888,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [selectedAgent, examplePrompts])
 
     const inlinePrompts: string[] = useMemo(() => {
-      return examplePrompts.length > 0 ? examplePrompts : templatePrompts
+      if (examplePrompts.length > 0) return examplePrompts
+      if (templatePrompts.length > 0) return templatePrompts
+      // Final fallback to ensure animated placeholder renders even if backend has no prompts yet
+      return ['Design an agent that researches topics using Wikipedia', 'Create a customer support agent that can help users with common questions', 'Plan an onboarding workflow for new customers']
     }, [examplePrompts, templatePrompts])
 
     const isOnlyAgentMentionWithSpace = useCallback((editorInstance: typeof tiptap | null) => {
@@ -903,8 +935,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
         const coords = view.coordsAtPos(selPos)
         const hostRect = editorContainerRef.current.getBoundingClientRect()
-        const left = Math.max(0, coords.left - hostRect.left)
-        const top = Math.max(0, coords.top - hostRect.top)
+        let left = Math.max(0, coords.left - hostRect.left)
+        let top = Math.max(0, coords.top - hostRect.top)
+
+        // Compute baseline adjustment once
+        let baselineAdjust = 0
+        try {
+          const cs = window.getComputedStyle(editorContainerRef.current)
+          const fontSizePx = parseFloat(cs.fontSize || '16') || 16
+          let lineHeightPx = parseFloat(cs.lineHeight || '0')
+          if (!isFinite(lineHeightPx) || lineHeightPx <= 0) {
+            lineHeightPx = fontSizePx * 1.5
+          }
+          baselineAdjust = Math.max(0, (lineHeightPx - fontSizePx) / 2)
+          top = top + baselineAdjust
+        } catch {}
+
+        // Prefer anchoring relative to the mention chip when present, to avoid overlap
+        try {
+          const mentions = Array.from(editorContainerRef.current.querySelectorAll('[data-mention-node]')) as HTMLElement[]
+          const mentionEl = mentions.length ? (mentions[mentions.length - 1] as HTMLElement) : null
+          if (mentionEl) {
+            const mr = mentionEl.getBoundingClientRect()
+            const gap = 8
+            // Always ensure hint starts after chip edge to avoid overlap
+            left = Math.max(left, mr.right - hostRect.left + gap)
+            // Align to chip line visually (use chip box height vs font size for baseline approximation)
+            try {
+              const cs = window.getComputedStyle(editorContainerRef.current)
+              const fontSizePx = parseFloat(cs.fontSize || '16') || 16
+              top = Math.max(0, mr.top - hostRect.top + Math.max(0, (mr.height - fontSizePx) / 2))
+            } catch {}
+          }
+        } catch {}
         setHintPosition({ left, top })
       } catch {
         setHintPosition(null)
@@ -960,6 +1023,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             return `${options.suggestion.char}${display}`
           },
           suggestion: mentionSuggestion,
+        }),
+        InlineHintExtension.configure({
+          getPrompts: () => inlinePrompts,
+          getEnabled: () => !minimal && !disabled && !isStreamingEffective && !sending,
+          typingSpeedMs: 35,
+          pauseMs: 900,
+          debug: true,
         }),
       ],
       content: message,
@@ -1124,23 +1194,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-            .tiptap p.is-editor-empty:first-child::before,
-            .ProseMirror p.is-editor-empty:first-child::before {
-              content: attr(data-placeholder);
-              float: left;
-              height: 0;
-              pointer-events: none;
-              color: hsl(var(--muted-foreground));
-              opacity: 0.7;
-            }
-            .tiptap { line-height: 1.5; }
-            .tiptap p { margin: 0; }
-          `,
-          }}
-        />
         {/* Professional insufficient balance indicator - Show when there is conversation ID */}
         {!hasFunds && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
@@ -1190,15 +1243,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) */}
-            <div className="flex-1 min-w-0 pr-12 relative" ref={editorContainerRef}>
+            <div className="flex-1 min-w-0 pr-12 relative z-10" ref={editorContainerRef}>
               <EditorContent editor={tiptap} />
-              {/* Inline example prompt typing hint */}
-              {shouldShowInlineHint && (
-                <div className="pointer-events-none absolute text-muted-foreground/80" style={{ left: (hintPosition?.left ?? 8) + 2, top: (hintPosition?.top ?? 8) + 2 }} aria-hidden>
-                  <span className="opacity-80">{animatedHint}</span>
-                  <span className="inline-block w-[8px] h-[1.25em] align-middle bg-muted-foreground/60 ml-0.5 animate-pulse" />
-                </div>
-              )}
             </div>
 
             {/* Bottom-right Send Button */}
@@ -1235,20 +1281,18 @@ ConversationMessageInput.displayName = 'ConversationMessageInput'
 // Ensures the placeholder text is rendered when editor is empty
 export function PlaceholderStyles() {
   return (
-    <style
-      // styled-jsx global to avoid scoping issues
-      dangerouslySetInnerHTML={{
-        __html: `
-        .tiptap p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          height: 0;
-          pointer-events: none;
-          color: hsl(var(--muted-foreground));
-          opacity: 0.7;
-        }
-      `,
-      }}
-    />
+    <style>{`
+      .tiptap p.is-editor-empty:first-child::before,
+      .ProseMirror p.is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        float: left;
+        height: 0;
+        pointer-events: none;
+        color: hsl(var(--muted-foreground));
+        opacity: 0.7;
+      }
+      .tiptap { line-height: 1.5; }
+      .tiptap p { margin: 0; }
+    `}</style>
   )
 }

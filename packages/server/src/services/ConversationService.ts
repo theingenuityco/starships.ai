@@ -168,11 +168,7 @@ export class ConversationService {
   /**
    * Get messages for a conversation
    */
-  async getConversationMessages(
-    conversationId: string,
-    orderBy: 'createdAt' = 'createdAt',
-    orderDirection: 'asc' | 'desc' = 'asc'
-  ): Promise<MessageModel[]> {
+  async getConversationMessages(conversationId: string, orderDirection: 'asc' | 'desc' = 'asc'): Promise<MessageModel[]> {
     return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
   }
 
@@ -587,8 +583,8 @@ export class ConversationService {
       const entries: Entry[] = availableAgents.map((a) => ({
         id: a.id,
         agent: a,
-        nameKey: normalize((a as any).name || ''),
-        slugKey: normalize((a as any).slug || ''),
+        nameKey: normalize((a as { name?: string }).name || ''),
+        slugKey: normalize((a as { slug?: string }).slug || ''),
       }));
 
       let m: RegExpExecArray | null;
@@ -718,16 +714,33 @@ export class ConversationService {
         const chunkContent = (event as LLMEvent).data?.chunk;
 
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
-          const choice0: any = chunkContent.choices[0] || {};
-          const delta: any = choice0?.delta || {};
-          const messageNode: any = choice0?.message || {};
+          type ChoiceNode = {
+            delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
+            message?: {
+              content?: unknown;
+              toolCalls?: unknown[];
+              reasoning?: unknown;
+              reasoning_details?: unknown;
+            };
+          };
+          const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
+          const delta = choice0.delta ?? {};
+          const messageNode = choice0.message ?? {};
 
-          const contentFromDelta = typeof delta?.content === 'string' ? delta.content : '';
-          const contentFromMessage = typeof messageNode?.content === 'string' ? messageNode.content : '';
+          const contentFromDelta =
+            typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
+          const contentFromMessage =
+            typeof (messageNode as { content?: unknown }).content === 'string'
+              ? ((messageNode as { content?: unknown }).content as string)
+              : '';
           const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
 
-          const toolCallsFromDelta: any[] = Array.isArray(delta?.toolCalls) ? delta.toolCalls : [];
-          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.toolCalls) ? messageNode.toolCalls : [];
+          const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
+            ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
+            : [];
+          const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
+            ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
+            : [];
           const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
           // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
@@ -950,7 +963,8 @@ export class ConversationService {
               if (toolCallsFromDelta.length > 0) {
                 const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
 
-                for (const rawTc of toolCallsFromDelta as any[]) {
+                for (const raw of toolCallsFromDelta) {
+                  const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
                   const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
 
                   // Ensure slot only for the referenced index; do not pre-fill earlier indices
@@ -964,7 +978,7 @@ export class ConversationService {
 
                   // Accumulate arguments as string, parse later when complete
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    target.function.arguments = (target.function.arguments as string) + rawTc.function.arguments;
+                    target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
                   }
                 }
 
@@ -1008,8 +1022,9 @@ export class ConversationService {
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot toolCalls from message node (no incremental indices)
                 // Parse arguments using partial-json for robustness
-                const normalized: LlmToolCall[] = toolCallsFromMessage.map((tc: any) => {
-                  const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
+                  const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
+                  const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
                   let argsObj: unknown = {};
                   if (argsStr) {
                     try {
@@ -1026,7 +1041,7 @@ export class ConversationService {
                     id: tc?.id,
                     type: 'function' as const,
                     function: {
-                      name: tc?.function?.name,
+                      name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
                       arguments: argsObj, // Store as parsed object for UI
                     },
                   };
@@ -1056,7 +1071,7 @@ export class ConversationService {
                   value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
                 });
               }
-            } catch (e) {
+            } catch {
               // ignore toolCall parse errors to avoid breaking streaming
             }
           }
@@ -1108,7 +1123,10 @@ export class ConversationService {
                 await this.billingService.debitUsage(usageRow);
               } catch (e) {
                 // Prepaid policy: decline and log; do not break streaming UX
-                if (e instanceof InsufficientFundsError || (e as any)?.code === 'INSUFFICIENT_FUNDS') {
+                if (
+                  e instanceof InsufficientFundsError ||
+                  (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: unknown }).code === 'INSUFFICIENT_FUNDS')
+                ) {
                   console.warn('[BILLING] Insufficient funds for usage debit', {
                     starshipId: starship.id,
                     conversationId,
@@ -1203,19 +1221,24 @@ export class ConversationService {
           const results = Array.isArray(execution?.results) ? execution.results : [];
 
           // Walk results from the end to find a JSON payload that declares a UI action
-          let uiPayload: any = null;
+          type UIPayload = { __ui_action: string } & Record<string, unknown>;
+          let uiPayload: UIPayload | null = null;
           for (let i = results.length - 1; i >= 0 && !uiPayload; i--) {
             const items = Array.isArray(results[i]?.items) ? results[i].items : [];
             for (let j = items.length - 1; j >= 0 && !uiPayload; j--) {
               const json = items[j]?.json && typeof items[j].json === 'object' ? items[j].json : null;
               if (!json) continue;
-              if (json && (json as any).__ui_action) {
-                uiPayload = json;
+              if (json && typeof (json as Record<string, unknown>).__ui_action === 'string') {
+                uiPayload = json as UIPayload;
                 break;
               }
-              const maybeResult = (json as any)?.result;
-              if (maybeResult && typeof maybeResult === 'object' && (maybeResult as any).__ui_action) {
-                uiPayload = maybeResult;
+              const maybeResult = (json as Record<string, unknown>)['result'] as unknown;
+              if (
+                maybeResult &&
+                typeof maybeResult === 'object' &&
+                typeof (maybeResult as Record<string, unknown>).__ui_action === 'string'
+              ) {
+                uiPayload = maybeResult as UIPayload;
                 break;
               }
             }
@@ -1331,11 +1354,12 @@ export class ConversationService {
                   try {
                     const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
                     const svc = ResumeTokenService.getInstance();
+                    const persistedId = (persistedMsg as { id?: unknown }).id;
                     const token = svc.sign({
                       c: conversationId,
                       g: this.generationId.get(conversationId) || 'g',
                       p: this.accumulatedLength.get(conversationId) || 0,
-                      m: String((persistedMsg as any).id || '0'),
+                      m: String(typeof persistedId === 'string' || typeof persistedId === 'number' ? persistedId : '0'),
                       exp: Math.floor(Date.now() / 1000) + 600,
                     });
                     this.streamingService.sendResumeToken(conversationId, token);

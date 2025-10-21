@@ -12,18 +12,54 @@ import { sendError } from './responseHelpers';
 /**
  * Validates data against a Zod schema and sends error response if validation fails
  * 
- * @param schema - Zod schema to validate against
- * @param data - Data to validate
- * @param res - Express response object
- * @param context - Context string for error messages (e.g., 'registration data', 'user parameter')
- * @returns Validated data if successful, null if validation fails (error response already sent)
+ * This function centralizes validation logic across all API routes, ensuring consistent
+ * error handling and response formatting. It replaces the duplicate validation functions
+ * that were previously scattered across individual route files.
  * 
- * @example
+ * @param schema - Zod schema to validate against
+ * @param data - Data to validate (typically req.body, req.params, or req.query)
+ * @param res - Express response object (error response sent automatically on failure)
+ * @param context - Context string for error messages (e.g., 'login data', 'user parameter', 'pagination query')
+ * @returns Validated and transformed data if successful, null if validation fails
+ * 
+ * @throws {Error} If required parameters are missing or invalid
+ * 
+ * @example Basic usage
  * ```typescript
  * const bodyValidation = validateData(LoginSchema, req.body, res, 'login data');
  * if (!bodyValidation) return; // Error already sent to client
  * const { email, password } = bodyValidation;
  * ```
+ * 
+ * @example Parameter validation
+ * ```typescript
+ * const paramValidation = validateData(
+ *   z.object({ id: IdSchema }), 
+ *   req.params, 
+ *   res, 
+ *   'user parameter'
+ * );
+ * if (!paramValidation) return;
+ * const { id } = paramValidation;
+ * ```
+ * 
+ * @example Query validation with defaults
+ * ```typescript
+ * const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination');
+ * if (!queryValidation) return;
+ * const { page, limit } = queryValidation; // Defaults applied automatically
+ * ```
+ * 
+ * Error Response Format:
+ * - Status: 400 for validation errors, 500 for internal errors
+ * - Body: Standardized error object with field-level details
+ * - Headers: Standard error response headers
+ * 
+ * Security Notes:
+ * - Always validates input before processing
+ * - Prevents injection attacks through schema validation
+ * - Sanitizes error messages to prevent information leakage
+ * - Rate limiting should be applied at middleware level, not here
  */
 export function validateData<T>(
   schema: z.ZodSchema<T>,
@@ -31,6 +67,10 @@ export function validateData<T>(
   res: Response,
   context: string
 ): T | null {
+  // Parameter validation for development safety
+  if (!schema || !res || !context) {
+    throw new Error('validateData: missing required parameters (schema, res, context)');
+  }
   try {
     return schema.parse(data);
   } catch (error) {

@@ -28,8 +28,8 @@ export const SlugSchema = z
  * Provides consistent pagination across all list endpoints
  */
 export const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).optional(),
 });
 
@@ -75,3 +75,44 @@ export const SortOrderSchema = z.enum(['asc', 'desc']).default('desc').optional(
  * Validation schema for timestamps
  */
 export const TimestampSchema = z.string().datetime({ message: 'Invalid timestamp format' });
+
+/**
+ * Enhanced pagination schema with sorting support
+ * Extends basic pagination with sort functionality
+ */
+export const PaginationWithSortSchema = PaginationSchema.extend({
+  sortBy: z.string().optional(),
+  sortOrder: SortOrderSchema,
+});
+
+/**
+ * Search parameters schema
+ * Common search functionality across endpoints
+ */
+export const SearchSchema = z.object({
+  q: z.string().min(1, 'Search query cannot be empty').optional(),
+  fields: z.array(z.string()).optional(),
+});
+
+/**
+ * Date range schema for filtering
+ * Common date range filtering across endpoints
+ */
+export const DateRangeSchema = z.object({
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+}).refine((data) => {
+  if (data.startDate && data.endDate) {
+    return new Date(data.startDate) <= new Date(data.endDate);
+  }
+  return true;
+}, {
+  message: 'Start date must be before or equal to end date',
+  path: ['endDate'],
+});
+
+/**
+ * Filtering schema that combines search and date range
+ * Comprehensive filtering for list endpoints
+ */
+export const FilterSchema = SearchSchema.merge(DateRangeSchema);

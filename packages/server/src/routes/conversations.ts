@@ -7,17 +7,13 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
-import { IdSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
 
 const router: Router = Router();
 
-// Local pagination schema with required defaults
-const LocalPaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
+// Using standard pagination schema for consistency
 
 
 /**
@@ -112,7 +108,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     } else {
       // Regular JSON response mode
       // Validate pagination parameters
-      const paginationValidation = validateData(LocalPaginationSchema, req.query, res, 'pagination parameters');
+      const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
       if (!paginationValidation) return;
 
       // Validate query parameters for ordering
@@ -298,7 +294,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     if (!paramValidation) return;
 
     // Validate pagination query parameters
-    const paginationValidation = validateData(LocalPaginationSchema, req.query, res, 'pagination parameters');
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
     if (!paginationValidation) return;
 
     const { starshipId } = paramValidation;

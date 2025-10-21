@@ -1,7 +1,6 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import LoadingIcon from '@/components/primitives/LoadingSpinner'
 
 /**
  * Simple Loading Components
@@ -17,20 +16,34 @@ interface LoadingSpinnerProps {
 }
 
 /**
- * Basic loading spinner with optional text
- * Covers 90% of loading state use cases
+ * Vibrating rocket loading indicator
+ * Covers 90% of loading state use cases with style ✨
  */
 export function LoadingSpinner({ size = 'md', className, children }: LoadingSpinnerProps) {
   const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-6 w-6', 
-    lg: 'h-8 w-8'
+    sm: 'text-lg',
+    md: 'text-2xl', 
+    lg: 'text-4xl'
   }
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <LoadingIcon className={cn('text-primary', sizeClasses[size])} />
+    <div className={cn('flex items-center gap-3', className)}>
+      <div 
+        className={cn('animate-pulse', sizeClasses[size])}
+        style={{
+          animation: 'bounce 1s ease-in-out infinite, vibrate 0.3s ease-in-out infinite'
+        }}
+      >
+        🚀
+      </div>
       {children && <span className="text-muted-foreground">{children}</span>}
+      <style jsx global>{`
+        @keyframes vibrate {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          25% { transform: translateX(-0.5px) rotate(-0.5deg); }
+          75% { transform: translateX(0.5px) rotate(0.5deg); }
+        }
+      `}</style>
     </div>
   )
 }

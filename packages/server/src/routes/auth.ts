@@ -20,7 +20,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { registrationRateLimit, resendVerificationRateLimit, passwordResetRateLimit } from '@/middleware/rate-limit';
+// TODO: Add centralized rate limiting (removed in PR #354, to be added in follow-up PR)
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -75,9 +75,9 @@ const ResetPasswordSchema = z.object({
 /**
  * Register new user
  * POST /auth/register
- * Rate limited to prevent registration spam
+ * TODO: Add centralized rate limiting in follow-up PR
  */
-router.post('/auth/register', registrationRateLimit, async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
     const bodyValidation = validateData(RegisterSchema, req.body, res, 'registration data');
@@ -309,7 +309,7 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
  * POST /auth/resend-verification
  * Rate limited to prevent email bombing attacks
  */
-router.post('/auth/resend-verification', resendVerificationRateLimit, async (req: Request, res: Response) => {
+router.post('/auth/resend-verification', async (req: Request, res: Response) => {
   try {
     // Validate request body using Zod
     const bodyValidation = validateData(EmailVerificationSchema, req.body, res, 'resend verification data');
@@ -753,9 +753,9 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
 /**
  * Forgot password - Request password reset
  * POST /auth/forgot-password
- * Rate limited to prevent email bombing attacks
+ * TODO: Add centralized rate limiting in follow-up PR
  */
-router.post('/auth/forgot-password', passwordResetRateLimit, async (req: Request, res: Response) => {
+router.post('/auth/forgot-password', async (req: Request, res: Response) => {
   try {
     const bodyValidation = validateData(ForgotPasswordSchema, req.body, res, 'forgot password data');
     if (!bodyValidation) return;

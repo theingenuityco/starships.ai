@@ -11,10 +11,7 @@ import { AgentModel } from '@starships/protocol';
 const router: Router = Router();
 
 // Zod schemas for validation
-// Custom pagination with higher limit for agents
-const AgentPaginationSchema = PaginationSchema.extend({
-  limit: z.coerce.number().int().min(1).max(200).default(50).optional(),
-});
+// Using standard pagination schema for consistency
 
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
@@ -202,7 +199,7 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
   try {
     // Validate query parameters
     const queryValidation = validateData(
-      AgentPaginationSchema.extend({
+      PaginationSchema.extend({
         starshipId: IdSchema.optional(),
       }),
       req.query,

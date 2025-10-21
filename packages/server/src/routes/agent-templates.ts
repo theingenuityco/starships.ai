@@ -3,16 +3,13 @@ import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
-import { IdSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
 // Zod schemas for validation
-const LocalPaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
+// Using standard pagination schema for consistency
 
 const CreateAgentFromTemplateSchema = z.object({
   starshipId: z.string().regex(/^([a-z0-9_-]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
@@ -39,7 +36,7 @@ router.get('/agent-templates', jwtAuthMiddleware, async (req: Request, res: Resp
     }
 
     // Validate pagination parameters
-    const queryValidation = validateData(LocalPaginationSchema, req.query, res, 'pagination query');
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
     if (!queryValidation) return;
 
     const { page, limit } = queryValidation;

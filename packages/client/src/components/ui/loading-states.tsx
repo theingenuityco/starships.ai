@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
+import { StarTheme } from '@/components/theme-context'
 
 export interface LoadingStateProps {
   className?: string
@@ -204,7 +205,7 @@ export interface MultiStepLoadingProps {
 export function MultiStepLoading({ steps, currentStep, className }: MultiStepLoadingProps) {
   return (
     <div className={cn('space-y-3', className)}>
-      {steps.map((step, index) => {
+      {steps.map((step) => {
         const isActive = step.id === currentStep
         const isCompleted = step.status === 'completed'
         const isError = step.status === 'error'
@@ -318,5 +319,27 @@ export function InlineLoading({ message, size = 'sm', className }: { message?: s
       <LoadingIcon className={cn('text-muted-foreground', sizeClasses[size])} />
       {message && <span className={cn('text-muted-foreground', textSizeClasses[size])}>{message}</span>}
     </div>
+  )
+}
+
+/**
+ * Specialized loading state for authentication pages
+ * Provides consistent theming and layout for auth-related loading states
+ */
+export function AuthLoadingState({ 
+  message = "Authenticating...",
+  theme = "dark" 
+}: { 
+  message?: string
+  theme?: "light" | "dark"
+}) {
+  return (
+    <StarTheme theme={theme}>
+      <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner size="lg" message={message} />
+        </div>
+      </div>
+    </StarTheme>
   )
 }

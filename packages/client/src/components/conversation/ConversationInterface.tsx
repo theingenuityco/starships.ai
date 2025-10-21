@@ -259,7 +259,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           const toolName = (payload as any).toolName
           const toolCallId = (payload as any).toolCallId
 
-          console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
           // Store tool call info for later completion handling
           if (toolCallId) {
@@ -278,7 +277,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             'tool-blueprint-remove-edge',
           ])
           if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
-            console.log('📂 Navigating to tool builder page for', toolName)
             try {
               const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
               const slug = starshipSlug
@@ -297,7 +295,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           // Navigate to agent builder for agent actions
           const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
           if (openAgentBuilderSlugs.has(toolName)) {
-            console.log('🌍 Navigating to agent builder page for', toolName)
             try {
               const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
               const slug = starshipSlug
@@ -332,7 +329,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Agent tools - fetch and sync agent data
         const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
         if (agentTools.includes(toolName) && toolArgs?.slug) {
-          console.log('🔄 Fetching agent after tool completion:', toolArgs.slug)
 
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
@@ -352,7 +348,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           'tool-blueprint-remove-edge',
         ]
         if (toolTools.includes(toolName) && toolArgs?.slug) {
-          console.log('🔄 Fetching tool after tool completion:', toolArgs.slug)
 
           // Fetch complete tool data by slug
           const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)

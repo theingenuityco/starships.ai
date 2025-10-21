@@ -4,43 +4,20 @@ import { LoginForm } from '@/components/auth/LoginForm'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
-import Link from 'next/link'
-import { Suspense, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense } from 'react'
+import { AuthLoadingState } from '@/components/ui/loading-states'
 
 function LoginContent() {
-  const { isAuthenticated, isLoading, user, error } = useAuth()
-  const router = useRouter()
-
-
-  // Note: Redirect logic removed - let the login success handler manage redirects
-  // This prevents conflicts with the proper login flow redirects
+  const { isAuthenticated, isLoading } = useAuth()
 
   // Show loading state while checking authentication
   if (isLoading) {
-    return (
-      <StarTheme theme="light">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <div className="animate-pulse">
-            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-          </div>
-          <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </StarTheme>
-    )
+    return <AuthLoadingState message="Loading..." theme="light" />
   }
 
-  // If already authenticated, don't show login form
+  // If already authenticated, show redirecting state
   if (isAuthenticated) {
-    return (
-      <StarTheme theme="light">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <div className="animate-pulse">
-            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-          </div>
-        </div>
-      </StarTheme>
-    )
+    return <AuthLoadingState message="Redirecting..." theme="light" />
   }
 
   return (
@@ -67,15 +44,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <StarTheme theme="light">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <div className="animate-pulse">
-            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-          </div>
-        </div>
-      </StarTheme>
-    }>
+    <Suspense fallback={<AuthLoadingState theme="light" />}>
       <LoginContent />
     </Suspense>
   )

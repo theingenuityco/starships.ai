@@ -11,6 +11,7 @@ interface ErrorContext {
   operation?: string
   userId?: string
   requestId?: string
+  component?: string
   metadata?: Record<string, any>
 }
 
@@ -164,7 +165,6 @@ export class ErrorRecoveryManager {
    * Check if error is recoverable
    */
   private static isRecoverable(error: Error): boolean {
-    const category = this.categorizeError(error)
     const message = error.message.toLowerCase()
 
     // Non-recoverable errors
@@ -396,5 +396,74 @@ export function useErrorRecovery() {
     withRetry,
     getUserFriendlyMessage: ErrorRecoveryManager.getUserFriendlyMessage,
     getRecoveryGuidance: ErrorRecoveryManager.getRecoveryGuidance,
+  }
+}
+
+/**
+ * Logger utility for environment-aware logging
+ * Wraps console methods to only output in development mode
+ */
+export class Logger {
+  /**
+   * Log debug information (only in development)
+   */
+  static debug(context: string, data?: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[${context}]`, data)
+    }
+  }
+  
+  /**
+   * Log informational messages (only in development)
+   */
+  static info(context: string, message: string, data?: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.info(`[${context}] ${message}`, data)
+    }
+  }
+  
+  /**
+   * Log warnings (only in development)
+   */
+  static warn(context: string, message: string, data?: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[${context}] ${message}`, data)
+    }
+  }
+  
+  /**
+   * Log errors using ErrorRecoveryManager for proper tracking
+   */
+  static error(context: string, error: Error | any) {
+    ErrorRecoveryManager.logError(
+      ErrorRecoveryManager.enhanceError(error, { component: context })
+    )
+  }
+}
+
+/**
+ * Interface for error display in UI components
+ */
+export interface ErrorDisplay {
+  title: string
+  description?: string
+  action?: RecoveryAction
+}
+
+/**
+ * Prepare error for display in UI components
+ * Returns formatted messages without UI dependencies
+ */
+export function prepareErrorForDisplay(error: any, context: string): ErrorDisplay {
+  const enhanced = ErrorRecoveryManager.enhanceError(error, { component: context })
+  ErrorRecoveryManager.logError(enhanced)
+  
+  const message = ErrorRecoveryManager.getUserFriendlyMessage(enhanced)
+  const guidance = ErrorRecoveryManager.getRecoveryGuidance(enhanced)
+  
+  return {
+    title: enhanced.message || message,
+    description: guidance,
+    action: enhanced.recoveryActions?.[0]
   }
 }

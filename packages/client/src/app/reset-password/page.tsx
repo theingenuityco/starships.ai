@@ -5,6 +5,7 @@ import { StarTheme } from '@/components/theme-context'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { AuthLoadingState } from '@/components/ui/loading-states'
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams()
@@ -33,17 +34,7 @@ export default function ResetPasswordPage() {
   }, [searchParams, router])
 
   if (isLoading || !token) {
-    return (
-      <StarTheme theme="dark">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <div className="relative z-10">
-            <div className="animate-pulse">
-              <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-            </div>
-          </div>
-        </div>
-      </StarTheme>
-    )
+    return <AuthLoadingState message="Validating token..." theme="dark" />
   }
 
   return (

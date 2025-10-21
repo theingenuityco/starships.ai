@@ -12,20 +12,12 @@ function LoginContent() {
   const { isAuthenticated, isLoading, user, error } = useAuth()
   const router = useRouter()
 
-  // Debug logging to understand the state
-  console.log('[LoginPage] Auth state:', { isAuthenticated, isLoading, hasUser: !!user, error })
 
-  // Redirect authenticated users away from login page
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      console.log('[LoginPage] User is authenticated, redirecting to dashboard')
-      router.push('/')
-    }
-  }, [isAuthenticated, isLoading, router])
+  // Note: Redirect logic removed - let the login success handler manage redirects
+  // This prevents conflicts with the proper login flow redirects
 
   // Show loading state while checking authentication
   if (isLoading) {
-    console.log('[LoginPage] Showing loading state')
     return (
       <StarTheme theme="light">
         <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
@@ -38,16 +30,14 @@ function LoginContent() {
     )
   }
 
-  // If already authenticated, don't show login form (redirect will happen in useEffect)
+  // If already authenticated, don't show login form
   if (isAuthenticated) {
-    console.log('[LoginPage] User is authenticated, showing redirect loading')
     return (
       <StarTheme theme="light">
         <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
           <div className="animate-pulse">
             <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">Redirecting...</p>
         </div>
       </StarTheme>
     )

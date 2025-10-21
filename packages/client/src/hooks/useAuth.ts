@@ -149,9 +149,12 @@ export function useLogin() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Redirect to starship's conversation if available
+      // Redirect to appropriate page after login
       if (starship) {
         router.push(`/ship/${starship.slug}/conversations`)
+      } else {
+        // If no starship available, redirect to profile which handles starship routing
+        router.push('/profile')
       }
 
       // Invalidate all queries to refetch with new auth context
@@ -362,7 +365,6 @@ export function useResetPassword(options?: { onSuccess?: (data: any) => void; on
     },
     onSuccess: (data) => {
       // SECURITY: Clear authentication state after password reset
-      console.log('[useResetPassword] Password reset successful, clearing auth state')
       setStoredToken(null)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
       queryClient.clear()

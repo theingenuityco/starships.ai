@@ -75,11 +75,8 @@ export function LoginForm() {
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
-    console.log('[LoginForm] useEffect triggered, searchParams:', searchParams?.toString())
-    
     // Add safety check to prevent hydration issues
     if (typeof window === 'undefined' || !searchParams) {
-      console.log('[LoginForm] Skipping - SSR or no searchParams')
       return
     }
 
@@ -89,11 +86,8 @@ export function LoginForm() {
       const verificationError = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
 
-      console.log('[LoginForm] URL params:', { authCode, oauthError, verificationError, resetSuccess })
-
       // Handle password reset success message
       if (resetSuccess === 'success' && !successToastShownRef.current) {
-        console.log('[LoginForm] Showing password reset success toast')
         successToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
       }
@@ -113,7 +107,7 @@ export function LoginForm() {
         setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
       }
     } catch (error) {
-      console.error('[LoginForm] Error handling URL parameters:', error)
+      // Silently handle URL parameter errors
     }
   }, [searchParams, oauthLogin])
 

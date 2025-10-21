@@ -27,6 +27,9 @@ const CreateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
+  previewPrompts: z.array(z.string()).max(10).optional(),
+  templateId: z.string().min(1).optional(),
+  previewPrompts: z.array(z.string()).max(10).optional(),
   starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
@@ -41,6 +44,8 @@ const UpdateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
+  templateId: z.string().min(1).optional(),
+  previewPrompts: z.array(z.string()).max(10).optional(),
   starshipId: z.string().min(1, 'Starship ID is required').optional(),
 });
 

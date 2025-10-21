@@ -25,9 +25,9 @@ export default function HomePage() {
 
         {/* New Landing Sections */}
         <Hero />
+        <UseCases />
         <ProblemOutcome />
         <ProductModel />
-        <UseCases />
         <HowItWorks />
         <Integrations />
         <Security />

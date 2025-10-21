@@ -172,6 +172,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
+        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
+          onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
+        }
         if (value.timeout == null && agent.timeout != null) onFieldChange?.('timeout', agent.timeout as any)
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
           onFieldChange?.('blueprint', JSON.stringify(agent.blueprint, null, 2))
@@ -353,6 +356,31 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             placeholder="Define the agent's character, mission, and behavior..."
             minHeightPx={200}
           />
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Preview Prompts */}
+      <Collapsible defaultOpen={true} className="space-y-2">
+        <CollapsibleTrigger className="p-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground">Preview Prompts</Label>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-2">
+            <textarea
+              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px]"
+              placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
+              value={(value.previewPrompts || []).join('\n')}
+              onChange={e => {
+                const lines = e.target.value
+                  .split('\n')
+                  .map(s => s.trim())
+                  .filter(Boolean)
+                  .slice(0, 10)
+                onFieldChange?.('previewPrompts', lines)
+              }}
+            />
+            <div className="text-[10px] text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</div>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 

@@ -30,6 +30,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     temperature: agent?.temperature,
     maxTokens: agent?.maxTokens,
     systemPrompt: agent?.systemPrompt || '',
+    previewPrompts: Array.isArray(agent?.previewPrompts) ? agent?.previewPrompts : [],
     state: agent?.state || {
       messages: [],
       tools: [],
@@ -204,6 +205,29 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">Define how your agent should behave, what knowledge it should have, and any constraints it should follow</p>
+              </div>
+
+              {/* Preview Prompts */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="list" className="h-4 w-4 text-muted-foreground" />
+                  Preview Prompts
+                </label>
+                <Textarea
+                  value={(formData.previewPrompts || []).join('\n')}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                    const lines = e.target.value
+                      .split('\n')
+                      .map(s => s.trim())
+                      .filter(Boolean)
+                      .slice(0, 10)
+                    setFormData(prev => ({ ...prev, previewPrompts: lines }))
+                  }}
+                  placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
+                  className="border-muted-foreground/20 focus:border-primary min-h-[120px] font-mono text-sm"
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</p>
               </div>
             </div>
           </div>

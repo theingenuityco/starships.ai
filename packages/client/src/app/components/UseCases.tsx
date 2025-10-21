@@ -23,7 +23,7 @@ export default function UseCases() {
     },
   ]
 
-  const mediaSrc = ['/landing/usecases/agents.gif', '/landing/usecases/tools.gif', '/landing/usecases/assign.gif', '/landing/usecases/streaming.gif']
+  const mediaSrc = ['/landing/usecases/agents.png', '/landing/usecases/tools.png', '/landing/usecases/assign.png', '/landing/usecases/streaming.png']
 
   return (
     <section className="py-14 px-4">
@@ -36,7 +36,7 @@ export default function UseCases() {
               <div key={item.title} className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-8 py-10`}>
                 {/* Media slot */}
                 <div className="w-full md:w-[560px]">
-                  <img src={mediaSrc[idx]} alt={`${item.title} demo`} className="w-full h-[320px] object-cover rounded-lg" />
+                  <img src={mediaSrc[idx]} alt={`${item.title} demo`} className="w-full h-[320px] object-cover rounded-lg border border-white/10" />
                 </div>
 
                 {/* Text */}

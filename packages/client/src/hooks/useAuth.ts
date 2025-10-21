@@ -344,6 +344,8 @@ export function useForgotPassword() {
 // Reset password mutation
 export function useResetPassword(options?: { onSuccess?: (data: any) => void; onError?: (error: any) => void }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  
   return useMutation({
     mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
       const response = await fetch('/api/v1/auth/reset-password', {
@@ -359,7 +361,13 @@ export function useResetPassword(options?: { onSuccess?: (data: any) => void; on
       return result.data
     },
     onSuccess: (data) => {
-      toast.success('Password reset successful!')
+      // SECURITY: Clear authentication state after password reset
+      console.log('[useResetPassword] Password reset successful, clearing auth state')
+      setStoredToken(null)
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
+      queryClient.clear()
+      
+      // Don't show toast here - let the login page handle the success message via URL param
       router.push('/login?reset=success')
       options?.onSuccess?.(data)
     },

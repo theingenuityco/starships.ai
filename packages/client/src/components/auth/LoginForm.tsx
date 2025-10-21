@@ -70,11 +70,16 @@ export function LoginForm() {
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
+  // Track if success message has been shown to prevent duplicates
+  const successToastShownRef = useRef(false)
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
+    console.log('[LoginForm] useEffect triggered, searchParams:', searchParams?.toString())
+    
     // Add safety check to prevent hydration issues
     if (typeof window === 'undefined' || !searchParams) {
+      console.log('[LoginForm] Skipping - SSR or no searchParams')
       return
     }
 
@@ -84,9 +89,12 @@ export function LoginForm() {
       const verificationError = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
 
+      console.log('[LoginForm] URL params:', { authCode, oauthError, verificationError, resetSuccess })
+
       // Handle password reset success message
-      if (resetSuccess === 'success') {
+      if (resetSuccess === 'success' && !successToastShownRef.current) {
         console.log('[LoginForm] Showing password reset success toast')
+        successToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
       }
 

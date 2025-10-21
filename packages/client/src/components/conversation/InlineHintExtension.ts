@@ -116,10 +116,16 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
             const shown = current.slice(0, char)
             const span = document.createElement('span')
             span.className = 'inline-hint text-muted-foreground/80'
-            span.style.whiteSpace = 'pre'
+            // Allow wrapping within the editor flow
+            span.style.whiteSpace = 'pre-wrap'
+            span.style.wordBreak = 'break-word'
+            span.style.maxWidth = '100%'
             span.textContent = shown
             const caret = document.createElement('span')
-            caret.className = 'inline-block w-[8px] h-[1em] align-baseline bg-muted-foreground/60 ml-0.5 animate-pulse'
+            caret.className = 'inline-block align-baseline ml-0.5 animate-pulse'
+            caret.style.width = '1px'
+            caret.style.height = '1em'
+            caret.style.background = 'currentColor'
             span.appendChild(caret)
 
             const deco = Decoration.widget(anchorPos, span, { side: 1 })

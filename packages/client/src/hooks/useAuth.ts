@@ -3,9 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useErrorHandler } from './useErrorHandler'
+import { useSimpleError } from './useSimpleError'
 import { isValidRedirectUrl } from '@/lib/utils'
-import { Logger } from '@/lib/error-recovery'
 
 export type AuthMethod = 'password' | 'google' | 'github';
 
@@ -83,7 +82,9 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
 
     return null
   } catch (error) {
-    Logger.error('AUTH-Token-Validation', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[AUTH-Token-Validation]', error)
+    }
     return null
   }
 }
@@ -118,7 +119,7 @@ export function useAuthUser() {
 export function useLogin() {
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { handleError } = useErrorHandler()
+  const { handleError } = useSimpleError()
 
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
@@ -142,7 +143,7 @@ export function useLogin() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        handleError(new Error('Login successful but missing user or token'), 'useLogin', false)
+        handleError(new Error('Login successful but missing user or token'), 'useLogin')
         return
       }
 
@@ -178,7 +179,7 @@ export function useLogin() {
 export function useRegister() {
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { handleError } = useErrorHandler()
+  const { handleError } = useSimpleError()
 
   return useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
@@ -210,7 +211,7 @@ export function useRegister() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        handleError(new Error('Registration successful but missing user or token'), 'useRegister', false)
+        handleError(new Error('Registration successful but missing user or token'), 'useRegister')
         return
       }
 
@@ -238,7 +239,7 @@ export function useRegister() {
 export function useOAuthLogin() {
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { handleError } = useErrorHandler()
+  const { handleError } = useSimpleError()
 
   return useMutation({
     mutationFn: async ({ authCode }: { authCode: string }) => {
@@ -263,7 +264,7 @@ export function useOAuthLogin() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        handleError(new Error('OAuth successful but missing user or token'), 'useOAuthLogin', false)
+        handleError(new Error('OAuth successful but missing user or token'), 'useOAuthLogin')
         return
       }
 
@@ -296,7 +297,7 @@ export function useOAuthLogin() {
 
 // Resend verification mutation
 export function useResendVerification() {
-  const { handleError } = useErrorHandler()
+  const { handleError } = useSimpleError()
   
   return useMutation({
     mutationFn: async (email: string) => {
@@ -405,7 +406,9 @@ export function useLogout() {
           },
         })
       } catch (error) {
-        Logger.error('AUTH-Logout-API', error)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[AUTH-Logout-API]', error)
+        }
       }
     },
     onSuccess: () => {
@@ -419,7 +422,9 @@ export function useLogout() {
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
     },
     onError: (error: any) => {
-      Logger.error('AUTH-Logout', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AUTH-Logout]', error)
+      }
       // Still clear local data even if API call fails
       setStoredToken(null)
       queryClient.clear()

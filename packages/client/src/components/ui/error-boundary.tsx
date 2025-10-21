@@ -2,10 +2,8 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { EnhancedError, ErrorRecoveryManager } from '@/lib/error-recovery'
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 
@@ -19,7 +17,7 @@ interface Props {
 
 interface State {
   hasError: boolean
-  error: EnhancedError | null
+  error: Error | null
   errorInfo: ErrorInfo | null
   retryCount: number
 }
@@ -40,25 +38,20 @@ export class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): Partial<State> {
     return {
       hasError: true,
-      error: ErrorRecoveryManager.enhanceError(error, ErrorRecoveryManager.createContext('render', 'ErrorBoundary'), []),
+      error,
     }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const enhanced = ErrorRecoveryManager.enhanceError(
-      error,
-      ErrorRecoveryManager.createContext('render', this.props.component || 'ErrorBoundary', {
-        componentStack: errorInfo.componentStack,
-      })
-    )
-
     this.setState({
-      error: enhanced,
+      error,
       errorInfo,
     })
 
-    // Log error
-    ErrorRecoveryManager.logError(enhanced)
+    // Simple error logging
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[ErrorBoundary]', error, errorInfo)
+    }
 
     // Call custom error handler
     this.props.onError?.(error, errorInfo)
@@ -114,8 +107,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
       const error = this.state.error
       const canRetry = this.state.retryCount < this.maxRetries
-      const userMessage = error ? ErrorRecoveryManager.getUserFriendlyMessage(error) : 'Something went wrong'
-      const guidance = error ? ErrorRecoveryManager.getRecoveryGuidance(error) : ''
+      const userMessage = error?.message || 'Something went wrong'
+      const guidance = 'This is usually a temporary issue. Trying again often resolves the problem.'
 
       return (
         <div className="flex items-center justify-center min-h-[400px] p-4">
@@ -129,24 +122,9 @@ export class ErrorBoundary extends Component<Props, State> {
             </CardHeader>
 
             <CardContent className="space-y-4">
-              {guidance && (
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-sm text-muted-foreground">{guidance}</p>
-                </div>
-              )}
-
-              {error?.category && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {error.category}
-                  </Badge>
-                  {error.severity && (
-                    <Badge variant={error.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
-                      {error.severity}
-                    </Badge>
-                  )}
-                </div>
-              )}
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-sm text-muted-foreground">{guidance}</p>
+              </div>
 
               {this.props.showDetails && error && (
                 <details className="rounded-lg border bg-muted/20 p-3">
@@ -155,14 +133,12 @@ export class ErrorBoundary extends Component<Props, State> {
                     <div>
                       <strong>Error:</strong> {error.message}
                     </div>
-                    {error.context?.metadata?.timestamp && (
+                    <div>
+                      <strong>Time:</strong> {new Date().toLocaleString()}
+                    </div>
+                    {this.props.component && (
                       <div>
-                        <strong>Time:</strong> {error.context.metadata.timestamp.toLocaleString()}
-                      </div>
-                    )}
-                    {error.context?.location && (
-                      <div>
-                        <strong>Location:</strong> {error.context.location}
+                        <strong>Component:</strong> {this.props.component}
                       </div>
                     )}
                     {this.state.retryCount > 0 && (
@@ -225,16 +201,16 @@ export function withErrorBoundary<P extends object>(Component: React.ComponentTy
 }
 
 /**
- * Hook for handling errors in functional components
+ * Simple hook for handling errors in functional components
  */
 export function useErrorHandler() {
-  const [error, setError] = React.useState<EnhancedError | null>(null)
+  const [error, setError] = React.useState<Error | null>(null)
 
   const handleError = React.useCallback((error: Error, context?: string) => {
-    const enhanced = ErrorRecoveryManager.enhanceError(error, ErrorRecoveryManager.createContext('hook', context || 'useErrorHandler'))
-
-    ErrorRecoveryManager.logError(enhanced)
-    setError(enhanced)
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[${context || 'useErrorHandler'}]`, error)
+    }
+    setError(error)
   }, [])
 
   const clearError = React.useCallback(() => {

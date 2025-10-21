@@ -5,19 +5,19 @@ import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { Suspense } from 'react'
-import { AuthLoadingState } from '@/components/ui/loading-states'
+import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 
 function LoginContent() {
   const { isAuthenticated, isLoading } = useAuth()
 
   // Show loading state while checking authentication
   if (isLoading) {
-    return <AuthLoadingState message="Loading..." theme="light" />
+    return <AuthLoadingScreen message="Loading..." />
   }
 
   // If already authenticated, show redirecting state
   if (isAuthenticated) {
-    return <AuthLoadingState message="Redirecting..." theme="light" />
+    return <AuthLoadingScreen message="Redirecting..." />
   }
 
   return (
@@ -44,7 +44,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<AuthLoadingState theme="light" />}>
+    <Suspense fallback={<AuthLoadingScreen />}>
       <LoginContent />
     </Suspense>
   )

@@ -107,10 +107,10 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
 
     const { email, password } = bodyValidation;
 
-    // Get user with password
+    // Get user with password - enterprise standard approach
     const user = await UserService.getUserByEmailWithPassword(email);
     if (!user || !user.password) {
-      return sendError(res, 'AUTHENTICATION_FAILED', 'No account found with this email address. Please sign up first.', 401);
+      return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid email or password.', 401);
     }
 
     // Verify password
@@ -581,6 +581,7 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     handleError(error, res, 'Setting password failed');
   }
 });
+
 
 /**
  * Get user authentication methods

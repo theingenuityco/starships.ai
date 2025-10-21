@@ -135,21 +135,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     }
 
     if (!result.success) {
-      const errorMessage = result.error || 'Login failed'
-
-      // Check if user doesn't exist - offer to switch to registration
-      if (errorMessage.includes('No account found') || errorMessage.includes('Please sign up first')) {
-        setFormError(null) // Clear error since we're handling it gracefully
-        // Pre-fill registration form with the email
-        setRegisterData(prev => ({ ...prev, email: loginData.email }))
-        // Automatically switch to registration tab
-        setActiveTab('register')
-        onTabChange?.('register') // Notify parent of tab change
-        setAutoSwitchedToRegister(true)
-        return
-      }
-
-      setFormError(errorMessage)
+      setFormError(result.error || 'Login failed')
     }
   }
 
@@ -188,7 +174,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       return
     }
 
-    // Handle "user already exists" case gracefully
+    // Handle "user already exists" case - enterprise standard approach
     if (result.message && result.message.includes('already exists')) {
       // Switch to login tab and pre-fill email
       setActiveTab('login')
@@ -197,7 +183,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       // Show as informational message, not error
       setFormError(null)
       setEmailVerificationStatus({
-        needsVerification: true,
+        needsVerification: false,
         email: registerData.email,
         message: result.message,
       })

@@ -65,7 +65,7 @@ export default function Hero() {
               return 'Build automations at warp speed'
             })()}
           </h1>
-          <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Design agent behavior, connect tools, and run on a runtime with isolation and event streaming.</p>
+          <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Ship intelligent automations in minutes - safe, observable and fast.</p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Button size="lg" className="px-7" onClick={handlePrimaryClick}>
               <Icon name={isAuthenticated ? 'rocket' : 'user-plus'} className="w-4 h-4 mr-2" />
@@ -83,10 +83,7 @@ export default function Hero() {
               View Docs
             </Button>
           </div>
-
-          <div className="mt-8 flex items-center gap-6 opacity-90">
-            <div className="text-sm text-muted-foreground">Isolation • Event streaming • Structured logs</div>
-          </div>
+          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • $20 credit on signup</div>
         </div>
 
         {/* Visualization: viewport removed; styles moved into visualization */}

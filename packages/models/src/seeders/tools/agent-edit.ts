@@ -95,7 +95,7 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Build URL, headers and partial body for agent update',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\/+$/, '');
+            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
             const authToken = env('AUTH_TOKEN');
             const starshipId = env('STARSHIP_ID');

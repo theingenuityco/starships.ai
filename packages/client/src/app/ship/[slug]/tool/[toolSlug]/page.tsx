@@ -6,6 +6,7 @@ import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuil
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { toolAPI } from '@/lib/api'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
@@ -18,6 +19,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   const { data: starship } = useStarshipBySlug(slug, true)
   const toolBuilderRef = useRef<ToolBuilderViewRef>(null)
+  const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
   const conversationId = useMemo(() => searchParams.get('conversationId') || null, [searchParams])
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
@@ -35,6 +37,17 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   // Track applied tool calls to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
+
+  // Autofocus the conversation input when the page loads (and conversation is present)
+  useEffect(() => {
+    if (!conversationId) return
+    const t = setTimeout(() => {
+      try {
+        messageInputRef.current?.focusInput?.()
+      } catch {}
+    }, 150)
+    return () => clearTimeout(t)
+  }, [conversationId])
 
   // Stream tool arguments into builder as they arrive
   useEffect(() => {
@@ -345,6 +358,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <ConversationMessageInput
+                ref={messageInputRef}
                 selectedAgent={selectedAgent}
                 starshipId={starship.id}
                 conversationId={conversationId}

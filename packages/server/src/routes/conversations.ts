@@ -5,43 +5,16 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
+import { validateData } from '@/utils/validation';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
 
 const router: Router = Router();
 
-// Zod schemas for validation
-const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
+// Using standard pagination schema for consistency
 
-// Helper function for Zod validation
-const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const firstError = error.issues[0];
-      const fieldName = firstError.path.join('.');
-
-      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
-        field: fieldName,
-        context,
-        validationErrors: error.issues.map((err) => ({
-          path: err.path.join('.'),
-          message: err.message,
-          code: err.code,
-        })),
-      });
-    } else {
-      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
-    }
-    return null;
-  }
-};
 
 /**
  * GET /conversations/:conversationId/messages - Get conversation messages (supports streaming for live updates)
@@ -49,7 +22,7 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;
@@ -190,7 +163,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -282,7 +255,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
 router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;
@@ -311,7 +284,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
 router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate starshipId parameter
-    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
+    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -345,8 +318,8 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     const bodyValidation = validateData(
       z.object({
         title: z.string().min(1).max(100).optional(),
-        starshipId: NanoidSchema,
-        agentId: NanoidSchema.optional(),
+        starshipId: IdSchema,
+        agentId: IdSchema.optional(),
       }),
       req.body,
       res,
@@ -369,7 +342,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -423,7 +396,7 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
 router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;

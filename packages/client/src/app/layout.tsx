@@ -9,6 +9,7 @@ import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Toaster as SonnerToaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="min-h-[100dvh] bg-background">
                   <ClientLayout>{children}</ClientLayout>
                   <Toaster />
+                  <SonnerToaster position="top-center" />
                 </div>
               </TooltipProvider>
             </AuthProvider>

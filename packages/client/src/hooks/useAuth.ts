@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
+import { useSimpleError } from './useSimpleError'
+import { isValidRedirectUrl } from '@/lib/utils'
 
 export type AuthMethod = 'password' | 'google' | 'github';
 
@@ -45,6 +47,7 @@ export const AUTH_QUERY_KEYS = {
   user: () => [...AUTH_QUERY_KEYS.all, 'user'] as const,
   me: () => [...AUTH_QUERY_KEYS.user(), 'me'] as const,
   emailVerification: () => [...AUTH_QUERY_KEYS.all, 'email-verification'] as const,
+  passwordReset: () => [...AUTH_QUERY_KEYS.all, 'password-reset'] as const,
 } as const
 
 // Token storage utilities
@@ -79,7 +82,9 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
 
     return null
   } catch (error) {
-    console.error('[AUTH] Token validation failed:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[AUTH-Token-Validation]', error)
+    }
     return null
   }
 }
@@ -114,6 +119,7 @@ export function useAuthUser() {
 export function useLogin() {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const { handleError } = useSimpleError()
 
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
@@ -127,7 +133,6 @@ export function useLogin() {
 
       const data = await response.json()
 
-
       if (!response.ok || !data.data) {
         throw new Error(data.error?.message || 'Login failed')
       }
@@ -138,7 +143,7 @@ export function useLogin() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        console.error('[AUTH] Login successful but missing user or token')
+        handleError(new Error('Login successful but missing user or token'), 'useLogin')
         return
       }
 
@@ -148,20 +153,24 @@ export function useLogin() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Redirect to starship's conversation if available
-      if (starship) {
+      // Handle redirect with returnUrl pattern
+      const searchParams = new URLSearchParams(window.location.search)
+      const returnUrl = searchParams.get('returnUrl')
+
+      if (returnUrl && isValidRedirectUrl(returnUrl)) {
+        router.push(returnUrl)
+      } else if (starship) {
         router.push(`/ship/${starship.slug}/conversations`)
+      } else {
+        // If no starship available, redirect to profile which handles starship routing
+        router.push('/profile')
       }
 
       // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()
     },
     onError: (error: any) => {
-      console.error('[AUTH] Login error:', error)
-      const errorMessage = error.message || 'Login failed'
-      toast.error('Login failed', {
-        description: errorMessage,
-      })
+      handleError(error, 'useLogin')
     },
   })
 }
@@ -170,6 +179,7 @@ export function useLogin() {
 export function useRegister() {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const { handleError } = useSimpleError()
 
   return useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
@@ -201,7 +211,7 @@ export function useRegister() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        console.error('[AUTH] Registration successful but missing user or token')
+        handleError(new Error('Registration successful but missing user or token'), 'useRegister')
         return
       }
 
@@ -220,11 +230,7 @@ export function useRegister() {
       queryClient.invalidateQueries()
     },
     onError: (error: any) => {
-      console.error('[AUTH] Registration error:', error)
-      const errorMessage = error.message || 'Registration failed'
-      toast.error('Registration failed', {
-        description: errorMessage,
-      })
+      handleError(error, 'useRegister')
     },
   })
 }
@@ -233,6 +239,7 @@ export function useRegister() {
 export function useOAuthLogin() {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const { handleError } = useSimpleError()
 
   return useMutation({
     mutationFn: async ({ authCode }: { authCode: string }) => {
@@ -257,7 +264,7 @@ export function useOAuthLogin() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        console.error('[AUTH] OAuth successful but missing user or token')
+        handleError(new Error('OAuth successful but missing user or token'), 'useOAuthLogin')
         return
       }
 
@@ -267,26 +274,31 @@ export function useOAuthLogin() {
       // Update auth user cache (same as regular login)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Redirect to starship's conversation if available (same as regular login)
-      if (starship) {
+      // Handle redirect with returnUrl pattern (same as regular login)
+      const searchParams = new URLSearchParams(window.location.search)
+      const returnUrl = searchParams.get('returnUrl')
+
+      if (returnUrl && isValidRedirectUrl(returnUrl)) {
+        router.push(returnUrl)
+      } else if (starship) {
         router.push(`/ship/${starship.slug}/conversations`)
+      } else {
+        router.push('/profile')
       }
 
       // Invalidate all queries to refetch with new auth context (same as regular login)
       queryClient.invalidateQueries()
     },
     onError: (error: any) => {
-      console.error('[AUTH] OAuth login error:', error)
-      const errorMessage = error.message || 'OAuth login failed'
-      toast.error('OAuth login failed', {
-        description: errorMessage,
-      })
+      handleError(error, 'useOAuthLogin')
     },
   })
 }
 
 // Resend verification mutation
 export function useResendVerification() {
+  const { handleError } = useSimpleError()
+  
   return useMutation({
     mutationFn: async (email: string) => {
       const response = await fetch('/api/v1/auth/resend-verification', {
@@ -309,8 +321,70 @@ export function useResendVerification() {
       toast.success('Verification email sent! Please check your email.')
     },
     onError: (error: any) => {
-      console.error('[AUTH] Resend verification error:', error)
-      toast.error('Failed to send verification email. Please try again.')
+      handleError(error, 'useResendVerification')
+    },
+  })
+}
+
+// Forgot password mutation
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: async (data: { email: string }) => {
+      const response = await fetch('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to send reset email')
+      }
+      return result.data
+    },
+    onSuccess: () => {
+      toast.success('Password reset link sent! Check your email.')
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to send reset email. Please try again.')
+    },
+  })
+}
+
+// Reset password mutation
+export function useResetPassword(options?: { onSuccess?: (data: any) => void; onError?: (error: any) => void }) {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
+      const response = await fetch('/api/v1/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to reset password')
+      }
+      return result.data
+    },
+    onSuccess: (data) => {
+      // SECURITY: Clear authentication state after password reset
+      setStoredToken(null)
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
+      queryClient.clear()
+      
+      // Don't show toast here - let the login page handle the success message via URL param
+      router.push('/login?reset=success')
+      options?.onSuccess?.(data)
+    },
+    onError: (error: any) => {
+      const message = error.message || 'Failed to reset password'
+      toast.error(message)
+      options?.onError?.(error)
+      throw error // Re-throw for component error handling
     },
   })
 }
@@ -332,7 +406,9 @@ export function useLogout() {
           },
         })
       } catch (error) {
-        console.error('[AUTH] Logout API call failed:', error)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[AUTH-Logout-API]', error)
+        }
       }
     },
     onSuccess: () => {
@@ -346,7 +422,9 @@ export function useLogout() {
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
     },
     onError: (error: any) => {
-      console.error('[AUTH] Logout error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AUTH-Logout]', error)
+      }
       // Still clear local data even if API call fails
       setStoredToken(null)
       queryClient.clear()

@@ -1,47 +1,20 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
-import { getConnection } from '@starships/models';
 import { Request, Response, Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
+import { validateData } from '@/utils/validation';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
+// Using standard pagination schema for consistency
 
 const CreateAgentFromTemplateSchema = z.object({
   starshipId: z.string().regex(/^([a-z0-9_-]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
 });
 
-// Helper function for Zod validation
-const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const firstError = error.issues[0];
-      const fieldName = firstError.path.join('.');
-
-      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
-        field: fieldName,
-        context,
-        validationErrors: error.issues.map((err) => ({
-          path: err.path.join('.'),
-          message: err.message,
-          code: err.code,
-        })),
-      });
-    } else {
-      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
-    }
-    return null;
-  }
-};
 
 // Helper function to get AgentTemplateService instance
 function getAgentTemplateService(): AgentTemplateService | null {

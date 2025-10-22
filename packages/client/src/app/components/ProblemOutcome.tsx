@@ -9,18 +9,18 @@ export default function ProblemOutcome() {
           <Card className="p-5 bg-white/5 border-white/10">
             <ul className="list-disc ml-5 text-sm text-muted-foreground space-y-2">
               <li>Brittle scripts and LLM glue that fail silently</li>
-              <li>Manual ops across tools with no guardrails</li>
-              <li>Zero visibility into why runs succeed or fail</li>
+              <li>Manual ops across tools with minimal safety controls</li>
+              <li>Limited visibility into what happened during a run</li>
             </ul>
           </Card>
         </div>
         <div>
-          <h3 className="text-2xl md:text-3xl font-semibold mb-3">The outcome</h3>
+          <h3 className="text-2xl md:text-3xl font-semibold mb-3">What you get</h3>
           <Card className="p-5 bg-white/5 border-white/10">
             <ul className="list-disc ml-5 text-sm text-muted-foreground space-y-2">
-              <li>Repeatable agents with safe tool access</li>
-              <li>Guardrails, retries, and auditing built-in</li>
-              <li>Deep visibility with traces, metrics, replay</li>
+              <li>Repeatable agents with scoped tool access</li>
+              <li>Isolation via child/remote runner and streamed events</li>
+              <li>Structured logs and message history for visibility</li>
             </ul>
           </Card>
         </div>

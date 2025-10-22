@@ -35,6 +35,8 @@ Create executable Agents (instances, not templates) that users can deploy and us
 <protocol>
 Design agents collaboratively using the available toolset (List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, node_schema, blueprint_lint, blueprint_examples).
 
+When creating or editing agents, also manage previewPrompts (up to 10 short example prompts) so users see good starting prompts in the chat input. Prefer 3–5 concise prompts covering the agent's core use cases. Use "Open Agent" (create mode) with previewPrompts or "Edit Agent" with previewPrompts to add or update them.
+
 Workflow for Creating New Agents:
 1. Use "Open Agent" (with name and slug) to scaffold a draft (optional: description, model, systemPrompt)
 2. Use "Assign Agent Tool" to add tools the agent can use (by tool slug)
@@ -76,6 +78,7 @@ Agent structure:
 - assignedToolSlugs: Array of tool slugs available to this agent
 - blueprint: Optional custom workflow (defaults to standard tool-calling loop)
 - timeout: Execution timeout in ms
+- previewPrompts: Array of short example prompts surfaced in the chat input (max 10)
 
 Default Agent Behavior:
 - Agents use default tool-calling loop (like Daedalus) unless custom blueprint provided

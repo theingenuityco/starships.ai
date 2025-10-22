@@ -3,7 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -12,6 +12,8 @@ import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { motion } from 'motion/react'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { toast } from 'sonner'
 
 /**
  * OAuth error handling helper
@@ -34,7 +36,7 @@ function getOAuthErrorMessage(errorCode: string): string {
 /**
  * JWT-based login and registration form
  */
-export function LoginForm() {
+export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { login, register, oauthLogin, resendVerification, isLoading, error } = useAuth()
   const searchParams = useSearchParams()
 
@@ -68,26 +70,44 @@ export function LoginForm() {
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
+  // Track if success message has been shown to prevent duplicates
+  const successToastShownRef = useRef(false)
 
-  // OAuth callback and verification error handling
+  // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
-    const authCode = searchParams?.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
-    const oauthError = searchParams?.get('oauth_error')
-    const verificationError = searchParams?.get('verification')
-
-    // Prevent duplicate handling (synchronous check with ref)
-    if (oauthHandledRef.current) {
+    // Add safety check to prevent hydration issues
+    if (typeof window === 'undefined' || !searchParams) {
       return
     }
 
-    if (authCode) {
-      oauthHandledRef.current = true
-      // ✅ SECURE: Exchange authorization code for JWT via POST request
-      oauthLogin(authCode)
-    } else if (oauthError) {
-      setFormError(getOAuthErrorMessage(oauthError))
-    } else if (verificationError === 'error') {
-      setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
+    try {
+      const authCode = searchParams.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
+      const oauthError = searchParams.get('oauth_error')
+      const verificationError = searchParams.get('verification')
+      const resetSuccess = searchParams.get('reset')
+
+      // Handle password reset success message
+      if (resetSuccess === 'success' && !successToastShownRef.current) {
+        successToastShownRef.current = true
+        toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      // Prevent duplicate handling (synchronous check with ref)
+      if (oauthHandledRef.current) {
+        return
+      }
+
+      if (authCode) {
+        oauthHandledRef.current = true
+        // ✅ SECURE: Exchange authorization code for JWT via POST request
+        oauthLogin(authCode)
+      } else if (oauthError) {
+        setFormError(getOAuthErrorMessage(oauthError))
+      } else if (verificationError === 'error') {
+        setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
+      }
+    } catch (error) {
+      // Silently handle URL parameter errors
     }
   }, [searchParams, oauthLogin])
 
@@ -115,20 +135,7 @@ export function LoginForm() {
     }
 
     if (!result.success) {
-      const errorMessage = result.error || 'Login failed'
-
-      // Check if user doesn't exist - offer to switch to registration
-      if (errorMessage.includes('No account found') || errorMessage.includes('Please sign up first')) {
-        setFormError(null) // Clear error since we're handling it gracefully
-        // Pre-fill registration form with the email
-        setRegisterData(prev => ({ ...prev, email: loginData.email }))
-        // Automatically switch to registration tab
-        setActiveTab('register')
-        setAutoSwitchedToRegister(true)
-        return
-      }
-
-      setFormError(errorMessage)
+      setFormError(result.error || 'Login failed')
     }
   }
 
@@ -167,15 +174,16 @@ export function LoginForm() {
       return
     }
 
-    // Handle "user already exists" case gracefully
+    // Handle "user already exists" case - enterprise standard approach
     if (result.message && result.message.includes('already exists')) {
       // Switch to login tab and pre-fill email
       setActiveTab('login')
+      onTabChange?.('login') // Notify parent of tab change
       setLoginData(prev => ({ ...prev, email: registerData.email }))
       // Show as informational message, not error
       setFormError(null)
       setEmailVerificationStatus({
-        needsVerification: true,
+        needsVerification: false,
         email: registerData.email,
         message: result.message,
       })
@@ -197,8 +205,7 @@ export function LoginForm() {
     <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>Access Your Starship</CardTitle>
-          <CardDescription>Sign in to your starship or create a new account</CardDescription>
+          <CardDescription>Access your starship or create a new account</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -211,7 +218,7 @@ export function LoginForm() {
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
                   <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-gray-900 text-sm break-all">{emailVerificationStatus.email}</span>
+                  <span className="font-medium text-gray-600 text-sm break-all">{emailVerificationStatus.email}</span>
                 </div>
                 <AlertDescription>
                   <div className="flex justify-center">
@@ -235,6 +242,7 @@ export function LoginForm() {
             value={activeTab}
             onValueChange={value => {
               setActiveTab(value)
+              onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
               setFormError(null) // Clear form errors when switching tabs
             }}
@@ -303,6 +311,15 @@ export function LoginForm() {
                     </>
                   )}
                 </Button>
+                
+                <div className="text-center">
+                  <Link 
+                    href="/forgot-password" 
+                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
               </form>
             </TabsContent>
 

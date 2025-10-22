@@ -306,8 +306,8 @@
     --popover-foreground: 0 0% 8%;
 
     /* Command Deck Light - Gradient backgrounds */
-    --command-bg: linear-gradient(135deg, hsl(38 30% 95%), hsl(38 20% 98%));
-    --starship-accent: hsl(38 92% 50%);
+    --command-bg: linear-gradient(135deg, hsl(224 30% 95%), hsl(224 20% 98%));
+    --starship-accent: hsl(224 99% 53%);
     --primary-rgb: 245 158 11;
 
     /* Shadow colors for light mode - border moved to frosted-glass-card */
@@ -328,8 +328,8 @@
     --foreground: 0 0% 95%;
     --card: 220 15% 10%;
     --card-foreground: 0 0% 95%;
-    --primary: 38 92% 55%; /* Amber primary in dark */
-    --primary-foreground: 220 15% 8%;
+    --primary: 38 92% 54%; /* Amber primary in dark */
+    --primary-foreground: 0 0% 100%;
     --secondary: 220 15% 15%;
     --secondary-foreground: 0 0% 95%;
     --muted: 220 15% 15%;
@@ -338,15 +338,15 @@
     --accent-foreground: 0 0% 95%;
     --border: 220 15% 20%;
     --input: 220 15% 20%;
-    --ring: 38 92% 55%;
+    --ring: 38 92% 54%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
     --popover: 220 15% 12%;
     --popover-foreground: 0 0% 95%;
 
     /* Command Deck Dark - Deep space gradients */
-    --command-bg: linear-gradient(135deg, hsl(38 20% 12%), hsl(38 10% 8%));
-    --starship-accent: hsl(38 92% 55%);
+    --command-bg: linear-gradient(135deg, hsl(224 20% 12%), hsl(224 10% 8%));
+    --starship-accent: hsl(224 99% 58%);
     --primary-rgb: 245 158 11;
 
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
@@ -627,7 +627,7 @@
   --foreground: 0 0% 100%;
   --card: 220 15% 5%;
   --card-foreground: 0 0% 95%;
-  --primary: 38 92% 55%;
+  --primary: 38 92% 54%;
   --primary-foreground: 0 0% 0%;
   --secondary: 220 15% 10%;
   --secondary-foreground: 0 0% 95%;
@@ -637,7 +637,7 @@
   --accent-foreground: 0 0% 95%;
   --border: 220 15% 20%;
   --input: 220 15% 20%;
-  --ring: 38 92% 55%;
+  --ring: 38 92% 54%;
   --primary-rgb: 245 158 11;
 
   /* Ensure text color is applied */

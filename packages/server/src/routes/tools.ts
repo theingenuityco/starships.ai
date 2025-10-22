@@ -1,7 +1,9 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
+import { validateData } from '@/utils/validation';
+import { IdSchema, SlugSchema, PaginationSchema } from '@/schemas/common';
 import { ToolRepository, ToolTemplateRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
@@ -10,16 +12,6 @@ import { sendError, sendSuccess } from '../utils/responseHelpers';
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
-const SlugSchema = z
-  .string()
-  .min(1)
-  .max(100)
-  .regex(/^[a-z0-9-_]+$/, 'Invalid slug format');
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
 
 const CreateToolSchema = z
   .object({
@@ -85,30 +77,6 @@ const CreateToolTemplateSchema = z.object({
     .optional(),
 });
 
-// Helper function for Zod validation
-const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const firstError = error.issues[0];
-      const fieldName = firstError.path.join('.');
-
-      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
-        field: fieldName,
-        context,
-        validationErrors: error.issues.map((err) => ({
-          path: err.path.join('.'),
-          message: err.message,
-          code: err.code,
-        })),
-      });
-    } else {
-      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
-    }
-    return null;
-  }
-};
 
 // Balance validation middleware for tool operations
 const validateToolBalance = async (req: Request, res: Response, next: any) => {

@@ -4,29 +4,21 @@ import { LoginForm } from '@/components/auth/LoginForm'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
-import Link from 'next/link'
+import { Suspense, useState } from 'react'
+import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 
-export default function LoginPage() {
+function LoginContent() {
   const { isAuthenticated, isLoading } = useAuth()
-
-  // Redirect is handled by useAuth hook - no additional redirect logic needed
+  const [activeTab, setActiveTab] = useState('login')
 
   // Show loading state while checking authentication
   if (isLoading) {
-    return (
-      <StarTheme theme="light">
-        <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-          <div className="animate-pulse">
-            <div className="w-8 h-8 bg-primary/20 rounded-full mx-auto" />
-          </div>
-        </div>
-      </StarTheme>
-    )
+    return <AuthLoadingScreen message="Loading..." />
   }
 
-  // If already authenticated, don't show login form (redirect will happen in useEffect)
+  // If already authenticated, show redirecting state
   if (isAuthenticated) {
-    return null
+    return <AuthLoadingScreen message="Redirecting..." />
   }
 
   return (
@@ -38,20 +30,27 @@ export default function LoginPage() {
         <div className="relative z-10 w-full max-w-md px-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 text-center">
             <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-6">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">Welcome Back</h1>
-              <p className="text-muted-foreground mt-2">Continue your starship journey</p>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
+                {activeTab === 'login' ? 'Welcome Back' : 'Join Starships'}
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                {activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}
+              </p>
             </motion.div>
           </motion.div>
 
-          <LoginForm />
+          <LoginForm onTabChange={setActiveTab} />
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.6 }} className="mt-8 text-center">
-            <Link href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-              ← Back to home
-            </Link>
-          </motion.div>
         </div>
       </div>
     </StarTheme>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<AuthLoadingScreen />}>
+      <LoginContent />
+    </Suspense>
   )
 }

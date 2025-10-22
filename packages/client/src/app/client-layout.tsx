@@ -42,6 +42,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
   useAuth() // Keep the hook call but don't destructure unused values
   const isDashboard = pathname === '/'
+  const isPublicPage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
@@ -57,8 +58,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  if (isDashboard) {
-    // Landing page - no authentication required
+  if (isPublicPage) {
+    // Public pages - no authentication required
     return <div className="h-full w-full">{children}</div>
   }
 

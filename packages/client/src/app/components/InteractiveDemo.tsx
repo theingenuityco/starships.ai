@@ -49,6 +49,7 @@ export default function InteractiveDemo() {
           <div>
             <h2 className="text-3xl md:text-4xl font-semibold mb-2">Interactive demo</h2>
             <p className="text-muted-foreground">{scenarioLabel}</p>
+            <div className="text-xs text-white/60 mt-1">Simulated trace for illustration</div>
           </div>
           <div className="flex gap-2">
             <Button

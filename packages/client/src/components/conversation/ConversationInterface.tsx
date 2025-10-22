@@ -6,10 +6,14 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationStreamed, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
-import { agentAPI, toolAPI } from '@/lib/api'
+import api, { agentAPI, toolAPI } from '@/lib/api'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -62,8 +66,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
 
   // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId)
+  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId, { enabled: true })
   const prevStreamingRef = useRef(false)
+  const queryClient = useQueryClient()
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
@@ -72,11 +77,49 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Get agents data from starship and conversation
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
   const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
+  const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
+
+  // Cache of participants by conversation id (agents involved)
+  const [conversationParticipants, setConversationParticipants] = useState<Record<string, any[]>>({})
+
+  // Prefetch participants for top 5 recent conversations when on starter state
+  const prefetchRecentParticipants = useCallback(async () => {
+    try {
+      const list = starshipConversationsData?.conversations || []
+      if (!Array.isArray(list) || list.length === 0) return
+      const recent = list
+        .slice()
+        .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+        .slice(0, 3)
+      for (const conv of recent) {
+        const cid = conv?.id
+        if (!cid || conversationParticipants[cid]) continue
+        try {
+          const res = await api.get(`/api/v1/conversations/${cid}/messages`, { params: { limit: 1, page: 1 } })
+          const agents = (res as any)?.data?.data?.agents || []
+          if (Array.isArray(agents)) {
+            setConversationParticipants(prev => ({ ...prev, [cid]: agents }))
+          }
+        } catch {}
+      }
+    } catch {}
+  }, [starshipConversationsData, conversationParticipants])
+
+  // Kick off prefetch after showMessagesArea is computed
+  const shouldPrefetchParticipantsRef = useRef<boolean | null>(null)
 
   // Derive message presence and UI gating from streamed query (not store)
   const hasMessages = Array.isArray(liveMessages) && liveMessages.length > 0
   const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiStreaming)
+
+  useEffect(() => {
+    // Initialize ref after showMessagesArea is available
+    shouldPrefetchParticipantsRef.current = !showMessagesArea
+    if (shouldPrefetchParticipantsRef.current) {
+      void prefetchRecentParticipants()
+    }
+  }, [showMessagesArea, prefetchRecentParticipants])
 
   // Measure input container after showMessagesArea is known (prevents TS error and ensures correct layout)
   useEffect(() => {
@@ -115,13 +158,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     },
     [onConversationChange]
   )
-
-  // Handle suggestion click
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    if (messageInputRef.current?.handleSuggestionSubmit) {
-      messageInputRef.current.handleSuggestionSubmit(suggestion)
-    }
-  }, [])
 
   // Overlay disabled; keep a no-op for prop compatibility
   const handleToggleOverlay = useCallback(() => {}, [])
@@ -240,6 +276,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     router.push(`/ship/${starshipSlug}/tool/new${q}`)
   }, [router, starshipSlug, externalConversationId])
 
+  // Navigate/select recent conversation from starter state
+  const handleRecentConversationSelect = useCallback(
+    (conversationId: string) => {
+      try {
+        if (starshipSlug) {
+          router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(conversationId)}`)
+        }
+      } catch {}
+      setCurrentConversationId(conversationId)
+      onConversationChange?.(conversationId)
+    },
+    [router, starshipSlug, onConversationChange]
+  )
+
   // Removed manual agent builder toggle (route-based only)
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
@@ -255,11 +305,22 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Builders are route-based now; no in-place form updates
 
       switch (action) {
+        case 'conversation_title_updated': {
+          const cid = (payload as any)?.conversationId
+          try {
+            if (starshipId) {
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
+            }
+            if (cid) {
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+            }
+          } catch {}
+          break
+        }
         case 'tool_call_detected': {
           const toolName = (payload as any).toolName
           const toolCallId = (payload as any).toolCallId
 
-          console.log('🎯 Tool call detected:', { toolName, toolCallId })
 
           // Store tool call info for later completion handling
           if (toolCallId) {
@@ -278,7 +339,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             'tool-blueprint-remove-edge',
           ])
           if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
-            console.log('📂 Navigating to tool builder page for', toolName)
             try {
               const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
               const slug = starshipSlug
@@ -297,7 +357,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           // Navigate to agent builder for agent actions
           const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
           if (openAgentBuilderSlugs.has(toolName)) {
-            console.log('🌍 Navigating to agent builder page for', toolName)
             try {
               const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
               const slug = starshipSlug
@@ -332,7 +391,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Agent tools - fetch and sync agent data
         const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
         if (agentTools.includes(toolName) && toolArgs?.slug) {
-          console.log('🔄 Fetching agent after tool completion:', toolArgs.slug)
 
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
@@ -352,7 +410,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           'tool-blueprint-remove-edge',
         ]
         if (toolTools.includes(toolName) && toolArgs?.slug) {
-          console.log('🔄 Fetching tool after tool completion:', toolArgs.slug)
 
           // Fetch complete tool data by slug
           const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
@@ -531,7 +588,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="flex flex-col h-screen items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-            <Icon name="user" s className="w-8 h-8 text-muted-foreground" />
+            <Icon name="user" className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </div>
@@ -544,7 +601,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
-        <>
+        <ConversationStreamProvider conversationId={currentConversationId} starshipId={starshipId}>
           {/* Messages Area or Welcome Screen */}
           {showMessagesArea ? (
             <>
@@ -554,42 +611,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
-              {/* Welcome Section */}
-              <div className="text-center mb-8 max-w-2xl opacity-100">
-                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-              </div>
-
-              {/* Spacer for floating input */}
-              <div className="h-32 mb-8"></div>
-
-              {/* Suggestions */}
-              <div className="space-y-3 max-w-2xl w-full opacity-100">
-                {AGENT_SUGGESTIONS.map((suggestion, index) => (
-                  <button
-                    key={suggestion}
-                    className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                  >
-                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                      <Icon name="sparkles" className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
-                    </div>
-                    <span className="flex-1">{suggestion}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>
           )}
-        </>
+        </ConversationStreamProvider>
 
         {/* Floating Input Container - Always visible, position changes based on state */}
         <div
           ref={inputContainerRef}
           className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
-          style={{ bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)' }}
+          style={showMessagesArea ? { bottom: '0px' } : { top: '50%', transform: 'translateY(-50%)', marginTop: '-64px' }}
         >
           <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
+            {!showMessagesArea && (
+              <div className="text-center mb-6 opacity-100">
+                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+              </div>
+            )}
             <ConversationMessageInput
               ref={messageInputRef}
               selectedAgent={selectedAgent}
@@ -608,12 +646,57 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               budgetTokens={budgetTokens}
               onAgentChange={handleAgentChange}
             ></ConversationMessageInput>
+
+            {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
+              <div className="mt-8 opacity-100">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
+                <div className="space-y-1">
+                  {starshipConversationsData!.conversations
+                    .slice()
+                    .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+                    .slice(0, 3)
+                    .map((conv: any) => {
+                      const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
+                      const participants = conversationParticipants?.[conv?.id] || []
+                      return (
+                        <button
+                          key={conv.id}
+                          className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
+                          onClick={() => handleRecentConversationSelect(conv.id)}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
+                            <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
+                            {participants.length > 0 && (
+                              <div className="flex items-center gap-2 mt-1 min-w-0">
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {participants.slice(0, 3).map((agent: any) => (
+                                    <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
+                                      <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
+                                    </Avatar>
+                                  ))}
+                                </div>
+                                <span className="text-[12px] text-muted-foreground truncate">
+                                  {participants
+                                    .slice(0, 3)
+                                    .map((a: any) => a?.name || a?.slug || 'Agent')
+                                    .join(', ')}
+                                </span>
+                                {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
-
-// Suggestion examples
-const AGENT_SUGGESTIONS = ['Help me plan a project timeline with milestones', 'Analyze this data set and find patterns', 'Write code for a responsive navigation component']

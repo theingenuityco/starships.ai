@@ -2,7 +2,7 @@ import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM } from '@starships/autopilot';
 import type {
   ToolParams,
   ExecutionItem,
@@ -168,11 +168,7 @@ export class ConversationService {
   /**
    * Get messages for a conversation
    */
-  async getConversationMessages(
-    conversationId: string,
-    orderBy: 'createdAt' = 'createdAt',
-    orderDirection: 'asc' | 'desc' = 'asc'
-  ): Promise<MessageModel[]> {
+  async getConversationMessages(conversationId: string, orderDirection: 'asc' | 'desc' = 'asc'): Promise<MessageModel[]> {
     return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
   }
 
@@ -260,6 +256,42 @@ export class ConversationService {
       await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
     }
 
+    // Attempt early title generation before agent gating (so missing agent link doesn't block title updates)
+    try {
+      const convo = await this.getConversationById(data.conversationId);
+      if (convo) {
+        const t = (convo.title || '').trim().toLowerCase();
+        const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
+        console.log('[TITLE] Early check:', {
+          conversationId: convo.id,
+          currentTitle: convo.title,
+          needsTitle: needs,
+          contentPreview: String(data.content || '').slice(0, 80),
+        });
+        if (needs) {
+          const star = await this.getConversationStarship(data.conversationId);
+          if (star) {
+            const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
+            if (gen && gen.trim()) {
+              await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
+              console.log('[TITLE] Updated conversation title:', { conversationId: convo.id, title: gen.trim() });
+              if (this.streamingService && this.streamingService.isActive(convo.id)) {
+                await this.streamingService.broadcastUIAction(convo.id, {
+                  __ui_action: 'conversation_title_updated',
+                  conversationId: convo.id,
+                  title: gen.trim(),
+                });
+              }
+            } else {
+              console.warn('[TITLE] Generation returned empty title');
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[TITLE] Early generation failed:', err);
+    }
+
     const conversationAgents = await this.getConversationAgents(data.conversationId);
     if (conversationAgents.length < 1) {
       throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
@@ -289,6 +321,8 @@ export class ConversationService {
     if (!conversation) {
       throw new NotFoundError('Conversation', data.conversationId);
     }
+
+    // (late title generation block removed; handled early)
 
     // Get conversation messages from database
     let messages = await this.getConversationMessages(data.conversationId);
@@ -426,6 +460,111 @@ export class ConversationService {
     }
   }
 
+  /**
+   * Generate a short, descriptive conversation title using a lightweight LLM (autopilot LLM node)
+   * Records usage under the starship/conversation for billing.
+   */
+  private async generateConversationTitle(starshipId: string, conversationId: string, userContent: string): Promise<string | null> {
+    try {
+      const env = getEnvConfig();
+      const openRouterKey = env.OPENROUTER_API_KEY || '';
+      if (!openRouterKey) {
+        console.warn('[TITLE] OPENROUTER_API_KEY missing; skipping title generation');
+        return null;
+      }
+
+      // Hardcode a known, reliable OpenRouter model for titles
+      const model = 'openai/gpt-4o-mini';
+
+      const sys = [
+        'You generate concise, helpful conversation titles.',
+        'Rules:',
+        '- 4-8 words, sentence case, no trailing punctuation.',
+        '- Capture the main user intent/topic from the first message.',
+        '- Avoid quotes, emojis, and personal data. Keep under 60 characters.',
+      ].join('\n');
+
+      const prompt = `User message: "${String(userContent || '')
+        .replace(/\n+/g, ' ')
+        .slice(0, 400)}"\n\nReturn only the title text.`;
+
+      // Use autopilot LLM node directly (no runner/engine). Secure env provides API key.
+      const llm = new LLM(
+        {
+          model,
+          messages: [
+            { role: 'system' as const, content: sys },
+            { role: 'user' as const, content: prompt },
+          ],
+          temperature: 0.3,
+          maxTokens: 32,
+        },
+        { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
+      );
+      console.log('[TITLE] Using model:', model);
+      const items = await llm.execute();
+      const res = (items?.[0]?.json || {}) as {
+        model?: string;
+        usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cost?: number };
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      const choice = res?.choices?.[0]?.message?.content || '';
+      const usage = res?.usage || null;
+      const modelUsed = res?.model || model;
+
+      // Record usage if provided by LLM (camelCase fields)
+      try {
+        if (usage && typeof usage.totalTokens === 'number') {
+          await this.usageService
+            .createUsageForTurn({
+              starshipId,
+              conversationId,
+              promptTokens: Number(usage.promptTokens ?? 0),
+              completionTokens: Number(usage.completionTokens ?? 0),
+              totalTokens: Number(usage.totalTokens ?? 0),
+              cost: Number(usage.cost ?? 0),
+              model: String(modelUsed || model),
+            })
+            .then(async (row) => {
+              try {
+                await this.billingService.debitUsage(row);
+              } catch (err) {
+                console.warn('[TITLE] Billing debit failed:', err);
+              }
+            });
+        }
+      } catch (err) {
+        console.warn('[TITLE] Usage recording failed:', err);
+      }
+
+      // If model produced nothing, skip
+      if (!choice || String(choice).trim().length === 0) {
+        console.warn('[TITLE] Empty model response; skipping');
+        return null;
+      }
+
+      // Sanitize and trim the title
+      const title = String(choice || '')
+        .trim()
+        .replace(/^"|"$/g, '');
+      if (!title) {
+        console.warn('[TITLE] Title empty after sanitize; skipping');
+        return null;
+      }
+      // Remove trailing punctuation like '.' or ':'
+      const cleaned = title.replace(/[\s:。.]+$/g, '');
+      if (!cleaned) {
+        console.warn('[TITLE] Title empty after cleanup; skipping');
+        return null;
+      }
+      return cleaned.slice(0, 80);
+    } catch (e) {
+      console.warn('[TITLE] Generation error:', e instanceof Error ? e.message : e);
+      return null;
+    }
+  }
+
   /** Extract @mentions from text and resolve against available conversation agents */
   private extractMentionedAgents(text: string, availableAgents: AgentModel[]): AgentModel[] {
     try {
@@ -444,8 +583,8 @@ export class ConversationService {
       const entries: Entry[] = availableAgents.map((a) => ({
         id: a.id,
         agent: a,
-        nameKey: normalize((a as any).name || ''),
-        slugKey: normalize((a as any).slug || ''),
+        nameKey: normalize((a as { name?: string }).name || ''),
+        slugKey: normalize((a as { slug?: string }).slug || ''),
       }));
 
       let m: RegExpExecArray | null;
@@ -508,11 +647,7 @@ export class ConversationService {
         }
       }
       if (resolvedLog.length > 0) {
-        try {
-          console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
-        } catch {
-          void 0;
-        }
+        console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
       }
       return out;
     } catch {
@@ -579,16 +714,33 @@ export class ConversationService {
         const chunkContent = (event as LLMEvent).data?.chunk;
 
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
-          const choice0: any = chunkContent.choices[0] || {};
-          const delta: any = choice0?.delta || {};
-          const messageNode: any = choice0?.message || {};
+          type ChoiceNode = {
+            delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
+            message?: {
+              content?: unknown;
+              toolCalls?: unknown[];
+              reasoning?: unknown;
+              reasoning_details?: unknown;
+            };
+          };
+          const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
+          const delta = choice0.delta ?? {};
+          const messageNode = choice0.message ?? {};
 
-          const contentFromDelta = typeof delta?.content === 'string' ? delta.content : '';
-          const contentFromMessage = typeof messageNode?.content === 'string' ? messageNode.content : '';
+          const contentFromDelta =
+            typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
+          const contentFromMessage =
+            typeof (messageNode as { content?: unknown }).content === 'string'
+              ? ((messageNode as { content?: unknown }).content as string)
+              : '';
           const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
 
-          const toolCallsFromDelta: any[] = Array.isArray(delta?.toolCalls) ? delta.toolCalls : [];
-          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.toolCalls) ? messageNode.toolCalls : [];
+          const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
+            ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
+            : [];
+          const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
+            ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
+            : [];
           const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
           // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
@@ -811,7 +963,8 @@ export class ConversationService {
               if (toolCallsFromDelta.length > 0) {
                 const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
 
-                for (const rawTc of toolCallsFromDelta as any[]) {
+                for (const raw of toolCallsFromDelta) {
+                  const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
                   const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
 
                   // Ensure slot only for the referenced index; do not pre-fill earlier indices
@@ -825,7 +978,7 @@ export class ConversationService {
 
                   // Accumulate arguments as string, parse later when complete
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    target.function.arguments = (target.function.arguments as string) + rawTc.function.arguments;
+                    target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
                   }
                 }
 
@@ -869,8 +1022,9 @@ export class ConversationService {
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot toolCalls from message node (no incremental indices)
                 // Parse arguments using partial-json for robustness
-                const normalized: LlmToolCall[] = toolCallsFromMessage.map((tc: any) => {
-                  const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
+                  const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
+                  const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
                   let argsObj: unknown = {};
                   if (argsStr) {
                     try {
@@ -887,7 +1041,7 @@ export class ConversationService {
                     id: tc?.id,
                     type: 'function' as const,
                     function: {
-                      name: tc?.function?.name,
+                      name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
                       arguments: argsObj, // Store as parsed object for UI
                     },
                   };
@@ -917,7 +1071,7 @@ export class ConversationService {
                   value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
                 });
               }
-            } catch (e) {
+            } catch {
               // ignore toolCall parse errors to avoid breaking streaming
             }
           }
@@ -969,7 +1123,10 @@ export class ConversationService {
                 await this.billingService.debitUsage(usageRow);
               } catch (e) {
                 // Prepaid policy: decline and log; do not break streaming UX
-                if (e instanceof InsufficientFundsError || (e as any)?.code === 'INSUFFICIENT_FUNDS') {
+                if (
+                  e instanceof InsufficientFundsError ||
+                  (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: unknown }).code === 'INSUFFICIENT_FUNDS')
+                ) {
                   console.warn('[BILLING] Insufficient funds for usage debit', {
                     starshipId: starship.id,
                     conversationId,
@@ -1041,21 +1198,17 @@ export class ConversationService {
       }
 
       case 'node_failed': {
-        try {
-          const execEvent = event as ExecutionEvent;
-          const execution: Execution | undefined = execEvent?.data?.execution;
-          const nodeRef = execution?.currentNodeRef;
-          console.error('[STREAMING] Node failed', {
-            nodeRef,
-            depth: execEvent.executionDepth,
-          });
-          // Print execution snapshot for diagnosis
-          console.error('[STREAMING] Execution snapshot (node_failed)', {
-            results: execution?.results[0].items[0],
-          });
-        } catch (e) {
-          console.error('[STREAMING] Node failed (logging error):', e);
-        }
+        const execEvent = event as ExecutionEvent;
+        const execution: Execution | undefined = execEvent?.data?.execution;
+        const nodeRef = execution?.currentNodeRef;
+        console.error('[STREAMING] Node failed', {
+          nodeRef,
+          depth: execEvent.executionDepth,
+        });
+        // Print execution snapshot for diagnosis
+        console.error('[STREAMING] Execution snapshot (node_failed)', {
+          results: execution?.results?.[0]?.items?.[0],
+        });
         break;
       }
 
@@ -1068,19 +1221,24 @@ export class ConversationService {
           const results = Array.isArray(execution?.results) ? execution.results : [];
 
           // Walk results from the end to find a JSON payload that declares a UI action
-          let uiPayload: any = null;
+          type UIPayload = { __ui_action: string } & Record<string, unknown>;
+          let uiPayload: UIPayload | null = null;
           for (let i = results.length - 1; i >= 0 && !uiPayload; i--) {
             const items = Array.isArray(results[i]?.items) ? results[i].items : [];
             for (let j = items.length - 1; j >= 0 && !uiPayload; j--) {
               const json = items[j]?.json && typeof items[j].json === 'object' ? items[j].json : null;
               if (!json) continue;
-              if (json && (json as any).__ui_action) {
-                uiPayload = json;
+              if (json && typeof (json as Record<string, unknown>).__ui_action === 'string') {
+                uiPayload = json as UIPayload;
                 break;
               }
-              const maybeResult = (json as any)?.result;
-              if (maybeResult && typeof maybeResult === 'object' && (maybeResult as any).__ui_action) {
-                uiPayload = maybeResult;
+              const maybeResult = (json as Record<string, unknown>)['result'] as unknown;
+              if (
+                maybeResult &&
+                typeof maybeResult === 'object' &&
+                typeof (maybeResult as Record<string, unknown>).__ui_action === 'string'
+              ) {
+                uiPayload = maybeResult as UIPayload;
                 break;
               }
             }
@@ -1196,11 +1354,12 @@ export class ConversationService {
                   try {
                     const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
                     const svc = ResumeTokenService.getInstance();
+                    const persistedId = (persistedMsg as { id?: unknown }).id;
                     const token = svc.sign({
                       c: conversationId,
                       g: this.generationId.get(conversationId) || 'g',
                       p: this.accumulatedLength.get(conversationId) || 0,
-                      m: String((persistedMsg as any).id || '0'),
+                      m: String(typeof persistedId === 'string' || typeof persistedId === 'number' ? persistedId : '0'),
                       exp: Math.floor(Date.now() / 1000) + 600,
                     });
                     this.streamingService.sendResumeToken(conversationId, token);

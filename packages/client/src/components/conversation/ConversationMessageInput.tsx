@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
+import { useCreateConversation, useConversationStreamed, useConversationStop } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
@@ -116,6 +116,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const streamCtx = useConversationStreamContextOptional()
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
     const { sendMessage: sendMessageFn, isSending, isResponding } = streamCtx ?? fallbackStream
+    const stopConversation = useConversationStop()
     const isStreamingEffective = isResponding
 
     // Usage and context control
@@ -1358,19 +1359,36 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <EditorContent editor={tiptap} />
             </div>
 
-            {/* Bottom-right Send Button */}
-            <div className={cn('absolute', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
-              <Button
-                onClick={handleSubmit}
-                disabled={!canSend}
-                size="icon"
-                className={cn(
-                  'h-8 w-8 rounded-full shrink-0 transition-all',
-                  canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
-                )}
-              >
-                {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
-              </Button>
+            {/* Bottom-right Actions: Stop (when streaming) or Send */}
+            <div className={cn('absolute flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
+              {isStreamingEffective ? (
+                <Button
+                  onClick={() => {
+                    if (!conversationId) return
+                    void stopConversation(conversationId)
+                  }}
+                  size="icon"
+                  className={cn('h-8 w-8 rounded-full shrink-0 transition-all bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg hover:shadow-xl')}
+                  aria-label="Stop response"
+                  title="Stop response"
+                >
+                  <Icon name="square" className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!canSend}
+                  size="icon"
+                  className={cn(
+                    'h-8 w-8 rounded-full shrink-0 transition-all',
+                    canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  )}
+                  aria-label="Send"
+                  title="Send"
+                >
+                  {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           </div>
         </div>

@@ -252,6 +252,36 @@ export function useUpdateConversationStatus() {
   })
 }
 
+// Stop an in-flight streamed conversation turn across layers
+export function useConversationStop() {
+  const queryClient = useQueryClient()
+
+  return useCallback(
+    async (conversationId: string) => {
+      if (!conversationId) return
+      try {
+        // Abort SSE locally
+        await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } catch {}
+
+      try {
+        // Signal server to persist partials and cancel autopilot
+        await api.post(`/api/v1/conversations/${conversationId}/stop`)
+      } catch (error: any) {
+        const msg = error?.response?.data?.error || error?.message || 'Failed to stop'
+        toast.error('Failed to stop response', { description: msg })
+        return
+      }
+
+      try {
+        // Refresh messages to reflect finalized state if stream was already closed
+        await queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } catch {}
+    },
+    [queryClient]
+  )
+}
+
 // --- StreamedQuery-based conversation hook (experimental) ---
 import { experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
 

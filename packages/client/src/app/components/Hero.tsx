@@ -219,13 +219,13 @@ export default function Hero() {
             filter: blur(0);
           }
           45% {
-            filter: blur(0.8px);
-          }
-          50% {
             filter: blur(1.6px);
           }
+          50% {
+            filter: blur(3px);
+          }
           55% {
-            filter: blur(0.8px);
+            filter: blur(1.6px);
           }
         }
 

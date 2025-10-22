@@ -48,6 +48,8 @@ export class ConversationService {
   private agentRepository: AgentRepository;
   private messageService: MessageService;
   private streamingService: StreamingService;
+  // Track active runner cancellation handles per conversation
+  private static activeCancellations: Map<string, () => void> = new Map();
   private environmentService: EnvironmentService;
   private usageService: UsageService;
   private billingService: BillingService;
@@ -401,7 +403,28 @@ export class ConversationService {
         });
 
         const baselineCount = messages.length;
-        await agent.execute(input);
+        // Execute with cancellation controller at top level (depth=0 implied inside Agent)
+        // Use ChildProcessRunner directly to capture cancel handle
+        const runner = this.defaultRunner;
+        const engineConfig = { eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event), secureEnv } as any;
+        const blueprint = agent.getCurrentBlueprint();
+        const exec = ExecutionItemUtils.createExecution();
+        // Seed execution state from agent
+        (exec.state as Record<string, unknown>)['messages'] = (agentWithTools.state as any)?.messages ?? [];
+        (exec.state as Record<string, unknown>)['tools'] = (agentWithTools.state as any)?.tools ?? [];
+
+        const ctl = (runner as any).runWithController?.(blueprint, exec, engineConfig);
+        if (ctl && typeof ctl.cancel === 'function') {
+          ConversationService.activeCancellations.set(data.conversationId, ctl.cancel);
+          try {
+            await ctl.promise;
+          } finally {
+            ConversationService.activeCancellations.delete(data.conversationId);
+          }
+        } else {
+          // Fallback: no controller available
+          await runner.run(blueprint, exec, engineConfig as any);
+        }
 
         // Refresh messages after this agent's turn and discover mentions in new assistant messages
         const after = await this.getConversationMessages(data.conversationId);
@@ -458,6 +481,66 @@ export class ConversationService {
         });
       }
     }
+  }
+
+  /**
+   * Stop current turn: cancel runner, persist partial content/reasoning (omit tool_calls), finalize SSE.
+   */
+  async stopConversation(conversationId: string): Promise<void> {
+    // Cancel active runner if any
+    try {
+      const cancel = ConversationService.activeCancellations.get(conversationId);
+      if (typeof cancel === 'function') {
+        try {
+          cancel();
+        } catch {}
+        ConversationService.activeCancellations.delete(conversationId);
+      }
+    } catch {}
+
+    // Persist partials if available
+    const partialContent = this.streamingContent.get(conversationId) || '';
+    const partialReasoning = this.streamingReasoning.get(conversationId) || '';
+
+    let persistedMsg: MessageModel | null = null;
+    if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
+      const agentId = this.currentAgentForConversation.get(conversationId) || undefined;
+      persistedMsg = await this.messageService.createMessage({
+        conversationId,
+        role: 'assistant',
+        content: partialContent || '',
+        messageType: 'agent_response',
+        ...(partialReasoning ? { reasoning: partialReasoning } : {}),
+        ...(agentId ? ({ agentId } as any) : {}),
+      });
+    }
+
+    // Finalize stream on SSE
+    if (this.streamingService && this.streamingService.isActive(conversationId)) {
+      try {
+        if (persistedMsg) {
+          await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persistedMsg });
+        }
+        await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
+      } catch {}
+      try {
+        await this.streamingService.broadcastComplete(conversationId, {
+          source: 'agent',
+          content: 'Turn stopped by user',
+          agentId: 'agent',
+          scope: 'workflow',
+          conversationId,
+        });
+      } catch {}
+      try {
+        this.streamingService.closeConnection(conversationId);
+      } catch {}
+    }
+
+    // Clear accumulators
+    this.streamingContent.delete(conversationId);
+    this.streamingToolCalls.delete(conversationId);
+    this.streamingReasoning.delete(conversationId);
   }
 
   /**

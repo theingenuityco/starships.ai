@@ -28,7 +28,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   const isLoading = false
   const error: any = null
   const ctx = useConversationStreamContextOptional()
-  const { messages, isResponding: isRespondingHook } = ctx ?? useConversationStreamed(conversationId, undefined, { enabled: true })
+  const fallbackStream = useConversationStreamed(conversationId, undefined, { enabled: !ctx })
+  const { messages, isResponding: isRespondingHook } = ctx ?? fallbackStream
 
   // Use stable selectors to avoid returning new objects each render
   // messages are sourced from useConversationStreamed(conversationId)

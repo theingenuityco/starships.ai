@@ -3,11 +3,11 @@
 import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm'
 import { StarTheme } from '@/components/theme-context'
 import { motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [token, setToken] = useState<string | null>(null)
@@ -70,5 +70,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </StarTheme>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<AuthLoadingScreen message="Loading..." />}>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }

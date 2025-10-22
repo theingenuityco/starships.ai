@@ -7,13 +7,13 @@ export default function PricingTeaser() {
       <div className="max-w-6xl mx-auto">
         <Card className="p-6 bg-white/5 border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl md:text-3xl font-semibold mb-2">Pricing that scales with you</h2>
-            <p className="text-sm text-muted-foreground">Dev (free), Team, Enterprise. Start free, upgrade when ready.</p>
+            <h2 className="text-2xl md:text-3xl font-semibold mb-2">Get started</h2>
+            <p className="text-sm text-muted-foreground">Use your own keys or environment. Contact us for billing.</p>
           </div>
           <div className="flex gap-3">
-            <Button onClick={() => (window.location.href = '/pricing')}>See pricing</Button>
-            <Button variant="outline" onClick={() => (window.location.href = '/signup')}>
-              Start free
+            <Button onClick={() => (window.location.href = '/login')}>Sign in</Button>
+            <Button variant="outline" onClick={() => (window.location.href = '/docs')}>
+              Read docs
             </Button>
           </div>
         </Card>

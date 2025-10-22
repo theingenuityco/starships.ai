@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useWallet } from '@/hooks/useWallet'
@@ -112,7 +113,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [selectedAgent])
 
     // Use streamedQuery-based conversation hook
-    const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null, starshipId)
+    const streamCtx = useConversationStreamContextOptional()
+    const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
+    const { sendMessage: sendMessageFn, isSending, isResponding } = streamCtx ?? fallbackStream
     const isStreamingEffective = isResponding
 
     // Usage and context control
@@ -124,8 +127,28 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
+    // Keep InlineHint extension enablement in sync even when props change post-init
+    const minimalRef = useRef(minimal)
+    const disabledRef = useRef(disabled)
+    const streamingRef = useRef(isStreamingEffective)
+    const sendingRef = useRef(sending)
+    useEffect(() => {
+      minimalRef.current = minimal
+    }, [minimal])
+    useEffect(() => {
+      disabledRef.current = disabled
+    }, [disabled])
+    useEffect(() => {
+      streamingRef.current = isStreamingEffective
+    }, [isStreamingEffective])
+    useEffect(() => {
+      sendingRef.current = sending
+    }, [sending])
+
     // Track whether TipTap Suggestion is active to gate Enter handling
     const isSuggestionActiveRef = useRef(false)
+    // Track editor focus to control overlay visibility/mode
+    const [isEditorFocused, setIsEditorFocused] = useState(false)
 
     // Consolidated focus management - handles all focus scenarios (moved below tiptap init)
 
@@ -1035,7 +1058,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }),
         InlineHintExtension.configure({
           getPrompts: () => promptsRef.current,
-          getEnabled: () => !minimal && !disabled && !isStreamingEffective && !sending,
+          getEnabled: () => !minimalRef.current && !disabledRef.current && !streamingRef.current && !sendingRef.current,
           typingSpeedMs: 35,
           pauseMs: 900,
           debug: true,
@@ -1047,7 +1070,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            minimal ? 'min-h-[36px] max-h-[120px]' : 'min-h-[80px] max-h-[260px]',
+            minimal ? 'min-h-[28px] max-h-[120px]' : 'min-h-[80px] max-h-[260px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             minimal && 'text-sm'
           ),
@@ -1094,6 +1117,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch {}
       },
     })
+
+    // Bridge editor focus/blur to parent callbacks for overlay control and local focus state
+    useEffect(() => {
+      if (!tiptap) return
+      const handleFocus = () => {
+        try {
+          setIsEditorFocused(true)
+          onFocus?.()
+        } catch {}
+      }
+      const handleBlur = () => {
+        try {
+          setIsEditorFocused(false)
+          onBlur?.()
+        } catch {}
+      }
+      try {
+        ;(tiptap as any).on?.('focus', handleFocus)
+        ;(tiptap as any).on?.('blur', handleBlur)
+      } catch {}
+      return () => {
+        try {
+          ;(tiptap as any).off?.('focus', handleFocus)
+        } catch {}
+        try {
+          ;(tiptap as any).off?.('blur', handleBlur)
+        } catch {}
+      }
+    }, [tiptap, onFocus, onBlur])
 
     // Ensure initial compute and position after editor mounts and when dependencies change
     useEffect(() => {
@@ -1286,9 +1338,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
         >
           {/* Expandable Message Overlay - Inside the input container */}
-          {showExpandableOverlay && conversationId && <ExpandableMessageOverlay isExpanded={isOverlayExpanded} conversationId={conversationId} starshipId={starshipId} budgetTokens={budgetTokens} />}
+          {showExpandableOverlay && conversationId && (
+            <ExpandableMessageOverlay
+              mode={isEditorFocused ? (isOverlayExpanded ? 'expanded' : 'semi') : 'collapsed'}
+              conversationId={conversationId}
+              starshipId={starshipId}
+              budgetTokens={budgetTokens}
+              onExpand={onToggleOverlay}
+              onToggle={onToggleOverlay}
+            />
+          )}
           {/* Main Input Section - Text input with bottom-right action */}
-          <div className={cn('flex relative', minimal ? 'items-center p-3' : 'items-center p-4')}>
+          <div className={cn('flex relative', minimal ? 'items-center p-2' : 'items-center p-4')}>
             {/* Optional left-side controls in expanded mode */}
             {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
@@ -1298,7 +1359,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
 
             {/* Bottom-right Send Button */}
-            <div className={cn('absolute', minimal ? 'bottom-3 right-3' : 'bottom-4 right-4')}>
+            <div className={cn('absolute', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
               <Button
                 onClick={handleSubmit}
                 disabled={!canSend}

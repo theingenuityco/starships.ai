@@ -115,9 +115,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Use streamedQuery-based conversation hook
     const streamCtx = useConversationStreamContextOptional()
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
-    const { sendMessage: sendMessageFn, isSending, isResponding } = streamCtx ?? fallbackStream
+    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isFetching } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
-    const isStreamingEffective = isResponding
+    const isStreamingEffective = Boolean(isAssistantStreaming && isFetching)
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)

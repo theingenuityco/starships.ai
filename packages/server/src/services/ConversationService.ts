@@ -64,6 +64,22 @@ export class ConversationService {
   private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
+  /**
+   * Compute a non-overlapping append by trimming any prefix of 'fragment' that
+   * already exists as a suffix of 'base'. This guards against providers that
+   * re-send overlapping chunks (delta + snapshot or resume replays).
+   */
+  private static computeNonOverlappingAppend(base: string, fragment: string): string {
+    if (!fragment) return '';
+    const maxCheck = Math.min(base.length, fragment.length);
+    for (let k = maxCheck; k > 0; k--) {
+      if (base.endsWith(fragment.slice(0, k))) {
+        return fragment.slice(k);
+      }
+    }
+    // No overlap; append entire fragment
+    return fragment;
+  }
   // Track last persisted message index to avoid re-persisting on workflow loops
   private lastPersistedIndex: Map<string, number> = new Map();
   // Suppress broadcasting 'complete' for conversations during multi-agent orchestration
@@ -499,8 +515,24 @@ export class ConversationService {
     } catch {}
 
     // Persist partials if available
-    const partialContent = this.streamingContent.get(conversationId) || '';
+    let partialContent = this.streamingContent.get(conversationId) || '';
     const partialReasoning = this.streamingReasoning.get(conversationId) || '';
+
+    // Fallback: if streamingContent was not populated (e.g., only snapshot/replays), rebuild from ringBuffer
+    if (!partialContent || partialContent.length === 0) {
+      try {
+        const rb = this.ringBuffer.get(conversationId) || [];
+        if (Array.isArray(rb) && rb.length > 0) {
+          const sorted = [...rb].sort((a, b) => Number(a.position) - Number(b.position));
+          let agg = '';
+          for (const item of sorted) {
+            const frag = typeof item.content === 'string' ? item.content : '';
+            agg += ConversationService.computeNonOverlappingAppend(agg, frag);
+          }
+          partialContent = agg;
+        }
+      } catch {}
+    }
 
     let persistedMsg: MessageModel | null = null;
     if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
@@ -963,46 +995,53 @@ export class ConversationService {
             if (incremental) {
               append = incremental;
             } else if (snapshot) {
-              append = snapshot.slice(currentLength);
+              // Prefer using the whole snapshot with non-overlap normalization
+              append = ConversationService.computeNonOverlappingAppend(currentContent, snapshot);
             }
 
             if (append) {
-              const newContent = currentContent + append;
-              this.streamingContent.set(conversationId, newContent);
-              const newLen = (this.accumulatedLength.get(conversationId) || 0) + append.length;
-              this.accumulatedLength.set(conversationId, newLen);
-              const rb = this.ringBuffer.get(conversationId) || [];
-              rb.push({ position: currentLength, content: append, ts: Date.now() });
-              if (rb.length > 200) rb.splice(0, rb.length - 200);
-              this.ringBuffer.set(conversationId, rb);
+              // Normalize to avoid duplicated overlaps (delta + snapshot or replays)
+              const normalized = ConversationService.computeNonOverlappingAppend(currentContent, append);
+              if (normalized.length === 0) {
+                // Nothing new to append
+              } else {
+                const newContent = currentContent + normalized;
+                this.streamingContent.set(conversationId, newContent);
+                const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
+                this.accumulatedLength.set(conversationId, newLen);
+                const rb = this.ringBuffer.get(conversationId) || [];
+                rb.push({ position: currentLength, content: normalized, ts: Date.now() });
+                if (rb.length > 200) rb.splice(0, rb.length - 200);
+                this.ringBuffer.set(conversationId, rb);
 
-              // Stream delta chunk as JSON Patch add into chunks array
-              const chunkDelta: Operation = {
-                op: 'add',
-                path: '/messages/-1/chunks/-',
-                value: {
-                  content: append,
-                  position: currentLength,
-                  timestamp: Date.now(),
-                },
-              };
-              await this.streamingService.broadcastDelta(conversationId, chunkDelta);
-              // Periodically emit resume token (every ~2s)
-              try {
-                if (Math.random() < 0.15) {
-                  const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                  const svc = ResumeTokenService.getInstance();
-                  const token = svc.sign({
-                    c: conversationId,
-                    g: this.generationId.get(conversationId) || 'g',
-                    p: newLen,
-                    m: '0',
-                    exp: Math.floor(Date.now() / 1000) + 600,
-                  });
-                  this.streamingService.sendResumeToken(conversationId, token);
+                // Stream delta chunk as JSON Patch add into chunks array
+                const chunkDelta: Operation = {
+                  op: 'add',
+                  path: '/messages/-1/chunks/-',
+                  value: {
+                    content: normalized,
+                    position: currentLength,
+                    timestamp: Date.now(),
+                  },
+                };
+                await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+                // Periodically emit resume token (every ~2s)
+                try {
+                  if (Math.random() < 0.15) {
+                    const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                    const svc = ResumeTokenService.getInstance();
+                    const token = svc.sign({
+                      c: conversationId,
+                      g: this.generationId.get(conversationId) || 'g',
+                      p: newLen,
+                      m: '0',
+                      exp: Math.floor(Date.now() / 1000) + 600,
+                    });
+                    this.streamingService.sendResumeToken(conversationId, token);
+                  }
+                } catch {
+                  /* non-fatal: periodic resume token emission failed */
                 }
-              } catch {
-                /* non-fatal: periodic resume token emission failed */
               }
             }
           }
@@ -1019,24 +1058,27 @@ export class ConversationService {
             if (incrementalR) {
               appendR = incrementalR;
             } else if (snapshotR) {
-              appendR = snapshotR.slice(currentRLength);
+              appendR = ConversationService.computeNonOverlappingAppend(currentR, snapshotR);
             }
 
             if (appendR) {
-              const newR = currentR + appendR;
-              this.streamingReasoning.set(conversationId, newR);
+              const normalizedR = ConversationService.computeNonOverlappingAppend(currentR, appendR);
+              if (normalizedR.length > 0) {
+                const newR = currentR + normalizedR;
+                this.streamingReasoning.set(conversationId, newR);
 
-              // Stream delta chunk for reasoning
-              const rChunkDelta: Operation = {
-                op: 'add',
-                path: '/messages/-1/reasoningChunks/-',
-                value: {
-                  content: appendR,
-                  position: currentRLength,
-                  timestamp: Date.now(),
-                },
-              };
-              await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
+                // Stream delta chunk for reasoning
+                const rChunkDelta: Operation = {
+                  op: 'add',
+                  path: '/messages/-1/reasoningChunks/-',
+                  value: {
+                    content: normalizedR,
+                    position: currentRLength,
+                    timestamp: Date.now(),
+                  },
+                };
+                await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
+              }
             }
           }
 

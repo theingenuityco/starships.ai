@@ -1,0 +1,437 @@
+---
+title: Gaia - Agent Creator
+description: The meta-agent that creates specialized business and operational agents through natural conversation
+icon: Globe
+---
+
+import { Globe, MessageSquare, Settings, CheckCircle, Wrench, Bot, Workflow } from 'lucide-react';
+
+# Gaia - Agent Creator
+
+The conversational AI specialist that creates and configures other agents on your starship. Gaia transforms your business requirements into working AI assistants through natural language interaction.
+
+<Callout type="success">
+  **Gaia's Specialty**: Creating agents that understand your business domain, have the right tools, and work exactly how you need them to.
+</Callout>
+
+## What Makes Gaia Special
+
+Unlike general-purpose AI assistants, Gaia is a **meta-agent** - an AI that specializes in building other AIs. Gaia understands:
+
+- **Agent Architecture**: How to structure agents for optimal performance
+- **Tool Selection**: Which capabilities each agent needs
+- **Business Context**: How to translate requirements into agent configurations
+- **Best Practices**: Proven patterns for successful agent deployment
+
+## When to Use Gaia
+
+<Tabs items={['Perfect For', 'Alternative Approaches']}>
+<Tab value="Perfect For">
+
+**Business Users Building Agents**:
+- "I need a customer support agent for our SaaS platform"
+- "Create an agent that processes invoices and handles approvals"
+- "Build a research assistant for market analysis"
+
+**Rapid Prototyping**:
+- Test agent concepts quickly
+- Iterate on agent capabilities
+- Get working prototypes in minutes
+
+**Domain-Specific Agents**:
+- Agents that need business context
+- Industry-specific knowledge requirements
+- Custom workflow integration
+
+**Team Collaboration**:
+- Multiple stakeholders providing input
+- Non-technical users defining requirements
+- Collaborative agent refinement
+
+</Tab>
+<Tab value="Alternative Approaches">
+
+**Use Code-First Instead When**:
+- You need version control integration
+- Complex custom integrations required  
+- Precise programmatic control needed
+- CI/CD pipeline integration
+
+**Use Templates Instead When**:
+- Standard, well-defined use cases
+- Consistent deployment across teams
+- Minimal customization needed
+- Rapid scaling requirements
+
+**Use Other Meta-Agents When**:
+- **Daedalus**: Building custom tools and workflows
+- **Sybil**: Navigation and coordination guidance
+
+</Tab>
+</Tabs>
+
+## How Gaia Creates Agents
+
+### Conversation-Driven Creation
+
+**Natural Language Requirements**:
+```
+You: "I need an agent that helps with customer onboarding"
+
+Gaia: "I'll create a customer onboarding agent. Let me ask a few questions:
+- What type of customers are you onboarding?
+- What systems should the agent access?
+- What's the typical onboarding workflow?"
+```
+
+**Progressive Refinement**:
+```
+You: "Actually, it should also handle billing questions"
+
+Gaia: "Adding billing capabilities. I'll assign these tools:
+- Customer lookup
+- Billing system integration  
+- Escalation workflows for complex billing issues
+Would you like me to configure specific billing scenarios?"
+```
+
+### Behind the Scenes: Gaia's Toolkit
+
+Gaia uses specialized tools to create and configure agents:
+
+<Accordions>
+  <Accordion title="🔧 Agent Management Tools">
+    **Core Agent Operations**:
+    - **`agent-open`**: Creates new agent drafts or opens existing agents for editing
+    - **`agent-edit`**: Modifies agent configuration, system prompts, and behavioral settings
+    - **`agent-test`**: Runs validation scenarios to ensure agent works correctly
+    - **`agent-list`**: Discovers existing agents to avoid duplicates and enable reuse
+    - **`agent-get`**: Retrieves complete agent details and configuration for analysis
+
+    **How Gaia Uses These**:
+    - Creates agent structure based on your requirements
+    - Iteratively refines configuration through conversation
+    - Validates functionality before deployment
+  </Accordion>
+
+  <Accordion title="🛠️ Tool Assignment & Discovery">
+    **Tool Management**:
+    - **`agent-assign-tool`**: Adds specific capabilities to agents
+    - **`agent-unassign-tool`**: Removes tools that aren't needed
+    - **`tool-list`**: Discovers all available tools and capabilities
+    
+    **Strategic Assignment**:
+    - Matches tools to agent requirements automatically
+    - Suggests additional capabilities based on use case
+    - Optimizes tool selection for performance and cost
+    - Prevents tool conflicts and overlaps
+
+    **Example Tool Assignment Logic**:
+    ```
+    Customer Support Agent Requirements → 
+    Gaia Assigns: knowledge-base-search, ticket-creation, user-lookup, escalation-routing
+    Gaia Suggests: sentiment-analysis, automated-responses
+    ```
+  </Accordion>
+
+  <Accordion title="🏗️ Blueprint & Workflow Design">
+    **Workflow Validation**:
+    - **`blueprint-lint`**: Validates workflow structure and node connectivity
+    - **`blueprint-examples`**: Accesses proven workflow patterns
+    - **`node-schema`**: Gets exact parameter requirements for workflow nodes
+    
+    **Quality Assurance**:
+    - Ensures agents have reliable, production-ready workflows
+    - Validates all workflow paths and error handling
+    - Optimizes workflow efficiency and performance
+    - Implements best practices automatically
+
+    **Workflow Pattern Matching**:
+    ```
+    User Requirement: "Process documents and send alerts"
+    Gaia Applies: File Processing → Analysis → Conditional → Notification
+    Validation: Checks all paths, error handling, timeout settings
+    ```
+  </Accordion>
+</Accordions>
+
+## Gaia Creation Examples
+
+<Tabs items={['Support Agent', 'Processing Agent', 'Research Agent']}>
+<Tab value="Support Agent">
+
+### Customer Support Agent Creation
+
+**User Request**:
+> "Create a support agent for our project management software"
+
+**Gaia's Process**:
+
+1. **Requirement Analysis**:
+   ```
+   Gaia: "I'll create a support agent. What are the main support issues?"
+   User: "Login problems, feature questions, bug reports"
+   ```
+
+2. **Tool Selection**:
+   ```
+   Gaia assigns:
+   - knowledge-base-search (for feature questions)
+   - user-lookup (for login issues)  
+   - ticket-creation (for bug reports)
+   - escalation-routing (for complex issues)
+   ```
+
+3. **Personality Configuration**:
+   ```
+   System prompt: "You are a helpful support specialist for ProjectFlow. 
+   Be friendly, patient, and thorough. Always check the knowledge base 
+   first, then escalate complex technical issues to human support."
+   ```
+
+4. **Testing & Validation**:
+   ```
+   Gaia tests scenarios:
+   ✓ Password reset request
+   ✓ Feature explanation request  
+   ✓ Bug report submission
+   ✓ Escalation trigger
+   ```
+
+**Result**: 24/7 support agent that handles 80% of common questions automatically.
+
+</Tab>
+<Tab value="Processing Agent">
+
+### Invoice Processing Agent Creation
+
+**User Request**:
+> "Build an agent that processes invoices and handles approvals"
+
+**Gaia's Process**:
+
+1. **Workflow Design**:
+   ```
+   Gaia: "What's your approval workflow?"
+   User: "Small invoices auto-approve, large ones need manager approval"
+   ```
+
+2. **Integration Setup**:
+   ```
+   Gaia configures:
+   - file-processing (PDF/Excel invoice reading)
+   - data-extraction (amount, vendor, details)
+   - approval-routing (based on amount thresholds)
+   - notification-system (status updates)
+   ```
+
+3. **Business Logic**:
+   ```
+   Workflow: Upload → Extract → Validate → Route → Notify
+   Rules: <$500 auto-approve, >$500 manager approval, >$5000 finance approval
+   ```
+
+4. **Error Handling**:
+   ```
+   Gaia adds:
+   - Invalid format detection
+   - Missing information flagging
+   - Escalation for manual review
+   - Audit trail logging
+   ```
+
+**Result**: Automated invoice processing reducing manual work by 90%.
+
+</Tab>
+<Tab value="Research Agent">
+
+### Market Research Agent Creation
+
+**User Request**:
+> "I need an agent that researches market trends and generates reports"
+
+**Gaia's Process**:
+
+1. **Research Scope**:
+   ```
+   Gaia: "What markets should I research?"
+   User: "SaaS productivity tools, competitor analysis, pricing trends"
+   ```
+
+2. **Capability Assignment**:
+   ```
+   Gaia assigns:
+   - web-search (market data gathering)
+   - data-analysis (trend identification)
+   - report-generation (structured output)
+   - visualization (charts and graphs)
+   ```
+
+3. **Report Structure**:
+   ```
+   Template: Executive Summary → Key Trends → Competitor Analysis → 
+            Pricing Insights → Recommendations → Data Sources
+   ```
+
+4. **Automation Setup**:
+   ```
+   Schedule: Weekly reports every Monday
+   Distribution: Email to marketing team
+   Format: PDF + slide deck
+   ```
+
+**Result**: Weekly market intelligence reports generated automatically.
+
+</Tab>
+</Tabs>
+
+## Gaia Best Practices
+
+### Effective Communication with Gaia
+
+**Be Specific About Requirements**:
+```
+❌ "Create a support agent"
+✅ "Create a support agent for our SaaS product that handles login issues, 
+   feature questions, and routes complex bugs to human support"
+```
+
+**Provide Business Context**:
+```
+❌ "Make it friendly"
+✅ "Use a professional but approachable tone, similar to our current 
+   support team's communication style"
+```
+
+**Define Success Metrics**:
+```
+❌ "Make it work well"
+✅ "Target 80% resolution rate with <2 minute response time, 
+   escalate when confidence is low"
+```
+
+### Iterative Improvement
+
+**Start Simple, Expand Gradually**:
+1. **Version 1**: Basic functionality with core tools
+2. **Version 2**: Add capabilities based on usage patterns
+3. **Version 3**: Optimize workflows and add integrations
+4. **Ongoing**: Continuous refinement based on feedback
+
+**Monitor and Adjust**:
+- Review agent performance metrics
+- Analyze conversation logs for improvement opportunities
+- Gather user feedback on agent interactions
+- Update capabilities based on changing business needs
+
+## Common Gaia Patterns
+
+### Multi-Purpose Agents
+**Strategy**: Create agents that handle related tasks efficiently
+```
+Example: Customer Success Agent
+- Onboarding new customers
+- Handling support questions  
+- Processing upgrade requests
+- Managing account renewals
+```
+
+### Specialized Experts
+**Strategy**: Create focused agents for specific domains
+```
+Example: Technical Documentation Agent
+- API documentation generation
+- Code comment analysis
+- Developer onboarding guides
+- Technical writing assistance
+```
+
+### Workflow Coordinators
+**Strategy**: Create agents that orchestrate complex processes
+```
+Example: Project Launch Agent  
+- Coordinate cross-team tasks
+- Track milestone progress
+- Send status updates
+- Escalate blockers
+```
+
+## Troubleshooting with Gaia
+
+### Common Issues and Solutions
+
+**Agent Not Understanding Context**:
+```
+Problem: Agent gives generic responses
+Solution: Ask Gaia to "add more domain-specific context to the system prompt"
+```
+
+**Missing Capabilities**:
+```
+Problem: Agent can't perform needed actions
+Solution: "Add [specific tool] capability to handle [specific task]"
+```
+
+**Inconsistent Behavior**:
+```
+Problem: Agent responses vary wildly
+Solution: "Make the agent's responses more consistent by [specific guidance]"
+```
+
+### Advanced Configuration
+
+**Custom Personality Tuning**:
+```
+"Make the agent more [specific trait]:
+- Technical vs. business language
+- Formal vs. casual tone  
+- Proactive vs. reactive approach
+- Brief vs. detailed responses"
+```
+
+**Performance Optimization**:
+```
+"Optimize the agent for:
+- Faster response times
+- Lower API costs
+- Higher accuracy
+- Better user satisfaction"
+```
+
+## Integration and Export
+
+### Export to Code
+**Convert Conversational Agents to Code**:
+```bash
+starships export my-support-agent
+# Generates TypeScript agent definition
+# Enables version control and CI/CD integration
+```
+
+### Team Sharing
+**Share Agents Across Organization**:
+- Export agent configurations
+- Share with team members
+- Clone and customize for different departments
+- Maintain consistent agent standards
+
+## Next Steps with Gaia
+
+<Cards>
+  <Card title="Start Creating" href="#how-gaia-creates-agents">
+    Begin your first conversation with Gaia
+  </Card>
+  <Card title="Explore Patterns" href="#common-gaia-patterns">
+    Learn proven agent design patterns
+  </Card>
+  <Card title="Advanced Features" href="/core-concepts/agents#advanced-framework-concepts">
+    Understand framework capabilities
+  </Card>
+  <Card title="Work with Daedalus" href="/agents/daedalus">
+    Create custom tools for your agents
+  </Card>
+</Cards>
+
+<Callout type="info">
+  **Ready to Start?** Find Gaia in your starship's agent marketplace and begin creating your first specialized agent through natural conversation.
+</Callout>

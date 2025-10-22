@@ -1,293 +1,370 @@
 ---
 title: Agents
-description: Specialized AI assistants that understand your workflows, make intelligent decisions, and work autonomously alongside your team through natural conversation
+description: The AI agent framework that powers intelligent, autonomous assistants on your starship
 icon: Bot
 ---
 
-import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Brain } from 'lucide-react';
+import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Brain, Network, Cpu, Database } from 'lucide-react';
 
 # Agents
 
+The foundational framework for creating AI assistants that understand context, use tools, and execute complex workflows autonomously.
+
 <Callout type="success">
-  **Core Concept**: Agents are AI assistants that can use tools, remember context, and execute multi-step workflows autonomously.
+  **Framework Core**: Agents are the building blocks of your AI workforce - each one a specialized assistant built on the same universal architecture.
 </Callout>
 
-## Agent Architecture
+## What Are Agents?
 
-Every agent consists of:
+**Agents** are AI entities that combine language understanding with tool usage and memory retention. Unlike simple chatbots, agents can:
 
-- **Personality**: System prompt defining expertise and communication style
-- **Tools**: Capabilities like API calls, data processing, integrations
-- **Memory**: Context retention across conversations and tasks
-- **Workflows**: Multi-step processes and decision trees
+- **Take Actions**: Use tools to interact with systems, APIs, and data
+- **Remember Context**: Maintain conversation history and learned preferences
+- **Execute Workflows**: Follow multi-step processes with decision making
+- **Collaborate**: Work with humans and other agents on complex tasks
 
-## Gaia: Your Agent Creation Assistant
+Think of agents as **AI teammates** that understand your domain and can work independently within defined boundaries.
 
-**Gaia** is the meta-agent that creates all other agents on your starship. Think of Gaia as your AI assistant that specializes in building other AI assistants.
+## Universal Agent Architecture
 
-**How Gaia Works**: Simply describe what you need, and Gaia handles the technical details:
+Every agent in the Starships.ai framework shares the same core architecture:
 
-**Behind the Scenes**: Gaia uses these tools to build agents:
+<Tabs items={['Components', 'Execution Model', 'Memory System']}>
+<Tab value="Components">
 
-<Accordions>
-  <Accordion title="🔧 Agent Management Tools">
-    - **`agent-open`**: Creates new agents or opens existing ones for editing
-    - **`agent-edit`**: Modifies agent configuration, system prompts, and settings
-    - **`agent-test`**: Validates agent functionality with test scenarios
-    - **`agent-list`**: Discovers existing agents to avoid duplicates
-    - **`agent-get`**: Retrieves complete agent details and configuration
-  </Accordion>
+### Core Components
 
-  <Accordion title="🛠️ Tool Assignment Tools">
-    - **`agent-assign-tool`**: Adds tools to an agent's capability set
-    - **`agent-unassign-tool`**: Removes tools from agents
-    - **`tool-list`**: Discovers available tools for assignment
-    - Strategic assignment based on agent role and requirements
-  </Accordion>
+- **🧠 Personality**: System prompt defining expertise, communication style, and behavioral guidelines
+- **🛠️ Tools**: Set of capabilities like API calls, data processing, file operations, integrations  
+- **💾 Memory**: Persistent context including conversation history, user preferences, and learned patterns
+- **📋 Blueprints**: Workflow definitions that specify how the agent executes multi-step tasks
+- **⚙️ Configuration**: Model selection, permissions, timeout settings, and operational parameters
 
-  <Accordion title="🏗️ Blueprint & Validation Tools">
-    - **`blueprint-lint`**: Validates workflow structure and node connectivity
-    - **`blueprint-examples`**: Provides proven workflow patterns
-    - **`node-schema`**: Gets exact parameter requirements for workflow nodes
-    - Ensures agents have reliable, production-ready workflows
-  </Accordion>
-</Accordions>
+</Tab>
+<Tab value="Execution Model">
 
-
-## How Agent Workflows Work
-
-Agents execute tasks through **blueprints** - visual workflows made of connected nodes. Here's how it works:
-
-### Agent Creation Workflow
+### How Any Agent Executes Tasks
 
 ```mermaid
-flowchart TD
-    A[User Request] --> B{Gaia Analyzes Request}
-    B --> C[Create Agent Draft]
-    C --> D[Design System Prompt]
-    D --> E[Select Tools]
-    E --> F[Assign Tools to Agent]
-    F --> G[Validate Configuration]
-    G --> H{Test Agent}
-    H -->|Pass| I[Agent Ready]
-    H -->|Fail| J[Debug & Fix]
-    J --> G
-    I --> K[Deploy to Starship]
+graph TD
+    A[Receive Input] --> B{Analyze Intent}
+    B --> C[Check Memory/Context]
+    C --> D{Select Strategy}
+    D -->|Single Tool| E[Execute Tool]
+    D -->|Multi-Step| F[Execute Blueprint]
+    D -->|Need Info| G[Ask Clarifying Questions]
+    E --> H[Update Memory]
+    F --> H
+    G --> A
+    H --> I[Format Response]
+    I --> J[Return Result]
     
     style A fill:#e1f5fe
-    style I fill:#c8e6c9
-    style B fill:#fff3e0
-    style H fill:#fce4ec
+    style J fill:#c8e6c9
+    style D fill:#fff3e0
+    style H fill:#f3e5f5
 ```
 
+**Universal Process**:
+1. **Input Analysis**: Understand user intent and context
+2. **Memory Consultation**: Access relevant conversation history and learned patterns
+3. **Strategy Selection**: Choose appropriate tools or workflows
+4. **Execution**: Perform actions while monitoring for errors
+5. **Memory Update**: Store results and learned patterns
+6. **Response Formation**: Provide clear, contextual feedback
 
+</Tab>
+<Tab value="Memory System">
 
+### Memory Architecture
 
-### Agent Communication & Context
+**Short-term Memory**:
+- Current conversation context
+- Recent actions and results  
+- Active workflow state
 
-**Memory Across Conversations**: Agents remember previous interactions and can reference past decisions, making them truly conversational rather than stateless.
+**Long-term Memory**:
+- User preferences and patterns
+- Successful workflow strategies
+- Domain-specific knowledge
 
-**Natural Language Interface**: Communicate with agents in plain English - no need to learn specific commands or syntax.
+**Shared Memory** (between agents):
+- Team context and coordination
+- Cross-agent workflow results
+- Organizational knowledge base
 
-**Context Awareness**: Agents understand your business domain, team structure, and project requirements through their system prompts and training.
+</Tab>
+</Tabs>
 
-**Multi-Modal Capabilities**: Agents can process text, analyze data, work with files, and integrate with various systems seamlessly.
+## Agent Creation Framework
 
-### Agent Lifecycle Management
+The platform provides multiple approaches to create agents:
 
-**Development to Production**: 
-- Start with a prototype agent for testing
-- Iterate based on real usage patterns  
-- Deploy to production when ready
-- Monitor and improve over time
+### Conversational Creation
+**Best for**: Rapid prototyping, business users, iterative development
 
-**Version Control**: Track changes to agent configurations and roll back if needed
+```
+User: "I need an agent that processes customer feedback and generates reports"
+Meta-Agent: Creates agent with appropriate tools, workflows, and reporting capabilities
+Result: Working agent ready immediately with option to refine
+```
 
-**Performance Analytics**: Monitor response times, success rates, and user satisfaction to optimize agent performance
+### Code-First Development
+**Best for**: Developers, complex integrations, version control
 
-**Scaling**: Start with one agent, then create specialized variants for different use cases or departments
+```typescript
+import { Agent, Blueprint } from '@starships/core';
+
+const feedbackAgent = new Agent({
+  name: 'Customer Feedback Processor',
+  model: 'anthropic/claude-sonnet-4.5',
+  tools: ['sentiment-analysis', 'report-generator', 'crm-integration'],
+  blueprint: feedbackProcessingWorkflow,
+  systemPrompt: 'You are a customer success analyst...'
+});
+```
+
+### Template-Based Creation
+**Best for**: Consistent deployment, enterprise standards, rapid scaling
+
+- Start with proven agent templates
+- Customize for specific use cases
+- Deploy across teams with standard configurations
+
+## Meta-Agents: The Creator Framework
+
+**Meta-agents** are specialized agents that create and manage other agents. They understand the agent framework deeply and can:
+
+<Cards>
+  <Card
+    icon={<Globe />}
+    title="Gaia - Agent Creator"
+    href="/agents/gaia"
+  >
+    Specializes in creating business and operational agents through conversation
+  </Card>
+  
+  <Card
+    icon={<Code />}
+    title="Daedalus - Tool Creator"
+    href="/agents/daedalus"  
+  >
+    Builds custom tools and complex workflows that any agent can use
+  </Card>
+  
+  <Card
+    icon={<Network />}
+    title="Sybil - Navigator"
+    href="/agents/sybil"
+  >
+    Provides guidance and coordinates multi-agent workflows
+  </Card>
+</Cards>
+
+### Meta-Agent Capabilities
+
+**Gaia's Framework Knowledge**:
+```mermaid
+graph TB
+    GAIA[🌍 Gaia] --> TOOLS[Tool Selection]
+    GAIA --> CONFIG[Agent Configuration]
+    GAIA --> BLUEPRINT[Blueprint Design]
+    GAIA --> TEST[Testing & Validation]
+    
+    TOOLS --> |agent-list| DB1[Available Agents]
+    TOOLS --> |tool-list| DB2[Available Tools]
+    CONFIG --> |agent-edit| DB3[System Prompts]
+    CONFIG --> |agent-assign-tool| DB4[Tool Assignment]
+    BLUEPRINT --> |blueprint-lint| DB5[Workflow Validation]
+    TEST --> |agent-test| DB6[Testing Scenarios]
+    
+    style GAIA fill:#c8e6c9
+    style TOOLS fill:#e8f5e8
+    style CONFIG fill:#e8f5e8
+    style BLUEPRINT fill:#e8f5e8
+    style TEST fill:#e8f5e8
+```
+
+## Agent Publishing & Sharing
+
+<Callout type="info" title="Feature In Development">
+The agent marketplace and publishing system is currently being developed.
+</Callout>
+
+**Planned Publishing Framework**:
+
+- **Private Sharing**: Share agents within your organization
+- **Public Marketplace**: Contribute agents to the community marketplace
+- **Version Control**: Track agent iterations and improvements
+- **Quality Assurance**: Community ratings, reviews, and validation
+- **Template System**: Convert successful agents into reusable templates
+
+**Publishing Workflow** (Coming Soon):
+```bash
+starships agent publish my-support-agent --visibility=public
+starships agent version my-support-agent --major  
+starships marketplace search "customer support"
+```
 
 ## Building Your First Agent
-
-**Quick Start**: Chat with Gaia to create an agent in under 5 minutes
 
 <Steps>
 <Step>
 
-### Describe Your Need
-Tell Gaia what you want your agent to do:
+### Choose Your Approach
+
+**Conversational** (Recommended for beginners):
+- Chat with Gaia to describe your needs
+- Iterate through natural conversation
+- Deploy immediately
+
+**Code-First** (For developers):
+- Use CLI and SDK for full control
+- Version control and CI/CD integration
+- Export conversational agents to code
+
+</Step>
+
+<Step>
+
+### Define Agent Purpose
+
+**Clear Scope**: What specific problem does this agent solve?
+**Success Metrics**: How will you measure agent effectiveness?
+**Boundaries**: What should the agent NOT do?
+
+**Example Scoping**:
 ```
-"Create a customer support agent for our SaaS product"
-"Build an agent that processes invoices and sends follow-ups"
-"I need a research assistant that finds market data"
+Purpose: Process customer support tickets
+Success: 80% resolution rate, < 2min response time
+Boundaries: Cannot offer refunds > $100, escalates billing issues
 ```
 
 </Step>
 
 <Step>
 
-### Gaia Designs Your Agent
-Gaia asks clarifying questions and builds:
-- Appropriate personality and expertise
-- Relevant tool access and permissions
-- Workflow patterns and escalation rules
+### Deploy and Iterate
 
-</Step>
-
-<Step>
-
-### Start Using Immediately
-Your agent is ready to work:
-- Chat naturally about tasks
-- Watch it take actions with tools
-- Iterate and improve based on usage
+**Start Simple**: Begin with core functionality
+**Monitor Performance**: Track usage patterns and success rates
+**Expand Gradually**: Add tools and capabilities based on real usage
+**Version Control**: Track changes and improvements over time
 
 </Step>
 </Steps>
 
-### Common Agent Patterns
+## Common Agent Patterns
 
-<Tabs items={['Support Agents', 'Processing Agents', 'Research Agents']}>
-<Tab value="Support Agents">
-
-**Use case**: Handle customer inquiries and support tickets
-
-**Typical tools**: Knowledge base search, ticket creation, user lookup
-**Personality**: Friendly, helpful, professional
-**Escalation**: Route complex issues to human support
-
-**Example**: 24/7 support that handles 80% of common questions automatically
-
-</Tab>
+<Tabs items={['Processing Agents', 'Interactive Agents', 'Analytical Agents']}>
 <Tab value="Processing Agents">
 
-**Use case**: Automate data processing and workflow tasks
+**Purpose**: Automate repetitive tasks and data processing workflows
 
-**Typical tools**: File processing, database updates, API integrations
-**Personality**: Efficient, detail-oriented, systematic
-**Escalation**: Flag exceptions for human review
+**Characteristics**:
+- High automation level
+- Minimal human interaction required  
+- Focus on efficiency and accuracy
+- Exception handling and escalation
 
-**Example**: Invoice processing agent that handles end-to-end workflow
+**Examples**:
+- Invoice processing and approval routing
+- Document analysis and categorization
+- Data synchronization between systems
+- Automated quality assurance checks
 
-</Tab>
-<Tab value="Research Agents">
-
-**Use case**: Gather information and generate insights
-
-**Typical tools**: Web search, data analysis, report generation
-**Personality**: Analytical, thorough, objective
-**Escalation**: Request guidance on research scope
-
-**Example**: Market research agent that delivers weekly trend reports
+**Key Tools**: File processing, API integrations, data validation, notification systems
 
 </Tab>
-</Tabs>
+<Tab value="Interactive Agents">
 
-## See It In Action
+**Purpose**: Engage with humans for support, guidance, and collaboration
 
-<Tabs items={['Customer Support', 'Research Assistant', 'Operations Manager']}>
-<Tab value="Customer Support">
+**Characteristics**:
+- Natural conversation flow
+- Context awareness and memory
+- Personality and communication style
+- Escalation to human experts
 
-**User**: "Create a support agent for our project management tool"
+**Examples**:
+- Customer support and help desk
+- Sales qualification and lead nurturing
+- Internal IT support and guidance
+- Training and onboarding assistants
 
-**Gaia builds**:
-- Agent with knowledge of your product features
-- Access to user lookup and ticket creation tools
-- Friendly, helpful communication style
-- Escalation patterns for complex issues
-
-**Result**: 24/7 support that handles 80% of inquiries automatically
-
-</Tab>
-<Tab value="Research Assistant">
-
-**User**: "I need an agent that researches market trends"
-
-**Gaia builds**:
-- Agent specialized in market analysis
-- Access to web search and data analysis tools
-- Structured reporting capabilities
-- Industry-specific knowledge patterns
-
-**Result**: Weekly market reports generated automatically
+**Key Tools**: Knowledge base search, ticket creation, CRM integration, communication platforms
 
 </Tab>
-<Tab value="Operations Manager">
+<Tab value="Analytical Agents">
 
-**User**: "Create an agent that manages our deployment pipeline"
+**Purpose**: Process data, generate insights, and support decision-making
 
-**Gaia builds**:
-- Agent with DevOps expertise and monitoring access
-- Integration with CI/CD tools and alert systems
-- Decision-making protocols for routine operations
-- Escalation rules for critical issues
+**Characteristics**:
+- Data analysis and pattern recognition
+- Report generation and visualization  
+- Predictive modeling and forecasting
+- Research and information synthesis
 
-**Result**: Automated deployment management with intelligent oversight
+**Examples**:
+- Market research and competitive analysis
+- Financial reporting and trend analysis
+- Performance monitoring and optimization
+- Risk assessment and compliance checking
+
+**Key Tools**: Database queries, statistical analysis, visualization, research APIs
 
 </Tab>
 </Tabs>
 
-## Advanced Features
+## Advanced Framework Concepts
+
+### Agent Collaboration
+**Multi-Agent Workflows**: Agents can coordinate on complex tasks
+- **Handoffs**: Pass work between specialized agents
+- **Parallel Processing**: Multiple agents work simultaneously  
+- **Shared Context**: Collaborate using shared memory and context
 
 ### Dynamic Capability Expansion
+**Runtime Tool Addition**: Agents can gain new capabilities without rebuilding
+- **Hot Tool Loading**: Add tools to running agents
+- **Capability Discovery**: Agents learn about new available tools
+- **Permission Management**: Control what tools agents can access
 
-**The Power of Meta-Agents**: Start with a basic agent and expand its capabilities over time:
+### Enterprise Integration
+**Framework Extensibility**: Connect agents to any system
+- **Custom Tool Development**: Build domain-specific capabilities
+- **API Integration**: Connect to existing business systems
+- **Security Framework**: Role-based access and audit trails
 
-1. **Gaia creates** your initial agent with core functionality
-2. **Identify gaps** during real-world usage
-3. **Add new tools** as needed (via Daedalus or existing tools)
-4. **Agent evolves** without rebuilding from scratch
+## Performance and Monitoring
 
-**Real Example**:
-```
-Week 1: Support agent handles basic questions
-Week 2: Add ticket creation capability
-Week 3: Add customer history lookup
-Week 4: Add escalation routing logic
-```
+### Agent Analytics
+**Built-in Monitoring**: Track agent performance and usage
+- **Response Times**: Monitor speed and efficiency
+- **Success Rates**: Track task completion and accuracy
+- **User Satisfaction**: Collect feedback and ratings
+- **Cost Tracking**: Monitor API usage and resource consumption
 
-### Governance and Control
-
-- **Agent Permissions**: Control what each agent can access
-- **Approval Workflows**: Require human confirmation for sensitive actions
-- **Audit Trails**: Complete logging of agent decisions and actions
-- **Performance Monitoring**: Track effectiveness and ROI
-
-
-
-### Code Integration
-
-**Export to Code**: Export any conversational agent as TypeScript:
-```bash
-starships export my-agent
-# Generates complete agent.ts file
-```
-
-**Import from Code**: Import CLI-created agents for conversational editing:
-```bash
-starships import my-agent
-# Now available in conversational interface
-```
-
-### Enterprise Features
-
-- **Access Controls**: Role-based permissions and team management
-- **Custom Integrations**: Connect to any API or internal system
-- **Team Collaboration**: Share agents across departments
+### Optimization Strategies
+**Continuous Improvement**: Enhance agent performance over time
+- **Workflow Optimization**: Improve blueprint efficiency
+- **Tool Selection**: Choose optimal tools for each task
+- **Model Tuning**: Select appropriate AI models for different needs
+- **Memory Management**: Optimize context and memory usage
 
 ## Next Steps
 
 <Cards>
-  <Card title="Start Building" href="#building-your-first-agent">
-    Create your first agent now
+  <Card title="Create with Gaia" href="/agents/gaia">
+    Use Gaia to create agents through conversation
+  </Card>
+  <Card title="Build with Daedalus" href="/agents/daedalus">
+    Create custom tools and workflows with Daedalus  
+  </Card>
+  <Card title="Code-First Development" href="/getting-started/quickstart">
+    Use CLI and SDK for programmatic development
   </Card>
   <Card title="Tools & Capabilities" href="/core-concepts/tools">
-    Understand what agents can do
-  </Card>
-  <Card title="Advanced Workflows" href="/core-concepts/workflows">
-    Multi-step processes and automation
-  </Card>
-  <Card title="Developer Guide" href="/getting-started/quickstart">
-    CLI and SDK for code-first development
+    Understand the tool ecosystem that powers agents
   </Card>
 </Cards>

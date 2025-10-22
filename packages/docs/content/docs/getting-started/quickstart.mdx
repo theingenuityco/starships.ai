@@ -1,9 +1,12 @@
 ---
-title: Quickstart
-description: Build and deploy your first AI agent in 5 minutes
+title: CLI Quickstart
+description: Build and deploy agents using code with full programmatic control
 icon: Zap
 ---
 
+# CLI Quickstart
+
+Build agents programmatically using our CLI and SDK.
 
 ## Installation
 
@@ -148,21 +151,28 @@ const data = await response.json();
 console.log(data.message);
 ```
 
+## Import to Conversational Interface
+
+```bash
+starships import my-first-agent
+# Makes your code agent available for conversational editing
+```
+
 ## Next Steps
 
 Congratulations! You've deployed your first AI agent. Here's what to explore next:
 
 <Cards>
-  <Card title="Add Tools" href="/guides/tools">
-    Give your agent superpowers with custom tools
+  <Card title="Agent Concepts" href="/core-concepts/agents">
+    Understand how agents work and what they can do
   </Card>
-  <Card title="Memory & Context" href="/guides/memory">
-    Make your agent remember conversations
+  <Card title="Tools & Capabilities" href="/core-concepts/tools">
+    Extend your agents with custom tools
   </Card>
-  <Card title="Streaming" href="/guides/streaming">
-    Implement real-time streaming responses
+  <Card title="Memory & Context" href="/core-concepts/memory">
+    Configure memory and conversation persistence
   </Card>
-  <Card title="Monitoring" href="/guides/monitoring">
-    Track usage, performance, and costs
+  <Card title="Advanced Workflows" href="/core-concepts/workflows">
+    Build complex multi-step automation
   </Card>
 </Cards>

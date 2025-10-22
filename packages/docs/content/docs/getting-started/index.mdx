@@ -1,50 +1,78 @@
 ---
 title: Getting Started
-description: Everything you need to start building with Starships.ai
+description: Set up your development environment and choose your implementation approach
 icon: Play
 ---
 
+import { MessageSquare, Code, ArrowRight, Settings } from 'lucide-react';
 
-## What You'll Learn
+# Getting Started
 
-In this section, you'll discover:
+Quick setup guide for both conversational and code-first approaches.
+
+## Account Setup
+
+**Required for both approaches:**
+
+1. **Create Account**: Sign up at [starships.ai](https://starships.ai)
+2. **Access Dashboard**: Log into your personal starship
+3. **Choose Approach**: Select your preferred building method
+
+## Implementation Paths
 
 <Cards>
-  <Card title="Quickstart" href="/getting-started/quickstart">
-    Build and deploy your first AI agent in 5 minutes
+  <Card
+    icon={<MessageSquare />}
+    title="Conversational Building"
+    href="/core-concepts/agents"
+  >
+    Chat with AI to create agents. No coding required.
   </Card>
-  <Card title="Core Concepts" href="/getting-started/concepts">
-    Understand the foundational principles of Starships.ai
+  
+  <Card
+    icon={<Code />}
+    title="Code-First Development"
+    href="/getting-started/quickstart"
+  >
+    Use CLI and SDK for full programmatic control.
   </Card>
-  <Card title="Installation" href="/getting-started/installation">
-    Set up your development environment
-  </Card>
-  <Card title="Authentication" href="/getting-started/authentication">
-    Configure API keys and secure your agents
+  
+  <Card
+    icon={<Settings />}
+    title="Installation Guide"
+    href="/getting-started/installation"
+  >
+    Detailed setup instructions for development tools.
   </Card>
 </Cards>
 
-## Prerequisites
+## Development Prerequisites
 
-Before you begin, ensure you have:
+**Only required for code-first approach:**
 
 - **Node.js** 18.0 or higher
-- **npm** or **yarn** package manager
-- A **Starships.ai account** (sign up at [starships.ai](https://starships.ai))
-- Basic knowledge of JavaScript/TypeScript
+- **npm**, **yarn**, or **pnpm** package manager  
+- Basic **JavaScript/TypeScript** knowledge
+- **Git** for version control (optional)
 
-## Choose Your Path
+## What's Next
 
 <Accordions>
-  <Accordion title="🚀 I want to start fast (Recommended)">
-    Jump straight to our [Quickstart Guide](/getting-started/quickstart) and have an agent running in 5 minutes.
+  <Accordion title="I want to build agents through conversation">
+    **Recommended for**: Business users, rapid prototyping, getting immediate results
+    
+    **[Go to Agent Building →](/core-concepts/agents)**
   </Accordion>
 
-  <Accordion title="📚 I want to learn the fundamentals">
-    Start with [Core Concepts](/getting-started/concepts) to understand how Starships.ai works under the hood.
+  <Accordion title="I want to code agents from scratch">
+    **Recommended for**: Developers, complex integrations, full customization
+    
+    **[Go to CLI Quickstart →](/getting-started/quickstart)**
   </Accordion>
 
-  <Accordion title="🔧 I want to integrate with existing code">
-    Check out our [Integration Guides](/integrations) for framework-specific instructions.
+  <Accordion title="I want to understand the concepts first">
+    **Recommended for**: Technical leaders, architects, learning the platform
+    
+    **[Go to Core Concepts →](/core-concepts/agents)**
   </Accordion>
 </Accordions>

@@ -42,66 +42,67 @@ import { Sparkles, Zap, Shield, Globe } from 'lucide-react';
   </Card>
 </Cards>
 
-## Quick Start
+## Choose Your Path
 
-Get up and running with Starships.ai in three simple steps:
+Select the approach that matches your goals and technical comfort level:
 
-<Steps>
-<Step>
+<Tabs items={['Conversational (Recommended)', 'Code-First']}>
+<Tab value="Conversational (Recommended)">
 
-### Install the CLI
+**Perfect for**: Getting results fast, business users, rapid prototyping
+
+**What you'll do**: Chat with AI to create agents
+**Time to success**: Under 5 minutes
+**Technical skill**: None required
+
+```
+You: "Create a customer support agent for our SaaS product"
+Gaia: "Creating agent with CRM integration, friendly tone, escalation rules..."
+Result: Working agent ready immediately
+```
+
+**[Start building conversationally →](/core-concepts/agents)**
+
+</Tab>
+<Tab value="Code-First">
+
+**Perfect for**: Developers who want full control, complex integrations
+
+**What you'll do**: Write code using CLI and SDK
+**Time to success**: 15-30 minutes
+**Technical skill**: JavaScript/TypeScript knowledge required
 
 ```bash
 npm install -g @starships/cli
-# or
-curl -fsSL https://get.starships.ai | sh
-```
-
-</Step>
-
-<Step>
-
-### Initialize Your Project
-
-```bash
 starships init my-agent
-cd my-agent
-```
-
-</Step>
-
-<Step>
-
-### Deploy Your First Agent
-
-```bash
 starships deploy
 ```
 
-Your agent is now live! 🚀
+**[Start with CLI development →](/getting-started/quickstart)**
 
-</Step>
-</Steps>
+</Tab>
+</Tabs>
 
-## Popular Use Cases
+<Callout type="info">
+**Can't decide?** Start conversational - you can export to code later. Most users find this path faster and more intuitive.
+</Callout>
 
-<Accordions type="multiple" defaultValue={['chatbots', 'automation']}>
-  <Accordion title="🤖 Intelligent Chatbots" value="chatbots">
-    Build conversational AI that understands context, maintains memory, and integrates with your existing tools. Perfect for customer support, sales, and internal operations.
-  </Accordion>
+## What You Can Build
 
-  <Accordion title="⚡ Workflow Automation" value="automation">
-    Automate complex business processes with AI agents that can read documents, make decisions, and take actions across multiple systems.
-  </Accordion>
-
-  <Accordion title="📊 Data Analysis" value="analytics">
-    Deploy AI analysts that can query databases, generate insights, and create visualizations from natural language requests.
-  </Accordion>
-
-  <Accordion title="🔍 Smart Search" value="search">
-    Implement semantic search across your content with RAG (Retrieval Augmented Generation) pipelines that deliver precise answers.
-  </Accordion>
-</Accordions>
+<Cards>
+  <Card title="Customer Support" href="/core-concepts/agents#see-it-in-action">
+    24/7 support agents that handle common questions and escalate complex issues
+  </Card>
+  <Card title="Data Processing" href="/core-concepts/agents#see-it-in-action">
+    Agents that process documents, extract insights, and generate reports
+  </Card>
+  <Card title="Workflow Automation" href="/core-concepts/workflows">
+    Multi-step processes that integrate with your existing tools and systems
+  </Card>
+  <Card title="Research Assistants" href="/core-concepts/agents#see-it-in-action">
+    Agents that gather information, analyze trends, and provide summaries
+  </Card>
+</Cards>
 
 ## Why Developers Choose Starships.ai
 
@@ -127,17 +128,17 @@ Your agent is now live! 🚀
 ## Next Steps
 
 <Cards>
-  <Card title="Quickstart Guide" href="/getting-started/quickstart">
-    Follow our step-by-step guide to build your first AI agent
+  <Card title="Build Your First Agent" href="/core-concepts/agents">
+    Start with the conversational approach - fastest path to results
   </Card>
-  <Card title="Core Concepts" href="/getting-started/concepts">
-    Learn the fundamental concepts behind Starships.ai
+  <Card title="Developer Guide" href="/getting-started/quickstart">
+    CLI and SDK documentation for code-first development
   </Card>
-  <Card title="API Reference" href="/api-reference">
-    Explore our comprehensive API documentation
+  <Card title="Core Concepts" href="/core-concepts/agents">
+    Understand agents, tools, and how they work together
   </Card>
-  <Card title="Examples" href="/examples">
-    Browse real-world examples and templates
+  <Card title="Advanced Workflows" href="/core-concepts/workflows">
+    Build complex multi-step automation and integrations
   </Card>
 </Cards>
 

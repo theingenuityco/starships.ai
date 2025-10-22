@@ -29,10 +29,7 @@ Think of agents as **AI teammates** that understand your domain and can work ind
 
 Every agent in the Starships.ai framework shares the same core architecture:
 
-<Tabs items={['Components', 'Execution Model', 'Memory System']}>
-<Tab value="Components">
-
-### Core Components
+## Core Components
 
 - **🧠 Personality**: System prompt defining expertise, communication style, and behavioral guidelines
 - **🛠️ Tools**: Set of capabilities like API calls, data processing, file operations, integrations  
@@ -40,61 +37,125 @@ Every agent in the Starships.ai framework shares the same core architecture:
 - **📋 Blueprints**: Workflow definitions that specify how the agent executes multi-step tasks
 - **⚙️ Configuration**: Model selection, permissions, timeout settings, and operational parameters
 
-</Tab>
-<Tab value="Execution Model">
+## The Universal Agent Blueprint
 
-### How Any Agent Executes Tasks
+Every agent follows the same core execution pattern:
 
 ```mermaid
 graph TD
-    A[Receive Input] --> B{Analyze Intent}
-    B --> C[Check Memory/Context]
-    C --> D{Select Strategy}
-    D -->|Single Tool| E[Execute Tool]
-    D -->|Multi-Step| F[Execute Blueprint]
-    D -->|Need Info| G[Ask Clarifying Questions]
-    E --> H[Update Memory]
-    F --> H
-    G --> A
-    H --> I[Format Response]
-    I --> J[Return Result]
+    START([start]) --> LLM[llm: AI Processing]
+    LLM --> CHECK{conditional: Has Tool Calls?}
     
-    style A fill:#e1f5fe
-    style J fill:#c8e6c9
-    style D fill:#fff3e0
-    style H fill:#f3e5f5
+    CHECK -->|No Tool Calls| END([end: Return Response])
+    CHECK -->|Has Tool Calls| ARGS[code: Prepare Arguments]
+    
+    ARGS --> TOOL[tool: Execute Function]
+    TOOL --> RESULT[mutate: Add Tool Result]
+    RESULT --> LLM
+    
+    style START fill:#22c55e
+    style END fill:#22c55e
+    style LLM fill:#3b82f6
+    style CHECK fill:#f59e0b
+    style ARGS fill:#8b5cf6
+    style TOOL fill:#10b981
+    style RESULT fill:#06b6d4
 ```
 
-**Universal Process**:
-1. **Input Analysis**: Understand user intent and context
-2. **Memory Consultation**: Access relevant conversation history and learned patterns
-3. **Strategy Selection**: Choose appropriate tools or workflows
-4. **Execution**: Perform actions while monitoring for errors
-5. **Memory Update**: Store results and learned patterns
-6. **Response Formation**: Provide clear, contextual feedback
+### How Each Node Works
 
-</Tab>
-<Tab value="Memory System">
+- <span style={{color: '#0066cc'}}>**[start](/core-concepts/blueprints#start-node)** 🔗</span>: Receives input and triggers agent execution
+- <span style={{color: '#0066cc'}}>**[llm](/core-concepts/blueprints#llm-node)** 🔗</span>: Processes requests using AI models, decides on tool usage  
+- <span style={{color: '#0066cc'}}>**[conditional](/core-concepts/blueprints#conditional-node)** 🔗</span>: Routes execution based on LLM decisions (tools vs. response)
+- <span style={{color: '#0066cc'}}>**[code](/core-concepts/blueprints#code-node)** 🔗</span>: Prepares data and formats tool arguments for execution
+- <span style={{color: '#0066cc'}}>**[tool](/core-concepts/blueprints#tool-node)** 🔗</span>: Executes capabilities like API calls, data processing
+- <span style={{color: '#0066cc'}}>**[mutate](/core-concepts/blueprints#mutate-node)** 🔗</span>: Updates memory with tool results for next LLM cycle
+- <span style={{color: '#0066cc'}}>**[end](/core-concepts/blueprints#end-node)** 🔗</span>: Returns response when agent has complete answer
 
-### Memory Architecture
+### The Intelligence Loop
 
-**Short-term Memory**:
-- Current conversation context
-- Recent actions and results  
-- Active workflow state
+This universal pattern enables agents to:
+- **Analyze** requests against available capabilities
+- **Gather** additional data through tool execution  
+- **Synthesize** information into helpful responses
+- **Remember** context for future interactions
 
-**Long-term Memory**:
-- User preferences and patterns
-- Successful workflow strategies
-- Domain-specific knowledge
+<Callout type="info">
+**Want to build custom workflows?** Learn about all blueprint nodes and advanced patterns in our [Blueprint Reference Guide](/core-concepts/blueprints).
+</Callout>
+
+## Memory Architecture
+
+**Conversation Memory** (`state.messages`):
+- Remembers what you've discussed
+- Maintains context across interactions
+- Learns your preferences over time
+
+**Tool Memory** (`state.tools`):
+- Knows what capabilities are available
+- Remembers successful tool combinations
+- Adapts to new tools automatically
+
+**Custom Memory** (`state.*`):
+- Stores workflow-specific data
+- Maintains progress on multi-step tasks
+- Keeps track of user preferences and settings
+
+### Memory in Action
+When you ask "Continue where we left off," the agent knows:
+- What you were working on
+- Which tools were being used
+- What decisions were made
+- What still needs to be completed
 
 **Shared Memory** (between agents):
 - Team context and coordination
-- Cross-agent workflow results
+- Cross-agent workflow results  
 - Organizational knowledge base
 
-</Tab>
-</Tabs>
+## How Agents Process Requests
+
+### The Tool-Calling Loop
+What makes agents intelligent rather than just chatbots:
+
+<Steps>
+<Step icon="🧠">
+### LLM Analyzes Request
+The AI model examines your input and compares it against available tools and conversation history
+</Step>
+
+<Step icon="🤔">
+### Decides on Action
+Either provides a direct response or identifies which tools are needed to gather more information
+</Step>
+
+<Step icon="🔧">
+### Executes Tools
+Calls external APIs, searches databases, processes files, or performs calculations as needed
+</Step>
+
+<Step icon="🔄">
+### Incorporates Results
+Adds tool results to its understanding and repeats until it can provide a complete answer
+</Step>
+</Steps>
+
+**Example Flow**:
+```
+User: "What's our team's progress this week?"
+
+Agent thinks: "I need project data" → Calls project-status tool
+Tool returns: Current task completion rates
+Agent thinks: "I need recent updates" → Calls team-activity tool  
+Tool returns: This week's commits and updates
+Agent responds: "Your team completed 12 tasks this week, 3 ahead of schedule..."
+```
+
+### Why This Works
+- **Self-contained**: Each agent has AI model + tools + memory
+- **Purpose-built**: Same architecture, different tools = different capabilities  
+- **Composable**: Agents can work together on complex workflows
+- **Learning**: Every interaction improves decision-making
 
 ## Agent Creation Framework
 
@@ -112,17 +173,11 @@ Result: Working agent ready immediately with option to refine
 ### Code-First Development
 **Best for**: Developers, complex integrations, version control
 
-```typescript
-import { Agent, Blueprint } from '@starships/core';
-
-const feedbackAgent = new Agent({
-  name: 'Customer Feedback Processor',
-  model: 'anthropic/claude-sonnet-4.5',
-  tools: ['sentiment-analysis', 'report-generator', 'crm-integration'],
-  blueprint: feedbackProcessingWorkflow,
-  systemPrompt: 'You are a customer success analyst...'
-});
-```
+Developers can export agents created through conversation into code for:
+- Version control and team collaboration
+- CI/CD pipeline integration  
+- Complex custom integrations
+- Programmatic agent management
 
 ### Template-Based Creation
 **Best for**: Consistent deployment, enterprise standards, rapid scaling
@@ -200,11 +255,10 @@ The agent marketplace and publishing system is currently being developed.
 - **Template System**: Convert successful agents into reusable templates
 
 **Publishing Workflow** (Coming Soon):
-```bash
-starships agent publish my-support-agent --visibility=public
-starships agent version my-support-agent --major  
-starships marketplace search "customer support"
-```
+- Publish agents through the web interface
+- Set visibility and sharing permissions
+- Browse and install community agents
+- Track versions and updates automatically
 
 ## Building Your First Agent
 
@@ -234,11 +288,9 @@ starships marketplace search "customer support"
 **Boundaries**: What should the agent NOT do?
 
 **Example Scoping**:
-```
-Purpose: Process customer support tickets
-Success: 80% resolution rate, < 2min response time
-Boundaries: Cannot offer refunds > $100, escalates billing issues
-```
+- **Purpose**: Process customer support tickets automatically
+- **Success**: 80% resolution rate with under 2-minute response time
+- **Boundaries**: Cannot offer refunds over $100, escalates billing issues to humans
 
 </Step>
 

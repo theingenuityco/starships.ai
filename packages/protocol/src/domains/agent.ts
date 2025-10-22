@@ -27,6 +27,10 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   updatedAt: string;
   // Starship ownership (FK)
   starshipId: string;
+  // Optional source template reference (FK)
+  templateId?: string;
+  // Optional example prompts surfaced on agents (may be inherited from template)
+  previewPrompts?: string[];
 }
 
 // ============================================================================
@@ -39,9 +43,15 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   slug?: string; // Optional: if not provided, will be generated
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
+  // Optional template reference and prompts
+  templateId?: string;
+  previewPrompts?: string[];
 };
 
 /**
  * Request to update an agent
  */
-export type UpdateAgentRequest = Partial<AgentParamsWithoutMetadata>;
+export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
+  templateId?: string;
+  previewPrompts?: string[];
+}

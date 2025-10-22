@@ -3,10 +3,10 @@ import Icon from '@/components/primitives/Icon'
 
 export default function HowItWorks() {
   const steps = [
-    { icon: 'pencil', title: 'Define', desc: 'Describe agent behavior, policies, and tools' },
-    { icon: 'plug', title: 'Connect', desc: 'Grant scoped, auditable permissions to tools' },
-    { icon: 'rocket', title: 'Deploy', desc: 'Run on the Autopilot Runner with scaling' },
-    { icon: 'activity', title: 'Observe', desc: 'Trace, metrics, replay, and control' },
+    { icon: 'pencil', title: 'Define', desc: 'Describe agent behavior and tools' },
+    { icon: 'plug', title: 'Connect', desc: 'Grant scoped access to tools' },
+    { icon: 'rocket', title: 'Run', desc: 'Execute with process isolation (child or remote)' },
+    { icon: 'activity', title: 'Observe', desc: 'Streamed events and structured logs' },
   ]
   return (
     <section className="py-14 px-4">

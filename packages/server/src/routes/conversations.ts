@@ -83,8 +83,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             }
           }
 
-          // 2) Replay recent ring buffer deltas (skip 'message' entries to avoid duplicate persisted messages)
-          await streamingService.replayBufferedEvents(conversationId, (evt) => evt.type !== 'message');
+          // 2) Replay current-turn buffered events (skip 'message' to avoid duplicate persisted messages)
+          await streamingService.replayCurrentTurn(conversationId);
         }
       } else {
         // Send only messages the client may be missing based on their baselineLength hint
@@ -97,10 +97,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           }
         }
 
-        // Also replay critical lifecycle events (like 'complete') that may have occurred
-        // during client navigation gaps even when no resume token is present.
-        // We intentionally skip 'message' and 'delta' here to avoid duplicating content.
-        await streamingService.replayBufferedEvents(conversationId, (evt) => evt.type === 'complete');
+        // Also replay current turn events to cover race where streaming started just before connect
+        await streamingService.replayCurrentTurn(conversationId);
       }
 
       // Connection stays open for live updates via StreamingService
@@ -125,11 +123,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const messages = await conversationService.getConversationMessages(
-        conversationId,
-        orderValidation.orderBy,
-        orderValidation.orderDirection
-      );
+      const messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
 
       // Verify conversation exists
       const conversation = await conversationService.getConversationById(conversationId);

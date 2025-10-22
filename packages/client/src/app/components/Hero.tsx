@@ -60,12 +60,12 @@ export default function Hero() {
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
             {(() => {
               const v = getHeadlineVariant()
-              if (v === 'B') return 'From prompt to production agent—without brittle glue'
-              if (v === 'C') return 'Build, run, and trust AI automations'
-              return 'Ship production AI agents fast'
+              if (v === 'B') return 'From prompt to working agent—without brittle glue'
+              if (v === 'C') return 'Design, run, and monitor AI automations'
+              return 'Build automations at warp speed'
             })()}
           </h1>
-          <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.</p>
+          <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Ship intelligent automations in minutes - safe, observable and fast.</p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Button size="lg" className="px-7" onClick={handlePrimaryClick}>
               <Icon name={isAuthenticated ? 'rocket' : 'user-plus'} className="w-4 h-4 mr-2" />
@@ -83,10 +83,7 @@ export default function Hero() {
               View Docs
             </Button>
           </div>
-
-          <div className="mt-8 flex items-center gap-6 opacity-90">
-            <div className="text-sm text-muted-foreground">Guardrails built-in • Production runner • Deep visibility</div>
-          </div>
+          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • $20 credit on signup</div>
         </div>
 
         {/* Visualization: viewport removed; styles moved into visualization */}
@@ -114,7 +111,8 @@ export default function Hero() {
             className="absolute inset-0 rounded-2xl shadow-2xl"
             containerClassName="rounded-lg bg-black/30 border border-white/10"
             containerStyle={{
-              background: 'radial-gradient(circle at 20% 20%, hsl(var(--primary) / 0.12) 0%, transparent 42%), radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.06) 0%, transparent 40%)',
+              background:
+                'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
             }}
             transparent
             nodesDraggable={false}

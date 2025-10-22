@@ -3,9 +3,9 @@ import Icon from '@/components/primitives/Icon'
 
 export default function Security() {
   const items = [
-    { icon: 'shield-check', text: 'Sandboxed tool access with scoped tokens' },
-    { icon: 'file-text', text: 'Audit logs for actions and tool calls' },
-    { icon: 'eye', text: 'PII handling model with redaction support' },
+    { icon: 'shield-check', text: 'Process isolation for runs (child/remote runner)' },
+    { icon: 'file-text', text: 'Structured events for tool calls and workflow state' },
+    { icon: 'eye', text: 'Secret redaction in streamed events/logs' },
   ]
   return (
     <section className="py-14 px-4">

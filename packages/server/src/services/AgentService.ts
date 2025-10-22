@@ -91,7 +91,7 @@ export class AgentService {
     // Initialize state with default if not provided (same logic as Agent class)
     const agentState = data.state || { tools: [], messages: [] };
 
-    const agentData = {
+    const agentData: CreateAgentRequest = {
       name: data.name,
       slug,
       description: data.description,
@@ -102,6 +102,9 @@ export class AgentService {
       blueprint: generatedBlueprint, // Use the blueprint from Agent class (default or provided)
       systemPrompt: data.systemPrompt,
       state: agentState, // Use provided state or default initialization
+      previewPrompts: data.previewPrompts,
+      assignedToolSlugs: data.assignedToolSlugs,
+      templateId: data.templateId,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);

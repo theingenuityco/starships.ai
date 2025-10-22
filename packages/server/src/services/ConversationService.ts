@@ -409,8 +409,8 @@ export class ConversationService {
         const engineConfig = { eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event), secureEnv } as any;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
-        // Seed execution state from agent
-        (exec.state as Record<string, unknown>)['messages'] = (agentWithTools.state as any)?.messages ?? [];
+        // Seed execution state with ordered conversation messages for LLM node validation
+        (exec.state as Record<string, unknown>)['messages'] = llmMessages;
         (exec.state as Record<string, unknown>)['tools'] = (agentWithTools.state as any)?.tools ?? [];
 
         const ctl = (runner as any).runWithController?.(blueprint, exec, engineConfig);

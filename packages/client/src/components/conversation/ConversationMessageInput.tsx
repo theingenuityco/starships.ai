@@ -1360,7 +1360,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
 
             {/* Bottom-right Actions: Stop (when streaming) or Send */}
-            <div className={cn('absolute flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
+            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
               {isStreamingEffective ? (
                 <Button
                   onClick={() => {
@@ -1372,7 +1372,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   aria-label="Stop response"
                   title="Stop response"
                 >
-                  <Icon name="square" className="h-3.5 w-3.5" />
+                  <Icon name="x" className="h-4 w-4" />
                 </Button>
               ) : (
                 <Button

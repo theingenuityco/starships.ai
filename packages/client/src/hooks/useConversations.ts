@@ -264,6 +264,16 @@ export function useConversationStop() {
         await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
       } catch {}
 
+      // Optimistically flip streaming off and mark complete in local cache so UI hides Stop immediately
+      try {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const chunks = Array.isArray(old) ? old.slice() : []
+          chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
+          chunks.push({ type: 'complete' })
+          return chunks
+        })
+      } catch {}
+
       try {
         // Signal server to persist partials and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
@@ -274,7 +284,13 @@ export function useConversationStop() {
       }
 
       try {
-        // Refresh messages to reflect finalized state if stream was already closed
+        // Clear any stale streamed chunks and force fresh stream attach
+        queryClient.removeQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+        // Best-effort: drop resume token so we don't resume a stale turn
+        try {
+          if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
+        } catch {}
+        // Kick a refetch to rebuild state
         await queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
       } catch {}
     },
@@ -294,6 +310,7 @@ type StreamedChunk =
   | { type: 'replace_reasoning'; value: string }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
+  | { type: 'replace_whole_assistant'; message: ClientMessage }
   | { type: 'ui_action'; payload: any }
   | { type: 'complete' }
   | { type: 'error'; error: any }
@@ -392,6 +409,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             const replaceIdRe = /^\/messages\/(?:-1|\d+)\/id$/i
             const replaceUpdatedAtRe = /^\/messages\/(?:-1|\d+)\/updatedAt$/i
             const replaceStreamingRe = /^\/messages\/(?:-1|\d+)\/streaming$/i
+            const replaceWholeRe = /^\/messages\/(?:-1|\d+)$/i
 
             // Add assistant/user/tool messages
             if (op === 'add' && addMessageRe.test(path)) {
@@ -439,6 +457,13 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
+              break
+            }
+
+            // Replace whole assistant message (server persisted final)
+            if (op === 'replace' && replaceWholeRe.test(path)) {
+              const value = raw.value as ClientMessage
+              push({ type: 'replace_whole_assistant', message: value })
               break
             }
 
@@ -541,6 +566,23 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
         return acc
       }
       return [...acc, { ...msg }]
+    }
+    case 'replace_whole_assistant': {
+      const messages = clone(acc)
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'assistant') {
+          const next: any = { ...(chunk.message as any) }
+          // Ensure streaming is false and transient chunks are cleared when final arrives
+          next.streaming = false
+          if (typeof next.content === 'string' && next.content.trim().length > 0) {
+            next.chunks = undefined
+          }
+          messages[i] = next as ClientMessage
+          return messages
+        }
+      }
+      // If no assistant exists yet, append
+      return [...messages, { ...(chunk.message as any), streaming: false } as ClientMessage]
     }
     case 'append_chunk': {
       const messages = clone(acc)

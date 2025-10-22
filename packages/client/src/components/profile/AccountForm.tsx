@@ -52,7 +52,6 @@ export default function AccountForm() {
 
   const handleManageSessions = () => {
     // TODO: Implement session management
-    console.log('Manage sessions clicked')
   }
 
   if (loadingUser && !currentUser) {

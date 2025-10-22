@@ -6,7 +6,7 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository } from '@starships/models';
+import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository, PasswordResetTokenRepository } from '@starships/models';
 import type {
   CreateUserRequest,
   UpdateUserRequest,
@@ -51,10 +51,12 @@ export interface UpdateUserProfileRequest extends UpdateUserRequest {
 export class UserService {
   private userRepository: UserRepository;
   private oauthRepository: OAuthAccountRepository;
+  private passwordResetTokenRepository: PasswordResetTokenRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
     this.oauthRepository = new OAuthAccountRepository();
+    this.passwordResetTokenRepository = new PasswordResetTokenRepository();
   }
 
   // ============================================================================
@@ -870,5 +872,76 @@ export class UserService {
       userId: verification.userId,
       email: verification.email,
     };
+  }
+
+  // ============================================================================
+  // PASSWORD RESET METHODS
+  // ============================================================================
+
+  /**
+   * Send password reset email (business logic layer)
+   * Orchestrates repository and email service calls with security validations
+   */
+  async sendPasswordReset(email: string): Promise<void> {
+    const user = await this.getUserByEmail(email);
+    
+    // SECURITY: Always return success (prevent user enumeration)
+    if (!user) {
+      logger.info('[UserService] Password reset requested for non-existent email', { email });
+      return; // Silent success
+    }
+    
+    // BUSINESS RULE: Only users with passwords can reset passwords
+    if (!user.hasPassword) {
+      logger.info('[UserService] Password reset requested for OAuth-only user', { 
+        userId: user.id, email, authMethods: user.authMethods 
+      });
+      return; // Silent success (OAuth users use "Set Password" flow)
+    }
+    
+    // Generate and send reset token using existing email service pattern
+    const token = await this.passwordResetTokenRepository.generateToken(user.id, email);
+    const { ServiceFactory } = await import('./ServiceFactory');
+    const emailService = ServiceFactory.createEmailService();
+    await emailService.sendPasswordResetEmail(email, token);
+    
+    logger.info('[UserService] Password reset email sent', { userId: user.id, email });
+  }
+
+  /**
+   * Reset password using token (business logic layer)
+   * Validates token, confirms passwords match, and updates user password
+   */
+  async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<void> {
+    // Business validation: Password confirmation
+    if (newPassword !== confirmPassword) {
+      throw new ValidationError('Passwords do not match', 'confirmPassword');
+    }
+
+    // Business validation: Password strength
+    if (newPassword.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long', 'newPassword');
+    }
+
+    // Validate and consume token
+    const verification = await this.passwordResetTokenRepository.validateAndConsumeToken(token);
+
+    if (!verification) {
+      throw new ValidationError('Invalid or expired reset token', 'token');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    await this.userRepository.update(verification.userId, {
+      password: hashedPassword,
+      hasPassword: true
+    });
+
+    logger.info('[UserService] Password reset successful', { 
+      userId: verification.userId,
+      email: verification.email
+    });
   }
 }

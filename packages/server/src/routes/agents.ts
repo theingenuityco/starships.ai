@@ -1,7 +1,9 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
+import { validateData } from '@/utils/validation';
 import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentModel } from '@starships/protocol';
@@ -9,11 +11,7 @@ import { AgentModel } from '@starships/protocol';
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().min(1, 'ID is required');
-const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
+// Using standard pagination schema for consistency
 
 // Shared validation for preview prompts
 const PreviewPromptItem = z.string().trim().min(1).max(120);
@@ -69,30 +67,6 @@ const SingleToolAssignmentSchema = z.object({
   toolSlug: z.string().min(1, 'Tool slug is required'),
 });
 
-// Helper function for Zod validation
-const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const firstError = error.issues[0];
-      const fieldName = firstError.path.join('.');
-
-      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
-        field: fieldName,
-        context,
-        validationErrors: error.issues.map((err) => ({
-          path: err.path.join('.'),
-          message: err.message,
-          code: err.code,
-        })),
-      });
-    } else {
-      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
-    }
-    return null;
-  }
-};
 
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

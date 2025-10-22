@@ -6,9 +6,11 @@ import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/Agent
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { agentAPI } from '@/lib/api'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
+import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -17,8 +19,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   const { data: starship } = useStarshipBySlug(slug, true)
   const agentBuilderRef = useRef<AgentBuilderViewRef>(null)
+  const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
-  const conversationId = useMemo(() => searchParams.get('conversationId') || null, [searchParams])
+  const conversationId = searchParams.get('conversationId') || null
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
   const selectedAgent = useMemo(() => {
@@ -29,17 +32,25 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // Keep conversation streaming active and capture live messages/UI actions
   const { messages: liveMessages = [], isResponding } = useConversationStreamed(conversationId, starship?.id || '')
 
-  // Control the expandable overlay: expand only while streaming; user can toggle
+  // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
-  useEffect(() => {
-    setIsOverlayExpanded(!!isResponding)
-  }, [isResponding])
 
   // Track applied tool call keys to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
 
   // After tool execution completes, fetch and sync agent data once
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
+
+  // Autofocus the conversation input when the page loads (and conversation is present)
+  useEffect(() => {
+    if (!conversationId) return
+    const t = setTimeout(() => {
+      try {
+        messageInputRef.current?.focusInput?.()
+      } catch {}
+    }, 150)
+    return () => clearTimeout(t)
+  }, [conversationId])
 
   // Ensure slug is present in form ASAP so downstream effects can resolve agentId
   useEffect(() => {
@@ -357,24 +368,29 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     <div className="relative h-screen w-full">
       <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined} />
       {conversationId && (
-        <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
-          <div className="max-w-2xl mx-auto pointer-events-auto">
-            <ConversationMessageInput
-              selectedAgent={selectedAgent}
-              starshipId={starship.id}
-              conversationId={conversationId}
-              isToolFormOpen={true}
-              minimal={true}
-              showExpandableOverlay={true}
-              isOverlayExpanded={isOverlayExpanded}
-              onFocus={() => setIsOverlayExpanded(true)}
-              onBlur={() => setIsOverlayExpanded(false)}
-              onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
-            >
-              <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
-            </ConversationMessageInput>
+        <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
+          <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
+            <div className="max-w-2xl mx-auto pointer-events-auto">
+              <ConversationMessageInput
+                ref={messageInputRef}
+                selectedAgent={selectedAgent}
+                starshipId={starship.id}
+                conversationId={conversationId}
+                isToolFormOpen={true}
+                minimal={true}
+                showExpandableOverlay={true}
+                isOverlayExpanded={isOverlayExpanded}
+                onFocus={() => {
+                  if (!isResponding) setIsOverlayExpanded(true)
+                }}
+                onBlur={() => setIsOverlayExpanded(false)}
+                onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
+              >
+                <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
+              </ConversationMessageInput>
+            </div>
           </div>
-        </div>
+        </ConversationStreamProvider>
       )}
     </div>
   )

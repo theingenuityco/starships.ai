@@ -10,7 +10,7 @@ export default function Security() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-semibold mb-6">Security & reliability</h2>
+        <h2 className="text-3xl md:text-4xl font-semibold mb-6 text-center">Security & reliability</h2>
         <Card className="p-6 bg-white/5 border-white/10">
           <ul className="grid md:grid-cols-3 gap-4">
             {items.map((i, idx) => (

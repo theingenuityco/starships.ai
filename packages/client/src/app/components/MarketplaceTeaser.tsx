@@ -6,12 +6,12 @@ export default function MarketplaceTeaser() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="flex flex-col items-center gap-6 text-center">
           <div className="max-w-2xl">
             <h2 className="text-3xl md:text-4xl font-semibold mb-2">Launch from the Marketplace</h2>
             <p className="text-muted-foreground">Browse ready‑to‑use agent and tool templates. Deploy in one click, then customize prompts, models, and blueprints.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 justify-center">
             <Button size="lg" onClick={() => (window.location.href = '/marketplace')}>
               <Icon name="store" className="w-4 h-4 mr-2" /> Explore marketplace
             </Button>

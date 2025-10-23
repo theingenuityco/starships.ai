@@ -22,7 +22,7 @@ export default function FAQ() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-semibold mb-6">FAQ</h2>
+        <h2 className="text-3xl md:text-4xl font-semibold mb-6 text-center">FAQ</h2>
         <div className="grid md:grid-cols-2 gap-4">
           {QA.map((item, i) => (
             <Card key={i} className="p-5 bg-white/5 border-white/10">

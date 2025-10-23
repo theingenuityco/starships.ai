@@ -10,11 +10,11 @@ import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
+import { getEnvConfig } from '@starships/env';
 
 const router: Router = Router();
 
 // Using standard pagination schema for consistency
-
 
 /**
  * GET /conversations/:conversationId/messages - Get conversation messages (supports streaming for live updates)
@@ -154,6 +154,33 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     }
   } catch (error) {
     handleError(error, res, 'fetching conversation messages');
+  }
+});
+
+/**
+ * POST /conversations/:conversationId/stop - Stop streaming for the current turn
+ * - Cancels backend execution if running
+ * - Persists partial content/reasoning (no tool_calls)
+ * - Finalizes SSE and closes connections
+ */
+router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    const { conversationId } = paramValidation;
+
+    const conversationService = new ConversationService();
+    const exists = await conversationService.getConversationById(conversationId);
+    if (!exists) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+      return;
+    }
+
+    await conversationService.stopConversation(conversationId);
+    sendSuccess(res, { status: 'stopped', conversationId }, 200);
+  } catch (error) {
+    handleError(error, res, 'stopping conversation');
   }
 });
 

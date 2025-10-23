@@ -124,3 +124,15 @@ process.on('disconnect', () => {
     // ignore
   }
 });
+
+// Handle SIGTERM gracefully to allow parent to cancel work
+process.on('SIGTERM', () => {
+  try {
+    // Exit cleanly; Engine work will be interrupted
+    process.exit(0);
+  } catch (_e) {
+    try {
+      process.exit(1);
+    } catch {}
+  }
+});

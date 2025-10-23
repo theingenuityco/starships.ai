@@ -108,8 +108,9 @@ export class ChildProcessRunner implements Runner {
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-            await Promise.resolve(cb(msg.event)).catch(() => {
-              // ignore event callback errors
+            await Promise.resolve(cb(msg.event)).catch((err: unknown) => {
+              // Log and continue so a bad callback doesn't break execution
+              console.error('[ChildProcessRunner] eventCallback error:', err);
             });
           } else if (msg.type === 'done') {
             if (settled) return;
@@ -189,5 +190,152 @@ export class ChildProcessRunner implements Runner {
         payload: { blueprint, execution, config: safeConfig, autopilotCredentials },
       });
     });
+  }
+
+  /**
+   * Execute with cancellation controller returned to caller.
+   */
+  runWithController(
+    blueprint: Blueprint,
+    execution: Execution,
+    config?: EngineConfig
+  ): { promise: Promise<ExecutionItem[]>; cancel: () => void } {
+    const childEntry = resolve(__dirname, '../scripts/child-entry.js');
+
+    const execArgv: string[] = [];
+    const memoryLimitMB = this.options?.memoryLimitMB;
+    if (typeof memoryLimitMB === 'number' && Number.isFinite(memoryLimitMB) && memoryLimitMB > 0) {
+      execArgv.push(`--max-old-space-size=${Math.floor(memoryLimitMB)}`);
+    }
+    if (this.options?.nodeExecArgv?.length) {
+      execArgv.push(...this.options.nodeExecArgv);
+    }
+
+    const stdio: StdioOptions = this.options?.stdioInherit ? 'inherit' : ['ignore', 'pipe', 'pipe', 'ipc'];
+    const child: ChildProcess = fork(childEntry, [], {
+      stdio,
+      execArgv,
+      env: { ...process.env, ...(this.options?.env ?? {}) },
+      serialization: 'advanced',
+    });
+
+    let settled = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const cleanup = () => {
+      if (killTimer) {
+        clearTimeout(killTimer);
+        killTimer = undefined;
+      }
+      child.removeAllListeners('message');
+      child.removeAllListeners('exit');
+      child.removeAllListeners('error');
+      if (!this.options?.stdioInherit && child.stdout) child.stdout.removeAllListeners('data');
+      if (!this.options?.stdioInherit && child.stderr) child.stderr.removeAllListeners('data');
+    };
+
+    if (!this.options?.stdioInherit) {
+      child.stdout?.on('data', (chunk: Buffer) => {
+        process.stdout.write(`[autopilot:child ${child.pid}] ${chunk.toString()}`);
+      });
+      child.stderr?.on('data', (chunk: Buffer) => {
+        process.stderr.write(`[autopilot:child ${child.pid}] ${chunk.toString()}`);
+      });
+    }
+
+    const promise = new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
+      child.on('message', async (msg: unknown) => {
+        try {
+          if (!isChildMessage(msg)) return;
+          if (msg.type === 'event' && config?.eventCallback) {
+            const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
+            await Promise.resolve(cb(msg.event)).catch((err: unknown) => {
+              // Log and continue so a bad callback doesn't break execution
+              console.error('[ChildProcessRunner] eventCallback error:', err);
+            });
+          } else if (msg.type === 'done') {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolvePromise(msg.result);
+            try {
+              child.disconnect();
+            } catch {
+              // ignore
+            }
+          } else if (msg.type === 'error') {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            const e = new Error(msg.error?.message ?? 'Child runner error');
+            rejectPromise(e);
+            try {
+              child.disconnect();
+            } catch {
+              // ignore
+            }
+          }
+        } catch {
+          // ignore
+        }
+      });
+
+      child.once('error', (err) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        rejectPromise(err);
+      });
+
+      child.once('exit', (code, signal) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        rejectPromise(new Error(`Child exited before completion (code=${code}, signal=${signal ?? 'none'})`));
+      });
+
+      const timeoutMs = this.options?.timeoutMs ?? 0;
+      if (timeoutMs > 0) {
+        killTimer = setTimeout(() => {
+          if (settled) return;
+          try {
+            child.kill();
+          } catch {
+            // ignore
+          }
+          const grace = Math.max(0, this.options?.killGraceMs ?? 1000);
+          setTimeout(() => {
+            try {
+              child.kill('SIGKILL');
+            } catch {
+              // ignore
+            }
+          }, grace);
+        }, timeoutMs);
+      }
+
+      const safeConfig = config ? { ...config, eventCallback: undefined } : undefined;
+      const autopilotCredentials = { openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined };
+      child.send({ type: 'parent_ready' });
+      child.send({ type: 'start', payload: { blueprint, execution, config: safeConfig, autopilotCredentials } });
+    });
+
+    const cancel = () => {
+      try {
+        child.kill();
+      } catch {
+        // ignore
+      }
+      const grace = Math.max(0, this.options?.killGraceMs ?? 1000);
+      setTimeout(() => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // ignore
+        }
+      }, grace);
+    };
+
+    return { promise, cancel };
   }
 }

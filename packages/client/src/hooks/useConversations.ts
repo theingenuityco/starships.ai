@@ -1,7 +1,7 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
@@ -77,7 +77,6 @@ export function useCreateConversation() {
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
         })
       }
-      toast.success('New conversation created successfully!')
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create conversation'
@@ -252,6 +251,52 @@ export function useUpdateConversationStatus() {
   })
 }
 
+// Stop an in-flight streamed conversation turn across layers
+export function useConversationStop() {
+  const queryClient = useQueryClient()
+
+  return useCallback(
+    async (conversationId: string) => {
+      if (!conversationId) return
+      try {
+        // Abort SSE locally
+        await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } catch {}
+
+      // Optimistically flip streaming off and mark complete in local cache so UI hides Stop immediately
+      try {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const chunks = Array.isArray(old) ? old.slice() : []
+          chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
+          chunks.push({ type: 'complete' })
+          return chunks
+        })
+      } catch {}
+
+      try {
+        // Signal server to persist partials and cancel autopilot
+        await api.post(`/api/v1/conversations/${conversationId}/stop`)
+      } catch (error: any) {
+        const msg = error?.response?.data?.error || error?.message || 'Failed to stop'
+        toast.error('Failed to stop response', { description: msg })
+        return
+      }
+
+      try {
+        // Clear any stale streamed chunks and force fresh stream attach
+        queryClient.removeQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+        // Best-effort: drop resume token so we don't resume a stale turn
+        try {
+          if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
+        } catch {}
+        // Kick a refetch to rebuild state
+        await queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } catch {}
+    },
+    [queryClient]
+  )
+}
+
 // --- StreamedQuery-based conversation hook (experimental) ---
 import { experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
 
@@ -264,6 +309,7 @@ type StreamedChunk =
   | { type: 'replace_reasoning'; value: string }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
+  | { type: 'replace_whole_assistant'; message: ClientMessage }
   | { type: 'ui_action'; payload: any }
   | { type: 'complete' }
   | { type: 'error'; error: any }
@@ -271,10 +317,12 @@ type StreamedChunk =
 // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events
 function makeSSEAsyncIterable(conversationId: string, token: string | null, signal?: AbortSignal, baselineLength?: number): AsyncIterable<StreamedChunk> {
   let url = `/api/v1/conversations/${conversationId}/messages?stream=true`
-  // Attach resume token via query param (avoid custom headers)
+  // Attach resume token only when client has a non-zero baseline to avoid empty reloads skipping history
   try {
     const rt = typeof window !== 'undefined' ? window.localStorage.getItem(`conv:${conversationId}:resumeToken`) : null
-    if (rt) url += `&resumeToken=${encodeURIComponent(rt)}`
+    if (rt && typeof baselineLength === 'number' && baselineLength > 0) {
+      url += `&resumeToken=${encodeURIComponent(rt)}`
+    }
   } catch {}
   if (typeof baselineLength === 'number' && baselineLength >= 0) {
     url += `&baselineLength=${baselineLength}`
@@ -362,6 +410,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             const replaceIdRe = /^\/messages\/(?:-1|\d+)\/id$/i
             const replaceUpdatedAtRe = /^\/messages\/(?:-1|\d+)\/updatedAt$/i
             const replaceStreamingRe = /^\/messages\/(?:-1|\d+)\/streaming$/i
+            const replaceWholeRe = /^\/messages\/(?:-1|\d+)$/i
 
             // Add assistant/user/tool messages
             if (op === 'add' && addMessageRe.test(path)) {
@@ -409,6 +458,13 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
+              break
+            }
+
+            // Replace whole assistant message (server persisted final)
+            if (op === 'replace' && replaceWholeRe.test(path)) {
+              const value = raw.value as ClientMessage
+              push({ type: 'replace_whole_assistant', message: value })
               break
             }
 
@@ -511,6 +567,23 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
         return acc
       }
       return [...acc, { ...msg }]
+    }
+    case 'replace_whole_assistant': {
+      const messages = clone(acc)
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'assistant') {
+          const next: any = { ...(chunk.message as any) }
+          // Ensure streaming is false and transient chunks are cleared when final arrives
+          next.streaming = false
+          if (typeof next.content === 'string' && next.content.trim().length > 0) {
+            next.chunks = undefined
+          }
+          messages[i] = next as ClientMessage
+          return messages
+        }
+      }
+      // If no assistant exists yet, append
+      return [...messages, { ...(chunk.message as any), streaming: false } as ClientMessage]
     }
     case 'append_chunk': {
       const messages = clone(acc)
@@ -669,6 +742,52 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
 
+  // Detect if current session has any live streaming signals (placeholder or deltas)
+  const hasLiveStreamHint = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (!c) continue
+      if (
+        c.type === 'append_chunk' ||
+        c.type === 'replace_content' ||
+        c.type === 'replace_reasoning' ||
+        c.type === 'replace_tool_calls' ||
+        c.type === 'update_last_assistant' ||
+        c.type === 'mark_last_assistant_streaming'
+      ) {
+        return true
+      }
+      if (c.type === 'append' && c.message && c.message.role === 'assistant' && (c.message as any).streaming === true) {
+        return true
+      }
+    }
+    return false
+  }, [chunks])
+
+  // Track the start of the latest user turn and cap the pre-stream indicator duration
+  const lastUserSerial = useMemo(() => {
+    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return null
+    for (let i = computedMessages.length - 1; i >= 0; i--) {
+      const m = computedMessages[i]
+      if (m.role === 'user') {
+        return String(m.id || m.createdAt || i)
+      }
+    }
+    return null
+  }, [computedMessages])
+
+  const [preStreamExpired, setPreStreamExpired] = useState(false)
+  useEffect(() => {
+    if (!lastUserSerial) {
+      setPreStreamExpired(false)
+      return
+    }
+    setPreStreamExpired(false)
+    const t = setTimeout(() => setPreStreamExpired(true), 7000)
+    return () => clearTimeout(t)
+  }, [lastUserSerial])
+
   // Extract last UI action payload (from 'ui_action' SSE events) for consumers
   const lastUIAction = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return null
@@ -743,13 +862,41 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
-    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
+    // Show awaiting immediately after a user turn until first assistant progress.
+    // Keep it on during the initial pre-stream window, or anytime we have a live-stream hint, or active fetching.
+    if (!hasAssistantAfter) return !preStreamExpired || hasLiveStreamHint || messagesQuery.fetchStatus === 'fetching'
+    if (!hasAssistantProgress) return !preStreamExpired || hasLiveStreamHint || messagesQuery.fetchStatus === 'fetching'
     return false
-  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent])
+  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent, preStreamExpired, hasLiveStreamHint])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
+
+  // Fallback: if after connection there are no messages yet, fetch baseline once via REST
+  useEffect(() => {
+    if (!conversationId) return
+    if (messagesQuery.fetchStatus === 'fetching') return
+    if (Array.isArray(computedMessages) && computedMessages.length > 0) return
+    let cancelled = false
+    const loadBaseline = async () => {
+      try {
+        const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${conversationId}/messages`)
+        if (cancelled) return
+        const list = Array.isArray((response as any)?.data?.data?.messages) ? (((response as any).data.data.messages as any[]) ?? []) : []
+        if (list.length === 0) return
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const next = Array.isArray(old) ? old.slice() : []
+          for (const msg of list) next.push({ type: 'append', message: msg })
+          return next
+        })
+      } catch {}
+    }
+    const t = setTimeout(loadBaseline, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [conversationId, computedMessages, messagesQuery.fetchStatus, queryClient])
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
@@ -810,6 +957,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isResponding,
     isAssistantStreaming,
     isAwaitingAssistant,
+    // Expose whether a turn-completion event has been received since the last user message
+    hasCompleteEvent,
     // Expose last UI action payload from SSE
     lastUIAction,
     isFetching: messagesQuery.fetchStatus === 'fetching',

@@ -29,7 +29,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   const error: any = null
   const ctx = useConversationStreamContextOptional()
   const fallbackStream = useConversationStreamed(conversationId, undefined, { enabled: !ctx })
-  const { messages, isResponding: isRespondingHook } = ctx ?? fallbackStream
+  const { messages, isResponding: isRespondingHook, isFetching: isFetchingHook, hasCompleteEvent: hasCompleteEventHook } = ctx ?? fallbackStream
 
   // Use stable selectors to avoid returning new objects each render
   // messages are sourced from useConversationStreamed(conversationId)
@@ -42,6 +42,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
   const agentName = storeAgentName || agentObj?.name
   const isResponding = isRespondingHook
+  const isFetching = isFetchingHook
+  const hasCompleteEvent = !!hasCompleteEventHook
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -278,8 +280,12 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   //  - no assistant text progress yet after the user (first response is pending), or
   //  - we are waiting for the assistant to resume after tool results.
   const shouldShowGapLoader = useMemo(() => {
-    return isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
-  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
+    // Show while actively responding (pre-first tokens or during resume after tools),
+    // OR if we're in a tool gap and the stream is fetching and the turn hasn't completed yet.
+    const responding = isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
+    const toolGapFetching = awaitingResumeAfterTools && isFetching && !hasCompleteEvent
+    return responding || toolGapFetching
+  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools, isFetching, hasCompleteEvent])
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {

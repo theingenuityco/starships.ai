@@ -6,8 +6,8 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useConversationStreamed, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
-import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import { useConversationAgents, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { ConversationStreamProvider, useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
@@ -20,6 +20,7 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion } from 'motion/react'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -65,14 +66,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track toolCallIds we've already navigated for to avoid duplicate route pushes
   const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
 
-  // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId, { enabled: true })
-  const prevStreamingRef = useRef(false)
   const queryClient = useQueryClient()
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
+  const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
+  const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
+  const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
 
   // Get agents data from starship and conversation
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -109,9 +111,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Kick off prefetch after showMessagesArea is computed
   const shouldPrefetchParticipantsRef = useRef<boolean | null>(null)
 
-  // Derive message presence and UI gating from streamed query (not store)
-  const hasMessages = Array.isArray(liveMessages) && liveMessages.length > 0
-  const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiStreaming)
+  // Gate UI by presence of a conversation id; streaming details are handled in context consumers
+  const showMessagesArea = Boolean(currentConversationId)
+
+  // Start docking immediately when messages area appears; allow welcome to fade concurrently
+  useEffect(() => {
+    if (showMessagesArea) {
+      setHasWelcomeExited(true)
+      // Freeze height during docking to avoid top thrash as content exits
+      if (heightUnfreezeTimerRef.current) clearTimeout(heightUnfreezeTimerRef.current)
+      setIsHeightFrozen(true)
+      heightUnfreezeTimerRef.current = setTimeout(() => {
+        setIsHeightFrozen(false)
+      }, 280)
+    } else {
+      setHasWelcomeExited(false)
+      if (heightUnfreezeTimerRef.current) {
+        clearTimeout(heightUnfreezeTimerRef.current)
+        heightUnfreezeTimerRef.current = null
+      }
+      setIsHeightFrozen(false)
+    }
+  }, [showMessagesArea])
+
+  const isInputDocked = showMessagesArea
 
   useEffect(() => {
     // Initialize ref after showMessagesArea is available
@@ -127,6 +150,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (!el) return
 
     const update = () => {
+      if (isHeightFrozen) return
       const rect = el.getBoundingClientRect()
       setInputHeight(Math.ceil(rect.height))
     }
@@ -143,7 +167,39 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       ro.disconnect()
       window.removeEventListener('resize', onResize)
     }
-  }, [showMessagesArea, currentConversationId])
+  }, [showMessagesArea, currentConversationId, isHeightFrozen])
+
+  // Compute offset from bottom so input appears centered before docking (only transforms animate)
+  useEffect(() => {
+    const compute = () => {
+      try {
+        const viewportH = window.innerHeight || 0
+        // Bias toward top: place around ~75% of viewport from bottom (i.e., above center)
+        const bias = 0.75
+        const liftPx = 64
+        const raw = viewportH * bias - (inputHeight || 0) / 2 - liftPx
+        // Clamp so it never starts too low or off-screen on very short heights
+        const minOffset = 64
+        const maxOffset = Math.max(0, Math.round(viewportH - (inputHeight || 0) - 96))
+        const offset = Math.min(maxOffset, Math.max(minOffset, Math.round(raw)))
+        setDockOffsetPx(offset)
+      } catch {}
+    }
+    compute()
+    const onResize = () => compute()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [inputHeight])
+
+  // After unfreezing, recalc height once
+  useEffect(() => {
+    if (!isHeightFrozen) {
+      const el = inputContainerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      setInputHeight(Math.ceil(rect.height))
+    }
+  }, [isHeightFrozen])
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -245,26 +301,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId])
 
-  // Focus input when streaming transitions from true -> false
+  // Focus after conversation becomes ready
   useEffect(() => {
-    const was = prevStreamingRef.current
-    if (was && !uiStreaming) {
-      setTimeout(() => {
-        messageInputRef.current?.focusInput?.()
-      }, 50)
-    }
-    prevStreamingRef.current = uiStreaming
-  }, [uiStreaming])
-
-  // Focus after first message or when conversation becomes ready
-  useEffect(() => {
-    if (hasMessages && currentConversationId) {
+    if (currentConversationId) {
       const t = setTimeout(() => {
         messageInputRef.current?.focusInput?.()
       }, 100)
       return () => clearTimeout(t)
     }
-  }, [hasMessages, currentConversationId])
+  }, [currentConversationId])
 
   // Removed in-page builder save/cancel handlers
 
@@ -320,7 +365,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         case 'tool_call_detected': {
           const toolName = (payload as any).toolName
           const toolCallId = (payload as any).toolCallId
-
 
           // Store tool call info for later completion handling
           if (toolCallId) {
@@ -391,7 +435,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Agent tools - fetch and sync agent data
         const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
         if (agentTools.includes(toolName) && toolArgs?.slug) {
-
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
 
@@ -410,7 +453,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           'tool-blueprint-remove-edge',
         ]
         if (toolTools.includes(toolName) && toolArgs?.slug) {
-
           // Fetch complete tool data by slug
           const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
 
@@ -423,150 +465,143 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [starshipId]
   )
 
-  // Detect special UI action responses from assistant messages (back-compat path)
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length) return
-    // Only handle back-compat UI actions during active streaming of the current turn
-    if (!uiStreaming) return
-    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-    if (!hasStreamingAssistant) return
+  // Stream-dependent side-effects are handled within the provider context to avoid duplicate SSE connections
+  function StreamSideEffects() {
+    const ctx = useConversationStreamContextOptional()
+    const uiStreaming = ctx?.isStreaming
+    const liveMessages = (ctx?.messages as any[]) || []
+    const lastUIAction = (ctx as any)?.lastUIAction
+    const prevStreamingRef = useRef(false)
 
-    const lastMessage = liveMessages[liveMessages.length - 1]
-    if (lastMessage?.role === 'assistant' && lastMessage?.content) {
-      try {
-        const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
-        handleUIPayload(payload)
-      } catch {
-        // Not JSON or doesn't have UI action, ignore
+    // Focus input when streaming transitions from true -> false
+    useEffect(() => {
+      const was = prevStreamingRef.current
+      if (was && !uiStreaming) {
+        setTimeout(() => {
+          messageInputRef.current?.focusInput?.()
+        }, 50)
       }
-    }
-  }, [currentConversationId, liveMessages, handleUIPayload])
+      prevStreamingRef.current = Boolean(uiStreaming)
+    }, [uiStreaming])
 
-  // Proactively navigate when assistant tool calls are detected (without waiting for ui_action)
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length || !starshipSlug) return
-    // Only react during active streaming to avoid replays causing navigation
-    if (!uiStreaming) return
-    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-    if (!hasStreamingAssistant) return
+    // Back-compat UI actions parsed from assistant message JSON
+    useEffect(() => {
+      if (!currentConversationId || !liveMessages.length) return
+      if (!uiStreaming) return
+      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+      if (!hasStreamingAssistant) return
+      const lastMessage = liveMessages[liveMessages.length - 1]
+      if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+        try {
+          const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
+          handleUIPayload(payload)
+        } catch {}
+      }
+    }, [currentConversationId, liveMessages, uiStreaming])
 
-    // Scan the most recent assistant messages for new tool calls
-    const recent = (liveMessages as any[]).slice(-10)
-    for (let i = recent.length - 1; i >= 0; i--) {
-      const msg = recent[i] as any
-      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
-      for (const tc of msg.toolCalls as any[]) {
-        const id = tc?.id as string | undefined
-        if (!id || navigatedToolCallIdsRef.current.has(id)) continue
-        const name = tc?.function?.name as string | undefined
-        if (!name) continue
-
-        // Define which calls should trigger navigation
-        const openToolBuilderSlugs = new Set([
-          'tool-open',
-          'tool-edit',
-          'tool-add-blueprint-node',
-          'tool-add-blueprint-edge',
-          'tool-blueprint-edit-node',
-          'tool-blueprint-remove-node',
-          'tool-blueprint-edit-edge',
-          'tool-blueprint-remove-edge',
-        ])
-        const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-
-        // Parse args if present to extract slug
-        let args: any = tc?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // keep as-is
+    // Proactive navigation on tool calls
+    useEffect(() => {
+      if (!currentConversationId || !liveMessages.length || !starshipSlug) return
+      if (!uiStreaming) return
+      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+      if (!hasStreamingAssistant) return
+      const recent = (liveMessages as any[]).slice(-10)
+      for (let i = recent.length - 1; i >= 0; i--) {
+        const msg = recent[i] as any
+        if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+        for (const tc of msg.toolCalls as any[]) {
+          const id = tc?.id as string | undefined
+          if (!id || navigatedToolCallIdsRef.current.has(id)) continue
+          const name = tc?.function?.name as string | undefined
+          if (!name) continue
+          const openToolBuilderSlugs = new Set([
+            'tool-open',
+            'tool-edit',
+            'tool-add-blueprint-node',
+            'tool-add-blueprint-edge',
+            'tool-blueprint-edit-node',
+            'tool-blueprint-remove-node',
+            'tool-blueprint-edit-edge',
+            'tool-blueprint-remove-edge',
+          ])
+          const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+          let args: any = tc?.function?.arguments
+          if (typeof args === 'string') {
+            try {
+              args = JSON.parse(args)
+            } catch {}
+          }
+          if (openToolBuilderSlugs.has(name) || name?.startsWith?.('tool-blueprint-')) {
+            const toolSlug = args?.slug || args?.toolSlug || 'new'
+            const convId = currentConversationIdRef.current || externalConversationId || null
+            const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+            try {
+              router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+            } catch {}
+            navigatedToolCallIdsRef.current.add(id)
+            return
+          }
+          if (openAgentBuilderSlugs.has(name)) {
+            const agentSlug = args?.slug || args?.agentSlug || 'new'
+            const convId = currentConversationIdRef.current || externalConversationId || null
+            const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+            try {
+              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+            } catch {}
+            navigatedToolCallIdsRef.current.add(id)
+            return
           }
         }
-
-        if (openToolBuilderSlugs.has(name) || name.startsWith?.('tool-blueprint-')) {
-          const toolSlug = args?.slug || args?.toolSlug || 'new'
-          const convId = currentConversationIdRef.current || externalConversationId || null
-          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-          try {
-            router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
-          } catch {}
-          navigatedToolCallIdsRef.current.add(id)
-          return
-        }
-
-        if (openAgentBuilderSlugs.has(name)) {
-          const agentSlug = args?.slug || args?.agentSlug || 'new'
-          const convId = currentConversationIdRef.current || externalConversationId || null
-          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-          try {
-            router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
-          } catch {}
-          navigatedToolCallIdsRef.current.add(id)
-          return
-        }
       }
-    }
-  }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
+    }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
 
-  // Detect tool completion from streaming messages
-  useEffect(() => {
-    if (!liveMessages || liveMessages.length === 0) return
-
-    // Check last few messages for tool results
-    const recentMessages = liveMessages.slice(-5)
-
-    for (const msg of recentMessages) {
-      if (msg.role === 'tool' && msg.toolCallId) {
-        const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
-
-        if (pendingCall && !pendingCall.completed) {
-          // Mark as completed
-          pendingCall.completed = true
-
-          // Extract tool arguments from the conversation history
-          // Look for assistant message with this toolCallId
-          const assistantMsg = liveMessages.find(m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === msg.toolCallId))
-
-          if (assistantMsg) {
-            const toolCall = assistantMsg.toolCalls?.find(tc => tc.id === msg.toolCallId)
-            if (toolCall?.function?.arguments) {
-              pendingCall.args = toolCall.function.arguments
-
-              // Trigger fetch after tool completes
-              handleToolComplete(pendingCall.toolName, pendingCall.args)
+    // Tool completion follow-ups
+    useEffect(() => {
+      if (!liveMessages || liveMessages.length === 0) return
+      const recentMessages = liveMessages.slice(-5)
+      for (const msg of recentMessages) {
+        if (msg.role === 'tool' && msg.toolCallId) {
+          const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
+          if (pendingCall && !pendingCall.completed) {
+            pendingCall.completed = true
+            const assistantMsg = liveMessages.find((m: any) => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === msg.toolCallId))
+            if (assistantMsg) {
+              const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === msg.toolCallId)
+              if (toolCall?.function?.arguments) {
+                pendingCall.args = toolCall.function.arguments
+                handleToolComplete(pendingCall.toolName, pendingCall.args)
+              }
             }
           }
         }
       }
-    }
-  }, [liveMessages, handleToolComplete])
+    }, [liveMessages])
 
-  // Consume SSE 'ui_action' events directly (clean channel)
-  useEffect(() => {
-    if (!currentConversationId || !lastUIAction) return
-    // Only react to UI actions while actively streaming/responding in this conversation
-    if (!uiStreaming) return
-    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-    if (!hasStreamingAssistant) return
-    try {
-      handleUIPayload(lastUIAction as any)
-    } catch {
-      // ignore
-    }
-  }, [currentConversationId, lastUIAction, handleUIPayload, uiStreaming, liveMessages])
+    // Consume clean ui_action channel
+    useEffect(() => {
+      if (!currentConversationId || !lastUIAction) return
+      if (!uiStreaming) return
+      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+      if (!hasStreamingAssistant) return
+      try {
+        handleUIPayload(lastUIAction as any)
+      } catch {}
+    }, [currentConversationId, lastUIAction, uiStreaming, liveMessages])
+
+    return null
+  }
 
   // Removed overlay UI effects
 
   // Removed streaming into in-page tool builder (handled in dedicated route)
   useEffect(() => {
     return
-  }, [currentConversationId, liveMessages])
+  }, [currentConversationId])
 
   // Removed streaming into in-page agent builder (handled in dedicated route)
   useEffect(() => {
     return
-  }, [currentConversationId, liveMessages])
+  }, [currentConversationId])
 
   // Show loading state
   if (isLoading) {
@@ -609,25 +644,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               <div className="flex-1 min-h-0">
                 <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
               </div>
+              {/* Single place for stream-dependent side-effects to avoid duplicate SSE subscriptions */}
+              <StreamSideEffects />
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>
           )}
         </ConversationStreamProvider>
 
-        {/* Floating Input Container - Always visible, position changes based on state */}
-        <div
-          ref={inputContainerRef}
-          className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
-          style={showMessagesArea ? { bottom: '0px' } : { top: '50%', transform: 'translateY(-50%)', marginTop: '-64px' }}
-        >
-          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
-            {!showMessagesArea && (
-              <div className="text-center mb-6 opacity-100">
-                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-              </div>
-            )}
+        {/* Floating Input Container - Always bottom-anchored; we animate inner translateY only */}
+        <div ref={inputContainerRef} className="absolute left-0 right-0 bottom-0 p-6 pointer-events-none z-30">
+          <motion.div
+            className="max-w-2xl mx-auto pointer-events-auto opacity-100 relative"
+            data-message-input
+            initial={false}
+            animate={{ y: isInputDocked ? 0 : -dockOffsetPx }}
+            transition={{ type: 'spring', stiffness: 210, damping: 24 }}
+            style={{ willChange: 'transform' }}
+          >
             <ConversationMessageInput
               ref={messageInputRef}
               selectedAgent={selectedAgent}
@@ -637,7 +671,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={false}
               disabled={false}
-              minimal={showMessagesArea}
+              minimal={isInputDocked && !isHeightFrozen}
               onFocus={() => {}}
               onBlur={() => {}}
               onToggleOverlay={handleToggleOverlay}
@@ -646,55 +680,64 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               budgetTokens={budgetTokens}
               onAgentChange={handleAgentChange}
             ></ConversationMessageInput>
-
-            {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
-              <div className="mt-8 opacity-100">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
-                <div className="space-y-1">
-                  {starshipConversationsData!.conversations
-                    .slice()
-                    .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
-                    .slice(0, 3)
-                    .map((conv: any) => {
-                      const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
-                      const participants = conversationParticipants?.[conv?.id] || []
-                      return (
-                        <button
-                          key={conv.id}
-                          className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
-                          onClick={() => handleRecentConversationSelect(conv.id)}
-                        >
-                          <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
-                            <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
-                            {participants.length > 0 && (
-                              <div className="flex items-center gap-2 mt-1 min-w-0">
-                                <div className="flex items-center gap-1 shrink-0">
-                                  {participants.slice(0, 3).map((agent: any) => (
-                                    <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
-                                      <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
-                                    </Avatar>
-                                  ))}
+            <AnimatePresence initial={false} mode="wait">
+              {!showMessagesArea && (
+                <motion.div key="welcome-copy" exit={{ opacity: 0, y: -12, transition: { duration: 0.2, ease: 'easeOut' } }} className="absolute inset-x-0 bottom-full mb-6 text-center opacity-100">
+                  <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                  <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence initial={false} mode="wait">
+              {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
+                <motion.div key="recent-list" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
+                  <div className="space-y-1">
+                    {starshipConversationsData!.conversations
+                      .slice()
+                      .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+                      .slice(0, 3)
+                      .map((conv: any) => {
+                        const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
+                        const participants = conversationParticipants?.[conv?.id] || []
+                        return (
+                          <button
+                            key={conv.id}
+                            className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
+                            onClick={() => handleRecentConversationSelect(conv.id)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
+                              <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
+                              {participants.length > 0 && (
+                                <div className="flex items-center gap-2 mt-1 min-w-0">
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {participants.slice(0, 3).map((agent: any) => (
+                                      <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
+                                        <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
+                                      </Avatar>
+                                    ))}
+                                  </div>
+                                  <span className="text-[12px] text-muted-foreground truncate">
+                                    {participants
+                                      .slice(0, 3)
+                                      .map((a: any) => a?.name || a?.slug || 'Agent')
+                                      .join(', ')}
+                                  </span>
+                                  {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
                                 </div>
-                                <span className="text-[12px] text-muted-foreground truncate">
-                                  {participants
-                                    .slice(0, 3)
-                                    .map((a: any) => a?.name || a?.slug || 'Agent')
-                                    .join(', ')}
-                                </span>
-                                {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </div>
       </div>
     </div>

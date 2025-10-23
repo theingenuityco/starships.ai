@@ -41,6 +41,13 @@ export class MessageService {
   }
 
   /**
+   * Update an existing message by id
+   */
+  async updateMessage(id: string, updates: Partial<MessageModel>): Promise<MessageModel | null> {
+    return this.messageRepository.update(id, updates);
+  }
+
+  /**
    * Get message by ID
    */
   async getMessage(messageId: string): Promise<MessageModel | null> {

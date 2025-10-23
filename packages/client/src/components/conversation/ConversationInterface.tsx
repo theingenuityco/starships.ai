@@ -6,8 +6,8 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useConversationStreamed, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
-import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import { useConversationAgents, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { ConversationStreamProvider, useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
@@ -65,9 +65,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track toolCallIds we've already navigated for to avoid duplicate route pushes
   const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
 
-  // Track streaming state for current conversation to focus input on completion
-  const { isStreaming: uiStreaming, messages: liveMessages = [], lastUIAction } = useConversationStreamed(currentConversationId, starshipId, { enabled: true })
-  const prevStreamingRef = useRef(false)
   const queryClient = useQueryClient()
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
@@ -109,9 +106,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Kick off prefetch after showMessagesArea is computed
   const shouldPrefetchParticipantsRef = useRef<boolean | null>(null)
 
-  // Derive message presence and UI gating from streamed query (not store)
-  const hasMessages = Array.isArray(liveMessages) && liveMessages.length > 0
-  const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiStreaming)
+  // Gate UI by presence of a conversation id; streaming details are handled in context consumers
+  const showMessagesArea = Boolean(currentConversationId)
 
   useEffect(() => {
     // Initialize ref after showMessagesArea is available
@@ -245,26 +241,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [currentConversationId])
 
-  // Focus input when streaming transitions from true -> false
+  // Focus after conversation becomes ready
   useEffect(() => {
-    const was = prevStreamingRef.current
-    if (was && !uiStreaming) {
-      setTimeout(() => {
-        messageInputRef.current?.focusInput?.()
-      }, 50)
-    }
-    prevStreamingRef.current = uiStreaming
-  }, [uiStreaming])
-
-  // Focus after first message or when conversation becomes ready
-  useEffect(() => {
-    if (hasMessages && currentConversationId) {
+    if (currentConversationId) {
       const t = setTimeout(() => {
         messageInputRef.current?.focusInput?.()
       }, 100)
       return () => clearTimeout(t)
     }
-  }, [hasMessages, currentConversationId])
+  }, [currentConversationId])
 
   // Removed in-page builder save/cancel handlers
 
@@ -320,7 +305,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         case 'tool_call_detected': {
           const toolName = (payload as any).toolName
           const toolCallId = (payload as any).toolCallId
-
 
           // Store tool call info for later completion handling
           if (toolCallId) {
@@ -391,7 +375,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Agent tools - fetch and sync agent data
         const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
         if (agentTools.includes(toolName) && toolArgs?.slug) {
-
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
 
@@ -410,7 +393,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           'tool-blueprint-remove-edge',
         ]
         if (toolTools.includes(toolName) && toolArgs?.slug) {
-
           // Fetch complete tool data by slug
           const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
 
@@ -423,150 +405,143 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [starshipId]
   )
 
-  // Detect special UI action responses from assistant messages (back-compat path)
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length) return
-    // Only handle back-compat UI actions during active streaming of the current turn
-    if (!uiStreaming) return
-    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-    if (!hasStreamingAssistant) return
+  // Stream-dependent side-effects are handled within the provider context to avoid duplicate SSE connections
+  function StreamSideEffects() {
+    const ctx = useConversationStreamContextOptional()
+    const uiStreaming = ctx?.isStreaming
+    const liveMessages = (ctx?.messages as any[]) || []
+    const lastUIAction = (ctx as any)?.lastUIAction
+    const prevStreamingRef = useRef(false)
 
-    const lastMessage = liveMessages[liveMessages.length - 1]
-    if (lastMessage?.role === 'assistant' && lastMessage?.content) {
-      try {
-        const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
-        handleUIPayload(payload)
-      } catch {
-        // Not JSON or doesn't have UI action, ignore
+    // Focus input when streaming transitions from true -> false
+    useEffect(() => {
+      const was = prevStreamingRef.current
+      if (was && !uiStreaming) {
+        setTimeout(() => {
+          messageInputRef.current?.focusInput?.()
+        }, 50)
       }
-    }
-  }, [currentConversationId, liveMessages, handleUIPayload])
+      prevStreamingRef.current = Boolean(uiStreaming)
+    }, [uiStreaming])
 
-  // Proactively navigate when assistant tool calls are detected (without waiting for ui_action)
-  useEffect(() => {
-    if (!currentConversationId || !liveMessages.length || !starshipSlug) return
-    // Only react during active streaming to avoid replays causing navigation
-    if (!uiStreaming) return
-    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-    if (!hasStreamingAssistant) return
+    // Back-compat UI actions parsed from assistant message JSON
+    useEffect(() => {
+      if (!currentConversationId || !liveMessages.length) return
+      if (!uiStreaming) return
+      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+      if (!hasStreamingAssistant) return
+      const lastMessage = liveMessages[liveMessages.length - 1]
+      if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+        try {
+          const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
+          handleUIPayload(payload)
+        } catch {}
+      }
+    }, [currentConversationId, liveMessages, uiStreaming])
 
-    // Scan the most recent assistant messages for new tool calls
-    const recent = (liveMessages as any[]).slice(-10)
-    for (let i = recent.length - 1; i >= 0; i--) {
-      const msg = recent[i] as any
-      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
-      for (const tc of msg.toolCalls as any[]) {
-        const id = tc?.id as string | undefined
-        if (!id || navigatedToolCallIdsRef.current.has(id)) continue
-        const name = tc?.function?.name as string | undefined
-        if (!name) continue
-
-        // Define which calls should trigger navigation
-        const openToolBuilderSlugs = new Set([
-          'tool-open',
-          'tool-edit',
-          'tool-add-blueprint-node',
-          'tool-add-blueprint-edge',
-          'tool-blueprint-edit-node',
-          'tool-blueprint-remove-node',
-          'tool-blueprint-edit-edge',
-          'tool-blueprint-remove-edge',
-        ])
-        const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-
-        // Parse args if present to extract slug
-        let args: any = tc?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // keep as-is
+    // Proactive navigation on tool calls
+    useEffect(() => {
+      if (!currentConversationId || !liveMessages.length || !starshipSlug) return
+      if (!uiStreaming) return
+      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+      if (!hasStreamingAssistant) return
+      const recent = (liveMessages as any[]).slice(-10)
+      for (let i = recent.length - 1; i >= 0; i--) {
+        const msg = recent[i] as any
+        if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+        for (const tc of msg.toolCalls as any[]) {
+          const id = tc?.id as string | undefined
+          if (!id || navigatedToolCallIdsRef.current.has(id)) continue
+          const name = tc?.function?.name as string | undefined
+          if (!name) continue
+          const openToolBuilderSlugs = new Set([
+            'tool-open',
+            'tool-edit',
+            'tool-add-blueprint-node',
+            'tool-add-blueprint-edge',
+            'tool-blueprint-edit-node',
+            'tool-blueprint-remove-node',
+            'tool-blueprint-edit-edge',
+            'tool-blueprint-remove-edge',
+          ])
+          const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+          let args: any = tc?.function?.arguments
+          if (typeof args === 'string') {
+            try {
+              args = JSON.parse(args)
+            } catch {}
+          }
+          if (openToolBuilderSlugs.has(name) || name?.startsWith?.('tool-blueprint-')) {
+            const toolSlug = args?.slug || args?.toolSlug || 'new'
+            const convId = currentConversationIdRef.current || externalConversationId || null
+            const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+            try {
+              router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+            } catch {}
+            navigatedToolCallIdsRef.current.add(id)
+            return
+          }
+          if (openAgentBuilderSlugs.has(name)) {
+            const agentSlug = args?.slug || args?.agentSlug || 'new'
+            const convId = currentConversationIdRef.current || externalConversationId || null
+            const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+            try {
+              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+            } catch {}
+            navigatedToolCallIdsRef.current.add(id)
+            return
           }
         }
-
-        if (openToolBuilderSlugs.has(name) || name.startsWith?.('tool-blueprint-')) {
-          const toolSlug = args?.slug || args?.toolSlug || 'new'
-          const convId = currentConversationIdRef.current || externalConversationId || null
-          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-          try {
-            router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
-          } catch {}
-          navigatedToolCallIdsRef.current.add(id)
-          return
-        }
-
-        if (openAgentBuilderSlugs.has(name)) {
-          const agentSlug = args?.slug || args?.agentSlug || 'new'
-          const convId = currentConversationIdRef.current || externalConversationId || null
-          const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-          try {
-            router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
-          } catch {}
-          navigatedToolCallIdsRef.current.add(id)
-          return
-        }
       }
-    }
-  }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
+    }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
 
-  // Detect tool completion from streaming messages
-  useEffect(() => {
-    if (!liveMessages || liveMessages.length === 0) return
-
-    // Check last few messages for tool results
-    const recentMessages = liveMessages.slice(-5)
-
-    for (const msg of recentMessages) {
-      if (msg.role === 'tool' && msg.toolCallId) {
-        const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
-
-        if (pendingCall && !pendingCall.completed) {
-          // Mark as completed
-          pendingCall.completed = true
-
-          // Extract tool arguments from the conversation history
-          // Look for assistant message with this toolCallId
-          const assistantMsg = liveMessages.find(m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === msg.toolCallId))
-
-          if (assistantMsg) {
-            const toolCall = assistantMsg.toolCalls?.find(tc => tc.id === msg.toolCallId)
-            if (toolCall?.function?.arguments) {
-              pendingCall.args = toolCall.function.arguments
-
-              // Trigger fetch after tool completes
-              handleToolComplete(pendingCall.toolName, pendingCall.args)
+    // Tool completion follow-ups
+    useEffect(() => {
+      if (!liveMessages || liveMessages.length === 0) return
+      const recentMessages = liveMessages.slice(-5)
+      for (const msg of recentMessages) {
+        if (msg.role === 'tool' && msg.toolCallId) {
+          const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
+          if (pendingCall && !pendingCall.completed) {
+            pendingCall.completed = true
+            const assistantMsg = liveMessages.find((m: any) => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === msg.toolCallId))
+            if (assistantMsg) {
+              const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === msg.toolCallId)
+              if (toolCall?.function?.arguments) {
+                pendingCall.args = toolCall.function.arguments
+                handleToolComplete(pendingCall.toolName, pendingCall.args)
+              }
             }
           }
         }
       }
-    }
-  }, [liveMessages, handleToolComplete])
+    }, [liveMessages])
 
-  // Consume SSE 'ui_action' events directly (clean channel)
-  useEffect(() => {
-    if (!currentConversationId || !lastUIAction) return
-    // Only react to UI actions while actively streaming/responding in this conversation
-    if (!uiStreaming) return
-    const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-    if (!hasStreamingAssistant) return
-    try {
-      handleUIPayload(lastUIAction as any)
-    } catch {
-      // ignore
-    }
-  }, [currentConversationId, lastUIAction, handleUIPayload, uiStreaming, liveMessages])
+    // Consume clean ui_action channel
+    useEffect(() => {
+      if (!currentConversationId || !lastUIAction) return
+      if (!uiStreaming) return
+      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
+      if (!hasStreamingAssistant) return
+      try {
+        handleUIPayload(lastUIAction as any)
+      } catch {}
+    }, [currentConversationId, lastUIAction, uiStreaming, liveMessages])
+
+    return null
+  }
 
   // Removed overlay UI effects
 
   // Removed streaming into in-page tool builder (handled in dedicated route)
   useEffect(() => {
     return
-  }, [currentConversationId, liveMessages])
+  }, [currentConversationId])
 
   // Removed streaming into in-page agent builder (handled in dedicated route)
   useEffect(() => {
     return
-  }, [currentConversationId, liveMessages])
+  }, [currentConversationId])
 
   // Show loading state
   if (isLoading) {
@@ -609,6 +584,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               <div className="flex-1 min-h-0">
                 <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
               </div>
+              {/* Single place for stream-dependent side-effects to avoid duplicate SSE subscriptions */}
+              <StreamSideEffects />
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>

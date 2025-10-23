@@ -118,7 +118,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isFetching } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
     const isStreamingEffective = Boolean(isAssistantStreaming && isFetching)
-    const shouldShowStop = Boolean(isStreamingEffective || sending || isResponding || isFetching)
+    // Show stop button during pre-stream window and while streaming/responding
+    const [preStreamPending, setPreStreamPending] = useState(false)
+    const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
+    const showLoaderRing = Boolean(isAssistantStreaming || isResponding)
 
     // Track last known conversationId to enable stop during pre-stream window
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
@@ -127,6 +130,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         lastConversationIdRef.current = conversationId
       }
     }, [conversationId])
+    // Hide pre-stream indicator when not active
+    useEffect(() => {
+      const anyActive = Boolean(isAssistantStreaming || isResponding)
+      if (!anyActive) setPreStreamPending(false)
+    }, [isAssistantStreaming, isResponding])
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
@@ -208,6 +216,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       try {
         setSending(true)
+        setPreStreamPending(true)
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
         if (!currentConversationId) {
@@ -252,6 +261,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
             // Restore message on error
             setMessage(messageToSend)
+            setPreStreamPending(false)
           })
           .finally(() => {
             setSending(false)
@@ -264,6 +274,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
+        setPreStreamPending(false)
       }
     }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, onAgentChange, starshipAgents])
 
@@ -290,6 +301,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         try {
           setSending(true)
+          setPreStreamPending(true)
           // Create conversation if one doesn't exist
           let currentConversationId = conversationId
           if (!currentConversationId) {
@@ -324,6 +336,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
+              setPreStreamPending(false)
             })
             .finally(() => {
               setSending(false)
@@ -333,6 +346,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch (error) {
           toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
           setSending(false)
+          setPreStreamPending(false)
         }
       },
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
@@ -1378,6 +1392,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     onClick={() => {
                       const id = lastConversationIdRef.current
                       if (!id) return
+                      setPreStreamPending(false)
                       void stopConversation(id)
                     }}
                     variant="outline"
@@ -1388,7 +1403,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   >
                     <Icon name="stop" weight="fill" className="h-4 w-4" />
                   </Button>
-                  <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                  {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
                 </div>
               ) : (
                 <Button

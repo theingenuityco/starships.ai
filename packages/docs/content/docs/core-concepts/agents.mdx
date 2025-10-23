@@ -53,13 +53,13 @@ graph TD
     TOOL --> RESULT[mutate: Add Tool Result]
     RESULT --> LLM
     
-    style START fill:#22c55e
-    style END fill:#22c55e
-    style LLM fill:#3b82f6
-    style CHECK fill:#f59e0b
-    style ARGS fill:#8b5cf6
-    style TOOL fill:#10b981
-    style RESULT fill:#06b6d4
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style LLM fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style ARGS fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style TOOL fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style RESULT fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
 ```
 
 ### How Each Node Works
@@ -72,46 +72,10 @@ graph TD
 - <span style={{color: '#0066cc'}}>**[mutate](/core-concepts/blueprints#mutate-node)** 🔗</span>: Updates memory with tool results for next LLM cycle
 - <span style={{color: '#0066cc'}}>**[end](/core-concepts/blueprints#end-node)** 🔗</span>: Returns response when agent has complete answer
 
-### The Intelligence Loop
-
-This universal pattern enables agents to:
-- **Analyze** requests against available capabilities
-- **Gather** additional data through tool execution  
-- **Synthesize** information into helpful responses
-- **Remember** context for future interactions
 
 <Callout type="info">
-**Want to build custom workflows?** Learn about all blueprint nodes and advanced patterns in our [Blueprint Reference Guide](/core-concepts/blueprints).
+**Blueprint vs. Creation**: This diagram shows how agents execute tasks internally using blueprints. For how meta-agents like Gaia create other agents, see the individual [meta-agent documentation](/agents/gaia).
 </Callout>
-
-## Memory Architecture
-
-**Conversation Memory** (`state.messages`):
-- Remembers what you've discussed
-- Maintains context across interactions
-- Learns your preferences over time
-
-**Tool Memory** (`state.tools`):
-- Knows what capabilities are available
-- Remembers successful tool combinations
-- Adapts to new tools automatically
-
-**Custom Memory** (`state.*`):
-- Stores workflow-specific data
-- Maintains progress on multi-step tasks
-- Keeps track of user preferences and settings
-
-### Memory in Action
-When you ask "Continue where we left off," the agent knows:
-- What you were working on
-- Which tools were being used
-- What decisions were made
-- What still needs to be completed
-
-**Shared Memory** (between agents):
-- Team context and coordination
-- Cross-agent workflow results  
-- Organizational knowledge base
 
 ## How Agents Process Requests
 
@@ -157,34 +121,113 @@ Agent responds: "Your team completed 12 tasks this week, 3 ahead of schedule..."
 - **Composable**: Agents can work together on complex workflows
 - **Learning**: Every interaction improves decision-making
 
+<Callout type="info">
+**Want to build custom workflows?** Learn about all blueprint nodes and advanced patterns in our [Blueprint Reference Guide](/core-concepts/blueprints).
+</Callout>
+
+## Agent Memory
+
+Agents maintain context across conversations:
+- **Remember what you've discussed** and your preferences
+- **Adapt to new capabilities** when tools are added
+- **Share context** with other agents when working together
+
+This persistent memory is what makes agents intelligent teammates rather than simple chatbots.
+
+## Building Your First Agent
+
+<Steps>
+<Step>
+
+### Choose Your Approach
+
+**Conversational** (Recommended for beginners):
+- Chat with Gaia to describe your needs
+- Iterate through natural conversation
+- Deploy immediately
+
+**Marketplace Templates** (For quick deployment):
+- Browse pre-built agent templates in the [Marketplace](/marketplace)
+- Deploy proven solutions for common use cases
+- Customize after deployment as needed
+
+</Step>
+
+<Step>
+
+### Define Agent Purpose
+
+**Clear Scope**: What specific problem does this agent solve?
+**Success Metrics**: How will you measure agent effectiveness?
+**Boundaries**: What should the agent NOT do?
+
+**Example Scoping**:
+- **Purpose**: Process customer support tickets automatically
+- **Success**: 80% resolution rate with under 2-minute response time
+- **Boundaries**: Cannot offer refunds over $100, escalates billing issues to humans
+
+</Step>
+
+<Step>
+
+### Deploy and Iterate
+
+**Start Simple**: Begin with core functionality
+**Monitor Performance**: Track usage patterns and success rates
+**Expand Gradually**: Add tools and capabilities based on real usage
+**Version Control**: Track changes and improvements over time
+
+</Step>
+</Steps>
+
 ## Agent Creation Framework
 
 The platform provides multiple approaches to create agents:
 
-### Conversational Creation
+### Conversational Creation with Gaia
 **Best for**: Rapid prototyping, business users, iterative development
 
 ```
 User: "I need an agent that processes customer feedback and generates reports"
-Meta-Agent: Creates agent with appropriate tools, workflows, and reporting capabilities
+Gaia: Creates agent with appropriate tools, workflows, and reporting capabilities
 Result: Working agent ready immediately with option to refine
 ```
+
+**How Gaia helps**:
+- Understands business requirements in natural language
+- Selects appropriate tools and capabilities automatically
+- Designs optimal workflows for your specific use case
+- Tests and validates the agent before deployment
+
+Learn more about [Gaia's capabilities](/agents/gaia).
+
+### Marketplace Deployment
+**Best for**: Quick starts, proven solutions, common use cases
+
+Deploy pre-built agent templates from the marketplace:
+- **Browse by category**: Coding, creative, analysis, support, automation
+- **One-click deployment**: Instant agent creation from templates
+- **Customize post-deployment**: Modify tools, prompts, and configurations
+
+Explore available templates in the [Agent Marketplace](/marketplace).
 
 ### Code-First Development
 **Best for**: Developers, complex integrations, version control
 
-Developers can export agents created through conversation into code for:
+<Callout type="warning" title="🚧 In Development">
+**SDK Coming Soon**: The Starships SDK for programmatic agent creation is currently in development.
+</Callout>
+
+**Planned capabilities**:
+- Export agents created through conversation into code
 - Version control and team collaboration
 - CI/CD pipeline integration  
-- Complex custom integrations
 - Programmatic agent management
 
-### Template-Based Creation
-**Best for**: Consistent deployment, enterprise standards, rapid scaling
-
-- Start with proven agent templates
-- Customize for specific use cases
-- Deploy across teams with standard configurations
+**Current options for developers**:
+- Use REST API endpoints for integration
+- Export agent configurations for backup/restore
+- Template-based deployment at scale
 
 ## Meta-Agents: The Creator Framework
 
@@ -216,34 +259,11 @@ Developers can export agents created through conversation into code for:
   </Card>
 </Cards>
 
-### Meta-Agent Capabilities
-
-**Gaia's Framework Knowledge**:
-```mermaid
-graph TB
-    GAIA[🌍 Gaia] --> TOOLS[Tool Selection]
-    GAIA --> CONFIG[Agent Configuration]
-    GAIA --> BLUEPRINT[Blueprint Design]
-    GAIA --> TEST[Testing & Validation]
-    
-    TOOLS --> |agent-list| DB1[Available Agents]
-    TOOLS --> |tool-list| DB2[Available Tools]
-    CONFIG --> |agent-edit| DB3[System Prompts]
-    CONFIG --> |agent-assign-tool| DB4[Tool Assignment]
-    BLUEPRINT --> |blueprint-lint| DB5[Workflow Validation]
-    TEST --> |agent-test| DB6[Testing Scenarios]
-    
-    style GAIA fill:#c8e6c9
-    style TOOLS fill:#e8f5e8
-    style CONFIG fill:#e8f5e8
-    style BLUEPRINT fill:#e8f5e8
-    style TEST fill:#e8f5e8
-```
 
 ## Agent Publishing & Sharing
 
-<Callout type="info" title="Feature In Development">
-The agent marketplace and publishing system is currently being developed.
+<Callout type="warning" title="🚧 Marketplace In Development">
+**Coming Q2 2025**: The agent marketplace and publishing system is currently being developed.
 </Callout>
 
 **Planned Publishing Framework**:
@@ -254,57 +274,11 @@ The agent marketplace and publishing system is currently being developed.
 - **Quality Assurance**: Community ratings, reviews, and validation
 - **Template System**: Convert successful agents into reusable templates
 
-**Publishing Workflow** (Coming Soon):
+**Publishing Workflow** (Future):
 - Publish agents through the web interface
 - Set visibility and sharing permissions
 - Browse and install community agents
 - Track versions and updates automatically
-
-## Building Your First Agent
-
-<Steps>
-<Step>
-
-### Choose Your Approach
-
-**Conversational** (Recommended for beginners):
-- Chat with Gaia to describe your needs
-- Iterate through natural conversation
-- Deploy immediately
-
-**Code-First** (For developers):
-- Use CLI and SDK for full control
-- Version control and CI/CD integration
-- Export conversational agents to code
-
-</Step>
-
-<Step>
-
-### Define Agent Purpose
-
-**Clear Scope**: What specific problem does this agent solve?
-**Success Metrics**: How will you measure agent effectiveness?
-**Boundaries**: What should the agent NOT do?
-
-**Example Scoping**:
-- **Purpose**: Process customer support tickets automatically
-- **Success**: 80% resolution rate with under 2-minute response time
-- **Boundaries**: Cannot offer refunds over $100, escalates billing issues to humans
-
-</Step>
-
-<Step>
-
-### Deploy and Iterate
-
-**Start Simple**: Begin with core functionality
-**Monitor Performance**: Track usage patterns and success rates
-**Expand Gradually**: Add tools and capabilities based on real usage
-**Version Control**: Track changes and improvements over time
-
-</Step>
-</Steps>
 
 ## Common Agent Patterns
 

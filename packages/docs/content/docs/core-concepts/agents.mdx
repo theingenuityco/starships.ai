@@ -214,20 +214,15 @@ Explore available templates in the [Agent Marketplace](/marketplace).
 ### Code-First Development
 **Best for**: Developers, complex integrations, version control
 
-<Callout type="warning" title="🚧 In Development">
-**SDK Coming Soon**: The Starships SDK for programmatic agent creation is currently in development.
-</Callout>
+Use our CLI and SDK for programmatic agent creation:
 
-**Planned capabilities**:
-- Export agents created through conversation into code
-- Version control and team collaboration
-- CI/CD pipeline integration  
-- Programmatic agent management
+```bash
+npm install -g @starships/cli
+starships init my-agent
+starships deploy
+```
 
-**Current options for developers**:
-- Use REST API endpoints for integration
-- Export agent configurations for backup/restore
-- Template-based deployment at scale
+Learn more in the [CLI Quickstart](/getting-started/quickstart).
 
 ## Meta-Agents: The Creator Framework
 

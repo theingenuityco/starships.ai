@@ -1,7 +1,7 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
@@ -766,6 +766,42 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return false
   }, [chunks])
 
+  // Pre-stream awaiting timeout guard to avoid sticky typing indicator after cancellations
+  const preStreamAwaiting = useMemo(() => {
+    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
+    // Must be actively fetching SSE but without any live stream hint yet
+    if (messagesQuery.fetchStatus !== 'fetching') return false
+
+    let lastUserIdx = -1
+    for (let i = computedMessages.length - 1; i >= 0; i--) {
+      if (computedMessages[i].role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+    if (lastUserIdx === -1) return false
+
+    // If any assistant message exists after the user, we defer to the main awaiting logic
+    for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
+      if (computedMessages[i].role === 'assistant') {
+        return false
+      }
+    }
+    // No assistant yet, fetching, and no live hint — show briefly
+    return !hasLiveStreamHint
+  }, [computedMessages, messagesQuery.fetchStatus, hasLiveStreamHint])
+
+  const [preStreamExpired, setPreStreamExpired] = useState(false)
+  useEffect(() => {
+    if (!preStreamAwaiting) {
+      setPreStreamExpired(false)
+      return
+    }
+    setPreStreamExpired(false)
+    const t = setTimeout(() => setPreStreamExpired(true), 5000)
+    return () => clearTimeout(t)
+  }, [preStreamAwaiting])
+
   // Extract last UI action payload (from 'ui_action' SSE events) for consumers
   const lastUIAction = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return null
@@ -840,12 +876,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    // Show awaiting immediately after a user turn while the stream is fetching,
-    // even before any live-stream hint has arrived.
-    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
-    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
+    // Show awaiting immediately after a user turn while the stream is fetching.
+    // If we don't yet have a live-stream hint, cap the indicator with a short timeout to avoid stickiness after cancellations.
+    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching' && (!preStreamExpired || hasLiveStreamHint)
+    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching' && (!preStreamExpired || hasLiveStreamHint)
     return false
-  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent])
+  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent, preStreamExpired, hasLiveStreamHint])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant

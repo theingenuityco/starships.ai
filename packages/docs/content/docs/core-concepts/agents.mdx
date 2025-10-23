@@ -169,17 +169,38 @@ This persistent memory is what makes agents intelligent teammates rather than si
 <Steps>
 <Step>
 
-### Choose Your Approach
+### Choose Your Creation Method
 
-**Conversational** (Recommended for beginners):
-- Chat with Gaia to describe your needs
-- Iterate through natural conversation
-- Deploy immediately
+**Conversational with Gaia** (Recommended for beginners):
+- **Best for**: Rapid prototyping, business users, iterative development
+- Chat with Gaia to describe your needs in natural language
+- Gaia understands requirements and selects appropriate tools automatically
+- Designs optimal workflows and validates before deployment
+- Example: "I need an agent that processes customer feedback and generates reports"
+
+Learn more about [Gaia's capabilities](/agents/gaia).
 
 **Marketplace Templates** (For quick deployment):
-- Browse pre-built agent templates in the [Marketplace](/marketplace)
-- Deploy proven solutions for common use cases
-- Customize after deployment as needed
+- **Best for**: Quick starts, proven solutions, common use cases
+- Browse by category: Coding, creative, analysis, support, automation
+- One-click deployment with instant agent creation
+- Customize post-deployment to modify tools, prompts, and configurations
+
+Explore available templates in the [Agent Marketplace](/marketplace).
+
+**Code-First Development** (For developers):
+- **Best for**: Complex integrations, version control, programmatic management
+
+<Callout type="warning" title="🚧 Coming Soon">
+**CLI Package**: Programmatic agent creation via npm package is currently in development.
+</Callout>
+
+**Planned approach**:
+```bash
+npm install -g @starships/cli
+starships init my-agent
+starships deploy
+```
 
 </Step>
 
@@ -209,51 +230,6 @@ This persistent memory is what makes agents intelligent teammates rather than si
 
 </Step>
 </Steps>
-
-## Agent Creation Framework
-
-The platform provides multiple approaches to create agents:
-
-### Conversational Creation with Gaia
-**Best for**: Rapid prototyping, business users, iterative development
-
-```
-User: "I need an agent that processes customer feedback and generates reports"
-Gaia: Creates agent with appropriate tools, workflows, and reporting capabilities
-Result: Working agent ready immediately with option to refine
-```
-
-**How Gaia helps**:
-- Understands business requirements in natural language
-- Selects appropriate tools and capabilities automatically
-- Designs optimal workflows for your specific use case
-- Tests and validates the agent before deployment
-
-Learn more about [Gaia's capabilities](/agents/gaia).
-
-### Marketplace Deployment
-**Best for**: Quick starts, proven solutions, common use cases
-
-Deploy pre-built agent templates from the marketplace:
-- **Browse by category**: Coding, creative, analysis, support, automation
-- **One-click deployment**: Instant agent creation from templates
-- **Customize post-deployment**: Modify tools, prompts, and configurations
-
-Explore available templates in the [Agent Marketplace](/marketplace).
-
-### Code-First Development
-**Best for**: Developers, complex integrations, version control
-
-<Callout type="warning" title="🚧 Coming Soon">
-**CLI Package**: Programmatic agent creation via npm package is currently in development.
-</Callout>
-
-**Planned approach**:
-```bash
-npm install -g @starships/cli
-starships init my-agent
-starships deploy
-```
 
 ## Agent Publishing & Sharing
 

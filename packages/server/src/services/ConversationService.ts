@@ -65,6 +65,8 @@ export class ConversationService {
   private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
+  // Track whether the currently active streaming assistant placeholder has been persisted
+  private activeStreamPersisted: Set<string> = new Set();
   /**
    * Compute a non-overlapping append by trimming any prefix of 'fragment' that
    * already exists as a suffix of 'base'. This guards against providers that
@@ -116,6 +118,58 @@ export class ConversationService {
 
     ConversationService.instance = this;
     return this;
+  }
+
+  /** Persist the currently active streaming assistant partial (content/reasoning only) if any. */
+  private async persistActivePartial(conversationId: string): Promise<MessageModel | null> {
+    // If we've already persisted the active stream for this conversation, skip
+    if (this.activeStreamPersisted.has(conversationId)) {
+      return null;
+    }
+
+    // Reconstruct partials from ringBuffer/accumulators
+    let partialContent = this.streamingContent.get(conversationId) || '';
+    const partialReasoning = this.streamingReasoning.get(conversationId) || '';
+
+    try {
+      const rb = this.ringBuffer.get(conversationId) || [];
+      if (Array.isArray(rb) && rb.length > 0) {
+        const sorted = [...rb].sort((a, b) => Number(a.position) - Number(b.position));
+        let agg = '';
+        for (const item of sorted) {
+          const frag = typeof item.content === 'string' ? item.content : '';
+          agg += ConversationService.computeNonOverlappingAppend(agg, frag);
+        }
+        if (agg && agg.length > 0) {
+          partialContent = agg;
+        }
+      }
+    } catch {}
+
+    // Only persist if we have something meaningful
+    if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
+      const agentId = this.currentAgentForConversation.get(conversationId) || undefined;
+      const persistedMsg = await this.messageService.createMessage({
+        conversationId,
+        role: 'assistant',
+        content: partialContent || '',
+        messageType: 'agent_response',
+        ...(partialReasoning ? { reasoning: partialReasoning } : {}),
+        ...(agentId ? ({ agentId } as any) : {}),
+      });
+      // Mark both per-turn and active-stream persisted flags
+      this.assistantPersistedThisTurn.add(conversationId);
+      this.activeStreamPersisted.add(conversationId);
+
+      // Clear accumulators for the active stream so a future stream can start cleanly
+      this.streamingContent.delete(conversationId);
+      this.streamingToolCalls.delete(conversationId);
+      this.streamingReasoning.delete(conversationId);
+      this.ringBuffer.delete(conversationId);
+
+      return persistedMsg;
+    }
+    return null;
   }
 
   /**
@@ -524,44 +578,8 @@ export class ConversationService {
       }
     } catch {}
 
-    // Persist partials if available
-    const canPersistPartial = !this.assistantPersistedThisTurn.has(conversationId);
-    let partialContent = this.streamingContent.get(conversationId) || '';
-    const partialReasoning = this.streamingReasoning.get(conversationId) || '';
-
-    // Always prefer reconstructing from ringBuffer when available to dedupe any interleaved/raced chunks
-    try {
-      const rb = this.ringBuffer.get(conversationId) || [];
-      if (Array.isArray(rb) && rb.length > 0) {
-        const sorted = [...rb].sort((a, b) => Number(a.position) - Number(b.position));
-        let agg = '';
-        for (const item of sorted) {
-          const frag = typeof item.content === 'string' ? item.content : '';
-          agg += ConversationService.computeNonOverlappingAppend(agg, frag);
-        }
-        if (agg && agg.length > 0) {
-          partialContent = agg;
-        }
-      }
-    } catch {}
-
-    let persistedMsg: MessageModel | null = null;
-    if (
-      canPersistPartial &&
-      ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0))
-    ) {
-      const agentId = this.currentAgentForConversation.get(conversationId) || undefined;
-      persistedMsg = await this.messageService.createMessage({
-        conversationId,
-        role: 'assistant',
-        content: partialContent || '',
-        messageType: 'agent_response',
-        ...(partialReasoning ? { reasoning: partialReasoning } : {}),
-        ...(agentId ? ({ agentId } as any) : {}),
-      });
-      // Mark persisted to avoid duplicate save if stop is called multiple times
-      this.assistantPersistedThisTurn.add(conversationId);
-    }
+    // Persist the active streaming partial (if any), regardless of prior assistant messages this turn
+    let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId);
 
     // Finalize stream on SSE
     if (this.streamingService) {
@@ -838,6 +856,8 @@ export class ConversationService {
         this.streamingReasoning.delete(conversationId);
         // Clear assistant-persisted flag at the start of a new top-level turn
         this.assistantPersistedThisTurn.delete(conversationId);
+        // Reset active stream persisted guard for this new turn
+        this.activeStreamPersisted.delete(conversationId);
         // Seed message index tracking to the current baseline so prior history isn't re-persisted
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent.data?.execution;
@@ -849,6 +869,24 @@ export class ConversationService {
           this.lastPersistedIndex.set(conversationId, baselineIndex);
         }
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
+        break;
+      }
+
+      case 'workflow_paused': {
+        // Persist the current partial assistant message so that reloads include it while paused
+        try {
+          const persisted = await this.persistActivePartial(conversationId);
+          if (persisted && this.streamingService && this.streamingService.isActive(conversationId)) {
+            try {
+              await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persisted });
+            } catch {}
+            try {
+              await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('[STREAMING] Failed to persist partial on workflow_paused:', e);
+        }
         break;
       }
 
@@ -1496,6 +1534,13 @@ export class ConversationService {
                 // Mark that an assistant message has been persisted for this turn
                 if (role === 'assistant') {
                   this.assistantPersistedThisTurn.add(conversationId);
+                  // Reset streaming accumulators so subsequent assistant responses in the same turn
+                  // get their own placeholder and can be persisted independently
+                  this.streamingContent.delete(conversationId);
+                  this.streamingReasoning.delete(conversationId);
+                  this.streamingToolCalls.delete(conversationId);
+                  this.ringBuffer.delete(conversationId);
+                  this.activeStreamPersisted.delete(conversationId);
                 }
 
                 // Broadcast via SSE if streaming is active

@@ -75,9 +75,10 @@ module.exports = {
     function ({ addUtilities }) {
       const newUtilities = {
         '.frosted-glass-card': {
-          background: 'linear-gradient(135deg, hsl(var(--card) / 0.30) 0%, hsl(var(--card) / 0.20) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          background: 'transparent !important',
+          backgroundColor: 'transparent !important',
+          backdropFilter: 'blur(12px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(12px) saturate(160%)',
           border: 'var(--frosted-border)',
         },
       }

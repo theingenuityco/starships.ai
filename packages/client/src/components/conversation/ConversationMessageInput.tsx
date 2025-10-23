@@ -1007,12 +1007,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
         Placeholder.configure({ placeholder: placeholderText }),
         Mention.extend({
-          selectable: true,
+          selectable: false,
           addNodeView() {
             return ReactNodeViewRenderer(MentionNodeView as any)
           },
         }).configure({
-          deleteTriggerWithBackspace: true,
+          // Prevent deleting the mention by backspace; enforcement relies on it
+          deleteTriggerWithBackspace: false,
           // Force display as @name by resolving the agent name from id if needed
           renderText: ({ options, node }: any) => {
             const id = node?.attrs?.id
@@ -1046,6 +1047,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           if (isSuggestionActiveRef.current) {
             // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
+          }
+          // Block Backspace when the cursor is within the leading mention or immediately after it
+          if (event.key === 'Backspace') {
+            try {
+              const json: any = (tiptap as any)?.getJSON?.()
+              const docContent = Array.isArray(json?.content) ? json.content : []
+              const firstBlock = docContent[0]
+              const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+              const first = blockContent[0]
+              const second = blockContent[1]
+              const firstIsMention = first && first.type === 'mention'
+              // If selection is at the very start or right after a single space following the mention, prevent deletion
+              const selFrom = (tiptap as any)?.state?.selection?.from || 0
+              const posAtStart = selFrom <= 1
+              if (firstIsMention) {
+                if (posAtStart) {
+                  event.preventDefault()
+                  return true
+                }
+                // If immediately after the mention + space, prevent deleting the mention/space pair
+                try {
+                  const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
+                  if (hasLeadingSpace) {
+                    // Rough heuristic: forbid backspace for the first two typed positions
+                    const anchor = (tiptap as any)?.state?.selection?.anchor || 0
+                    if (anchor <= 2) {
+                      event.preventDefault()
+                      return true
+                    }
+                  }
+                } catch {}
+              }
+            } catch {}
           }
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault()

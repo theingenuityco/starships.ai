@@ -77,7 +77,6 @@ export function useCreateConversation() {
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
         })
       }
-      toast.success('New conversation created successfully!')
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create conversation'

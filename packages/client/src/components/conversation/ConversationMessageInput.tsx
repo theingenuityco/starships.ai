@@ -1264,11 +1264,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // If a mention already exists at the start, do not replace its id; only ensure spacing
         if (first && first.type === 'mention' && first.attrs && first.attrs.id) {
           const second = blockContent[1]
-          const needsSpace = !(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
-          if (!needsSpace) return
+          const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
+          if (hasLeadingSpace) return
+          let contentAfterMention: any[]
+          if (second && second.type === 'text' && typeof second.text === 'string') {
+            // Preserve the user's first typed character(s) by prefixing a space
+            const mergedSecond = { type: 'text', text: ' ' + second.text }
+            contentAfterMention = [mergedSecond, ...blockContent.slice(2)]
+          } else {
+            // No text node immediately after mention; insert a single space token
+            contentAfterMention = [{ type: 'text', text: ' ' }, ...blockContent.slice(1)]
+          }
           const newParagraph = {
             type: 'paragraph',
-            content: [first, { type: 'text', text: ' ' }, ...blockContent.slice(2)],
+            content: [first, ...contentAfterMention],
           }
           const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
           scheduleSetContent(newDoc)

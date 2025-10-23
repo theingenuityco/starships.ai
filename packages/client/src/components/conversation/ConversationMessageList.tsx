@@ -280,9 +280,12 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   //  - no assistant text progress yet after the user (first response is pending), or
   //  - we are waiting for the assistant to resume after tool results.
   const shouldShowGapLoader = useMemo(() => {
-    // Only show when the UI is actively responding for this turn
-    return isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
-  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
+    // Show while actively responding (pre-first tokens or during resume after tools),
+    // OR if we're in a tool gap and the stream is fetching and the turn hasn't completed yet.
+    const responding = isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
+    const toolGapFetching = awaitingResumeAfterTools && isFetching && !hasCompleteEvent
+    return responding || toolGapFetching
+  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools, isFetching, hasCompleteEvent])
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {

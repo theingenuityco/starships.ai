@@ -766,41 +766,28 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return false
   }, [chunks])
 
-  // Pre-stream awaiting timeout guard to avoid sticky typing indicator after cancellations
-  const preStreamAwaiting = useMemo(() => {
-    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
-    // Must be actively fetching SSE but without any live stream hint yet
-    if (messagesQuery.fetchStatus !== 'fetching') return false
-
-    let lastUserIdx = -1
+  // Track the start of the latest user turn and cap the pre-stream indicator duration
+  const lastUserSerial = useMemo(() => {
+    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return null
     for (let i = computedMessages.length - 1; i >= 0; i--) {
-      if (computedMessages[i].role === 'user') {
-        lastUserIdx = i
-        break
+      const m = computedMessages[i]
+      if (m.role === 'user') {
+        return String(m.id || m.createdAt || i)
       }
     }
-    if (lastUserIdx === -1) return false
-
-    // If any assistant message exists after the user, we defer to the main awaiting logic
-    for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
-      if (computedMessages[i].role === 'assistant') {
-        return false
-      }
-    }
-    // No assistant yet, fetching, and no live hint — show briefly
-    return !hasLiveStreamHint
-  }, [computedMessages, messagesQuery.fetchStatus, hasLiveStreamHint])
+    return null
+  }, [computedMessages])
 
   const [preStreamExpired, setPreStreamExpired] = useState(false)
   useEffect(() => {
-    if (!preStreamAwaiting) {
+    if (!lastUserSerial) {
       setPreStreamExpired(false)
       return
     }
     setPreStreamExpired(false)
-    const t = setTimeout(() => setPreStreamExpired(true), 5000)
+    const t = setTimeout(() => setPreStreamExpired(true), 7000)
     return () => clearTimeout(t)
-  }, [preStreamAwaiting])
+  }, [lastUserSerial])
 
   // Extract last UI action payload (from 'ui_action' SSE events) for consumers
   const lastUIAction = useMemo(() => {
@@ -876,10 +863,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    // Show awaiting immediately after a user turn while the stream is fetching.
-    // If we don't yet have a live-stream hint, cap the indicator with a short timeout to avoid stickiness after cancellations.
-    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching' && (!preStreamExpired || hasLiveStreamHint)
-    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching' && (!preStreamExpired || hasLiveStreamHint)
+    // Show awaiting immediately after a user turn until first assistant progress.
+    // Keep it on during the initial pre-stream window, or anytime we have a live-stream hint, or active fetching.
+    if (!hasAssistantAfter) return !preStreamExpired || hasLiveStreamHint || messagesQuery.fetchStatus === 'fetching'
+    if (!hasAssistantProgress) return !preStreamExpired || hasLiveStreamHint || messagesQuery.fetchStatus === 'fetching'
     return false
   }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent, preStreamExpired, hasLiveStreamHint])
 

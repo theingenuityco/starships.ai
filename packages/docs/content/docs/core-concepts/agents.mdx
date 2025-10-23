@@ -4,7 +4,7 @@ description: The AI agent framework that powers intelligent, autonomous assistan
 icon: Bot
 ---
 
-import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Brain, Network, Cpu, Database } from 'lucide-react';
+import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Brain, Network, Cpu, Database, Wrench, RotateCcw } from 'lucide-react';
 
 # Agents
 
@@ -33,11 +33,11 @@ Every agent in the Starships.ai framework shares the same core architecture:
 
 ### Core Components
 
-- **🧠 Personality**: System prompt defining expertise, communication style, and behavioral guidelines
-- **🛠️ Tools**: Set of capabilities like API calls, data processing, file operations, integrations  
-- **💾 Memory**: Persistent context including conversation history, user preferences, and learned patterns
-- **📋 Blueprints**: Workflow definitions that specify how the agent executes multi-step tasks
-- **⚙️ Configuration**: Model selection, permissions, timeout settings, and operational parameters
+- **<Brain className="inline w-4 h-4" /> Personality**: System prompt defining expertise, communication style, and behavioral guidelines
+- **<Wrench className="inline w-4 h-4" /> Tools**: Set of capabilities like API calls, data processing, file operations, integrations  
+- **<Database className="inline w-4 h-4" /> Memory**: Persistent context including conversation history, user preferences, and learned patterns
+- **<Workflow className="inline w-4 h-4" /> Blueprints**: Workflow definitions that specify how the agent executes multi-step tasks
+- **<Settings className="inline w-4 h-4" /> Configuration**: Model selection, permissions, timeout settings, and operational parameters
 
 ---
 
@@ -89,22 +89,22 @@ graph TD
 What makes agents intelligent rather than just chatbots:
 
 <Steps>
-<Step icon="🧠">
+<Step icon={<Brain />}>
 ### LLM Analyzes Request
 The AI model examines your input and compares it against available tools and conversation history
 </Step>
 
-<Step icon="🤔">
+<Step icon={<Zap />}>
 ### Decides on Action
 Either provides a direct response or identifies which tools are needed to gather more information
 </Step>
 
-<Step icon="🔧">
+<Step icon={<Wrench />}>
 ### Executes Tools
 Calls external APIs, searches databases, processes files, or performs calculations as needed
 </Step>
 
-<Step icon="🔄">
+<Step icon={<RotateCcw />}>
 ### Incorporates Results
 Adds tool results to its understanding and repeats until it can provide a complete answer
 </Step>

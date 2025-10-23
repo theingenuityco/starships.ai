@@ -44,15 +44,16 @@ type StreamingToolCallAccum = {
  * Clean conversation service with proper error handling
  */
 export class ConversationService {
-  private conversationRepository: ConversationRepository;
-  private agentRepository: AgentRepository;
-  private messageService: MessageService;
-  private streamingService: StreamingService;
+  private static instance: ConversationService | null = null;
+  private conversationRepository!: ConversationRepository;
+  private agentRepository!: AgentRepository;
+  private messageService!: MessageService;
+  private streamingService!: StreamingService;
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
-  private environmentService: EnvironmentService;
-  private usageService: UsageService;
-  private billingService: BillingService;
+  private environmentService!: EnvironmentService;
+  private usageService!: UsageService;
+  private billingService!: BillingService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Resume state per conversation generation
@@ -84,10 +85,12 @@ export class ConversationService {
   private lastPersistedIndex: Map<string, number> = new Map();
   // Suppress broadcasting 'complete' for conversations during multi-agent orchestration
   private suppressCompleteFor: Set<string> = new Set();
+  // Track if an assistant message has been persisted for the current turn to avoid duplicates on stop
+  private assistantPersistedThisTurn: Set<string> = new Set();
   // Track which agent is currently producing streamed content for a conversation (for attribution)
   private currentAgentForConversation: Map<string, string> = new Map();
   // Default runner for non-streaming paths (child process)
-  private defaultRunner: ChildProcessRunner;
+  private defaultRunner!: ChildProcessRunner;
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -97,6 +100,10 @@ export class ConversationService {
   };
 
   constructor() {
+    // Enforce singleton to share in-memory streaming buffers across routes/requests
+    if (ConversationService.instance) {
+      return ConversationService.instance;
+    }
     this.conversationRepository = new ConversationRepository();
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
@@ -106,6 +113,9 @@ export class ConversationService {
     this.billingService = new BillingService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
+
+    ConversationService.instance = this;
+    return this;
   }
 
   /**
@@ -515,27 +525,31 @@ export class ConversationService {
     } catch {}
 
     // Persist partials if available
+    const canPersistPartial = !this.assistantPersistedThisTurn.has(conversationId);
     let partialContent = this.streamingContent.get(conversationId) || '';
     const partialReasoning = this.streamingReasoning.get(conversationId) || '';
 
-    // Fallback: if streamingContent was not populated (e.g., only snapshot/replays), rebuild from ringBuffer
-    if (!partialContent || partialContent.length === 0) {
-      try {
-        const rb = this.ringBuffer.get(conversationId) || [];
-        if (Array.isArray(rb) && rb.length > 0) {
-          const sorted = [...rb].sort((a, b) => Number(a.position) - Number(b.position));
-          let agg = '';
-          for (const item of sorted) {
-            const frag = typeof item.content === 'string' ? item.content : '';
-            agg += ConversationService.computeNonOverlappingAppend(agg, frag);
-          }
+    // Always prefer reconstructing from ringBuffer when available to dedupe any interleaved/raced chunks
+    try {
+      const rb = this.ringBuffer.get(conversationId) || [];
+      if (Array.isArray(rb) && rb.length > 0) {
+        const sorted = [...rb].sort((a, b) => Number(a.position) - Number(b.position));
+        let agg = '';
+        for (const item of sorted) {
+          const frag = typeof item.content === 'string' ? item.content : '';
+          agg += ConversationService.computeNonOverlappingAppend(agg, frag);
+        }
+        if (agg && agg.length > 0) {
           partialContent = agg;
         }
-      } catch {}
-    }
+      }
+    } catch {}
 
     let persistedMsg: MessageModel | null = null;
-    if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
+    if (
+      canPersistPartial &&
+      ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0))
+    ) {
       const agentId = this.currentAgentForConversation.get(conversationId) || undefined;
       persistedMsg = await this.messageService.createMessage({
         conversationId,
@@ -545,34 +559,50 @@ export class ConversationService {
         ...(partialReasoning ? { reasoning: partialReasoning } : {}),
         ...(agentId ? ({ agentId } as any) : {}),
       });
+      // Mark persisted to avoid duplicate save if stop is called multiple times
+      this.assistantPersistedThisTurn.add(conversationId);
     }
 
     // Finalize stream on SSE
-    if (this.streamingService && this.streamingService.isActive(conversationId)) {
-      try {
-        if (persistedMsg) {
-          await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persistedMsg });
-        }
-        await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
-      } catch {}
-      try {
-        await this.streamingService.broadcastComplete(conversationId, {
-          source: 'agent',
-          content: 'Turn stopped by user',
-          agentId: 'agent',
-          scope: 'workflow',
-          conversationId,
-        });
-      } catch {}
-      try {
-        this.streamingService.closeConnection(conversationId);
-      } catch {}
+    if (this.streamingService) {
+      if (this.streamingService.isActive(conversationId)) {
+        try {
+          if (persistedMsg) {
+            await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persistedMsg });
+          }
+          await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
+        } catch {}
+        try {
+          await this.streamingService.broadcastComplete(conversationId, {
+            source: 'agent',
+            content: 'Turn stopped by user',
+            agentId: 'agent',
+            scope: 'workflow',
+            conversationId,
+          });
+        } catch {}
+        try {
+          this.streamingService.closeConnection(conversationId);
+        } catch {}
+      } else {
+        // No active connection: still buffer a logical 'complete' to bound future replays
+        try {
+          await this.streamingService.broadcastComplete(conversationId, {
+            source: 'agent',
+            content: 'Turn stopped by user',
+            agentId: 'agent',
+            scope: 'workflow',
+            conversationId,
+          });
+        } catch {}
+      }
     }
 
     // Clear accumulators
     this.streamingContent.delete(conversationId);
     this.streamingToolCalls.delete(conversationId);
     this.streamingReasoning.delete(conversationId);
+    // Leave assistantPersistedThisTurn as-is until next workflow_started clears it
   }
 
   /**
@@ -806,6 +836,8 @@ export class ConversationService {
         this.ringBuffer.set(conversationId, []);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
+        // Clear assistant-persisted flag at the start of a new top-level turn
+        this.assistantPersistedThisTurn.delete(conversationId);
         // Seed message index tracking to the current baseline so prior history isn't re-persisted
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent.data?.execution;
@@ -975,7 +1007,12 @@ export class ConversationService {
                 /* non-fatal: resume token emission failed */
               }
             } else {
-              break;
+              // No active SSE client: still initialize accumulators so stop can persist partials.
+              this.streamingContent.set(conversationId, '');
+              this.placeholderEmitted.set(conversationId, true);
+              this.streamingToolCalls.delete(conversationId);
+              if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
+              // Skip shell broadcast; continue accumulating for persistence
             }
           }
 
@@ -983,10 +1020,6 @@ export class ConversationService {
           if (hasContent) {
             const incremental = contentFromDelta || '';
             const snapshot = contentFromMessage || '';
-
-            // Track accumulated content server-side for completion event
-            const currentContent = this.streamingContent.get(conversationId) || '';
-            const currentLength = currentContent.length;
 
             // Compute the append text:
             // - If incremental tokens exist, append them directly.
@@ -996,16 +1029,19 @@ export class ConversationService {
               append = incremental;
             } else if (snapshot) {
               // Prefer using the whole snapshot with non-overlap normalization
-              append = ConversationService.computeNonOverlappingAppend(currentContent, snapshot);
+              const baseForSnapshot = this.streamingContent.get(conversationId) || '';
+              append = ConversationService.computeNonOverlappingAppend(baseForSnapshot, snapshot);
             }
 
             if (append) {
-              // Normalize to avoid duplicated overlaps (delta + snapshot or replays)
-              const normalized = ConversationService.computeNonOverlappingAppend(currentContent, append);
+              // Normalize against the latest base right before applying to avoid races/duplicates
+              const latestBase = this.streamingContent.get(conversationId) || '';
+              const currentLength = latestBase.length;
+              const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
               if (normalized.length === 0) {
                 // Nothing new to append
               } else {
-                const newContent = currentContent + normalized;
+                const newContent = latestBase + normalized;
                 this.streamingContent.set(conversationId, newContent);
                 const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
                 this.accumulatedLength.set(conversationId, newLen);
@@ -1309,10 +1345,9 @@ export class ConversationService {
           }
         }
 
-        // Clear streaming trackers
-        this.streamingContent.delete(conversationId);
-        this.streamingToolCalls.delete(conversationId);
-        this.streamingReasoning.delete(conversationId);
+        // Do not clear streaming trackers here. We keep accumulators until persistence in
+        // node_completed or finalization in workflow_completed, so that stopConversation
+        // can persist partials if a cancel happens between content_complete and persistence.
 
         break;
       }
@@ -1458,6 +1493,11 @@ export class ConversationService {
                   ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
                 });
 
+                // Mark that an assistant message has been persisted for this turn
+                if (role === 'assistant') {
+                  this.assistantPersistedThisTurn.add(conversationId);
+                }
+
                 // Broadcast via SSE if streaming is active
                 if (this.streamingService && this.streamingService.isActive(conversationId)) {
                   if (role === 'assistant') {
@@ -1566,7 +1606,27 @@ export class ConversationService {
               /* non-fatal: final resume token emission failed */
             }
           }
+        } else if (this.streamingService) {
+          // No active connection: still buffer a logical 'complete' to bound future replays
+          if (!this.suppressCompleteFor.has(conversationId)) {
+            try {
+              await this.streamingService.broadcastComplete(conversationId, {
+                source: 'agent',
+                content: 'Workflow completed',
+                agentId: 'agent',
+                scope: 'workflow',
+                conversationId,
+              });
+            } catch {
+              /* non-fatal */
+            }
+          }
         }
+
+        // Clear streaming trackers now that the workflow turn has fully completed
+        this.streamingContent.delete(conversationId);
+        this.streamingToolCalls.delete(conversationId);
+        this.streamingReasoning.delete(conversationId);
         break;
       }
 

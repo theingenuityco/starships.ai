@@ -318,10 +318,12 @@ type StreamedChunk =
 // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events
 function makeSSEAsyncIterable(conversationId: string, token: string | null, signal?: AbortSignal, baselineLength?: number): AsyncIterable<StreamedChunk> {
   let url = `/api/v1/conversations/${conversationId}/messages?stream=true`
-  // Attach resume token via query param (avoid custom headers)
+  // Attach resume token only when client has a non-zero baseline to avoid empty reloads skipping history
   try {
     const rt = typeof window !== 'undefined' ? window.localStorage.getItem(`conv:${conversationId}:resumeToken`) : null
-    if (rt) url += `&resumeToken=${encodeURIComponent(rt)}`
+    if (rt && typeof baselineLength === 'number' && baselineLength > 0) {
+      url += `&resumeToken=${encodeURIComponent(rt)}`
+    }
   } catch {}
   if (typeof baselineLength === 'number' && baselineLength >= 0) {
     url += `&baselineLength=${baselineLength}`
@@ -741,6 +743,29 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
 
+  // Detect if current session has any live streaming signals (placeholder or deltas)
+  const hasLiveStreamHint = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (!c) continue
+      if (
+        c.type === 'append_chunk' ||
+        c.type === 'replace_content' ||
+        c.type === 'replace_reasoning' ||
+        c.type === 'replace_tool_calls' ||
+        c.type === 'update_last_assistant' ||
+        c.type === 'mark_last_assistant_streaming'
+      ) {
+        return true
+      }
+      if (c.type === 'append' && c.message && c.message.role === 'assistant' && (c.message as any).streaming === true) {
+        return true
+      }
+    }
+    return false
+  }, [chunks])
+
   // Extract last UI action payload (from 'ui_action' SSE events) for consumers
   const lastUIAction = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return null
@@ -815,13 +840,40 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
-    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
+    // Only show awaiting when there's a live stream hint in this session
+    if (!hasAssistantAfter) return hasLiveStreamHint && messagesQuery.fetchStatus === 'fetching'
+    if (!hasAssistantProgress) return hasLiveStreamHint && messagesQuery.fetchStatus === 'fetching'
     return false
-  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent])
+  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent, hasLiveStreamHint])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
+
+  // Fallback: if after connection there are no messages yet, fetch baseline once via REST
+  useEffect(() => {
+    if (!conversationId) return
+    if (messagesQuery.fetchStatus === 'fetching') return
+    if (Array.isArray(computedMessages) && computedMessages.length > 0) return
+    let cancelled = false
+    const loadBaseline = async () => {
+      try {
+        const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${conversationId}/messages`)
+        if (cancelled) return
+        const list = Array.isArray((response as any)?.data?.data?.messages) ? (((response as any).data.data.messages as any[]) ?? []) : []
+        if (list.length === 0) return
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const next = Array.isArray(old) ? old.slice() : []
+          for (const msg of list) next.push({ type: 'append', message: msg })
+          return next
+        })
+      } catch {}
+    }
+    const t = setTimeout(loadBaseline, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [conversationId, computedMessages, messagesQuery.fetchStatus, queryClient])
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {

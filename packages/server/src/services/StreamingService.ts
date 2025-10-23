@@ -291,9 +291,14 @@ export class StreamingService {
    * and allow additional messages in the same SSE session if needed.
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
+    // Always buffer the logical 'complete' event even if no active connections are present.
+    // This ensures that on reconnection, any previously buffered deltas from the current turn
+    // are correctly bounded and not replayed, preventing duplicated/garbled content.
+    this.bufferLogicalEvent(streamId, 'complete', finalResponse);
+
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
-    this.bufferLogicalEvent(streamId, 'complete', finalResponse);
+
     await Promise.all(
       Array.from(conns).map(async (connection) => {
         if (connection && !connection.res.destroyed) {
@@ -589,11 +594,14 @@ export class StreamingService {
 
     this.suppressBuffering = true;
     try {
+      const lastEvt = buffer[buffer.length - 1];
+      let replayedAny = false;
       for (const connection of conns) {
         if (connection.res.destroyed) continue;
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history
+          replayedAny = true;
           switch (evt.type) {
             case 'delta': {
               const normalized = this.normalizeDelta(streamId, evt.payload as Operation, connection);
@@ -613,6 +621,10 @@ export class StreamingService {
               break;
             }
           }
+        }
+        // If nothing to replay after last 'complete', emit that 'complete' so clients can finalize state
+        if (!replayedAny && lastEvt && lastEvt.type === 'complete') {
+          this.sendEventToStream(streamId, connection.res, 'complete', lastEvt.payload);
         }
       }
     } finally {

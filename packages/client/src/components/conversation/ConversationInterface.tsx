@@ -174,7 +174,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const compute = () => {
       try {
         const viewportH = window.innerHeight || 0
-        const offset = Math.max(0, Math.round(viewportH / 2 - (inputHeight || 0) / 2 - 64))
+        // Bias toward top: place around ~75% of viewport from bottom (i.e., above center)
+        const bias = 0.75
+        const liftPx = 64
+        const raw = viewportH * bias - (inputHeight || 0) / 2 - liftPx
+        // Clamp so it never starts too low or off-screen on very short heights
+        const minOffset = 64
+        const maxOffset = Math.max(0, Math.round(viewportH - (inputHeight || 0) - 96))
+        const offset = Math.min(maxOffset, Math.max(minOffset, Math.round(raw)))
         setDockOffsetPx(offset)
       } catch {}
     }

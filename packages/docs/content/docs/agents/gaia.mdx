@@ -155,132 +155,75 @@ Gaia uses specialized tools to create and configure agents:
   </Accordion>
 </Accordions>
 
-## Gaia Creation Examples
+## See Gaia in Action
 
-<Tabs items={['Support Agent', 'Processing Agent', 'Research Agent']}>
-<Tab value="Support Agent">
+<Tabs items={['Personal Productivity', 'Content Creation', 'Personal Finance', 'Learning & Development']}>
+<Tab value="Personal Productivity">
 
-### Customer Support Agent Creation
+### Email Assistant Creation
 
-**User Request**:
-> "Create a support agent for our project management software"
+**Prompt**: "Create an email assistant that reads my Gmail, categorizes emails by urgency, drafts responses to common questions, and schedules follow-ups in Google Calendar"
 
-**Gaia's Process**:
+**What Gaia Does Behind the Scenes**:
+- Selects Gmail API, text classification, and calendar tools
+- Designs workflow blueprint connecting email → analysis → action
+- Configures professional communication style
 
-1. **Requirement Analysis**:
-   ```
-   Gaia: "I'll create a support agent. What are the main support issues?"
-   User: "Login problems, feature questions, bug reports"
-   ```
+**Tools Used**: Gmail API, OpenAI text classification, Google Calendar API, email templates
 
-2. **Tool Selection**:
-   ```
-   Gaia assigns:
-   - knowledge-base-search (for feature questions)
-   - user-lookup (for login issues)  
-   - ticket-creation (for bug reports)
-   - escalation-routing (for complex issues)
-   ```
-
-3. **Personality Configuration**:
-   ```
-   System prompt: "You are a helpful support specialist for ProjectFlow. 
-   Be friendly, patient, and thorough. Always check the knowledge base 
-   first, then escalate complex technical issues to human support."
-   ```
-
-4. **Testing & Validation**:
-   ```
-   Gaia tests scenarios:
-   ✓ Password reset request
-   ✓ Feature explanation request  
-   ✓ Bug report submission
-   ✓ Escalation trigger
-   ```
-
-**Result**: 24/7 support agent that handles 80% of common questions automatically.
+**Expected Workflow**:
+- New email arrives → Agent analyzes content → Categorizes (urgent/normal/spam) → Drafts response if routine → Adds to Google Calendar if action needed
 
 </Tab>
-<Tab value="Processing Agent">
+<Tab value="Content Creation">
 
-### Invoice Processing Agent Creation
+### Research Assistant Creation
 
-**User Request**:
-> "Build an agent that processes invoices and handles approvals"
+**Prompt**: "Build a research assistant that helps me write blog posts by gathering information from research papers via arXiv and PubMed, checking facts, and creating structured outlines in Notion"
 
-**Gaia's Process**:
+**What Gaia Does Behind the Scenes**:
+- Chooses academic search tools (arXiv, PubMed) over general web search
+- Sets up fact-checking and citation workflows
+- Configures Notion integration for structured output
 
-1. **Workflow Design**:
-   ```
-   Gaia: "What's your approval workflow?"
-   User: "Small invoices auto-approve, large ones need manager approval"
-   ```
+**Tools Used**: arXiv API, PubMed API, research paper analysis, fact-checking services, Notion API
 
-2. **Integration Setup**:
-   ```
-   Gaia configures:
-   - file-processing (PDF/Excel invoice reading)
-   - data-extraction (amount, vendor, details)
-   - approval-routing (based on amount thresholds)
-   - notification-system (status updates)
-   ```
-
-3. **Business Logic**:
-   ```
-   Workflow: Upload → Extract → Validate → Route → Notify
-   Rules: <$500 auto-approve, >$500 manager approval, >$5000 finance approval
-   ```
-
-4. **Error Handling**:
-   ```
-   Gaia adds:
-   - Invalid format detection
-   - Missing information flagging
-   - Escalation for manual review
-   - Audit trail logging
-   ```
-
-**Result**: Automated invoice processing reducing manual work by 90%.
+**Expected Workflow**:
+- I give topic → Agent searches arXiv + PubMed for papers → Extracts key findings → Fact-checks with multiple sources → Creates structured outline in Notion → Suggests citations
 
 </Tab>
-<Tab value="Research Agent">
+<Tab value="Personal Finance">
 
-### Market Research Agent Creation
+### Spending Tracker Creation
 
-**User Request**:
-> "I need an agent that researches market trends and generates reports"
+**Prompt**: "Create a spending tracker that connects to my bank via Plaid, categorizes expenses, sends Slack notifications when I overspend, and updates my budget spreadsheet"
 
-**Gaia's Process**:
+**What Gaia Does Behind the Scenes**:
+- Integrates Plaid for secure banking data access
+- Sets up expense categorization algorithms
+- Configures real-time budget monitoring with alert thresholds
 
-1. **Research Scope**:
-   ```
-   Gaia: "What markets should I research?"
-   User: "SaaS productivity tools, competitor analysis, pricing trends"
-   ```
+**Tools Used**: Plaid banking API, expense categorization algorithms, Slack notifications, Google Sheets API
 
-2. **Capability Assignment**:
-   ```
-   Gaia assigns:
-   - web-search (market data gathering)
-   - data-analysis (trend identification)
-   - report-generation (structured output)
-   - visualization (charts and graphs)
-   ```
+**Expected Workflow**:
+- Transaction occurs → Agent pulls from Plaid → Categorizes expense → Compares to budget → Sends Slack alert if over limit → Updates Google Sheets budget
 
-3. **Report Structure**:
-   ```
-   Template: Executive Summary → Key Trends → Competitor Analysis → 
-            Pricing Insights → Recommendations → Data Sources
-   ```
+</Tab>
+<Tab value="Learning & Development">
 
-4. **Automation Setup**:
-   ```
-   Schedule: Weekly reports every Monday
-   Distribution: Email to marketing team
-   Format: PDF + slide deck
-   ```
+### Study Assistant Creation
 
-**Result**: Weekly market intelligence reports generated automatically.
+**Prompt**: "Build a study assistant that takes my text notes, creates Anki flashcards, tracks progress in Airtable, and sends WhatsApp reminders for review sessions"
+
+**What Gaia Does Behind the Scenes**:
+- Sets up text processing for note analysis
+- Configures spaced repetition algorithms for optimal learning
+- Integrates progress tracking with automated reminders
+
+**Tools Used**: Text processing, Anki deck generation, Airtable API, WhatsApp Business API, spaced repetition algorithms
+
+**Expected Workflow**:
+- I input text notes → Agent processes content → Generates Anki flashcards → Tracks progress in Airtable → Schedules spaced repetition → Sends WhatsApp reminders
 
 </Tab>
 </Tabs>

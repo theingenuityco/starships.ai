@@ -840,11 +840,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    // Only show awaiting when there's a live stream hint in this session
-    if (!hasAssistantAfter) return hasLiveStreamHint && messagesQuery.fetchStatus === 'fetching'
-    if (!hasAssistantProgress) return hasLiveStreamHint && messagesQuery.fetchStatus === 'fetching'
+    // Show awaiting immediately after a user turn while the stream is fetching,
+    // even before any live-stream hint has arrived.
+    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
+    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
     return false
-  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent, hasLiveStreamHint])
+  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
@@ -934,6 +935,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isResponding,
     isAssistantStreaming,
     isAwaitingAssistant,
+    // Expose whether a turn-completion event has been received since the last user message
+    hasCompleteEvent,
     // Expose last UI action payload from SSE
     lastUIAction,
     isFetching: messagesQuery.fetchStatus === 'fetching',

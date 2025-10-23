@@ -51,9 +51,9 @@ export default function Hero() {
 
   return (
     <section className="pt-28 pb-20 px-4">
-      <div className="max-w-6xl mx-auto flex flex-col gap-10">
+      <div className="max-w-6xl mx-auto flex flex-col gap-10 items-center text-center">
         <div>
-          <div className="mb-6 flex items-center gap-3 cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
+          <div className="mb-6 flex items-center gap-3 cursor-pointer select-none justify-center" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
             <StarshipsLogo width={56} height={56} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
             <span className={`${orbitron.className} text-3xl md:text-4xl font-normal tracking-tight`}>starships.ai</span>
           </div>
@@ -77,7 +77,7 @@ export default function Hero() {
             })()}
           </h1>
           <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Ship intelligent automations in minutes - safe, observable and fast.</p>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button size="lg" className="px-7" onClick={handlePrimaryClick}>
               <Icon name={isAuthenticated ? 'rocket' : 'user-plus'} className="w-4 h-4 mr-2" />
               {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Sign up'}
@@ -98,7 +98,7 @@ export default function Hero() {
         </div>
 
         {/* Visualization: viewport removed; styles moved into visualization */}
-        <div className="relative h-[560px] overflow-visible">
+        <div className="relative h-[560px] overflow-visible w-full">
           {/* Tabs for switching blueprints */}
           <div className="absolute top-3 left-3 right-3 z-30 flex items-center gap-2 overflow-x-visible overflow-y-visible py-1 pointer-events-auto">
             {popularBlueprints.map((item, idx) => {

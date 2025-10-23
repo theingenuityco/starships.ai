@@ -495,6 +495,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let popup: any = null
         let active = 0
         let lastProps: any = null
+        let lastQuery: string = ''
+
+        const cleanupTrailingQueryAfterMention = (ed: any, query: string) => {
+          try {
+            if (!ed) return
+            const q = String(query || '')
+            if (!q) return
+            const state = ed.state
+            const pos = state.selection?.from || state.selection?.to || 0
+            if (!pos) return
+            // Skip a single space after the mention if present
+            const firstChar = state.doc.textBetween(pos, pos + 1, '\n')
+            let start = pos
+            if (firstChar === ' ') start = pos + 1
+            const ahead = state.doc.textBetween(start, start + q.length, '\n')
+            if (ahead && ahead.toLowerCase() === q.toLowerCase()) {
+              ed.chain()
+                ?.setTextSelection({ from: start, to: start + q.length })
+                ?.deleteSelection()
+                ?.run()
+            }
+          } catch {}
+        }
         const handleDocKeyDown = (e: KeyboardEvent) => {
           if (!lastProps) return
           const items = (lastProps.items as Array<{ id: string; label: string; agent?: AgentModel }>) || []
@@ -550,12 +573,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             if (choice) {
               try {
                 lastProps.command(choice)
-              } catch (err) {
                 try {
-                  const label = (choice as any)?.label || ''
-                  lastProps.editor?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                  cleanupTrailingQueryAfterMention(lastProps.editor, lastQuery)
                 } catch {}
-              }
+                // Update selected agent (mirror mouse selection)
+                try {
+                  const id = (choice as any)?.id
+                  const label = (choice as any)?.label
+                  let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                  if (!agent && label) {
+                    const lower = String(label).toLowerCase()
+                    agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                  }
+                  if (agent) {
+                    currentAgentRef.current = agent
+                    onAgentChange?.(agent)
+                  }
+                } catch {}
+              } catch {}
             }
             return
           }
@@ -570,6 +605,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             isSuggestionActiveRef.current = true
             mentionAgentsSnapshotRef.current = Array.isArray(agentsRef.current) ? [...agentsRef.current] : []
             lastProps = props
+            lastQuery = String(props?.query || '')
 
             component = new ReactRenderer(MentionList as any, {
               props: {
@@ -585,6 +621,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   isEditingMentionRef.current = false
                   // Insert/replace with the mention node
                   props.command(realItem)
+                  try {
+                    cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                  } catch {}
                   // Then update selected agent
                   try {
                     const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
@@ -617,6 +656,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           },
           onUpdate(props: any) {
             lastProps = props
+            lastQuery = String(props?.query || '')
             component?.updateProps({
               ...component.props,
               items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
@@ -672,10 +712,45 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               if (choice) {
                 try {
                   props.command(choice)
+                  try {
+                    cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                  } catch {}
+                  // Update selected agent state (mirror mouse path)
+                  try {
+                    const id = (choice as any)?.id
+                    const label = (choice as any)?.label
+                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                    if (!agent && label) {
+                      const lower = String(label).toLowerCase()
+                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                    }
+                    if (agent) {
+                      currentAgentRef.current = agent
+                      onAgentChange?.(agent)
+                    }
+                  } catch {}
                 } catch (err) {
                   try {
                     const label = (choice as any)?.label || ''
-                    props.editor?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                    const ed = props.editor
+                    ed?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                    const end = ed?.state?.selection?.from || 0
+                    const totalLen = String(label).length + 1
+                    const from = Math.max(0, end - totalLen)
+                    const to = end
+                    ed?.chain()?.setTextSelection({ from, to })?.run()
+                    try {
+                      cleanupTrailingQueryAfterMention(ed, lastQuery)
+                    } catch {}
+                    // Best-effort agent resolution by label when fallback path used
+                    try {
+                      const lower = String(label).toLowerCase()
+                      const agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                      if (agent) {
+                        currentAgentRef.current = agent
+                        onAgentChange?.(agent)
+                      }
+                    } catch {}
                   } catch {}
                 }
               }
@@ -732,7 +807,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             } catch {}
             editor?.chain()?.focus()?.insertContent(`@${display}`)?.run()
             const end = editor?.state?.selection?.from || 0
-            const from = Math.max(0, end - String(display).length)
+            const totalLen = String(display).length + 1 // include '@'
+            const from = Math.max(0, end - totalLen)
             const to = end
             editor?.chain()?.setTextSelection({ from, to })?.run()
             editor?.chain()?.focus()?.run()
@@ -785,7 +861,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
-    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, leadingMentionAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const placeholderRef = useRef<string>(placeholderText)
+    useEffect(() => {
+      placeholderRef.current = placeholderText
+    }, [placeholderText])
 
     // Inline animated hint (typing) after preselected mention when no other text
     const editorContainerRef = useRef<HTMLDivElement | null>(null)
@@ -1005,7 +1085,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const tiptap = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
-        Placeholder.configure({ placeholder: placeholderText }),
+        Placeholder.configure({ placeholder: () => placeholderRef.current }),
         Mention.extend({
           selectable: false,
           addNodeView() {
@@ -1128,6 +1208,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       },
     })
 
+    // Force a lightweight re-render so Placeholder re-evaluates its function when text changes
+    useEffect(() => {
+      if (!tiptap) return
+      try {
+        ;(tiptap as any).view?.dispatch?.((tiptap as any).state?.tr)
+      } catch {}
+    }, [tiptap, placeholderText])
+
     // Bridge editor focus/blur to parent callbacks for overlay control and local focus state
     useEffect(() => {
       if (!tiptap) return
@@ -1240,50 +1328,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
         const first = blockContent[0]
 
-        // If a mention exists anywhere in the first paragraph, normalize it to the beginning
-        const mentionIndex = blockContent.findIndex((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
-        if (mentionIndex > 0) {
-          // Move the existing mention to the front and ensure a single space after it
-          const mentionNode = blockContent[mentionIndex]
-          const before = blockContent.slice(0, mentionIndex).filter((n: any) => !(n?.type === 'text' && typeof n.text === 'string' && n.text.trim() === ''))
-          const after = blockContent.slice(mentionIndex + 1)
+        // Collect all mention nodes in the first paragraph
+        const mentionNodes = blockContent.filter((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
+        if (mentionNodes.length > 0) {
+          // Always prefer the most recently inserted mention (last in content order)
+          const desiredMention = mentionNodes[mentionNodes.length - 1]
+          // Build remaining content excluding all mention nodes
+          let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+          // Ensure exactly one leading space after the mention if there is following text
           let contentAfterMention: any[]
-          const second = after[0]
+          const second = rest[0]
           const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
           if (hasLeadingSpace) {
-            contentAfterMention = after
+            contentAfterMention = rest
           } else if (second && second.type === 'text' && typeof second.text === 'string') {
-            contentAfterMention = [{ type: 'text', text: ' ' + second.text }, ...after.slice(1)]
+            contentAfterMention = [{ type: 'text', text: ' ' + second.text }, ...rest.slice(1)]
+          } else if (rest.length > 0) {
+            contentAfterMention = [{ type: 'text', text: ' ' }, ...rest]
           } else {
-            contentAfterMention = [{ type: 'text', text: ' ' }, ...after]
+            contentAfterMention = []
           }
           const newParagraph = {
             type: 'paragraph',
-            content: [mentionNode, ...contentAfterMention, ...before],
-          }
-          const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
-          scheduleSetContent(newDoc)
-          return
-        }
-
-        // If a mention already exists at the start, do not replace its id; only ensure spacing
-        if (first && first.type === 'mention' && first.attrs && first.attrs.id) {
-          if (isEditingMentionRef.current) return
-          const second = blockContent[1]
-          const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
-          if (hasLeadingSpace) return
-          let contentAfterMention: any[]
-          if (second && second.type === 'text' && typeof second.text === 'string') {
-            // Preserve the user's first typed character(s) by prefixing a space
-            const mergedSecond = { type: 'text', text: ' ' + second.text }
-            contentAfterMention = [mergedSecond, ...blockContent.slice(2)]
-          } else {
-            // No text node immediately after mention; insert a single space token
-            contentAfterMention = [{ type: 'text', text: ' ' }, ...blockContent.slice(1)]
-          }
-          const newParagraph = {
-            type: 'paragraph',
-            content: [first, ...contentAfterMention],
+            content: [desiredMention, ...contentAfterMention],
           }
           const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
           scheduleSetContent(newDoc)

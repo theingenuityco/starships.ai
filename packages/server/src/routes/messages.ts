@@ -21,7 +21,9 @@ const CreateMessageSchema = z.object({
   parentMessageId: IdSchema.optional(),
   threadDepth: z.number().min(0).max(100).optional(),
   processingStatus: z.enum(['pending', 'processing', 'completed', 'failed']).optional(),
-  messageType: z.enum(['user_input', 'agent_response', 'system_message', 'workflow_output', 'tool_result']).optional(),
+  messageType: z
+    .enum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error', 'tool_result'])
+    .optional(),
   importance: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   metadata: z.object({}).passthrough().optional(),
   hasAttachments: z.boolean().optional(),
@@ -41,7 +43,6 @@ const checkAuth = (req: Request, res: Response): boolean => {
   }
   return true;
 };
-
 
 /**
  * GET /messages/:messageId - Get message by ID

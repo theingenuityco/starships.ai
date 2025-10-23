@@ -67,6 +67,11 @@ export class ConversationService {
   private streamingReasoning: Map<string, string> = new Map();
   // Track whether the currently active streaming assistant placeholder has been persisted
   private activeStreamPersisted: Set<string> = new Set();
+  // Track latest provider-reported usage during streaming for mid-turn persistence
+  private latestStreamingUsage: Map<
+    string,
+    { promptTokens: number; completionTokens: number; totalTokens: number; cost: number; model?: string }
+  > = new Map();
   /**
    * Compute a non-overlapping append by trimming any prefix of 'fragment' that
    * already exists as a suffix of 'base'. This guards against providers that
@@ -144,7 +149,12 @@ export class ConversationService {
           partialContent = agg;
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[STREAMING] Failed to reconstruct partial from ring buffer', {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Only persist if we have something meaningful
     if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
@@ -573,13 +583,56 @@ export class ConversationService {
       if (typeof cancel === 'function') {
         try {
           cancel();
-        } catch {}
+        } catch (err) {
+          console.warn('[STOP] Error while cancelling active runner', {
+            conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         ConversationService.activeCancellations.delete(conversationId);
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[STOP] Error accessing active cancellation handle', {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Persist the active streaming partial (if any), regardless of prior assistant messages this turn
     let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId);
+
+    // If we have cached usage from streaming but no content_complete occurred, persist usage now
+    try {
+      const latest = this.latestStreamingUsage.get(conversationId);
+      if (latest) {
+        const starship = await this.getConversationStarship(conversationId);
+        if (starship) {
+          const usageRow = await this.usageService.createUsageForTurn({
+            starshipId: starship.id,
+            conversationId,
+            promptTokens: Number(latest.promptTokens || 0),
+            completionTokens: Number(latest.completionTokens || 0),
+            totalTokens: Number(latest.totalTokens || 0),
+            cost: Number(latest.cost || 0),
+            ...(latest.model ? { model: latest.model } : {}),
+          });
+          try {
+            await this.billingService.debitUsage(usageRow);
+          } catch (e) {
+            // Non-fatal: log only; stopping should still finalize UX
+            console.warn('[STOP] Billing debit failed for mid-turn usage', {
+              conversationId,
+              usageId: usageRow.id,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[STOP] Failed to persist mid-turn usage on stop:', e);
+    } finally {
+      // Clear cached usage regardless to avoid double-accounting on future turns
+      this.latestStreamingUsage.delete(conversationId);
+    }
 
     // Finalize stream on SSE
     if (this.streamingService) {
@@ -589,7 +642,12 @@ export class ConversationService {
             await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persistedMsg });
           }
           await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
-        } catch {}
+        } catch (err) {
+          console.warn('[STOP] Failed to finalize streaming state via delta', {
+            conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         try {
           await this.streamingService.broadcastComplete(conversationId, {
             source: 'agent',
@@ -598,10 +656,20 @@ export class ConversationService {
             scope: 'workflow',
             conversationId,
           });
-        } catch {}
+        } catch (err) {
+          console.warn('[STOP] Failed to broadcast complete on stop', {
+            conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         try {
           this.streamingService.closeConnection(conversationId);
-        } catch {}
+        } catch (err) {
+          console.warn('[STOP] Failed to close streaming connection', {
+            conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       } else {
         // No active connection: still buffer a logical 'complete' to bound future replays
         try {
@@ -612,7 +680,12 @@ export class ConversationService {
             scope: 'workflow',
             conversationId,
           });
-        } catch {}
+        } catch (err) {
+          console.warn('[STOP] Failed to buffer complete event on stop', {
+            conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
 
@@ -852,6 +925,8 @@ export class ConversationService {
         this.accumulatedLength.set(conversationId, 0);
         this.placeholderEmitted.set(conversationId, false);
         this.ringBuffer.set(conversationId, []);
+        // Reset cached usage for the new turn
+        this.latestStreamingUsage.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
         // Clear assistant-persisted flag at the start of a new top-level turn
@@ -879,10 +954,20 @@ export class ConversationService {
           if (persisted && this.streamingService && this.streamingService.isActive(conversationId)) {
             try {
               await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persisted });
-            } catch {}
+            } catch (err) {
+              console.warn('[STREAMING] Failed to broadcast persisted partial on workflow_paused', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
             try {
               await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
-            } catch {}
+            } catch (err) {
+              console.warn('[STREAMING] Failed to mark streaming=false on workflow_paused', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
           }
         } catch (e) {
           console.warn('[STREAMING] Failed to persist partial on workflow_paused:', e);
@@ -911,6 +996,37 @@ export class ConversationService {
           const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
           const delta = choice0.delta ?? {};
           const messageNode = choice0.message ?? {};
+          // Capture provider usage from chunk if present for mid-stream accounting
+          try {
+            const rawUsage = (chunkContent as { usage?: unknown }).usage as
+              | { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown; cost?: unknown }
+              | undefined;
+            if (rawUsage && typeof rawUsage === 'object') {
+              const uRec = rawUsage as Record<string, unknown>;
+              const promptTokens = typeof uRec.promptTokens === 'number' ? uRec.promptTokens : 0;
+              const completionTokens = typeof uRec.completionTokens === 'number' ? uRec.completionTokens : 0;
+              const totalTokens = typeof uRec.totalTokens === 'number' ? uRec.totalTokens : Number(promptTokens) + Number(completionTokens);
+              const cost = typeof uRec.cost === 'number' ? uRec.cost : 0;
+              const model =
+                typeof (chunkContent as { model?: unknown }).model === 'string'
+                  ? ((chunkContent as { model?: string }).model as string)
+                  : undefined;
+              if (totalTokens > 0 || promptTokens > 0 || completionTokens > 0 || cost > 0) {
+                this.latestStreamingUsage.set(conversationId, {
+                  promptTokens: Number(promptTokens || 0),
+                  completionTokens: Number(completionTokens || 0),
+                  totalTokens: Number(totalTokens || 0),
+                  cost: Number(cost || 0),
+                  ...(model ? { model } : {}),
+                });
+              }
+            }
+          } catch (err) {
+            console.warn('[STREAMING] Failed to capture usage from chunk', {
+              conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
 
           const contentFromDelta =
             typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
@@ -1041,8 +1157,11 @@ export class ConversationService {
                   exp: Math.floor(Date.now() / 1000) + 600,
                 });
                 this.streamingService.sendResumeToken(conversationId, token);
-              } catch {
-                /* non-fatal: resume token emission failed */
+              } catch (err) {
+                console.warn('[STREAMING] Failed to emit initial resume token', {
+                  conversationId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
               }
             } else {
               // No active SSE client: still initialize accumulators so stop can persist partials.
@@ -1113,8 +1232,11 @@ export class ConversationService {
                     });
                     this.streamingService.sendResumeToken(conversationId, token);
                   }
-                } catch {
-                  /* non-fatal: periodic resume token emission failed */
+                } catch (err) {
+                  console.warn('[STREAMING] Failed to emit periodic resume token', {
+                    conversationId,
+                    error: err instanceof Error ? err.message : String(err),
+                  });
                 }
               }
             }
@@ -1302,7 +1424,18 @@ export class ConversationService {
               cost: Number(llmUsage.cost) || 0,
               ...(typeof model === 'string' ? { model } : {}),
             }
-          : undefined;
+          : (() => {
+              const latest = this.latestStreamingUsage.get(conversationId);
+              return latest
+                ? {
+                    promptTokens: Number(latest.promptTokens || 0),
+                    completionTokens: Number(latest.completionTokens || 0),
+                    totalTokens: Number(latest.totalTokens || 0),
+                    cost: Number(latest.cost || 0),
+                    ...(latest.model ? { model: latest.model } : {}),
+                  }
+                : undefined;
+            })();
 
         if (usagePayload) {
           try {
@@ -1377,6 +1510,7 @@ export class ConversationService {
                   }
                 }
               }
+              this.latestStreamingUsage.delete(conversationId);
             }
           } catch (e) {
             console.error('[STREAMING] Failed to persist usage record:', e);
@@ -1623,8 +1757,11 @@ export class ConversationService {
                 setTimeout(resolve, 0);
               }
             });
-          } catch {
-            /* non-fatal */
+          } catch (err) {
+            console.warn('[STREAMING] Failed to finalize streaming shell on workflow_completed', {
+              conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
 
           // If this conversation is under multi-agent suppression, skip broadcasting 'complete' here
@@ -1647,8 +1784,11 @@ export class ConversationService {
                 exp: Math.floor(Date.now() / 1000) + 600,
               });
               this.streamingService.sendResumeToken(conversationId, token);
-            } catch {
-              /* non-fatal: final resume token emission failed */
+            } catch (err) {
+              console.warn('[STREAMING] Failed to emit final resume token on workflow_completed', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
             }
           }
         } else if (this.streamingService) {
@@ -1662,8 +1802,11 @@ export class ConversationService {
                 scope: 'workflow',
                 conversationId,
               });
-            } catch {
-              /* non-fatal */
+            } catch (err) {
+              console.warn('[STREAMING] Failed to buffer logical complete on workflow_completed (no active conn)', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
             }
           }
         }

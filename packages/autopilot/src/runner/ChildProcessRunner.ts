@@ -108,8 +108,9 @@ export class ChildProcessRunner implements Runner {
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-            await Promise.resolve(cb(msg.event)).catch(() => {
-              // ignore event callback errors
+            await Promise.resolve(cb(msg.event)).catch((err: unknown) => {
+              // Log and continue so a bad callback doesn't break execution
+              console.error('[ChildProcessRunner] eventCallback error:', err);
             });
           } else if (msg.type === 'done') {
             if (settled) return;
@@ -248,7 +249,10 @@ export class ChildProcessRunner implements Runner {
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-            await Promise.resolve(cb(msg.event)).catch(() => {});
+            await Promise.resolve(cb(msg.event)).catch((err: unknown) => {
+              // Log and continue so a bad callback doesn't break execution
+              console.error('[ChildProcessRunner] eventCallback error:', err);
+            });
           } else if (msg.type === 'done') {
             if (settled) return;
             settled = true;
@@ -256,7 +260,9 @@ export class ChildProcessRunner implements Runner {
             resolvePromise(msg.result);
             try {
               child.disconnect();
-            } catch {}
+            } catch {
+              // ignore
+            }
           } else if (msg.type === 'error') {
             if (settled) return;
             settled = true;
@@ -265,9 +271,13 @@ export class ChildProcessRunner implements Runner {
             rejectPromise(e);
             try {
               child.disconnect();
-            } catch {}
+            } catch {
+              // ignore
+            }
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
       });
 
       child.once('error', (err) => {
@@ -290,12 +300,16 @@ export class ChildProcessRunner implements Runner {
           if (settled) return;
           try {
             child.kill();
-          } catch {}
+          } catch {
+            // ignore
+          }
           const grace = Math.max(0, this.options?.killGraceMs ?? 1000);
           setTimeout(() => {
             try {
               child.kill('SIGKILL');
-            } catch {}
+            } catch {
+              // ignore
+            }
           }, grace);
         }, timeoutMs);
       }
@@ -309,12 +323,16 @@ export class ChildProcessRunner implements Runner {
     const cancel = () => {
       try {
         child.kill();
-      } catch {}
+      } catch {
+        // ignore
+      }
       const grace = Math.max(0, this.options?.killGraceMs ?? 1000);
       setTimeout(() => {
         try {
           child.kill('SIGKILL');
-        } catch {}
+        } catch {
+          // ignore
+        }
       }, grace);
     };
 

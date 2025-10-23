@@ -63,14 +63,7 @@ export class MessageService {
   /**
    * Update message
    */
-  async updateMessage(messageId: string, updates: Partial<Pick<Message, 'content'>>): Promise<MessageModel | null> {
-    // Filter updates to only include valid MessageModel properties
-    const validUpdates: Partial<MessageModel> = {};
-    if (updates.content !== undefined) validUpdates.content = updates.content;
-
-    const updatedMessage = await this.messageRepository.update(messageId, validUpdates);
-    return updatedMessage;
-  }
+  // Removed duplicate updateMessage method that restricted updates to content only
 
   /**
    * Delete message

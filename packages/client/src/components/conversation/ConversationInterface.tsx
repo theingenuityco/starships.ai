@@ -20,6 +20,7 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion } from 'motion/react'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -70,6 +71,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
+  const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
+  const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
+  const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
 
   // Get agents data from starship and conversation
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -109,6 +114,28 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Gate UI by presence of a conversation id; streaming details are handled in context consumers
   const showMessagesArea = Boolean(currentConversationId)
 
+  // Start docking immediately when messages area appears; allow welcome to fade concurrently
+  useEffect(() => {
+    if (showMessagesArea) {
+      setHasWelcomeExited(true)
+      // Freeze height during docking to avoid top thrash as content exits
+      if (heightUnfreezeTimerRef.current) clearTimeout(heightUnfreezeTimerRef.current)
+      setIsHeightFrozen(true)
+      heightUnfreezeTimerRef.current = setTimeout(() => {
+        setIsHeightFrozen(false)
+      }, 280)
+    } else {
+      setHasWelcomeExited(false)
+      if (heightUnfreezeTimerRef.current) {
+        clearTimeout(heightUnfreezeTimerRef.current)
+        heightUnfreezeTimerRef.current = null
+      }
+      setIsHeightFrozen(false)
+    }
+  }, [showMessagesArea])
+
+  const isInputDocked = showMessagesArea
+
   useEffect(() => {
     // Initialize ref after showMessagesArea is available
     shouldPrefetchParticipantsRef.current = !showMessagesArea
@@ -123,6 +150,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (!el) return
 
     const update = () => {
+      if (isHeightFrozen) return
       const rect = el.getBoundingClientRect()
       setInputHeight(Math.ceil(rect.height))
     }
@@ -139,7 +167,32 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       ro.disconnect()
       window.removeEventListener('resize', onResize)
     }
-  }, [showMessagesArea, currentConversationId])
+  }, [showMessagesArea, currentConversationId, isHeightFrozen])
+
+  // Compute offset from bottom so input appears centered before docking (only transforms animate)
+  useEffect(() => {
+    const compute = () => {
+      try {
+        const viewportH = window.innerHeight || 0
+        const offset = Math.max(0, Math.round(viewportH / 2 - (inputHeight || 0) / 2 - 64))
+        setDockOffsetPx(offset)
+      } catch {}
+    }
+    compute()
+    const onResize = () => compute()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [inputHeight])
+
+  // After unfreezing, recalc height once
+  useEffect(() => {
+    if (!isHeightFrozen) {
+      const el = inputContainerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      setInputHeight(Math.ceil(rect.height))
+    }
+  }, [isHeightFrozen])
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -592,19 +645,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           )}
         </ConversationStreamProvider>
 
-        {/* Floating Input Container - Always visible, position changes based on state */}
-        <div
-          ref={inputContainerRef}
-          className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
-          style={showMessagesArea ? { top: `calc(100% - ${inputHeight}px)`, transform: 'translateY(0)' } : { top: '50%', transform: 'translateY(-50%)', marginTop: '-64px' }}
-        >
-          <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
-            {!showMessagesArea && (
-              <div className="text-center mb-6 opacity-100">
-                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-              </div>
-            )}
+        {/* Floating Input Container - Always bottom-anchored; we animate inner translateY only */}
+        <div ref={inputContainerRef} className="absolute left-0 right-0 bottom-0 p-6 pointer-events-none z-30">
+          <motion.div
+            className="max-w-2xl mx-auto pointer-events-auto opacity-100 relative"
+            data-message-input
+            initial={false}
+            animate={{ y: isInputDocked ? 0 : -dockOffsetPx }}
+            transition={{ type: 'spring', stiffness: 210, damping: 24 }}
+            style={{ willChange: 'transform' }}
+          >
             <ConversationMessageInput
               ref={messageInputRef}
               selectedAgent={selectedAgent}
@@ -614,7 +664,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={false}
               disabled={false}
-              minimal={showMessagesArea}
+              minimal={isInputDocked && !isHeightFrozen}
               onFocus={() => {}}
               onBlur={() => {}}
               onToggleOverlay={handleToggleOverlay}
@@ -623,55 +673,64 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               budgetTokens={budgetTokens}
               onAgentChange={handleAgentChange}
             ></ConversationMessageInput>
-
-            {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
-              <div className="mt-8 opacity-100">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
-                <div className="space-y-1">
-                  {starshipConversationsData!.conversations
-                    .slice()
-                    .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
-                    .slice(0, 3)
-                    .map((conv: any) => {
-                      const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
-                      const participants = conversationParticipants?.[conv?.id] || []
-                      return (
-                        <button
-                          key={conv.id}
-                          className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
-                          onClick={() => handleRecentConversationSelect(conv.id)}
-                        >
-                          <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
-                            <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
-                            {participants.length > 0 && (
-                              <div className="flex items-center gap-2 mt-1 min-w-0">
-                                <div className="flex items-center gap-1 shrink-0">
-                                  {participants.slice(0, 3).map((agent: any) => (
-                                    <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
-                                      <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
-                                    </Avatar>
-                                  ))}
+            <AnimatePresence initial={false} mode="wait">
+              {!showMessagesArea && (
+                <motion.div key="welcome-copy" exit={{ opacity: 0, y: -12, transition: { duration: 0.2, ease: 'easeOut' } }} className="absolute inset-x-0 bottom-full mb-6 text-center opacity-100">
+                  <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                  <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence initial={false} mode="wait">
+              {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
+                <motion.div key="recent-list" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
+                  <div className="space-y-1">
+                    {starshipConversationsData!.conversations
+                      .slice()
+                      .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+                      .slice(0, 3)
+                      .map((conv: any) => {
+                        const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
+                        const participants = conversationParticipants?.[conv?.id] || []
+                        return (
+                          <button
+                            key={conv.id}
+                            className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
+                            onClick={() => handleRecentConversationSelect(conv.id)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
+                              <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
+                              {participants.length > 0 && (
+                                <div className="flex items-center gap-2 mt-1 min-w-0">
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {participants.slice(0, 3).map((agent: any) => (
+                                      <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
+                                        <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
+                                      </Avatar>
+                                    ))}
+                                  </div>
+                                  <span className="text-[12px] text-muted-foreground truncate">
+                                    {participants
+                                      .slice(0, 3)
+                                      .map((a: any) => a?.name || a?.slug || 'Agent')
+                                      .join(', ')}
+                                  </span>
+                                  {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
                                 </div>
-                                <span className="text-[12px] text-muted-foreground truncate">
-                                  {participants
-                                    .slice(0, 3)
-                                    .map((a: any) => a?.name || a?.slug || 'Agent')
-                                    .join(', ')}
-                                </span>
-                                {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </div>
       </div>
     </div>

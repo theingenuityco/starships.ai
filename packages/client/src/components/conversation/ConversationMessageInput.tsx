@@ -118,6 +118,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isFetching } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
     const isStreamingEffective = Boolean(isAssistantStreaming && isFetching)
+    const shouldShowStop = Boolean(isStreamingEffective || sending || isResponding || isFetching)
+
+    // Track last known conversationId to enable stop during pre-stream window
+    const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
+    useEffect(() => {
+      if (conversationId) {
+        lastConversationIdRef.current = conversationId
+      }
+    }, [conversationId])
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
@@ -210,6 +219,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)
         }
+        // Ensure local ref is updated immediately for stop button usability
+        lastConversationIdRef.current = currentConversationId!
 
         // Set agent information in store
         const { setConversationAgent } = useStarshipUIStore.getState()
@@ -1361,20 +1372,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             {/* Bottom-right Actions: Stop (when streaming) or Send */}
             <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
-              {isStreamingEffective ? (
-                <Button
-                  onClick={() => {
-                    if (!conversationId) return
-                    void stopConversation(conversationId)
-                  }}
-                  variant="outline"
-                  size="icon"
-                  className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10')}
-                  aria-label="Stop response"
-                  title="Stop response"
-                >
-                  <Icon name="stop" weight="fill" className="h-4 w-4" />
-                </Button>
+              {shouldShowStop ? (
+                <div className="relative h-8 w-8">
+                  <Button
+                    onClick={() => {
+                      const id = lastConversationIdRef.current
+                      if (!id) return
+                      void stopConversation(id)
+                    }}
+                    variant="outline"
+                    size="icon"
+                    className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
+                    aria-label="Stop response"
+                    title="Stop response"
+                  >
+                    <Icon name="stop" weight="fill" className="h-4 w-4" />
+                  </Button>
+                  <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                </div>
               ) : (
                 <Button
                   onClick={handleSubmit}

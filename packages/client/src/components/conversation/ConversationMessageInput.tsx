@@ -90,6 +90,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const enforcingMentionRef = useRef(false)
     // Track any pending enforcement to avoid racing against user input
     const enforceTimeoutRef = useRef<number | null>(null)
+    // When true, user is editing the mention text inline (avoid auto-enforcement)
+    const isEditingMentionRef = useRef(false)
 
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
@@ -579,14 +581,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 },
                 command: (agent: AgentModel) => {
                   const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: agent.name }
-                  // Update selected agent without altering editor text
+                  // Ensure inline editing mode is off before inserting the node
+                  isEditingMentionRef.current = false
+                  // Insert/replace with the mention node
+                  props.command(realItem)
+                  // Then update selected agent
                   try {
                     const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
-                    // Update local ref immediately to avoid UI lag
                     currentAgentRef.current = selected
                     onAgentChange?.(selected)
                   } catch {}
-                  props.command(realItem)
                 },
                 anchorRect: null,
               },
@@ -700,106 +704,44 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     // React NodeView for mention rendering using our avatar component
-    const MentionNodeView = ({ node, updateAttributes, editor }: any) => {
+    const MentionNodeView = ({ node, updateAttributes, editor, deleteNode }: any) => {
       const id = node?.attrs?.id
       const label = node?.attrs?.label
       const agent = (agentsRef.current || []).find(a => a.id === id)
       const display = agent?.name || label || id || ''
       const anchorRef = useRef<HTMLSpanElement | null>(null)
-      const popupRef = useRef<any>(null)
-      const rendererRef = useRef<ReactRenderer | null>(null)
-
-      const openSwitcher = () => {
+      const startInlineMentionEdit = () => {
         try {
-          console.debug('[mention] openSwitcher:start', { hasAnchor: !!anchorRef.current, display })
-        } catch {}
-        try {
-          const anchorEl = anchorRef.current
-          if (!anchorEl) return
-          // Destroy any existing
+          isEditingMentionRef.current = true
+          // Replace the chip with editable text: @<current name>
           try {
-            popupRef.current?.destroy()
+            deleteNode?.()
           } catch {}
           try {
-            rendererRef.current?.destroy()
-          } catch {}
-
-          const items = (agentsRef.current || []) as AgentModel[]
-          const currentIndex = Math.max(
-            0,
-            items.findIndex(a => a.id === id)
-          )
-
-          try {
-            rendererRef.current = new ReactRenderer(MentionList as any, {
-              props: {
-                items,
-                active: currentIndex,
-                onHover: (i: number) => {
-                  rendererRef.current?.updateProps({ ...rendererRef.current.props, active: i })
-                },
-                command: (newAgent: AgentModel) => {
-                  try {
-                    updateAttributes({ id: newAgent.id, label: newAgent.name })
-                  } catch {}
-                  try {
-                    // Update local ref immediately so enforcement logic sees the new agent
-                    currentAgentRef.current = newAgent
-                    onAgentChange?.(newAgent)
-                  } catch {}
-                  try {
-                    popupRef.current?.destroy()
-                  } catch {}
-                  try {
-                    rendererRef.current?.destroy()
-                  } catch {}
-                },
-                anchorRect: null,
-              },
-              editor,
-            })
-          } catch (err) {
+            // If a single enforced space remains after deletion, remove it so '@' starts at index 0
             try {
-              console.error('[mention] openSwitcher:renderer error', err)
+              const from = editor?.state?.selection?.from || 0
+              const nextChar = (editor?.state as any)?.doc?.textBetween?.(from, from + 1, '\n', '\n') || ''
+              if (nextChar === ' ') {
+                editor
+                  ?.chain()
+                  ?.focus()
+                  ?.deleteRange({ from, to: from + 1 })
+                  ?.run()
+              }
             } catch {}
-            return
-          }
-          try {
-            console.debug('[mention] openSwitcher:renderer ready', { items: items.length, currentIndex })
+            editor?.chain()?.focus()?.insertContent(`@${display}`)?.run()
+            const end = editor?.state?.selection?.from || 0
+            const from = Math.max(0, end - String(display).length)
+            const to = end
+            editor?.chain()?.setTextSelection({ from, to })?.run()
+            editor?.chain()?.focus()?.run()
           } catch {}
-
-          popupRef.current = tippy(anchorEl, {
-            content: rendererRef.current.element,
-            appendTo: () => document.body,
-            showOnCreate: true,
-            interactive: true,
-            trigger: 'manual',
-            placement: 'bottom-start',
-            zIndex: 1000,
-          })
-          try {
-            console.debug('[mention] openSwitcher:tippy created')
-          } catch {}
-          try {
-            popupRef.current.show()
-            console.debug('[mention] openSwitcher:tippy shown')
-          } catch (err) {
-            try {
-              console.error('[mention] openSwitcher:show error', err)
-            } catch {}
-          }
         } catch {}
       }
 
       useEffect(() => {
-        return () => {
-          try {
-            popupRef.current?.destroy()
-          } catch {}
-          try {
-            rendererRef.current?.destroy()
-          } catch {}
-        }
+        return () => {}
       }, [])
       return (
         <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground" data-mention-node>
@@ -818,10 +760,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               e.stopPropagation()
               // Defer to avoid ProseMirror selection interfering
               setTimeout(() => {
-                try {
-                  console.debug('[mention] onMouseDown:deferred open')
-                } catch {}
-                openSwitcher()
+                startInlineMentionEdit()
               }, 0)
             }}
             onKeyDown={e => {
@@ -831,7 +770,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 } catch {}
                 e.preventDefault()
                 e.stopPropagation()
-                openSwitcher()
+                startInlineMentionEdit()
               }
             }}
           >
@@ -1119,7 +1058,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       onUpdate: ({ editor }) => {
         // Enforce leading mention on every update (deferred to next tick to avoid flushSync during lifecycle)
         try {
-          if (!enforcingMentionRef.current) {
+          if (!enforcingMentionRef.current && !isSuggestionActiveRef.current && !isEditingMentionRef.current) {
             // Schedule to avoid synchronous mutations during TipTap update lifecycle
             if (enforceTimeoutRef.current) {
               clearTimeout(enforceTimeoutRef.current)
@@ -1141,6 +1080,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const prevId = leadingMentionAgent ? leadingMentionAgent.id : null
           const nextId = mentioned ? mentioned.id : null
           if (prevId !== nextId) setLeadingMentionAgent(mentioned)
+          if (mentioned) {
+            // Exit inline editing mode once a real mention node exists again
+            isEditingMentionRef.current = false
+          }
         } catch {}
         // Update hint visibility and position on editor update
         try {
@@ -1255,14 +1198,43 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const ensureLeadingAgentMention = useCallback(() => {
       if (!tiptap) return
       try {
+        // Do not enforce while user is editing the mention inline
+        if (isEditingMentionRef.current) return
         const json: any = tiptap.getJSON()
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
         const first = blockContent[0]
 
+        // If a mention exists anywhere in the first paragraph, normalize it to the beginning
+        const mentionIndex = blockContent.findIndex((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
+        if (mentionIndex > 0) {
+          // Move the existing mention to the front and ensure a single space after it
+          const mentionNode = blockContent[mentionIndex]
+          const before = blockContent.slice(0, mentionIndex).filter((n: any) => !(n?.type === 'text' && typeof n.text === 'string' && n.text.trim() === ''))
+          const after = blockContent.slice(mentionIndex + 1)
+          let contentAfterMention: any[]
+          const second = after[0]
+          const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
+          if (hasLeadingSpace) {
+            contentAfterMention = after
+          } else if (second && second.type === 'text' && typeof second.text === 'string') {
+            contentAfterMention = [{ type: 'text', text: ' ' + second.text }, ...after.slice(1)]
+          } else {
+            contentAfterMention = [{ type: 'text', text: ' ' }, ...after]
+          }
+          const newParagraph = {
+            type: 'paragraph',
+            content: [mentionNode, ...contentAfterMention, ...before],
+          }
+          const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+          scheduleSetContent(newDoc)
+          return
+        }
+
         // If a mention already exists at the start, do not replace its id; only ensure spacing
         if (first && first.type === 'mention' && first.attrs && first.attrs.id) {
+          if (isEditingMentionRef.current) return
           const second = blockContent[1]
           const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
           if (hasLeadingSpace) return
@@ -1284,7 +1256,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           return
         }
 
-        // Otherwise, insert the current agent mention if available
+        // Otherwise, insert the current agent mention if available (still skip if editing)
+        if (isEditingMentionRef.current) return
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return

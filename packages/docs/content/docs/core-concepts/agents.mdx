@@ -4,7 +4,7 @@ description: The AI agent framework that powers intelligent, autonomous assistan
 icon: Bot
 ---
 
-import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Brain, Network, Cpu, Database, Wrench, RotateCcw } from 'lucide-react';
+import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Brain, Network, Cpu, Database, Wrench, RotateCcw, ExternalLink, Construction } from 'lucide-react';
 
 # Agents
 
@@ -68,13 +68,13 @@ graph TD
 
 ### How Each Node Works
 
-- <span style={{color: '#0066cc'}}>**[start](/core-concepts/blueprints#start-node)** 🔗</span>: Receives input and triggers agent execution
-- <span style={{color: '#0066cc'}}>**[llm](/core-concepts/blueprints#llm-node)** 🔗</span>: Processes requests using AI models, decides on tool usage  
-- <span style={{color: '#0066cc'}}>**[conditional](/core-concepts/blueprints#conditional-node)** 🔗</span>: Routes execution based on LLM decisions (tools vs. response)
-- <span style={{color: '#0066cc'}}>**[code](/core-concepts/blueprints#code-node)** 🔗</span>: Prepares data and formats tool arguments for execution
-- <span style={{color: '#0066cc'}}>**[tool](/core-concepts/blueprints#tool-node)** 🔗</span>: Executes capabilities like API calls, data processing
-- <span style={{color: '#0066cc'}}>**[mutate](/core-concepts/blueprints#mutate-node)** 🔗</span>: Updates memory with tool results for next LLM cycle
-- <span style={{color: '#0066cc'}}>**[end](/core-concepts/blueprints#end-node)** 🔗</span>: Returns response when agent has complete answer
+- <span style={{color: '#0066cc'}}>**[start](/core-concepts/blueprints#start-node)** <ExternalLink className="inline w-3 h-3" /></span>: Receives input and triggers agent execution
+- <span style={{color: '#0066cc'}}>**[llm](/core-concepts/blueprints#llm-node)** <ExternalLink className="inline w-3 h-3" /></span>: Processes requests using AI models, decides on tool usage  
+- <span style={{color: '#0066cc'}}>**[conditional](/core-concepts/blueprints#conditional-node)** <ExternalLink className="inline w-3 h-3" /></span>: Routes execution based on LLM decisions (tools vs. response)
+- <span style={{color: '#0066cc'}}>**[code](/core-concepts/blueprints#code-node)** <ExternalLink className="inline w-3 h-3" /></span>: Prepares data and formats tool arguments for execution
+- <span style={{color: '#0066cc'}}>**[tool](/core-concepts/blueprints#tool-node)** <ExternalLink className="inline w-3 h-3" /></span>: Executes capabilities like API calls, data processing
+- <span style={{color: '#0066cc'}}>**[mutate](/core-concepts/blueprints#mutate-node)** <ExternalLink className="inline w-3 h-3" /></span>: Updates memory with tool results for next LLM cycle
+- <span style={{color: '#0066cc'}}>**[end](/core-concepts/blueprints#end-node)** <ExternalLink className="inline w-3 h-3" /></span>: Returns response when agent has complete answer
 
 
 <Callout type="info">
@@ -194,7 +194,7 @@ This persistent memory is what makes agents intelligent teammates rather than si
 - One-click deployment with customization options
 
 **Code-First Development**:
-<Callout type="warning" title="🚧 Coming Soon">
+<Callout type="warning" title={<><Construction className="inline w-4 h-4 mr-1" />Coming Soon</>}>
 CLI package for programmatic agent creation is in development.
 </Callout>
 
@@ -231,7 +231,7 @@ CLI package for programmatic agent creation is in development.
 
 ## Agent Publishing & Sharing
 
-<Callout type="warning" title="🚧 Publishing to Marketplace In Development">
+<Callout type="warning" title={<><Construction className="inline w-4 h-4 mr-1" />Publishing to Marketplace In Development</>}>
 Agent marketplace and publishing system is currently in development.
 </Callout>
 

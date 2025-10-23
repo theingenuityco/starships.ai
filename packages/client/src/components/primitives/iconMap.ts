@@ -35,6 +35,8 @@ const map: Record<string, ResolvedIcon> = {
   'message-square': { type: 'phosphor', component: 'ChatCircleText' },
   // Send / paper plane
   send: { type: 'phosphor', component: 'PaperPlaneTilt' },
+  // Stop (square)
+  stop: { type: 'phosphor', component: 'Stop' },
   plus: { type: 'phosphor', component: 'Plus' },
   x: { type: 'phosphor', component: 'X' },
   history: { type: 'phosphor', component: 'ClockCounterClockwise' },

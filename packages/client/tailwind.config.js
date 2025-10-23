@@ -75,8 +75,8 @@ module.exports = {
     function ({ addUtilities }) {
       const newUtilities = {
         '.frosted-glass-card': {
-          background: 'transparent !important',
-          backgroundColor: 'transparent !important',
+          background: 'var(--frosted-overlay) !important',
+          backgroundColor: 'var(--frosted-overlay) !important',
           backdropFilter: 'blur(12px) saturate(160%)',
           WebkitBackdropFilter: 'blur(12px) saturate(160%)',
           border: 'var(--frosted-border)',

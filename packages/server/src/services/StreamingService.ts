@@ -86,14 +86,14 @@ export class StreamingService {
       }
     } catch (e: unknown) {
       // Non-fatal: some environments do not expose flushHeaders
-      // eslint-disable-next-line no-console
+       
       console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, e);
     }
     // SSE prelude/comment to ensure the connection is established before first event
     try {
       res.write(':ok\n\n');
     } catch (e: unknown) {
-      // eslint-disable-next-line no-console
+       
       console.debug(`[StreamingService] prelude write failed for ${streamId}:`, e);
     }
 
@@ -341,7 +341,7 @@ export class StreamingService {
           if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
         }
       } catch (flushError: unknown) {
-        // eslint-disable-next-line no-console
+         
         console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
       }
 
@@ -353,7 +353,7 @@ export class StreamingService {
         const maybe = res as unknown as { flush?: () => void };
         if (typeof maybe.flush === 'function') maybe.flush();
       } catch (flushError: unknown) {
-        // eslint-disable-next-line no-console
+         
         console.debug(`[StreamingService] flush failed for ${streamId}:`, flushError);
       }
     } catch (error) {

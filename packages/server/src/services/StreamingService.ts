@@ -86,14 +86,14 @@ export class StreamingService {
       }
     } catch (e: unknown) {
       // Non-fatal: some environments do not expose flushHeaders
-      // eslint-disable-next-line no-console
+       
       console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, e);
     }
     // SSE prelude/comment to ensure the connection is established before first event
     try {
       res.write(':ok\n\n');
     } catch (e: unknown) {
-      // eslint-disable-next-line no-console
+       
       console.debug(`[StreamingService] prelude write failed for ${streamId}:`, e);
     }
 
@@ -291,9 +291,14 @@ export class StreamingService {
    * and allow additional messages in the same SSE session if needed.
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
+    // Always buffer the logical 'complete' event even if no active connections are present.
+    // This ensures that on reconnection, any previously buffered deltas from the current turn
+    // are correctly bounded and not replayed, preventing duplicated/garbled content.
+    this.bufferLogicalEvent(streamId, 'complete', finalResponse);
+
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
-    this.bufferLogicalEvent(streamId, 'complete', finalResponse);
+
     await Promise.all(
       Array.from(conns).map(async (connection) => {
         if (connection && !connection.res.destroyed) {
@@ -336,7 +341,7 @@ export class StreamingService {
           if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
         }
       } catch (flushError: unknown) {
-        // eslint-disable-next-line no-console
+         
         console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
       }
 
@@ -348,7 +353,7 @@ export class StreamingService {
         const maybe = res as unknown as { flush?: () => void };
         if (typeof maybe.flush === 'function') maybe.flush();
       } catch (flushError: unknown) {
-        // eslint-disable-next-line no-console
+         
         console.debug(`[StreamingService] flush failed for ${streamId}:`, flushError);
       }
     } catch (error) {
@@ -589,11 +594,14 @@ export class StreamingService {
 
     this.suppressBuffering = true;
     try {
+      const lastEvt = buffer[buffer.length - 1];
+      let replayedAny = false;
       for (const connection of conns) {
         if (connection.res.destroyed) continue;
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history
+          replayedAny = true;
           switch (evt.type) {
             case 'delta': {
               const normalized = this.normalizeDelta(streamId, evt.payload as Operation, connection);
@@ -613,6 +621,10 @@ export class StreamingService {
               break;
             }
           }
+        }
+        // If nothing to replay after last 'complete', emit that 'complete' so clients can finalize state
+        if (!replayedAny && lastEvt && lastEvt.type === 'complete') {
+          this.sendEventToStream(streamId, connection.res, 'complete', lastEvt.payload);
         }
       }
     } finally {

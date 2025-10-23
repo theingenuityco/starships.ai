@@ -312,7 +312,9 @@
 
     /* Shadow colors for light mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
-    --frosted-border: 1px solid rgba(255, 255, 255, 0.05);
+    --frosted-border: 1px solid rgba(255, 255, 255, 0.03);
+    /* Subtle frosted overlay for light mode: slightly darker than bg */
+    --frosted-overlay: hsl(0 0% 0% / 0.04);
 
     /* App gradient variables (light) */
     --app-tint: hsl(220 10% 22%); /* adjust hue/sat/lightness for gray temperature */
@@ -351,7 +353,9 @@
 
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
-    --frosted-border: 1px solid rgba(255, 255, 255, 0.12);
+    --frosted-border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Subtle frosted overlay for dark mode: slightly lighter than bg */
+    --frosted-overlay: hsl(0 0% 100% / 0.06);
 
     /* App gradient variables (dark) */
     --app-tint: hsl(220 12% 20%); /* adjust for darker theme tint */
@@ -476,11 +480,11 @@
 
     /* Layered gradients: radial vignette + ultra-faint grid */
     background-image:
-      radial-gradient(1200px 600px at 15% -10%, hsl(var(--primary) / 0.06), transparent 60%),
-      radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.05), transparent 60%),
-      linear-gradient(to bottom, hsl(var(--foreground) / 0.02), transparent 15%, transparent 85%, hsl(var(--foreground) / 0.02)),
-      /* Faint grid */ linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px),
-      linear-gradient(0deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
+      radial-gradient(1200px 600px at 15% -10%, hsl(var(--primary) / 0.03), transparent 60%),
+      radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.025), transparent 60%),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.01), transparent 15%, transparent 85%, hsl(var(--foreground) / 0.01)),
+      /* Faint grid */ linear-gradient(90deg, hsl(var(--foreground) / 0.02) 1px, transparent 1px),
+      linear-gradient(0deg, hsl(var(--foreground) / 0.02) 1px, transparent 1px);
 
     background-size:
       100% 100%,
@@ -499,9 +503,9 @@
   /* Slightly adjust intensities for dark mode */
   .dark .app-textured-bg {
     background-image:
-      radial-gradient(1200px 600px at 15% -10%, hsl(var(--primary) / 0.1), transparent 60%), radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.08), transparent 60%),
-      linear-gradient(to bottom, hsl(var(--foreground) / 0.06), transparent 15%, transparent 85%, hsl(var(--foreground) / 0.06)),
-      linear-gradient(90deg, hsl(var(--foreground) / 0.1) 1px, transparent 1px), linear-gradient(0deg, hsl(var(--foreground) / 0.1) 1px, transparent 1px);
+      radial-gradient(1200px 600px at 15% -10%, hsl(var(--primary) / 0.05), transparent 60%), radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.04), transparent 60%),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.03), transparent 15%, transparent 85%, hsl(var(--foreground) / 0.03)),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.05) 1px, transparent 1px), linear-gradient(0deg, hsl(var(--foreground) / 0.05) 1px, transparent 1px);
   }
 
   /*
@@ -513,21 +517,21 @@
     background-color: hsl(var(--background));
     background-image:
       /* Soft bias highlight across the diagonal */
-      linear-gradient(115deg, hsl(var(--primary) / 0.04), transparent 40%, transparent 60%, hsl(var(--primary) / 0.04)),
+      linear-gradient(115deg, hsl(var(--primary) / 0.02), transparent 40%, transparent 60%, hsl(var(--primary) / 0.02)),
       /* Wide repeating bands to emulate folds (shadow edge + soft belly) */
         repeating-linear-gradient(
           115deg,
-          hsl(var(--foreground) / 0.1) 0px,
-          hsl(var(--foreground) / 0.1) 2px,
+          hsl(var(--foreground) / 0.06) 0px,
+          hsl(var(--foreground) / 0.06) 2px,
           transparent 2px,
           transparent 74px,
-          hsl(var(--foreground) / 0.14) 74px,
-          hsl(var(--foreground) / 0.14) 76px,
+          hsl(var(--foreground) / 0.08) 74px,
+          hsl(var(--foreground) / 0.08) 76px,
           transparent 76px,
           transparent 150px
         ),
-      /* Gentle vignettes to avoid flatness */ radial-gradient(1000px 520px at 18% -10%, hsl(var(--foreground) / 0.05), transparent 60%),
-      radial-gradient(860px 480px at 82% 110%, hsl(var(--foreground) / 0.05), transparent 60%);
+      /* Gentle vignettes to avoid flatness */ radial-gradient(1000px 520px at 18% -10%, hsl(var(--foreground) / 0.03), transparent 60%),
+      radial-gradient(860px 480px at 82% 110%, hsl(var(--foreground) / 0.03), transparent 60%);
 
     backface-visibility: hidden;
     will-change: background;
@@ -535,19 +539,19 @@
 
   .dark .app-folded-bg {
     background-image:
-      linear-gradient(115deg, hsl(var(--primary) / 0.08), transparent 40%, transparent 60%, hsl(var(--primary) / 0.08)),
+      linear-gradient(115deg, hsl(var(--primary) / 0.04), transparent 40%, transparent 60%, hsl(var(--primary) / 0.04)),
       repeating-linear-gradient(
         115deg,
-        hsl(var(--foreground) / 0.18) 0px,
-        hsl(var(--foreground) / 0.18) 2px,
+        hsl(var(--foreground) / 0.1) 0px,
+        hsl(var(--foreground) / 0.1) 2px,
         transparent 2px,
         transparent 74px,
-        hsl(var(--foreground) / 0.22) 74px,
-        hsl(var(--foreground) / 0.22) 76px,
+        hsl(var(--foreground) / 0.12) 74px,
+        hsl(var(--foreground) / 0.12) 76px,
         transparent 76px,
         transparent 150px
       ),
-      radial-gradient(1000px 520px at 18% -10%, hsl(var(--foreground) / 0.1), transparent 60%), radial-gradient(860px 480px at 82% 110%, hsl(var(--foreground) / 0.1), transparent 60%);
+      radial-gradient(1000px 520px at 18% -10%, hsl(var(--foreground) / 0.06), transparent 60%), radial-gradient(860px 480px at 82% 110%, hsl(var(--foreground) / 0.06), transparent 60%);
   }
 
   /*
@@ -558,8 +562,8 @@
     background-color: hsl(var(--background));
     background-image:
       /* Light: shift overlays to reflect primary tone subtly */
-      linear-gradient(135deg, hsl(var(--foreground) / 0.06) 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, hsl(var(--primary) / 0.15), transparent 75%),
-      radial-gradient(1600px 1000px at 53% 120%, hsl(var(--primary) / 0.12), transparent 65%), radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.12), transparent 60%);
+      linear-gradient(135deg, hsl(var(--foreground) / 0.03) 0%, transparent 60%), radial-gradient(1400px 900px at 53% -10%, hsl(var(--primary) / 0.08), transparent 75%),
+      radial-gradient(1600px 1000px at 53% 120%, hsl(var(--primary) / 0.06), transparent 65%), radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.06), transparent 60%);
     backface-visibility: hidden;
     will-change: background;
   }
@@ -567,9 +571,9 @@
   .dark .app-gradient-bg {
     background-image:
       /* Dark: warm near-dark overlays tuned by primary */
-      linear-gradient(0deg, hsl(var(--foreground) / 0.3), hsl(var(--foreground) / 0.3)), linear-gradient(135deg, hsl(var(--foreground) / 0.2) 0%, transparent 60%),
-      radial-gradient(1400px 900px at 53% -10%, hsl(var(--primary) / 0.22), transparent 75%), radial-gradient(1600px 1000px at 53% 120%, hsl(var(--primary) / 0.18), transparent 65%),
-      radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.22), transparent 60%);
+      linear-gradient(0deg, hsl(var(--foreground) / 0.12), hsl(var(--foreground) / 0.12)), linear-gradient(135deg, hsl(var(--foreground) / 0.1) 0%, transparent 60%),
+      radial-gradient(1400px 900px at 53% -10%, hsl(var(--primary) / 0.12), transparent 75%), radial-gradient(1600px 1000px at 53% 120%, hsl(var(--primary) / 0.1), transparent 65%),
+      radial-gradient(900px 500px at 85% 110%, hsl(var(--primary) / 0.12), transparent 60%);
   }
 }
 
@@ -644,7 +648,7 @@
   color: hsl(var(--foreground));
 
   /* Match frosted border tone in StarTheme dark wrapper */
-  --frosted-border: 1px solid rgba(255, 255, 255, 0.12);
+  --frosted-border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Star Light Theme - If needed */
@@ -1126,7 +1130,7 @@
 
   /* Neutral frosted glass in dark mode (no primary tint) */
   .dark .frosted-glass-card {
-    background: linear-gradient(135deg, hsl(var(--card) / 0.3) 0%, hsl(var(--card) / 0.2) 100%);
+    background: var(--frosted-overlay);
     border: var(--frosted-border);
   }
 }

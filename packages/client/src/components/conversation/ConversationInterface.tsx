@@ -596,7 +596,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         <div
           ref={inputContainerRef}
           className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out z-30"
-          style={showMessagesArea ? { bottom: '0px' } : { top: '50%', transform: 'translateY(-50%)', marginTop: '-64px' }}
+          style={showMessagesArea ? { top: `calc(100% - ${inputHeight}px)`, transform: 'translateY(0)' } : { top: '50%', transform: 'translateY(-50%)', marginTop: '-64px' }}
         >
           <div className="max-w-2xl mx-auto pointer-events-auto opacity-100" data-message-input>
             {!showMessagesArea && (

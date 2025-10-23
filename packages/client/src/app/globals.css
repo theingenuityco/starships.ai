@@ -313,6 +313,8 @@
     /* Shadow colors for light mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
     --frosted-border: 1px solid rgba(255, 255, 255, 0.03);
+    /* Subtle frosted overlay for light mode: slightly darker than bg */
+    --frosted-overlay: hsl(0 0% 0% / 0.04);
 
     /* App gradient variables (light) */
     --app-tint: hsl(220 10% 22%); /* adjust hue/sat/lightness for gray temperature */
@@ -352,6 +354,8 @@
     /* Shadow colors for dark mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
     --frosted-border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Subtle frosted overlay for dark mode: slightly lighter than bg */
+    --frosted-overlay: hsl(0 0% 100% / 0.06);
 
     /* App gradient variables (dark) */
     --app-tint: hsl(220 12% 20%); /* adjust for darker theme tint */
@@ -1126,7 +1130,7 @@
 
   /* Neutral frosted glass in dark mode (no primary tint) */
   .dark .frosted-glass-card {
-    background: transparent;
+    background: var(--frosted-overlay);
     border: var(--frosted-border);
   }
 }

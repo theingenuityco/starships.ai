@@ -1367,12 +1367,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     if (!conversationId) return
                     void stopConversation(conversationId)
                   }}
+                  variant="outline"
                   size="icon"
-                  className={cn('h-8 w-8 rounded-full shrink-0 transition-all bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg hover:shadow-xl')}
+                  className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10')}
                   aria-label="Stop response"
                   title="Stop response"
                 >
-                  <Icon name="x" className="h-4 w-4" />
+                  <Icon name="stop" weight="fill" className="h-4 w-4" />
                 </Button>
               ) : (
                 <Button

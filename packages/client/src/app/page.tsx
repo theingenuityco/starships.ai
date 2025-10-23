@@ -6,7 +6,6 @@ import ProductModel from '@/app/components/ProductModel'
 import UseCases from '@/app/components/UseCases'
 import ProblemOutcome from '@/app/components/ProblemOutcome'
 import HowItWorks from '@/app/components/HowItWorks'
-import Integrations from '@/app/components/Integrations'
 import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
@@ -31,7 +30,6 @@ export default function HomePage() {
         <ProblemOutcome />
         <ProductModel />
         <HowItWorks />
-        <Integrations />
         <Security />
         <PricingTeaser />
         <FAQ />

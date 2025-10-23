@@ -88,6 +88,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const clearEditorRef = useRef<() => void>(() => {})
     // Guard to avoid recursive update loops when enforcing leading mention
     const enforcingMentionRef = useRef(false)
+    // Track any pending enforcement to avoid racing against user input
+    const enforceTimeoutRef = useRef<number | null>(null)
 
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
@@ -1119,10 +1121,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         try {
           if (!enforcingMentionRef.current) {
             // Schedule to avoid synchronous mutations during TipTap update lifecycle
-            setTimeout(() => {
+            if (enforceTimeoutRef.current) {
+              clearTimeout(enforceTimeoutRef.current)
+              enforceTimeoutRef.current = null
+            }
+            enforceTimeoutRef.current = window.setTimeout(() => {
               try {
                 ensureLeadingAgentMention()
               } catch {}
+              enforceTimeoutRef.current = null
             }, 0)
           }
         } catch {}
@@ -1228,12 +1235,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       (content: any) => {
         if (!tiptap) return
         enforcingMentionRef.current = true
-        setTimeout(() => {
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+        enforceTimeoutRef.current = window.setTimeout(() => {
           try {
             tiptap?.commands.setContent(content)
           } finally {
             enforcingMentionRef.current = false
           }
+          enforceTimeoutRef.current = null
         }, 0)
       },
       [tiptap]
@@ -1280,12 +1292,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     useEffect(() => {
       if (!tiptap) return
       // Defer enforcement to avoid synchronous mutations during mount/prop change lifecycles
-      setTimeout(() => {
+      if (enforceTimeoutRef.current) {
+        clearTimeout(enforceTimeoutRef.current)
+        enforceTimeoutRef.current = null
+      }
+      enforceTimeoutRef.current = window.setTimeout(() => {
         try {
           ensureLeadingAgentMention()
         } catch {}
+        enforceTimeoutRef.current = null
       }, 0)
+      return () => {
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+      }
     }, [tiptap, selectedAgent, ensureLeadingAgentMention])
+
+    // Clear any pending enforcement when unmounting
+    useEffect(() => {
+      return () => {
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+      }
+    }, [])
     // Consolidated focus management - handles all focus scenarios (requires tiptap)
     useEffect(() => {
       const shouldFocus = () => {

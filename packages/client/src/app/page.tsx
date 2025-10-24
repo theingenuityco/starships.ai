@@ -15,6 +15,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useEffect, useState } from 'react'
 import { Orbitron } from 'next/font/google'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -22,6 +23,7 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
+  const pathname = usePathname()
 
   // Trigger a one-off logo entry animation after a short delay while keeping default static state
   useEffect(() => {
@@ -41,13 +43,27 @@ export default function HomePage() {
 
         {/* Top-right navigation items */}
         <nav className="fixed top-8 right-8 z-50 flex items-center gap-6 text-sm">
-          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/"
+            className={pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+            aria-current={pathname === '/' ? 'page' : undefined}
+          >
             Home
           </Link>
-          <Link href="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/marketplace"
+            className={pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+            aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
+          >
             Marketplace
           </Link>
-          <a href="/docs" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+          <a
+            href="/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+            aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
+          >
             Documentation
           </a>
         </nav>

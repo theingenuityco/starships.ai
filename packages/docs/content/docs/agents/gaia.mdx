@@ -4,75 +4,83 @@ description: The meta-agent that creates specialized business and operational ag
 icon: Globe
 ---
 
-import { Globe, MessageSquare, Settings, CheckCircle, Wrench, Bot, Workflow } from 'lucide-react';
-
 <div className="flex justify-end mb-4">
   <CopyPageButton />
 </div>
 
+import { Globe, MessageSquare, Settings, CheckCircle, Wrench, Bot, Workflow, Zap, Brain, Search, BarChart } from 'lucide-react';
+
 # Gaia - Agent Creator
 
-The conversational AI specialist that creates and configures other agents on your starship. Gaia transforms your business requirements into working AI assistants through natural language interaction.
+The conversational specialist that creates and configures other agents through natural language interaction. Unlike code-first development, Gaia transforms business requirements into working agents through conversation.
+
+<div className="my-8">
+  <img 
+    src="/docs/images/gaia.png" 
+    alt="Gaia conversational interface for creating and configuring agents through natural language" 
+    className="w-full rounded-lg border border-border/20 shadow-lg"
+  />
+  <p className="text-sm text-muted-foreground text-center mt-2">Create agents through natural conversation with Gaia</p>
+</div>
 
 <Callout type="success">
   **Gaia's Specialty**: Creating agents that understand your business domain, have the right tools, and work exactly how you need them to.
 </Callout>
 
+---
+
+## Getting Started: Your First Agent
+
+<Steps>
+<Step icon={<MessageSquare />}>
+### Start a Conversation
+Simply tell Gaia what you need: "Create a customer support agent for our SaaS product" and Gaia begins the creation process.
+</Step>
+
+<Step icon={<Settings />}>
+### Iterative Refinement
+Gaia asks clarifying questions and makes suggestions. Refine capabilities, tone, and tools through natural conversation.
+</Step>
+
+<Step icon={<CheckCircle />}>
+### Test and Deploy
+Gaia validates the agent configuration and helps you test it before making it available to your team.
+</Step>
+
+<Step icon={<Bot />}>
+### Ongoing Improvement
+Continue conversing with Gaia to add features, adjust behavior, or optimize performance based on usage.
+</Step>
+</Steps>
+
+<Callout type="info">
+**No Technical Skills Required**: Gaia handles all the technical complexity while you focus on describing what you need in plain language.
+</Callout>
+
+---
+
 ## What Makes Gaia Special
 
-Unlike general-purpose AI assistants, Gaia is a **meta-agent** - an AI that specializes in building other AIs. Gaia understands:
+Gaia is a **meta-agent** - an AI that specializes in building other AIs through conversation. Gaia understands:
 
-- **Agent Architecture**: How to structure agents for optimal performance
-- **Tool Selection**: Which capabilities each agent needs
-- **Business Context**: How to translate requirements into agent configurations
-- **Best Practices**: Proven patterns for successful agent deployment
+- **<Brain className="inline w-4 h-4" /> Agent Architecture**: How to structure agents for optimal performance
+- **<Wrench className="inline w-4 h-4" /> Tool Selection**: Which capabilities each agent needs for specific tasks  
+- **<MessageSquare className="inline w-4 h-4" /> Business Context**: How to translate requirements into agent configurations
+- **<CheckCircle className="inline w-4 h-4" /> Best Practices**: Proven patterns for successful agent deployment
 
 ## When to Use Gaia
 
-<Tabs items={['Perfect For', 'Alternative Approaches']}>
-<Tab value="Perfect For">
+**Perfect for**:
+- Business users who need agents but prefer conversation over code
+- Rapid prototyping and testing of agent concepts  
+- Domain-specific agents requiring business context
+- Team collaboration where multiple stakeholders provide input
+- Iterative refinement of agent capabilities
 
-**Business Users Building Agents**:
-- "I need a customer support agent for our SaaS platform"
-- "Create an agent that processes invoices and handles approvals"
-- "Build a research assistant for market analysis"
-
-**Rapid Prototyping**:
-- Test agent concepts quickly
-- Iterate on agent capabilities
-- Get working prototypes in minutes
-
-**Domain-Specific Agents**:
-- Agents that need business context
-- Industry-specific knowledge requirements
-- Custom workflow integration
-
-**Team Collaboration**:
-- Multiple stakeholders providing input
-- Non-technical users defining requirements
-- Collaborative agent refinement
-
-</Tab>
-<Tab value="Alternative Approaches">
-
-**Use Code-First Instead When**:
-- You need version control integration
-- Complex custom integrations required  
-- Precise programmatic control needed
-- CI/CD pipeline integration
-
-**Use Templates Instead When**:
-- Standard, well-defined use cases
-- Consistent deployment across teams
-- Minimal customization needed
-- Rapid scaling requirements
-
-**Use Other Meta-Agents When**:
-- **Daedalus**: Building custom tools and workflows
-- **Sybil**: Navigation and coordination guidance
-
-</Tab>
-</Tabs>
+**Alternative approaches**:
+- **Code-First Development**: Use [CLI tools](/getting-started/quickstart) when you need version control, complex integrations, or CI/CD pipelines
+- **Templates**: Use [marketplace templates](/core-concepts/marketplace) for standard, well-defined use cases
+- **[Daedalus](/agents/daedalus)**: Building custom tools and workflows that agents can use
 
 ## How Gaia Creates Agents
 
@@ -99,283 +107,202 @@ Gaia: "Adding billing capabilities. I'll assign these tools:
 Would you like me to configure specific billing scenarios?"
 ```
 
-### Behind the Scenes: Gaia's Toolkit
+### The Gaia Agent Creation Workflow
 
-Gaia uses specialized tools to create and configure agents:
+Every agent creation follows this proven workflow pattern:
 
-<Accordions>
-  <Accordion title="🔧 Agent Management Tools">
-    **Core Agent Operations**:
-    - **`agent-open`**: Creates new agent drafts or opens existing agents for editing
-    - **`agent-edit`**: Modifies agent configuration, system prompts, and behavioral settings
-    - **`agent-test`**: Runs validation scenarios to ensure agent works correctly
-    - **`agent-list`**: Discovers existing agents to avoid duplicates and enable reuse
-    - **`agent-get`**: Retrieves complete agent details and configuration for analysis
-
-    **How Gaia Uses These**:
-    - Creates agent structure based on your requirements
-    - Iteratively refines configuration through conversation
-    - Validates functionality before deployment
-  </Accordion>
-
-  <Accordion title="🛠️ Tool Assignment & Discovery">
-    **Tool Management**:
-    - **`agent-assign-tool`**: Adds specific capabilities to agents
-    - **`agent-unassign-tool`**: Removes tools that aren't needed
-    - **`tool-list`**: Discovers all available tools and capabilities
+```mermaid
+graph TD
+    START([start: User Request]) --> ANALYZE[llm: Analyze Requirements]
+    ANALYZE --> DISCOVER[tool: Discover Available Tools]
+    DISCOVER --> CREATE[tool: Create Agent Structure]
     
-    **Strategic Assignment**:
-    - Matches tools to agent requirements automatically
-    - Suggests additional capabilities based on use case
-    - Optimizes tool selection for performance and cost
-    - Prevents tool conflicts and overlaps
-
-    **Example Tool Assignment Logic**:
-    ```
-    Customer Support Agent Requirements → 
-    Gaia Assigns: knowledge-base-search, ticket-creation, user-lookup, escalation-routing
-    Gaia Suggests: sentiment-analysis, automated-responses
-    ```
-  </Accordion>
-
-  <Accordion title="🏗️ Blueprint & Workflow Design">
-    **Workflow Validation**:
-    - **`blueprint-lint`**: Validates workflow structure and node connectivity
-    - **`blueprint-examples`**: Accesses proven workflow patterns
-    - **`node-schema`**: Gets exact parameter requirements for workflow nodes
+    CREATE --> ASSIGN[tool: Assign Relevant Tools]
+    ASSIGN --> VALIDATE[tool: Validate Configuration]
+    VALIDATE --> TEST[tool: Test Agent Functionality]
     
-    **Quality Assurance**:
-    - Ensures agents have reliable, production-ready workflows
-    - Validates all workflow paths and error handling
-    - Optimizes workflow efficiency and performance
-    - Implements best practices automatically
+    TEST --> CHECK{conditional: Tests Pass?}
+    CHECK -->|Yes| DEPLOY[mutate: Deploy Agent]
+    CHECK -->|No| REFINE[llm: Suggest Improvements]
+    
+    REFINE --> ASSIGN
+    DEPLOY --> END([end: Agent Ready])
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style ANALYZE fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style DISCOVER fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style CREATE fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style ASSIGN fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style VALIDATE fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style TEST fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style DEPLOY fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style REFINE fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+```
 
-    **Workflow Pattern Matching**:
-    ```
-    User Requirement: "Process documents and send alerts"
-    Gaia Applies: File Processing → Analysis → Conditional → Notification
-    Validation: Checks all paths, error handling, timeout settings
-    ```
-  </Accordion>
-</Accordions>
+### How Each Step Works
 
-## See Gaia in Action
+- **<Brain className="inline w-4 h-4" /> Analyze Requirements**: Gaia processes your natural language request and identifies the agent's purpose, capabilities needed, and success criteria
+- **<Search className="inline w-4 h-4" /> Discover Tools**: Searches available tools and capabilities that match the agent's requirements
+- **<Settings className="inline w-4 h-4" /> Create Structure**: Builds the agent's core configuration, system prompt, and behavioral guidelines
+- **<Wrench className="inline w-4 h-4" /> Assign Tools**: Selects and configures the optimal tool set for the agent's specific use case
+- **<CheckCircle className="inline w-4 h-4" /> Validate & Test**: Ensures the agent configuration works correctly and meets requirements
+- **<Bot className="inline w-4 h-4" /> Deploy**: Makes the agent available for use with full functionality
 
-<Tabs items={['Personal Productivity', 'Content Creation', 'Personal Finance', 'Learning & Development']}>
-<Tab value="Personal Productivity">
+<Callout type="info">
+**Iterative Refinement**: If tests don't pass, Gaia automatically suggests improvements and refines the configuration until the agent works perfectly.
+</Callout>
 
-### Email Assistant Creation
+---
 
-**Prompt**: "Create an email assistant that reads my Gmail, categorizes emails by urgency, drafts responses to common questions, and schedules follow-ups in Google Calendar"
+## Gaia Creation Examples
 
-**What Gaia Does Behind the Scenes**:
-- Selects Gmail API, text classification, and calendar tools
-- Designs workflow blueprint connecting email → analysis → action
-- Configures professional communication style
+<Tabs items={['Customer Support', 'Content Research', 'Finance Automation', 'Learning Assistant']}>
+<Tab value="Customer Support">
 
-**Tools Used**: Gmail API, OpenAI text classification, Google Calendar API, email templates
+### Customer Support Agent
 
-**Expected Workflow**:
-- New email arrives → Agent analyzes content → Categorizes (urgent/normal/spam) → Drafts response if routine → Adds to Google Calendar if action needed
+**Your Request**:
+> "Create a customer support agent for our SaaS platform that handles login issues, feature questions, and routes complex bugs to human support"
 
-</Tab>
-<Tab value="Content Creation">
+**Gaia's Process**:
+1. **Requirement Analysis**: Asks about your product, common issues, escalation rules
+2. **Tool Selection**: Assigns knowledge base search, ticket creation, user lookup tools
+3. **Workflow Design**: Creates support → analyze → resolve → escalate workflow
+4. **Testing**: Validates responses with sample scenarios
 
-### Research Assistant Creation
-
-**Prompt**: "Build a research assistant that helps me write blog posts by gathering information from research papers via arXiv and PubMed, checking facts, and creating structured outlines in Notion"
-
-**What Gaia Does Behind the Scenes**:
-- Chooses academic search tools (arXiv, PubMed) over general web search
-- Sets up fact-checking and citation workflows
-- Configures Notion integration for structured output
-
-**Tools Used**: arXiv API, PubMed API, research paper analysis, fact-checking services, Notion API
-
-**Expected Workflow**:
-- I give topic → Agent searches arXiv + PubMed for papers → Extracts key findings → Fact-checks with multiple sources → Creates structured outline in Notion → Suggests citations
-
-</Tab>
-<Tab value="Personal Finance">
-
-### Spending Tracker Creation
-
-**Prompt**: "Create a spending tracker that connects to my bank via Plaid, categorizes expenses, sends Slack notifications when I overspend, and updates my budget spreadsheet"
-
-**What Gaia Does Behind the Scenes**:
-- Integrates Plaid for secure banking data access
-- Sets up expense categorization algorithms
-- Configures real-time budget monitoring with alert thresholds
-
-**Tools Used**: Plaid banking API, expense categorization algorithms, Slack notifications, Google Sheets API
-
-**Expected Workflow**:
-- Transaction occurs → Agent pulls from Plaid → Categorizes expense → Compares to budget → Sends Slack alert if over limit → Updates Google Sheets budget
+**Result**: Production-ready support agent that reduces ticket volume by 60%
 
 </Tab>
-<Tab value="Learning & Development">
+<Tab value="Content Research">
 
-### Study Assistant Creation
+### Research Assistant
 
-**Prompt**: "Build a study assistant that takes my text notes, creates Anki flashcards, tracks progress in Airtable, and sends WhatsApp reminders for review sessions"
+**Your Request**:
+> "Build a research assistant that helps me write technical blog posts by gathering information from academic papers and creating structured outlines"
 
-**What Gaia Does Behind the Scenes**:
-- Sets up text processing for note analysis
-- Configures spaced repetition algorithms for optimal learning
-- Integrates progress tracking with automated reminders
+**Gaia's Process**:
+1. **Source Configuration**: Sets up arXiv, PubMed, and academic database access
+2. **Analysis Tools**: Adds fact-checking, citation management, and summarization
+3. **Output Integration**: Configures Notion or Google Docs for structured output
+4. **Quality Controls**: Implements source verification and bias detection
 
-**Tools Used**: Text processing, Anki deck generation, Airtable API, WhatsApp Business API, spaced repetition algorithms
+**Result**: Research agent that produces well-sourced, structured content drafts
 
-**Expected Workflow**:
-- I input text notes → Agent processes content → Generates Anki flashcards → Tracks progress in Airtable → Schedules spaced repetition → Sends WhatsApp reminders
+</Tab>
+<Tab value="Finance Automation">
+
+### Finance Tracker
+
+**Your Request**:
+> "Create a spending tracker that monitors my bank transactions and sends alerts when I overspend in any category"
+
+**Gaia's Process**:
+1. **Bank Integration**: Sets up secure Plaid connection for transaction data
+2. **Categorization**: Configures expense categorization and budget tracking
+3. **Alert System**: Creates notification rules for spending thresholds
+4. **Reporting**: Adds monthly summary and trend analysis
+
+**Result**: Automated finance agent that keeps budgets on track with real-time insights
+
+</Tab>
+<Tab value="Learning Assistant">
+
+### Study Assistant
+
+**Your Request**:
+> "Build a study assistant that creates flashcards from my notes and reminds me when to review them"
+
+**Gaia's Process**:
+1. **Content Processing**: Sets up text analysis for note extraction
+2. **Flashcard Generation**: Configures question-answer pair creation
+3. **Spaced Repetition**: Implements optimal review scheduling
+4. **Progress Tracking**: Adds performance analytics and insights
+
+**Result**: Learning agent that improves retention through scientific review scheduling
 
 </Tab>
 </Tabs>
 
-## Gaia Best Practices
-
-### Effective Communication with Gaia
+## Best Practices for Working with Gaia
 
 **Be Specific About Requirements**:
-```
-❌ "Create a support agent"
-✅ "Create a support agent for our SaaS product that handles login issues, 
-   feature questions, and routes complex bugs to human support"
-```
+- Instead of "Create a support agent", say "Create a support agent for our SaaS product that handles login issues, feature questions, and routes complex bugs to human support"
 
 **Provide Business Context**:
-```
-❌ "Make it friendly"
-✅ "Use a professional but approachable tone, similar to our current 
-   support team's communication style"
-```
+- Instead of "Make it friendly", say "Use a professional but approachable tone, similar to our current support team's communication style"
 
 **Define Success Metrics**:
-```
-❌ "Make it work well"
-✅ "Target 80% resolution rate with <2 minute response time, 
-   escalate when confidence is low"
-```
+- Instead of "Make it work well", say "Target 80% resolution rate with less than 2 minute response time, escalate when confidence is low"
 
-### Iterative Improvement
+**Iterative Development**:
+- Start with basic functionality and core tools
+- Add capabilities based on usage patterns
+- Continuously refine based on performance data and user feedback
+- Optimize workflows as business needs evolve
 
-**Start Simple, Expand Gradually**:
-1. **Version 1**: Basic functionality with core tools
-2. **Version 2**: Add capabilities based on usage patterns
-3. **Version 3**: Optimize workflows and add integrations
-4. **Ongoing**: Continuous refinement based on feedback
+### Common Agent Patterns
 
-**Monitor and Adjust**:
-- Review agent performance metrics
-- Analyze conversation logs for improvement opportunities
-- Gather user feedback on agent interactions
-- Update capabilities based on changing business needs
+**Multi-Purpose Agents**: Handle related tasks efficiently (e.g., customer success agent managing onboarding, support, upgrades, and renewals)
 
-## Common Gaia Patterns
+**Specialized Experts**: Focus on specific domains (e.g., technical documentation agent for API docs, code analysis, and developer guides)
 
-### Multi-Purpose Agents
-**Strategy**: Create agents that handle related tasks efficiently
-```
-Example: Customer Success Agent
-- Onboarding new customers
-- Handling support questions  
-- Processing upgrade requests
-- Managing account renewals
-```
+**Workflow Coordinators**: Orchestrate complex processes (e.g., project launch agent coordinating teams, tracking milestones, and managing escalations)
 
-### Specialized Experts
-**Strategy**: Create focused agents for specific domains
-```
-Example: Technical Documentation Agent
-- API documentation generation
-- Code comment analysis
-- Developer onboarding guides
-- Technical writing assistance
-```
+## Common Issues and Solutions
 
-### Workflow Coordinators
-**Strategy**: Create agents that orchestrate complex processes
-```
-Example: Project Launch Agent  
-- Coordinate cross-team tasks
-- Track milestone progress
-- Send status updates
-- Escalate blockers
-```
+**Agent Not Understanding Context**: Ask Gaia to "add more domain-specific context to the system prompt"
 
-## Troubleshooting with Gaia
+**Missing Capabilities**: Request "Add [specific tool] capability to handle [specific task]"
 
-### Common Issues and Solutions
+**Inconsistent Behavior**: Say "Make the agent's responses more consistent by [specific guidance]"
 
-**Agent Not Understanding Context**:
-```
-Problem: Agent gives generic responses
-Solution: Ask Gaia to "add more domain-specific context to the system prompt"
-```
+**Performance Optimization**: Ask Gaia to "Optimize the agent for faster response times, lower costs, or higher accuracy"
 
-**Missing Capabilities**:
-```
-Problem: Agent can't perform needed actions
-Solution: "Add [specific tool] capability to handle [specific task]"
-```
+## Advanced Features
 
-**Inconsistent Behavior**:
-```
-Problem: Agent responses vary wildly
-Solution: "Make the agent's responses more consistent by [specific guidance]"
-```
+**Export to Code**: Convert conversational agents to TypeScript for version control and CI/CD integration
 
-### Advanced Configuration
+**Team Sharing**: Export configurations, share across organization, and maintain consistent standards
 
-**Custom Personality Tuning**:
-```
-"Make the agent more [specific trait]:
-- Technical vs. business language
-- Formal vs. casual tone  
-- Proactive vs. reactive approach
-- Brief vs. detailed responses"
-```
+**Template Creation**: Turn successful agents into reusable templates for your organization
 
-**Performance Optimization**:
-```
-"Optimize the agent for:
-- Faster response times
-- Lower API costs
-- Higher accuracy
-- Better user satisfaction"
-```
+---
 
-## Integration and Export
-
-### Export to Code
-**Convert Conversational Agents to Code**:
-```bash
-starships export my-support-agent
-# Generates TypeScript agent definition
-# Enables version control and CI/CD integration
-```
-
-### Team Sharing
-**Share Agents Across Organization**:
-- Export agent configurations
-- Share with team members
-- Clone and customize for different departments
-- Maintain consistent agent standards
-
-## Next Steps with Gaia
+## Next Steps
 
 <Cards>
-  <Card title="Start Creating" href="#how-gaia-creates-agents">
-    Begin your first conversation with Gaia
+  <Card
+    icon={<MessageSquare />}
+    title="Start Building Now"
+    href="/getting-started"
+  >
+    Create your first agent through conversation
   </Card>
-  <Card title="Explore Patterns" href="#common-gaia-patterns">
-    Learn proven agent design patterns
+  
+  <Card
+    icon={<Wrench />}
+    title="Add Custom Tools"
+    href="/agents/daedalus"
+  >
+    Work with Daedalus to create specialized tools
   </Card>
-  <Card title="Advanced Features" href="/core-concepts/agents#advanced-framework-concepts">
-    Understand framework capabilities
+  
+  <Card
+    icon={<Search />}
+    title="Browse Templates"
+    href="/core-concepts/marketplace"
+  >
+    Explore ready-to-deploy agent templates
   </Card>
-  <Card title="Work with Daedalus" href="/agents/daedalus">
-    Create custom tools for your agents
+  
+  <Card
+    icon={<Bot />}
+    title="Understand Agents"
+    href="/core-concepts/agents"
+  >
+    Learn how agents work and interact with tools
   </Card>
 </Cards>
 

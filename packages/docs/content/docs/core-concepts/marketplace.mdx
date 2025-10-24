@@ -4,15 +4,35 @@ description: Discover, deploy, and customize pre-built agents and tools with one
 icon: Store
 ---
 
-import { Store, Download, Star, Users, Zap, Shield, Search, Bot, Wrench, Sparkles, CheckCircle, ExternalLink, Globe, Code, Lightbulb, BarChart, HeartPulse, Package, Workflow, Database, MessageSquare, Settings, Brain } from 'lucide-react';
-
 <div className="flex justify-end mb-4">
   <CopyPageButton />
 </div>
 
-# Marketplace
-
-**Your gateway to instant AI capabilities.** Browse hundreds of ready-to-deploy [agents](/core-concepts/agents) and [tools](/core-concepts/tools), then add them to your starship with one click.
+import {
+  Store,
+  Download,
+  Star,
+  Users,
+  Zap,
+  Shield,
+  Search,
+  Bot,
+  Wrench,
+  Sparkles,
+  CheckCircle,
+  ExternalLink,
+  Globe,
+  Code,
+  Lightbulb,
+  BarChart,
+  HeartPulse,
+  Package,
+  Workflow,
+  Database,
+  MessageSquare,
+  Settings,
+  Brain,
+} from 'lucide-react';
 
 <Callout type="success">
   **Deploy in 30 seconds**: From discovery to deployment, get powerful AI capabilities running on your starship instantly.
@@ -28,13 +48,14 @@ The Marketplace is Starships.ai's **template ecosystem** - a curated collection 
 - **<BarChart className="inline w-4 h-4" /> Scale** with enterprise-grade templates built by experts
 
 <Callout type="info">
-**New to Starships.ai?** Check out our [Getting Started](/getting-started) guide to set up your account and understand how agents work within your starship.
+  **New to Starships.ai?** Check out our [Getting Started](/getting-started) guide to set up your account and understand how agents work
+  within your starship.
 </Callout>
 
 <div className="my-8">
-  <img 
-    src="/docs/images/marketplace.png" 
-    alt="Marketplace interface showing agent templates with search, categories, and one-click deployment" 
+  <img
+    src="/docs/images/marketplace.png"
+    alt="Marketplace interface showing agent templates with search, categories, and one-click deployment"
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
   <p className="text-sm text-muted-foreground text-center mt-2">The Marketplace: Search, filter, and deploy agents and tools instantly</p>
@@ -51,13 +72,12 @@ Navigate to the Marketplace and explore available templates. Use categories to n
 </Step>
 
 <Step icon={<Zap />}>
-### Select Your Template
-Click on a template that matches your needs. Review the detailed information, preview prompts, and requirements.
+  ### Select Your Template Click on a template that matches your needs. Review the detailed information, preview prompts, and requirements.
 </Step>
 
 <Step icon={<Sparkles />}>
-### Deploy with One Click
-Click "Deploy" and confirm your selection. The template will be automatically converted to a running instance on your starship.
+  ### Deploy with One Click Click "Deploy" and confirm your selection. The template will be automatically converted to a running instance on
+  your starship.
 </Step>
 
 <Step icon={<CheckCircle />}>
@@ -77,6 +97,7 @@ Find the perfect template with powerful search and filtering:
 - **<BarChart className="inline w-4 h-4" /> Smart Sorting**: Most popular, recently updated, best ratings
 
 Each template card shows:
+
 - **Agent Templates**: Avatar, category, description, model info, usage stats, preview prompts
 - **Tool Templates**: Icon, configuration needs, code examples, integration notes
 
@@ -85,12 +106,14 @@ Each template card shows:
 ## Template Details
 
 <div className="my-6">
-  <img 
-    src="/docs/images/agent_template.png" 
-    alt="Agent template detail view showing usage statistics, system prompt inspection, and interactive blueprint workflow visualization" 
+  <img
+    src="/docs/images/agent_template.png"
+    alt="Agent template detail view showing usage statistics, system prompt inspection, and interactive blueprint workflow visualization"
     className="w-1/2 mx-auto rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">Template deep dive: Complete agent information with system prompt and blueprint visualization</p>
+  <p className="text-sm text-muted-foreground text-center mt-2">
+    Template deep dive: Complete agent information with system prompt and blueprint visualization
+  </p>
 </div>
 
 Click any template to see detailed information:
@@ -101,7 +124,8 @@ Click any template to see detailed information:
 - **<MessageSquare className="inline w-4 h-4" /> Preview Prompts**: Test conversations before deployment
 
 <Callout type="info">
-**Blueprint Visualization**: Advanced templates include visual workflow diagrams showing exactly how agents process requests and use tools. Learn more about [blueprint architecture](/core-concepts/blueprints).
+  **Blueprint Visualization**: Advanced templates include visual workflow diagrams showing exactly how agents process requests and use
+  tools. Learn more about [blueprint architecture](/core-concepts/blueprints).
 </Callout>
 
 ---
@@ -109,18 +133,20 @@ Click any template to see detailed information:
 ## One-Click Deployment
 
 <div className="my-6">
-  <img 
-    src="/docs/images/agent_deploy.png" 
-    alt="Deployment confirmation modal showing template details, destination starship, and model information before deployment" 
+  <img
+    src="/docs/images/agent_deploy.png"
+    alt="Deployment confirmation modal showing template details, destination starship, and model information before deployment"
     className="w-2/3 mx-auto rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">Deployment confirmation: Review template details and destination before one-click deployment</p>
+  <p className="text-sm text-muted-foreground text-center mt-2">
+    Deployment confirmation: Review template details and destination before one-click deployment
+  </p>
 </div>
 
 Deployment is simple and automatic:
 
 1. **Select Template** → Review capabilities and requirements
-2. **Confirm Deployment** → Verify template, starship, and model details  
+2. **Confirm Deployment** → Verify template, starship, and model details
 3. **Automatic Installation** → Template converts to active instance, tools install automatically
 4. **Ready to Use** → Instant availability with optimal settings
 
@@ -131,21 +157,25 @@ Deployment is simple and automatic:
 ## Agents vs Tools
 
 <div className="my-6">
-  <img 
-    src="/docs/images/marketplace_tools.png" 
-    alt="Tools marketplace section showing automation tools with code examples and installation status" 
+  <img
+    src="/docs/images/marketplace_tools.png"
+    alt="Tools marketplace section showing automation tools with code examples and installation status"
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">Tool templates: Reusable capabilities with code examples and one-click installation</p>
+  <p className="text-sm text-muted-foreground text-center mt-2">
+    Tool templates: Reusable capabilities with code examples and one-click installation
+  </p>
 </div>
 
 ### <Bot className="inline w-5 h-5" /> Agent Templates
+
 **Complete AI assistants** with personality, memory, and capabilities. Deploy as conversational interfaces you can chat with immediately. Learn more about [how agents work](/core-concepts/agents).
 
 **Includes**: System prompt, model configuration, tool suite, memory setup, example prompts  
 **Result**: New agent in your starship ready for conversation
 
-### <Wrench className="inline w-5 h-5" /> Tool Templates  
+### <Wrench className="inline w-5 h-5" /> Tool Templates
+
 **Standalone capabilities** that extend agent functionality. Install once, use across multiple agents. Explore the [tool ecosystem](/core-concepts/tools).
 
 **Includes**: Function definition, configuration schema, usage examples, integration guides  
@@ -166,43 +196,23 @@ Deployment is simple and automatic:
 Ready to enhance your starship's capabilities?
 
 <Cards>
-  <Card
-    icon={<Store />}
-    title="Browse Marketplace"
-    href="/marketplace"
-  >
+  <Card icon={<Store />} title="Browse Marketplace" href="/marketplace">
     Explore hundreds of ready-to-deploy agents and tools
   </Card>
-  
-  <Card
-    icon={<Bot />}
-    title="Create with Gaia"
-    href="/agents/gaia"
-  >
+
+  <Card icon={<Bot />} title="Create with Gaia" href="/agents/gaia">
     Build custom agents through conversation with our meta-agent
   </Card>
-  
-  <Card
-    icon={<Wrench />}
-    title="Build with Daedalus"
-    href="/agents/daedalus"
-  >
+
+  <Card icon={<Wrench />} title="Build with Daedalus" href="/agents/daedalus">
     Create custom tools and workflows with our tool creator
   </Card>
-  
-  <Card
-    icon={<Search />}
-    title="Getting Started Guide"
-    href="/getting-started"
-  >
+
+  <Card icon={<Search />} title="Getting Started Guide" href="/getting-started">
     Complete setup and building guide for new users
   </Card>
-  
-  <Card
-    icon={<ExternalLink />}
-    title="Agent Architecture"
-    href="/core-concepts/agents"
-  >
+
+  <Card icon={<ExternalLink />} title="Agent Architecture" href="/core-concepts/agents">
     Understand how agents work under the hood
   </Card>
 </Cards>

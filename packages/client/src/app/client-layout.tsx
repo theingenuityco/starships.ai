@@ -40,9 +40,10 @@ const pageVariants = {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  useAuth() // Keep the hook call but don't destructure unused values
+  const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
-  const isPublicPage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
+  const isMarketplace = pathname === '/marketplace'
+  const isPublicSimplePage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
@@ -58,9 +59,54 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  if (isPublicPage) {
+  if (isPublicSimplePage) {
     // Public pages - no authentication required
     return <div className="h-full w-full">{children}</div>
+  }
+
+  // Public page with optional navigation (shown only when authenticated)
+  if (isMarketplace) {
+    // Unauthenticated users: simple public view without nav
+    if (!isAuthenticated) {
+      return <div className="h-full w-full">{children}</div>
+    }
+
+    // Authenticated users: show navigation like protected pages (without auth gate)
+    const shouldHideNavigation = false
+
+    return (
+      <StarTheme theme="dark">
+        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+          {/* Floating Navigation - conditionally rendered */}
+          {!shouldHideNavigation && (
+            <div className="fixed top-6 left-6 z-[1000]">
+              <aside className="relative" style={{ zIndex: 1000 }}>
+                <Navigation isMobile={isMobile} />
+              </aside>
+            </div>
+          )}
+
+          {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
+          {isMobile && !shouldHideNavigation && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="fixed top-4 left-4 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+              aria-label="Open navigation menu"
+              style={{ zIndex: 999 }}
+            >
+              <Icon name="menu" className="w-5 h-5" />
+            </motion.button>
+          )}
+
+          {/* Main Content Area - Dynamic positioning based on navigation visibility */}
+          <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+            {children}
+          </main>
+        </div>
+      </StarTheme>
+    )
   }
 
   // Only show navigation for authenticated users (JwtAuthGate will handle this)

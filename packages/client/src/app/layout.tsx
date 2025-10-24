@@ -1,6 +1,6 @@
 import { ClientLayout } from '@/app/client-layout'
 import '@/app/globals.css'
-import { GoogleAnalytics } from '@/components/analytics/google-analytics'
+import { AnalyticsProvider } from '@/components/analytics/analytics-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -52,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
-        <GoogleAnalytics />
+        <AnalyticsProvider />
       </body>
     </html>
   )

@@ -152,6 +152,9 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.53.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@next/env':
+        specifier: ^16.0.0
+        version: 16.0.0
       '@next/third-parties':
         specifier: ^15.5.5
         version: 15.5.6(next@15.5.6(@opentelemetry/api@1.9.0)(@playwright/test@1.53.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0)
@@ -1968,6 +1971,9 @@ packages:
 
   '@next/env@15.5.6':
     resolution: {integrity: sha512-3qBGRW+sCGzgbpc5TS1a0p7eNxnOarGVQhZxfvTdnV0gFI61lX7QNtQ4V1TSREctXzYn5NetbUsLvyqwLFJM6Q==}
+
+  '@next/env@16.0.0':
+    resolution: {integrity: sha512-s5j2iFGp38QsG1LWRQaE2iUY3h1jc014/melHFfLdrsMJPqxqDQwWNwyQTcNoUSGZlCVZuM7t7JDMmSyRilsnA==}
 
   '@next/eslint-plugin-next@15.5.4':
     resolution: {integrity: sha512-SR1vhXNNg16T4zffhJ4TS7Xn7eq4NfKfcOsRwea7RIAHrjRpI9ALYbamqIJqkAhowLlERffiwk0FMvTLNdnVtw==}
@@ -9953,6 +9959,8 @@ snapshots:
   '@next/env@15.5.4': {}
 
   '@next/env@15.5.6': {}
+
+  '@next/env@16.0.0': {}
 
   '@next/eslint-plugin-next@15.5.4':
     dependencies:

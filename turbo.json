@@ -17,7 +17,12 @@
     "RUNNER_PORT",
     "RUNNER_AUTH_TOKEN",
     "AUTOPILOT_ISOLATE_MEM_MB",
-    "AUTOPILOT_ISOLATE_TIMEOUT_MS"
+    "AUTOPILOT_ISOLATE_TIMEOUT_MS",
+    "GA_MEASUREMENT_ID",
+    "PUBLIC_URL",
+    "CLIENT_URL",
+    "SERVER_URL",
+    "DOCS_URL"
   ],
   "tasks": {
     "build": {

@@ -8,6 +8,10 @@ import { Bot, Code, Globe, Zap, Settings, Play, CheckCircle, Users, Workflow, Br
 
 # Agents
 
+<div className="flex justify-end mb-4">
+  <CopyPageButton />
+</div>
+
 ## What Are Agents?
 
 **Agents** are AI assistants that combine language understanding, tool usage, and memory. Unlike simple chatbots, agents can:
@@ -139,87 +143,35 @@ This persistent memory is what makes agents intelligent teammates rather than si
 
 ---
 
-## Meta-Agents: The Creator Framework
+## Ready to Build Your First Agent?
 
-**Meta-agents** are specialized agents that create and manage other agents. They understand the agent framework deeply and can:
+Now that you understand how agents work, you're ready to create your own:
 
 <Cards>
   <Card
     icon={<Globe />}
-    title="Gaia - Agent Creator"
+    title="Getting Started Guide"
+    href="/getting-started"
+  >
+    Step-by-step guide to creating your first agent with Gaia
+  </Card>
+  
+  <Card
+    icon={<Bot />}
+    title="Chat with Gaia"
     href="/agents/gaia"
   >
-    Specializes in creating business and operational agents through conversation
+    The meta-agent that creates other agents through conversation
   </Card>
   
   <Card
-    icon={<Code />}
-    title="Daedalus - Tool Creator"
-    href="/agents/daedalus"  
+    icon={<Wrench />}
+    title="Chat with Daedalus"
+    href="/agents/daedalus"
   >
-    Builds custom tools and complex workflows that any agent can use
-  </Card>
-  
-  <Card
-    icon={<Network />}
-    title="Sybil - Navigator"
-    href="/agents/sybil"
-  >
-    Provides guidance and coordinates multi-agent workflows
+    The meta-agent that builds custom tools and workflows
   </Card>
 </Cards>
-
----
-
-## Building Your First Agent
-
-<Steps>
-<Step>
-
-### Choose Your Creation Method
-
-**Conversational with Gaia** (Recommended):
-- Chat with Gaia to describe your needs in natural language
-- Automatically selects tools and designs workflows
-- Example: "Create a customer support agent for our SaaS product"
-
-**Marketplace Templates**:
-- Browse pre-built agents by category (coding, analysis, support, etc.)
-- One-click deployment with customization options
-
-**Code-First Development**:
-<Callout type="warning" title="Coming Soon">
-CLI package for programmatic agent creation is in development.
-</Callout>
-
-</Step>
-
-<Step>
-
-### Define Agent Purpose
-
-- **Clear Scope**: What specific problem does this agent solve?
-- **Success Metrics**: How will you measure agent effectiveness?
-- **Boundaries**: What should the agent NOT do?
-
-**Example Scoping**:
-- **Purpose**: Process customer support tickets automatically
-- **Success**: 80% resolution rate with under 2-minute response time
-- **Boundaries**: Cannot offer refunds over $100, escalates billing issues to humans
-
-</Step>
-
-<Step>
-
-### Deploy and Iterate
-
-- **Start Simple**: Begin with core functionality
-- **Monitor Performance**: Track usage patterns and success rates
-- **Expand Gradually**: Add tools and capabilities based on real usage
-- **Version Control**: Track changes and improvements over time
-
-</Step>
-</Steps>
 
 ---
 

@@ -1,90 +1,64 @@
 ---
 title: CLI Quickstart
-description: Build and deploy agents using code with full programmatic control
+description: Build and deploy agents using code with full programmatic control - coming soon
 icon: Zap
 ---
 
+import { Terminal, Code, Zap, Bot, Wrench, MessageSquare } from 'lucide-react';
+
 # CLI Quickstart
 
-Build agents programmatically using our CLI and SDK.
+<div className="flex justify-end mb-4">
+  <CopyPageButton />
+</div>
 
-## Installation
+<Callout type="warning" title="Coming Soon">
+CLI package for programmatic agent creation is in active development and will be available soon.
+</Callout>
 
-First, install the Starships CLI:
+Build agents programmatically using our CLI and SDK - perfect for developers who want full control and integration capabilities.
 
-<Tabs items={['npm', 'yarn', 'pnpm']}>
-<Tab value="npm">
+---
 
+## What You'll Be Able To Do
+
+When the CLI is ready, you'll have powerful code-first development capabilities:
+
+### Installation
 ```bash
 npm install -g @starships/cli
 ```
 
-</Tab>
-<Tab value="yarn">
-
-```bash
-yarn global add @starships/cli
-```
-
-</Tab>
-<Tab value="pnpm">
-
-```bash
-pnpm add -g @starships/cli
-```
-
-</Tab>
-</Tabs>
-
-Verify the installation:
-
-```bash
-starships --version
-```
-
-## Authentication
-
-Log in to your Starships.ai account:
-
+### Authentication
 ```bash
 starships login
 ```
+This will open your browser to authenticate with your Starships.ai account.
 
-This will open your browser to authenticate. Once complete, you're ready to build!
-
-## Create Your First Agent
-
-Initialize a new project:
-
+### Create Your First Agent
 ```bash
 starships init my-first-agent
 cd my-first-agent
 ```
 
-This creates a project with the following structure:
+### Project Structure
+```
+my-first-agent/
+├── starships.config.ts    # Project configuration
+├── agent.ts              # Agent definition
+├── package.json          # Dependencies
+└── tools/               # Custom tools
+    └── example.ts
+```
 
-<Files>
-  <Folder name="my-first-agent" defaultOpen>
-    <File name="starships.config.ts" />
-    <File name="agent.ts" />
-    <File name="package.json" />
-    <Folder name="tools">
-      <File name="example.ts" />
-    </Folder>
-  </Folder>
-</Files>
-
-## Configure Your Agent
-
-Open `agent.ts` and customize your agent:
-
+### Agent Definition
 ```typescript title="agent.ts"
 import { defineAgent } from '@starships/sdk';
 
 export default defineAgent({
   name: 'my-assistant',
   description: 'A helpful AI assistant',
-  model: 'gpt-4-turbo',
+  model: 'anthropic/claude-sonnet-4.5',
 
   instructions: `
     You are a helpful assistant that can answer questions
@@ -97,82 +71,147 @@ export default defineAgent({
 });
 ```
 
-## Test Locally
-
-Run your agent in development mode:
-
+### Local Development
 ```bash
-starships dev
+starships dev        # Start local development server
+starships chat       # Test your agent in terminal
 ```
 
-Interact with your agent in the terminal:
-
-```bash
-starships chat
-```
-
-<Callout type="info">
-  The `dev` command starts a local server with hot reload. Changes to your agent are applied immediately.
-</Callout>
-
-## Deploy to Production
-
-When you're ready, deploy your agent:
-
+### Deploy to Production
 ```bash
 starships deploy
 ```
 
-You'll receive a unique URL for your agent:
-
-```bash
-✓ Deployed successfully!
-  URL: https://my-first-agent-abc123.starships.ai
-  API: https://api.starships.ai/v1/agents/abc123
-```
-
-## Make API Calls
-
-Use your agent via API:
-
-```typescript title="example.ts"
-const response = await fetch('https://api.starships.ai/v1/agents/abc123/chat', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    message: 'Hello, agent!',
-  }),
-});
-
-const data = await response.json();
-console.log(data.message);
-```
-
-## Import to Conversational Interface
-
+### Import to Conversational Interface
 ```bash
 starships import my-first-agent
 # Makes your code agent available for conversational editing
 ```
 
-## Next Steps
+---
 
-Congratulations! You've deployed your first AI agent. Here's what to explore next:
+## Why Use Code-First Development?
 
 <Cards>
-  <Card title="Agent Concepts" href="/core-concepts/agents">
-    Understand how agents work and what they can do
+  <Card
+    icon={<Terminal />}
+    title="Full Control"
+  >
+    Complete programmatic control over agent configuration, tools, and deployment
   </Card>
-  <Card title="Tools & Capabilities" href="/core-concepts/tools">
-    Extend your agents with custom tools
+  
+  <Card
+    icon={<Code />}
+    title="Version Control"
+  >
+    Track changes, collaborate with teams, and manage agent evolution through Git
   </Card>
-  <Card title="Memory & Context" href="/core-concepts/memory">
-    Configure memory and conversation persistence
+  
+  <Card
+    icon={<Zap />}
+    title="Advanced Integrations"
+  >
+    Build complex tools, custom workflows, and enterprise integrations
   </Card>
-  <Card title="Blueprint Workflows" href="/core-concepts/blueprints">
-    Build complex multi-step automation
+  
+  <Card
+    icon={<Bot />}
+    title="Scalable Development"
+  >
+    Create agent templates, reusable components, and automated deployment pipelines
   </Card>
 </Cards>
+
+---
+
+## Current Alternative: Start with Conversation
+
+While you're waiting for CLI tools, **start building today** with our conversational interface. You'll be able to **import and extend** these agents with code later:
+
+<Steps>
+<Step>
+### Build with Gaia Now
+Chat with Gaia to create your agent through conversation:
+- "Create a customer support agent for our SaaS product"
+- Get immediate results and learn the platform
+- Test and iterate quickly
+</Step>
+
+<Step>
+### Add Custom Tools with Daedalus
+Build specialized tools for your agents:
+- "Design a tool that calls our internal API"
+- Create complex workflows and integrations
+- Test tool behavior in real conversations
+</Step>
+
+<Step>
+### Export to Code Later
+When CLI is ready:
+- Export your conversational agents to code projects
+- Add version control and advanced customization
+- Deploy through automated pipelines
+</Step>
+</Steps>
+
+---
+
+## Code-First Advantages (Coming Soon)
+
+### Advanced Features You'll Get:
+- **Custom tool development** with full TypeScript support
+- **Blueprint editor integration** for visual + code workflows
+- **Enterprise deployment** options and environment management
+- **Team collaboration** with shared agent repositories
+- **CI/CD integration** for automated testing and deployment
+- **Custom model fine-tuning** and performance optimization
+
+### Development Workflow:
+```bash
+# Create and iterate
+starships init project-assistant
+starships dev
+starships chat "Help me plan a project"
+
+# Deploy when ready
+starships deploy --environment production
+
+# Import to conversational interface for easy editing
+starships import project-assistant
+```
+
+---
+
+## Get Started Today
+
+Don't wait for code-first tools - **start building now** with conversation and transition to code later:
+
+<Cards>
+  <Card
+    icon={<MessageSquare />}
+    title="Start Building Now"
+    href="/getting-started"
+  >
+    Create agents through conversation today
+  </Card>
+  
+  <Card
+    icon={<Bot />}
+    title="Chat with Gaia"
+    href="/agents/gaia"
+  >
+    Build your first agent in minutes
+  </Card>
+  
+  <Card
+    icon={<Wrench />}
+    title="Chat with Daedalus"
+    href="/agents/daedalus"
+  >
+    Create custom tools and workflows
+  </Card>
+</Cards>
+
+<Callout type="info">
+**Seamless Transition**: Agents and tools you build conversationally today will be fully compatible with code-first development when it's available.
+</Callout>

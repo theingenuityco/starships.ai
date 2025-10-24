@@ -1,78 +1,198 @@
 ---
 title: Getting Started
-description: Set up your development environment and choose your implementation approach
+description: Create your account, access your starship, and build your first AI agent through conversation
 icon: Play
 ---
 
-import { MessageSquare, Code, ArrowRight, Settings } from 'lucide-react';
+import { Globe, MessageSquare, Code, ArrowRight, Settings, Bot, Wrench, CheckCircle, Users, Workflow, Brain, Network, Cpu, Database, RotateCcw, ExternalLink, Construction } from 'lucide-react';
 
 # Getting Started
 
-Quick setup guide for both conversational and code-first approaches.
+<div className="flex justify-end mb-4">
+  <CopyPageButton />
+</div>
 
-## Account Setup
+Welcome to Starships.ai! Build AI agents and tools through natural conversation - no coding required.
 
-**Required for both approaches:**
+---
 
-1. **Create Account**: Sign up at [starships.ai](https://starships.ai)
-2. **Access Dashboard**: Log into your personal starship
-3. **Choose Approach**: Select your preferred building method
+## Your First Steps
 
-## Implementation Paths
+### 1. Create Your Account
+
+1. **Sign up** at [starships.ai](https://starships.ai)
+2. **Verify your email** (required to access the platform)
+3. **Automatic setup**: Upon verification, you'll receive:
+   - Your personal starship (workspace)
+   - Two specialized AI assistants: **Gaia** and **Daedalus**
+   - **$20 credit** to get started
+
+<Callout type="info">
+**What's a Starship?** Your starship is your personal AI workspace where all your agents, tools, and conversations live. Think of it as your command center for building with AI.
+</Callout>
+
+### 2. Access Your Starship Dashboard
+
+After email verification, you'll be taken directly to your **conversation interface** at:
+`/ship/your-starship-name/conversations`
+
+**Interface Overview:**
+- **Left Sidebar**: Navigate between Overview, Conversations, and Marketplace
+- **Main Area**: Conversational interface for building with AI
+- **Floating Input**: Type `@` to select an AI assistant
+
+### 3. Understand the Chat Interface
+
+Starships.ai uses a **conversational building approach**:
+
+- **Empty state**: "Type @ to choose an agent, then ask your question"
+- **Agent selection**: "Ask Gaia..." or "Ask Daedalus..."
+- **Building**: Describe what you want in natural language
+- **Results**: AI creates agents and tools for you automatically
+
+---
+
+## Meet Your AI Builders
+
+**Meta-agents** are specialized AI assistants that create and manage other agents and tools for you.
 
 <Cards>
   <Card
-    icon={<MessageSquare />}
-    title="Conversational Building"
-    href="/core-concepts/agents"
+    icon={<Globe />}
+    title="Gaia - Agent Creator"
+    href="/agents/gaia"
   >
-    Chat with AI to create agents. No coding required.
+    Specializes in creating business and operational agents through conversation
   </Card>
   
   <Card
     icon={<Code />}
-    title="Code-First Development"
-    href="/getting-started/quickstart"
+    title="Daedalus - Tool Creator"
+    href="/agents/daedalus"
   >
-    Use CLI and SDK for full programmatic control.
-  </Card>
-  
-  <Card
-    icon={<Settings />}
-    title="Installation Guide"
-    href="/getting-started/installation"
-  >
-    Detailed setup instructions for development tools.
+    Builds custom tools and complex workflows that any agent can use
   </Card>
 </Cards>
 
-## Development Prerequisites
+### What Each Assistant Does
 
-**Only required for code-first approach:**
+**Gaia** creates agents for you:
+- "Create a customer support agent for our SaaS product"
+- "Design an agent that researches topics using Wikipedia"
+- "Build an agent that helps with onboarding new customers"
 
-- **Node.js** 18.0 or higher
-- **npm**, **yarn**, or **pnpm** package manager  
-- Basic **JavaScript/TypeScript** knowledge
-- **Git** for version control (optional)
+**Daedalus** builds tools and workflows:
+- "Design a tool that calls a REST API"
+- "Create a Slack webhook sender tool"
+- "Build a workflow that processes customer feedback"
 
-## What's Next
+---
 
-<Accordions>
-  <Accordion title="I want to build agents through conversation">
-    **Recommended for**: Business users, rapid prototyping, getting immediate results
-    
-    **[Go to Agent Building →](/core-concepts/agents)**
-  </Accordion>
+## Building Your First Agent
 
-  <Accordion title="I want to code agents from scratch">
-    **Recommended for**: Developers, complex integrations, full customization
-    
-    **[Go to CLI Quickstart →](/getting-started/quickstart)**
-  </Accordion>
+### Option 1: Deploy from Marketplace (Fastest)
 
-  <Accordion title="I want to understand the concepts first">
-    **Recommended for**: Technical leaders, architects, learning the platform
-    
-    **[Go to Core Concepts →](/core-concepts/agents)**
-  </Accordion>
-</Accordions>
+1. **Browse Templates**: Click **Marketplace** → Browse categories (Support, Coding, Creative, Analysis)
+2. **Deploy**: Select template → Click "Deploy" → Confirm to your starship
+3. **Test**: Use `@` to select your new agent and start chatting
+
+**Benefits**: Pre-configured prompts, assigned tools, ready in 1-2 minutes
+
+### Option 2: Build with Gaia (Custom)
+
+1. **Start Conversation**: Type `@` → Select **Gaia** → Describe your agent needs
+2. **Provide Details**: Answer Gaia's questions about tasks, tone, and requirements  
+3. **Deploy & Test**: Gaia creates your agent → Test immediately → Iterate as needed
+
+**Benefits**: Fully customized for your specific use case, 5-10 minutes total
+
+<Cards>
+  <Card
+    icon={<MessageSquare />}
+    title="Marketplace Templates"
+  >
+    **Best for**: Quick deployment, common use cases
+  </Card>
+  
+  <Card
+    icon={<Bot />}
+    title="Build with Gaia"
+  >
+    **Best for**: Custom requirements, unique workflows
+  </Card>
+</Cards>
+
+---
+
+## Next Steps
+
+After creating your first agent:
+
+<Cards>
+  <Card
+    icon={<Wrench />}
+    title="Build Custom Tools"
+    href="/agents/daedalus"
+  >
+    Chat with Daedalus to create specialized tools for your agents
+  </Card>
+  
+  <Card
+    icon={<Bot />}
+    title="Explore Agent Templates"
+    href="/core-concepts/marketplace"
+  >
+    Browse pre-built agents you can deploy with one click
+  </Card>
+  
+  <Card
+    icon={<Brain />}
+    title="Understand Core Concepts"
+    href="/core-concepts/agents"
+  >
+    Learn how agents work under the hood
+  </Card>
+  
+  <Card
+    icon={<Workflow />}
+    title="Advanced Workflows"
+    href="/core-concepts/blueprints"
+  >
+    Create complex multi-step automations
+  </Card>
+</Cards>
+
+---
+
+## Implementation Approaches
+
+<Callout type="info" title="Current Focus: Conversational Building">
+Starships.ai is designed around **conversational AI building**. Chat with specialized agents to create what you need - it's faster and more intuitive than traditional development approaches.
+</Callout>
+
+**Available Now:**
+- ✅ **Conversational Building**: Chat with Gaia and Daedalus to build agents and tools
+- ✅ **Template Marketplace**: Deploy pre-built agents with one click
+- ✅ **Custom Tools**: Create specialized capabilities for your agents
+
+**Coming Soon:**
+- 🔄 **Code-First Development**: CLI and SDK for programmatic control
+- 🔄 **Advanced Integrations**: Enterprise features and custom deployments
+
+<Cards>
+  <Card
+    icon={<MessageSquare />}
+    title="Ready to Build?"
+    href="/agents/gaia"
+  >
+    Start building your first agent with Gaia
+  </Card>
+  
+  <Card
+    icon={<Construction />}
+    title="Code-First Development"
+    href="/getting-started/quickstart"
+  >
+    CLI and SDK tools (coming soon)
+  </Card>
+</Cards>

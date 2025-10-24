@@ -7,6 +7,7 @@ import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { WelcomeModalProvider } from '@/components/auth/WelcomeModalProvider'
 
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
@@ -25,11 +26,11 @@ interface ClientLayoutProps {
 //   exit: { opacity: 0, scale: 1.05 },
 // }
 
-const pageVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 },
-}
+// const pageVariants = {
+//   initial: { opacity: 0, y: 20 },
+//   animate: { opacity: 1, y: 0 },
+//   exit: { opacity: 0, y: -20 },
+// }
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -171,8 +172,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // Regular pages with conditional navigation sidebar
   return (
     <JwtAuthGate>
-      <StarTheme theme="dark">
-        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+      <WelcomeModalProvider>
+        <StarTheme theme="dark">
+          <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Floating Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <div className="fixed top-6 left-6 z-[1000]">
@@ -202,6 +204,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </main>
         </div>
       </StarTheme>
+      </WelcomeModalProvider>
     </JwtAuthGate>
   )
 }

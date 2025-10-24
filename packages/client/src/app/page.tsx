@@ -15,7 +15,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useEffect, useState } from 'react'
 import { Orbitron } from 'next/font/google'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -25,6 +25,17 @@ export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Store verification success flag for later (after login)
+  useEffect(() => {
+    if (searchParams?.get('verification') === 'success') {
+      // Store flag so modal will show AFTER user logs in
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('starships_pending_welcome', 'true')
+      }
+    }
+  }, [searchParams])
 
   // Trigger a one-off logo entry animation after a short delay while keeping default static state
   useEffect(() => {

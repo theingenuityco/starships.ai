@@ -89,6 +89,8 @@ const map: Record<string, ResolvedIcon> = {
   copy: { type: 'radix', component: 'CopyIcon' },
   book: { type: 'phosphor', component: 'Book' },
   menu: { type: 'radix', component: 'HamburgerMenuIcon' },
+  // Social
+  discord: { type: 'phosphor', component: 'DiscordLogo' },
 }
 
 export function resolveIcon(name: string): ResolvedIcon | undefined {

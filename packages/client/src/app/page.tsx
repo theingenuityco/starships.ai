@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useEffect, useState } from 'react'
 import { Orbitron } from 'next/font/google'
+import Link from 'next/link'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -30,13 +31,26 @@ export default function HomePage() {
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
-        {/* Top-left logo with same animation as previous center placement */}
+        {/* Top-left logo with same animation as before */}
         <div className="fixed top-8 left-8 z-50 cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
           <div className="flex items-center gap-2">
             <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
             <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>
           </div>
         </div>
+
+        {/* Top-right navigation items */}
+        <nav className="fixed top-8 right-8 z-50 flex items-center gap-6 text-sm">
+          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+            Home
+          </Link>
+          <Link href="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
+            Marketplace
+          </Link>
+          <a href="/docs" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+            Documentation
+          </a>
+        </nav>
 
         {/* New Landing Sections */}
         <Hero />

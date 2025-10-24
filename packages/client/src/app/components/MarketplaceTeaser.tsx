@@ -16,9 +16,9 @@ export default function MarketplaceTeaser() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-semibold mb-2">Launch from the Marketplace</h2>
-          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-12 md:mb-16">Start with ready‑made agents and tools. Deploy in one click.</p>
+        <div className="flex flex-col items-center text-center">
+          <h2 className="text-3xl md:text-4xl font-semibold mb-2 text-center">Launch from the Marketplace</h2>
+          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Start with ready‑made agents and tools. Deploy in one click.</p>
           <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
             <Icon name="sparkles" className="w-4 h-4 opacity-80" />
             {agentCount} agents, {toolCount} tools — and counting
@@ -31,7 +31,7 @@ export default function MarketplaceTeaser() {
         </div>
 
         {/* Featured agents carousel */}
-        <div className="mt-8">
+        <div className="mt-6">
           <Carousel className="px-8">
             <CarouselContent>
               {agentLoading

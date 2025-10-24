@@ -29,14 +29,17 @@ export default function UseCases() {
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-semibold mb-8 text-center">Build agents and tools fast</h2>
-        <div>
+        <div className="space-y-8 md:space-y-10">
           {items.map((item, idx) => {
             const reverse = idx % 2 === 1
             return (
-              <div key={item.title} className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-8 py-10`}>
+              <div
+                key={item.title}
+                className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-8 py-10 frosted-glass-card rounded-2xl shadow-frosted-lg border border-border/40 p-5 md:p-6`}
+              >
                 {/* Media slot */}
-                <div className="w-full md:w-[560px]">
-                  <img src={mediaSrc[idx]} alt={`${item.title} demo`} className="w-full h-[320px] object-cover rounded-lg border border-white/10" />
+                <div className="w-full md:w-[700px] lg:w-[740px]">
+                  <img src={mediaSrc[idx]} alt={`${item.title} demo`} className="w-full h-[360px] md:h-[460px] object-cover rounded-lg border border-white/10" />
                 </div>
 
                 {/* Text */}

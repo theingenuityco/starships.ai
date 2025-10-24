@@ -83,7 +83,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme theme="dark">
           <div className="relative min-h-[100dvh] flex overflow-hidden bg-background">
             {/* Public top navigation for marketplace (unauthenticated) */}
-            <div className="fixed top-8 left-8 z-[1000] cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
+            <div
+              className="fixed top-8 left-8 z-[1000] cursor-pointer select-none"
+              onClick={() => {
+                setLogoTrigger(v => v + 1)
+                window.location.href = '/'
+              }}
+              title="Go to home"
+            >
               <div className="flex items-center gap-2">
                 <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
                 <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>

@@ -15,7 +15,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useEffect, useState } from 'react'
 import { Orbitron } from 'next/font/google'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -24,6 +24,7 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const pathname = usePathname()
+  const router = useRouter()
 
   // Trigger a one-off logo entry animation after a short delay while keeping default static state
   useEffect(() => {
@@ -34,7 +35,14 @@ export default function HomePage() {
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         {/* Top-left logo with same animation as before */}
-        <div className="fixed top-8 left-8 z-50 cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
+        <div
+          className="fixed top-8 left-8 z-50 cursor-pointer select-none"
+          onClick={() => {
+            setLogoTrigger(v => v + 1)
+            router.push('/')
+          }}
+          title="Animate logo"
+        >
           <div className="flex items-center gap-2">
             <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
             <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>

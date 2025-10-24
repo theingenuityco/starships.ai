@@ -57,6 +57,7 @@
     "@tiptap/suggestion": "^3.7.2",
     "@xyflow/react": "^12.8.6",
     "autoprefixer": "^10.4.21",
+    "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -94,6 +95,7 @@
     "zustand": "5.0.6"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^24.7.2",
     "@types/prismjs": "^1.26.5",
     "@types/react": "^19.2.2",

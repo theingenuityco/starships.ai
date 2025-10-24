@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useSimpleError } from './useSimpleError'
 import { isValidRedirectUrl } from '@/lib/utils'
+import { triggerWelcomeModal } from '@/components/auth/WelcomeModalProvider'
 
 export type AuthMethod = 'password' | 'google' | 'github';
 
@@ -268,11 +269,25 @@ export function useOAuthLogin() {
         return
       }
 
+      // Check if this is a new user (first time logging in)
+      const hadPreviousStarship = typeof window !== 'undefined' && localStorage.getItem('starships_has_starship')
+      const isNewUser = !hadPreviousStarship && starship
+
       // Store token (same as regular login)
       setStoredToken(token)
 
       // Update auth user cache (same as regular login)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+
+      // If new user, trigger welcome modal
+      if (isNewUser) {
+        triggerWelcomeModal()
+      }
+
+      // Remember that user has a starship now
+      if (starship && typeof window !== 'undefined') {
+        localStorage.setItem('starships_has_starship', 'true')
+      }
 
       // Handle redirect with returnUrl pattern (same as regular login)
       const searchParams = new URLSearchParams(window.location.search)

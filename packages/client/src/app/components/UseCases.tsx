@@ -36,7 +36,7 @@ export default function UseCases() {
             return (
               <div
                 key={item.title}
-                className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-stretch gap-8 py-10 frosted-glass-card rounded-2xl shadow-frosted-lg border border-border/40 p-5 md:p-6 md:min-h-[460px]`}
+                className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-stretch gap-8 py-8 frosted-glass-card rounded-2xl shadow-frosted-lg border border-border/40 p-4 md:p-5 md:min-h-[460px]`}
               >
                 {/* Media slot */}
                 <div className="w-full md:w-[700px] lg:w-[740px]">

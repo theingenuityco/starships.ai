@@ -15,10 +15,12 @@ export class WalletService {
 
   /**
    * Ensure a wallet exists for the given starship. Creates one if missing.
+   * @param starshipId - The starship ID
+   * @param initialBalance - Optional initial balance (default: 0.00)
    */
-  async createForStarship(starshipId: string): Promise<WalletModel> {
+  async createForStarship(starshipId: string, initialBalance: number = 0): Promise<WalletModel> {
     try {
-      logger.info('[WALLET] Ensuring wallet exists for starship', { starshipId, operation: 'createForStarship' });
+      logger.info('[WALLET] Ensuring wallet exists for starship', { starshipId, initialBalance, operation: 'createForStarship' });
 
       const existing = await this.walletRepository.findByStarshipId(starshipId);
       if (existing) {
@@ -26,13 +28,14 @@ export class WalletService {
         return existing;
       }
 
+      const balanceStr = initialBalance.toFixed(6);
       const wallet = await this.walletRepository.create({
         starshipId,
         currency: 'USD',
-        balance: '0.000000',
+        balance: balanceStr,
       });
 
-      logger.info('[WALLET] Wallet created', { starshipId, walletId: wallet.id, balance: wallet.balance });
+      logger.info('[WALLET] Wallet created', { starshipId, walletId: wallet.id, balance: wallet.balance, initialBalance });
       return wallet;
     } catch (error) {
       logger.error('[WALLET] Failed to create wallet', { starshipId, operation: 'createForStarship' }, error as Error);

@@ -17,6 +17,7 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -192,5 +193,38 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         />
       </Card>
     </motion.div>
+  )
+}
+
+interface AgentTemplateCardCompactProps {
+  template: AgentTemplateModel
+  onClick?: (template: AgentTemplateModel) => void
+}
+
+export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCardCompactProps) {
+  return (
+    <Card className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer" onClick={() => onClick?.(template)}>
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <CardHeader className="pb-3 relative z-10">
+        <div className="mb-1 flex items-center gap-2">
+          <Avatar className="h-6 w-6 ring-1 ring-border/40">
+            <AgentAvatar seed={template.name} size={24} />
+          </Avatar>
+          <CardTitle className="truncate text-base font-semibold">{template.name}</CardTitle>
+        </div>
+        {template.description && <CardDescription className="line-clamp-2 text-xs">{template.description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="relative z-10 pt-0">
+        <div className="flex items-center justify-between">
+          <Badge variant="secondary" className="text-xs">
+            {template.model || 'N/A'}
+          </Badge>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Icon name="download" className="h-3.5 w-3.5" />
+            <span className="text-[10px]">{template.usageCount ?? 0}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

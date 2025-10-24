@@ -97,11 +97,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               </div>
             </div>
             <nav className="fixed top-8 right-8 z-[1000] flex items-center gap-6 text-sm">
-              <Link
-                href="/"
-                className={pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
-                aria-current={pathname === '/' ? 'page' : undefined}
-              >
+              <Link href="/" className={isDashboard ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'} aria-current={isDashboard ? 'page' : undefined}>
                 Home
               </Link>
               <Link

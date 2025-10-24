@@ -6,10 +6,13 @@ import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
 
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Orbitron } from 'next/font/google'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -27,6 +30,8 @@ const pageVariants = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -20 },
 }
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 // const LoadingSpinner = () => (
 //   <div className="flex items-center justify-center h-screen bg-background">
@@ -48,6 +53,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [logoTrigger, setLogoTrigger] = useState(0)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -57,6 +63,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
+    return () => clearTimeout(t)
   }, [])
 
   if (isPublicSimplePage) {
@@ -71,6 +82,24 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       return (
         <StarTheme theme="dark">
           <div className="relative min-h-[100dvh] flex overflow-hidden bg-background">
+            {/* Public top navigation for marketplace (unauthenticated) */}
+            <div className="fixed top-8 left-8 z-[1000] cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
+              <div className="flex items-center gap-2">
+                <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
+                <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>
+              </div>
+            </div>
+            <nav className="fixed top-8 right-8 z-[1000] flex items-center gap-6 text-sm">
+              <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+                Home
+              </Link>
+              <Link href="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
+                Marketplace
+              </Link>
+              <a href="/docs" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                Documentation
+              </a>
+            </nav>
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>

@@ -2,12 +2,9 @@
 
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
-import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
-import POPULAR_BLUEPRINTS from '@/components/marketplace/popularBlueprints'
-import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Orbitron } from 'next/font/google'
 import { useAuth } from '@/hooks/useAuth'
@@ -22,17 +19,7 @@ export default function Hero() {
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = starships[0]
 
-  const [blueprintIndex, setBlueprintIndex] = useState(0)
-  const popularBlueprints = useMemo(() => POPULAR_BLUEPRINTS, [])
   const [logoTrigger, setLogoTrigger] = useState(0)
-
-  useEffect(() => {
-    if (!popularBlueprints.length) return
-    const interval = setInterval(() => {
-      setBlueprintIndex(prev => (prev + 1) % popularBlueprints.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [popularBlueprints.length])
 
   // Trigger a one-off logo entry animation after a short delay while keeping default static state
   useEffect(() => {
@@ -97,41 +84,17 @@ export default function Hero() {
           <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • $20 credit on signup</div>
         </div>
 
-        {/* Visualization: viewport removed; styles moved into visualization */}
+        {/* Demo video replacing blueprint visualization */}
         <div className="relative h-[560px] overflow-visible w-full">
-          {/* Tabs for switching blueprints */}
-          <div className="absolute top-3 left-3 right-3 z-30 flex items-center gap-2 overflow-x-visible overflow-y-visible py-1 pointer-events-auto">
-            {popularBlueprints.map((item, idx) => {
-              const isActive = idx === blueprintIndex
-              return (
-                <button
-                  key={item.name || idx}
-                  onClick={() => setBlueprintIndex(idx)}
-                  className={`px-3 py-1.5 rounded-full text-xs transition-colors duration-200 whitespace-nowrap shadow-frosted-lg frosted-glass-card ${
-                    isActive ? 'bg-primary/15 ring-2 ring-primary/30 text-white font-semibold shadow-[0_6px_28px_rgba(var(--primary-rgb),0.35)]' : 'text-white/90 hover:bg-white/5'
-                  }`}
-                >
-                  {item.name || `Blueprint ${idx + 1}`}
-                </button>
-              )
-            })}
-          </div>
-
-          <BlueprintVisualization
-            blueprint={popularBlueprints[blueprintIndex]?.blueprint || { nodes: [], edges: [] }}
-            className="absolute inset-0 rounded-2xl shadow-2xl"
-            containerClassName="rounded-lg bg-black/30 border border-white/10"
-            containerStyle={{
-              background:
-                'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
-            }}
-            transparent
-            nodesDraggable={false}
-            borderless
-          />
-          <div className="pointer-events-none absolute inset-x-0 bottom-6 md:bottom-8 px-4 md:px-6 z-40">
-            <div className="max-w-2xl mx-auto pointer-events-auto">
-              <ConversationMessageInput starshipId="" minimal disabled={false} />
+          <div className="absolute inset-0 rounded-2xl shadow-2xl overflow-hidden">
+            <div
+              className="h-full w-full rounded-lg bg-black/30 overflow-hidden"
+              style={{
+                background:
+                  'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
+              }}
+            >
+              <video className="h-full w-full object-cover" src="/landing/demo.webm" autoPlay loop muted playsInline />
             </div>
           </div>
         </div>

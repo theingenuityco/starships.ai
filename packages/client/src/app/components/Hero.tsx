@@ -85,7 +85,11 @@ export default function Hero() {
         </div>
 
         {/* Demo video replacing blueprint visualization */}
-        <div className="relative h-[560px] overflow-visible w-full">
+        <div className="relative w-full overflow-visible pt-[56.25%]">
+          {/* Glow layer around the video frame */}
+          <div className="absolute inset-0 rounded-2xl video-glow pointer-events-none" aria-hidden />
+          {/* Blurry, almost transparent border */}
+          <div className="absolute inset-0 rounded-2xl video-blur-border pointer-events-none" aria-hidden />
           <div className="absolute inset-0 rounded-2xl shadow-2xl overflow-hidden">
             <div
               className="h-full w-full rounded-lg bg-black/30 overflow-hidden"
@@ -94,7 +98,7 @@ export default function Hero() {
                   'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
               }}
             >
-              <video className="h-full w-full object-cover" src="/landing/demo.webm" autoPlay loop muted playsInline />
+              <video className="h-full w-full object-contain" src="/landing/demo.webm" autoPlay loop muted playsInline />
             </div>
           </div>
         </div>
@@ -200,6 +204,28 @@ export default function Hero() {
           }
           .warp-word {
           }
+        }
+
+        /* Soft glow around the video frame */
+        .video-glow::before {
+          content: '';
+          position: absolute;
+          inset: -14px;
+          border-radius: inherit;
+          background: conic-gradient(from 0deg at 50% 50%, rgba(59, 130, 246, 0.45), rgba(168, 85, 247, 0.45), rgba(245, 158, 11, 0.4), rgba(59, 130, 246, 0.45));
+          filter: blur(28px);
+          opacity: 0.7;
+        }
+
+        /* Blurry, almost transparent border close to the edge */
+        .video-blur-border::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          border: 3px solid rgba(255, 255, 255, 0.22);
+          filter: blur(6px);
+          opacity: 1;
         }
       `}</style>
     </section>

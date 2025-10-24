@@ -2,20 +2,29 @@ import { Card } from '@/components/ui/card'
 
 const QA = [
   {
-    q: 'How is this different from a workflow tool?',
-    a: 'Agents can decide and call tools; runs are executed with process isolation and streamed events.',
+    q: 'Can I self-host or run Starships locally?',
+    a: 'No. Starships.ai is a fully managed, hosted service. Self-hosting and local deployments are not supported at this time.',
   },
   {
-    q: 'What happens when the model is wrong?',
-    a: 'You can inspect streamed events and messages; add checks in your blueprints/tools.',
+    q: 'How do I get access and start?',
+    a: 'Create an account, add your model provider keys in Environment settings, create a starship workspace, then launch your first agent from a template and start a conversation.',
   },
   {
-    q: 'Do I need my own LLM keys?',
-    a: 'Bring your own provider keys via environment configuration.',
+    q: 'Which models and providers are supported?',
+    a: 'OpenRouter (recommended), OpenAI, and Anthropic. Set a default provider/model for your workspace and override per agent or workflow (e.g., “anthropic/claude-3.5-sonnet”, “gpt-4o”).',
   },
-  { q: 'Can I connect custom tools?', a: 'Yes. Define tools with blueprints or adapters to call your APIs.' },
-  { q: 'How do you handle PII?', a: 'Secrets are redacted in emitted events; scope access via your environment.' },
-  { q: 'Where do agents run?', a: 'On a runner with process isolation (child process locally or remote).' },
+  {
+    q: 'How do tools work and how do I add custom ones?',
+    a: 'Tools are JSON-schema functions backed by a blueprint workflow. Define name, description, parameters, and blueprint; agents will call them automatically when appropriate. You can test tools and iterate before enabling them.',
+  },
+  {
+    q: 'What are agents and workflows?',
+    a: 'Workflows are DAGs composed of nodes (LLM, HTTP, transform, conditional, tool, workflow, code, user_prompt). Agents wrap workflows to manage conversation state, tool calls, and streaming results.',
+  },
+  {
+    q: 'How does Starships handle security and privacy?',
+    a: 'JWT-protected APIs, encrypted environment variables for secrets, and data stored in our managed PostgreSQL. Provider keys remain in your workspace and are used only at runtime. We do not use your data to train models.',
+  },
 ]
 
 export default function FAQ() {

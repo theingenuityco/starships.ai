@@ -35,7 +35,7 @@ export default function UseCases() {
             return (
               <div
                 key={item.title}
-                className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-8 py-10 frosted-glass-card rounded-2xl shadow-frosted-lg border border-border/40 p-5 md:p-6`}
+                className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-stretch gap-8 py-10 frosted-glass-card rounded-2xl shadow-frosted-lg border border-border/40 p-5 md:p-6 md:min-h-[460px]`}
               >
                 {/* Media slot */}
                 <div className="w-full md:w-[700px] lg:w-[740px]">
@@ -43,7 +43,7 @@ export default function UseCases() {
                 </div>
 
                 {/* Text */}
-                <div className="flex-1">
+                <div className="flex-1 flex flex-col justify-center h-[360px] md:h-[460px]">
                   <h3 className="text-xl md:text-2xl font-medium mb-2">{item.title}</h3>
                   <p className="text-sm md:text-base text-muted-foreground max-w-prose">{item.desc}</p>
                 </div>

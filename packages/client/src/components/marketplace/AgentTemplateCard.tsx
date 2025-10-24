@@ -16,6 +16,7 @@ import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -28,7 +29,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
   // Get current user and their starships for deployment
-  const { userId } = useAuth()
+  const { userId, isAuthenticated } = useAuth()
   const { data: starships = [] } = useUserStarships(userId || '', !!userId)
   const primaryStarship = starships[0] // Use first starship by default
 
@@ -39,6 +40,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
 
   // Deployment mutation
   const createAgentMutation = useCreateAgentFromTemplate()
+
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -68,6 +73,13 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
 
   const handleDeployClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click from triggering
+    if (!isAuthenticated) {
+      const current = `${pathname}${searchParams && searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+      const params = new URLSearchParams({ returnUrl: current })
+      router.push(`/login?${params.toString()}`)
+      return
+    }
+
     if (!primaryStarship) {
       return // No starship to deploy to
     }
@@ -161,7 +173,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
               <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
             </Button>
           ) : (
-            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || !primaryStarship}>
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || (isAuthenticated && !primaryStarship)}>
               <Icon name="sparkles" className="w-4 h-4 mr-2" />
               {isDeploying ? 'Deploying...' : 'Deploy'}
             </Button>

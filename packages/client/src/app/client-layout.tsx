@@ -68,7 +68,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   if (isMarketplace) {
     // Unauthenticated users: simple public view without nav
     if (!isAuthenticated) {
-      return <div className="h-full w-full">{children}</div>
+      return (
+        <StarTheme theme="dark">
+          <div className="relative min-h-[100dvh] flex overflow-hidden bg-background">
+            <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
+          </div>
+        </StarTheme>
+      )
     }
 
     // Authenticated users: show navigation like protected pages (without auth gate)

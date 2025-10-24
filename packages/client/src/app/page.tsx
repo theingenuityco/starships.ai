@@ -111,7 +111,7 @@ export default function HomePage() {
                   Documentation
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}>
-                  <Icon name="user" className="w-4 h-4 mr-2" />
+                  <Icon name="discord" className="w-4 h-4 mr-2" />
                   Discord
                 </Button>
               </div>

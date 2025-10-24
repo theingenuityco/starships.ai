@@ -111,7 +111,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 className={pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
                 aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
               >
-                Documentation
+                <span className="inline-flex items-center gap-1">
+                  Documentation
+                  <Icon name="external-link" className="w-3 h-3 opacity-80" />
+                </span>
               </a>
             </nav>
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>

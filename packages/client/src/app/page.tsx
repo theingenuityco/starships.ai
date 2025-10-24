@@ -64,7 +64,10 @@ export default function HomePage() {
             className={pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
             aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
           >
-            Documentation
+            <span className="inline-flex items-center gap-1">
+              Documentation
+              <Icon name="external-link" className="w-3 h-3 opacity-80" />
+            </span>
           </a>
         </nav>
 

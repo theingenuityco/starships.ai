@@ -12,7 +12,7 @@ import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { Orbitron } from 'next/font/google'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -21,10 +21,7 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 // Legacy components removed for a cleaner landing
 
-export default function HomePage() {
-  const [logoTrigger, setLogoTrigger] = useState(0)
-  const pathname = usePathname()
-  const router = useRouter()
+function SearchParamsHandler() {
   const searchParams = useSearchParams()
 
   // Store verification success flag for later (after login)
@@ -37,6 +34,14 @@ export default function HomePage() {
     }
   }, [searchParams])
 
+  return null
+}
+
+export default function HomePage() {
+  const [logoTrigger, setLogoTrigger] = useState(0)
+  const pathname = usePathname()
+  const router = useRouter()
+
   // Trigger a one-off logo entry animation after a short delay while keeping default static state
   useEffect(() => {
     const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
@@ -44,6 +49,9 @@ export default function HomePage() {
   }, [])
   return (
     <StarTheme theme="dark">
+      <Suspense fallback={null}>
+        <SearchParamsHandler />
+      </Suspense>
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         {/* Top-left logo with same animation as before */}
         <div

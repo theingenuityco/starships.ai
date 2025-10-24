@@ -1,4 +1,11 @@
 import type { NextConfig } from 'next'
+import { loadEnvConfig } from '@next/env'
+import path from 'path'
+
+// Load env from monorepo root for local dev
+// In production (Docker/K8s), env vars are injected directly into process.env
+const monorepoRoot = path.resolve(__dirname, '../..')
+loadEnvConfig(monorepoRoot)
 
 const nextConfig: NextConfig = {
   eslint: {

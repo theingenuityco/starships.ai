@@ -2,30 +2,18 @@
 
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
-import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { Orbitron } from 'next/font/google'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
-
-const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 export default function Hero() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuth()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = starships[0]
-
-  const [logoTrigger, setLogoTrigger] = useState(0)
-
-  // Trigger a one-off logo entry animation after a short delay while keeping default static state
-  useEffect(() => {
-    const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
-    return () => clearTimeout(t)
-  }, [])
 
   const handlePrimaryClick = useCallback(() => {
     track({ type: 'hero_cta_clicked' })
@@ -40,10 +28,6 @@ export default function Hero() {
     <section className="pt-28 pb-20 px-4">
       <div className="max-w-6xl mx-auto flex flex-col gap-10 items-center text-center">
         <div>
-          <div className="mb-6 flex items-center gap-3 cursor-pointer select-none justify-center" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
-            <StarshipsLogo width={56} height={56} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
-            <span className={`${orbitron.className} text-3xl md:text-4xl font-normal tracking-tight`}>starships.ai</span>
-          </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
             {(() => {
               const v = getHeadlineVariant()

@@ -77,7 +77,6 @@ const CreateToolTemplateSchema = z.object({
     .optional(),
 });
 
-
 // Balance validation middleware for tool operations
 const validateToolBalance = async (req: Request, res: Response, next: any) => {
   try {
@@ -123,8 +122,8 @@ const validateToolBalance = async (req: Request, res: Response, next: any) => {
 // TOOL TEMPLATE ENDPOINTS
 // ============================================================================
 
-// GET /tool-templates - List all tool templates (OpenAPI pattern)
-router.get('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /tool-templates - List all tool templates (public)
+router.get('/tool-templates', async (req: Request, res: Response): Promise<void> => {
   try {
     const queryValidation = validateData(
       PaginationSchema.extend({
@@ -154,8 +153,8 @@ router.get('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Respo
   }
 });
 
-// GET /tool-templates/:slug - Get specific tool template (OpenAPI pattern)
-router.get('/tool-templates/:slug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /tool-templates/:slug - Get specific tool template (public)
+router.get('/tool-templates/:slug', async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ slug: SlugSchema }), req.params, res, 'template slug parameter');
     if (!paramValidation) return;

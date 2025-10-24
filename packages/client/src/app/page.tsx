@@ -2,10 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import Hero from '@/app/components/Hero'
-import ProductModel from '@/app/components/ProductModel'
 import UseCases from '@/app/components/UseCases'
-import ProblemOutcome from '@/app/components/ProblemOutcome'
-import HowItWorks from '@/app/components/HowItWorks'
 import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
@@ -45,9 +42,6 @@ export default function HomePage() {
         <Hero />
         <UseCases />
         <MarketplaceTeaser />
-        <ProblemOutcome />
-        <ProductModel />
-        <HowItWorks />
         <Security />
         <PricingTeaser />
         <FAQ />

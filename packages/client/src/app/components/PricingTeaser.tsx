@@ -1,7 +1,21 @@
+'use client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/useAuth'
+import { useUserStarships } from '@/hooks/useStarships'
 
 export default function PricingTeaser() {
+  const { isAuthenticated, user } = useAuth()
+  const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
+  const primaryStarship = starships[0]
+
+  const handleClick = () => {
+    if (isAuthenticated && primaryStarship?.slug) {
+      window.location.href = `/ship/${primaryStarship.slug}/conversations`
+      return
+    }
+    window.location.href = '/login'
+  }
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
@@ -13,8 +27,8 @@ export default function PricingTeaser() {
               <p className="text-sm text-muted-foreground">Bring your own keys or environment. Production‑ready from day one.</p>
             </div>
             <div className="flex gap-3">
-              <Button size="lg" variant="outline" className="h-12 px-10 text-base" onClick={() => (window.location.href = '/login')}>
-                Launch your starship now
+              <Button size="lg" variant="outline" className="h-12 px-10 text-base" onClick={handleClick}>
+                {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Launch your starship now'}
               </Button>
             </div>
           </Card>

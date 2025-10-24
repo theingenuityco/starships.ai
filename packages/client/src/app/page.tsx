@@ -14,14 +14,32 @@ import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { useEffect, useState } from 'react'
+import { Orbitron } from 'next/font/google'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 // Legacy components removed for a cleaner landing
 
 export default function HomePage() {
+  const [logoTrigger, setLogoTrigger] = useState(0)
+
+  // Trigger a one-off logo entry animation after a short delay while keeping default static state
+  useEffect(() => {
+    const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
+    return () => clearTimeout(t)
+  }, [])
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
-        {/* Top bar removed per design update */}
+        {/* Top-left logo with same animation as previous center placement */}
+        <div className="fixed top-8 left-8 z-50 cursor-pointer select-none" onClick={() => setLogoTrigger(v => v + 1)} title="Animate logo">
+          <div className="flex items-center gap-2">
+            <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
+            <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>
+          </div>
+        </div>
 
         {/* New Landing Sections */}
         <Hero />

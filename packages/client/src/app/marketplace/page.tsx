@@ -13,12 +13,23 @@ import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { PageLayout } from '@/components/layout/PageLayout'
 
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const categoryFromUrl = useMemo(() => (searchParams?.get('category') ?? 'all').toLowerCase(), [searchParams])
+  const [selectedCategory, setSelectedCategory] = useState<string>(categoryFromUrl)
+
+  // Keep state in sync with URL changes (back/forward/navigation)
+  useEffect(() => {
+    setSelectedCategory(categoryFromUrl)
+  }, [categoryFromUrl])
   const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
   const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false)
   const [selectedTool, setSelectedTool] = useState<ToolTemplateModel | null>(null)
@@ -118,7 +129,19 @@ export default function MarketplacePage() {
             {/* Category Filter */}
             <div className="flex flex-wrap gap-2 justify-center mb-8">
               {allCategories.map(category => (
-                <Button key={category} variant={selectedCategory === category ? 'default' : 'outline'} size="sm" onClick={() => setSelectedCategory(category)} className="capitalize">
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCategory(category)
+                    const params = new URLSearchParams(searchParams?.toString() ?? '')
+                    if (category && category !== 'all') params.set('category', category)
+                    else params.delete('category')
+                    router.replace(`${pathname}?${params.toString()}`)
+                  }}
+                  className="capitalize"
+                >
                   {category === 'all' ? 'All Categories' : category}
                 </Button>
               ))}

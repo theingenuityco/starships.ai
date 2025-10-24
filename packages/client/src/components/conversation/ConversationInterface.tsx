@@ -81,6 +81,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
+  const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
 
   // Cache of participants by conversation id (agents involved)
   const [conversationParticipants, setConversationParticipants] = useState<Record<string, any[]>>({})
@@ -201,10 +202,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [isHeightFrozen])
 
+  // Track if user explicitly selected an agent to avoid auto-restore overriding it
+  const userSelectedAgentRef = useRef(false)
+
   // Memoized agent change handler to prevent AgentSelector from remounting
-  const handleAgentChange = useCallback((agent: Agent | null) => {
-    setSelectedAgent(agent)
-  }, [])
+  const handleAgentChange = useCallback(
+    (agent: Agent | null) => {
+      userSelectedAgentRef.current = true
+      setSelectedAgent(agent)
+      // Persist to UI store immediately so other UI reads reflect the change
+      if (agent && currentConversationId) {
+        setConversationAgentStore(currentConversationId, agent.id as any, agent.name as any)
+      }
+    },
+    [currentConversationId, setConversationAgentStore]
+  )
 
   // Handle conversation start - receive actual database conversation ID
   const handleConversationStart = useCallback(
@@ -222,6 +234,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
+    // Allow auto-restore again on new conversation
+    userSelectedAgentRef.current = false
   }, [externalConversationId])
 
   useEffect(() => {
@@ -240,6 +254,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Restore selected agent from conversation data (with stable guard to avoid loops)
   useEffect(() => {
+    // If user explicitly chose an agent, do not override until conversation changes
+    if (userSelectedAgentRef.current && selectedAgent) {
+      return
+    }
     // Priority 1: first linked conversation agent
     if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
       const conversationAgent = conversationAgents[0]

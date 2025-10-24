@@ -17,6 +17,7 @@ const map: Record<string, ResolvedIcon> = {
   settings: { type: 'phosphor', component: 'GearSix' },
   bot: { type: 'phosphor', component: 'Robot' },
   rocket: { type: 'phosphor', component: 'Rocket' },
+  'rocket-launch': { type: 'phosphor', component: 'RocketLaunch' },
   sparkles: { type: 'phosphor', component: 'Sparkle' },
   wrench: { type: 'phosphor', component: 'Wrench' },
   'check-circle': { type: 'phosphor', component: 'CheckCircle' },
@@ -35,11 +36,44 @@ const map: Record<string, ResolvedIcon> = {
   'message-square': { type: 'phosphor', component: 'ChatCircleText' },
   // Send / paper plane
   send: { type: 'phosphor', component: 'PaperPlaneTilt' },
+  // Stop (square)
+  stop: { type: 'phosphor', component: 'Stop' },
   plus: { type: 'phosphor', component: 'Plus' },
   x: { type: 'phosphor', component: 'X' },
   history: { type: 'phosphor', component: 'ClockCounterClockwise' },
   sun: { type: 'phosphor', component: 'Sun' },
   moon: { type: 'phosphor', component: 'Moon' },
+
+  // Security & system
+  'shield-check': { type: 'phosphor', component: 'ShieldCheck' },
+  'file-text': { type: 'phosphor', component: 'FileText' },
+  eye: { type: 'phosphor', component: 'Eye' },
+  'eye-off': { type: 'phosphor', component: 'EyeSlash' },
+  lock: { type: 'phosphor', component: 'Lock' },
+  activity: { type: 'phosphor', component: 'ChartLineUp' },
+  plug: { type: 'phosphor', component: 'Plug' },
+
+  // Data & visuals
+  'bar-chart3': { type: 'phosphor', component: 'ChartBar' },
+  globe: { type: 'phosphor', component: 'Globe' },
+  code: { type: 'phosphor', component: 'Code' },
+  'git-branch': { type: 'phosphor', component: 'GitBranch' },
+  cog: { type: 'phosphor', component: 'Gear' },
+  'edit-3': { type: 'phosphor', component: 'PencilSimpleLine' },
+  split: { type: 'phosphor', component: 'ArrowsSplit' },
+  play: { type: 'phosphor', component: 'Play' },
+  zap: { type: 'phosphor', component: 'Lightning' },
+
+  // Commerce & actions
+  download: { type: 'phosphor', component: 'DownloadSimple' },
+  'user-plus': { type: 'phosphor', component: 'UserPlus' },
+  'log-in': { type: 'phosphor', component: 'SignIn' },
+  'loader-2': { type: 'radix', component: 'ReloadIcon' },
+
+  // Health & info
+  'alert-circle': { type: 'phosphor', component: 'WarningCircle' },
+  lightbulb: { type: 'phosphor', component: 'Lightbulb' },
+  'heart-pulse': { type: 'phosphor', component: 'Heartbeat' },
 
   // Status & help
   'alert-triangle': { type: 'phosphor', component: 'Warning' },
@@ -49,6 +83,14 @@ const map: Record<string, ResolvedIcon> = {
 
   // Animated affordances → Iconify line-md
   loading: { type: 'iconify', icon: 'line-md:loading-twotone-loop' },
+
+  // External/action affordances
+  'external-link': { type: 'radix', component: 'ExternalLinkIcon' },
+  copy: { type: 'radix', component: 'CopyIcon' },
+  book: { type: 'phosphor', component: 'Book' },
+  menu: { type: 'radix', component: 'HamburgerMenuIcon' },
+  // Social
+  discord: { type: 'phosphor', component: 'DiscordLogo' },
 }
 
 export function resolveIcon(name: string): ResolvedIcon | undefined {

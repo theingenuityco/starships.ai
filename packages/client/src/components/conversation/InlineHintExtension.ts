@@ -35,20 +35,31 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
         char: number
         lastTick: number
         lastReason?: string
+        promptsSig?: string
       }>({
         key,
         state: {
-          init: () => ({ decorations: DecorationSet.empty, idx: 0, char: 0, lastTick: 0 }),
+          init: () => ({ decorations: DecorationSet.empty, idx: 0, char: 0, lastTick: 0, promptsSig: '' }),
           apply: (tr: Transaction, prev, _old: EditorState, state: EditorState) => {
-            let { decorations, idx, char, lastTick, lastReason } = prev
+            let { decorations, idx, char, lastTick, lastReason, promptsSig } = prev
 
             // Recompute every transaction
             const enabled = getEnabled()
             const prompts = getPrompts() || []
+            const nextSig = Array.isArray(prompts) ? prompts.join('\n') : ''
             if (!enabled || prompts.length === 0) {
               const reason = `enabled=${enabled} prompts=${prompts.length}`
               if (debug && reason !== lastReason) console.debug('[InlineHint] hidden: ' + reason)
-              return { decorations: DecorationSet.empty, idx: 0, char: 0, lastTick: 0, lastReason: reason }
+              return { decorations: DecorationSet.empty, idx: 0, char: 0, lastTick: 0, lastReason: reason, promptsSig: nextSig }
+            }
+
+            // Reset animation if prompt list changed (e.g., agent switched)
+            if (nextSig !== promptsSig) {
+              idx = 0
+              char = 0
+              lastTick = 0
+              promptsSig = nextSig
+              if (debug) console.debug('[InlineHint] prompts changed, resetting animation')
             }
 
             // Detect if content is only a leading mention node plus optional whitespace text, and compute anchor
@@ -124,7 +135,7 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
 
             const deco = Decoration.widget(anchorPos, span, { side: 1 })
             decorations = DecorationSet.empty.add(state.doc, [deco])
-            return { decorations, idx, char, lastTick, lastReason: 'showing' }
+            return { decorations, idx, char, lastTick, lastReason: 'showing', promptsSig }
           },
         },
         props: {

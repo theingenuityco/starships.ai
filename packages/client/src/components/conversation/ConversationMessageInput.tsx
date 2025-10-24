@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
+import { useCreateConversation, useConversationStreamed, useConversationStop } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
@@ -88,6 +88,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const clearEditorRef = useRef<() => void>(() => {})
     // Guard to avoid recursive update loops when enforcing leading mention
     const enforcingMentionRef = useRef(false)
+    // Track any pending enforcement to avoid racing against user input
+    const enforceTimeoutRef = useRef<number | null>(null)
+    // When true, user is editing the mention text inline (avoid auto-enforcement)
+    const isEditingMentionRef = useRef(false)
 
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
@@ -115,8 +119,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Use streamedQuery-based conversation hook
     const streamCtx = useConversationStreamContextOptional()
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
-    const { sendMessage: sendMessageFn, isSending, isResponding } = streamCtx ?? fallbackStream
-    const isStreamingEffective = isResponding
+    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isFetching } = streamCtx ?? fallbackStream
+    const stopConversation = useConversationStop()
+    const isStreamingEffective = Boolean(isAssistantStreaming && isFetching)
+    // Show stop button during pre-stream window and while streaming/responding
+    const [preStreamPending, setPreStreamPending] = useState(false)
+    const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
+    const showLoaderRing = Boolean(isAssistantStreaming || isResponding)
+
+    // Track last known conversationId to enable stop during pre-stream window
+    const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
+    useEffect(() => {
+      if (conversationId) {
+        lastConversationIdRef.current = conversationId
+      }
+    }, [conversationId])
+    // Hide pre-stream indicator when not active
+    useEffect(() => {
+      const anyActive = Boolean(isAssistantStreaming || isResponding)
+      if (!anyActive) setPreStreamPending(false)
+    }, [isAssistantStreaming, isResponding])
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
@@ -198,6 +220,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       try {
         setSending(true)
+        setPreStreamPending(true)
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
         if (!currentConversationId) {
@@ -209,6 +232,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)
         }
+        // Ensure local ref is updated immediately for stop button usability
+        lastConversationIdRef.current = currentConversationId!
 
         // Set agent information in store
         const { setConversationAgent } = useStarshipUIStore.getState()
@@ -240,6 +265,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
             // Restore message on error
             setMessage(messageToSend)
+            setPreStreamPending(false)
           })
           .finally(() => {
             setSending(false)
@@ -252,6 +278,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
+        setPreStreamPending(false)
       }
     }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, onAgentChange, starshipAgents])
 
@@ -278,6 +305,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         try {
           setSending(true)
+          setPreStreamPending(true)
           // Create conversation if one doesn't exist
           let currentConversationId = conversationId
           if (!currentConversationId) {
@@ -312,6 +340,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
+              setPreStreamPending(false)
             })
             .finally(() => {
               setSending(false)
@@ -321,6 +350,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch (error) {
           toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
           setSending(false)
+          setPreStreamPending(false)
         }
       },
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
@@ -465,6 +495,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let popup: any = null
         let active = 0
         let lastProps: any = null
+        let lastQuery: string = ''
+
+        const cleanupTrailingQueryAfterMention = (ed: any, query: string) => {
+          try {
+            if (!ed) return
+            const q = String(query || '')
+            if (!q) return
+            const state = ed.state
+            const pos = state.selection?.from || state.selection?.to || 0
+            if (!pos) return
+            // Skip a single space after the mention if present
+            const firstChar = state.doc.textBetween(pos, pos + 1, '\n')
+            let start = pos
+            if (firstChar === ' ') start = pos + 1
+            const ahead = state.doc.textBetween(start, start + q.length, '\n')
+            if (ahead && ahead.toLowerCase() === q.toLowerCase()) {
+              ed.chain()
+                ?.setTextSelection({ from: start, to: start + q.length })
+                ?.deleteSelection()
+                ?.run()
+            }
+          } catch {}
+        }
         const handleDocKeyDown = (e: KeyboardEvent) => {
           if (!lastProps) return
           const items = (lastProps.items as Array<{ id: string; label: string; agent?: AgentModel }>) || []
@@ -520,12 +573,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             if (choice) {
               try {
                 lastProps.command(choice)
-              } catch (err) {
                 try {
-                  const label = (choice as any)?.label || ''
-                  lastProps.editor?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                  cleanupTrailingQueryAfterMention(lastProps.editor, lastQuery)
                 } catch {}
-              }
+                // Update selected agent (mirror mouse selection)
+                try {
+                  const id = (choice as any)?.id
+                  const label = (choice as any)?.label
+                  let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                  if (!agent && label) {
+                    const lower = String(label).toLowerCase()
+                    agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                  }
+                  if (agent) {
+                    currentAgentRef.current = agent
+                    onAgentChange?.(agent)
+                  }
+                } catch {}
+              } catch {}
             }
             return
           }
@@ -540,6 +605,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             isSuggestionActiveRef.current = true
             mentionAgentsSnapshotRef.current = Array.isArray(agentsRef.current) ? [...agentsRef.current] : []
             lastProps = props
+            lastQuery = String(props?.query || '')
 
             component = new ReactRenderer(MentionList as any, {
               props: {
@@ -551,14 +617,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 },
                 command: (agent: AgentModel) => {
                   const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: agent.name }
-                  // Update selected agent without altering editor text
+                  // Ensure inline editing mode is off before inserting the node
+                  isEditingMentionRef.current = false
+                  // Insert/replace with the mention node
+                  props.command(realItem)
+                  try {
+                    cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                  } catch {}
+                  // Then update selected agent
                   try {
                     const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
-                    // Update local ref immediately to avoid UI lag
                     currentAgentRef.current = selected
                     onAgentChange?.(selected)
                   } catch {}
-                  props.command(realItem)
                 },
                 anchorRect: null,
               },
@@ -585,6 +656,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           },
           onUpdate(props: any) {
             lastProps = props
+            lastQuery = String(props?.query || '')
             component?.updateProps({
               ...component.props,
               items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
@@ -640,10 +712,45 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               if (choice) {
                 try {
                   props.command(choice)
+                  try {
+                    cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                  } catch {}
+                  // Update selected agent state (mirror mouse path)
+                  try {
+                    const id = (choice as any)?.id
+                    const label = (choice as any)?.label
+                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                    if (!agent && label) {
+                      const lower = String(label).toLowerCase()
+                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                    }
+                    if (agent) {
+                      currentAgentRef.current = agent
+                      onAgentChange?.(agent)
+                    }
+                  } catch {}
                 } catch (err) {
                   try {
                     const label = (choice as any)?.label || ''
-                    props.editor?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                    const ed = props.editor
+                    ed?.chain()?.focus()?.insertContent(`@${label}`)?.run()
+                    const end = ed?.state?.selection?.from || 0
+                    const totalLen = String(label).length + 1
+                    const from = Math.max(0, end - totalLen)
+                    const to = end
+                    ed?.chain()?.setTextSelection({ from, to })?.run()
+                    try {
+                      cleanupTrailingQueryAfterMention(ed, lastQuery)
+                    } catch {}
+                    // Best-effort agent resolution by label when fallback path used
+                    try {
+                      const lower = String(label).toLowerCase()
+                      const agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                      if (agent) {
+                        currentAgentRef.current = agent
+                        onAgentChange?.(agent)
+                      }
+                    } catch {}
                   } catch {}
                 }
               }
@@ -672,106 +779,45 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     // React NodeView for mention rendering using our avatar component
-    const MentionNodeView = ({ node, updateAttributes, editor }: any) => {
+    const MentionNodeView = ({ node, updateAttributes, editor, deleteNode }: any) => {
       const id = node?.attrs?.id
       const label = node?.attrs?.label
       const agent = (agentsRef.current || []).find(a => a.id === id)
       const display = agent?.name || label || id || ''
       const anchorRef = useRef<HTMLSpanElement | null>(null)
-      const popupRef = useRef<any>(null)
-      const rendererRef = useRef<ReactRenderer | null>(null)
-
-      const openSwitcher = () => {
+      const startInlineMentionEdit = () => {
         try {
-          console.debug('[mention] openSwitcher:start', { hasAnchor: !!anchorRef.current, display })
-        } catch {}
-        try {
-          const anchorEl = anchorRef.current
-          if (!anchorEl) return
-          // Destroy any existing
+          isEditingMentionRef.current = true
+          // Replace the chip with editable text: @<current name>
           try {
-            popupRef.current?.destroy()
+            deleteNode?.()
           } catch {}
           try {
-            rendererRef.current?.destroy()
-          } catch {}
-
-          const items = (agentsRef.current || []) as AgentModel[]
-          const currentIndex = Math.max(
-            0,
-            items.findIndex(a => a.id === id)
-          )
-
-          try {
-            rendererRef.current = new ReactRenderer(MentionList as any, {
-              props: {
-                items,
-                active: currentIndex,
-                onHover: (i: number) => {
-                  rendererRef.current?.updateProps({ ...rendererRef.current.props, active: i })
-                },
-                command: (newAgent: AgentModel) => {
-                  try {
-                    updateAttributes({ id: newAgent.id, label: newAgent.name })
-                  } catch {}
-                  try {
-                    // Update local ref immediately so enforcement logic sees the new agent
-                    currentAgentRef.current = newAgent
-                    onAgentChange?.(newAgent)
-                  } catch {}
-                  try {
-                    popupRef.current?.destroy()
-                  } catch {}
-                  try {
-                    rendererRef.current?.destroy()
-                  } catch {}
-                },
-                anchorRect: null,
-              },
-              editor,
-            })
-          } catch (err) {
+            // If a single enforced space remains after deletion, remove it so '@' starts at index 0
             try {
-              console.error('[mention] openSwitcher:renderer error', err)
+              const from = editor?.state?.selection?.from || 0
+              const nextChar = (editor?.state as any)?.doc?.textBetween?.(from, from + 1, '\n', '\n') || ''
+              if (nextChar === ' ') {
+                editor
+                  ?.chain()
+                  ?.focus()
+                  ?.deleteRange({ from, to: from + 1 })
+                  ?.run()
+              }
             } catch {}
-            return
-          }
-          try {
-            console.debug('[mention] openSwitcher:renderer ready', { items: items.length, currentIndex })
+            editor?.chain()?.focus()?.insertContent(`@${display}`)?.run()
+            const end = editor?.state?.selection?.from || 0
+            const totalLen = String(display).length + 1 // include '@'
+            const from = Math.max(0, end - totalLen)
+            const to = end
+            editor?.chain()?.setTextSelection({ from, to })?.run()
+            editor?.chain()?.focus()?.run()
           } catch {}
-
-          popupRef.current = tippy(anchorEl, {
-            content: rendererRef.current.element,
-            appendTo: () => document.body,
-            showOnCreate: true,
-            interactive: true,
-            trigger: 'manual',
-            placement: 'bottom-start',
-            zIndex: 1000,
-          })
-          try {
-            console.debug('[mention] openSwitcher:tippy created')
-          } catch {}
-          try {
-            popupRef.current.show()
-            console.debug('[mention] openSwitcher:tippy shown')
-          } catch (err) {
-            try {
-              console.error('[mention] openSwitcher:show error', err)
-            } catch {}
-          }
         } catch {}
       }
 
       useEffect(() => {
-        return () => {
-          try {
-            popupRef.current?.destroy()
-          } catch {}
-          try {
-            rendererRef.current?.destroy()
-          } catch {}
-        }
+        return () => {}
       }, [])
       return (
         <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground" data-mention-node>
@@ -790,10 +836,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               e.stopPropagation()
               // Defer to avoid ProseMirror selection interfering
               setTimeout(() => {
-                try {
-                  console.debug('[mention] onMouseDown:deferred open')
-                } catch {}
-                openSwitcher()
+                startInlineMentionEdit()
               }, 0)
             }}
             onKeyDown={e => {
@@ -803,7 +846,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 } catch {}
                 e.preventDefault()
                 e.stopPropagation()
-                openSwitcher()
+                startInlineMentionEdit()
               }
             }}
           >
@@ -818,7 +861,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
-    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, leadingMentionAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const placeholderRef = useRef<string>(placeholderText)
+    useEffect(() => {
+      placeholderRef.current = placeholderText
+    }, [placeholderText])
 
     // Inline animated hint (typing) after preselected mention when no other text
     const editorContainerRef = useRef<HTMLDivElement | null>(null)
@@ -1038,14 +1085,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const tiptap = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, bulletList: false, orderedList: false }),
-        Placeholder.configure({ placeholder: placeholderText }),
+        Placeholder.configure({ placeholder: () => placeholderRef.current }),
         Mention.extend({
-          selectable: true,
+          selectable: false,
           addNodeView() {
             return ReactNodeViewRenderer(MentionNodeView as any)
           },
         }).configure({
-          deleteTriggerWithBackspace: true,
+          // Prevent deleting the mention by backspace; enforcement relies on it
+          deleteTriggerWithBackspace: false,
           // Force display as @name by resolving the agent name from id if needed
           renderText: ({ options, node }: any) => {
             const id = node?.attrs?.id
@@ -1080,6 +1128,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
           }
+          // Block Backspace when the cursor is within the leading mention or immediately after it
+          if (event.key === 'Backspace') {
+            try {
+              const json: any = (tiptap as any)?.getJSON?.()
+              const docContent = Array.isArray(json?.content) ? json.content : []
+              const firstBlock = docContent[0]
+              const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+              const first = blockContent[0]
+              const second = blockContent[1]
+              const firstIsMention = first && first.type === 'mention'
+              // If selection is at the very start or right after a single space following the mention, prevent deletion
+              const selFrom = (tiptap as any)?.state?.selection?.from || 0
+              const posAtStart = selFrom <= 1
+              if (firstIsMention) {
+                if (posAtStart) {
+                  event.preventDefault()
+                  return true
+                }
+                // If immediately after the mention + space, prevent deleting the mention/space pair
+                try {
+                  const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
+                  if (hasLeadingSpace) {
+                    // Rough heuristic: forbid backspace for the first two typed positions
+                    const anchor = (tiptap as any)?.state?.selection?.anchor || 0
+                    if (anchor <= 2) {
+                      event.preventDefault()
+                      return true
+                    }
+                  }
+                } catch {}
+              }
+            } catch {}
+          }
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault()
             handleSubmit()
@@ -1091,12 +1172,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       onUpdate: ({ editor }) => {
         // Enforce leading mention on every update (deferred to next tick to avoid flushSync during lifecycle)
         try {
-          if (!enforcingMentionRef.current) {
+          if (!enforcingMentionRef.current && !isSuggestionActiveRef.current && !isEditingMentionRef.current) {
             // Schedule to avoid synchronous mutations during TipTap update lifecycle
-            setTimeout(() => {
+            if (enforceTimeoutRef.current) {
+              clearTimeout(enforceTimeoutRef.current)
+              enforceTimeoutRef.current = null
+            }
+            enforceTimeoutRef.current = window.setTimeout(() => {
               try {
                 ensureLeadingAgentMention()
               } catch {}
+              enforceTimeoutRef.current = null
             }, 0)
           }
         } catch {}
@@ -1108,6 +1194,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const prevId = leadingMentionAgent ? leadingMentionAgent.id : null
           const nextId = mentioned ? mentioned.id : null
           if (prevId !== nextId) setLeadingMentionAgent(mentioned)
+          if (mentioned) {
+            // Exit inline editing mode once a real mention node exists again
+            isEditingMentionRef.current = false
+          }
         } catch {}
         // Update hint visibility and position on editor update
         try {
@@ -1117,6 +1207,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch {}
       },
     })
+
+    // Force a lightweight re-render so Placeholder re-evaluates its function when text changes
+    useEffect(() => {
+      if (!tiptap) return
+      try {
+        ;(tiptap as any).view?.dispatch?.((tiptap as any).state?.tr)
+      } catch {}
+    }, [tiptap, placeholderText])
 
     // Bridge editor focus/blur to parent callbacks for overlay control and local focus state
     useEffect(() => {
@@ -1202,12 +1300,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       (content: any) => {
         if (!tiptap) return
         enforcingMentionRef.current = true
-        setTimeout(() => {
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+        enforceTimeoutRef.current = window.setTimeout(() => {
           try {
             tiptap?.commands.setContent(content)
           } finally {
             enforcingMentionRef.current = false
           }
+          enforceTimeoutRef.current = null
         }, 0)
       },
       [tiptap]
@@ -1217,27 +1320,45 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const ensureLeadingAgentMention = useCallback(() => {
       if (!tiptap) return
       try {
+        // Do not enforce while user is editing the mention inline
+        if (isEditingMentionRef.current) return
         const json: any = tiptap.getJSON()
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
         const first = blockContent[0]
 
-        // If a mention already exists at the start, do not replace its id; only ensure spacing
-        if (first && first.type === 'mention' && first.attrs && first.attrs.id) {
-          const second = blockContent[1]
-          const needsSpace = !(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
-          if (!needsSpace) return
+        // Collect all mention nodes in the first paragraph
+        const mentionNodes = blockContent.filter((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
+        if (mentionNodes.length > 0) {
+          // Always prefer the most recently inserted mention (last in content order)
+          const desiredMention = mentionNodes[mentionNodes.length - 1]
+          // Build remaining content excluding all mention nodes
+          let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+          // Ensure exactly one leading space after the mention if there is following text
+          let contentAfterMention: any[]
+          const second = rest[0]
+          const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
+          if (hasLeadingSpace) {
+            contentAfterMention = rest
+          } else if (second && second.type === 'text' && typeof second.text === 'string') {
+            contentAfterMention = [{ type: 'text', text: ' ' + second.text }, ...rest.slice(1)]
+          } else if (rest.length > 0) {
+            contentAfterMention = [{ type: 'text', text: ' ' }, ...rest]
+          } else {
+            contentAfterMention = []
+          }
           const newParagraph = {
             type: 'paragraph',
-            content: [first, { type: 'text', text: ' ' }, ...blockContent.slice(2)],
+            content: [desiredMention, ...contentAfterMention],
           }
           const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
           scheduleSetContent(newDoc)
           return
         }
 
-        // Otherwise, insert the current agent mention if available
+        // Otherwise, insert the current agent mention if available (still skip if editing)
+        if (isEditingMentionRef.current) return
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return
@@ -1254,12 +1375,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     useEffect(() => {
       if (!tiptap) return
       // Defer enforcement to avoid synchronous mutations during mount/prop change lifecycles
-      setTimeout(() => {
+      if (enforceTimeoutRef.current) {
+        clearTimeout(enforceTimeoutRef.current)
+        enforceTimeoutRef.current = null
+      }
+      enforceTimeoutRef.current = window.setTimeout(() => {
         try {
           ensureLeadingAgentMention()
         } catch {}
+        enforceTimeoutRef.current = null
       }, 0)
+      return () => {
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+      }
     }, [tiptap, selectedAgent, ensureLeadingAgentMention])
+
+    // Clear any pending enforcement when unmounting
+    useEffect(() => {
+      return () => {
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+      }
+    }, [])
     // Consolidated focus management - handles all focus scenarios (requires tiptap)
     useEffect(() => {
       const shouldFocus = () => {
@@ -1358,19 +1500,42 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <EditorContent editor={tiptap} />
             </div>
 
-            {/* Bottom-right Send Button */}
-            <div className={cn('absolute', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
-              <Button
-                onClick={handleSubmit}
-                disabled={!canSend}
-                size="icon"
-                className={cn(
-                  'h-8 w-8 rounded-full shrink-0 transition-all',
-                  canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
-                )}
-              >
-                {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
-              </Button>
+            {/* Bottom-right Actions: Stop (when streaming) or Send */}
+            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
+              {shouldShowStop ? (
+                <div className="relative h-8 w-8">
+                  <Button
+                    onClick={() => {
+                      const id = lastConversationIdRef.current
+                      if (!id) return
+                      setPreStreamPending(false)
+                      void stopConversation(id)
+                    }}
+                    variant="outline"
+                    size="icon"
+                    className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
+                    aria-label="Stop response"
+                    title="Stop response"
+                  >
+                    <Icon name="stop" weight="fill" className="h-4 w-4" />
+                  </Button>
+                  {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                </div>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!canSend}
+                  size="icon"
+                  className={cn(
+                    'h-8 w-8 rounded-full shrink-0 transition-all',
+                    canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  )}
+                  aria-label="Send"
+                  title="Send"
+                >
+                  {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           </div>
         </div>

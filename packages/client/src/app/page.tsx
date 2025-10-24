@@ -2,11 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import Hero from '@/app/components/Hero'
-import ProductModel from '@/app/components/ProductModel'
 import UseCases from '@/app/components/UseCases'
-import ProblemOutcome from '@/app/components/ProblemOutcome'
-import HowItWorks from '@/app/components/HowItWorks'
-import Integrations from '@/app/components/Integrations'
 import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
@@ -15,23 +11,78 @@ import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { useEffect, useState } from 'react'
+import { Orbitron } from 'next/font/google'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 // Legacy components removed for a cleaner landing
 
 export default function HomePage() {
+  const [logoTrigger, setLogoTrigger] = useState(0)
+  const pathname = usePathname()
+  const router = useRouter()
+
+  // Trigger a one-off logo entry animation after a short delay while keeping default static state
+  useEffect(() => {
+    const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
+    return () => clearTimeout(t)
+  }, [])
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
-        {/* Top bar removed per design update */}
+        {/* Top-left logo with same animation as before */}
+        <div
+          className="fixed top-8 left-8 z-50 cursor-pointer select-none"
+          onClick={() => {
+            setLogoTrigger(v => v + 1)
+            router.push('/')
+          }}
+          title="Animate logo"
+        >
+          <div className="flex items-center gap-2">
+            <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
+            <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>
+          </div>
+        </div>
+
+        {/* Top-right navigation items */}
+        <nav className="fixed top-8 right-8 z-50 flex items-center gap-6 text-sm">
+          <Link
+            href="/"
+            className={pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+            aria-current={pathname === '/' ? 'page' : undefined}
+          >
+            Home
+          </Link>
+          <Link
+            href="/marketplace"
+            className={pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+            aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
+          >
+            Marketplace
+          </Link>
+          <a
+            href="/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+            aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
+          >
+            <span className="inline-flex items-center gap-1">
+              Documentation
+              <Icon name="external-link" className="w-3 h-3 opacity-80" />
+            </span>
+          </a>
+        </nav>
 
         {/* New Landing Sections */}
         <Hero />
         <UseCases />
         <MarketplaceTeaser />
-        <ProblemOutcome />
-        <ProductModel />
-        <HowItWorks />
-        <Integrations />
         <Security />
         <PricingTeaser />
         <FAQ />
@@ -60,7 +111,7 @@ export default function HomePage() {
                   Documentation
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}>
-                  <Icon name="user" className="w-4 h-4 mr-2" />
+                  <Icon name="discord" className="w-4 h-4 mr-2" />
                   Discord
                 </Button>
               </div>

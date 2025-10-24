@@ -16,6 +16,8 @@ import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -28,7 +30,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
   // Get current user and their starships for deployment
-  const { userId } = useAuth()
+  const { userId, isAuthenticated } = useAuth()
   const { data: starships = [] } = useUserStarships(userId || '', !!userId)
   const primaryStarship = starships[0] // Use first starship by default
 
@@ -39,6 +41,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
 
   // Deployment mutation
   const createAgentMutation = useCreateAgentFromTemplate()
+
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -68,6 +74,13 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
 
   const handleDeployClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click from triggering
+    if (!isAuthenticated) {
+      const current = `${pathname}${searchParams && searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+      const params = new URLSearchParams({ returnUrl: current })
+      router.push(`/login?${params.toString()}`)
+      return
+    }
+
     if (!primaryStarship) {
       return // No starship to deploy to
     }
@@ -161,7 +174,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
               <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
             </Button>
           ) : (
-            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || !primaryStarship}>
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || (isAuthenticated && !primaryStarship)}>
               <Icon name="sparkles" className="w-4 h-4 mr-2" />
               {isDeploying ? 'Deploying...' : 'Deploy'}
             </Button>
@@ -180,5 +193,38 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         />
       </Card>
     </motion.div>
+  )
+}
+
+interface AgentTemplateCardCompactProps {
+  template: AgentTemplateModel
+  onClick?: (template: AgentTemplateModel) => void
+}
+
+export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCardCompactProps) {
+  return (
+    <Card className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer" onClick={() => onClick?.(template)}>
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <CardHeader className="pb-3 relative z-10">
+        <div className="mb-1 flex items-center gap-2">
+          <Avatar className="h-6 w-6 ring-1 ring-border/40">
+            <AgentAvatar seed={template.name} size={24} />
+          </Avatar>
+          <CardTitle className="truncate text-base font-semibold">{template.name}</CardTitle>
+        </div>
+        {template.description && <CardDescription className="line-clamp-2 text-xs">{template.description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="relative z-10 pt-0">
+        <div className="flex items-center justify-between">
+          <Badge variant="secondary" className="text-xs">
+            {template.model || 'N/A'}
+          </Badge>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Icon name="download" className="h-3.5 w-3.5" />
+            <span className="text-[10px]">{template.usageCount ?? 0}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

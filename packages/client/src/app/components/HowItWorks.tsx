@@ -11,7 +11,7 @@ export default function HowItWorks() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-semibold mb-8">How it works</h2>
+        <h2 className="text-3xl md:text-4xl font-semibold mb-8 text-center">How it works</h2>
         <div className="grid md:grid-cols-4 gap-4">
           {steps.map((s, i) => (
             <Card key={i} className="p-6 bg-white/5 border-white/10">

@@ -15,7 +15,6 @@ const CreateAgentFromTemplateSchema = z.object({
   starshipId: z.string().regex(/^([a-z0-9_-]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
 });
 
-
 // Helper function to get AgentTemplateService instance
 function getAgentTemplateService(): AgentTemplateService | null {
   try {
@@ -26,8 +25,8 @@ function getAgentTemplateService(): AgentTemplateService | null {
   }
 }
 
-// GET /agent-templates - Get all templates (OpenAPI pattern)
-router.get('/agent-templates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /agent-templates - Get all templates (public)
+router.get('/agent-templates', async (req: Request, res: Response): Promise<void> => {
   try {
     const templateService = getAgentTemplateService();
     if (!templateService) {
@@ -55,8 +54,8 @@ router.get('/agent-templates', jwtAuthMiddleware, async (req: Request, res: Resp
   }
 });
 
-// GET /agent-templates/:id - Get template by ID (OpenAPI pattern)
-router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /agent-templates/:id - Get template by ID (public)
+router.get('/agent-templates/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 

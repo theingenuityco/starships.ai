@@ -25,10 +25,10 @@ export default function Hero() {
   }, [isAuthenticated, primaryStarship?.slug, router])
 
   return (
-    <section className="pt-28 pb-20 px-4">
+    <section className="pt-44 md:pt-52 pb-20 px-4">
       <div className="max-w-6xl mx-auto flex flex-col gap-10 items-center text-center">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-4">
             {(() => {
               const v = getHeadlineVariant()
               if (v === 'B') return 'From prompt to working agent—without brittle glue'
@@ -47,7 +47,7 @@ export default function Hero() {
               )
             })()}
           </h1>
-          <p className="text-lg text-muted-foreground mb-6 leading-relaxed">Ship intelligent automations in minutes - safe, observable and fast.</p>
+          <p className="text-lg text-muted-foreground mb-8 md:mb-10 leading-relaxed">Ship intelligent automations in minutes - safe, observable and fast.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button size="lg" className="px-7" onClick={handlePrimaryClick}>
               <Icon name={isAuthenticated ? 'rocket' : 'user-plus'} className="w-4 h-4 mr-2" />
@@ -65,7 +65,7 @@ export default function Hero() {
               View Docs
             </Button>
           </div>
-          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • $20 credit on signup</div>
+          <div className="mt-3 mb-8 md:mb-12 text-sm text-muted-foreground">Get started for free • No credit card required • $20 credit on signup</div>
         </div>
 
         {/* Demo video replacing blueprint visualization */}

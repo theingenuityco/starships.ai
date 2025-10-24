@@ -275,7 +275,7 @@ export class StarshipService {
   // ============================================================================
 
   /**
-   * Create a default starship for a new user with $20 welcome credit
+   * Create a default starship for a new user with $10 welcome credit
    */
   static async createDefaultStarship(userId: string): Promise<StarshipModel> {
     const starshipService = new StarshipService();
@@ -283,12 +283,12 @@ export class StarshipService {
     // Generate a random name for the starship
     const starshipName = getRandomStarshipName();
 
-    // Create the starship with default settings and $20 welcome credit
+    // Create the starship with default settings and $10 welcome credit
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
       maxAgents: 3,
-      initialWalletBalance: 20, // $20 welcome credit for new users
+      initialWalletBalance: 10, // $10 welcome credit for new users
     });
 
     return starship;

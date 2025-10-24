@@ -44,6 +44,37 @@ const map: Record<string, ResolvedIcon> = {
   sun: { type: 'phosphor', component: 'Sun' },
   moon: { type: 'phosphor', component: 'Moon' },
 
+  // Security & system
+  'shield-check': { type: 'phosphor', component: 'ShieldCheck' },
+  'file-text': { type: 'phosphor', component: 'FileText' },
+  eye: { type: 'phosphor', component: 'Eye' },
+  'eye-off': { type: 'phosphor', component: 'EyeSlash' },
+  lock: { type: 'phosphor', component: 'Lock' },
+  activity: { type: 'phosphor', component: 'ChartLineUp' },
+  plug: { type: 'phosphor', component: 'Plug' },
+
+  // Data & visuals
+  'bar-chart3': { type: 'phosphor', component: 'ChartBar' },
+  globe: { type: 'phosphor', component: 'Globe' },
+  code: { type: 'phosphor', component: 'Code' },
+  'git-branch': { type: 'phosphor', component: 'GitBranch' },
+  cog: { type: 'phosphor', component: 'Gear' },
+  'edit-3': { type: 'phosphor', component: 'PencilSimpleLine' },
+  split: { type: 'phosphor', component: 'ArrowsSplit' },
+  play: { type: 'phosphor', component: 'Play' },
+  zap: { type: 'phosphor', component: 'Lightning' },
+
+  // Commerce & actions
+  download: { type: 'phosphor', component: 'DownloadSimple' },
+  'user-plus': { type: 'phosphor', component: 'UserPlus' },
+  'log-in': { type: 'phosphor', component: 'SignIn' },
+  'loader-2': { type: 'radix', component: 'ReloadIcon' },
+
+  // Health & info
+  'alert-circle': { type: 'phosphor', component: 'WarningCircle' },
+  lightbulb: { type: 'phosphor', component: 'Lightbulb' },
+  'heart-pulse': { type: 'phosphor', component: 'Heartbeat' },
+
   // Status & help
   'alert-triangle': { type: 'phosphor', component: 'Warning' },
   'help-circle': { type: 'phosphor', component: 'Question' },

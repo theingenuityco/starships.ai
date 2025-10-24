@@ -202,11 +202,11 @@ export default function Hero() {
         .video-glow::before {
           content: '';
           position: absolute;
-          inset: -14px;
+          inset: -18px;
           border-radius: inherit;
-          background: conic-gradient(from 0deg at 50% 50%, rgba(59, 130, 246, 0.45), rgba(168, 85, 247, 0.45), rgba(245, 158, 11, 0.4), rgba(59, 130, 246, 0.45));
-          filter: blur(28px);
-          opacity: 0.7;
+          background: conic-gradient(from 0deg at 50% 50%, rgba(59, 130, 246, 0.8), rgba(168, 85, 247, 0.8), rgba(245, 158, 11, 0.7), rgba(59, 130, 246, 0.8));
+          filter: blur(40px);
+          opacity: 0.9;
         }
 
         /* Blurry, almost transparent border close to the edge */
@@ -215,8 +215,8 @@ export default function Hero() {
           position: absolute;
           inset: 0;
           border-radius: inherit;
-          border: 3px solid rgba(255, 255, 255, 0.22);
-          filter: blur(6px);
+          border: 4px solid rgba(255, 255, 255, 0.35);
+          filter: blur(10px);
           opacity: 1;
         }
       `}</style>

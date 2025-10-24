@@ -28,8 +28,9 @@ export default function UseCases() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-semibold mb-8 text-center">Build agents and tools fast</h2>
-        <div className="space-y-8 md:space-y-10">
+        <h2 className="text-3xl md:text-4xl font-semibold mb-2 text-center">Build agents and tools fast</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-12 md:mb-16">Design, connect, and iterate on agents and tools in minutes.</p>
+        <div className="space-y-12 md:space-y-16">
           {items.map((item, idx) => {
             const reverse = idx % 2 === 1
             return (

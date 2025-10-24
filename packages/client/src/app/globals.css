@@ -17,7 +17,7 @@
   position: absolute;
   inset: -18px;
   border-radius: inherit;
-  background: conic-gradient(from 0deg at 50% 50%, rgba(59, 130, 246, 0.8), rgba(168, 85, 247, 0.8), rgba(245, 158, 11, 0.7), rgba(59, 130, 246, 0.8));
+  background: conic-gradient(from 0deg at 50% 50%, rgba(99, 102, 241, 0.85), rgba(217, 70, 239, 0.85), rgba(245, 158, 11, 0.75), rgba(99, 102, 241, 0.85));
   filter: blur(40px);
   opacity: 0.9;
   pointer-events: none;

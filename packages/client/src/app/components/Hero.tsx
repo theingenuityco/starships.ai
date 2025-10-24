@@ -198,27 +198,7 @@ export default function Hero() {
           }
         }
 
-        /* Soft glow around the video frame */
-        .video-glow::before {
-          content: '';
-          position: absolute;
-          inset: -18px;
-          border-radius: inherit;
-          background: conic-gradient(from 0deg at 50% 50%, rgba(59, 130, 246, 0.8), rgba(168, 85, 247, 0.8), rgba(245, 158, 11, 0.7), rgba(59, 130, 246, 0.8));
-          filter: blur(40px);
-          opacity: 0.9;
-        }
-
-        /* Blurry, almost transparent border close to the edge */
-        .video-blur-border::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: inherit;
-          border: 4px solid rgba(255, 255, 255, 0.35);
-          filter: blur(10px);
-          opacity: 1;
-        }
+        /* Glow styles moved to global CSS for earlier paint */
       `}</style>
     </section>
   )

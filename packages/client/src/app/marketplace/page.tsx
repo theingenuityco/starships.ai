@@ -99,7 +99,7 @@ export default function MarketplacePage() {
   }
 
   return (
-    <PageLayout>
+    <PageLayout requireAuth={false}>
       <div className="bg-background">
         <div className="flex flex-col items-center px-6 py-8">
           <div className="w-full max-w-6xl mx-auto space-y-8">

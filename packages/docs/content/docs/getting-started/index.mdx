@@ -14,6 +14,10 @@ import { Globe, MessageSquare, Code, ArrowRight, Settings, Bot, Wrench, CheckCir
 
 Welcome to Starships.ai! Build AI agents and tools through natural conversation - no coding required.
 
+<Callout type="tip">
+**New to AI agents?** Check out [Core Concepts → Agents](/core-concepts/agents) to understand how agents work, or dive straight into [Meeting Your AI Builders](#meet-your-ai-builders) below.
+</Callout>
+
 ---
 
 ## Your First Steps
@@ -24,11 +28,11 @@ Welcome to Starships.ai! Build AI agents and tools through natural conversation 
 2. **Verify your email** (required to access the platform)
 3. **Automatic setup**: Upon verification, you'll receive:
    - Your personal starship (workspace)
-   - Two specialized AI assistants: **Gaia** and **Daedalus**
+   - Two specialized AI assistants: **[Gaia](/agents/gaia)** and **[Daedalus](/agents/daedalus)**
    - **$20 credit** to get started
 
 <Callout type="info">
-**What's a Starship?** Your starship is your personal AI workspace where all your agents, tools, and conversations live. Think of it as your command center for building with AI.
+**What's a Starship?** Your starship is your personal AI workspace where all your agents, tools, and conversations live. Think of it as your command center for building with AI. Learn more about the [agent architecture](/core-concepts/agents) and [tool ecosystem](/core-concepts/tools).
 </Callout>
 
 ### 2. Access Your Starship Dashboard
@@ -46,15 +50,19 @@ After email verification, you'll be taken directly to your **conversation interf
 Starships.ai uses a **conversational building approach**:
 
 - **Empty state**: "Type @ to choose an agent, then ask your question"
-- **Agent selection**: "Ask Gaia..." or "Ask Daedalus..."
+- **Agent selection**: "Ask [Gaia](/agents/gaia)..." or "Ask [Daedalus](/agents/daedalus)..."
 - **Building**: Describe what you want in natural language
-- **Results**: AI creates agents and tools for you automatically
+- **Results**: AI creates [agents](/core-concepts/agents) and [tools](/core-concepts/tools) for you automatically
+
+<Callout type="tip">
+**Want to see how it all works?** Check out the [Blueprint architecture](/core-concepts/blueprints) that powers agent workflows behind the scenes.
+</Callout>
 
 ---
 
 ## Meet Your AI Builders
 
-**Meta-agents** are specialized AI assistants that create and manage other agents and tools for you.
+**Meta-agents** are specialized AI assistants that create and manage other agents and tools for you. For detailed capabilities, visit their individual documentation pages:
 
 <Cards>
   <Card
@@ -76,15 +84,19 @@ Starships.ai uses a **conversational building approach**:
 
 ### What Each Assistant Does
 
-**Gaia** creates agents for you:
+**[Gaia](/agents/gaia)** creates agents for you:
 - "Create a customer support agent for our SaaS product"
 - "Design an agent that researches topics using Wikipedia"
 - "Build an agent that helps with onboarding new customers"
 
-**Daedalus** builds tools and workflows:
+→ [Learn more about Gaia's capabilities](/agents/gaia)
+
+**[Daedalus](/agents/daedalus)** builds tools and workflows:
 - "Design a tool that calls a REST API"
 - "Create a Slack webhook sender tool"
 - "Build a workflow that processes customer feedback"
+
+→ [Learn more about Daedalus's capabilities](/agents/daedalus) | [Understand tool architecture](/core-concepts/tools)
 
 ---
 
@@ -99,7 +111,7 @@ Starships.ai uses a **conversational building approach**:
   <p className="text-sm text-muted-foreground text-center mt-2">Deploy powerful agents instantly from the marketplace or build custom ones with Gaia</p>
 </div>
 
-### Option 1: Deploy from Marketplace (Fastest)
+### Option 1: Deploy from [Marketplace](/core-concepts/marketplace) (Fastest)
 
 1. **Browse Templates**: Click **Marketplace** → Browse categories (Support, Coding, Creative, Analysis)
 2. **Deploy**: Select template → Click "Deploy" → Confirm to your starship
@@ -107,13 +119,17 @@ Starships.ai uses a **conversational building approach**:
 
 **Benefits**: Pre-configured prompts, assigned tools, ready in 1-2 minutes
 
-### Option 2: Build with Gaia (Custom)
+→ [Learn more about the Marketplace](/core-concepts/marketplace)
+
+### Option 2: Build with [Gaia](/agents/gaia) (Custom)
 
 1. **Start Conversation**: Type `@` → Select **Gaia** → Describe your agent needs
 2. **Provide Details**: Answer Gaia's questions about tasks, tone, and requirements  
 3. **Deploy & Test**: Gaia creates your agent → Test immediately → Iterate as needed
 
 **Benefits**: Fully customized for your specific use case, 5-10 minutes total
+
+→ [Deep dive into Gaia's agent creation process](/agents/gaia)
 
 <Cards>
   <Card
@@ -189,13 +205,13 @@ Starships.ai is designed around **conversational AI building**. Chat with specia
 </Callout>
 
 **Available Now:**
-- ✅ **Conversational Building**: Chat with Gaia and Daedalus to build agents and tools
-- ✅ **Template Marketplace**: Deploy pre-built agents with one click
-- ✅ **Custom Tools**: Create specialized capabilities for your agents
+- ✅ **[Conversational Building](/agents/gaia)**: Chat with Gaia and Daedalus to build agents and tools
+- ✅ **[Template Marketplace](/core-concepts/marketplace)**: Deploy pre-built agents with one click
+- ✅ **[Custom Tools](/core-concepts/tools)**: Create specialized capabilities for your agents
 
 **Coming Soon:**
-- 🔄 **Code-First Development**: CLI and SDK for programmatic control
-- 🔄 **Advanced Integrations**: Enterprise features and custom deployments
+- 🔄 **[Code-First Development](/getting-started/quickstart)**: CLI and SDK for programmatic control ([preview available](/getting-started/quickstart))
+- 🔄 **[Advanced Integrations](/getting-started/installation)**: Enterprise features and custom deployments
 
 <Cards>
   <Card
@@ -214,3 +230,48 @@ Starships.ai is designed around **conversational AI building**. Chat with specia
     CLI and SDK tools (coming soon)
   </Card>
 </Cards>
+
+---
+
+## Quick Links & Resources
+
+<Callout type="success">
+**🚀 Ready to dive deeper?** Here's where to go based on what you want to learn:
+</Callout>
+
+<Tabs items={['Build Agents', 'Create Tools', 'Learn Concepts', 'Future Features']}>
+<Tab value="Build Agents">
+
+- **[Chat with Gaia](/agents/gaia)** - Start creating custom agents immediately
+- **[Browse Marketplace](/core-concepts/marketplace)** - Find pre-built agents to deploy
+- **[Agent Architecture](/core-concepts/agents)** - Understand how agents work internally
+- **[Memory & Context](/core-concepts/memory)** - Learn about agent persistence (coming soon)
+
+</Tab>
+<Tab value="Create Tools">
+
+- **[Chat with Daedalus](/agents/daedalus)** - Build custom tools and workflows
+- **[Tool Ecosystem](/core-concepts/tools)** - Understand tool architecture and capabilities
+- **[Blueprint Workflows](/core-concepts/blueprints)** - Visual workflow system that powers tools
+- **[Integration Patterns](/agents/daedalus#integration-patterns)** - Connect to external APIs and services
+
+</Tab>
+<Tab value="Learn Concepts">
+
+- **[Agents Explained](/core-concepts/agents)** - Core concepts and architecture
+- **[Tools & Capabilities](/core-concepts/tools)** - How tools extend agent functionality
+- **[Blueprints](/core-concepts/blueprints)** - Visual workflow definitions
+- **[Marketplace](/core-concepts/marketplace)** - Template ecosystem and sharing
+- **[Models](/core-concepts/models)** - AI models available (coming soon)
+- **[Prompts](/core-concepts/prompts)** - Prompt engineering best practices (coming soon)
+
+</Tab>
+<Tab value="Future Features">
+
+- **[CLI Quickstart](/getting-started/quickstart)** - Preview code-first development
+- **[Installation Guide](/getting-started/installation)** - SDK setup instructions (coming soon)
+- **[Memory Systems](/core-concepts/memory)** - Advanced context management (coming soon)
+- **[Model Selection](/core-concepts/models)** - Choose optimal AI models (coming soon)
+
+</Tab>
+</Tabs>

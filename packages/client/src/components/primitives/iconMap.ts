@@ -52,6 +52,12 @@ const map: Record<string, ResolvedIcon> = {
 
   // Animated affordances → Iconify line-md
   loading: { type: 'iconify', icon: 'line-md:loading-twotone-loop' },
+
+  // External/action affordances
+  'external-link': { type: 'radix', component: 'ExternalLinkIcon' },
+  copy: { type: 'radix', component: 'CopyIcon' },
+  book: { type: 'phosphor', component: 'Book' },
+  menu: { type: 'radix', component: 'HamburgerMenuIcon' },
 }
 
 export function resolveIcon(name: string): ResolvedIcon | undefined {

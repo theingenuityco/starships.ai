@@ -90,13 +90,27 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               </div>
             </div>
             <nav className="fixed top-8 right-8 z-[1000] flex items-center gap-6 text-sm">
-              <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                href="/"
+                className={pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+                aria-current={pathname === '/' ? 'page' : undefined}
+              >
                 Home
               </Link>
-              <Link href="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                href="/marketplace"
+                className={pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+                aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
+              >
                 Marketplace
               </Link>
-              <a href="/docs" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+              <a
+                href="/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
+                aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
+              >
                 Documentation
               </a>
             </nav>

@@ -55,7 +55,7 @@ export default function HomePage() {
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         {/* Top-left logo with same animation as before */}
         <div
-          className="fixed top-8 left-8 z-50 cursor-pointer select-none"
+          className="fixed top-4 left-4 sm:top-8 sm:left-8 z-50 cursor-pointer select-none"
           onClick={() => {
             setLogoTrigger(v => v + 1)
             router.push('/')
@@ -69,7 +69,7 @@ export default function HomePage() {
         </div>
 
         {/* Top-right navigation items */}
-        <nav className="fixed top-8 right-8 z-50 flex items-center gap-6 text-sm">
+        <nav className="fixed top-4 right-4 sm:top-8 sm:right-8 z-50 hidden sm:flex items-center gap-4 sm:gap-6 text-sm">
           <Link
             href="/"
             className={pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}

@@ -102,41 +102,108 @@ Every tool in the Starships.ai framework shares the same core architecture:
 
 ## Blueprint-Powered Architecture
 
-### What Makes Tools Intelligent
+### Three Types of Tool Blueprints
 
-Unlike traditional functions, tools in Starships.ai are powered by **visual workflows (blueprints)**:
+Tools in Starships.ai use **visual workflows (blueprints)** that fall into three main patterns based on complexity and use case:
+
+### 1. Linear Blueprint (Simple Sequential Flow)
+
+For straightforward operations like calculations, data formatting, or simple API calls:
 
 ```mermaid
 graph TD
     START([start]) --> VALIDATE[code: Validate Input]
-    VALIDATE --> CHECK{conditional: Input Valid?}
-    CHECK -->|Valid| API[http_request: External API Call]
-    CHECK -->|Invalid| ERROR([end: Return Error])
+    VALIDATE --> PROCESS[code: Main Processing]
+    PROCESS --> FORMAT[transform: Format Output]
+    FORMAT --> END([end: Return Result])
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style PROCESS fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style FORMAT fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+```
 
-    API --> MUTATE[mutate: Store API Response]
-    MUTATE --> PROCESS[code: Process Data]
-    PROCESS --> TRANSFORM[transform: Format Output]
-    TRANSFORM --> END([end: Return Result])
+**Use Cases**: Calculator tool, time utilities, text processing, unit conversions
 
-    API -->|API Failure| RETRY{conditional: Can Retry?}
-    RETRY -->|Yes| API
-    RETRY -->|No| ERROR
+### 2. Branched Blueprint (Conditional Logic)
 
+For tools that need different processing paths based on input or context:
+
+```mermaid
+graph TD
+    START([start]) --> VALIDATE[code: Validate Input]
+    VALIDATE --> ROUTE{conditional: Route by Type}
+    
+    ROUTE -->|Search| API_A[http_request: Search API]
+    ROUTE -->|Summary| API_B[http_request: Summary API]
+    ROUTE -->|Content| API_C[http_request: Content API]
+    
+    API_A --> FORMAT_A[transform: Format Search]
+    API_B --> FORMAT_B[transform: Format Summary]
+    API_C --> FORMAT_C[transform: Format Content]
+    
+    FORMAT_A --> END([end: Return Result])
+    FORMAT_B --> END
+    FORMAT_C --> END
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style ROUTE fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style API_A fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style API_B fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style API_C fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style FORMAT_A fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style FORMAT_B fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style FORMAT_C fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+```
+
+**Use Cases**: Wikipedia search tool, multi-format processors, API routing tools, content type handlers
+
+### 3. Loop Blueprint (Retry and State Management)
+
+For tools that need retry logic, error recovery, or iterative processing:
+
+```mermaid
+graph TD
+    START([start]) --> INIT[code: Initialize State]
+    INIT --> ATTEMPT[http_request: API Attempt]
+    ATTEMPT --> CHECK{conditional: Success?}
+    
+    CHECK -->|Success| FORMAT[transform: Format Result]
+    CHECK -->|Failure| RETRY_CHECK{conditional: Can Retry?}
+    
+    RETRY_CHECK -->|Yes| BACKOFF[code: Exponential Backoff]
+    RETRY_CHECK -->|No| ERROR([end: Return Error])
+    
+    BACKOFF --> MUTATE[mutate: Update Retry Count]
+    MUTATE --> ATTEMPT
+    FORMAT --> END([end: Return Success])
+    
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style ERROR fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#dc2626
-    style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style INIT fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style ATTEMPT fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
     style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
-    style API fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style RETRY_CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style BACKOFF fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
     style MUTATE fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
-    style PROCESS fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
-    style TRANSFORM fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
-    style RETRY fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style FORMAT fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
 ```
+
+**Use Cases**: Rate-limited APIs, unreliable external services, batch processing tools, file upload handlers
+
+### Choosing the Right Blueprint Type
+
+- **Linear**: Choose for simple, predictable operations with no branching logic needed
+- **Branched**: Choose when you need different processing paths based on input parameters or conditions  
+- **Loop**: Choose when dealing with unreliable external services or need retry/recovery mechanisms
 
 ### Blueprint Node Types
 
-Tools can use any combination of these powerful node types:
+All blueprint types can use any combination of these powerful node types:
 
 - <span style={{color: '#0066cc'}}>**[start](/core-concepts/blueprints#start-node)**</span> <ExternalLink className="inline w-3 h-3" />: Receives tool parameters and initiates execution
 - <span style={{color: '#0066cc'}}>**[code](/core-concepts/blueprints#code-node)**</span> <ExternalLink className="inline w-3 h-3" />: Executes JavaScript for data processing and validation logic

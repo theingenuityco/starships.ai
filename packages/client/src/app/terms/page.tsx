@@ -111,7 +111,7 @@ export default function TermsOfServicePage() {
                     <li><strong>Taxes:</strong> You are responsible for all applicable taxes and payment processing fees</li>
                   </ul>
                   <p className="mt-4">
-                    Your wallet balance is specific to each starship. You can view your current balance and transaction history in your starship's billing dashboard.
+                    Your wallet balance is specific to each starship. You can view your current balance and transaction history in your starship&apos;s billing dashboard.
                   </p>
                 </div>
               </section>

@@ -101,19 +101,19 @@ export default function MarketplacePageClient() {
   return (
     <PageLayout requireAuth={false}>
       <div className="bg-background">
-        <div className="flex flex-col items-center px-6 py-8">
-          <div className="w-full max-w-6xl mx-auto space-y-8">
-            {/* Header */}
+        <div className="flex flex-col items-center px-4 sm:px-6 py-6 sm:py-8">
+          <div className="w-full max-w-6xl mx-auto space-y-6 sm:space-y-8">
+            {/* Page title */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Icon name="store" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Marketplace</h1>
+                <Icon name="store" className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <h1 className="text-xl sm:text-2xl font-bold">Marketplace</h1>
               </div>
-              <p className="text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship&apos;s capabilities.</p>
+              <p className="text-sm sm:text-base text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship&apos;s capabilities.</p>
             </div>
 
             {/* Search and Filters */}
-            <div className="mb-8 sticky top-6 z-30">
+            <div className="mb-6 sm:mb-8 sticky top-16 sm:top-20 z-30">
               <div className="relative max-w-md mb-6 mx-auto">
                 <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
                 <Input
@@ -127,44 +127,46 @@ export default function MarketplacePageClient() {
             </div>
 
             {/* Category Filter */}
-            <div className="flex flex-wrap gap-2 justify-center mb-8">
-              {allCategories.map(category => (
-                <Button
-                  key={category}
-                  variant={selectedCategory === category ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCategory(category)
-                    const params = new URLSearchParams(searchParams?.toString() ?? '')
-                    if (category && category !== 'all') params.set('category', category)
-                    else params.delete('category')
-                    router.replace(`${pathname}?${params.toString()}`)
-                  }}
-                  className="capitalize"
-                >
-                  {category === 'all' ? 'All Categories' : category}
-                </Button>
-              ))}
+            <div className="mb-6 sm:mb-8">
+              <div className="flex sm:flex-wrap sm:justify-center gap-2 overflow-x-auto whitespace-nowrap -mx-4 px-4">
+                {allCategories.map(category => (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory(category)
+                      const params = new URLSearchParams(searchParams?.toString() ?? '')
+                      if (category && category !== 'all') params.set('category', category)
+                      else params.delete('category')
+                      router.replace(`${pathname}?${params.toString()}`)
+                    }}
+                    className="capitalize shrink-0"
+                  >
+                    {category === 'all' ? 'All Categories' : category}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             {/* Agents Section */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center gap-3">
-                <Icon name="bot" className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-semibold">Agents</h2>
+                <Icon name="bot" className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                <h2 className="text-lg sm:text-xl font-semibold">Agents</h2>
                 <Badge variant="outline" className="ml-2">
                   {filteredAgentTemplates.length}
                 </Badge>
               </div>
 
               {agentTemplatesLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
                   ))}
                 </div>
               ) : filteredAgentTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
                     <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
                       <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
@@ -181,23 +183,23 @@ export default function MarketplacePageClient() {
             </div>
 
             {/* Tools Section */}
-            <div className="space-y-6 mt-12">
+            <div className="space-y-4 sm:space-y-6 mt-10 sm:mt-12">
               <div className="flex items-center gap-3">
-                <Icon name="wrench" className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-semibold">Tools</h2>
+                <Icon name="wrench" className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                <h2 className="text-lg sm:text-xl font-semibold">Tools</h2>
                 <Badge variant="outline" className="ml-2">
                   {filteredToolTemplates.length}
                 </Badge>
               </div>
 
               {toolTemplatesLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
                   ))}
                 </div>
               ) : filteredToolTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {filteredToolTemplates.map((template: ToolTemplateModel, idx: number) => (
                     <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
                       <ToolTemplateCard template={template} onInstall={handleToolInstall} onClick={handleToolClick} />

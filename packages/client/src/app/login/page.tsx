@@ -5,14 +5,21 @@ import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { Suspense, useState } from 'react'
+import * as React from 'react'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 
 function LoginContent() {
   const { isAuthenticated, isLoading } = useAuth()
   const [activeTab, setActiveTab] = useState('login')
+  const [mounted, setMounted] = useState(false)
 
-  // Show loading state while checking authentication
-  if (isLoading) {
+  // Prevent hydration mismatch by only rendering after mount
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Show loading state while checking authentication or mounting
+  if (!mounted || isLoading) {
     return <AuthLoadingScreen message="Loading..." />
   }
 

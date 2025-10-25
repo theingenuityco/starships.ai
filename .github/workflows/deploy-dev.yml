@@ -48,7 +48,33 @@ jobs:
           echo "Using image tag: ${IMAGE_TAG}"
           echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
+      - name: Check if image exists
+        id: check-image
+        run: |
+          IMAGE_TAG="${{ steps.get-image.outputs.image_tag }}"
+          IMAGE_URL="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+          echo "Checking if image exists: ${IMAGE_URL}"
+
+          # Try to get the manifest for the image
+          if docker manifest inspect "${IMAGE_URL}" > /dev/null 2>&1; then
+            echo "✅ Image found: ${IMAGE_URL}"
+            echo "image_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "❌ Image does not exist: ${IMAGE_URL}"
+            echo "ℹ️  This typically happens when semantic-release skipped the build (e.g., docs/chore commits)"
+            echo "image_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip deployment if no image
+        if: steps.check-image.outputs.image_exists != 'true'
+        run: |
+          echo "⏭️  Skipping deployment - no new image was built"
+          echo "This is expected for commits that don't trigger a release (docs, chore, etc.)"
+          exit 0
+
       - name: Configure AWS credentials
+        if: steps.check-image.outputs.image_exists == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -56,10 +82,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Update kubeconfig
+        if: steps.check-image.outputs.image_exists == 'true'
         run: |
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
 
       - name: Validate manifests
+        if: steps.check-image.outputs.image_exists == 'true'
         run: |
           kubectl apply --dry-run=client -f k8s/dev/00-namespace.yaml
           kubectl apply --dry-run=client -f k8s/dev/02-pvc.yaml
@@ -73,6 +101,7 @@ jobs:
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
+        if: steps.check-image.outputs.image_exists == 'true'
         run: |
           kubectl apply -f k8s/dev/00-namespace.yaml
           kubectl apply -f k8s/dev/02-pvc.yaml
@@ -86,6 +115,7 @@ jobs:
           echo "✅ Applied manifests to dev cluster."
 
       - name: Update secrets
+        if: steps.check-image.outputs.image_exists == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -154,6 +184,7 @@ jobs:
           echo "✅ Secrets updated successfully."
 
       - name: Deploy new image
+        if: steps.check-image.outputs.image_exists == 'true'
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
           kubectl set image statefulset/starships-app \
@@ -163,6 +194,7 @@ jobs:
           echo "✅ Deployment rolled out successfully."
 
       - name: Verify deployment
+        if: steps.check-image.outputs.image_exists == 'true'
         run: |
           kubectl get pods -n ${{ env.NAMESPACE }}
           kubectl get pv,pvc -n ${{ env.NAMESPACE }} || true

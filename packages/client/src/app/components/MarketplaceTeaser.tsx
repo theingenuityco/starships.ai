@@ -32,13 +32,13 @@ export default function MarketplaceTeaser() {
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col items-center text-center">
-          <h2 className="text-3xl md:text-4xl font-semibold mb-2 text-center">Launch from the Marketplace</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Launch from the Marketplace</h2>
           <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Start with ready‑made agents and tools. Deploy in one click.</p>
         </div>
 
         {/* Featured agents carousel */}
         <div className="mt-6">
-          <Carousel className="px-8" opts={{ loop: true }} setApi={setCarouselApi} onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
+          <Carousel className="px-2 sm:px-4 md:px-8" opts={{ loop: true }} setApi={setCarouselApi} onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
             <CarouselContent>
               {agentLoading
                 ? [...Array(6)].map((_, idx) => (
@@ -58,14 +58,14 @@ export default function MarketplaceTeaser() {
         </div>
 
         {/* Counts and CTA below carousel */}
-        <div className="mt-10 md:mt-12 flex flex-col items-center text-center gap-4">
+        <div className="mt-10 md:mt-12 flex flex-col items-center text-center gap-3 sm:gap-4">
           <div className="inline-flex items-baseline gap-2">
-            <span className="font-mono text-3xl md:text-4xl font-bold text-primary">{agentCount}</span>
-            <span className="text-lg md:text-xl">agents,</span>
-            <span className="font-mono text-3xl md:text-4xl font-bold text-primary">{toolCount}</span>
-            <span className="text-lg md:text-xl">tools and counting</span>
+            <span className="font-mono text-2xl sm:text-3xl md:text-4xl font-bold text-primary">{agentCount}</span>
+            <span className="text-base sm:text-lg md:text-xl">agents,</span>
+            <span className="font-mono text-2xl sm:text-3xl md:text-4xl font-bold text-primary">{toolCount}</span>
+            <span className="text-base sm:text-lg md:text-xl">tools and counting</span>
           </div>
-          <div className="mt-3 md:mt-4">
+          <div className="mt-2 sm:mt-3 md:mt-4">
             <Button size="lg" variant="outline" className="border-primary/60 text-primary hover:bg-primary/10" onClick={() => (window.location.href = '/marketplace')}>
               <Icon name="store" className="w-7 h-7 mr-2" /> Open marketplace
             </Button>

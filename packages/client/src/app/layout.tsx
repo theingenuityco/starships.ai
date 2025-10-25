@@ -1,6 +1,6 @@
 import { ClientLayout } from '@/app/client-layout'
 import '@/app/globals.css'
-import { GoogleAnalytics } from '@/components/analytics/google-analytics'
+import { AnalyticsProvider } from '@/components/analytics/analytics-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -17,22 +17,32 @@ export const metadata: Metadata = {
   title: 'Starships.ai – Ship production AI agents fast',
   description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
   openGraph: {
+    type: 'website',
+    siteName: 'Starships.ai',
     title: 'Starships.ai – Ship production AI agents fast',
     description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
     url: 'https://starships.ai',
-    images: [{ url: '/og.png', width: 1200, height: 630 }],
+    locale: 'en',
+    images: [{ url: '/static-assets/og.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Starships.ai – Ship production AI agents fast',
     description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
-    images: ['/og.png'],
+    images: ['/static-assets/og.png'],
   },
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: [
+      { url: '/favicons/favicon.ico', sizes: 'any' },
+      { url: '/favicons/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicons/icon.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: '/favicons/apple-icon.png',
   },
+  appleWebApp: {
+    title: 'Starships.ai',
+  },
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -52,7 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
-        <GoogleAnalytics />
+        <AnalyticsProvider />
       </body>
     </html>
   )

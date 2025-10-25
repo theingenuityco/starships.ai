@@ -26,9 +26,9 @@ export default function Hero() {
 
   return (
     <section className="pt-44 md:pt-52 pb-20 px-4">
-      <div className="max-w-6xl mx-auto flex flex-col gap-10 items-center text-center">
+      <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-4">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[22ch] mx-auto">
             {(() => {
               const v = getHeadlineVariant()
               if (v === 'B') return 'From prompt to working agent—without brittle glue'
@@ -47,7 +47,7 @@ export default function Hero() {
               )
             })()}
           </h1>
-          <p className="text-lg text-muted-foreground mb-8 md:mb-10 leading-relaxed">Ship intelligent automations in minutes - safe, observable and fast.</p>
+          <p className="text-base sm:text-lg text-muted-foreground mb-6 md:mb-10 leading-relaxed max-w-[60ch] mx-auto">Ship intelligent automations in minutes - safe, observable and fast.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button size="lg" className="h-12 px-10 text-base leading-none overflow-hidden [&_svg]:!w-7 [&_svg]:!h-7" onClick={handlePrimaryClick}>
               {isAuthenticated ? (
@@ -73,7 +73,7 @@ export default function Hero() {
               View Docs
             </Button>
           </div>
-          <div className="mt-3 mb-8 md:mb-12 text-sm text-muted-foreground">Get started for free • No credit card required • $20 credit on signup</div>
+          <div className="mt-3 mb-8 md:mb-12 text-sm text-muted-foreground">Get started for free • No credit card required • $10 credit on signup</div>
         </div>
 
         {/* Demo video replacing blueprint visualization */}
@@ -90,7 +90,7 @@ export default function Hero() {
                   'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
               }}
             >
-              <video className="h-full w-full object-contain" src="/landing/demo.webm" autoPlay loop muted playsInline />
+              <video className="h-full w-full object-contain" src="/landing/demo.webm" autoPlay loop muted playsInline preload="none" />
             </div>
           </div>
         </div>

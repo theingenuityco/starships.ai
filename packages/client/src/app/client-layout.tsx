@@ -49,7 +49,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
   const isMarketplace = pathname === '/marketplace'
-  const isPublicSimplePage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
+  const isPublicSimplePage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password' || pathname === '/terms' || pathname === '/privacy'
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)

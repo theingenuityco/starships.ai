@@ -23,12 +23,12 @@ export default function Security() {
     },
   ]
   return (
-    <section className="py-20 px-4">
+    <section className="py-16 px-4">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-semibold mb-2 text-center">Security & reliability</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-12 md:mb-16">Designed for safe execution and clear visibility across every run.</p>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Security & reliability</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-16">Designed for safe execution and clear visibility across every run.</p>
         <div>
-          <ul className="grid gap-8 md:grid-cols-3">
+          <ul className="grid gap-4 sm:gap-6 md:gap-8 md:grid-cols-3">
             {items.map((i, idx) => (
               <li key={idx}>
                 <Card className="h-full p-5 md:p-6 bg-white/5 border-white/10">

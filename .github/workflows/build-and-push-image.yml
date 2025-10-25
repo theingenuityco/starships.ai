@@ -245,7 +245,9 @@ jobs:
             echo "✅ **Version Calculation:** New version detected (\`${{ needs.calculate-version.outputs.new_release_version }}\`)" >> $GITHUB_STEP_SUMMARY
 
             if [[ "${{ needs.build-dev.result }}" == "success" ]]; then
-              echo "✅ **Build Status:** Docker image built successfully" >> $GITHUB_STEP_SUMMARY
+              echo "✅ **Build Status:** Docker images built and pushed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "   - Main app: \`ghcr.io/theingenuityco/starships.ai:${{ needs.calculate-version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
+              echo "   - Autopilot runner: \`ghcr.io/theingenuityco/autopilot-runner:${{ needs.calculate-version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
             else
               echo "❌ **Build Status:** Docker image build failed" >> $GITHUB_STEP_SUMMARY
             fi
@@ -259,14 +261,27 @@ jobs:
             fi
           else
             echo "ℹ️ **Semantic Version Check:** No new version detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Reason:** Commits since last release contain only:" >> $GITHUB_STEP_SUMMARY
+            echo "- \`docs:\` (documentation changes)" >> $GITHUB_STEP_SUMMARY
+            echo "- \`chore:\` (maintenance tasks)" >> $GITHUB_STEP_SUMMARY
+            echo "- \`style:\`, \`refactor:\`, \`test:\`, \`perf:\` (non-feature changes)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
               echo "🔧 **Build Status:** Manual override triggered" >> $GITHUB_STEP_SUMMARY
             else
-              echo "⏭️ **Build Status:** Build skipped (no meaningful changes)" >> $GITHUB_STEP_SUMMARY
+              echo "⏭️ **Build Status:** Build skipped - no images were pushed" >> $GITHUB_STEP_SUMMARY
+              echo "⏭️ **Deploy Status:** Deployment will be skipped (no new image available)" >> $GITHUB_STEP_SUMMARY
             fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To trigger a release, use one of these commit prefixes:" >> $GITHUB_STEP_SUMMARY
+            echo "- \`feat:\` for new features (minor version bump)" >> $GITHUB_STEP_SUMMARY
+            echo "- \`fix:\` for bug fixes (patch version bump)" >> $GITHUB_STEP_SUMMARY
+            echo "- \`BREAKING CHANGE:\` for breaking changes (major version bump)" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

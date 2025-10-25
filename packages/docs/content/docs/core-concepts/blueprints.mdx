@@ -41,36 +41,13 @@ import {
 
 ---
 
-## Getting Started: Your First Blueprint
+## How You'll Use Blueprints
 
-Understanding blueprints is key to building powerful agents and tools. Here's how they work in practice:
+Blueprints work behind the scenes in three key ways:
 
-<Steps>
-<Step icon={<Play />}>
-### See Blueprints in Action
-Every agent conversation follows a blueprint. When you chat with an agent, here's what happens:
-- **Start** → **LLM Processing** → **Tool Calls** (if needed) → **Response**
-- The agent decides whether to use tools based on your request
-- Results flow back through the blueprint to create intelligent responses
-</Step>
-
-<Step icon={<Wrench />}>
-### Tools Use Blueprints Too
-When an agent calls a tool, that tool executes its own blueprint:
-- **Validate Input** → **API Call** → **Process Data** → **Return Result**
-- Tools can have conditional logic, retry mechanisms, and error handling
-- Multiple tools can be called in sequence or parallel
-</Step>
-
-<Step icon={<Settings />}>
-### Build Custom Workflows
-Advanced users can create custom blueprints for complex automations:
-- **Multi-step processes** with branching logic
-- **External API integrations** with authentication
-- **Data transformations** and state management
-- **Error recovery** and retry strategies
-</Step>
-</Steps>
+- **Agent Conversations**: Every chat follows a blueprint workflow automatically
+- **Template Browsing**: See blueprint visualizations in [marketplace](/core-concepts/marketplace) template details
+- **Custom Tools**: [Daedalus](/agents/daedalus) creates blueprints when you describe automation needs
 
 ## Universal Blueprint Architecture
 
@@ -108,7 +85,7 @@ Every blueprint is built from these fundamental elements:
 - **<Play className="inline w-4 h-4" /> Nodes**: Individual processing steps that perform specific actions
 - **<ArrowRight className="inline w-4 h-4" /> Edges**: Connections that define execution flow and data passing
 - **<Settings className="inline w-4 h-4" /> State**: Shared data that persists across node executions
-- **<Code className="inline w-4 h-4" /> Templates**: Dynamic expressions that access state and node outputs
+- **<Code className="inline w-4 h-4" /> Data Flow**: Simple expressions that connect node outputs to inputs
 
 ---
 
@@ -141,6 +118,25 @@ The workflow completes at an `end` node, returning structured results back to th
 </Step>
 </Steps>
 
+### Blueprint Data Flow
+
+Blueprints use simple expressions to pass data between workflow steps:
+
+```javascript
+// Access workflow state
+"{{ state.userEmail }}"
+
+// Get results from previous nodes
+"{{ $lastOutputOf('api_call').json }}"
+
+// Use input data
+"{{ $input('message') }}"
+```
+
+**Common Patterns:**
+- **State Variables**: `{{ state.variableName }}` - Access persistent workflow data
+- **Node Results**: `{{ $lastOutputOf('nodeRef') }}` - Get outputs from previous steps
+- **Input Access**: `{{ $input('path') }}` - Extract data from workflow input
 
 <Callout type="info">
   **Deep Integration**: Blueprints are tightly integrated with [agents](/core-concepts/agents) for tool calling and [tools](/core-concepts/tools) for custom functionality. Every interaction in Starships.ai is powered by this workflow system.
@@ -406,7 +402,4 @@ Blueprints power real automation workflows in the [marketplace](/core-concepts/m
 - **Content Moderation**: Parallel processing with rule-based and AI-powered validation
 - **API Orchestrator**: Complex multi-service coordination with error handling
 
-<Callout type="info">
-  **Building Workflows**: Use [Daedalus](/agents/daedalus) to create custom tools powered by blueprints, or work with [Gaia](/agents/gaia) to build agents that leverage these workflow patterns automatically.
-</Callout>
 

@@ -12,6 +12,7 @@ import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
+import PublicHeader from '@/components/navigation/PublicHeader'
 import { useEffect, useState, Suspense } from 'react'
 import { Orbitron } from 'next/font/google'
 import Link from 'next/link'
@@ -41,6 +42,7 @@ export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const pathname = usePathname()
   const router = useRouter()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Trigger a one-off logo entry animation after a short delay while keeping default static state
   useEffect(() => {
@@ -53,50 +55,7 @@ export default function HomePage() {
         <SearchParamsHandler />
       </Suspense>
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
-        {/* Top-left logo with same animation as before */}
-        <div
-          className="fixed top-8 left-8 z-50 cursor-pointer select-none"
-          onClick={() => {
-            setLogoTrigger(v => v + 1)
-            router.push('/')
-          }}
-          title="Animate logo"
-        >
-          <div className="flex items-center gap-2">
-            <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
-            <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight`}>starships.ai</span>
-          </div>
-        </div>
-
-        {/* Top-right navigation items */}
-        <nav className="fixed top-8 right-8 z-50 flex items-center gap-6 text-sm">
-          <Link
-            href="/"
-            className={pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
-            aria-current={pathname === '/' ? 'page' : undefined}
-          >
-            Home
-          </Link>
-          <Link
-            href="/marketplace"
-            className={pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
-            aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
-          >
-            Marketplace
-          </Link>
-          <a
-            href="/docs"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}
-            aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
-          >
-            <span className="inline-flex items-center gap-1">
-              Documentation
-              <Icon name="external-link" className="w-3 h-3 opacity-80" />
-            </span>
-          </a>
-        </nav>
+        <PublicHeader />
 
         {/* New Landing Sections */}
         <Hero />

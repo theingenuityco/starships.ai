@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
                 Secure Account Recovery
               </h1>
               <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-                We'll help you get back to building your AI automations safely
+                We&apos;ll help you get back to building your AI automations safely
               </p>
               <div className="space-y-4">
                 <motion.div

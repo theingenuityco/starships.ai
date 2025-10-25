@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useSimpleError } from './useSimpleError'
 import { isValidRedirectUrl } from '@/lib/utils'
-import { triggerWelcomeModal } from '@/components/auth/WelcomeModalProvider'
 
 export type AuthMethod = 'password' | 'google' | 'github';
 
@@ -29,6 +28,8 @@ interface AuthLoginResponse {
   // Email verification fields
   emailNotVerified?: boolean
   canResendVerification?: boolean
+  // First login detection (backend-tracked)
+  isFirstLogin?: boolean
 }
 
 interface AuthRegisterResponse {
@@ -91,6 +92,19 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
 }
 
 // Get current user info using query
+// Welcome modal state key (separate from user data)
+const SHOW_WELCOME_MODAL_KEY = ['auth', 'showWelcomeModal'] as const
+
+// Hook to get welcome modal state
+export function useWelcomeModalState() {
+  const queryClient = useQueryClient()
+
+  return {
+    shouldShow: queryClient.getQueryData<boolean>(SHOW_WELCOME_MODAL_KEY) ?? false,
+    clearFlag: () => queryClient.setQueryData(SHOW_WELCOME_MODAL_KEY, false),
+  }
+}
+
 export function useAuthUser() {
   return useQuery({
     queryKey: AUTH_QUERY_KEYS.me(),
@@ -141,7 +155,7 @@ export function useLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token, starship } = data
+      const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
         handleError(new Error('Login successful but missing user or token'), 'useLogin')
@@ -153,6 +167,11 @@ export function useLogin() {
 
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+
+      // If first login (backend-tracked), set welcome modal flag in query cache
+      if (isFirstLogin) {
+        queryClient.setQueryData(SHOW_WELCOME_MODAL_KEY, true)
+      }
 
       // Handle redirect with returnUrl pattern
       const searchParams = new URLSearchParams(window.location.search)
@@ -262,16 +281,12 @@ export function useOAuthLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token, starship } = data
+      const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
         handleError(new Error('OAuth successful but missing user or token'), 'useOAuthLogin')
         return
       }
-
-      // Check if this is a new user (first time logging in)
-      const hadPreviousStarship = typeof window !== 'undefined' && localStorage.getItem('starships_has_starship')
-      const isNewUser = !hadPreviousStarship && starship
 
       // Store token (same as regular login)
       setStoredToken(token)
@@ -279,14 +294,9 @@ export function useOAuthLogin() {
       // Update auth user cache (same as regular login)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // If new user, trigger welcome modal
-      if (isNewUser) {
-        triggerWelcomeModal()
-      }
-
-      // Remember that user has a starship now
-      if (starship && typeof window !== 'undefined') {
-        localStorage.setItem('starships_has_starship', 'true')
+      // If first login (backend-tracked), set welcome modal flag in query cache
+      if (isFirstLogin) {
+        queryClient.setQueryData(SHOW_WELCOME_MODAL_KEY, true)
       }
 
       // Handle redirect with returnUrl pattern (same as regular login)

@@ -12,7 +12,7 @@ import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { EmailSchema, PasswordSchema, OAuthProviderSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
-import { StarshipRepository } from '@starships/models';
+import { StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
@@ -172,6 +172,23 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       // Continue with login even if starship fetch fails
     }
 
+    // Track first login (before updating lastLoginAt)
+    const isFirstLogin = !user.lastLoginAt;
+
+    // Update lastLoginAt for login tracking (general purpose)
+    try {
+      const userRepo = new UserRepository();
+      await userRepo.update(user.id, {
+        lastLoginAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.warn('[AUTH] Failed to update lastLoginAt', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      // Continue with login even if update fails
+    }
+
     // Generate JWT token
     const token = await generateJWT({
       id: user.id,
@@ -187,6 +204,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
         avatar: user.avatar,
       },
       token,
+      isFirstLogin,
       starship: firstStarship
         ? {
             id: firstStarship.id,
@@ -637,6 +655,23 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
     }
 
+    // Track first login (before updating lastLoginAt)
+    const isFirstLogin = !user.lastLoginAt;
+
+    // Update lastLoginAt for login tracking (general purpose)
+    try {
+      const userRepo = new UserRepository();
+      await userRepo.update(user.id, {
+        lastLoginAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.warn('[OAUTH-EXCHANGE] Failed to update lastLoginAt', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      // Continue with login even if update fails
+    }
+
     // Generate JWT token (returned in response body, NOT URL)
     const token = await generateJWT({
       id: user.id,
@@ -666,6 +701,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         primaryAuthMethod: user.primaryAuthMethod || 'oauth',
       },
       token,
+      isFirstLogin,
       starship: firstStarship
         ? {
             id: firstStarship.id,

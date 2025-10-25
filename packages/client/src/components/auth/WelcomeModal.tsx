@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { motion, useAnimate } from 'motion/react'
@@ -110,9 +110,9 @@ export function WelcomeModal({ open, onClose, userName, walletBalance = 10 }: We
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
+                <DialogTitle className="text-3xl font-bold mb-3 bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
                   {userName ? `Welcome, ${userName.split(' ')[0]}!` : 'Welcome aboard!'}
-                </h1>
+                </DialogTitle>
                 <p className="text-base text-muted-foreground">
                   Your Starship journey begins now
                 </p>

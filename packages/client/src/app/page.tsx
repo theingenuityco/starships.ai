@@ -20,23 +20,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
-// Legacy components removed for a cleaner landing
-
-function SearchParamsHandler() {
-  const searchParams = useSearchParams()
-
-  // Store verification success flag for later (after login)
-  useEffect(() => {
-    if (searchParams?.get('verification') === 'success') {
-      // Store flag so modal will show AFTER user logs in
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('starships_pending_welcome', 'true')
-      }
-    }
-  }, [searchParams])
-
-  return null
-}
 
 export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
@@ -51,9 +34,6 @@ export default function HomePage() {
   }, [])
   return (
     <StarTheme theme="dark">
-      <Suspense fallback={null}>
-        <SearchParamsHandler />
-      </Suspense>
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         <PublicHeader />
 

@@ -24,12 +24,16 @@ import {
   Construction,
 } from 'lucide-react';
 
+<Callout type="info">
+  **What's a Starship?** Your starship is your personal AI workspace where all your agents, tools, and conversations live. Think of it as
+  your command center for building with AI. Learn more about the [agent architecture](/core-concepts/agents) and [tool
+  ecosystem](/core-concepts/tools).
+</Callout>
+
 <div className="flex items-center justify-between">
-  <h2>Your First Steps</h2>
+  <h3> 1. Create Your Account</h3>
   <CopyPageButton />
 </div>
-
-### 1. Create Your Account
 
 1. **Sign up** at [starships.ai](https://starships.ai)
 2. **Verify your email** (required to access the platform)
@@ -37,12 +41,6 @@ import {
    - Your personal starship (workspace)
    - Two specialized AI assistants: **[Gaia](/agents/gaia)** and **[Daedalus](/agents/daedalus)**
    - **$20 credit** to get started
-
-<Callout type="info">
-  **What's a Starship?** Your starship is your personal AI workspace where all your agents, tools, and conversations live. Think of it as
-  your command center for building with AI. Learn more about the [agent architecture](/core-concepts/agents) and [tool
-  ecosystem](/core-concepts/tools).
-</Callout>
 
 ### 2. Access Your Starship Dashboard
 
@@ -125,7 +123,9 @@ Starships.ai uses a **conversational building approach**:
     alt="Gaia conversation interface showing agent creation through natural language"
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
-  <div className="text-sm text-muted-foreground text-center mt-2">Chat with Gaia to create custom agents tailored to your specific needs</div>
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Chat with Gaia to create custom agents tailored to your specific needs
+  </div>
 </div>
 
 **Steps:**
@@ -136,8 +136,30 @@ Starships.ai uses a **conversational building approach**:
 
 **Benefits:** Fully customized for your specific use case, 5-10 minutes total
 
-| Approach                  | Best For                                                       | Time to Deploy |
-| ------------------------- | -------------------------------------------------------------- | -------------- |
-| **Marketplace Templates** | Quick deployment, common use cases, getting started fast       | 1-2 minutes    |
-| **Build with Gaia**       | Custom requirements, unique workflows, specific business needs | 5-10 minutes   |
-
+<div className="overflow-x-auto my-6">
+  <table className="w-full border-collapse bg-fd-card rounded-xl shadow-sm">
+    <thead>
+      <tr className="bg-gradient-to-r from-fd-muted/40 to-fd-muted/20 border-b border-fd-border">
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50 first:rounded-tl-xl">Approach</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">Best For</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground last:rounded-tr-xl">Time to Deploy</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-fd-border/50">
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 font-semibold text-fd-foreground border-r border-fd-border/50">Marketplace Templates</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Quick deployment, common use cases, getting started fast</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">1-2 minutes</span>
+        </td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 font-semibold text-fd-foreground border-r border-fd-border/50 last:rounded-bl-xl">Build with Gaia</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Custom requirements, unique workflows, specific business needs</td>
+        <td className="px-6 py-4 text-fd-muted-foreground last:rounded-br-xl">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">5-10 minutes</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

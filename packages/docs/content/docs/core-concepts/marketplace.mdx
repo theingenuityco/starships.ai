@@ -46,10 +46,6 @@ The Marketplace is Starships.ai's **template ecosystem** - a curated collection 
 - **<Settings className="inline w-4 h-4" /> Customize** after deployment to match your exact needs
 - **<BarChart className="inline w-4 h-4" /> Scale** with enterprise-grade templates built by experts
 
-<Callout type="info">
-  **New to Starships.ai?** Check out our [Getting Started](/getting-started) guide to set up your account and understand how agents work
-  within your starship.
-</Callout>
 
 <div className="my-8">
   <img
@@ -71,12 +67,13 @@ Navigate to the Marketplace and explore available templates. Use categories to n
 </Step>
 
 <Step icon={<Zap />}>
-  ### Select Your Template Click on a template that matches your needs. Review the detailed information, preview prompts, and requirements.
+### Select Your Template
+Click on a template that matches your needs. Review the detailed information, preview prompts, and requirements.
 </Step>
 
 <Step icon={<Sparkles />}>
-  ### Deploy with One Click Click "Deploy" and confirm your selection. The template will be automatically converted to a running instance on
-  your starship.
+### Deploy with One Click
+Click "Deploy" and confirm your selection. The template will be automatically converted to a running instance on your starship.
 </Step>
 
 <Step icon={<CheckCircle />}>
@@ -166,25 +163,48 @@ Deployment is simple and automatic:
   </div>
 </div>
 
-### <Bot className="inline w-5 h-5" /> Agent Templates
-
-**Complete AI assistants** with personality, memory, and capabilities. Deploy as conversational interfaces you can chat with immediately. Learn more about [how agents work](/core-concepts/agents).
-
-**Includes**: System prompt, model configuration, tool suite, memory setup, example prompts  
-**Result**: New agent in your starship ready for conversation
-
-### <Wrench className="inline w-5 h-5" /> Tool Templates
-
-**Standalone capabilities** that extend agent functionality. Install once, use across multiple agents. Explore the [tool ecosystem](/core-concepts/tools).
-
-**Includes**: Function definition, configuration schema, usage examples, integration guides  
-**Result**: New tool in your library, assignable to any agent
+<div className="overflow-x-auto my-6">
+  <table className="w-full border-collapse bg-fd-card rounded-xl shadow-sm">
+    <thead>
+      <tr className="bg-gradient-to-r from-fd-muted/40 to-fd-muted/20 border-b border-fd-border">
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50 first:rounded-tl-xl">Template Type</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">Description</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">What's Included</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground last:rounded-tr-xl">Result</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-fd-border/50">
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Bot className="w-5 h-5 mr-3 text-blue-600" />
+            <a href="/core-concepts/agents" className="font-semibold text-fd-foreground hover:text-blue-600 hover:underline transition-colors">Agents</a>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Complete AI assistants with personality, memory, and capabilities</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">System prompt, model configuration, tool suite, memory setup</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">New agent in your starship ready for conversation</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50 last:rounded-bl-xl">
+          <div className="flex items-center">
+            <Wrench className="w-5 h-5 mr-3 text-green-600" />
+            <a href="/core-concepts/tools" className="font-semibold text-fd-foreground hover:text-green-600 hover:underline transition-colors">Tools</a>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Standalone capabilities that extend agent functionality</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Function definition, configuration schema, usage examples</td>
+        <td className="px-6 py-4 text-fd-muted-foreground last:rounded-br-xl">New tool in your library, assignable to any agent</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 ---
 
 ## Quality & Customization
 
-**Enterprise-Grade Quality**: All templates undergo security review, functionality testing, and community validation before publication.
+- **<CheckCircle className="inline w-4 h-4 text-green-600" /> Enterprise-Grade Quality**: All templates undergo security review, functionality testing, and community validation before publication.
 
-**Fully Customizable**: Once deployed, edit system prompts, add/remove tools, adjust model settings, and configure memory to match your exact needs.
+- **<Settings className="inline w-4 h-4 text-blue-600" /> Fully Customizable**: Once deployed, edit system prompts, add/remove tools, adjust model settings, and configure memory to match your exact needs.
 

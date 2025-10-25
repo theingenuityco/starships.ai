@@ -114,11 +114,13 @@ The AI model examines your input and compares it against available tools and con
 </Step>
 
 <Step icon={<Zap />}>
-  ### Decides on Action Either provides a direct response or identifies which tools are needed to gather more information
+### Decides on Action
+Either provides a direct response or identifies which tools are needed to gather more information
 </Step>
 
 <Step icon={<Wrench />}>
-  ### Executes Tools Calls external APIs, searches databases, processes files, or performs calculations as needed
+### Executes Tools
+Calls external APIs, searches databases, processes files, or performs calculations as needed
 </Step>
 
 <Step icon={<RotateCcw />}>
@@ -139,29 +141,21 @@ Tool returns: This week's commits and updates
 Agent responds: "Your team completed 12 tasks this week, 3 ahead of schedule..."
 ```
 
-### Why This Works
+### What Makes Agents Intelligent
 
-- **Self-contained**: Each agent has AI model + tools + memory
-- **Purpose-built**: Same architecture, different tools = different capabilities
-- **Composable**: Agents can work together on complex workflows
-- **Learning**: Every interaction improves decision-making
+Unlike simple chatbots, agents combine memory, tools, and reasoning:
+
+- **Persistent Memory**: Remember conversations and adapt to your preferences
+- **Tool Integration**: Execute actions through specialized capabilities
+- **Intelligent Reasoning**: Make decisions and learn from interactions
+- **Collaborative**: Work together and share context on complex tasks
+
+This makes them true AI teammates rather than simple question-answering systems.
 
 <Callout type="info">
   **Want to build custom workflows?** Learn about all blueprint nodes and advanced patterns in our [Blueprint Reference
   Guide](/core-concepts/blueprints).
 </Callout>
-
----
-
-## Agent Memory
-
-Agents maintain context across conversations:
-
-- **Remember what you've discussed** and your preferences
-- **Adapt to new capabilities** when tools are added
-- **Share context** with other agents when working together
-
-This persistent memory is what makes agents intelligent teammates rather than simple chatbots.
 
 ---
 

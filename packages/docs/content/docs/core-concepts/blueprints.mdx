@@ -1,11 +1,30 @@
 ---
 title: Blueprints
-description: Visual workflow definitions that specify how agents execute multi-step tasks
+description: Visual workflow system that powers intelligent agent execution and complex automation
 icon: GitBranch
 ---
 
+import {
+  GitBranch,
+  Play,
+  Zap,
+  Settings,
+  Bot,
+  Code,
+  Network,
+  Database,
+  ArrowRight,
+  CheckCircle,
+  Workflow,
+  Brain,
+  Wrench,
+  MessageSquare,
+  Globe,
+  ExternalLink,
+} from 'lucide-react';
+
 <Callout type="success">
-  **Visual Programming**: Blueprints provide a node-based approach to defining complex agent workflows without traditional coding.
+  **Visual Workflow Engine**: Blueprints power every agent interaction - from simple conversations to complex multi-step automations through an intuitive node-based system.
 </Callout>
 
 <div className="flex items-center justify-between">
@@ -13,56 +32,404 @@ icon: GitBranch
   <CopyPageButton />
 </div>
 
-**Blueprints** are visual workflow definitions that specify how agents execute multi-step tasks. They consist of interconnected nodes that define:
+**Blueprints** are the visual workflow system that powers how [agents](/core-concepts/agents) and [tools](/core-concepts/tools) execute tasks. Every conversation, tool call, and automation in Starships.ai runs through blueprints - making them the foundational execution engine of the platform.
 
-- **Data flow** between processing steps
-- **Decision logic** for conditional branching
-- **Tool execution** for external integrations
-- **State management** for persistent data
-- **Error handling** for robust workflows
+- **<Workflow className="inline w-4 h-4" /> Visual Workflows**: Node-based system for building complex logic without code
+- **<Brain className="inline w-4 h-4" /> Intelligent Execution**: AI-driven decision making with conditional branching  
+- **<Wrench className="inline w-4 h-4" /> Tool Integration**: Seamless connection to external APIs and services
+- **<Database className="inline w-4 h-4" /> State Management**: Persistent data flow across multi-step processes
 
-Think of blueprints as **visual programs** that agents follow to accomplish complex tasks.
+---
 
-## Core Blueprint Concepts
+## Getting Started: Your First Blueprint
 
-_Detailed blueprint documentation coming soon - will cover:_
+Understanding blueprints is key to building powerful agents and tools. Here's how they work in practice:
 
-### Node Types
+<Steps>
+<Step icon={<Play />}>
+### See Blueprints in Action
+Every agent conversation follows a blueprint. When you chat with an agent, here's what happens:
+- **Start** → **LLM Processing** → **Tool Calls** (if needed) → **Response**
+- The agent decides whether to use tools based on your request
+- Results flow back through the blueprint to create intelligent responses
+</Step>
 
-- Comprehensive reference for all 12 node types
-- Parameter specifications and examples
-- Common usage patterns
+<Step icon={<Wrench />}>
+### Tools Use Blueprints Too
+When an agent calls a tool, that tool executes its own blueprint:
+- **Validate Input** → **API Call** → **Process Data** → **Return Result**
+- Tools can have conditional logic, retry mechanisms, and error handling
+- Multiple tools can be called in sequence or parallel
+</Step>
 
-### Flow Control
+<Step icon={<Settings />}>
+### Build Custom Workflows
+Advanced users can create custom blueprints for complex automations:
+- **Multi-step processes** with branching logic
+- **External API integrations** with authentication
+- **Data transformations** and state management
+- **Error recovery** and retry strategies
+</Step>
+</Steps>
 
-- Sequential execution patterns
-- Conditional branching logic
-- Loop and iteration constructs
-- Error handling strategies
+## Universal Blueprint Architecture
 
-### State Management
+Every blueprint follows the same core execution pattern, regardless of complexity:
 
-- Data persistence between nodes
-- Memory and context handling
-- Variable scoping and access
+```mermaid
+graph TD
+    START([start: Workflow Entry]) --> PROCESS[Processing Node]
+    PROCESS --> DECISION{conditional: Decision Point}
+    
+    DECISION -->|True| ACTION1[Action Node]
+    DECISION -->|False| ACTION2[Alternative Action]
+    
+    ACTION1 --> MERGE[Data Processing]
+    ACTION2 --> MERGE
+    
+    MERGE --> CHECK{conditional: More Steps?}
+    CHECK -->|Yes| PROCESS
+    CHECK -->|No| END([end: Return Result])
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style PROCESS fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style DECISION fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style ACTION1 fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style ACTION2 fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style MERGE fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+```
 
-### Template Expressions
+### Core Components
 
-- Dynamic value resolution
-- Context access patterns
-- Helper functions and utilities
+Every blueprint is built from these fundamental elements:
 
-## Blueprint Builder
+- **<Play className="inline w-4 h-4" /> Nodes**: Individual processing steps that perform specific actions
+- **<ArrowRight className="inline w-4 h-4" /> Edges**: Connections that define execution flow and data passing
+- **<Settings className="inline w-4 h-4" /> State**: Shared data that persists across node executions
+- **<Code className="inline w-4 h-4" /> Templates**: Dynamic expressions that access state and node outputs
 
-_Documentation coming soon for the visual blueprint editor_
+---
 
-## Advanced Patterns
+## How Blueprints Execute
 
-_Documentation coming soon covering:_
+When a blueprint runs, the execution engine follows this process:
 
-- Nested workflows
-- Parallel execution
-- Tool calling loops
-- Error recovery strategies
-- Performance optimization
+<Steps>
+<Step icon={<Play />}>
+### Initialize State
+The workflow begins with the `start` node, which receives input data and initializes the workflow state.
+</Step>
+
+<Step icon={<Network />}>
+### Process Nodes
+Each node executes in sequence, with data flowing along edges. Nodes can be:
+- **Processing** (transform data, make API calls)
+- **Decision** (branch based on conditions)  
+- **Integration** (call tools, external services)
+</Step>
+
+<Step icon={<Database />}>
+### Manage State
+State persists across nodes, allowing complex data transformations and multi-step processes to maintain context.
+</Step>
+
+<Step icon={<CheckCircle />}>
+### Return Results
+The workflow completes at an `end` node, returning structured results back to the calling agent or system.
+</Step>
+</Steps>
+
+### Template Expression System
+
+Blueprints use a powerful template system for dynamic data access:
+
+```javascript
+// Access workflow state
+"{{ state.userEmail }}"
+
+// Get outputs from previous nodes  
+"{{ $lastOutputOf('api_call').json.result }}"
+
+// Use helper functions
+"{{ $input('user.preferences') }}"
+
+// Complex expressions with logic
+"{{ state.attempts < 3 ? 'retry' : 'fail' }}"
+```
+
+**Common Template Patterns:**
+- **State Access**: `{{ state.variableName }}` - Access persistent workflow data
+- **Node Outputs**: `{{ $lastOutputOf('nodeRef') }}` - Get results from previous steps
+- **Input Data**: `{{ $input('path.to.data') }}` - Extract specific input values
+- **Environment**: `{{ env('API_KEY') }}` - Access environment variables
+
+<Callout type="info">
+  **Deep Integration**: Blueprints are tightly integrated with [agents](/core-concepts/agents) for tool calling and [tools](/core-concepts/tools) for custom functionality. Every interaction in Starships.ai is powered by this workflow system.
+</Callout>
+
+---
+
+## Node Reference Guide
+
+Blueprints are built from 12 specialized node types, each designed for specific workflow functions:
+
+<div className="overflow-x-auto my-6">
+  <table className="w-full border-collapse bg-fd-card rounded-xl shadow-sm">
+    <thead>
+      <tr className="bg-gradient-to-r from-fd-muted/40 to-fd-muted/20 border-b border-fd-border">
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50 first:rounded-tl-xl">Node Type</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">Purpose</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">Key Parameters</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground last:rounded-tr-xl">Common Use Cases</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-fd-border/50">
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Play className="w-4 h-4 mr-2 text-green-600" />
+            <span className="font-semibold">start</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Workflow entry point</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">input schema</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">All workflows, input validation</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
+            <span className="font-semibold">end</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Workflow exit point</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">output data</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Return results, workflow completion</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Brain className="w-4 h-4 mr-2 text-purple-600" />
+            <span className="font-semibold">llm</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">AI model processing</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">model, prompt, temperature</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Text analysis, reasoning, generation</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <GitBranch className="w-4 h-4 mr-2 text-orange-600" />
+            <span className="font-semibold">conditional</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Branch execution flow</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">expression, conditions</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Decision points, logic routing</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Globe className="w-4 h-4 mr-2 text-red-600" />
+            <span className="font-semibold">http_request</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">External API calls</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">url, method, headers, auth</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">API integrations, data fetching</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Code className="w-4 h-4 mr-2 text-yellow-600" />
+            <span className="font-semibold">code</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">JavaScript execution</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">script, timeout</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Data processing, calculations</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Wrench className="w-4 h-4 mr-2 text-green-600" />
+            <span className="font-semibold">tool</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Function execution</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">tool reference, parameters</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Custom functions, tool calling</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Settings className="w-4 h-4 mr-2 text-gray-600" />
+            <span className="font-semibold">transform</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Data transformation</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">JSON patches, mappings</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Format conversion, data shaping</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Database className="w-4 h-4 mr-2 text-indigo-600" />
+            <span className="font-semibold">mutate</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">State modification</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">reducer function</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Update workflow state, counters</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Network className="w-4 h-4 mr-2 text-teal-600" />
+            <span className="font-semibold">workflow</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Nested blueprint execution</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">blueprint reference</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Reusable workflows, composition</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Bot className="w-4 h-4 mr-2 text-blue-600" />
+            <span className="font-semibold">agent</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Complete agent execution</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">agent reference, context</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Delegate to agents, conversations</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50 last:rounded-bl-xl">
+          <div className="flex items-center">
+            <MessageSquare className="w-4 h-4 mr-2 text-pink-600" />
+            <span className="font-semibold">user_prompt</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Human interaction</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">prompt text, input type</td>
+        <td className="px-6 py-4 text-fd-muted-foreground last:rounded-br-xl">User input, approval workflows</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+---
+
+## Advanced Workflow Patterns
+
+Blueprints support sophisticated workflow patterns for complex automation needs:
+
+### Sequential Processing Pattern
+
+For straightforward workflows with ordered steps:
+
+```mermaid
+graph TD
+    START([start]) --> VALIDATE[code: Validate Input]
+    VALIDATE --> FETCH[http_request: Fetch Data]
+    FETCH --> PROCESS[code: Process Data]
+    PROCESS --> SAVE[http_request: Save Result]
+    SAVE --> END([end: Return Success])
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style FETCH fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style PROCESS fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style SAVE fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+```
+
+**Use Cases**: Data processing pipelines, API integrations, file operations
+
+### Conditional Branching Pattern
+
+For workflows requiring different paths based on data or conditions:
+
+```mermaid
+graph TD
+    START([start]) --> CHECK{conditional: Check Type}
+    
+    CHECK -->|User| USER_FLOW[llm: User Response]
+    CHECK -->|System| SYS_FLOW[code: System Process]
+    CHECK -->|Admin| ADMIN_FLOW[tool: Admin Tool]
+    
+    USER_FLOW --> FORMAT_USER[transform: Format User]
+    SYS_FLOW --> FORMAT_SYS[transform: Format System]
+    ADMIN_FLOW --> FORMAT_ADMIN[transform: Format Admin]
+    
+    FORMAT_USER --> END([end: Return Result])
+    FORMAT_SYS --> END
+    FORMAT_ADMIN --> END
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style USER_FLOW fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style SYS_FLOW fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style ADMIN_FLOW fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style FORMAT_USER fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style FORMAT_SYS fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style FORMAT_ADMIN fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+```
+
+**Use Cases**: User role routing, content type handling, error recovery strategies
+
+### Loop and Retry Pattern
+
+For workflows requiring iteration or error recovery:
+
+```mermaid
+graph TD
+    START([start]) --> INIT[mutate: Initialize Counter]
+    INIT --> ATTEMPT[http_request: API Call]
+    ATTEMPT --> SUCCESS{conditional: Success?}
+    
+    SUCCESS -->|Yes| PROCESS[transform: Process Result]
+    SUCCESS -->|No| RETRY{conditional: Can Retry?}
+    
+    RETRY -->|Yes| WAIT[code: Exponential Backoff]
+    RETRY -->|No| ERROR([end: Return Error])
+    
+    WAIT --> INCREMENT[mutate: Increment Counter]
+    INCREMENT --> ATTEMPT
+    PROCESS --> END([end: Return Success])
+    
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style ERROR fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#dc2626
+    style INIT fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style ATTEMPT fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style SUCCESS fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style RETRY fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style WAIT fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style INCREMENT fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style PROCESS fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+```
+
+**Use Cases**: API retry logic, batch processing, polling operations, error recovery
+
+---
+
+## Real-World Examples
+
+Blueprints power real automation workflows in the [marketplace](/core-concepts/marketplace):
+
+- **RAG Search & Chat**: Multi-step vector search with AI-powered response generation
+- **Support Ticket Triage**: Automated classification and routing based on content analysis
+- **Lead Enrichment**: Sequential API calls to gather and consolidate customer data  
+- **Content Moderation**: Parallel processing with rule-based and AI-powered validation
+- **API Orchestrator**: Complex multi-service coordination with error handling
+
+<Callout type="info">
+  **Building Workflows**: Use [Daedalus](/agents/daedalus) to create custom tools powered by blueprints, or work with [Gaia](/agents/gaia) to build agents that leverage these workflow patterns automatically.
+</Callout>
 

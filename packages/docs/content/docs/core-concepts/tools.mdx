@@ -56,36 +56,6 @@ Think of tools as **specialized AI workers** that agents can delegate specific t
 
 ---
 
-## Getting Started: Your First Tool
-
-<Steps>
-<Step icon={<Search />}>
-### Browse Tool Templates
-Navigate to the [Marketplace](/core-concepts/marketplace) and explore available tool templates. Filter by category to find tools for your use case.
-</Step>
-
-<Step icon={<Zap />}>
-### Deploy a Tool
-Click on a tool template and select "Deploy". Configure any required API keys or settings, then confirm deployment to your starship.
-</Step>
-
-<Step icon={<Bot />}>
-### Assign to Agent
-Go to your agent settings and assign the new tool. Agents can now use this tool during conversations automatically.
-</Step>
-
-<Step icon={<CheckCircle />}>
-### Test in Conversation
-Chat with your agent and ask them to use the tool. Watch as they intelligently call the tool when needed.
-</Step>
-</Steps>
-
-<Callout type="info">
-  **New to Starships.ai?** Check out our [Getting Started](/getting-started) guide to set up your account and understand how tools work
-  within your starship.
-</Callout>
-
----
 
 ## Universal Tool Architecture
 
@@ -227,13 +197,13 @@ The agent examines your request and identifies which tools might be helpful to p
 </Step>
 
 <Step icon={<Zap />}>
-  ### Function Calling Decision The agent decides to call specific tools with appropriate parameters, like "I need to search for current
-  weather data."
+### Function Calling Decision
+The agent decides to call specific tools with appropriate parameters, like "I need to search for current weather data."
 </Step>
 
 <Step icon={<Wrench />}>
-  ### Tool Execution The tool's blueprint executes with the provided parameters, potentially involving multiple steps like API calls, data
-  processing, and formatting.
+### Tool Execution
+The tool's blueprint executes with the provided parameters, potentially involving multiple steps like API calls, data processing, and formatting.
 </Step>
 
 <Step icon={<RotateCcw />}>
@@ -285,11 +255,4 @@ Tools are organized into categories based on their primary function:
 
 ---
 
-## Enterprise Features
-
-- **Isolated Execution**: Tools run in separate processes with resource controls
-- **Input Validation**: JSON Schema validation and sanitization
-- **Access Control**: Permission-based tool access per agent
-- **Tool Composition**: Tools can call other tools for complex workflows
-- **Dynamic Discovery**: Agents automatically understand new tool capabilities
 

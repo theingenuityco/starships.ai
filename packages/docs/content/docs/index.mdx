@@ -1,52 +1,33 @@
 ---
 title: Welcome to Starships.ai
-description: Build the future of AI-powered applications with Starships.ai - Your comprehensive platform for deploying intelligent agents at scale
+description: Build AI agents and tools through natural conversation - no coding required
 icon: Rocket
 ---
 
-import { Sparkles, Zap, Shield, Globe } from 'lucide-react';
+import { Sparkles, MessageSquare, Bot, Wrench, Globe, Code, Brain, Workflow } from 'lucide-react';
 
-<div className="flex justify-end mb-4">
+<div className="flex items-center justify-between">
+  <h2>What is Starships.ai?</h2>
   <CopyPageButton />
 </div>
 
-# Welcome to Starships.ai
+**Starships.ai** is your personal AI workspace where you create agents and tools through natural conversation. No coding experience required - just describe what you need and watch AI build it for you.
 
-## Key Features
+<div className="my-8">
+  <img
+    src="/docs/images/landing.png"
+    alt="Starships.ai platform interface showing the conversational agent selection and collaboration workflow"
+    className="w-full rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Build automations at warp speed through conversational AI collaboration
+  </div>
+</div>
 
-<Cards>
-  <Card
-    icon={<Zap />}
-    title="Lightning Fast Deployment"
-    href="/getting-started/quickstart"
-  >
-    Deploy production-ready AI agents in under 5 minutes with our streamlined CLI and SDK.
-  </Card>
-
-  <Card
-    icon={<Shield />}
-    title="Enterprise Security"
-    href="/guides/security"
-  >
-    Bank-grade encryption, SOC 2 compliance, and granular access controls out of the box.
-  </Card>
-
-  <Card
-    icon={<Globe />}
-    title="Global Scale"
-    href="/guides/scaling"
-  >
-    Auto-scaling infrastructure across 50+ regions with sub-100ms latency worldwide.
-  </Card>
-
-  <Card
-    icon={<Sparkles />}
-    title="Advanced AI Models"
-    href="/api-reference/models"
-  >
-    Access to GPT-4, Claude, Gemini, and custom fine-tuned models through a unified API.
-  </Card>
-</Cards>
+- **<MessageSquare className="inline w-4 h-4" /> Conversational Creation**: Build by chatting with specialized AI assistants
+- **<Bot className="inline w-4 h-4" /> Intelligent Agents**: AI teammates that handle tasks and conversations
+- **<Wrench className="inline w-4 h-4" /> Custom Tools**: Extend capabilities with workflow automation
+- **<Globe className="inline w-4 h-4" /> Ready-Made Templates**: Deploy proven solutions instantly
 
 ## Choose Your Path
 
@@ -90,53 +71,58 @@ starships deploy
 </Tabs>
 
 <Callout type="info">
-**Can't decide?** Start conversational - you can export to code later. Most users find this path faster and more intuitive.
+  **Can't decide?** Start conversational - you can export to code later. Most users find this path faster and more intuitive.
 </Callout>
 
 ## What You Can Build
 
-<Cards>
-  <Card title="Customer Support" href="/core-concepts/agents#see-it-in-action">
-    24/7 support agents that handle common questions and escalate complex issues
-  </Card>
-  <Card title="Data Processing" href="/core-concepts/agents#see-it-in-action">
-    Agents that process documents, extract insights, and generate reports
-  </Card>
-  <Card title="Blueprint Automation" href="/core-concepts/blueprints">
-    Multi-step processes that integrate with your existing tools and systems
-  </Card>
-  <Card title="Research Assistants" href="/core-concepts/agents#see-it-in-action">
-    Agents that gather information, analyze trends, and provide summaries
-  </Card>
-</Cards>
+Create agents for any business need:
 
-## Why Developers Choose Starships.ai
+- **Customer Support**: 24/7 support agents that handle common questions and escalate complex issues
+- **Data Processing**: Agents that process documents, extract insights, and generate reports
+- **Blueprint Automation**: Multi-step processes that integrate with your existing tools and systems
+- **Research Assistants**: Agents that gather information, analyze trends, and provide summaries
 
-> "We went from prototype to production in 2 weeks. Starships.ai handled all the infrastructure complexity while we focused on building features our users love."
->
-> — **Sarah Chen**, Lead Engineer at TechCorp
+## What Our Users Say
 
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
-  <div className="p-6 rounded-lg border border-fd-border bg-fd-card">
-    <div className="text-3xl font-bold text-[#0066FF] mb-2">99.9%</div>
-    <div className="text-sm text-fd-muted-foreground">Uptime SLA</div>
-  </div>
-  <div className="p-6 rounded-lg border border-fd-border bg-fd-card">
-    <div className="text-3xl font-bold text-[#0066FF] mb-2">&lt;100ms</div>
-    <div className="text-sm text-fd-muted-foreground">Average Latency</div>
-  </div>
-  <div className="p-6 rounded-lg border border-fd-border bg-fd-card">
-    <div className="text-3xl font-bold text-[#0066FF] mb-2">10M+</div>
-    <div className="text-sm text-fd-muted-foreground">API Calls Daily</div>
+<div className="my-8 p-6 rounded-lg border border-fd-border bg-fd-card/30">
+  <blockquote className="text-lg italic text-fd-foreground mb-4">
+    "We built our entire customer onboarding flow in under an hour. What used to take weeks of development now happens through simple conversations with our agents."
+  </blockquote>
+  <div className="flex items-center">
+    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold mr-3">
+      JC
+    </div>
+    <div>
+      <div className="font-semibold">Jasper Chen</div>
+      <div className="text-sm text-fd-muted-foreground">CMO, SKUU Skincare LTD.</div>
+    </div>
   </div>
 </div>
 
+## Why Choose Starships.ai
 
-## Community & Support
+Built for teams who want to move fast without complexity:
 
-Join thousands of developers building with Starships.ai:
+- **<Brain className="inline w-4 h-4" /> Conversational Interface**: Build through natural language - no learning curve
+- **<Workflow className="inline w-4 h-4" /> Ready in Minutes**: Deploy from templates or create custom agents instantly
+- **<Globe className="inline w-4 h-4" /> Enterprise Ready**: Secure, scalable infrastructure that grows with your team
+- **<Code className="inline w-4 h-4" /> Developer Friendly**: Export to code when you need full control
 
-- **Discord**: Join our [community server](https://discord.gg/starships) for real-time help
-- **GitHub**: Explore [open-source examples](https://github.com/starships-ai) and contribute
-- **Support**: Enterprise support available 24/7 via email and Slack
-- **Newsletter**: Subscribe for weekly tips and product updates
+## Get Started Today
+
+Ready to build your first AI agent? Choose your path:
+
+<Cards>
+  <Card icon={<Globe />} title="Getting Started Guide" href="/getting-started">
+    Complete walkthrough from account setup to your first agent
+  </Card>
+
+<Card icon={<Bot />} title="Browse Templates" href="/core-concepts/marketplace">
+  Deploy proven agents in seconds from our template library
+</Card>
+
+  <Card icon={<MessageSquare />} title="Chat with Gaia" href="/agents/gaia">
+    Create custom agents through conversation with our meta-agent
+  </Card>
+</Cards>

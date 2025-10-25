@@ -21,102 +21,31 @@ Build agents programmatically using our CLI and SDK - perfect for developers who
 
 ## What You'll Be Able To Do
 
-When the CLI is ready, you'll have powerful code-first development capabilities:
-
-### Installation
+When the CLI is ready, you'll have code-first development capabilities:
 
 ```bash
+# Install and authenticate
 npm install -g @starships/cli
-```
-
-### Authentication
-
-```bash
 starships login
-```
 
-This will open your browser to authenticate with your Starships.ai account.
+# Create and develop
+starships init my-agent
+starships dev
 
-### Create Your First Agent
-
-```bash
-starships init my-first-agent
-cd my-first-agent
-```
-
-### Project Structure
-
-```
-my-first-agent/
-├── starships.config.ts    # Project configuration
-├── agent.ts              # Agent definition
-├── package.json          # Dependencies
-└── tools/               # Custom tools
-    └── example.ts
-```
-
-### Agent Definition
-
-```typescript title="agent.ts"
-import { defineAgent } from '@starships/sdk';
-
-export default defineAgent({
-  name: 'my-assistant',
-  description: 'A helpful AI assistant',
-  model: 'anthropic/claude-sonnet-4.5',
-
-  instructions: `
-    You are a helpful assistant that can answer questions
-    and help users with various tasks.
-  `,
-
-  tools: [
-    // Add tools here
-  ],
-});
-```
-
-### Local Development
-
-```bash
-starships dev        # Start local development server
-starships chat       # Test your agent in terminal
-```
-
-### Deploy to Production
-
-```bash
+# Deploy to production
 starships deploy
 ```
 
-### Import to Conversational Interface
-
-```bash
-starships import my-first-agent
-# Makes your code agent available for conversational editing
-```
+Perfect for developers who need version control, custom integrations, and automated deployment.
 
 ---
 
-## Why Use Code-First Development?
+## Why Code-First?
 
-<Cards>
-  <Card icon={<Terminal />} title="Full Control">
-    Complete programmatic control over agent configuration, tools, and deployment
-  </Card>
-
-<Card icon={<Code />} title="Version Control">
-  Track changes, collaborate with teams, and manage agent evolution through Git
-</Card>
-
-<Card icon={<Zap />} title="Advanced Integrations">
-  Build complex tools, custom workflows, and enterprise integrations
-</Card>
-
-  <Card icon={<Bot />} title="Scalable Development">
-    Create agent templates, reusable components, and automated deployment pipelines
-  </Card>
-</Cards>
+- **Version Control**: Track changes and collaborate with teams through Git
+- **Advanced Integrations**: Build complex tools and enterprise workflows  
+- **Automated Deployment**: CI/CD pipelines and environment management
+- **Full Control**: Complete programmatic access to all platform features
 
 ---
 
@@ -134,8 +63,11 @@ Chat with Gaia to create your agent through conversation:
 </Step>
 
 <Step>
-  ### Add Custom Tools with Daedalus Build specialized tools for your agents: - "Design a tool that calls our internal API" - Create complex
-  workflows and integrations - Test tool behavior in real conversations
+### Add Custom Tools with Daedalus
+Build specialized tools for your agents:
+- "Design a tool that calls our internal API"
+- Create complex workflows and integrations
+- Test tool behavior in real conversations
 </Step>
 
 <Step>
@@ -149,31 +81,12 @@ When CLI is ready:
 
 ---
 
-## Code-First Advantages (Coming Soon)
+## Advanced Features Coming Soon
 
-### Advanced Features You'll Get:
-
-- **Custom tool development** with full TypeScript support
-- **Blueprint editor integration** for visual + code workflows
-- **Enterprise deployment** options and environment management
-- **Team collaboration** with shared agent repositories
-- **CI/CD integration** for automated testing and deployment
-- **Custom model fine-tuning** and performance optimization
-
-### Development Workflow:
-
-```bash
-# Create and iterate
-starships init project-assistant
-starships dev
-starships chat "Help me plan a project"
-
-# Deploy when ready
-starships deploy --environment production
-
-# Import to conversational interface for easy editing
-starships import project-assistant
-```
+- **TypeScript Support**: Full type safety for tool development
+- **Blueprint Integration**: Visual + code workflow editor
+- **Enterprise Deployment**: Environment management and team collaboration
+- **CI/CD Integration**: Automated testing and deployment pipelines
 
 ---
 

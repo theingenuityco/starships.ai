@@ -46,10 +46,10 @@ This document outlines the disaster recovery process for the Starships.ai produc
   ```
 - **Size:** 30 GB
 - **Type:** gp3 (encrypted with KMS)
-- **Selection Method:** Tag-based (recommended for automatic protection)
-- **Tag Filter:** `kubernetes.io/created-for/pvc/namespace=starships-prod`
+- **Selection Method:** Tag-based (automatic protection for restored volumes)
+- **Tag Filter:** `BackupPolicy=starships-postgres-production`
 
-**Important:** Tag-based selection automatically protects any volume with the matching tag, including restored volumes after disaster recovery.
+**Important:** Tag-based selection automatically protects any volume with the matching tag, including restored volumes after disaster recovery. When restoring from backup, ensure the new volume is tagged with `BackupPolicy=starships-postgres-production` to enable automatic backup protection.
 
 ### IAM Role
 
@@ -223,7 +223,7 @@ NEW_VOLUME_ID=$(aws ec2 create-volume \
   --availability-zone ${NODE_AZ:-ap-south-1a} \
   --volume-type gp3 \
   --encrypted \
-  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=starships-prod-restored-from-backup},{Key=kubernetes.io/created-for/pvc/namespace,Value=starships-prod},{Key=RestoredFrom,Value='$SNAPSHOT_ID'}]' \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=starships-prod-postgres-data},{Key=kubernetes.io/created-for/pvc/namespace,Value=starships-prod},{Key=BackupPolicy,Value=starships-postgres-production},{Key=RestoredFrom,Value='$SNAPSHOT_ID'}]' \
   --region ap-south-1 \
   --query 'VolumeId' \
   --output text)
@@ -363,72 +363,42 @@ echo "✅ Pod is ready! Status: $POD_STATUS"
 kubectl get pods -n starships-prod -l app=starships-ai
 ```
 
-### Step 7: Update AWS Backup Resource Assignment
+### Step 7: Verify AWS Backup Protection
 
-**⚠️ CRITICAL:** After restoring from backup, you must update AWS Backup to protect the new volume.
+**✅ AUTOMATIC PROTECTION:** If you followed Step 4 correctly and tagged the new volume with `BackupPolicy=starships-postgres-production`, the volume is automatically protected. No manual update needed!
 
-**Check current backup selection:**
+**Verify backup protection:**
 ```bash
-# Get backup plan ID
-BACKUP_PLAN_ID=$(aws backup list-backup-plans --region ap-south-1 \
-  --query 'BackupPlansList[?BackupPlanName==`starships-postgres-daily-backup`].BackupPlanId' \
-  --output text)
-
-# Get current selection ID
-SELECTION_ID=$(aws backup list-backup-selections \
-  --backup-plan-id $BACKUP_PLAN_ID \
+# Verify the new volume has the correct backup tag
+aws ec2 describe-volumes \
+  --volume-ids $NEW_VOLUME_ID \
   --region ap-south-1 \
-  --query 'BackupSelectionsList[0].SelectionId' \
-  --output text)
+  --query 'Volumes[0].Tags[?Key==`BackupPolicy`]' \
+  --output table
 
-# Check what's currently protected
-aws backup get-backup-selection \
-  --backup-plan-id $BACKUP_PLAN_ID \
-  --selection-id $SELECTION_ID \
-  --region ap-south-1
+# Expected output: BackupPolicy = starships-postgres-production
 ```
 
-**If using tag-based selection (recommended):** No action needed - the new volume will be automatically protected if it has the correct tag.
-
-**If using volume-ID based selection:** Update to tag-based or new volume ID:
-
+**Check that backups will occur:**
 ```bash
-# Delete old selection
-aws backup delete-backup-selection \
-  --backup-plan-id $BACKUP_PLAN_ID \
-  --selection-id $SELECTION_ID \
-  --region ap-south-1
-
-# Create new tag-based selection (RECOMMENDED)
-aws backup create-backup-selection \
-  --backup-plan-id $BACKUP_PLAN_ID \
-  --backup-selection '{
-    "SelectionName": "postgres-ebs-volume-tags",
-    "IamRoleArn": "arn:aws:iam::'${AWS_ACCOUNT_ID}':role/service-role/AWSBackupDefaultServiceRole",
-    "Resources": ["arn:aws:ec2:*:*:volume/*"],
-    "ListOfTags": [
-      {
-        "ConditionType": "STRINGEQUALS",
-        "ConditionKey": "kubernetes.io/created-for/pvc/namespace",
-        "ConditionValue": "starships-prod"
-      }
-    ]
-  }' \
-  --region ap-south-1
-
-# Verify volumes that will be backed up
+# List all volumes that will be backed up (should only show your new volume)
 aws ec2 describe-volumes \
   --region ap-south-1 \
-  --filters "Name=tag:kubernetes.io/created-for/pvc/namespace,Values=starships-prod" \
-  --query 'Volumes[*].{VolumeId:VolumeId,State:State}' \
+  --filters "Name=tag:BackupPolicy,Values=starships-postgres-production" \
+  --query 'Volumes[*].{VolumeId:VolumeId,Name:Tags[?Key==`Name`]|[0].Value}' \
   --output table
 ```
 
-**Or via AWS Console:**
-1. Go to AWS Backup > Backup plans > starships-postgres-daily-backup
-2. Delete old resource assignment
-3. Click "Assign resources"
-4. Use tag-based selection: `kubernetes.io/created-for/pvc/namespace = starships-prod`
+**If the tag is missing (fix it):**
+```bash
+# Add the backup tag to the new volume
+aws ec2 create-tags \
+  --resources $NEW_VOLUME_ID \
+  --tags Key=BackupPolicy,Value=starships-postgres-production \
+  --region ap-south-1
+
+echo "✅ Backup tag added. Volume will be automatically backed up at next scheduled time (04:00 IST)"
+```
 
 ---
 
@@ -827,6 +797,7 @@ aws backup list-backup-jobs \
 | 1.0 | 2025-10-24 | DevOps Team | Initial version - tested and verified |
 | 1.1 | 2025-10-24 | DevOps Team | Added Step 7: Update AWS Backup after recovery, emphasized tag-based selection |
 | 1.2 | 2025-10-24 | DevOps Team | Security hardening: Removed hardcoded AWS account IDs, resource IDs, and availability zones; Added dynamic lookups, error handling, and credential security notes |
+| 1.3 | 2025-10-25 | DevOps Team | Fixed backup selection to use custom tag `BackupPolicy=starships-postgres-production` for automatic protection after disaster recovery; Updated Step 4 and Step 7 to ensure restored volumes are automatically backed up |
 
 ---
 

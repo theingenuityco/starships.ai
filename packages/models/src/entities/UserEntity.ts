@@ -136,6 +136,11 @@ export class UserEntity implements UserModel {
   @IsBoolean()
   emailVerified?: boolean;
 
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  lastLoginAt?: string;
+
   // Stripe integration
   @Expose()
   @IsOptional()

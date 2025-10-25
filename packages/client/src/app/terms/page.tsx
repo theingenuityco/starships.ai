@@ -44,7 +44,7 @@ export default function TermsOfServicePage() {
               <section>
                 <h2 className="text-2xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  By accessing and using Starships.ai ("Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to these Terms of Service, please do not use our Service.
+                  By accessing and using Starships.ai (&quot;Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to these Terms of Service, please do not use our Service.
                 </p>
               </section>
 
@@ -77,7 +77,7 @@ export default function TermsOfServicePage() {
                     <li>Violate any applicable laws or regulations</li>
                     <li>Infringe upon the rights of others</li>
                     <li>Transmit malicious code, viruses, or harmful components</li>
-                    <li>Attempt to gain unauthorized access to our systems or other users' accounts</li>
+                    <li>Attempt to gain unauthorized access to our systems or other users&apos; accounts</li>
                     <li>Interfere with or disrupt the Service or servers</li>
                     <li>Use the Service for any illegal or unauthorized purpose</li>
                     <li>Engage in activities that could harm minors</li>

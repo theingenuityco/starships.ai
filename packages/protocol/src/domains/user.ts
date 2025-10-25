@@ -24,6 +24,7 @@ export interface UserModel {
   password?: string; // For local authentication
   emailVerified?: boolean; // OAuth email verification
   createdAt: string;
+  lastLoginAt?: string; // Last successful login timestamp
 
   // Stripe integration
   stripeCustomerId?: string;

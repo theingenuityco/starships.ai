@@ -17,9 +17,12 @@ export const metadata: Metadata = {
   title: 'Starships.ai – Ship production AI agents fast',
   description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
   openGraph: {
+    type: 'website',
+    siteName: 'Starships.ai',
     title: 'Starships.ai – Ship production AI agents fast',
     description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
     url: 'https://starships.ai',
+    locale: 'en',
     images: [{ url: '/static-assets/og.png', width: 1200, height: 630 }],
   },
   twitter: {

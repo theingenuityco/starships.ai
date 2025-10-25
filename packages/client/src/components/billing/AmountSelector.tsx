@@ -25,7 +25,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
   const { toast } = useToast()
 
   const currentAmount = useCustom ? Number(customAmount) || 0 : selectedAmount
-  const isValidAmount = currentAmount >= 1 && currentAmount <= 1000
+  const isValidAmount = currentAmount >= 5 && currentAmount <= 1000
 
   const handleTopup = async () => {
     if (!wallet) {
@@ -40,7 +40,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
     if (!isValidAmount) {
       toast({
         title: 'Invalid Amount',
-        description: 'Please enter a valid amount between $1 and $1000.',
+        description: 'Please enter a valid amount between $5 and $1000.',
         variant: 'destructive',
       })
       return
@@ -146,7 +146,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
             placeholder="20.00"
             value={customAmount}
             onChange={e => handleCustomChange(e.target.value)}
-            min="1"
+            min="5"
             max="1000"
             step="0.01"
             className="pl-8 h-12 text-lg font-medium border-2 focus:border-primary transition-colors"
@@ -184,7 +184,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
       {/* Amount validation message */}
       {useCustom && customAmount && !isValidAmount && (
         <div className="text-center p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-xs text-destructive font-medium">Please enter an amount between $1 and $1000</p>
+          <p className="text-xs text-destructive font-medium">Please enter an amount between $5 and $1000</p>
         </div>
       )}
     </div>

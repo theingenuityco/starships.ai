@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { WelcomeModal } from './WelcomeModal'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, useWelcomeModalState } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-
-const WELCOME_MODAL_STORAGE_KEY = 'starships_show_welcome'
-const WELCOME_MODAL_SHOWN_KEY = 'starships_welcome_shown'
 
 export function WelcomeModalProvider({ children }: { children: React.ReactNode }) {
   const [showWelcome, setShowWelcome] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { user, isAuthenticated } = useAuth()
+  const { shouldShow, clearFlag } = useWelcomeModalState()
   const router = useRouter()
 
   useEffect(() => {
@@ -19,32 +17,20 @@ export function WelcomeModalProvider({ children }: { children: React.ReactNode }
   }, [])
 
   useEffect(() => {
-    if (!mounted || typeof window === 'undefined') return
+    if (!mounted) return
 
     // Only check for welcome modal if user is authenticated
-    if (isAuthenticated && user) {
-      const shouldShowWelcome = localStorage.getItem(WELCOME_MODAL_STORAGE_KEY)
-      const pendingWelcome = localStorage.getItem('starships_pending_welcome')
-      const hasShownBefore = localStorage.getItem(WELCOME_MODAL_SHOWN_KEY)
+    if (isAuthenticated && user && shouldShow) {
+      // Small delay to ensure page has loaded
+      const timer = setTimeout(() => {
+        setShowWelcome(true)
+        // Clear the flag from query cache so modal doesn't show again
+        clearFlag()
+      }, 800)
 
-      // Check if we should show the modal (either from OAuth or from email verification)
-      const shouldShow = (shouldShowWelcome === 'true' || pendingWelcome === 'true') && hasShownBefore !== 'true'
-
-      if (shouldShow) {
-        // Small delay to ensure page has loaded
-        const timer = setTimeout(() => {
-          setShowWelcome(true)
-          // Clear the flags so modal doesn't show again
-          localStorage.removeItem(WELCOME_MODAL_STORAGE_KEY)
-          localStorage.removeItem('starships_pending_welcome')
-          // Mark as shown
-          localStorage.setItem(WELCOME_MODAL_SHOWN_KEY, 'true')
-        }, 800)
-
-        return () => clearTimeout(timer)
-      }
+      return () => clearTimeout(timer)
     }
-  }, [mounted, isAuthenticated, user])
+  }, [mounted, isAuthenticated, user, shouldShow, clearFlag])
 
   const handleClose = () => {
     setShowWelcome(false)
@@ -70,11 +56,4 @@ export function WelcomeModalProvider({ children }: { children: React.ReactNode }
       )}
     </>
   )
-}
-
-// Helper function to trigger welcome modal (called from auth hooks)
-export function triggerWelcomeModal() {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(WELCOME_MODAL_STORAGE_KEY, 'true')
-  }
 }

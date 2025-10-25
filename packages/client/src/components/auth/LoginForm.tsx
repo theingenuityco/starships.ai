@@ -211,8 +211,31 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
         </CardHeader>
 
         <CardContent>
+          {/* Terms acceptance - required for all login methods */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Checkbox
+              id="terms-oauth"
+              checked={acceptTerms}
+              onCheckedChange={(checked) => setAcceptTerms(checked === true)}
+              disabled={isLoading}
+            />
+            <label
+              htmlFor="terms-oauth"
+              className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              I agree to the{' '}
+              <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                Privacy Policy
+              </a>
+            </label>
+          </div>
+
           {/* OAuth buttons ABOVE existing tabs */}
-          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
+          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading || !acceptTerms} />
 
           {emailVerificationStatus && (
             <Alert className="mb-3 border-emerald-200 bg-emerald-50/50 backdrop-blur-sm text-center">
@@ -303,28 +326,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                     <AlertDescription>{formError || error}</AlertDescription>
                   </Alert>
                 )}
-
-                <div className="flex items-center justify-center gap-3 pt-1">
-                  <Checkbox
-                    id="terms-login"
-                    checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="terms-login"
-                    className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    By signing in, you agree to our{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Privacy Policy
-                    </a>
-                  </label>
-                </div>
 
                 <Button type="submit" className="w-full h-12" disabled={isLoading || !acceptTerms}>
                   {isLoading ? (
@@ -436,28 +437,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                     <AlertDescription>{formError || error}</AlertDescription>
                   </Alert>
                 )}
-
-                <div className="flex items-center justify-center gap-3 pt-1">
-                  <Checkbox
-                    id="terms-register"
-                    checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="terms-register"
-                    className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    By signing up, you agree to our{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Privacy Policy
-                    </a>
-                  </label>
-                </div>
 
                 <Button type="submit" className="w-full h-12" disabled={isLoading || !acceptTerms}>
                   {isLoading ? (

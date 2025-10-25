@@ -21,6 +21,7 @@ concurrency:
 permissions:
   id-token: write
   contents: read
+  packages: read
 
 jobs:
   deploy-dev:
@@ -63,7 +64,7 @@ jobs:
 
           echo "Checking if image exists: ${IMAGE_URL}"
 
-          # Try to get the manifest for the image
+          # Check if the image manifest exists
           if docker manifest inspect "${IMAGE_URL}" > /dev/null 2>&1; then
             echo "✅ Image found: ${IMAGE_URL}"
             echo "image_exists=true" >> "$GITHUB_OUTPUT"

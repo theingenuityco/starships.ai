@@ -131,6 +131,51 @@ Daedalus uses specialized capabilities to design and build tools:
 
 **<CheckCircle className="inline w-4 h-4" /> Quality Assurance**: Validates workflows, implements security best practices, and ensures tools work reliably across different scenarios.
 
+### The Daedalus Tool Creation Workflow
+
+Every tool creation follows this proven workflow pattern:
+
+```mermaid
+graph TD
+    START([start: User Request]) --> ANALYZE[llm: Analyze Requirements]
+    ANALYZE --> DESIGN[code: Design Architecture]
+    DESIGN --> SCAFFOLD[tool: Create Tool Scaffold]
+
+    SCAFFOLD --> BUILD[tool: Build Blueprint Logic]
+    BUILD --> CONFIG[code: Configure Parameters]
+    CONFIG --> TEST[tool: Test Tool Functionality]
+
+    TEST --> CHECK{conditional: Tests Pass?}
+    CHECK -->|Yes| OPTIMIZE[code: Performance Optimization]
+    CHECK -->|No| DEBUG[llm: Debug & Fix Issues]
+
+    DEBUG --> BUILD
+    OPTIMIZE --> DEPLOY[mutate: Deploy Tool]
+    DEPLOY --> END([end: Tool Ready])
+
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style ANALYZE fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style DESIGN fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style SCAFFOLD fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style BUILD fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style CONFIG fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style TEST fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style OPTIMIZE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style DEBUG fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style DEPLOY fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+```
+
+### How Each Step Works
+
+- **<Brain className="inline w-4 h-4" /> Analyze Requirements**: Daedalus processes your request and identifies the tool's purpose, input/output specifications, and technical constraints
+- **<Code className="inline w-4 h-4" /> Design Architecture**: Plans the blueprint workflow, determines node types needed, and maps data flow patterns
+- **<Wrench className="inline w-4 h-4" /> Create Scaffold**: Builds the basic tool structure with parameter definitions and initial blueprint nodes
+- **<Workflow className="inline w-4 h-4" /> Build Logic**: Implements the core workflow with proper error handling, validation, and business logic
+- **<Settings className="inline w-4 h-4" /> Configure Parameters**: Sets up input validation, output formatting, and environment variable requirements
+- **<CheckCircle className="inline w-4 h-4" /> Test & Optimize**: Validates functionality, optimizes performance, and ensures reliability before deployment
+
 <Callout type="info">
   **Production-Ready Tools**: Daedalus builds tools with comprehensive error handling, security, and performance optimization built-in.
 </Callout>

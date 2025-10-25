@@ -3,6 +3,7 @@
 import { LoginForm } from '@/components/auth/LoginForm'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
+import Icon from '@/components/primitives/Icon'
 import { motion } from 'motion/react'
 import { Suspense, useState } from 'react'
 import * as React from 'react'
@@ -100,7 +101,7 @@ function LoginContent() {
                   transition={{ duration: 0.6, delay: 0.4 }}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-primary text-xl">✓</span>
+                    <Icon name="rocket-launch" className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-gray-200">Rapid agent development & deployment</span>
                 </motion.div>
@@ -111,7 +112,7 @@ function LoginContent() {
                   transition={{ duration: 0.6, delay: 0.6 }}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-primary text-xl">✓</span>
+                    <Icon name="wrench" className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-gray-200">Pre-built tools & customization</span>
                 </motion.div>
@@ -122,7 +123,7 @@ function LoginContent() {
                   transition={{ duration: 0.6, delay: 0.8 }}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-primary text-xl">✓</span>
+                    <Icon name="store" className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-gray-200">Marketplace of agents & tools</span>
                 </motion.div>

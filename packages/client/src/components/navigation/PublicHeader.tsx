@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Orbitron } from 'next/font/google'
@@ -14,6 +14,19 @@ export function PublicHeader(): React.JSX.Element {
   const router = useRouter()
   const [logoTrigger, setLogoTrigger] = useState(0)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [brandCollapsed, setBrandCollapsed] = useState(false)
+
+  // Collapse brand text after scrolling past threshold
+  useEffect(() => {
+    const COLLAPSE_SCROLL_Y = 48
+    const onScroll = () => {
+      const shouldCollapse = window.scrollY > COLLAPSE_SCROLL_Y
+      setBrandCollapsed(shouldCollapse)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
@@ -28,7 +41,13 @@ export function PublicHeader(): React.JSX.Element {
         >
           <span className="flex items-center gap-2">
             <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
-            <span className={`${orbitron.className} text-xl md:text-2xl font-normal tracking-tight leading-none hidden md:inline`}>starships.ai</span>
+            <span
+              className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none transition-all duration-200 ease-out ${
+                brandCollapsed ? 'opacity-0 -translate-x-1 max-w-0 w-0 overflow-hidden' : 'opacity-100 translate-x-0 max-w-[260px] w-auto'
+              }`}
+            >
+              starships.ai
+            </span>
           </span>
         </button>
 
@@ -107,5 +126,3 @@ export function PublicHeader(): React.JSX.Element {
 }
 
 export default PublicHeader
-
-

@@ -29,7 +29,7 @@ export default function TermsOfServicePage() {
               Terms of Service
             </h1>
             <p className="text-muted-foreground text-lg">
-              Last updated: January 2025
+              Last updated: October 2025
             </p>
           </motion.div>
 
@@ -99,13 +99,20 @@ export default function TermsOfServicePage() {
               <section>
                 <h2 className="text-2xl font-semibold text-foreground mb-4">6. Payment and Billing</h2>
                 <div className="space-y-3 text-muted-foreground leading-relaxed">
-                  <p>Certain features of the Service require payment. By purchasing a subscription or credits:</p>
+                  <p>Our Service operates on a prepaid wallet system:</p>
                   <ul className="list-disc pl-6 space-y-2">
-                    <li>You agree to pay all fees associated with your account</li>
-                    <li>All fees are non-refundable unless otherwise specified</li>
-                    <li>We reserve the right to change our pricing with 30 days notice</li>
-                    <li>You are responsible for all applicable taxes</li>
+                    <li><strong>Wallet Top-ups:</strong> You add funds to your starship wallet via Stripe payment</li>
+                    <li><strong>Usage-Based Billing:</strong> Costs are deducted from your wallet balance as you use the Service (LLM API calls, compute time)</li>
+                    <li><strong>Real-Time Deductions:</strong> Usage charges are deducted immediately from your wallet balance</li>
+                    <li><strong>No Subscriptions:</strong> We do not operate on a subscription model - you only pay for what you use</li>
+                    <li><strong>Non-Refundable:</strong> Wallet top-ups are non-refundable unless required by law</li>
+                    <li><strong>Low Balance:</strong> When your wallet balance is low or zero, service functionality may be limited until you add funds</li>
+                    <li><strong>Pricing Changes:</strong> We reserve the right to change usage rates with 30 days advance notice</li>
+                    <li><strong>Taxes:</strong> You are responsible for all applicable taxes and payment processing fees</li>
                   </ul>
+                  <p className="mt-4">
+                    Your wallet balance is specific to each starship. You can view your current balance and transaction history in your starship's billing dashboard.
+                  </p>
                 </div>
               </section>
 
@@ -131,27 +138,117 @@ export default function TermsOfServicePage() {
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground mb-4">10. Termination</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  We may terminate or suspend your account and access to the Service immediately, without prior notice, for any reason, including breach of these Terms. Upon termination, your right to use the Service will immediately cease.
-                </p>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">10. Shared Content and Marketplace</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p>When you share agents, tools, or workflows publicly or via our marketplace:</p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>You grant other users a license to use your shared content according to the terms you specify</li>
+                    <li>You represent that you have the right to share the content and it does not infringe third-party rights</li>
+                    <li>Your API credentials and sensitive data are never shared, even in public agents</li>
+                    <li>We may review shared content for policy violations and remove content that violates these Terms</li>
+                    <li>You remain responsible for the behavior and outputs of agents you share</li>
+                  </ul>
+                  <p className="mt-4">
+                    Content you make public may be used by other users. You can make content private at any time, but previously downloaded versions may remain available to users who obtained them.
+                  </p>
+                </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground mb-4">11. Changes to Terms</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  We reserve the right to modify these Terms at any time. We will notify users of any material changes via email or through the Service. Continued use of the Service after changes constitutes acceptance of the modified Terms.
-                </p>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">11. API and Third-Party Integrations</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p>Our Service allows integration with third-party APIs and services:</p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>You are responsible for obtaining and managing your own API credentials</li>
+                    <li>You must comply with third-party service terms and usage limits</li>
+                    <li>We are not responsible for third-party service availability, changes, or pricing</li>
+                    <li>You are responsible for any costs incurred with third-party services</li>
+                    <li>We store your API credentials encrypted but cannot guarantee absolute security</li>
+                    <li>Rate limits and usage quotas may apply to API calls made through our Service</li>
+                  </ul>
+                </div>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground mb-4">12. Contact Information</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  If you have any questions about these Terms, please contact us at{' '}
-                  <a href="mailto:tech@theingenuity.co" className="text-primary hover:underline">
-                    tech@theingenuity.co
-                  </a>
-                </p>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">12. Account Termination and Data Deletion</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p><strong>Termination by You:</strong></p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>You may delete your account by contacting our support team</li>
+                    <li>Upon account deletion, your data will be permanently removed from active systems (except as required by law)</li>
+                    <li>Running agents will be stopped immediately upon account deletion</li>
+                    <li>Financial records are retained for 7 years for legal compliance</li>
+                    <li>Contact us at tech@theingenuity.co to request account deletion or data export</li>
+                  </ul>
+                  <p className="mt-4"><strong>Termination by Us:</strong></p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>We may suspend or terminate your account for Terms violations</li>
+                    <li>We will provide notice when possible, except for serious violations</li>
+                    <li>Upon termination, you lose access to all Service features</li>
+                    <li>Outstanding fees remain due even after termination</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">13. Service Level and Uptime</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p>While we strive for high availability:</p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>We do not guarantee 100% uptime or uninterrupted service</li>
+                    <li>Scheduled maintenance will be announced in advance when possible</li>
+                    <li>We are not liable for service interruptions due to factors beyond our control</li>
+                    <li>Enterprise customers may have separate SLA agreements</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">14. Governing Law and Disputes</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p>
+                    These Terms shall be governed by and construed in accordance with applicable laws. Any disputes arising from these Terms or the Service shall be resolved through:
+                  </p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>Good faith negotiation first</li>
+                    <li>Mediation if negotiation fails</li>
+                    <li>Arbitration or court proceedings as a last resort</li>
+                  </ul>
+                  <p className="mt-4">
+                    For EU/EEA consumers: You retain your right to bring disputes before the courts in your country of residence.
+                  </p>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">15. Changes to Terms</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p>
+                    We reserve the right to modify these Terms at any time. Material changes will be communicated via:
+                  </p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>Email notification to your registered address</li>
+                    <li>In-app notification when you log in</li>
+                    <li>Updated &quot;Last updated&quot; date at the top of this page</li>
+                  </ul>
+                  <p className="mt-4">
+                    Continued use of the Service after changes constitutes acceptance of the modified Terms. If you do not agree with the changes, you must stop using the Service and may delete your account.
+                  </p>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold text-foreground mb-4">16. Contact Information</h2>
+                <div className="space-y-3 text-muted-foreground leading-relaxed">
+                  <p>If you have any questions about these Terms, please contact us:</p>
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <p><strong>INGENUITY LABS INC</strong></p>
+                    <p>8 THE GREEN STE B</p>
+                    <p>DOVER DE 19901</p>
+                    <p className="mt-3"><strong>Email:</strong></p>
+                    <p><a href="mailto:tech@theingenuity.co" className="text-primary hover:underline">tech@theingenuity.co</a></p>
+                  </div>
+                </div>
               </section>
             </div>
           </motion.div>

@@ -248,6 +248,23 @@ Tools are organized into categories based on their primary function:
 
 [**Daedalus**](/agents/daedalus) is the meta-agent that specializes in creating custom tools through conversation. Build API integrations, data processors, monitoring systems, and automation workflows tailored to your specific needs.
 
+---
+
+## Tool Configuration & Environment Variables
+
+When creating custom tools, you can securely store API keys and configuration using environment variables:
+
+<div className="my-6">
+  <img
+    src="/docs/images/env_variables.png"
+    alt="Environment variable configuration interface showing secure key-value storage for API credentials"
+    className="w-2/3 mx-auto rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">Add environment variables for secure API key storage</div>
+</div>
+
+Securely store API keys, tokens, and credentials that your custom tools can access. Values are encrypted and follow standard naming conventions (uppercase, letters, numbers, underscores).
+
 <Callout type="info">
   **Ready to Create Custom Tools?** Work with [Daedalus](/agents/daedalus) to build tools tailored to your specific needs through natural
   conversation.

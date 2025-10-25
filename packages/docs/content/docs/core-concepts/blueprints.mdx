@@ -141,29 +141,6 @@ The workflow completes at an `end` node, returning structured results back to th
 </Step>
 </Steps>
 
-### Template Expression System
-
-Blueprints use a powerful template system for dynamic data access:
-
-```javascript
-// Access workflow state
-"{{ state.userEmail }}"
-
-// Get outputs from previous nodes  
-"{{ $lastOutputOf('api_call').json.result }}"
-
-// Use helper functions
-"{{ $input('user.preferences') }}"
-
-// Complex expressions with logic
-"{{ state.attempts < 3 ? 'retry' : 'fail' }}"
-```
-
-**Common Template Patterns:**
-- **State Access**: `{{ state.variableName }}` - Access persistent workflow data
-- **Node Outputs**: `{{ $lastOutputOf('nodeRef') }}` - Get results from previous steps
-- **Input Data**: `{{ $input('path.to.data') }}` - Extract specific input values
-- **Environment**: `{{ env('API_KEY') }}` - Access environment variables
 
 <Callout type="info">
   **Deep Integration**: Blueprints are tightly integrated with [agents](/core-concepts/agents) for tool calling and [tools](/core-concepts/tools) for custom functionality. Every interaction in Starships.ai is powered by this workflow system.

@@ -65,12 +65,13 @@ Navigate to the [Marketplace](/core-concepts/marketplace) and explore available 
 </Step>
 
 <Step icon={<Zap />}>
-  ### Deploy a Tool Click on a tool template and select "Deploy". Configure any required API keys or settings, then confirm deployment to
-  your starship.
+### Deploy a Tool
+Click on a tool template and select "Deploy". Configure any required API keys or settings, then confirm deployment to your starship.
 </Step>
 
 <Step icon={<Bot />}>
-  ### Assign to Agent Go to your agent settings and assign the new tool. Agents can now use this tool during conversations automatically.
+### Assign to Agent
+Go to your agent settings and assign the new tool. Agents can now use this tool during conversations automatically.
 </Step>
 
 <Step icon={<CheckCircle />}>
@@ -195,11 +196,6 @@ graph TD
 
 **Use Cases**: Rate-limited APIs, unreliable external services, batch processing tools, file upload handlers
 
-### Choosing the Right Blueprint Type
-
-- **Linear**: Choose for simple, predictable operations with no branching logic needed
-- **Branched**: Choose when you need different processing paths based on input parameters or conditions  
-- **Loop**: Choose when dealing with unreliable external services or need retry/recovery mechanisms
 
 ### Blueprint Node Types
 
@@ -268,27 +264,6 @@ Tools are organized into categories based on their primary function:
 - **Communication**: Email integration, chat platforms, SMS, calendar scheduling
 - **Utilities**: Mathematical operations, time/date tools, text processing, system operations
 
-### Built-in Tools Available Now
-
-**<Calculator className="inline w-4 h-4" /> Calculator**  
-Evaluate mathematical expressions safely with support for complex calculations and unit conversions.
-
-**<Clock className="inline w-4 h-4" /> Time**  
-Current time retrieval with timezone support, date arithmetic, and scheduling helpers.
-
-**<Search className="inline w-4 h-4" /> Wikipedia Search**  
-Search and extract content from Wikipedia with automatic summarization and fact checking.
-
-**<Globe className="inline w-4 h-4" /> DuckDuckGo Search**  
-Web search capabilities with result filtering, ranking, and content extraction.
-
-**<MessageSquare className="inline w-4 h-4" /> Echo**  
-Testing and debugging tool for validating workflows and checking data flow.
-
-**<Cog className="inline w-4 h-4" /> System Tools**  
-File operations, environment checks, and system monitoring capabilities.
-
----
 
 ## Create Custom Tools with Daedalus
 
@@ -301,25 +276,7 @@ File operations, environment checks, and system monitoring capabilities.
   <div className="text-sm text-muted-foreground text-center mt-2">Create tools with parameters and blueprints, or deploy from templates</div>
 </div>
 
-[**Daedalus**](/agents/daedalus) is the meta-agent that specializes in creating, managing, and optimizing tools. Chat with Daedalus to build:
-
-<Cards>
-  <Card icon={<Code />} title="API Integration Tools">
-    **External Service Connections**: Payment processing, communication tools, data services, enterprise systems
-  </Card>
-
-<Card icon={<BarChart />} title="Data Processing Tools">
-  **Complex Data Workflows**: CSV import/export, report generation, format conversion, real-time analysis
-</Card>
-
-<Card icon={<Shield />} title="Monitoring Tools">
-  **System Intelligence**: Uptime monitoring, business metrics, log analysis, security monitoring
-</Card>
-
-  <Card icon={<Workflow />} title="Automation Tools">
-    **Process Orchestration**: Order processing, customer onboarding, document approval, event automation
-  </Card>
-</Cards>
+[**Daedalus**](/agents/daedalus) is the meta-agent that specializes in creating custom tools through conversation. Build API integrations, data processors, monitoring systems, and automation workflows tailored to your specific needs.
 
 <Callout type="info">
   **Ready to Create Custom Tools?** Work with [Daedalus](/agents/daedalus) to build tools tailored to your specific needs through natural
@@ -330,40 +287,9 @@ File operations, environment checks, and system monitoring capabilities.
 
 ## Enterprise Features
 
-### Security & Performance
-
 - **Isolated Execution**: Tools run in separate processes with resource controls
 - **Input Validation**: JSON Schema validation and sanitization
 - **Access Control**: Permission-based tool access per agent
-- **Monitoring**: Comprehensive event system with metrics collection
-
-### Advanced Capabilities
-
 - **Tool Composition**: Tools can call other tools for complex workflows
 - **Dynamic Discovery**: Agents automatically understand new tool capabilities
-- **Enterprise Integration**: OAuth, VPN support, compliance (SOC 2, GDPR, HIPAA)
-- **Template Expression System**: Dynamic data access with `{{ $json.parameter }}` syntax
 
----
-
-## Next Steps
-
-Ready to extend your agents' capabilities?
-
-<Cards>
-  <Card icon={<Search />} title="Browse Tool Marketplace" href="/core-concepts/marketplace">
-    Explore hundreds of ready-to-deploy tool templates
-  </Card>
-
-<Card icon={<Wrench />} title="Create with Daedalus" href="/agents/daedalus">
-  Build custom tools and workflows through conversation
-</Card>
-
-<Card icon={<Bot />} title="Agent Integration" href="/core-concepts/agents">
-  Learn how agents discover and use tools effectively
-</Card>
-
-  <Card icon={<ExternalLink />} title="Blueprint Reference" href="/core-concepts/blueprints">
-    Understand the visual workflow system that powers tools
-  </Card>
-</Cards>

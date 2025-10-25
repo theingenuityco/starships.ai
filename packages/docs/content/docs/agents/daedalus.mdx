@@ -4,15 +4,44 @@ description: The meta-agent that builds custom tools and complex workflows that 
 icon: Code
 ---
 
-<div className="flex justify-end mb-4">
+import {
+  Code,
+  Wrench,
+  Workflow,
+  Settings,
+  CheckCircle,
+  Bot,
+  Network,
+  Cpu,
+  Zap,
+  Brain,
+  Search,
+  BarChart,
+  MessageSquare,
+  Globe,
+} from 'lucide-react';
+
+<Callout type="success">
+  **Build Any Tool**: From simple API integrations to complex multi-system workflows - Daedalus creates production-ready tools through conversation.
+</Callout>
+
+<div className="flex items-center justify-between">
+  <h2>Who is Daedalus?</h2>
   <CopyPageButton />
 </div>
 
-import { Code, Wrench, Workflow, Settings, CheckCircle, Bot, Network, Cpu, Zap, Brain, Search, BarChart, MessageSquare, Globe } from 'lucide-react';
-
-# Daedalus - Tool Creator
-
 The technical specialist that builds custom tools and workflows through conversation. Unlike using existing tools, Daedalus creates specialized capabilities that any agent can use to solve complex technical challenges.
+
+<div className="my-8">
+  <img
+    src="/docs/images/tools.png"
+    alt="Tool creation interface showing parameters, blueprints, and template deployment options"
+    className="w-full rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Create tools with parameters and blueprints, or deploy from templates
+  </div>
+</div>
 
 ---
 
@@ -21,27 +50,35 @@ The technical specialist that builds custom tools and workflows through conversa
 <Steps>
 <Step icon={<MessageSquare />}>
 ### Describe Your Need
-Tell Daedalus what you want: "Create a tool that sends Slack notifications" and Daedalus begins the technical design process.
+Tell Daedalus: "Create a tool that sends formatted Slack notifications with error handling"
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Be Detailed**: Include functionality, format, and reliability requirements upfront
 </Step>
 
 <Step icon={<Code />}>
 ### Technical Planning
-Daedalus asks about requirements, error handling, and integration details while designing the optimal workflow architecture.
+Daedalus asks about requirements and integration details while designing the workflow.
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Share Context**: Mention authentication methods, rate limits, and integration needs
 </Step>
 
 <Step icon={<CheckCircle />}>
 ### Build and Test
-Daedalus creates the tool with proper validation, testing, and documentation, ready for any agent to use.
+Daedalus creates the tool with validation, testing, and documentation ready for agents.
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Set Success Criteria**: Define "working" - delivery confirmation, success rate, response time
 </Step>
 
 <Step icon={<Wrench />}>
 ### Deploy and Assign
-Your custom tool becomes available for assignment to agents, extending their capabilities with your specific requirements.
+Your tool becomes available for assignment to agents with your specific requirements.
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Start Simple**: Deploy basic functionality first, then add features based on usage
 </Step>
 </Steps>
 
 <Callout type="info">
-**Technical Expertise Included**: Daedalus handles complex workflow design, error handling, and optimization automatically.
+  **Technical Expertise Included**: Daedalus handles complex workflow design, error handling, and optimization automatically.
 </Callout>
 
 ---
@@ -56,26 +93,12 @@ Daedalus is a **meta-agent builder** - an AI that creates the technical building
 - **<Cpu className="inline w-4 h-4" /> Performance Optimization**: Building fast, scalable solutions
 
 
-
-## When to Use Daedalus
-
-**Perfect for**:
-- Custom tool development that existing tools can't handle
-- Complex workflow automation with branching logic and error handling
-- API integrations and data processing pipelines
-- Extending agent capabilities with domain-specific tools
-- Technical problem solving requiring custom business logic
-
-**Alternative approaches**:
-- **[Gaia](/agents/gaia)**: Creating conversational agents and business process automation
-- **[Existing Tools](/core-concepts/tools)**: When standard functionality already exists
-- **Code-First Development**: When you need full programmatic control and CI/CD integration
-
 ## How Daedalus Creates Tools
 
 ### Requirement Analysis and Design
 
 **Technical Specification Gathering**:
+
 ```
 You: "Create a tool that validates email addresses and checks domain reputation"
 
@@ -87,6 +110,7 @@ Daedalus: "I'll build an email validation tool. Let me confirm requirements:
 ```
 
 **Architecture Planning**:
+
 ```
 Daedalus designs:
 1. Input validation node
@@ -107,17 +131,8 @@ Daedalus uses specialized capabilities to design and build tools:
 
 **<CheckCircle className="inline w-4 h-4" /> Quality Assurance**: Validates workflows, implements security best practices, and ensures tools work reliably across different scenarios.
 
-<div className="my-8">
-  <img 
-    src="/docs/images/tools.png" 
-    alt="Tool creation interface showing parameters, blueprints, and template deployment options" 
-    className="w-full rounded-lg border border-border/20 shadow-lg"
-  />
-  <div className="text-sm text-muted-foreground text-center mt-2">Create tools with parameters and blueprints, or deploy from templates</div>
-</div>
-
 <Callout type="info">
-**Production-Ready Tools**: Daedalus builds tools with comprehensive error handling, security, and performance optimization built-in.
+  **Production-Ready Tools**: Daedalus builds tools with comprehensive error handling, security, and performance optimization built-in.
 </Callout>
 
 ## Daedalus Creation Examples
@@ -128,9 +143,11 @@ Daedalus uses specialized capabilities to design and build tools:
 ### Slack Notification Tool
 
 **Your Request**:
+
 > "Create a tool that sends formatted messages to Slack channels with error handling"
 
 **Daedalus's Process**:
+
 1. **Requirements Analysis**: Clarifies message formats, channels, authentication methods
 2. **Workflow Design**: Creates validate → format → authenticate → send → handle-response flow
 3. **Error Handling**: Implements retry logic, rate limiting, and fallback strategies
@@ -144,9 +161,11 @@ Daedalus uses specialized capabilities to design and build tools:
 ### CSV Database Import
 
 **Your Request**:
+
 > "Build a tool that processes CSV files and imports data to our database safely"
 
 **Daedalus's Process**:
+
 1. **Data Flow Design**: Creates upload → parse → validate → transform → insert → report workflow
 2. **Validation Logic**: Implements data type checking, constraint validation, and business rules
 3. **Performance Optimization**: Adds batch processing, streaming, and memory management
@@ -160,9 +179,11 @@ Daedalus uses specialized capabilities to design and build tools:
 ### Uptime Monitor
 
 **Your Request**:
+
 > "Create a monitoring tool that checks website uptime and sends intelligent alerts"
 
 **Daedalus's Process**:
+
 1. **Monitoring Architecture**: Designs scheduled checks with response analysis and alerting
 2. **Health Logic**: Implements status determination based on response codes, timing, and content
 3. **Alert Management**: Creates escalation rules, recovery notifications, and multi-channel alerts
@@ -176,9 +197,11 @@ Daedalus uses specialized capabilities to design and build tools:
 ### Order Processing Workflow
 
 **Your Request**:
+
 > "Build a tool that handles complex order processing with multiple system integrations"
 
 **Daedalus's Process**:
+
 1. **System Integration**: Maps connections to inventory, payment, CRM, and shipping systems
 2. **Business Rules**: Implements validation, pricing logic, and approval workflows
 3. **Compensation Logic**: Creates rollback strategies for partial failures
@@ -189,96 +212,3 @@ Daedalus uses specialized capabilities to design and build tools:
 </Tab>
 </Tabs>
 
-## Tool Design Principles
-
-**Single Responsibility**: Each tool does one thing exceptionally well rather than trying to handle multiple unrelated functions
-
-**Reliable Error Handling**: Comprehensive handling of invalid inputs, network failures, authentication issues, and unexpected responses
-
-**Performance Optimization**: Minimal response times, efficient resource usage, proper timeout handling, and batch processing capabilities
-
-**Security by Design**: Input validation, secure credential handling, audit logging, and permission-based access control
-
-### Common Workflow Patterns
-
-**API Integration**: authenticate → validate-input → make-request → handle-response → format-output → log-activity
-
-**Data Processing**: receive-data → validate-format → transform → apply-business-rules → store-results → notify-completion
-
-**Monitoring**: schedule → check-status → compare-thresholds → determine-action → execute-response → update-state
-
-## Advanced Capabilities
-
-**Multi-System Integration**: Orchestrates complex workflows across multiple systems with compensation logic for partial failures
-
-**Performance Optimization**: Implements intelligent caching, parallel processing, and resource management for enterprise-scale operations
-
-**Error Recovery**: Creates sophisticated rollback and retry strategies for mission-critical workflows
-
-## Tool Lifecycle
-
-**Development Process**: Prototype → Testing → Optimization → Documentation → Production deployment with monitoring
-
-**Version Management**: Semantic versioning with clear upgrade paths and backward compatibility
-
-**Continuous Improvement**: Performance monitoring, user feedback integration, and automated security updates
-
-## Integration with Agents
-
-**Automatic Assignment**: When [Gaia](/agents/gaia) creates agents, Daedalus tools are automatically considered for relevant capabilities
-
-**Manual Assignment**: Add custom tools to existing agents by simply requesting the assignment
-
-**Shared Tool Library**: Tools built by Daedalus become available to all agents, ensuring consistent behavior and centralized updates
-
-## Common Issues and Solutions
-
-**Performance Problems**: Daedalus can optimize tools by adding caching, batch processing, and parallel execution
-
-**Integration Failures**: Debug authentication issues and implement comprehensive retry logic
-
-**Workflow Issues**: Add error handling, alternative paths, and monitoring to complex blueprints
-
-**Advanced Debugging**: Daedalus analyzes bottlenecks, identifies error patterns, and suggests architectural improvements
-
----
-
-## Next Steps
-
-<Cards>
-  <Card
-    icon={<Wrench />}
-    title="Start Building Tools"
-    href="/getting-started"
-  >
-    Begin creating your first custom tool with Daedalus
-  </Card>
-  
-  <Card
-    icon={<Bot />}
-    title="Create Agents"
-    href="/agents/gaia"
-  >
-    Work with Gaia to create agents that use your tools
-  </Card>
-  
-  <Card
-    icon={<Search />}
-    title="Explore Tool Templates"
-    href="/core-concepts/marketplace"
-  >
-    Browse existing tool templates and patterns
-  </Card>
-  
-  <Card
-    icon={<Globe />}
-    title="Understand Tools"
-    href="/core-concepts/tools"
-  >
-    Learn how tools work within the agent framework
-  </Card>
-</Cards>
-
-<Callout type="info">
-  **Ready to Build?** Find Daedalus in your starship's agent marketplace and start creating custom tools and workflows that extend your agents' capabilities.
-</Callout>

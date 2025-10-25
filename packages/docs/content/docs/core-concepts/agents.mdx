@@ -4,10 +4,6 @@ description: The AI agent framework that powers intelligent, autonomous assistan
 icon: Bot
 ---
 
-<div className="flex justify-end mb-4">
-  <CopyPageButton />
-</div>
-
 import {
   Bot,
   Code,
@@ -28,7 +24,10 @@ import {
   Construction,
 } from 'lucide-react';
 
-## What Are Agents?
+<div className="flex items-center justify-between">
+  <h2>What Are Agents?</h2>
+  <CopyPageButton />
+</div>
 
 **Agents** are AI assistants that combine language understanding, tool usage, and memory. Unlike simple chatbots, agents can:
 
@@ -41,7 +40,7 @@ Think of agents as **AI teammates** that work independently within defined bound
 
 <div className="my-8">
   <video className="w-full rounded-lg border border-border/20 shadow-lg" src="/docs/images/demo.webm" autoPlay loop muted playsInline />
-  <p className="text-sm text-muted-foreground text-center mt-2">See the full Starships.ai platform in action</p>
+  <div className="text-sm text-muted-foreground text-center mt-2">See the full Starships.ai platform in action</div>
 </div>
 
 ---
@@ -87,34 +86,13 @@ graph TD
 
 ### How Each Node Works
 
-- <span style={{ color: '#0066cc' }}>
-    **[start](/core-concepts/blueprints#start-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Receives input and triggers agent execution
-- <span style={{ color: '#0066cc' }}>
-    **[llm](/core-concepts/blueprints#llm-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Processes requests using AI models, decides on tool usage
-- <span style={{ color: '#0066cc' }}>
-    **[conditional](/core-concepts/blueprints#conditional-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Routes execution based on LLM decisions (tools vs. response)
-- <span style={{ color: '#0066cc' }}>
-    **[code](/core-concepts/blueprints#code-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Prepares data and formats tool arguments for execution
-- <span style={{ color: '#0066cc' }}>
-    **[tool](/core-concepts/blueprints#tool-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Executes capabilities like API calls, data processing
-- <span style={{ color: '#0066cc' }}>
-    **[mutate](/core-concepts/blueprints#mutate-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Updates memory with tool results for next LLM cycle
-- <span style={{ color: '#0066cc' }}>
-    **[end](/core-concepts/blueprints#end-node)** <ExternalLink className="inline w-3 h-3" />
-  </span>
-  : Returns response when agent has complete answer
+- <span style={{color: '#0066cc'}}>**[start](/core-concepts/blueprints#start-node)**</span> <ExternalLink className="inline w-3 h-3" />: Receives input and triggers agent execution
+- <span style={{color: '#0066cc'}}>**[llm](/core-concepts/blueprints#llm-node)**</span> <ExternalLink className="inline w-3 h-3" />: Processes requests using AI models, decides on tool usage
+- <span style={{color: '#0066cc'}}>**[conditional](/core-concepts/blueprints#conditional-node)**</span> <ExternalLink className="inline w-3 h-3" />: Routes execution based on LLM decisions (tools vs. response)
+- <span style={{color: '#0066cc'}}>**[code](/core-concepts/blueprints#code-node)**</span> <ExternalLink className="inline w-3 h-3" />: Prepares data and formats tool arguments for execution
+- <span style={{color: '#0066cc'}}>**[tool](/core-concepts/blueprints#tool-node)**</span> <ExternalLink className="inline w-3 h-3" />: Executes capabilities like API calls, data processing
+- <span style={{color: '#0066cc'}}>**[mutate](/core-concepts/blueprints#mutate-node)**</span> <ExternalLink className="inline w-3 h-3" />: Updates memory with tool results for next LLM cycle
+- <span style={{color: '#0066cc'}}>**[end](/core-concepts/blueprints#end-node)**</span> <ExternalLink className="inline w-3 h-3" />: Returns response when agent has complete answer
 
 <Callout type="info">
   **Blueprint vs. Creation**: This diagram shows how agents execute tasks internally using blueprints. For how meta-agents like Gaia create

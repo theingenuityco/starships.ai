@@ -4,10 +4,6 @@ description: Discover, deploy, and customize pre-built agents and tools with one
 icon: Store
 ---
 
-<div className="flex justify-end mb-4">
-  <CopyPageButton />
-</div>
-
 import {
   Store,
   Download,
@@ -38,7 +34,10 @@ import {
   **Deploy in 30 seconds**: From discovery to deployment, get powerful AI capabilities running on your starship instantly.
 </Callout>
 
-## What is the Marketplace?
+<div className="flex items-center justify-between">
+  <h2>What is the Marketplace?</h2>
+  <CopyPageButton />
+</div>
 
 The Marketplace is Starships.ai's **template ecosystem** - a curated collection of production-ready agents and tools that you can deploy instantly. Instead of building from scratch:
 
@@ -58,7 +57,7 @@ The Marketplace is Starships.ai's **template ecosystem** - a curated collection 
     alt="Marketplace interface showing agent templates with search, categories, and one-click deployment"
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">The Marketplace: Search, filter, and deploy agents and tools instantly</p>
+  <div className="text-sm text-muted-foreground text-center mt-2">The Marketplace: Search, filter, and deploy agents and tools instantly</div>
 </div>
 
 ---
@@ -111,9 +110,9 @@ Each template card shows:
     alt="Agent template detail view showing usage statistics, system prompt inspection, and interactive blueprint workflow visualization"
     className="w-1/2 mx-auto rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">
+  <div className="text-sm text-muted-foreground text-center mt-2">
     Template deep dive: Complete agent information with system prompt and blueprint visualization
-  </p>
+  </div>
 </div>
 
 Click any template to see detailed information:
@@ -138,9 +137,9 @@ Click any template to see detailed information:
     alt="Deployment confirmation modal showing template details, destination starship, and model information before deployment"
     className="w-2/3 mx-auto rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">
+  <div className="text-sm text-muted-foreground text-center mt-2">
     Deployment confirmation: Review template details and destination before one-click deployment
-  </p>
+  </div>
 </div>
 
 Deployment is simple and automatic:
@@ -162,9 +161,9 @@ Deployment is simple and automatic:
     alt="Tools marketplace section showing automation tools with code examples and installation status"
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
-  <p className="text-sm text-muted-foreground text-center mt-2">
+  <div className="text-sm text-muted-foreground text-center mt-2">
     Tool templates: Reusable capabilities with code examples and one-click installation
-  </p>
+  </div>
 </div>
 
 ### <Bot className="inline w-5 h-5" /> Agent Templates
@@ -200,17 +199,17 @@ Ready to enhance your starship's capabilities?
     Explore hundreds of ready-to-deploy agents and tools
   </Card>
 
-  <Card icon={<Bot />} title="Create with Gaia" href="/agents/gaia">
-    Build custom agents through conversation with our meta-agent
-  </Card>
+<Card icon={<Bot />} title="Create with Gaia" href="/agents/gaia">
+  Build custom agents through conversation with our meta-agent
+</Card>
 
-  <Card icon={<Wrench />} title="Build with Daedalus" href="/agents/daedalus">
-    Create custom tools and workflows with our tool creator
-  </Card>
+<Card icon={<Wrench />} title="Build with Daedalus" href="/agents/daedalus">
+  Create custom tools and workflows with our tool creator
+</Card>
 
-  <Card icon={<Search />} title="Getting Started Guide" href="/getting-started">
-    Complete setup and building guide for new users
-  </Card>
+<Card icon={<Search />} title="Getting Started Guide" href="/getting-started">
+  Complete setup and building guide for new users
+</Card>
 
   <Card icon={<ExternalLink />} title="Agent Architecture" href="/core-concepts/agents">
     Understand how agents work under the hood

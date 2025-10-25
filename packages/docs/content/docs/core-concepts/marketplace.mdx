@@ -1,0 +1,210 @@
+---
+title: Marketplace
+description: Discover, deploy, and customize pre-built agents and tools with one-click deployment
+icon: Store
+---
+
+import {
+  Store,
+  Download,
+  Star,
+  Users,
+  Zap,
+  Shield,
+  Search,
+  Bot,
+  Wrench,
+  Sparkles,
+  CheckCircle,
+  ExternalLink,
+  Globe,
+  Code,
+  Lightbulb,
+  BarChart,
+  HeartPulse,
+  Package,
+  Workflow,
+  Database,
+  MessageSquare,
+  Settings,
+  Brain,
+} from 'lucide-react';
+
+<Callout type="success">
+  **Deploy in 30 seconds**: From discovery to deployment, get powerful AI capabilities running on your starship instantly.
+</Callout>
+
+<div className="flex items-center justify-between">
+  <h2>What is the Marketplace?</h2>
+  <CopyPageButton />
+</div>
+
+The Marketplace is Starships.ai's **template ecosystem** - a curated collection of production-ready agents and tools that you can deploy instantly. Instead of building from scratch:
+
+- **<Search className="inline w-4 h-4" /> Discover** proven solutions for your specific use case
+- **<Zap className="inline w-4 h-4" /> Deploy** with one click to your starship
+- **<Settings className="inline w-4 h-4" /> Customize** after deployment to match your exact needs
+- **<BarChart className="inline w-4 h-4" /> Scale** with enterprise-grade templates built by experts
+
+
+<div className="my-8">
+  <img
+    src="/docs/images/marketplace.png"
+    alt="Marketplace interface showing agent templates with search, categories, and one-click deployment"
+    className="w-full rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">The Marketplace: Search, filter, and deploy agents and tools instantly</div>
+</div>
+
+---
+
+## Getting Started: Your First Template Deployment
+
+<Steps>
+<Step icon={<Search />}>
+### Browse the Marketplace
+Navigate to the Marketplace and explore available templates. Use categories to narrow down to your use case.
+</Step>
+
+<Step icon={<Zap />}>
+### Select Your Template
+Click on a template that matches your needs. Review the detailed information, preview prompts, and requirements.
+</Step>
+
+<Step icon={<Sparkles />}>
+### Deploy with One Click
+Click "Deploy" and confirm your selection. The template will be automatically converted to a running instance on your starship.
+</Step>
+
+<Step icon={<CheckCircle />}>
+### Start Using Immediately
+Your new agent or tool is ready to use! Access it through your starship's interface and begin your first conversation. Learn more about the [universal agent architecture](/core-concepts/agents#universal-agent-architecture).
+</Step>
+</Steps>
+
+---
+
+## Discover Templates
+
+Find the perfect template with powerful search and filtering:
+
+- **<Search className="inline w-4 h-4" /> Universal Search**: Real-time search across names, descriptions, and capabilities
+- **<Package className="inline w-4 h-4" /> 9 Categories**: Coding, Creative, Analysis, Support, Integration, Automation, Data, Communication, General
+- **<BarChart className="inline w-4 h-4" /> Smart Sorting**: Most popular, recently updated, best ratings
+
+Each template card shows:
+
+- **Agent Templates**: Avatar, category, description, model info, usage stats, preview prompts
+- **Tool Templates**: Icon, configuration needs, code examples, integration notes
+
+---
+
+## Template Details
+
+<div className="my-6">
+  <img
+    src="/docs/images/agent_template.png"
+    alt="Agent template detail view showing usage statistics, system prompt inspection, and interactive blueprint workflow visualization"
+    className="w-1/2 mx-auto rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Template deep dive: Complete agent information with system prompt and blueprint visualization
+  </div>
+</div>
+
+Click any template to see detailed information:
+
+- **<Settings className="inline w-4 h-4" /> System Prompt**: View and copy the exact prompt that defines agent behavior
+- **<BarChart className="inline w-4 h-4" /> Usage Analytics**: Community adoption metrics, ratings, and feedback
+- **<Workflow className="inline w-4 h-4" /> Blueprint Visualization**: Interactive workflow diagrams showing decision processes
+- **<MessageSquare className="inline w-4 h-4" /> Preview Prompts**: Test conversations before deployment
+
+<Callout type="info">
+  **Blueprint Visualization**: Advanced templates include visual workflow diagrams showing exactly how agents process requests and use
+  tools. Learn more about [blueprint architecture](/core-concepts/blueprints).
+</Callout>
+
+---
+
+## One-Click Deployment
+
+<div className="my-6">
+  <img
+    src="/docs/images/agent_deploy.png"
+    alt="Deployment confirmation modal showing template details, destination starship, and model information before deployment"
+    className="w-2/3 mx-auto rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Deployment confirmation: Review template details and destination before one-click deployment
+  </div>
+</div>
+
+Deployment is simple and automatic:
+
+1. **Select Template** → Review capabilities and requirements
+2. **Confirm Deployment** → Verify template, starship, and model details
+3. **Automatic Installation** → Template converts to active instance, tools install automatically
+4. **Ready to Use** → Instant availability with optimal settings
+
+**Behind the Scenes**: Templates deploy with modular design, automatic dependency management, rollback protection, and security validation.
+
+---
+
+## Agents vs Tools
+
+<div className="my-6">
+  <img
+    src="/docs/images/marketplace_tools.png"
+    alt="Tools marketplace section showing automation tools with code examples and installation status"
+    className="w-full rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Tool templates: Reusable capabilities with code examples and one-click installation
+  </div>
+</div>
+
+<div className="overflow-x-auto my-6">
+  <table className="w-full border-collapse bg-fd-card rounded-xl shadow-sm">
+    <thead>
+      <tr className="bg-gradient-to-r from-fd-muted/40 to-fd-muted/20 border-b border-fd-border">
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50 first:rounded-tl-xl">Template Type</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">Description</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground border-r border-fd-border/50">What's Included</th>
+        <th className="px-6 py-4 text-left font-semibold text-fd-foreground last:rounded-tr-xl">Result</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-fd-border/50">
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <Bot className="w-5 h-5 mr-3 text-blue-600" />
+            <a href="/core-concepts/agents" className="font-semibold text-fd-foreground hover:text-blue-600 hover:underline transition-colors">Agents</a>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Complete AI assistants with personality, memory, and capabilities</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">System prompt, model configuration, tool suite, memory setup</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">New agent in your starship ready for conversation</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50 last:rounded-bl-xl">
+          <div className="flex items-center">
+            <Wrench className="w-5 h-5 mr-3 text-green-600" />
+            <a href="/core-concepts/tools" className="font-semibold text-fd-foreground hover:text-green-600 hover:underline transition-colors">Tools</a>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Standalone capabilities that extend agent functionality</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Function definition, configuration schema, usage examples</td>
+        <td className="px-6 py-4 text-fd-muted-foreground last:rounded-br-xl">New tool in your library, assignable to any agent</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+---
+
+## Quality & Customization
+
+- **<CheckCircle className="inline w-4 h-4 text-green-600" /> Enterprise-Grade Quality**: All templates undergo security review, functionality testing, and community validation before publication.
+
+- **<Settings className="inline w-4 h-4 text-blue-600" /> Fully Customizable**: Once deployed, edit system prompts, add/remove tools, adjust model settings, and configure memory to match your exact needs.
+

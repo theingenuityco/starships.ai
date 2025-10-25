@@ -1,0 +1,233 @@
+---
+title: Gaia - Agent Creator
+description: The meta-agent that creates specialized business and operational agents through natural conversation
+icon: Globe
+---
+
+import { Globe, MessageSquare, Settings, CheckCircle, Wrench, Bot, Workflow, Zap, Brain, Search, BarChart } from 'lucide-react';
+
+<Callout type="success">
+  **Create Agents in Minutes**: From conversation to deployment - Gaia builds custom agents that understand your business through natural language.
+</Callout>
+
+<div className="flex items-center justify-between">
+  <h2>Who is Gaia?</h2>
+  <CopyPageButton />
+</div>
+
+The conversational specialist that creates and configures other agents through natural language interaction. Unlike code-first development, Gaia transforms business requirements into working agents through conversation.
+
+<div className="my-8">
+  <img
+    src="/docs/images/gaia.png"
+    alt="Gaia conversational interface for creating and configuring agents through natural language"
+    className="w-full rounded-lg border border-border/20 shadow-lg"
+  />
+  <div className="text-sm text-muted-foreground text-center mt-2">Create agents through natural conversation with Gaia</div>
+</div>
+
+
+---
+
+## Getting Started: Your First Agent
+
+<Steps>
+<Step icon={<MessageSquare />}>
+### Start a Conversation
+Tell Gaia: "Create a customer support agent that handles login issues and routes complex bugs to human support"
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Be Specific**: Include your use case and key capabilities upfront
+</Step>
+
+<Step icon={<Settings />}>
+### Refine Through Conversation
+Gaia asks clarifying questions. Answer with business context and specific requirements.
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Provide Context**: "Use a professional tone, similar to our current support team"
+</Step>
+
+<Step icon={<CheckCircle />}>
+### Test and Deploy
+Gaia validates the configuration. Test with real scenarios, then deploy to your team.
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Test Real Cases**: Try "I can't log in" to ensure proper responses
+</Step>
+
+<Step icon={<Workflow />}>
+### Iterate and Improve
+Add capabilities based on actual usage patterns and performance data.
+
+**<CheckCircle className="inline w-4 h-4 text-green-600" /> Start Simple**: Begin with core functions, expand based on real needs
+</Step>
+</Steps>
+
+<Callout type="info">
+  **No Technical Skills Required**: Gaia handles all the technical complexity while you focus on describing what you need in plain language.
+</Callout>
+
+---
+
+## What Makes Gaia Special
+
+Gaia is a **meta-agent** - an AI that specializes in building other AIs through conversation. Gaia understands:
+
+- **<Brain className="inline w-4 h-4" /> Agent Architecture**: How to structure agents for optimal performance
+- **<Wrench className="inline w-4 h-4" /> Tool Selection**: Which capabilities each agent needs for specific tasks
+- **<MessageSquare className="inline w-4 h-4" /> Business Context**: How to translate requirements into agent configurations
+- **<CheckCircle className="inline w-4 h-4" /> Best Practices**: Proven patterns for successful agent deployment
+
+
+## How Gaia Creates Agents
+
+### Conversation-Driven Creation
+
+**Natural Language Requirements**:
+
+```
+You: "I need an agent that helps with customer onboarding"
+
+Gaia: "I'll create a customer onboarding agent. Let me ask a few questions:
+- What type of customers are you onboarding?
+- What systems should the agent access?
+- What's the typical onboarding workflow?"
+```
+
+**Progressive Refinement**:
+
+```
+You: "Actually, it should also handle billing questions"
+
+Gaia: "Adding billing capabilities. I'll assign these tools:
+- Customer lookup
+- Billing system integration
+- Escalation workflows for complex billing issues
+Would you like me to configure specific billing scenarios?"
+```
+
+### The Gaia Agent Creation Workflow
+
+Every agent creation follows this proven workflow pattern:
+
+```mermaid
+graph TD
+    START([start: User Request]) --> ANALYZE[llm: Analyze Requirements]
+    ANALYZE --> DISCOVER[tool: Discover Available Tools]
+    DISCOVER --> CREATE[tool: Create Agent Structure]
+
+    CREATE --> ASSIGN[tool: Assign Relevant Tools]
+    ASSIGN --> VALIDATE[tool: Validate Configuration]
+    VALIDATE --> TEST[tool: Test Agent Functionality]
+
+    TEST --> CHECK{conditional: Tests Pass?}
+    CHECK -->|Yes| DEPLOY[mutate: Deploy Agent]
+    CHECK -->|No| REFINE[llm: Suggest Improvements]
+
+    REFINE --> ASSIGN
+    DEPLOY --> END([end: Agent Ready])
+
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style ANALYZE fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style DISCOVER fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style CREATE fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style ASSIGN fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style VALIDATE fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style TEST fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style DEPLOY fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+    style REFINE fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+```
+
+### How Each Step Works
+
+- **<Brain className="inline w-4 h-4" /> Analyze Requirements**: Gaia processes your natural language request and identifies the agent's purpose, capabilities needed, and success criteria
+- **<Search className="inline w-4 h-4" /> Discover Tools**: Searches available tools and capabilities that match the agent's requirements
+- **<Settings className="inline w-4 h-4" /> Create Structure**: Builds the agent's core configuration, system prompt, and behavioral guidelines
+- **<Wrench className="inline w-4 h-4" /> Assign Tools**: Selects and configures the optimal tool set for the agent's specific use case
+- **<CheckCircle className="inline w-4 h-4" /> Validate & Test**: Ensures the agent configuration works correctly and meets requirements
+- **<Bot className="inline w-4 h-4" /> Deploy**: Makes the agent available for use with full functionality
+
+<Callout type="info">
+  **Iterative Refinement**: If tests don't pass, Gaia automatically suggests improvements and refines the configuration until the agent
+  works perfectly.
+</Callout>
+
+---
+
+## Gaia Creation Examples
+
+<Tabs items={['Customer Support', 'Content Research', 'Finance Automation', 'Learning Assistant']}>
+<Tab value="Customer Support">
+
+### Customer Support Agent
+
+**Your Request**:
+
+> "Create a customer support agent for our SaaS platform that handles login issues, feature questions, and routes complex bugs to human support"
+
+**Gaia's Process**:
+
+1. **Requirement Analysis**: Asks about your product, common issues, escalation rules
+2. **Tool Selection**: Assigns knowledge base search, ticket creation, user lookup tools
+3. **Workflow Design**: Creates support → analyze → resolve → escalate workflow
+4. **Testing**: Validates responses with sample scenarios
+
+**Result**: Production-ready support agent that reduces ticket volume by 60%
+
+</Tab>
+<Tab value="Content Research">
+
+### Research Assistant
+
+**Your Request**:
+
+> "Build a research assistant that helps me write technical blog posts by gathering information from academic papers and creating structured outlines"
+
+**Gaia's Process**:
+
+1. **Source Configuration**: Sets up arXiv, PubMed, and academic database access
+2. **Analysis Tools**: Adds fact-checking, citation management, and summarization
+3. **Output Integration**: Configures Notion or Google Docs for structured output
+4. **Quality Controls**: Implements source verification and bias detection
+
+**Result**: Research agent that produces well-sourced, structured content drafts
+
+</Tab>
+<Tab value="Finance Automation">
+
+### Finance Tracker
+
+**Your Request**:
+
+> "Create a spending tracker that monitors my bank transactions and sends alerts when I overspend in any category"
+
+**Gaia's Process**:
+
+1. **Bank Integration**: Sets up secure Plaid connection for transaction data
+2. **Categorization**: Configures expense categorization and budget tracking
+3. **Alert System**: Creates notification rules for spending thresholds
+4. **Reporting**: Adds monthly summary and trend analysis
+
+**Result**: Automated finance agent that keeps budgets on track with real-time insights
+
+</Tab>
+<Tab value="Learning Assistant">
+
+### Study Assistant
+
+**Your Request**:
+
+> "Build a study assistant that creates flashcards from my notes and reminds me when to review them"
+
+**Gaia's Process**:
+
+1. **Content Processing**: Sets up text analysis for note extraction
+2. **Flashcard Generation**: Configures question-answer pair creation
+3. **Spaced Repetition**: Implements optimal review scheduling
+4. **Progress Tracking**: Adds performance analytics and insights
+
+**Result**: Learning agent that improves retention through scientific review scheduling
+
+</Tab>
+</Tabs>
+

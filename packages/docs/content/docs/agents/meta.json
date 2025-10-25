@@ -1,0 +1,6 @@
+{
+  "title": "Agents",
+  "icon": "Bot",
+  "description": "Specialized AI assistants and meta-agents",
+  "pages": ["gaia", "daedalus"]
+}

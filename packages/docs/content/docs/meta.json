@@ -1,6 +1,7 @@
 {
   "pages": [
     "getting-started",
-    "core-concepts"
+    "core-concepts",
+    "agents"
   ]
 }

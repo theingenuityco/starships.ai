@@ -1,168 +1,109 @@
 ---
-title: Quickstart
-description: Build and deploy your first AI agent in 5 minutes
+title: CLI Quickstart
+description: Build and deploy agents using code with full programmatic control - coming soon
 icon: Zap
 ---
 
+import { Terminal, Code, Zap, Bot, Wrench, MessageSquare } from 'lucide-react';
 
-## Installation
+<div className="flex items-center justify-between">
+  <h2>CLI Quickstart</h2>
+  <CopyPageButton />
+</div>
 
-First, install the Starships CLI:
-
-<Tabs items={['npm', 'yarn', 'pnpm']}>
-<Tab value="npm">
-
-```bash
-npm install -g @starships/cli
-```
-
-</Tab>
-<Tab value="yarn">
-
-```bash
-yarn global add @starships/cli
-```
-
-</Tab>
-<Tab value="pnpm">
-
-```bash
-pnpm add -g @starships/cli
-```
-
-</Tab>
-</Tabs>
-
-Verify the installation:
-
-```bash
-starships --version
-```
-
-## Authentication
-
-Log in to your Starships.ai account:
-
-```bash
-starships login
-```
-
-This will open your browser to authenticate. Once complete, you're ready to build!
-
-## Create Your First Agent
-
-Initialize a new project:
-
-```bash
-starships init my-first-agent
-cd my-first-agent
-```
-
-This creates a project with the following structure:
-
-<Files>
-  <Folder name="my-first-agent" defaultOpen>
-    <File name="starships.config.ts" />
-    <File name="agent.ts" />
-    <File name="package.json" />
-    <Folder name="tools">
-      <File name="example.ts" />
-    </Folder>
-  </Folder>
-</Files>
-
-## Configure Your Agent
-
-Open `agent.ts` and customize your agent:
-
-```typescript title="agent.ts"
-import { defineAgent } from '@starships/sdk';
-
-export default defineAgent({
-  name: 'my-assistant',
-  description: 'A helpful AI assistant',
-  model: 'gpt-4-turbo',
-
-  instructions: `
-    You are a helpful assistant that can answer questions
-    and help users with various tasks.
-  `,
-
-  tools: [
-    // Add tools here
-  ],
-});
-```
-
-## Test Locally
-
-Run your agent in development mode:
-
-```bash
-starships dev
-```
-
-Interact with your agent in the terminal:
-
-```bash
-starships chat
-```
-
-<Callout type="info">
-  The `dev` command starts a local server with hot reload. Changes to your agent are applied immediately.
+<Callout type="warning" title="Coming Soon">
+  CLI package for programmatic agent creation is in active development and will be available soon.
 </Callout>
 
-## Deploy to Production
+Build agents programmatically using our CLI and SDK - perfect for developers who want full control and integration capabilities.
 
-When you're ready, deploy your agent:
+---
+
+## What You'll Be Able To Do
+
+When the CLI is ready, you'll have code-first development capabilities:
 
 ```bash
+# Install and authenticate
+npm install -g @starships/cli
+starships login
+
+# Create and develop
+starships init my-agent
+starships dev
+
+# Deploy to production
 starships deploy
 ```
 
-You'll receive a unique URL for your agent:
+Perfect for developers who need version control, custom integrations, and automated deployment.
 
-```bash
-✓ Deployed successfully!
-  URL: https://my-first-agent-abc123.starships.ai
-  API: https://api.starships.ai/v1/agents/abc123
-```
+---
 
-## Make API Calls
+## Why Code-First?
 
-Use your agent via API:
+- **Version Control**: Track changes and collaborate with teams through Git
+- **Advanced Integrations**: Build complex tools and enterprise workflows  
+- **Automated Deployment**: CI/CD pipelines and environment management
+- **Full Control**: Complete programmatic access to all platform features
 
-```typescript title="example.ts"
-const response = await fetch('https://api.starships.ai/v1/agents/abc123/chat', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    message: 'Hello, agent!',
-  }),
-});
+---
 
-const data = await response.json();
-console.log(data.message);
-```
+## Current Alternative: Start with Conversation
 
-## Next Steps
+While you're waiting for CLI tools, **start building today** with our conversational interface. You'll be able to **import and extend** these agents with code later:
 
-Congratulations! You've deployed your first AI agent. Here's what to explore next:
+<Steps>
+<Step>
+### Build with Gaia Now
+Chat with Gaia to create your agent through conversation:
+- "Create a customer support agent for our SaaS product"
+- Get immediate results and learn the platform
+- Test and iterate quickly
+</Step>
+
+<Step>
+### Add Custom Tools with Daedalus
+Build specialized tools for your agents:
+- "Design a tool that calls our internal API"
+- Create complex workflows and integrations
+- Test tool behavior in real conversations
+</Step>
+
+<Step>
+### Export to Code Later
+When CLI is ready:
+- Export your conversational agents to code projects
+- Add version control and advanced customization
+- Deploy through automated pipelines
+</Step>
+</Steps>
+
+---
+
+## Advanced Features Coming Soon
+
+- **TypeScript Support**: Full type safety for tool development
+- **Blueprint Integration**: Visual + code workflow editor
+- **Enterprise Deployment**: Environment management and team collaboration
+- **CI/CD Integration**: Automated testing and deployment pipelines
+
+---
+
+## Get Started Today
+
+Don't wait for code-first tools - **start building now** with conversation and transition to code later:
 
 <Cards>
-  <Card title="Add Tools" href="/guides/tools">
-    Give your agent superpowers with custom tools
+  <Card icon={<MessageSquare />} title="Start Building Now" href="/getting-started">
+    Create agents through conversation today
   </Card>
-  <Card title="Memory & Context" href="/guides/memory">
-    Make your agent remember conversations
-  </Card>
-  <Card title="Streaming" href="/guides/streaming">
-    Implement real-time streaming responses
-  </Card>
-  <Card title="Monitoring" href="/guides/monitoring">
-    Track usage, performance, and costs
+
+<Card icon={<Bot />} title="Chat with Gaia" href="/agents/gaia">
+  Build your first agent in minutes
+</Card>
+
+  <Card icon={<Wrench />} title="Chat with Daedalus" href="/agents/daedalus">
+    Create custom tools and workflows
   </Card>
 </Cards>

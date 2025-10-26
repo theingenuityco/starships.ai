@@ -9,7 +9,6 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: 'Starships.ai',
       transparentMode: 'top',
-      disableThemeSwitch: true,
     },
     links: [
       {

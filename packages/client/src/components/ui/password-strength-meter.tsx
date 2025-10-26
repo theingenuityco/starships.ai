@@ -66,7 +66,7 @@ export function PasswordStrengthMeter({
   if (!password) return null
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       {/* Compact strength indicator */}
       <div className="flex items-center gap-2">
         <div className="flex-1">
@@ -85,13 +85,33 @@ export function PasswordStrengthMeter({
         </span>
       </div>
 
-      {/* Ultra-compact inline requirements */}
-      <div className="flex items-center gap-1 text-xs">
-        <RequirementDot met={requirements.minLength} text="8+" />
-        <RequirementDot met={requirements.hasUppercase} text="A" />
-        <RequirementDot met={requirements.hasLowercase} text="a" />
-        <RequirementDot met={requirements.hasNumber} text="1" />
-        <RequirementDot met={requirements.hasSpecial} text="!@" />
+      {/* Full requirements list */}
+      <div className="space-y-1">
+        <RequirementItem
+          met={requirements.minLength}
+          text="At least 8 characters"
+          compact
+        />
+        <RequirementItem
+          met={requirements.hasUppercase}
+          text="One uppercase letter"
+          compact
+        />
+        <RequirementItem
+          met={requirements.hasLowercase}
+          text="One lowercase letter"
+          compact
+        />
+        <RequirementItem
+          met={requirements.hasNumber}
+          text="One number"
+          compact
+        />
+        <RequirementItem
+          met={requirements.hasSpecial}
+          text="One special character"
+          compact
+        />
       </div>
     </div>
   )

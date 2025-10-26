@@ -356,8 +356,8 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               </form>
             </TabsContent>
 
-            <TabsContent value="register" className="space-y-3">
-              <form onSubmit={handleRegister} className="space-y-3">
+            <TabsContent value="register" className="space-y-2">
+              <form onSubmit={handleRegister} className="space-y-2">
                 <div className="space-y-1">
                   <Label htmlFor="register-name">Full Name</Label>
                   <Input

@@ -8,19 +8,48 @@ import { motion } from 'motion/react'
 import { Suspense, useState } from 'react'
 import * as React from 'react'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { isValidRedirectUrl } from '@/lib/utils'
+import { useUserStarships } from '@/hooks/useStarships'
 
 function LoginContent() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, user } = useAuth()
   const [activeTab, setActiveTab] = useState('login')
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Fetch user's starships when authenticated
+  const { data: starships, isLoading: starshipsLoading } = useUserStarships(
+    user?.id || '',
+    isAuthenticated && !!user?.id
+  )
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Redirect authenticated users to their starship
+  React.useEffect(() => {
+    if (mounted && isAuthenticated && !isLoading && !starshipsLoading) {
+      // Handle redirect with returnUrl pattern
+      const returnUrl = searchParams?.get('returnUrl')
+
+      if (returnUrl && isValidRedirectUrl(returnUrl)) {
+        router.push(returnUrl)
+      } else if (starships && starships.length > 0) {
+        // Redirect to the first starship's conversations
+        router.push(`/ship/${starships[0].slug}/conversations`)
+      } else {
+        // If no starship available, redirect to profile which handles starship creation
+        router.push('/profile')
+      }
+    }
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams])
+
   // Show loading state while checking authentication or mounting
-  if (!mounted || isLoading) {
+  if (!mounted || isLoading || (isAuthenticated && starshipsLoading)) {
     return <AuthLoadingScreen message="Loading..." />
   }
 

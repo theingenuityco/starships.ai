@@ -143,6 +143,7 @@ jobs:
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           DOCS_URL: ${{ vars.DOCS_URL }}
           GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
+          USERBACK_TOKEN: ${{ vars.USERBACK_TOKEN }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
           GH_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
           GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
@@ -177,6 +178,7 @@ jobs:
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
             --from-literal=DOCS_URL="$DOCS_URL" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
+            --from-literal=USERBACK_TOKEN="$USERBACK_TOKEN" \
             --from-literal=RUNNER_AUTH_TOKEN="$RUNNER_AUTH_TOKEN" \
             --from-literal=EMAIL_FROM_ADDRESS="$EMAIL_FROM_ADDRESS" \
             --from-literal=EMAIL_FROM_NAME="$EMAIL_FROM_NAME" \

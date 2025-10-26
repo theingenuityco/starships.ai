@@ -1,6 +1,46 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import MarketplacePageClient from './MarketplacePageClient'
 import PublicHeader from '@/components/navigation/PublicHeader'
+
+export const metadata: Metadata = {
+  title: 'Starships.ai - Marketplace',
+  description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
+  alternates: {
+    canonical: 'https://starships.ai/marketplace',
+  },
+  keywords: [
+    'AI agents marketplace',
+    'agent templates',
+    'AI tools',
+    'automation templates',
+    'pre-built agents',
+    'AI marketplace',
+    'agent library',
+  ],
+  openGraph: {
+    type: 'website',
+    siteName: 'Starships.ai',
+    title: 'Starships.ai - Marketplace',
+    description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
+    url: 'https://starships.ai/marketplace',
+    locale: 'en_US',
+    images: [
+      {
+        url: '/static-assets/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'Starships.ai Marketplace',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Starships.ai - Marketplace',
+    description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
+    images: ['/static-assets/og.png'],
+  },
+}
 
 export default function MarketplacePage() {
   return (

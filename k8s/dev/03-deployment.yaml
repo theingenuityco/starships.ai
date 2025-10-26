@@ -192,6 +192,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
+            - name: USERBACK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: USERBACK_TOKEN
             - name: GH_OAUTH_CLIENT_ID
               valueFrom:
                 secretKeyRef:

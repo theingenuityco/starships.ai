@@ -13,9 +13,11 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
+import { useCreateConversation } from '@/hooks/useConversations'
 import type { AgentModel } from '@starships/protocol'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 
 interface AgentSelectorProps {
   selectedAgent: AgentModel | null
@@ -32,10 +34,15 @@ interface FilterState {
 }
 
 export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton = true, showFilters = true, starshipId, onAgentsCountChange }: AgentSelectorProps) {
+  const router = useRouter()
+  const params = useParams()
+  const starshipSlug = params.slug as string
+  
   // TanStack Query hooks
   const { data, isLoading: loading, error: agentsError } = useStarshipAgents(starshipId || '', !!starshipId)
   const agents = useMemo(() => data ?? [], [data])
   const deleteAgentMutation = useDeleteAgent()
+  const createConversationMutation = useCreateConversation()
 
   const [filteredAgents, setFilteredAgents] = useState<AgentModel[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -196,6 +203,28 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     setAnalyticsAgent(null)
   }
 
+  const handleChatWithAgent = async (agent: AgentModel) => {
+    if (!starshipId) {
+      setError('No starship available to create conversation')
+      return
+    }
+
+    try {
+      // Create a new conversation with the selected agent
+      const conversation = await createConversationMutation.mutateAsync({
+        starshipId,
+        agentId: agent.id,
+        title: `Chat with ${agent.name}`
+      })
+
+      // Navigate to the new conversation
+      router.push(`/ship/${starshipSlug}/conversations/${conversation.id}`)
+    } catch (error) {
+      console.error('Failed to create conversation:', error)
+      setError('Failed to start conversation with agent')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-6">
@@ -293,7 +322,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
-            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} onChat={() => onAgentSelect(agent)} />
+            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} onChat={() => handleChatWithAgent(agent)} />
           ))}
         </div>
       )}

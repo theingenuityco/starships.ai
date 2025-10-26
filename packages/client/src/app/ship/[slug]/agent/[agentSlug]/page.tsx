@@ -41,6 +41,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // After tool execution completes, fetch and sync agent data once
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
 
+  // Track initial message count to only process NEW messages (prevents infinite loop on remount)
+  const initialMessageCountRef = useRef<number | null>(null)
+
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
     if (!conversationId) return
@@ -289,6 +292,69 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       }
     }
   }, [conversationId, liveMessages, agentSlug, slug, router])
+  // Detect tool creation via streaming and navigate to tool page
+  useEffect(() => {
+    if (!conversationId || !liveMessages.length) return
+
+    // On first render, record initial message count and don't process
+    if (initialMessageCountRef.current === null) {
+      initialMessageCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process if new messages have arrived
+    if (liveMessages.length <= initialMessageCountRef.current) {
+      return
+    }
+
+    // Tool-related tool slugs to monitor
+    const toolRelatedSlugs = new Set([
+      'tool-open',
+      'tool-edit',
+      'tool-add-blueprint-node',
+      'tool-remove-blueprint-node',
+      'tool-add-blueprint-edge',
+      'tool-remove-blueprint-edge',
+      'tool-update-node',
+      'tool-assign-mcp',
+      'tool-unassign-mcp',
+    ])
+
+    // Process only NEW messages (those after initial count)
+    const newMessages = liveMessages.slice(initialMessageCountRef.current)
+
+    for (const msg of newMessages as any[]) {
+      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+
+      for (const toolCall of msg.toolCalls as any[]) {
+        const funcName = toolCall?.function?.name as string | undefined
+        if (!funcName || !toolRelatedSlugs.has(funcName)) continue
+
+        // Parse arguments
+        let args: any = toolCall?.function?.arguments
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args)
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        // Extract tool slug from arguments (check both slug and toolSlug, default to 'new')
+        const toolSlug = args?.slug || args?.toolSlug || 'new'
+
+        // Don't navigate if we're somehow trying to navigate to ourselves
+        if (toolSlug === agentSlug) {
+          continue
+        }
+
+        // Construct URL with conversationId query param if present
+        const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+        router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+        return
+      }
+    }
+  }, [conversationId, liveMessages, slug, router, agentSlug])
 
   // Prefill when editing an existing agent
   useEffect(() => {

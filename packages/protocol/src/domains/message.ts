@@ -25,6 +25,9 @@ export interface Message extends LlmMessage {
   messageType: MessageType;
   // Optional model-provided reasoning/thinking text
   reasoning?: string;
+  // Agent tracking fields (assistant messages only)
+  agentId?: string;
+  agentName?: string;
 }
 
 /**
@@ -32,7 +35,7 @@ export interface Message extends LlmMessage {
  * Extends Message from autopilot with additional database/persistence fields
  */
 export interface MessageModel extends Message {
-  // Additional database fields (Message already has id, timestamp, role, content, metadata)
+  // Additional database fields (Message already has id, timestamp, role, content, metadata, agentId, agentName)
   id: string;
   createdAt: string;
   updatedAt: string;

@@ -24,18 +24,20 @@ import {
 } from 'lucide-react';
 
 <Callout type="success">
-  **Visual Workflow Engine**: Blueprints power every agent interaction - from simple conversations to complex multi-step automations through an intuitive node-based system.
+  **Visual Workflow Engine**: Blueprints power every agent interaction - from simple conversations to complex multi-step automations through
+  an intuitive node-based system.
 </Callout>
 
-<div className="flex items-center justify-between">
-  <h2>What Are Blueprints?</h2>
+<div style={{ position: 'relative', marginTop: '-160px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
   <CopyPageButton />
 </div>
+
+## What Are Blueprints?
 
 **Blueprints** are the visual workflow system that powers how [agents](/core-concepts/agents) and [tools](/core-concepts/tools) execute tasks. Every conversation, tool call, and automation in Starships.ai runs through blueprints - making them the foundational execution engine of the platform.
 
 - **<Workflow className="inline w-4 h-4" /> Visual Workflows**: Node-based system for building complex logic without code
-- **<Brain className="inline w-4 h-4" /> Intelligent Execution**: AI-driven decision making with conditional branching  
+- **<Brain className="inline w-4 h-4" /> Intelligent Execution**: AI-driven decision making with conditional branching
 - **<Wrench className="inline w-4 h-4" /> Tool Integration**: Seamless connection to external APIs and services
 - **<Database className="inline w-4 h-4" /> State Management**: Persistent data flow across multi-step processes
 
@@ -57,17 +59,17 @@ Every blueprint follows the same core execution pattern, regardless of complexit
 graph TD
     START([start: Workflow Entry]) --> PROCESS[Processing Node]
     PROCESS --> DECISION{conditional: Decision Point}
-    
+
     DECISION -->|True| ACTION1[Action Node]
     DECISION -->|False| ACTION2[Alternative Action]
-    
+
     ACTION1 --> MERGE[Data Processing]
     ACTION2 --> MERGE
-    
+
     MERGE --> CHECK{conditional: More Steps?}
     CHECK -->|Yes| PROCESS
     CHECK -->|No| END([end: Return Result])
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style PROCESS fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
@@ -100,16 +102,12 @@ The workflow begins with the `start` node, which receives input data and initial
 </Step>
 
 <Step icon={<Network />}>
-### Process Nodes
-Each node executes in sequence, with data flowing along edges. Nodes can be:
-- **Processing** (transform data, make API calls)
-- **Decision** (branch based on conditions)  
-- **Integration** (call tools, external services)
+  ### Process Nodes Each node executes in sequence, with data flowing along edges. Nodes can be: - **Processing** (transform data, make API
+  calls) - **Decision** (branch based on conditions) - **Integration** (call tools, external services)
 </Step>
 
 <Step icon={<Database />}>
-### Manage State
-State persists across nodes, allowing complex data transformations and multi-step processes to maintain context.
+  ### Manage State State persists across nodes, allowing complex data transformations and multi-step processes to maintain context.
 </Step>
 
 <Step icon={<CheckCircle />}>
@@ -124,22 +122,24 @@ Blueprints use simple expressions to pass data between workflow steps:
 
 ```javascript
 // Access workflow state
-"{{ state.userEmail }}"
+'{{ state.userEmail }}';
 
 // Get results from previous nodes
-"{{ $lastOutputOf('api_call').json }}"
+"{{ $lastOutputOf('api_call').json }}";
 
 // Use input data
-"{{ $input('message') }}"
+"{{ $input('message') }}";
 ```
 
 **Common Patterns:**
+
 - **State Variables**: `{{ state.variableName }}` - Access persistent workflow data
 - **Node Results**: `{{ $lastOutputOf('nodeRef') }}` - Get outputs from previous steps
 - **Input Access**: `{{ $input('path') }}` - Extract data from workflow input
 
 <Callout type="info">
-  **Deep Integration**: Blueprints are tightly integrated with [agents](/core-concepts/agents) for tool calling and [tools](/core-concepts/tools) for custom functionality. Every interaction in Starships.ai is powered by this workflow system.
+  **Deep Integration**: Blueprints are tightly integrated with [agents](/core-concepts/agents) for tool calling and
+  [tools](/core-concepts/tools) for custom functionality. Every interaction in Starships.ai is powered by this workflow system.
 </Callout>
 
 ---
@@ -312,7 +312,7 @@ graph TD
     FETCH --> PROCESS[code: Process Data]
     PROCESS --> SAVE[http_request: Save Result]
     SAVE --> END([end: Return Success])
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
@@ -330,19 +330,19 @@ For workflows requiring different paths based on data or conditions:
 ```mermaid
 graph TD
     START([start]) --> CHECK{conditional: Check Type}
-    
+
     CHECK -->|User| USER_FLOW[llm: User Response]
     CHECK -->|System| SYS_FLOW[code: System Process]
     CHECK -->|Admin| ADMIN_FLOW[tool: Admin Tool]
-    
+
     USER_FLOW --> FORMAT_USER[transform: Format User]
     SYS_FLOW --> FORMAT_SYS[transform: Format System]
     ADMIN_FLOW --> FORMAT_ADMIN[transform: Format Admin]
-    
+
     FORMAT_USER --> END([end: Return Result])
     FORMAT_SYS --> END
     FORMAT_ADMIN --> END
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
@@ -365,17 +365,17 @@ graph TD
     START([start]) --> INIT[mutate: Initialize Counter]
     INIT --> ATTEMPT[http_request: API Call]
     ATTEMPT --> SUCCESS{conditional: Success?}
-    
+
     SUCCESS -->|Yes| PROCESS[transform: Process Result]
     SUCCESS -->|No| RETRY{conditional: Can Retry?}
-    
+
     RETRY -->|Yes| WAIT[code: Exponential Backoff]
     RETRY -->|No| ERROR([end: Return Error])
-    
+
     WAIT --> INCREMENT[mutate: Increment Counter]
     INCREMENT --> ATTEMPT
     PROCESS --> END([end: Return Success])
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style ERROR fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#dc2626
@@ -398,8 +398,6 @@ Blueprints power real automation workflows in the [marketplace](/core-concepts/m
 
 - **RAG Search & Chat**: Multi-step vector search with AI-powered response generation
 - **Support Ticket Triage**: Automated classification and routing based on content analysis
-- **Lead Enrichment**: Sequential API calls to gather and consolidate customer data  
+- **Lead Enrichment**: Sequential API calls to gather and consolidate customer data
 - **Content Moderation**: Parallel processing with rule-based and AI-powered validation
 - **API Orchestrator**: Complex multi-service coordination with error handling
-
-

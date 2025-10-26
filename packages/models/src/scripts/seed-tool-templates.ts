@@ -11,7 +11,7 @@ import { ALL_TOOL_TEMPLATES } from '@/seeders/tools';
 
 /**
  * Seeds the database with default tool templates
- * Safe to run multiple times (idempotent via slug upsert behavior)
+ * Safe to run multiple times - skips existing templates to avoid overwriting production data
  */
 export async function seedToolTemplates(): Promise<void> {
   try {
@@ -34,19 +34,9 @@ export async function seedToolTemplates(): Promise<void> {
         const existing = await toolTemplateRepo.findBySlug(slug);
 
         if (existing) {
-          // Update core fields to propagate any fixes or improvements
-          await toolTemplateRepo.update(existing.id, {
-            name: template.name,
-            description: template.description,
-            parameters: template.parameters,
-            blueprint: template.blueprint,
-            category: template.category,
-            exampleUsage: template.exampleUsage,
-            requiresApiKey: template.requiresApiKey,
-            configurationFields: template.configurationFields,
-          });
+          // Skip existing templates to avoid overwriting production data
+          logger.info(`Tool template already exists, skipping: ${template.name} (slug: ${slug})`);
           updatedCount++;
-          logger.info(`Tool template updated: ${template.name} (slug: ${slug})`);
         } else {
           // Create new template
           const payload: CreateToolTemplateRequest = {
@@ -70,7 +60,7 @@ export async function seedToolTemplates(): Promise<void> {
       }
     }
 
-    logger.info(`✅ Tool template seeding completed: ${addedCount} new, ${updatedCount} updated, ${errorCount} errors`);
+    logger.info(`✅ Tool template seeding completed: ${addedCount} new, ${updatedCount} skipped, ${errorCount} errors`);
   } catch (error) {
     logger.error(`Failed to seed tool templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
     if (error instanceof Error) {

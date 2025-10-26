@@ -40,14 +40,7 @@ const frontendProxyOptions: Options = {
 // Health check endpoint for the proxy itself
 app.get('/_proxy/health', (req, res) => {
   res.json({
-    status: 'healthy',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    routes: {
-      frontend: FRONTEND_URL,
-      backend: BACKEND_URL,
-      docs: DOCS_URL,
-    },
+    status: 'ok',
   });
 });
 

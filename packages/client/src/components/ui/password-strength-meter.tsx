@@ -85,8 +85,8 @@ export function PasswordStrengthMeter({
         </span>
       </div>
 
-      {/* Full requirements list */}
-      <div className="space-y-1">
+      {/* Requirements in two columns */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
         <RequirementItem
           met={requirements.minLength}
           text="At least 8 characters"
@@ -112,6 +112,8 @@ export function PasswordStrengthMeter({
           text="One special character"
           compact
         />
+        {/* Empty div to balance the grid if needed */}
+        <div></div>
       </div>
     </div>
   )

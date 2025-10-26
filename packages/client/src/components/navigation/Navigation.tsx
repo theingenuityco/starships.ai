@@ -244,18 +244,13 @@ export function Navigation(props: NavigationProps) {
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
 
-  // Handle logo click - smart navigation based on context
+  // Handle logo click - navigate to landing screen
   const handleLogoClick = () => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
-
-    if (starshipSlug) {
-      // Go to overview if we have a starship
-      router.push(`/ship/${starshipSlug}`)
-    } else {
-      // Go to marketplace as default for authenticated users without starships
-      router.push('/marketplace')
-    }
+    
+    // Always go to landing screen
+    router.push('/')
   }
 
   // Floating mode - expandable layout
@@ -269,7 +264,7 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Compact Header with Theme Toggle */}
         <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Navigate to Overview">
+          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Go to Landing Screen">
             <StarshipsLogo
               width={36}
               height={36}

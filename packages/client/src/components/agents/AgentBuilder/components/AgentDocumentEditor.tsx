@@ -232,9 +232,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Quick selectors: Category and Model */}
-      <div className="grid grid-cols-1 gap-2">
+      <div className="space-y-2">
         {/* Category quick picker */}
-        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
+        <div className="flex items-center justify-start gap-2 px-2 h-9 w-fit">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="tag" className="w-4 h-4" />
             <span className="text-xs font-semibold w-36">Category</span>
@@ -275,32 +275,34 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           </DropdownMenu>
         </div>
 
-        {/* Model quick picker */}
-        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Icon name="cpu" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Model</span>
+        {/* Model and Tools row */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Model quick picker */}
+          <div className="flex items-center justify-start gap-2 px-2 h-9 min-w-0">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Icon name="cpu" className="w-4 h-4" />
+              <span className="text-xs font-semibold w-36">Model</span>
+            </div>
+            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
+              <SelectTrigger className="h-7 w-[180px] text-xs rounded-xl">
+                <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+              </SelectTrigger>
+              <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
+                {availableModels.map(m => (
+                  <SelectItem key={m} value={m} className="text-xs px-2 py-1">
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
-            <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
-              <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
-            </SelectTrigger>
-            <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-              {availableModels.map(m => (
-                <SelectItem key={m} value={m} className="text-xs px-2 py-1">
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {/* Assigned tools */}
-        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Icon name="wrench" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Assigned Tools</span>
-          </div>
-          <Popover>
+          {/* Assigned tools */}
+          <div className="flex items-center justify-start gap-2 px-2 h-9 min-w-0">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Icon name="wrench" className="w-4 h-4" />
+              <span className="text-xs font-semibold w-36">Assigned Tools</span>
+            </div>
+            <Popover>
             <PopoverTrigger asChild>
               <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
                 {selectedToolSlugs.length === 0 ? (
@@ -355,6 +357,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </Command>
             </PopoverContent>
           </Popover>
+          </div>
         </div>
       </div>
 

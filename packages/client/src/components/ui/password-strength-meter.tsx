@@ -66,8 +66,8 @@ export function PasswordStrengthMeter({
   if (!password) return null
 
   return (
-    <div className={cn('space-y-1', className)}>
-      {/* Ultra-compact inline strength meter */}
+    <div className="relative group">
+      {/* Compact strength indicator */}
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
@@ -80,25 +80,69 @@ export function PasswordStrengthMeter({
             />
           </div>
         </div>
-        <span className={cn('text-xs font-medium whitespace-nowrap min-w-[60px]', strength.color)}>
+        <span className={cn('text-xs font-medium whitespace-nowrap', strength.color)}>
           {strength.label}
         </span>
       </div>
 
-      {/* Ultra-compact Requirements - all in one line with dots */}
-      {showRequirements && (
-        <div className="flex items-center gap-1 text-xs flex-wrap">
-          <RequirementDot met={requirements.minLength} text="8+" />
-          <span className="text-muted-foreground/50">•</span>
-          <RequirementDot met={requirements.hasUppercase} text="A" />
-          <span className="text-muted-foreground/50">•</span>
-          <RequirementDot met={requirements.hasLowercase} text="a" />
-          <span className="text-muted-foreground/50">•</span>
-          <RequirementDot met={requirements.hasNumber} text="1" />
-          <span className="text-muted-foreground/50">•</span>
-          <RequirementDot met={requirements.hasSpecial} text="!@" />
+      {/* Popup tooltip that appears on hover/focus */}
+      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full mr-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-50">
+        <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[240px]">
+          {/* Strength header */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-foreground">Password Strength</span>
+            <span className={cn('text-sm font-medium', strength.color)}>
+              {strength.label}
+            </span>
+          </div>
+          
+          {/* Requirements list */}
+          <div className="space-y-2">
+            <RequirementItem
+              met={requirements.minLength}
+              text="At least 8 characters"
+            />
+            <RequirementItem
+              met={requirements.hasUppercase}
+              text="One uppercase letter"
+            />
+            <RequirementItem
+              met={requirements.hasLowercase}
+              text="One lowercase letter"
+            />
+            <RequirementItem
+              met={requirements.hasNumber}
+              text="One number"
+            />
+            <RequirementItem
+              met={requirements.hasSpecial}
+              text="One special character (!@#$%...)"
+            />
+          </div>
+
+          {/* Feedback messages */}
+          {strength.feedback.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              {strength.feedback.map((message, index) => (
+                <p
+                  key={index}
+                  className={cn(
+                    'text-xs',
+                    strength.score >= 3 ? 'text-green-600' : 'text-muted-foreground'
+                  )}
+                >
+                  {message}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+        
+        {/* Arrow pointing to the progress bar */}
+        <div className="absolute top-1/2 -translate-y-1/2 right-0 translate-x-full">
+          <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45 -translate-x-1"></div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -125,18 +169,23 @@ function RequirementDot({ met, text }: { met: boolean; text: string }) {
 
 function RequirementItem({ met, text, compact = false }: { met: boolean; text: string; compact?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-1.5", compact && "min-h-[18px]")}>
-      <Icon
-        name={met ? 'check-circle' : 'circle'}
-        className={cn(
-          compact ? 'h-3 w-3' : 'h-3.5 w-3.5',
-          met ? 'text-green-600' : 'text-muted-foreground'
-        )}
-      />
+    <div className={cn("flex items-center gap-2", compact && "min-h-[18px]")}>
+      <div className={cn(
+        "flex items-center justify-center rounded-full flex-shrink-0",
+        compact ? 'h-3 w-3' : 'h-4 w-4',
+        met ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+      )}>
+        <Icon
+          name={met ? 'check' : 'x'}
+          className={cn(
+            compact ? 'h-2 w-2' : 'h-2.5 w-2.5'
+          )}
+        />
+      </div>
       <span
         className={cn(
-          'text-xs',
-          met ? 'text-green-600' : 'text-muted-foreground'
+          'text-sm',
+          met ? 'text-green-700' : 'text-red-600'
         )}
       >
         {text}

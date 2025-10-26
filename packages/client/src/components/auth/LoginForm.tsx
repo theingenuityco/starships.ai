@@ -411,12 +411,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                       {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
-                  {/* Reserved space for password strength meter to prevent layout shift */}
-                  <div className="min-h-[32px]">
-                    {registerData.password && (
-                      <PasswordStrengthMeter password={registerData.password} />
-                    )}
-                  </div>
+                  {registerData.password && (
+                    <PasswordStrengthMeter password={registerData.password} />
+                  )}
                 </div>
 
                 <div className="space-y-1">

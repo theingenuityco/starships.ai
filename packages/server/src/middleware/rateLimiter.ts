@@ -15,52 +15,52 @@ import { logger } from '@/utils/logger';
  * Based on enterprise patterns from Stripe, AWS, and GitHub
  */
 const RATE_LIMIT_TIERS = {
-  // Authentication endpoints - lenient but still protective
+  // Authentication endpoints - very lenient for good UX
   AUTH: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15, // 15 attempts per 15 minutes
+    max: 30, // 30 attempts per 15 minutes (was 15)
     message: 'Too many authentication attempts, please try again later',
   },
   
   // Sensitive operations (password reset, email verification)
   SENSITIVE: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // 10 attempts per hour (was 3)
+    max: 20, // 20 attempts per hour (was 10)
     message: 'Too many requests for this operation, please try again later',
   },
   
-  // Financial operations - still protective but more lenient
+  // Financial operations - protective but reasonable
   FINANCIAL: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 25, // 25 transactions per hour (was 10)
+    max: 50, // 50 transactions per hour (was 25)
     message: 'Transaction rate limit exceeded, please try again later',
   },
   
-  // Standard API for authenticated users - generous limits  
+  // Standard API for authenticated users - very generous limits  
   API_AUTHENTICATED: {
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 120, // 120 requests per minute (was 60)
+    max: 200, // 200 requests per minute (was 120)
     message: 'API rate limit exceeded',
   },
   
-  // Unauthenticated API requests - still controlled but fair
+  // Unauthenticated API requests - fair and reasonable
   API_UNAUTHENTICATED: {
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 50, // 50 requests per minute (was 20)
+    max: 100, // 100 requests per minute (was 50)
     message: 'API rate limit exceeded for unauthenticated requests',
   },
   
-  // Messaging/streaming endpoints - high limits for real-time features
+  // Messaging/streaming endpoints - very high limits for real-time features
   MESSAGING: {
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 200, // 200 requests per minute (was 120)
+    max: 300, // 300 requests per minute (was 200)
     message: 'Message rate limit exceeded',
   },
   
-  // Public endpoints (health checks, docs) - very generous
+  // Public endpoints (health checks, docs) - extremely generous
   PUBLIC: {
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 300, // 300 requests per minute (was 100)
+    max: 500, // 500 requests per minute (was 300)
     message: 'Too many requests',
   },
 } as const;
@@ -142,11 +142,11 @@ const createRateLimiter = (
 };
 
 /**
- * Global rate limiter - base protection for all requests (very generous)
+ * Global rate limiter - base protection for all requests (extremely generous)
  */
 export const globalRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 500, // 500 requests per minute (was 200)
+  max: 1000, // 1000 requests per minute (was 500)
   message: 'Too many requests from this client',
   standardHeaders: true,
   legacyHeaders: false,
@@ -200,7 +200,7 @@ export const rateLimiters = {
  */
 export const streamingRateLimiter = createRateLimiter('MESSAGING', {
   skipSuccessfulRequests: true, // Only count failed connection attempts
-  max: 20, // 20 connection attempts per minute (was 10)
+  max: 50, // 50 connection attempts per minute (was 20)
   message: 'Too many connection attempts, please try again later',
 });
 

@@ -86,7 +86,7 @@ export function PasswordStrengthMeter({
       </div>
 
       {/* Popup tooltip that appears when password field is focused */}
-      <div className="absolute right-full top-1/2 -translate-y-1/2 pr-3 opacity-100 visible transition-all duration-200 z-50 pointer-events-none">
+      <div className="absolute right-full top-1/2 -translate-y-1/2 pr-3 opacity-100 visible transition-all duration-200 z-[9999] pointer-events-none">
         <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[240px]">
           {/* Strength header */}
           <div className="flex items-center justify-between mb-3">

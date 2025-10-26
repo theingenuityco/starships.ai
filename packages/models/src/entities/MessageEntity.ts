@@ -86,6 +86,19 @@ export class MessageEntity implements MessageModel {
   @IsString()
   toolCallId?: string;
 
+  // Agent tracking fields - which agent generated this message (assistant messages only)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  agentId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  agentName?: string;
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

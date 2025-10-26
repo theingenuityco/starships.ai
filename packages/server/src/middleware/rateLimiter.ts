@@ -115,8 +115,7 @@ const rateLimitErrorHandler = (req: Request, res: Response): void => {
  * Skip function to exclude health checks and certain paths
  */
 const skipHealthChecks = (req: Request): boolean => {
-  const healthPaths = ['/health', '/api/v1/health'];
-  return healthPaths.includes(req.path);
+  return req.path === '/api/v1/health';
 };
 
 /**

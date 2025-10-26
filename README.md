@@ -95,7 +95,7 @@ curl -N -H "Accept: text/event-stream" \
 ## Security & observability
 
 - JWT auth, rate limiting, CORS, encrypted API keys
-- Health: `GET /api/v1/health`, detailed: `GET /api/v1/health/detailed`, metrics: `GET /api/v1/health/metrics`
+- Health: `GET /api/v1/health`
 - Metrics and structured logs available; see package READMEs
 
 ## Links

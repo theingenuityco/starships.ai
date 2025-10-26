@@ -166,13 +166,7 @@ Response:
 
 ```json
 {
-  "status": "healthy",
-  "uptime": 123.456,
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "routes": {
-    "frontend": "http://localhost:3000",
-    "backend": "http://localhost:4000"
-  }
+  "status": "ok"
 }
 ```
 

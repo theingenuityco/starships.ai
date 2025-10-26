@@ -154,7 +154,7 @@ httpServer.listen(PORT, async () => {
   }
 
   console.log(`🚀 Aether Core Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/v1/health`);
   console.log(`🛸 Starships ready for launch!`);
 });
 

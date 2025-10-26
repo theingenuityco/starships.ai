@@ -231,80 +231,87 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
       </div>
 
-      {/* Quick selectors: Category and Model */}
-      <div className="grid grid-cols-1 gap-2">
-        {/* Category quick picker */}
-        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Icon name="tag" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Category</span>
+      {/* Quick selectors */}
+      <div className="space-y-8">
+        {/* Category section */}
+        <div className="border-b border-border/10 pb-6">
+          <div className="flex items-center gap-4 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+              <Icon name="tag" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Category</span>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div role="button" aria-label="Change category" className="flex items-center cursor-pointer select-none rounded-xl h-7 px-2 hover:bg-muted/30 hover:shadow-sm transition-colors border border-border/20">
+                  <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
+                    {getCategoryIcon(value.category)}
+                    <span className="capitalize">{value.category}</span>
+                  </Badge>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
+                <div className="flex flex-col gap-0">
+                  {AGENT_CATEGORIES.map(cat => {
+                    const isSelected = value.category === cat
+                    return (
+                      <DropdownMenuItem key={cat} className="px-1.5 py-0.5 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
+                        <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
+                          {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'm-0 inline-flex w-auto max-w-max items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
+                              isSelected ? getCategoryColor(cat) : 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
+                            )}
+                          >
+                            {getCategoryIcon(cat)}
+                            <span className="capitalize">{cat}</span>
+                          </Badge>
+                        </div>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
-                <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
-                  {getCategoryIcon(value.category)}
-                  <span className="capitalize">{value.category}</span>
-                </Badge>
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
-              <div className="flex flex-col gap-0">
-                {AGENT_CATEGORIES.map(cat => {
-                  const isSelected = value.category === cat
-                  return (
-                    <DropdownMenuItem key={cat} className="px-1.5 py-0.5 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
-                      <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
-                        {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'm-0 inline-flex w-auto max-w-max items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
-                            isSelected ? getCategoryColor(cat) : 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
-                          )}
-                        >
-                          {getCategoryIcon(cat)}
-                          <span className="capitalize">{cat}</span>
-                        </Badge>
-                      </div>
-                    </DropdownMenuItem>
-                  )
-                })}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
 
-        {/* Model quick picker */}
-        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Icon name="cpu" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Model</span>
+        {/* Model section */}
+        <div className="border-b border-border/10 pb-6">
+          <div className="flex items-center gap-4 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+              <Icon name="cpu" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Model</span>
+            </div>
+            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
+              <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
+                <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+              </SelectTrigger>
+              <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
+                {availableModels.map(m => (
+                  <SelectItem key={m} value={m} className="text-xs px-2 py-1">
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
-            <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
-              <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
-            </SelectTrigger>
-            <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-              {availableModels.map(m => (
-                <SelectItem key={m} value={m} className="text-xs px-2 py-1">
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
-        {/* Assigned tools */}
-        <div className="inline-flex items-center justify-start gap-2 px-2 h-9 w-fit">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Icon name="wrench" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Assigned Tools</span>
-          </div>
-          <Popover>
+
+        {/* Tools section */}
+        <div className="pb-6">
+          <div className="flex items-start gap-4 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+              <Icon name="wrench" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Assigned Tools</span>
+            </div>
+            <div className="flex-1">
+              <Popover>
             <PopoverTrigger asChild>
-              <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+              <div role="button" aria-label="Select tools" className="flex items-center cursor-pointer select-none rounded-xl h-7 px-2 hover:bg-muted/30 hover:shadow-sm transition-colors border border-border/20">
                 {selectedToolSlugs.length === 0 ? (
-                  <span className="pl-1.5 text-xs text-muted-foreground">Select tools</span>
+                  <span className="text-xs text-muted-foreground">Select tools</span>
                 ) : (
                   <div className="flex items-center gap-1 flex-wrap">
                     {selectedToolSlugs.map(slug => (
@@ -354,7 +361,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 </CommandList>
               </Command>
             </PopoverContent>
-          </Popover>
+              </Popover>
+            </div>
+          </div>
         </div>
       </div>
 

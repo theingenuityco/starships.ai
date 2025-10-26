@@ -9,6 +9,7 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
 import { StarshipService } from '@/services/StarshipService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { PasswordSchema } from '@/schemas/common';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -74,13 +75,13 @@ const UpdateUserProfileSchema = z.object({
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
   avatar: AvatarSchema.optional(),
-  currentPassword: z.string().min(6).optional(),
-  newPassword: z.string().min(6).optional(),
+  currentPassword: z.string().min(1).optional(),
+  newPassword: PasswordSchema.optional(),
 });
 
 const CreateUserWithPasswordSchema = z.object({
   email: z.string().email().max(255),
-  password: z.string().min(6).max(255),
+  password: PasswordSchema,
   displayName: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(100).optional(), // Legacy support
 });

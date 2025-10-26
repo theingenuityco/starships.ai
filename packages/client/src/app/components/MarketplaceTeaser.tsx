@@ -48,7 +48,7 @@ export default function MarketplaceTeaser() {
                   ))
                 : featuredAgents.map(template => (
                     <CarouselItem key={template.id} className="basis-full sm:basis-1/2 lg:basis-1/3">
-                      <AgentTemplateCardCompact template={template} onClick={() => (window.location.href = '/marketplace')} />
+                      <AgentTemplateCardCompact template={template} onClick={() => (window.location.href = '/marketplace?from=public')} />
                     </CarouselItem>
                   ))}
             </CarouselContent>
@@ -66,7 +66,7 @@ export default function MarketplaceTeaser() {
             <span className="text-base sm:text-lg md:text-xl">tools and counting</span>
           </div>
           <div className="mt-2 sm:mt-3 md:mt-4">
-            <Button size="lg" variant="outline" className="border-primary/60 text-primary hover:bg-primary/10" onClick={() => (window.location.href = '/marketplace')}>
+            <Button size="lg" variant="outline" className="border-primary/60 text-primary hover:bg-primary/10" onClick={() => (window.location.href = '/marketplace?from=public')}>
               <Icon name="store" className="w-7 h-7 mr-2" /> Open marketplace
             </Button>
           </div>

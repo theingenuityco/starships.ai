@@ -67,8 +67,8 @@ export function PasswordStrengthMeter({
 
   return (
     <div className="relative group">
-      {/* Compact strength indicator */}
-      <div className="flex items-center gap-2">
+      {/* Compact strength indicator with hover area */}
+      <div className="flex items-center gap-2 p-1 -m-1 rounded cursor-help" title="Hover to see password requirements">
         <div className="flex-1">
           <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
             <div
@@ -86,7 +86,7 @@ export function PasswordStrengthMeter({
       </div>
 
       {/* Popup tooltip that appears on hover/focus */}
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full mr-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-50">
+      <div className="absolute right-full top-1/2 -translate-y-1/2 pr-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
         <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[240px]">
           {/* Strength header */}
           <div className="flex items-center justify-between mb-3">
@@ -139,8 +139,8 @@ export function PasswordStrengthMeter({
         </div>
         
         {/* Arrow pointing to the progress bar */}
-        <div className="absolute top-1/2 -translate-y-1/2 right-0 translate-x-full">
-          <div className="w-2 h-2 bg-popover border-r border-b border-border rotate-45 -translate-x-1"></div>
+        <div className="absolute top-1/2 -translate-y-1/2 -right-1 translate-x-full">
+          <div className="w-2 h-2 bg-popover border-l border-t border-border rotate-45"></div>
         </div>
       </div>
     </div>

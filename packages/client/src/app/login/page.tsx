@@ -176,8 +176,14 @@ function LoginContent() {
                 transition={{ delay: 0.2, duration: 0.5 }}
                 className="mb-6"
               >
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
-                  {activeTab === 'login' ? 'Welcome Back' : 'Join Starships'}
+                <h1 className="text-3xl font-bold">
+                  {activeTab === 'login' ? (
+                    <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
+                      Welcome Back
+                    </span>
+                  ) : (
+                    <span className="text-primary">Join Starships</span>
+                  )}
                 </h1>
                 <p className="text-muted-foreground mt-2">
                   {activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}

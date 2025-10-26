@@ -276,13 +276,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
 
         {/* Model quick picker */}
-        <div className="flex items-center justify-start gap-2 px-2 h-9 w-fit">
+        <div className="grid grid-cols-[auto_1fr] gap-2 items-center px-2 h-9">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="cpu" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Model</span>
+            <span className="text-xs font-semibold">Model</span>
           </div>
           <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
-            <SelectTrigger className="h-7 w-[180px] text-xs rounded-xl">
+            <SelectTrigger className="h-7 max-w-[220px] text-xs rounded-xl">
               <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
             </SelectTrigger>
             <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
@@ -296,12 +296,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
 
         {/* Assigned tools */}
-        <div className="flex items-center justify-start gap-2 px-2 h-9 w-fit">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Icon name="wrench" className="w-4 h-4" />
-              <span className="text-xs font-semibold w-36">Assigned Tools</span>
-            </div>
-            <Popover>
+        <div className="grid grid-cols-[auto_1fr] gap-2 items-center px-2 h-9">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Icon name="wrench" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Assigned Tools</span>
+          </div>
+          <Popover>
             <PopoverTrigger asChild>
               <div role="button" aria-label="Select tools" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
                 {selectedToolSlugs.length === 0 ? (

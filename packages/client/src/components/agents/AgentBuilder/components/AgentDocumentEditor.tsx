@@ -232,7 +232,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Quick selectors: Category and Model */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         {/* Category quick picker */}
         <div className="grid grid-cols-[auto_1fr] gap-2 items-center px-2 h-9">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -296,7 +296,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
 
         {/* Assigned tools */}
-        <div className="grid grid-cols-[auto_1fr] gap-2 items-center px-2 h-9">
+        <div className="grid grid-cols-[auto_1fr] gap-2 items-center px-2 h-9 mt-2">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="wrench" className="w-4 h-4" />
             <span className="text-xs font-semibold">Assigned Tools</span>

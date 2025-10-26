@@ -15,10 +15,10 @@ import { logger } from '@/utils/logger';
  * Based on enterprise patterns from Stripe, AWS, and GitHub
  */
 const RATE_LIMIT_TIERS = {
-  // Authentication endpoints - lenient but still protective
+  // Authentication endpoints - TEMPORARY LOW LIMIT FOR TESTING
   AUTH: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15, // 15 attempts per 15 minutes (was 5)
+    windowMs: 1 * 60 * 1000, // 1 minute (TESTING ONLY)
+    max: 3, // 3 attempts per minute (TESTING ONLY) 
     message: 'Too many authentication attempts, please try again later',
   },
   

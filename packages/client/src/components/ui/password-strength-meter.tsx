@@ -66,8 +66,8 @@ export function PasswordStrengthMeter({
   if (!password) return null
 
   return (
-    <>
-      {/* Compact strength indicator - ONLY this affects layout */}
+    <div className="space-y-1">
+      {/* Compact strength indicator */}
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
@@ -85,46 +85,15 @@ export function PasswordStrengthMeter({
         </span>
       </div>
 
-      {/* Fixed positioned validation popup - NEVER affects document flow */}
-      <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[9999] pointer-events-none">
-        <div className="bg-popover border border-border rounded-lg shadow-xl p-3 w-[280px]">
-          {/* Strength header */}
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-foreground">Password Requirements</span>
-            <span className={cn('text-xs font-medium px-2 py-1 rounded', 
-              strength.score >= 4 ? 'bg-green-100 text-green-700' :
-              strength.score >= 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
-            )}>
-              {strength.label}
-            </span>
-          </div>
-          
-          {/* Requirements list */}
-          <div className="space-y-1.5">
-            <RequirementItem
-              met={requirements.minLength}
-              text="At least 8 characters"
-            />
-            <RequirementItem
-              met={requirements.hasUppercase}
-              text="One uppercase letter"
-            />
-            <RequirementItem
-              met={requirements.hasLowercase}
-              text="One lowercase letter"
-            />
-            <RequirementItem
-              met={requirements.hasNumber}
-              text="One number"
-            />
-            <RequirementItem
-              met={requirements.hasSpecial}
-              text="One special character (!@#$%...)"
-            />
-          </div>
-        </div>
+      {/* Ultra-compact inline requirements */}
+      <div className="flex items-center gap-1 text-xs">
+        <RequirementDot met={requirements.minLength} text="8+" />
+        <RequirementDot met={requirements.hasUppercase} text="A" />
+        <RequirementDot met={requirements.hasLowercase} text="a" />
+        <RequirementDot met={requirements.hasNumber} text="1" />
+        <RequirementDot met={requirements.hasSpecial} text="!@" />
       </div>
-    </>
+    </div>
   )
 }
 
@@ -132,18 +101,15 @@ function RequirementDot({ met, text }: { met: boolean; text: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-0.5',
-        met ? 'text-green-600' : 'text-muted-foreground'
+        'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-xs',
+        met ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
       )}
     >
       <Icon
         name={met ? 'check' : 'x'}
-        className={cn(
-          'h-2.5 w-2.5',
-          met ? 'text-green-600' : 'text-muted-foreground'
-        )}
+        className="h-2.5 w-2.5"
       />
-      <span className="text-xs">{text}</span>
+      <span className="text-xs font-medium">{text}</span>
     </span>
   )
 }

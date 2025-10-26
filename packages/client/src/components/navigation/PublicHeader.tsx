@@ -60,7 +60,7 @@ export function PublicHeader(): React.JSX.Element {
             Home
           </Link>
           <Link
-            href="/marketplace"
+            href="/marketplace?from=public"
             className={`${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
             aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
           >
@@ -102,7 +102,7 @@ export function PublicHeader(): React.JSX.Element {
                 Home
               </Link>
               <Link
-                href="/marketplace"
+                href="/marketplace?from=public"
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >

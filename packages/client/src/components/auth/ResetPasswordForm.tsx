@@ -11,6 +11,8 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { validatePassword } from '@/utils/passwordStrength'
 
 interface ResetPasswordFormProps {
   token: string
@@ -53,8 +55,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       return
     }
 
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long')
+    const passwordValidation = validatePassword(newPassword)
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.errors[0])
       return
     }
 
@@ -167,6 +170,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
                   <Icon name={showPassword ? 'eye-off' : 'eye'} className="h-4 w-4" />
                 </Button>
               </div>
+              {newPassword && (
+                <PasswordStrengthMeter password={newPassword} />
+              )}
             </div>
 
             <div className="space-y-2">

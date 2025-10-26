@@ -47,6 +47,8 @@ export function Navigation(props: NavigationProps) {
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
   const [navigationStarshipSlug, setNavigationStarshipSlug] = useState<string | null>(null)
+  // Ref for click outside detection
+  const sidebarRef = useRef<HTMLDivElement>(null)
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
@@ -86,6 +88,25 @@ export function Navigation(props: NavigationProps) {
       }
     }
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
+
+  // Click outside to close conversation sidebar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showConversationList && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        setShowConversationList(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showConversationList])
+
+  // Close conversation sidebar when pathname changes (tab navigation)
+  useEffect(() => {
+    setShowConversationList(false)
+  }, [pathname])
 
   const starshipSlug = navigationStarshipSlug
 
@@ -223,23 +244,18 @@ export function Navigation(props: NavigationProps) {
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
 
-  // Handle logo click - smart navigation based on context
+  // Handle logo click - navigate to landing screen
   const handleLogoClick = () => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
-
-    if (starshipSlug) {
-      // Go to overview if we have a starship
-      router.push(`/ship/${starshipSlug}`)
-    } else {
-      // Go to marketplace as default for authenticated users without starships
-      router.push('/marketplace')
-    }
+    
+    // Always go to landing screen
+    router.push('/')
   }
 
   // Floating mode - expandable layout
   return (
-    <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
+    <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
       <div
         className="flex flex-col items-center justify-center w-14 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{
@@ -248,7 +264,7 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Compact Header with Theme Toggle */}
         <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Navigate to Overview">
+          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Go to Landing Screen">
             <StarshipsLogo
               width={36}
               height={36}

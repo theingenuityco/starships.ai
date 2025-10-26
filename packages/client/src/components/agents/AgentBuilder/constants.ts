@@ -6,7 +6,7 @@ export const INITIAL_FORM_DATA: AgentFormData = {
   slug: '',
   description: '',
   category: 'general',
-  model: 'anthropic/claude-sonnet-4.5',
+  model: 'openai/gpt-4o-mini',
   temperature: 0.7,
   maxTokens: 2048,
   systemPrompt: '',

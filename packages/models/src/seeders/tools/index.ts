@@ -29,6 +29,7 @@ export { agentEditToolTemplate } from './agent-edit';
 export { agentTestToolTemplate } from './agent-test';
 export { agentAssignToolToolTemplate } from './agent-assign-tool';
 export { agentUnassignToolToolTemplate } from './agent-unassign-tool';
+export { modelsListToolTemplate } from './models-list';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -57,6 +58,7 @@ import { agentEditToolTemplate } from './agent-edit';
 import { agentTestToolTemplate } from './agent-test';
 import { agentAssignToolToolTemplate } from './agent-assign-tool';
 import { agentUnassignToolToolTemplate } from './agent-unassign-tool';
+import { modelsListToolTemplate } from './models-list';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -85,4 +87,5 @@ export const ALL_TOOL_TEMPLATES = [
   agentTestToolTemplate,
   agentAssignToolToolTemplate,
   agentUnassignToolToolTemplate,
+  modelsListToolTemplate,
 ];

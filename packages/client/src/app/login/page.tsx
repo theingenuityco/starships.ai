@@ -162,7 +162,7 @@ function LoginContent() {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 bg-gradient-to-br from-gray-950 to-black">
+        <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-8 bg-gradient-to-br from-gray-950 to-black min-h-screen max-h-screen overflow-y-auto">
           <div className="w-full max-w-md">
             <motion.div
               initial={{ opacity: 0, y: 20 }}

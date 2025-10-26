@@ -66,79 +66,68 @@ export function PasswordStrengthMeter({
   if (!password) return null
 
   return (
-    <div className={cn('space-y-3', className)}>
-      {/* Strength Meter */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Password Strength</span>
-          <span className={cn('text-sm font-medium', strength.color)}>
-            {strength.label}
-          </span>
+    <div className={cn('space-y-2', className)}>
+      {/* Compact Strength Meter with inline label */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn(
+                'h-full transition-all duration-300',
+                getStrengthColorClass(strength.score)
+              )}
+              style={{ width: `${strength.percentage}%` }}
+            />
+          </div>
         </div>
-        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-          <div
-            className={cn(
-              'h-full transition-all duration-300',
-              getStrengthColorClass(strength.score)
-            )}
-            style={{ width: `${strength.percentage}%` }}
-          />
-        </div>
+        <span className={cn('text-xs font-medium whitespace-nowrap', strength.color)}>
+          {strength.label}
+        </span>
       </div>
 
-      {/* Requirements Checklist */}
+      {/* Compact Requirements Grid */}
       {showRequirements && (
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-1">
           <RequirementItem
             met={requirements.minLength}
-            text="At least 8 characters"
+            text="8+ chars"
+            compact
           />
           <RequirementItem
             met={requirements.hasUppercase}
-            text="One uppercase letter"
+            text="Uppercase"
+            compact
           />
           <RequirementItem
             met={requirements.hasLowercase}
-            text="One lowercase letter"
+            text="Lowercase"
+            compact
           />
           <RequirementItem
             met={requirements.hasNumber}
-            text="One number"
+            text="Number"
+            compact
           />
           <RequirementItem
             met={requirements.hasSpecial}
-            text="One special character (!@#$%...)"
+            text="Special (!@#...)"
+            compact
           />
-        </div>
-      )}
-
-      {/* Feedback Messages */}
-      {strength.feedback.length > 0 && (
-        <div className="space-y-1">
-          {strength.feedback.map((message, index) => (
-            <p
-              key={index}
-              className={cn(
-                'text-xs',
-                strength.score >= 3 ? 'text-green-600' : 'text-muted-foreground'
-              )}
-            >
-              {message}
-            </p>
-          ))}
+          {/* Empty div for 2x3 grid balance when 5 items */}
+          <div />
         </div>
       )}
     </div>
   )
 }
 
-function RequirementItem({ met, text }: { met: boolean; text: string }) {
+function RequirementItem({ met, text, compact = false }: { met: boolean; text: string; compact?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn("flex items-center gap-1.5", compact && "min-h-[18px]")}>
       <Icon
         name={met ? 'check-circle' : 'circle'}
         className={cn(
-          'h-3.5 w-3.5',
+          compact ? 'h-3 w-3' : 'h-3.5 w-3.5',
           met ? 'text-green-600' : 'text-muted-foreground'
         )}
       />

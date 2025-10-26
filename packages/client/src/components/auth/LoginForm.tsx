@@ -356,9 +356,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               </form>
             </TabsContent>
 
-            <TabsContent value="register" className="space-y-4">
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
+            <TabsContent value="register" className="space-y-3">
+              <form onSubmit={handleRegister} className="space-y-3">
+                <div className="space-y-1">
                   <Label htmlFor="register-name">Full Name</Label>
                   <Input
                     id="register-name"
@@ -372,7 +372,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="register-email">Email</Label>
                   <Input
                     id="register-email"
@@ -386,7 +386,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="register-password">Password</Label>
                   <div className="relative">
                     <Input
@@ -416,7 +416,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="register-confirm-password">Confirm Password</Label>
                   <div className="relative">
                     <Input

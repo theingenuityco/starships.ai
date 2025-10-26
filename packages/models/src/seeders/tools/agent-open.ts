@@ -14,6 +14,23 @@ export const agentOpenTool: ToolParams = {
 - Create new draft: provide "name" and "slug" (optional: description, model, systemPrompt, temperature, maxTokens, previewPrompts)
 - Open existing: provide only "slug"
 
+## Model Selection
+IMPORTANT: Use "List Models" tool first to discover available models before creating agents.
+- Model format: provider/model-name
+- Default if not specified: First available paid Anthropic model, then OpenAI, then others
+- Selection priority based on objective data from List Models:
+  1. Match capabilities: Search description for use-case keywords
+  2. Prefer PAID models (pricing.prompt > "0" AND pricing.completion > "0")
+  3. Provider preference: Anthropic > OpenAI > Others (check model ID prefix)
+  4. Within provider: Best price/performance ratio
+- Free models ONLY for fallback/emergency scenarios
+- Selection criteria by use case:
+  * Coding: description contains "code"/"programming" + prefer Anthropic/OpenAI
+  * Creative: context_length > 100k + paid models + prefer Anthropic/OpenAI
+  * Reasoning: "reasoning" in supported_parameters + prefer Anthropic
+  * General: Prefer Anthropic first, OpenAI second
+- Fallback: Free models acceptable ONLY if no paid options available
+
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
 - BASE_URL: API server endpoint
@@ -43,7 +60,7 @@ Automatically inferred from agent state (do not pass manually):
       },
       model: {
         type: 'string',
-        description: 'LLM model (default: anthropic/claude-sonnet-4.5)',
+        description: 'LLM model ID from List Models (prefer paid Anthropic models, then OpenAI, then others)',
       },
       systemPrompt: {
         type: 'string',
@@ -92,7 +109,7 @@ Automatically inferred from agent state (do not pass manually):
                 name: input.name,
                 slug,
                 description: (input && input.description) || '',
-                model: (input && input.model) || 'anthropic/claude-sonnet-4.5',
+                model: (input && input.model) || 'openai/gpt-4o-mini',
                 systemPrompt: (input && input.systemPrompt) || '',
               };
               
@@ -181,7 +198,7 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   slug: 'agent-open',
   category: 'automation',
   exampleUsage:
-    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "slug": "support-agent", "description": "Helps users", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["Help me build an onboarding agent", "Design a research agent for Wikipedia"] } // create draft',
+    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "slug": "support-agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "slug": "code-assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',
   requiresApiKey: false,
   configurationFields: [],
 };

@@ -9,7 +9,7 @@ import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
 
 /**
  * Seeds the database with default agent templates
- * This runs when explicitly called, not on every server startup
+ * Safe to run multiple times - skips existing templates to avoid overwriting production data
  */
 export async function seedAgentTemplates(): Promise<void> {
   try {
@@ -30,25 +30,9 @@ export async function seedAgentTemplates(): Promise<void> {
         const existingTemplate = await templateRepo.findBySlug(template.slug as string);
 
         if (existingTemplate) {
-          // Force-update blueprint and state so agent logic/template fixes are applied
-          await templateRepo.update(existingTemplate.id, {
-            blueprint: template.blueprint,
-            systemPrompt: template.systemPrompt,
-            state: template.state,
-            model: template.model,
-            temperature: template.temperature,
-            maxTokens: template.maxTokens,
-            timeout: template.timeout,
-            description: template.description,
-            icon: template.icon,
-            previewPrompts: template.previewPrompts,
-            category: template.category,
-            name: template.name,
-            // Important: ensure assignedToolSlugs relationships are refreshed on updates
-            assignedToolSlugs: template.assignedToolSlugs,
-          });
+          // Skip existing templates to avoid overwriting production data
+          logger.info(`Agent template already exists, skipping: ${template.name} (slug: ${template.slug})`);
           existingCount++;
-          logger.info(`Agent template updated: ${template.name} (slug: ${template.slug})`);
         } else {
           // Create the template - explicitly construct payload with slug
           const payload = {
@@ -79,7 +63,7 @@ export async function seedAgentTemplates(): Promise<void> {
       }
     }
 
-    logger.info(`✅ Agent template seeding completed: ${addedCount} new, ${existingCount} existing, ${errorCount} errors`);
+    logger.info(`✅ Agent template seeding completed: ${addedCount} new, ${existingCount} skipped, ${errorCount} errors`);
   } catch (error) {
     logger.error(`Failed to seed agent templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
     if (error instanceof Error) {

@@ -14,7 +14,7 @@ import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { AGENT_CATEGORIES, DEFAULT_MODELS } from '../constants'
+import { AGENT_CATEGORIES } from '../constants'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -24,6 +24,7 @@ import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -35,6 +36,12 @@ interface AgentDocumentEditorProps {
 }
 
 export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
+  const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
+
+  const availableModels = useMemo(() => {
+    return openRouterModels?.map(m => m.id) || []
+  }, [openRouterModels])
+
   const generatedSlug = useMemo(
     () =>
       value.name
@@ -274,12 +281,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             <Icon name="cpu" className="w-4 h-4" />
             <span className="text-xs font-semibold w-36">Model</span>
           </div>
-          <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)}>
+          <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
             <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
-              <SelectValue placeholder="Select a model" />
+              <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
             </SelectTrigger>
             <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-              {DEFAULT_MODELS.map(m => (
+              {availableModels.map(m => (
                 <SelectItem key={m} value={m} className="text-xs px-2 py-1">
                   {m}
                 </SelectItem>

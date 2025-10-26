@@ -95,7 +95,7 @@ export class ConversationService {
   // Track if an assistant message has been persisted for the current turn to avoid duplicates on stop
   private assistantPersistedThisTurn: Set<string> = new Set();
   // Track which agent is currently producing streamed content for a conversation (for attribution)
-  private currentAgentForConversation: Map<string, string> = new Map();
+  private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: ChildProcessRunner;
 
@@ -158,14 +158,14 @@ export class ConversationService {
 
     // Only persist if we have something meaningful
     if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
-      const agentId = this.currentAgentForConversation.get(conversationId) || undefined;
+      const agent = this.currentAgentForConversation.get(conversationId);
       const persistedMsg = await this.messageService.createMessage({
         conversationId,
         role: 'assistant',
         content: partialContent || '',
         messageType: 'agent_response',
         ...(partialReasoning ? { reasoning: partialReasoning } : {}),
-        ...(agentId ? ({ agentId } as any) : {}),
+        ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
       });
       // Mark both per-turn and active-stream persisted flags
       this.assistantPersistedThisTurn.add(conversationId);
@@ -485,7 +485,7 @@ export class ConversationService {
         const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
 
         // Attribute streamed content to the current agent
-        this.currentAgentForConversation.set(data.conversationId, agentModel.id);
+        this.currentAgentForConversation.set(data.conversationId, { id: agentModel.id, name: agentModel.name });
 
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
@@ -1132,12 +1132,13 @@ export class ConversationService {
                 updatedAt: event.timestamp,
               };
 
+              const agent = this.currentAgentForConversation.get(conversationId);
               const shell: Operation = {
                 op: 'add',
                 path: '/messages/-',
                 value: {
                   ...assistantMessage,
-                  agentId: this.currentAgentForConversation.get(conversationId) || 'agent',
+                  ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
                   streaming: true,
                   chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                   reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
@@ -1655,6 +1656,8 @@ export class ConversationService {
 
                 // Persist the message (assistant or tool)
                 const messageType = role === 'tool' ? 'tool_result' : 'agent_response';
+                // For assistant messages, include agent attribution
+                const agent = role === 'assistant' ? this.currentAgentForConversation.get(conversationId) : undefined;
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,
                   role,
@@ -1663,6 +1666,7 @@ export class ConversationService {
                   ...(toolCallId ? { toolCallId } : {}),
                   ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
                   ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
+                  ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
                 });
 
                 // Mark that an assistant message has been persisted for this turn

@@ -66,8 +66,8 @@ export function PasswordStrengthMeter({
   if (!password) return null
 
   return (
-    <div className="relative group">
-      {/* Compact strength indicator */}
+    <>
+      {/* Compact strength indicator - ONLY this affects layout */}
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
@@ -85,19 +85,22 @@ export function PasswordStrengthMeter({
         </span>
       </div>
 
-      {/* Popup tooltip that appears when password field is focused */}
-      <div className="absolute left-0 top-full mt-2 opacity-100 visible transition-all duration-200 z-[9999] pointer-events-none">
-        <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[240px]">
+      {/* Fixed positioned validation popup - NEVER affects document flow */}
+      <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[9999] pointer-events-none">
+        <div className="bg-popover border border-border rounded-lg shadow-xl p-3 w-[280px]">
           {/* Strength header */}
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-foreground">Password Strength</span>
-            <span className={cn('text-sm font-medium', strength.color)}>
+            <span className="text-sm font-medium text-foreground">Password Requirements</span>
+            <span className={cn('text-xs font-medium px-2 py-1 rounded', 
+              strength.score >= 4 ? 'bg-green-100 text-green-700' :
+              strength.score >= 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
+            )}>
               {strength.label}
             </span>
           </div>
           
           {/* Requirements list */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <RequirementItem
               met={requirements.minLength}
               text="At least 8 characters"
@@ -119,31 +122,9 @@ export function PasswordStrengthMeter({
               text="One special character (!@#$%...)"
             />
           </div>
-
-          {/* Feedback messages */}
-          {strength.feedback.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              {strength.feedback.map((message, index) => (
-                <p
-                  key={index}
-                  className={cn(
-                    'text-xs',
-                    strength.score >= 3 ? 'text-green-600' : 'text-muted-foreground'
-                  )}
-                >
-                  {message}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        {/* Arrow pointing up to the progress bar */}
-        <div className="absolute left-4 -top-1 -translate-y-full">
-          <div className="w-2 h-2 bg-popover border-l border-b border-border rotate-45"></div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 

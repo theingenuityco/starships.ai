@@ -38,6 +38,9 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   // Track applied tool calls to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
 
+  // Track initial message count to only process NEW messages (prevents infinite loop on remount)
+  const initialMessageCountRef = useRef<number | null>(null)
+
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
     if (!conversationId) return
@@ -318,6 +321,61 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       }
     }
   }, [conversationId, liveMessages, starship?.id])
+
+  // Navigate to agent page when agent-related tool calls are detected
+  useEffect(() => {
+    if (!conversationId || !liveMessages.length) return
+
+    // On first render, record initial message count and don't process
+    if (initialMessageCountRef.current === null) {
+      initialMessageCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process if new messages have arrived
+    if (liveMessages.length <= initialMessageCountRef.current) {
+      return
+    }
+
+    const agentToolSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+
+    // Process only NEW messages (those after initial count)
+    const newMessages = liveMessages.slice(initialMessageCountRef.current)
+
+    for (const msg of newMessages as any[]) {
+      if (msg.role !== 'assistant') continue
+      const toolCalls = msg.toolCalls
+      if (!Array.isArray(toolCalls)) continue
+
+      for (const call of toolCalls) {
+        const funcName = call?.function?.name as string
+        if (!agentToolSlugs.has(funcName)) continue
+
+        // Parse arguments to extract agent slug
+        let args: any = call?.function?.arguments
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args)
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        const agentSlug = args?.slug || args?.agentSlug || 'new'
+
+        // Don't navigate if we're somehow trying to navigate to ourselves
+        if (agentSlug === toolSlug) {
+          continue
+        }
+
+        const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`
+
+        router.push(targetUrl)
+        return
+      }
+    }
+  }, [conversationId, liveMessages, slug, router, toolSlug])
 
   // Prefill when editing an existing tool
   useEffect(() => {

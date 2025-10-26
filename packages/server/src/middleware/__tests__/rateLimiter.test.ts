@@ -82,7 +82,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should skip health check endpoints', async () => {
-      const req = createMockRequest({ path: '/health' });
+      const req = createMockRequest({ path: '/api/v1/health' });
       const res = createMockResponse();
       const next = createMockNext();
 
@@ -256,19 +256,15 @@ describe('Rate Limiting Middleware', () => {
   });
 
   describe('Health Check Exemption', () => {
-    const healthPaths = ['/health', '/api/v1/health'];
-    
-    healthPaths.forEach(path => {
-      it(`should skip rate limiting for ${path}`, async () => {
-        const req = createMockRequest({ path });
-        const res = createMockResponse();
-        const next = createMockNext();
+    it('should skip rate limiting for /api/v1/health', async () => {
+      const req = createMockRequest({ path: '/api/v1/health' });
+      const res = createMockResponse();
+      const next = createMockNext();
 
-        await globalRateLimiter(req, res, next);
+      await globalRateLimiter(req, res, next);
 
-        expect(next).toHaveBeenCalled();
-        expect(mockSendError).not.toHaveBeenCalled();
-      });
+      expect(next).toHaveBeenCalled();
+      expect(mockSendError).not.toHaveBeenCalled();
     });
   });
 

@@ -28,8 +28,6 @@ Health:
 
 ```http
 GET /health
-GET /health/detailed
-GET /health/metrics
 ```
 
 Starships:
@@ -80,7 +78,7 @@ curl -X POST $API/starships \
 
 - JWT auth middleware on protected routes
 - CORS, rate limiting, structured errors
-- Health and detailed health probes
+- Health check probe
 
 ## Troubleshooting
 

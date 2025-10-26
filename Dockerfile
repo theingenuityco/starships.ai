@@ -87,7 +87,7 @@ EXPOSE 3000 3001 4000 5432
 # Health check for all services
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000 && \
-      wget --no-verbose --tries=1 --spider http://localhost:4000/health && \
+      wget --no-verbose --tries=1 --spider http://localhost:4000/api/v1/health && \
       pg_isready -h localhost -p 5432
 
 # Start supervisor to manage all services

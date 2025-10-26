@@ -87,6 +87,8 @@ export class MessageRepository extends BaseRepository {
           ...(entity.reasoning ? { reasoning: entity.reasoning } : {}),
           ...(entity.toolCalls ? { toolCalls: entity.toolCalls } : {}),
           ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
+          ...(entity.agentId ? { agentId: entity.agentId } : {}),
+          ...(entity.agentName ? { agentName: entity.agentName } : {}),
         };
 
         // Debug log for tool calls

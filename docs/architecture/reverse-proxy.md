@@ -83,19 +83,13 @@ sequenceDiagram
 ## Health Check
 
 - Endpoint: `GET /_proxy/health`
-- Served by the proxy itself; returns status, uptime, timestamp, and configured target URLs.
+- Served by the proxy itself; returns status only.
 
 Example:
 
 ```json
 {
-  "status": "healthy",
-  "uptime": 123.456,
-  "timestamp": "2025-01-01T00:00:00.000Z",
-  "routes": {
-    "frontend": "http://localhost:3000",
-    "backend": "http://localhost:4000"
-  }
+  "status": "ok"
 }
 ```
 

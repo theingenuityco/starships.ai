@@ -1,12 +1,18 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import Userback from '@userback/widget'
-import type { UserbackOptions, UserbackWidget } from '@userback/widget'
 import { useAuthContext } from '@/providers/auth-provider'
 
+// Extend Window interface for TypeScript
+declare global {
+  interface Window {
+    Userback: any
+  }
+}
+
 // Create the context
-const UserbackContext = createContext<UserbackWidget | null>(null)
+const UserbackContext = createContext<any>(null)
+
 
 interface UserbackProviderProps {
   children: React.ReactNode
@@ -14,55 +20,89 @@ interface UserbackProviderProps {
 }
 
 export function UserbackProvider({ children, token }: UserbackProviderProps) {
-  const [userback, setUserback] = useState<UserbackWidget | null>(null)
+  const [userback, setUserback] = useState<any>(null)
+  const [scriptLoaded, setScriptLoaded] = useState(false)
   const { isAuthenticated, userId, userEmail, userName } = useAuthContext()
 
+  // Initialize Userback script ONCE
   useEffect(() => {
-    const initUserback = async () => {
-      try {
-        const options: UserbackOptions = {}
-
-        // Add user data if authenticated
-        if (isAuthenticated && userId && userEmail) {
-          options.user_data = {
-            id: userId,
-            info: {
-              name: userName,
-              email: userEmail,
-            },
-          }
-
-          // Configure to hide name/email fields for authenticated users
-          // The widget settings types are incomplete, so we extend them here
-          options.widget_settings = {
-            form_settings: {
-              general: {
-                display_name: false,
-                display_email: false,
-              },
-            },
-          } as any
-        } else {
-          // For non-authenticated users, show name/email fields
-          options.widget_settings = {
-            form_settings: {
-              general: {
-                display_name: true,
-                display_email: true,
-              },
-            },
-          } as any
-        }
-
-        const instance = await Userback(token, options)
-        setUserback(instance)
-      } catch (error) {
-        console.error('Failed to initialize Userback:', error)
-      }
+    if (typeof window === 'undefined') return
+    if (document.querySelector('script[src*="static.userback.io"]')) {
+      console.log('✅ Userback script already exists')
+      setScriptLoaded(true)
+      return
     }
 
-    initUserback()
-  }, [token]) // Initialize once on mount or when token changes
+    console.log('🔵 Initializing Userback...')
+
+    // Initialize window.Userback object BEFORE loading script
+    window.Userback = window.Userback || {}
+    window.Userback.access_token = token
+
+    console.log('📦 Loading Userback script...')
+    const script = document.createElement('script')
+    script.async = true
+    script.src = 'https://static.userback.io/widget/v1.js'
+    script.onload = () => {
+      console.log('✅ Userback script loaded')
+      setScriptLoaded(true)
+      setTimeout(() => {
+        if (window.Userback) {
+          // Call start() to initialize the widget
+          if (typeof window.Userback.start === 'function') {
+            window.Userback.start()
+            console.log('✅ Userback.start() called')
+          }
+
+          setUserback(window.Userback)
+          console.log('✅ Userback initialized')
+
+          // Now show the launcher
+          setTimeout(() => {
+            if (typeof window.Userback.showLauncher === 'function') {
+              window.Userback.showLauncher()
+              console.log('✅ Launcher shown')
+            }
+          }, 500)
+        }
+      }, 1000)
+    }
+    script.onerror = () => {
+      console.error('❌ Failed to load Userback script')
+    }
+    ;(document.head || document.body).appendChild(script)
+  }, [token]) // Only run once when token is available
+
+  // Update user data when auth changes
+  useEffect(() => {
+    if (!scriptLoaded || typeof window === 'undefined') return
+
+    console.log('🔄 Updating user data...')
+    console.log('Auth state:', { isAuthenticated, userId, userEmail, userName })
+
+    if (isAuthenticated && userId && userEmail) {
+      // Update user data
+      if (window.Userback) {
+        window.Userback.user_data = {
+          id: userId,
+          info: {
+            name: userName,
+            email: userEmail,
+          },
+        }
+        console.log('✅ User data updated:', window.Userback.user_data)
+
+        // Use identify method if available
+        if (typeof window.Userback.identify === 'function') {
+          window.Userback.identify(userId, {
+            name: userName,
+            email: userEmail,
+          })
+          console.log('✅ User identified')
+        }
+      }
+    }
+  }, [scriptLoaded, isAuthenticated, userId, userEmail, userName])
 
   // Update user identification when auth state changes
   useEffect(() => {

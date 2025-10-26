@@ -531,8 +531,9 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
 /**
  * Get user's linked OAuth accounts
  * GET /auth/oauth/accounts
+ * TESTING: Temporarily rate limited for UI testing
  */
-router.get('/auth/oauth/accounts', jwtAuthMiddleware, async (req: Request, res: Response) => {
+router.get('/auth/oauth/accounts', rateLimiters.testing, jwtAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 

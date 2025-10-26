@@ -15,10 +15,10 @@ import { logger } from '@/utils/logger';
  * Based on enterprise patterns from Stripe, AWS, and GitHub
  */
 const RATE_LIMIT_TIERS = {
-  // Authentication endpoints - TEMPORARY LOW LIMIT FOR TESTING
+  // Authentication endpoints - lenient but still protective
   AUTH: {
-    windowMs: 1 * 60 * 1000, // 1 minute (TESTING ONLY)
-    max: 3, // 3 attempts per minute (TESTING ONLY) 
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 15, // 15 attempts per 15 minutes
     message: 'Too many authentication attempts, please try again later',
   },
   
@@ -36,11 +36,18 @@ const RATE_LIMIT_TIERS = {
     message: 'Transaction rate limit exceeded, please try again later',
   },
   
-  // Standard API for authenticated users - generous limits
+  // Standard API for authenticated users - generous limits  
   API_AUTHENTICATED: {
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 120, // 120 requests per minute (was 60)
     message: 'API rate limit exceeded',
+  },
+
+  // TESTING TIER - Very low limits for UI testing
+  TESTING: {
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 3, // 3 requests per minute (TESTING ONLY)
+    message: 'Rate limit exceeded - this is a test endpoint',
   },
   
   // Unauthenticated API requests - still controlled but fair
@@ -190,6 +197,9 @@ export const rateLimiters = {
   
   // Public endpoints
   public: createRateLimiter('PUBLIC'),
+  
+  // Testing endpoint (temporary)
+  testing: createRateLimiter('TESTING'),
   
   // Global adaptive limiter
   adaptive: adaptiveApiLimiter,

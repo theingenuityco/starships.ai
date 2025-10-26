@@ -42,13 +42,6 @@ const RATE_LIMIT_TIERS = {
     max: 120, // 120 requests per minute (was 60)
     message: 'API rate limit exceeded',
   },
-
-  // TESTING TIER - Very low limits for UI testing
-  TESTING: {
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: 3, // 3 requests per minute (TESTING ONLY)
-    message: 'Rate limit exceeded - this is a test endpoint',
-  },
   
   // Unauthenticated API requests - still controlled but fair
   API_UNAUTHENTICATED: {
@@ -197,9 +190,6 @@ export const rateLimiters = {
   
   // Public endpoints
   public: createRateLimiter('PUBLIC'),
-  
-  // Testing endpoint (temporary)
-  testing: createRateLimiter('TESTING'),
   
   // Global adaptive limiter
   adaptive: adaptiveApiLimiter,

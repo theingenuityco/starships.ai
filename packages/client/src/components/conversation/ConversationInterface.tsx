@@ -258,6 +258,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (userSelectedAgentRef.current && selectedAgent) {
       return
     }
+    
     // Priority 1: first linked conversation agent
     if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
       const conversationAgent = conversationAgents[0]
@@ -286,7 +287,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
 
-    // Priority 3: fallback to first starship agent when none selected
+    // Priority 3: fallback to first starship agent when none selected  
     if (!selectedAgent && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
       const fallback = starshipAgentsData[0]
       if (fallback && typeof fallback.id === 'string') {

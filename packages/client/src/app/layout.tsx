@@ -4,6 +4,7 @@ import { AnalyticsProvider } from '@/components/analytics/analytics-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { UserbackWrapper } from '@/components/userback-wrapper'
 import { UI_TEXT } from '@/constants/text'
 import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
@@ -91,13 +92,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <QueryProvider>
             <AuthProvider>
-              <TooltipProvider>
-                <div className="min-h-[100dvh] bg-background">
-                  <ClientLayout>{children}</ClientLayout>
-                  <Toaster />
-                  <SonnerToaster position="top-center" />
-                </div>
-              </TooltipProvider>
+              <UserbackWrapper>
+                <TooltipProvider>
+                  <div className="min-h-[100dvh] bg-background">
+                    <ClientLayout>{children}</ClientLayout>
+                    <Toaster />
+                    <SonnerToaster position="top-center" />
+                  </div>
+                </TooltipProvider>
+              </UserbackWrapper>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

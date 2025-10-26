@@ -55,6 +55,7 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       # Analytics
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID}
+      USERBACK_TOKEN: ${USERBACK_TOKEN}
 
     volumes:
       # Application data

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z, ZodError } from 'zod';
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { rateLimiters } from '@/middleware/rateLimiter';
 import { StarshipService } from '@/services/StarshipService';
 import { TopupService } from '@/services/TopupService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -41,7 +42,7 @@ function validateData<T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
  * POST /wallets/:starshipId/topup
  * Creates a Stripe checkout session for wallet topup
  */
-router.post('/wallets/:starshipId/topup', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/wallets/:starshipId/topup', rateLimiters.financial, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;

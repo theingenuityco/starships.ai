@@ -20,7 +20,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-// TODO: Add centralized rate limiting (removed in PR #354, to be added in follow-up PR)
+import { rateLimiters } from '@/middleware/rateLimiter';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -75,9 +75,8 @@ const ResetPasswordSchema = z.object({
 /**
  * Register new user
  * POST /auth/register
- * TODO: Add centralized rate limiting in follow-up PR
  */
-router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/register', rateLimiters.auth, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
     const bodyValidation = validateData(RegisterSchema, req.body, res, 'registration data');
@@ -99,7 +98,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
  * Login user
  * POST /auth/login
  */
-router.post('/auth/login', async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
     const bodyValidation = validateData(LoginSchema, req.body, res, 'login data');
@@ -327,7 +326,7 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
  * POST /auth/resend-verification
  * Rate limited to prevent email bombing attacks
  */
-router.post('/auth/resend-verification', async (req: Request, res: Response) => {
+router.post('/auth/resend-verification', rateLimiters.sensitive, async (req: Request, res: Response) => {
   try {
     // Validate request body using Zod
     const bodyValidation = validateData(EmailVerificationSchema, req.body, res, 'resend verification data');
@@ -790,9 +789,8 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
 /**
  * Forgot password - Request password reset
  * POST /auth/forgot-password
- * TODO: Add centralized rate limiting in follow-up PR
  */
-router.post('/auth/forgot-password', async (req: Request, res: Response) => {
+router.post('/auth/forgot-password', rateLimiters.sensitive, async (req: Request, res: Response) => {
   try {
     const bodyValidation = validateData(ForgotPasswordSchema, req.body, res, 'forgot password data');
     if (!bodyValidation) return;
@@ -816,7 +814,7 @@ router.post('/auth/forgot-password', async (req: Request, res: Response) => {
  * Reset password - Confirm password reset with token
  * POST /auth/reset-password
  */
-router.post('/auth/reset-password', async (req: Request, res: Response) => {
+router.post('/auth/reset-password', rateLimiters.sensitive, async (req: Request, res: Response) => {
   try {
     const bodyValidation = validateData(ResetPasswordSchema, req.body, res, 'reset password data');
     if (!bodyValidation) return;

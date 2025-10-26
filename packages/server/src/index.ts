@@ -32,6 +32,7 @@ import ledgerRoutes from '@/routes/ledger';
 
 // Import new error handling and health check routes
 import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
+import { globalRateLimiter } from '@/middleware/rateLimiter';
 import healthRoutes from '@/routes/health';
 
 // Load server configuration
@@ -69,6 +70,8 @@ const dbConnection = createConnection({
 app.use(cors());
 // Add request ID early
 app.use(requestIdMiddleware);
+// Apply global rate limiting (before routes but after request ID)
+app.use(globalRateLimiter);
 // Mount Stripe webhooks BEFORE JSON parser to preserve raw body for signature verification
 app.use('/api/v1', webhooksRoutes);
 // Parse JSON for all other routes

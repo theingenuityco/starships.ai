@@ -275,29 +275,28 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           </DropdownMenu>
         </div>
 
-        {/* Model and Tools row */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Model quick picker */}
-          <div className="flex items-center justify-start gap-2 px-2 h-9 min-w-0">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Icon name="cpu" className="w-4 h-4" />
-              <span className="text-xs font-semibold w-36">Model</span>
-            </div>
-            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
-              <SelectTrigger className="h-7 w-[180px] text-xs rounded-xl">
-                <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
-              </SelectTrigger>
-              <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-                {availableModels.map(m => (
-                  <SelectItem key={m} value={m} className="text-xs px-2 py-1">
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Model quick picker */}
+        <div className="flex items-center justify-start gap-2 px-2 h-9 w-fit">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Icon name="cpu" className="w-4 h-4" />
+            <span className="text-xs font-semibold w-36">Model</span>
           </div>
-          {/* Assigned tools */}
-          <div className="flex items-center justify-start gap-2 px-2 h-9 min-w-0">
+          <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
+            <SelectTrigger className="h-7 w-[180px] text-xs rounded-xl">
+              <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+            </SelectTrigger>
+            <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
+              {availableModels.map(m => (
+                <SelectItem key={m} value={m} className="text-xs px-2 py-1">
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Assigned tools */}
+        <div className="flex items-center justify-start gap-2 px-2 h-9 w-fit">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold w-36">Assigned Tools</span>
@@ -357,7 +356,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </Command>
             </PopoverContent>
           </Popover>
-          </div>
         </div>
       </div>
 

@@ -242,10 +242,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     currentConversationIdRef.current = currentConversationId
   }, [currentConversationId])
 
-  // Handle initial agent selection from URL parameter
+  // Handle initial agent selection from URL parameter (supports both ID and slug)
   useEffect(() => {
     if (initialAgentId && starshipAgentsData.length > 0 && !selectedAgent) {
-      const agent = starshipAgentsData.find(a => a.id === initialAgentId)
+      // Try to find by slug first (preferred), then fall back to ID for backward compatibility
+      const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || 
+                   starshipAgentsData.find(a => a.id === initialAgentId)
       if (agent) {
         setSelectedAgent(agent)
       }

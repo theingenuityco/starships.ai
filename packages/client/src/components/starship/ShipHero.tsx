@@ -22,7 +22,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
   const router = useRouter()
   const { data: agents = [] } = useStarshipAgents(starshipId || '', !!starshipId)
 
-  const gaiaAgentId = Array.isArray(agents) ? agents.find(a => (a?.name || '').toLowerCase().includes('gaia'))?.id || null : null
+  const gaiaAgentSlug = Array.isArray(agents) ? agents.find(a => (a?.name || '').toLowerCase().includes('gaia'))?.slug || null : null
   return (
     <section aria-labelledby="ship-hero" className={cn('relative overflow-hidden rounded-2xl frosted-glass-card shadow-frosted-lg border border-border/80 p-7 md:p-8', className)}>
       {/* Decorative gradient overlay */}
@@ -69,7 +69,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
         {/* Gaia-focused actions */}
         <div className="flex flex-col items-stretch gap-3 sm:w-64">
           <Button asChild size="lg" disabled={!starshipId} className="whitespace-nowrap">
-            <Link href={`/ship/${slug}/conversations${gaiaAgentId ? `?agent=${gaiaAgentId}` : ''}`}>
+            <Link href={`/ship/${slug}/conversations${gaiaAgentSlug ? `?agent=${gaiaAgentSlug}` : ''}`}>
               <Icon name="sparkles" className="h-5 w-5" />
               <span className="ml-1">Create with Gaia</span>
             </Link>

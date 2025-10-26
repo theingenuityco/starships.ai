@@ -23,14 +23,14 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
+<div style={{ position: 'relative', marginTop: '-140px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
+  <CopyPageButton />
+</div>
+
 <Callout type="success">
   **Visual Workflow Engine**: Blueprints power every agent interaction - from simple conversations to complex multi-step automations through
   an intuitive node-based system.
 </Callout>
-
-<div style={{ position: 'relative', marginTop: '-160px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
-  <CopyPageButton />
-</div>
 
 ## What Are Blueprints?
 
@@ -102,12 +102,16 @@ The workflow begins with the `start` node, which receives input data and initial
 </Step>
 
 <Step icon={<Network />}>
-  ### Process Nodes Each node executes in sequence, with data flowing along edges. Nodes can be: - **Processing** (transform data, make API
-  calls) - **Decision** (branch based on conditions) - **Integration** (call tools, external services)
+### Process Nodes
+Each node executes in sequence, with data flowing along edges. Nodes can be:
+- **Processing** (transform data, make API calls)
+- **Decision** (branch based on conditions)  
+- **Integration** (call tools, external services)
 </Step>
 
 <Step icon={<Database />}>
-  ### Manage State State persists across nodes, allowing complex data transformations and multi-step processes to maintain context.
+### Manage State
+State persists across nodes, allowing complex data transformations and multi-step processes to maintain context.
 </Step>
 
 <Step icon={<CheckCircle />}>

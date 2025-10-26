@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { validatePassword } from '@/utils/passwordStrength'
 
 
 interface SetPasswordDialogProps {
@@ -34,8 +36,9 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
       return
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long')
+    const passwordValidation = validatePassword(formData.password)
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.errors[0])
       return
     }
 
@@ -94,6 +97,9 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
                 {showPasswords ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
               </button>
             </div>
+            {formData.password && (
+              <PasswordStrengthMeter password={formData.password} />
+            )}
           </div>
 
           <div className="space-y-2">
@@ -108,9 +114,6 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
             />
           </div>
 
-          <div className="text-xs text-muted-foreground">
-            <p>Password must be at least 8 characters long</p>
-          </div>
 
           {error && (
             <Alert variant="destructive">

@@ -15,6 +15,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { validatePassword } from '@/utils/passwordStrength'
 
 /**
  * OAuth error handling helper
@@ -161,8 +163,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       return
     }
 
-    if (registerData.password.length < 8) {
-      setFormError('Password must be at least 8 characters long')
+    const passwordValidation = validatePassword(registerData.password)
+    if (!passwordValidation.isValid) {
+      setFormError(passwordValidation.errors[0])
       return
     }
 
@@ -408,6 +411,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                       {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
+                  {registerData.password && (
+                    <PasswordStrengthMeter password={registerData.password} />
+                  )}
                 </div>
 
                 <div className="space-y-2">

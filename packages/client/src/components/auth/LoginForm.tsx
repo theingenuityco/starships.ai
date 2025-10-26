@@ -312,7 +312,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 )}
 
                 {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-3 my-4">
                   <Checkbox
                     id="terms-login"
                     checked={acceptTerms}
@@ -449,7 +449,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 )}
 
                 {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-3 my-4">
                   <Checkbox
                     id="terms-register"
                     checked={acceptTerms}

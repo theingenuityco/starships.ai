@@ -66,11 +66,11 @@ export function PasswordStrengthMeter({
   if (!password) return null
 
   return (
-    <div className={cn('space-y-2', className)}>
-      {/* Compact Strength Meter with inline label */}
-      <div className="flex items-center gap-3">
+    <div className={cn('space-y-1', className)}>
+      {/* Ultra-compact inline strength meter */}
+      <div className="flex items-center gap-2">
         <div className="flex-1">
-          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
             <div
               className={cn(
                 'h-full transition-all duration-300',
@@ -80,44 +80,46 @@ export function PasswordStrengthMeter({
             />
           </div>
         </div>
-        <span className={cn('text-xs font-medium whitespace-nowrap', strength.color)}>
+        <span className={cn('text-xs font-medium whitespace-nowrap min-w-[60px]', strength.color)}>
           {strength.label}
         </span>
       </div>
 
-      {/* Compact Requirements Grid */}
+      {/* Ultra-compact Requirements - all in one line with dots */}
       {showRequirements && (
-        <div className="grid grid-cols-2 gap-1">
-          <RequirementItem
-            met={requirements.minLength}
-            text="8+ chars"
-            compact
-          />
-          <RequirementItem
-            met={requirements.hasUppercase}
-            text="Uppercase"
-            compact
-          />
-          <RequirementItem
-            met={requirements.hasLowercase}
-            text="Lowercase"
-            compact
-          />
-          <RequirementItem
-            met={requirements.hasNumber}
-            text="Number"
-            compact
-          />
-          <RequirementItem
-            met={requirements.hasSpecial}
-            text="Special (!@#...)"
-            compact
-          />
-          {/* Empty div for 2x3 grid balance when 5 items */}
-          <div />
+        <div className="flex items-center gap-1 text-xs flex-wrap">
+          <RequirementDot met={requirements.minLength} text="8+" />
+          <span className="text-muted-foreground/50">•</span>
+          <RequirementDot met={requirements.hasUppercase} text="A" />
+          <span className="text-muted-foreground/50">•</span>
+          <RequirementDot met={requirements.hasLowercase} text="a" />
+          <span className="text-muted-foreground/50">•</span>
+          <RequirementDot met={requirements.hasNumber} text="1" />
+          <span className="text-muted-foreground/50">•</span>
+          <RequirementDot met={requirements.hasSpecial} text="!@" />
         </div>
       )}
     </div>
+  )
+}
+
+function RequirementDot({ met, text }: { met: boolean; text: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-0.5',
+        met ? 'text-green-600' : 'text-muted-foreground'
+      )}
+    >
+      <Icon
+        name={met ? 'check' : 'x'}
+        className={cn(
+          'h-2.5 w-2.5',
+          met ? 'text-green-600' : 'text-muted-foreground'
+        )}
+      />
+      <span className="text-xs">{text}</span>
+    </span>
   )
 }
 

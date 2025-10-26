@@ -94,3 +94,13 @@ body {
 .dark {
   --gradient-premium: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(0, 0, 0, 0) 100%);
 }
+
+/* Force hide theme toggle completely */
+[data-theme-toggle],
+[data-theme-switch],
+button[title*="theme"],
+button[title*="Theme"],
+.theme-toggle,
+.theme-switch {
+  display: none !important;
+}

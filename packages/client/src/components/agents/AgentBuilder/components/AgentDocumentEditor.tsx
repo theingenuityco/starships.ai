@@ -232,10 +232,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Quick selectors */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Category section */}
-        <div className="border-b border-border/10 pb-4">
-          <div className="flex items-center gap-3 px-2">
+        <div className="border-b border-border/10 pb-6">
+          <div className="flex items-center gap-4 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
@@ -278,8 +278,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
 
         {/* Model section */}
-        <div className="border-b border-border/10 pb-4">
-          <div className="flex items-center gap-3 px-2">
+        <div className="border-b border-border/10 pb-6">
+          <div className="flex items-center gap-4 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
@@ -300,8 +300,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
 
         {/* Tools section */}
-        <div className="pb-4">
-          <div className="flex items-start gap-3 px-2">
+        <div className="pb-6">
+          <div className="flex items-start gap-4 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold">Assigned Tools</span>

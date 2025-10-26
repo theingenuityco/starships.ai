@@ -55,6 +55,7 @@
     "@tiptap/react": "^3.7.1",
     "@tiptap/starter-kit": "^3.7.1",
     "@tiptap/suggestion": "^3.7.2",
+    "@userback/widget": "^0.3.11",
     "@xyflow/react": "^12.8.6",
     "autoprefixer": "^10.4.21",
     "canvas-confetti": "^1.9.3",

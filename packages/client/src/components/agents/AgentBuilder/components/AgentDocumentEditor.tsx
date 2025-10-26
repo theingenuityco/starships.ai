@@ -234,14 +234,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       {/* Quick selectors: Category and Model */}
       <div className="space-y-2">
         {/* Category quick picker */}
-        <div className="flex items-center justify-start gap-2 px-2 h-9 w-fit">
+        <div className="grid grid-cols-[auto_1fr] gap-2 items-center px-2 h-9">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Icon name="tag" className="w-4 h-4" />
-            <span className="text-xs font-semibold w-36">Category</span>
+            <span className="text-xs font-semibold">Category</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div role="button" aria-label="Change category" className="inline-flex items-center cursor-pointer select-none rounded-md py-1 hover:bg-muted/30 hover:shadow-sm transition-colors">
+              <div role="button" aria-label="Change category" className="flex items-center cursor-pointer select-none rounded-xl h-7 px-2 hover:bg-muted/30 hover:shadow-sm transition-colors border border-border/20">
                 <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
                   {getCategoryIcon(value.category)}
                   <span className="capitalize">{value.category}</span>

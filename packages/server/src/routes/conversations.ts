@@ -1,4 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { rateLimiters } from '@/middleware/rateLimiter';
 import { ConversationService } from '@/services/ConversationService';
 import { StreamingService } from '@/services/StreamingService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
@@ -187,7 +188,7 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
 /**
  * POST /conversations/:conversationId/messages - Send message to agent (supports unified streaming)
  */
-router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/conversations/:conversationId/messages', rateLimiters.messaging, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');

@@ -21,14 +21,16 @@ import {
   Globe,
 } from 'lucide-react';
 
-<Callout type="success">
-  **Build Any Tool**: From simple API integrations to complex multi-system workflows - Daedalus creates production-ready tools through conversation.
-</Callout>
-
-<div className="flex items-center justify-between">
-  <h2>Who is Daedalus?</h2>
+<div style={{ position: 'relative', marginTop: '-140px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
   <CopyPageButton />
 </div>
+
+<Callout type="success">
+  **Build Any Tool**: From simple API integrations to complex multi-system workflows - Daedalus creates production-ready tools through
+  conversation.
+</Callout>
+
+## Who is Daedalus?
 
 The technical specialist that builds custom tools and workflows through conversation. Unlike using existing tools, Daedalus creates specialized capabilities that any agent can use to solve complex technical challenges.
 
@@ -53,6 +55,7 @@ The technical specialist that builds custom tools and workflows through conversa
 Tell Daedalus: "Create a tool that sends formatted Slack notifications with error handling"
 
 **<CheckCircle className="inline w-4 h-4 text-green-600" /> Be Detailed**: Include functionality, format, and reliability requirements upfront
+
 </Step>
 
 <Step icon={<Code />}>
@@ -60,6 +63,7 @@ Tell Daedalus: "Create a tool that sends formatted Slack notifications with erro
 Daedalus asks about requirements and integration details while designing the workflow.
 
 **<CheckCircle className="inline w-4 h-4 text-green-600" /> Share Context**: Mention authentication methods, rate limits, and integration needs
+
 </Step>
 
 <Step icon={<CheckCircle />}>
@@ -67,6 +71,7 @@ Daedalus asks about requirements and integration details while designing the wor
 Daedalus creates the tool with validation, testing, and documentation ready for agents.
 
 **<CheckCircle className="inline w-4 h-4 text-green-600" /> Set Success Criteria**: Define "working" - delivery confirmation, success rate, response time
+
 </Step>
 
 <Step icon={<Wrench />}>
@@ -74,6 +79,7 @@ Daedalus creates the tool with validation, testing, and documentation ready for 
 Your tool becomes available for assignment to agents with your specific requirements.
 
 **<CheckCircle className="inline w-4 h-4 text-green-600" /> Start Simple**: Deploy basic functionality first, then add features based on usage
+
 </Step>
 </Steps>
 
@@ -91,7 +97,6 @@ Daedalus is a **meta-agent builder** - an AI that creates the technical building
 - **<Code className="inline w-4 h-4" /> Tool Engineering**: Creating reliable, reusable capabilities with proper error handling
 - **<Network className="inline w-4 h-4" /> Integration Patterns**: Connecting systems and APIs effectively
 - **<Cpu className="inline w-4 h-4" /> Performance Optimization**: Building fast, scalable solutions
-
 
 ## How Daedalus Creates Tools
 
@@ -130,6 +135,51 @@ Daedalus uses specialized capabilities to design and build tools:
 **<Workflow className="inline w-4 h-4" /> Blueprint Construction**: Designs efficient workflow architectures with proper error handling, optimal performance, and maintainable structure.
 
 **<CheckCircle className="inline w-4 h-4" /> Quality Assurance**: Validates workflows, implements security best practices, and ensures tools work reliably across different scenarios.
+
+### The Daedalus Tool Creation Workflow
+
+Every tool creation follows this proven workflow pattern:
+
+```mermaid
+graph TD
+    START([start: User Request]) --> ANALYZE[llm: Analyze Requirements]
+    ANALYZE --> DESIGN[code: Design Architecture]
+    DESIGN --> SCAFFOLD[tool: Create Tool Scaffold]
+
+    SCAFFOLD --> BUILD[tool: Build Blueprint Logic]
+    BUILD --> CONFIG[code: Configure Parameters]
+    CONFIG --> TEST[tool: Test Tool Functionality]
+
+    TEST --> CHECK{conditional: Tests Pass?}
+    CHECK -->|Yes| OPTIMIZE[code: Performance Optimization]
+    CHECK -->|No| DEBUG[llm: Debug & Fix Issues]
+
+    DEBUG --> BUILD
+    OPTIMIZE --> DEPLOY[mutate: Deploy Tool]
+    DEPLOY --> END([end: Tool Ready])
+
+    style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
+    style ANALYZE fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style CHECK fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e
+    style DESIGN fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style SCAFFOLD fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style BUILD fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style CONFIG fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style TEST fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+    style OPTIMIZE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
+    style DEBUG fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e
+    style DEPLOY fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0c4a6e
+```
+
+### How Each Step Works
+
+- **<Brain className="inline w-4 h-4" /> Analyze Requirements**: Daedalus processes your request and identifies the tool's purpose, input/output specifications, and technical constraints
+- **<Code className="inline w-4 h-4" /> Design Architecture**: Plans the blueprint workflow, determines node types needed, and maps data flow patterns
+- **<Wrench className="inline w-4 h-4" /> Create Scaffold**: Builds the basic tool structure with parameter definitions and initial blueprint nodes
+- **<Workflow className="inline w-4 h-4" /> Build Logic**: Implements the core workflow with proper error handling, validation, and business logic
+- **<Settings className="inline w-4 h-4" /> Configure Parameters**: Sets up input validation, output formatting, and environment variable requirements
+- **<CheckCircle className="inline w-4 h-4" /> Test & Optimize**: Validates functionality, optimizes performance, and ensures reliability before deployment
 
 <Callout type="info">
   **Production-Ready Tools**: Daedalus builds tools with comprehensive error handling, security, and performance optimization built-in.
@@ -211,4 +261,3 @@ Daedalus uses specialized capabilities to design and build tools:
 
 </Tab>
 </Tabs>
-

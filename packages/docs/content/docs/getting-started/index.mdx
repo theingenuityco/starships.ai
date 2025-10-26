@@ -24,16 +24,17 @@ import {
   Construction,
 } from 'lucide-react';
 
+<div style={{ position: 'relative', marginTop: '-160px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
+  <CopyPageButton />
+</div>
+
 <Callout type="info">
   **What's a Starship?** Your starship is your personal AI workspace where all your agents, tools, and conversations live. Think of it as
   your command center for building with AI. Learn more about the [agent architecture](/core-concepts/agents) and [tool
   ecosystem](/core-concepts/tools).
 </Callout>
 
-<div className="flex items-center justify-between">
-  <h3> 1. Create Your Account</h3>
-  <CopyPageButton />
-</div>
+### 1. Create Your Account
 
 1. **Sign up** at [starships.ai](https://starships.ai)
 2. **Verify your email** (required to access the platform)
@@ -148,16 +149,24 @@ Starships.ai uses a **conversational building approach**:
     <tbody className="divide-y divide-fd-border/50">
       <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
         <td className="px-6 py-4 font-semibold text-fd-foreground border-r border-fd-border/50">Marketplace Templates</td>
-        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Quick deployment, common use cases, getting started fast</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">
+          Quick deployment, common use cases, getting started fast
+        </td>
         <td className="px-6 py-4 text-fd-muted-foreground">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">1-2 minutes</span>
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            1-2 minutes
+          </span>
         </td>
       </tr>
       <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
         <td className="px-6 py-4 font-semibold text-fd-foreground border-r border-fd-border/50 last:rounded-bl-xl">Build with Gaia</td>
-        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Custom requirements, unique workflows, specific business needs</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">
+          Custom requirements, unique workflows, specific business needs
+        </td>
         <td className="px-6 py-4 text-fd-muted-foreground last:rounded-br-xl">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">5-10 minutes</span>
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            5-10 minutes
+          </span>
         </td>
       </tr>
     </tbody>

@@ -34,10 +34,11 @@ import {
   HeartPulse,
 } from 'lucide-react';
 
-<div className="flex items-center justify-between">
-  <h2>What are Tools?</h2>
+<div style={{ position: 'relative', marginTop: '-170px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
   <CopyPageButton />
 </div>
+
+## What are Tools?
 
 **Tools** are executable capabilities that extend what [agents](/core-concepts/agents) can do beyond conversation. Unlike simple functions, tools are **blueprint-powered**, **reusable**, and **intelligent** - capable of complex workflows and decision-making.
 
@@ -55,7 +56,6 @@ Think of tools as **specialized AI workers** that agents can delegate specific t
 </div>
 
 ---
-
 
 ## Universal Tool Architecture
 
@@ -87,7 +87,7 @@ graph TD
     VALIDATE --> PROCESS[code: Main Processing]
     PROCESS --> FORMAT[transform: Format Output]
     FORMAT --> END([end: Return Result])
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
@@ -105,19 +105,19 @@ For tools that need different processing paths based on input or context:
 graph TD
     START([start]) --> VALIDATE[code: Validate Input]
     VALIDATE --> ROUTE{conditional: Route by Type}
-    
+
     ROUTE -->|Search| API_A[http_request: Search API]
     ROUTE -->|Summary| API_B[http_request: Summary API]
     ROUTE -->|Content| API_C[http_request: Content API]
-    
+
     API_A --> FORMAT_A[transform: Format Search]
     API_B --> FORMAT_B[transform: Format Summary]
     API_C --> FORMAT_C[transform: Format Content]
-    
+
     FORMAT_A --> END([end: Return Result])
     FORMAT_B --> END
     FORMAT_C --> END
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style VALIDATE fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151
@@ -141,17 +141,17 @@ graph TD
     START([start]) --> INIT[code: Initialize State]
     INIT --> ATTEMPT[http_request: API Attempt]
     ATTEMPT --> CHECK{conditional: Success?}
-    
+
     CHECK -->|Success| FORMAT[transform: Format Result]
     CHECK -->|Failure| RETRY_CHECK{conditional: Can Retry?}
-    
+
     RETRY_CHECK -->|Yes| BACKOFF[code: Exponential Backoff]
     RETRY_CHECK -->|No| ERROR([end: Return Error])
-    
+
     BACKOFF --> MUTATE[mutate: Update Retry Count]
     MUTATE --> ATTEMPT
     FORMAT --> END([end: Return Success])
-    
+
     style START fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style END fill:#e8f4fd,stroke:#1e40af,stroke-width:2px,color:#1e40af
     style ERROR fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#dc2626
@@ -166,18 +166,24 @@ graph TD
 
 **Use Cases**: Rate-limited APIs, unreliable external services, batch processing tools, file upload handlers
 
-
 ### Blueprint Node Types
 
 All blueprint types can use any combination of these powerful node types:
 
-- <span style={{color: '#0066cc'}}>**[start](/core-concepts/blueprints#start-node)**</span> <ExternalLink className="inline w-3 h-3" />: Receives tool parameters and initiates execution
-- <span style={{color: '#0066cc'}}>**[code](/core-concepts/blueprints#code-node)**</span> <ExternalLink className="inline w-3 h-3" />: Executes JavaScript for data processing and validation logic
-- <span style={{color: '#0066cc'}}>**[conditional](/core-concepts/blueprints#conditional-node)**</span> <ExternalLink className="inline w-3 h-3" />: Routes execution based on conditions and business logic
-- <span style={{color: '#0066cc'}}>**[http_request](/core-concepts/blueprints#http-node)**</span> <ExternalLink className="inline w-3 h-3" />: Makes API calls to external services with authentication
-- <span style={{color: '#0066cc'}}>**[mutate](/core-concepts/blueprints#mutate-node)**</span> <ExternalLink className="inline w-3 h-3" />: Updates tool state and context for complex workflows
-- <span style={{color: '#0066cc'}}>**[transform](/core-concepts/blueprints#transform-node)**</span> <ExternalLink className="inline w-3 h-3" />: Modifies data structure and format using JSON operations
-- <span style={{color: '#0066cc'}}>**[end](/core-concepts/blueprints#end-node)**</span> <ExternalLink className="inline w-3 h-3" />: Returns structured results to the calling agent
+- <span style={{ color: '#0066cc' }}>**[start](/core-concepts/blueprints#start-node)**</span> <ExternalLink className="inline w-3 h-3" />:
+  Receives tool parameters and initiates execution
+- <span style={{ color: '#0066cc' }}>**[code](/core-concepts/blueprints#code-node)**</span> <ExternalLink className="inline w-3 h-3" />:
+  Executes JavaScript for data processing and validation logic
+- <span style={{ color: '#0066cc' }}>**[conditional](/core-concepts/blueprints#conditional-node)**</span>
+  <ExternalLink className="inline w-3 h-3" />: Routes execution based on conditions and business logic
+- <span style={{ color: '#0066cc' }}>**[http_request](/core-concepts/blueprints#http-node)**</span>
+  <ExternalLink className="inline w-3 h-3" />: Makes API calls to external services with authentication
+- <span style={{ color: '#0066cc' }}>**[mutate](/core-concepts/blueprints#mutate-node)**</span> <ExternalLink className="inline w-3 h-3" />:
+  Updates tool state and context for complex workflows
+- <span style={{ color: '#0066cc' }}>**[transform](/core-concepts/blueprints#transform-node)**</span>
+  <ExternalLink className="inline w-3 h-3" />: Modifies data structure and format using JSON operations
+- <span style={{ color: '#0066cc' }}>**[end](/core-concepts/blueprints#end-node)**</span> <ExternalLink className="inline w-3 h-3" />:
+  Returns structured results to the calling agent
 
 <Callout type="info">
   **Blueprint Architecture**: Learn more about the [visual workflow system](/core-concepts/blueprints) that powers intelligent tool
@@ -202,7 +208,7 @@ The agent decides to call specific tools with appropriate parameters, like "I ne
 </Step>
 
 <Step icon={<Wrench />}>
-### Tool Execution
+### Tool Execution  
 The tool's blueprint executes with the provided parameters, potentially involving multiple steps like API calls, data processing, and formatting.
 </Step>
 
@@ -234,7 +240,6 @@ Tools are organized into categories based on their primary function:
 - **Communication**: Email integration, chat platforms, SMS, calendar scheduling
 - **Utilities**: Mathematical operations, time/date tools, text processing, system operations
 
-
 ## Create Custom Tools with Daedalus
 
 <div className="my-6">
@@ -243,7 +248,9 @@ Tools are organized into categories based on their primary function:
     alt="Tool creation interface showing parameters, blueprints, and template deployment options"
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
-  <div className="text-sm text-muted-foreground text-center mt-2">Create tools with parameters and blueprints, or deploy from templates</div>
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Create tools with parameters and blueprints, or deploy from templates
+  </div>
 </div>
 
 [**Daedalus**](/agents/daedalus) is the meta-agent that specializes in creating custom tools through conversation. Build API integrations, data processors, monitoring systems, and automation workflows tailored to your specific needs.
@@ -271,5 +278,3 @@ Securely store API keys, tokens, and credentials that your custom tools can acce
 </Callout>
 
 ---
-
-

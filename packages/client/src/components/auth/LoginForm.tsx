@@ -222,7 +222,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
           {emailVerificationStatus && (
-            <Alert className="mb-3 border-2 border-emerald-500 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
+            <Alert className="mb-3 border border-emerald-400 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />

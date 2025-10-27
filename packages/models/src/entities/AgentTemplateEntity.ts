@@ -103,7 +103,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @Expose()
   @IsNumber()
   @Min(1000)
-  @Max(300000)
+  @Max(600000)
   timeout!: number;
 
   @Expose()

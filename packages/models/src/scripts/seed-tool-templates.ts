@@ -56,18 +56,17 @@ export async function seedToolTemplates(): Promise<void> {
         }
       } catch (error) {
         errorCount++;
-        logger.warn(`Tool template error processing ${template.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        logger.warn(
+          `Tool template error processing ${template.name}`,
+          { component: 'seed-tool-templates', operation: 'create', metadata: { templateName: template.name } },
+          error as Error
+        );
       }
     }
 
     logger.info(`✅ Tool template seeding completed: ${addedCount} new, ${updatedCount} skipped, ${errorCount} errors`);
   } catch (error) {
-    logger.error(`Failed to seed tool templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    if (error instanceof Error) {
-      logger.error('Tool template seeding error details', {
-        stack: error.stack || 'No stack trace available',
-      });
-    }
+    logger.error('Failed to seed tool templates', { component: 'seed-tool-templates' }, error as Error);
     // Do not throw; seeding failure should not block startup
   }
 }

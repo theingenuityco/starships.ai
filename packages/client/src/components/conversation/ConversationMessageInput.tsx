@@ -432,6 +432,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       active: number
       onHover: (i: number) => void
     }) => {
+      const activeItemRef = useRef<HTMLButtonElement | null>(null)
+
+      // Scroll active item into view when active index changes
+      useEffect(() => {
+        if (activeItemRef.current) {
+          activeItemRef.current.scrollIntoView({
+            block: 'nearest',
+            behavior: 'smooth',
+          })
+        }
+      }, [active])
+
       const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
       const vh = typeof window !== 'undefined' ? window.innerHeight : 768
       const menuWidth = Math.min(420, vw - 40)
@@ -459,6 +471,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             <button
               key={agent.id}
               id={`mention-option-${agent.id}`}
+              ref={idx === active ? activeItemRef : null}
               type="button"
               tabIndex={-1}
               role="option"

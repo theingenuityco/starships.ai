@@ -23,8 +23,8 @@ Implicit environment (do not pass as arguments):
 - AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
 
 Output:
-- Array of models with { id, name, description, context_length, pricing, architecture }
-- Model IDs use provider/model format (e.g., "anthropic/claude-sonnet-4.5", "openai/gpt-4o")
+  - Array of strings: model IDs (provider/model), e.g., "anthropic/claude-sonnet-4.5"
+  - Returns only identifiers to minimize payload size and be directly usable
 
 Model Selection Guidelines:
 - For coding tasks: Look for models with "code" or "coding" in description
@@ -96,16 +96,11 @@ Behavior and limits:
               ? body.data
               : (Array.isArray(body) ? body : []);
 
-            // Return useful model information
-            return data.map((m) => ({
-              id: m && m.id,
-              name: m && m.name,
-              description: m && m.description,
-              context_length: m && m.context_length,
-              pricing: m && m.pricing,
-              architecture: m && m.architecture,
-              supported_parameters: m && m.supported_parameters,
-            }));
+            // Return only model identifiers (prefer id, fallback to name)
+            const ids = data
+              .map((m) => (m && (m.id || m.name)))
+              .filter((v) => typeof v === 'string' && v.length > 0);
+            return ids;
           `,
           timeout: 2000,
         },
@@ -138,7 +133,7 @@ export const modelsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
 
   slug: 'models-list',
   category: 'automation',
-  exampleUsage: '{} // returns array of available models with id, name, description, context_length, pricing, etc.',
+  exampleUsage: '{} // returns array of model IDs as strings (e.g., "anthropic/claude-sonnet-4.5")',
   requiresApiKey: false,
   configurationFields: [],
 };

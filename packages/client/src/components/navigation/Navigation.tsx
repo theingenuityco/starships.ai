@@ -14,6 +14,9 @@ import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import Icon from '@/components/primitives/Icon'
+import { Orbitron } from 'next/font/google'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 // (All items are composed into a single NavigationSection below)
 
@@ -26,9 +29,6 @@ export function Navigation() {
   // Navigation is always expanded like Claude - clean and simple
   const expanded = true
   const showLabels = false
-  // Smooth height animation (overview submenu)
-  const [overviewSubnavHeight, setOverviewSubnavHeight] = useState(0)
-  const overviewSubnavContentRef = useRef<HTMLDivElement>(null)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -86,24 +86,8 @@ export function Navigation() {
   const isAgentBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agent/`) : false
   const isToolsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tools`) : false
   const isToolBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tool/`) : false
-  const overviewExpanded = isOverviewRoute || isAgentsRoute || isAgentBuilderRoute || isToolsRoute || isToolBuilderRoute
 
 
-  // Measure overview subnav content height
-  useEffect(() => {
-    const measure = () => {
-      const el = overviewSubnavContentRef.current
-      if (!el) return
-      setOverviewSubnavHeight(el.offsetHeight)
-    }
-    if (overviewExpanded) {
-      requestAnimationFrame(measure)
-      window.addEventListener('resize', measure)
-    } else {
-      setOverviewSubnavHeight(0)
-    }
-    return () => window.removeEventListener('resize', measure)
-  }, [overviewExpanded])
 
   // Handle new conversation
   const handleNewConversation = () => {
@@ -113,6 +97,8 @@ export function Navigation() {
   // Build a single unified navigation section list
   const mainNavigationItems = [
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'agents', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'tools', isActive: isToolsRoute || isToolBuilderRoute }] : []),
     { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
@@ -151,7 +137,7 @@ export function Navigation() {
             />
           </div>
           <div className="flex-1">
-            <h1 className="text-base font-medium text-white">starships.ai</h1>
+            <h1 className={`${orbitron.className} text-base font-normal tracking-tight text-white`}>starships.ai</h1>
           </div>
         </div>
 
@@ -178,56 +164,6 @@ export function Navigation() {
               pathname={pathname}
               showLabels={showLabels}
               expanded={expanded}
-              renderAfter={item => {
-                const isOverviewItem = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}`
-                if (isOverviewItem) {
-                  return (
-                    <motion.div
-                      initial={false}
-                      animate={{ height: overviewExpanded ? overviewSubnavHeight : 0, opacity: overviewExpanded ? 1 : 0, y: overviewExpanded ? 0 : 4 }}
-                      transition={{ duration: 0.24, ease: 'easeInOut' }}
-                      className="overflow-hidden mt-1 bg-muted/20 rounded-lg mx-2"
-                      style={{ willChange: 'height, opacity, transform' }}
-                    >
-                      <div ref={overviewSubnavContentRef} className="px-2 py-2 space-y-1">
-                        {/* Agents */}
-                        <button
-                          onClick={() => {
-                            if (!starshipSlug) return
-                            router.push(`/ship/${starshipSlug}/agents`)
-                          }}
-                          className={`group relative transition-all duration-300 rounded-lg flex items-center justify-start w-full px-3 py-2 h-10 border ${
-                            isAgentsRoute || isAgentBuilderRoute
-                              ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
-                              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                          }`}
-                        >
-                          <LordIcon src={getLordiconUrl('agents')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
-                          <span className="ml-3 text-sm font-medium">Agents</span>
-                        </button>
-
-                        {/* Tools */}
-                        <button
-                          onClick={() => {
-                            if (!starshipSlug) return
-                            router.push(`/ship/${starshipSlug}/tools`)
-                          }}
-                          className={`group relative transition-all duration-300 rounded-lg flex items-center justify-start w-full px-3 py-2 h-10 border ${
-                            isToolsRoute || isToolBuilderRoute
-                              ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
-                              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                          }`}
-                        >
-                          <LordIcon src={getLordiconUrl('tools')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
-                          <span className="ml-3 text-sm font-medium">Tools</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )
-                }
-
-                return null
-              }}
             />
 
             {/* Recents Section */}

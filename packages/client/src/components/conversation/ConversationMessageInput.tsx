@@ -1487,86 +1487,79 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       } catch {}
     }, [tiptap, scheduleSetContent])
 
-    // Track when we're switching conversations to prevent conflicting updates
-    const conversationSwitchRef = useRef<boolean>(false)
-    
-    // Clear editor and reset mention when conversation changes
+    // When conversation OR selected agent changes, update the editor
     useEffect(() => {
       if (!tiptap) return
       
-      // Only proceed if conversation actually changed
-      if (conversationId && conversationId !== lastConversationIdRef.current) {
-        lastConversationIdRef.current = conversationId
-        conversationSwitchRef.current = true
+      // Check if conversation changed
+      const conversationChanged = conversationId && conversationId !== lastConversationIdRef.current
+      
+      // Check if agent changed
+      const agentChanged = selectedAgent && selectedAgent.id !== lastEnforcedAgentIdRef.current
+      
+      // If either changed, update the editor
+      if (conversationChanged || agentChanged) {
+        // Update tracking refs
+        if (conversationChanged) {
+          lastConversationIdRef.current = conversationId
+        }
+        if (selectedAgent) {
+          lastEnforcedAgentIdRef.current = selectedAgent.id
+        }
         
-        // Reset the last enforced agent
-        lastEnforcedAgentIdRef.current = null
-        
-        // Clear the editor content and set the new agent mention
+        // Clear and rebuild editor content with correct agent
         if (selectedAgent) {
           const mentionNode = buildMentionNodeForAgent(selectedAgent)
           if (mentionNode) {
+            // Get current text content (excluding mention)
+            const json: any = tiptap.getJSON()
+            const docContent = Array.isArray(json?.content) ? json.content : []
+            const firstBlock = docContent[0]
+            const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+            
+            // Extract text after any existing mention
+            let textContent = ''
+            for (const node of blockContent) {
+              if (node && node.type === 'text' && typeof node.text === 'string') {
+                textContent += node.text
+              }
+            }
+            
+            // If it's just a space or empty, clear it
+            if (textContent.trim() === '') {
+              textContent = ' '
+            } else if (!textContent.startsWith(' ')) {
+              textContent = ' ' + textContent.trimStart()
+            }
+            
+            // Build new content with updated mention
             const content = {
               type: 'doc',
               content: [
                 {
                   type: 'paragraph',
-                  content: [mentionNode, { type: 'text', text: ' ' }]
+                  content: [
+                    mentionNode,
+                    { type: 'text', text: textContent }
+                  ]
                 }
               ]
             }
-            tiptap.commands.setContent(content)
-            lastEnforcedAgentIdRef.current = selectedAgent.id
             
-            // Focus at the end after a small delay
+            // Set content directly
+            tiptap.commands.setContent(content)
+            
+            // Position cursor after mention and space
             setTimeout(() => {
-              tiptap.commands.focus('end')
-              conversationSwitchRef.current = false
-            }, 100)
+              try {
+                const pos = Math.min(2, tiptap.state.doc.content.size - 1)
+                tiptap.commands.setTextSelection(pos)
+              } catch {}
+            }, 10)
           }
-        } else {
-          tiptap.commands.clearContent()
-          setTimeout(() => {
-            conversationSwitchRef.current = false
-          }, 100)
         }
       }
-    }, [conversationId, tiptap, selectedAgent, buildMentionNodeForAgent])
-
-    // Insert or update the leading mention when selected agent changes (but not on conversation change)
-    useEffect(() => {
-      if (!tiptap || !selectedAgent) return
-
-      // Skip if we're in the middle of a conversation switch
-      if (conversationSwitchRef.current) {
-        return
-      }
-
-      // Reset enforcement tracking when agent actually changes from external source
-      if (selectedAgent.id !== lastEnforcedAgentIdRef.current) {
-        // Defer enforcement to avoid synchronous mutations during mount/prop change lifecycles
-        if (enforceTimeoutRef.current) {
-          clearTimeout(enforceTimeoutRef.current)
-          enforceTimeoutRef.current = null
-        }
-        enforceTimeoutRef.current = window.setTimeout(() => {
-          if (!conversationSwitchRef.current) {
-            try {
-              ensureLeadingAgentMention()
-              lastEnforcedAgentIdRef.current = selectedAgent.id
-            } catch {}
-          }
-          enforceTimeoutRef.current = null
-        }, 100)
-      }
-
-      return () => {
-        if (enforceTimeoutRef.current) {
-          clearTimeout(enforceTimeoutRef.current)
-          enforceTimeoutRef.current = null
-        }
-      }
-    }, [tiptap, selectedAgent, ensureLeadingAgentMention])
+    }, [conversationId, selectedAgent, tiptap, buildMentionNodeForAgent])
 
     // Clear any pending enforcement when unmounting
     useEffect(() => {

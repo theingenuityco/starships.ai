@@ -226,8 +226,8 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-800 font-medium text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-emerald-700 text-sm break-all">{emailVerificationStatus.email}</span>
+                  <span className="font-medium text-sm text-emerald-600">We&apos;ve sent a verification email to:</span>
+                  <span className="font-medium text-sm text-emerald-600 break-all">{emailVerificationStatus.email}</span>
                 </div>
                 <AlertDescription>
                   <div className="flex justify-center">
@@ -236,7 +236,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                       size="sm"
                       onClick={() => handleResendVerification(emailVerificationStatus.email)}
                       disabled={isLoading}
-                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      className="border-emerald-400 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
                     >
                       <Icon name="mail" className="h-4 w-4 mr-2" />
                       {isLoading ? 'Sending...' : 'Resend Email'}

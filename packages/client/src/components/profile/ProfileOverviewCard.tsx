@@ -45,10 +45,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
       <CardHeader className="pb-4">
         <CardTitle className="text-base">Profile overview</CardTitle>
         <CardDescription className="text-sm">
-          {hasProfileImage 
-            ? "Select an emoji avatar or keep your profile image." 
-            : "Select an emoji avatar or keep initials."
-          }
+          Select an emoji avatar or keep initials.
         </CardDescription>
       </CardHeader>
 

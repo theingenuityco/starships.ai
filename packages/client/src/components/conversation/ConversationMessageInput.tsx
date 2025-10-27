@@ -1487,6 +1487,38 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       } catch {}
     }, [tiptap, scheduleSetContent])
 
+    // Clear editor and reset mention when conversation changes
+    useEffect(() => {
+      if (!tiptap) return
+      
+      // Clear the editor when conversation changes
+      if (conversationId) {
+        // Reset the last enforced agent to force re-enforcement
+        lastEnforcedAgentIdRef.current = null
+        
+        // Clear the editor content
+        tiptap.commands.clearContent()
+        
+        // If we have a selected agent, enforce its mention
+        if (selectedAgent) {
+          const mentionNode = buildMentionNodeForAgent(selectedAgent)
+          if (mentionNode) {
+            const content = {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [mentionNode, { type: 'text', text: ' ' }]
+                }
+              ]
+            }
+            scheduleSetContent(content)
+            lastEnforcedAgentIdRef.current = selectedAgent.id
+          }
+        }
+      }
+    }, [conversationId, tiptap, selectedAgent, buildMentionNodeForAgent, scheduleSetContent])
+
     // Insert or update the leading mention whenever the editor or selected agent changes
     useEffect(() => {
       if (!tiptap || !selectedAgent) return

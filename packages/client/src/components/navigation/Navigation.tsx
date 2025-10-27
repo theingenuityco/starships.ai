@@ -115,7 +115,7 @@ export function Navigation() {
   // Full height mode - touching top, bottom, and left edges
   return (
     <div ref={sidebarRef} className="flex flex-row overflow-hidden shadow-frosted-lg bg-muted/50 backdrop-blur-md relative z-[100] h-screen border-r border-border/30">
-      <div className="flex flex-col flex-shrink-0 w-56 h-full">
+      <div className="flex flex-col flex-shrink-0 w-64 h-full">
         {/* Header */}
         <div className="px-3 py-3 flex-shrink-0 flex items-center space-x-3 bg-black relative z-[101]">
           <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Go to Landing Screen">
@@ -188,6 +188,7 @@ interface RecentsSectionProps {
 
 function RecentsSection({ starshipSlug }: RecentsSectionProps) {
   const router = useRouter()
+  const pathname = usePathname()
 
   // Get user from auth context
   const { user } = useAuth()
@@ -222,7 +223,18 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
       </h3>
       <div className="space-y-1">
         {recentConversations.length > 0 ? (
-          recentConversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} onClick={() => handleConversationClick(conversation.id)} />)
+          recentConversations.map(conversation => {
+            // Check if this conversation is currently active
+            const isActive = pathname === `/ship/${starshipSlug}/conversations/${conversation.id}`
+            return (
+              <ConversationItem 
+                key={conversation.id} 
+                conversation={conversation} 
+                onClick={() => handleConversationClick(conversation.id)}
+                isActive={isActive}
+              />
+            )
+          })
         ) : (
           <div className="text-sm text-muted-foreground px-2">No recent conversations</div>
         )}
@@ -235,9 +247,10 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
 interface ConversationItemProps {
   conversation: any
   onClick: () => void
+  isActive?: boolean
 }
 
-function ConversationItem({ conversation, onClick }: ConversationItemProps) {
+function ConversationItem({ conversation, onClick, isActive = false }: ConversationItemProps) {
   const [showMenu, setShowMenu] = useState(false)
   const deleteConversationMutation = useDeleteConversation()
   const updateConversationStatusMutation = useUpdateConversationStatus()
@@ -284,7 +297,11 @@ function ConversationItem({ conversation, onClick }: ConversationItemProps) {
     <div className="relative group" ref={menuRef}>
       <button
         onClick={onClick}
-        className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors truncate pr-8"
+        className={`w-full text-left px-2 py-1.5 text-sm rounded-lg transition-colors truncate pr-8 ${
+          isActive 
+            ? 'bg-primary/20 text-primary border border-primary/30' 
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+        }`}
         title={conversation.title || 'Untitled conversation'}
       >
         {conversation.title || 'Untitled conversation'}

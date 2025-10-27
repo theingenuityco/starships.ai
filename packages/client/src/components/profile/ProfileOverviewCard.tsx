@@ -44,9 +44,6 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
     <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
       <CardHeader className="pb-4">
         <CardTitle className="text-base">Profile overview</CardTitle>
-        <CardDescription className="text-sm">
-          Select an emoji avatar or keep initials.
-        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">

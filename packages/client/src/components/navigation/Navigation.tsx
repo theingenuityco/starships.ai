@@ -138,7 +138,8 @@ export function Navigation() {
 
         {/* Navigation Content */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 px-2 py-3 space-y-4">
+          {/* Fixed Top Section - New Chat Button and Main Navigation */}
+          <div className="flex-shrink-0 px-2 py-3 space-y-4">
             {/* New Chat Button */}
             {isAuthenticated && starshipSlug && (
               <button onClick={handleNewConversation} className="group relative w-full transition-all duration-300 flex items-center px-2 py-2 hover:bg-muted/30 rounded-lg">
@@ -153,14 +154,16 @@ export function Navigation() {
 
             {/* Main Navigation */}
             <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} showLabels={showLabels} expanded={expanded} />
+          </div>
 
-            {/* Recents Section */}
-            {isAuthenticated && starshipSlug && (
-              <div className="mt-8 pt-6 border-t border-border/20">
+          {/* Scrollable Recents Section */}
+          {isAuthenticated && starshipSlug && (
+            <div className="flex-1 min-h-0 mt-4 pt-6 border-t border-border/20">
+              <div className="h-full overflow-y-auto px-2">
                 <RecentsSection starshipSlug={starshipSlug} />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* User Profile Section */}

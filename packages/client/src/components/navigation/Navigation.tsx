@@ -164,10 +164,10 @@ export function Navigation() {
                 onClick={handleNewConversation}
                 className="group relative w-full transition-all duration-300 flex items-center px-2 py-2 hover:bg-muted/30 rounded-lg"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 flex items-center justify-center mr-3 transition-all duration-300 transform group-hover:scale-105">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 transition-all duration-300 transform group-hover:scale-105" style={{ backgroundColor: '#F5A61F' }}>
                   <LordIcon src={getLordiconUrl('plus')} width={16} height={16} className="w-[16px] h-[16px] text-white" trigger="click" />
                 </div>
-                <span className="text-sm font-medium text-orange-600 group-hover:text-orange-700 transition-colors duration-300">New Chat</span>
+                <span className="text-sm font-medium transition-colors duration-300" style={{ color: '#F5A61F' }}>New Chat</span>
               </button>
             )}
 

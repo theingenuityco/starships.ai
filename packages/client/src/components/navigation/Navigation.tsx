@@ -162,10 +162,12 @@ export function Navigation() {
             {isAuthenticated && starshipSlug && (
               <button
                 onClick={handleNewConversation}
-                className="group relative w-full transition-all duration-300 rounded-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+                className="group relative w-full transition-all duration-300 flex items-center px-2 py-2 hover:bg-muted/30 rounded-lg"
               >
-                <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px] mr-2" trigger="click" />
-                <span className="text-sm font-medium">New Chat</span>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 flex items-center justify-center mr-3 transition-all duration-300 transform group-hover:scale-105">
+                  <LordIcon src={getLordiconUrl('plus')} width={16} height={16} className="w-[16px] h-[16px] text-white" trigger="click" />
+                </div>
+                <span className="text-sm font-medium text-orange-600 group-hover:text-orange-700 transition-colors duration-300">New Chat</span>
               </button>
             )}
 

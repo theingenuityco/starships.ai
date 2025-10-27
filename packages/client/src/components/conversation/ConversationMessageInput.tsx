@@ -1560,20 +1560,38 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               } catch {}
             })
           } else if (existingMention) {
-            // Replace existing mention while preserving text
-            const newContent = blockContent.map((node: any) => {
-              if (node?.type === 'mention') {
-                return mentionNode
+            // Replace all mentions with single new mention and preserve text
+            let textContent = ''
+            const newContent = []
+            
+            // First, add the new mention
+            newContent.push(mentionNode)
+            
+            // Then, collect all text content (excluding mentions)
+            for (const node of blockContent) {
+              if (node && node.type === 'text' && typeof node.text === 'string') {
+                textContent += node.text
               }
-              return node
-            })
+            }
+            
+            // Ensure proper spacing
+            if (textContent.trim() === '') {
+              textContent = ' '
+            } else if (!textContent.startsWith(' ')) {
+              textContent = ' ' + textContent.trimStart()
+            }
+            
+            // Add the text content
+            if (textContent) {
+              newContent.push({ type: 'text', text: textContent })
+            }
             
             const content = {
               type: 'doc',
               content: [
                 {
                   type: 'paragraph',
-                  content: newContent.length > 0 ? newContent : [mentionNode, { type: 'text', text: ' ' }]
+                  content: newContent
                 }
               ]
             }
@@ -1584,11 +1602,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             
             requestAnimationFrame(() => {
               try {
-                const maxPos = tiptap.state.doc.content.size - 1
-                const safePos = Math.min(currentPos, maxPos)
-                if (safePos > 0) {
-                  tiptap.commands.setTextSelection(safePos)
-                }
+                // Position after mention and space
+                const pos = Math.min(2, tiptap.state.doc.content.size - 1)
+                tiptap.commands.setTextSelection(Math.max(2, pos))
               } catch {}
             })
           }

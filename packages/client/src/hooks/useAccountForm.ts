@@ -51,7 +51,11 @@ export function useAccountForm() {
   const initial = useMemo(
     () => ({
       displayName: currentUser?.displayName ?? user?.name ?? '',
-      avatar: currentUser?.avatar ?? user?.avatar ?? '',
+      // Only set avatar if it's an emoji (not a URL). URLs should be handled as profile images
+      avatar: (() => {
+        const avatarValue = currentUser?.avatar ?? user?.avatar ?? ''
+        return avatarValue && !avatarValue.startsWith('http') ? avatarValue : ''
+      })(),
       email: currentUser?.email ?? user?.email ?? '',
     }),
     [currentUser, user]

@@ -67,7 +67,7 @@ export default function AccountForm() {
           initials={initials}
           displayName={form.displayName || currentUser?.displayName}
           email={form.email || currentUser?.email}
-          selectedEmoji={form.avatar || ''}
+          selectedEmoji={form.avatar && !form.avatar.startsWith('http') ? form.avatar : ''}
           profileImageUrl={userAvatar}
           onSelectEmoji={emoji => setForm(prev => ({ ...prev, avatar: emoji }))}
         />

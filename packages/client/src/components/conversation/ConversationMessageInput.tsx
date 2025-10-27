@@ -92,6 +92,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const enforceTimeoutRef = useRef<number | null>(null)
     // When true, user is editing the mention text inline (avoid auto-enforcement)
     const isEditingMentionRef = useRef(false)
+    // Track when mention enforcement is happening for visual feedback
+    const [isMentionEnforcing, setIsMentionEnforcing] = useState(false)
+    // Track the last enforced agent to avoid re-enforcement on internal detections
+    const lastEnforcedAgentIdRef = useRef<string | null>(null)
 
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
@@ -239,11 +243,50 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const { setConversationAgent } = useStarshipUIStore.getState()
         setConversationAgent(currentConversationId!, effectiveAgent.id, effectiveAgent.name)
 
-        // Clear input and reset UI immediately for better UX
+        // Clear only the text content, preserve the mention
         setMessage('')
         try {
-          clearEditorRef.current()
-        } catch {}
+          // Instead of clearing everything, just clear the text after the mention
+          if (tiptap) {
+            const json = tiptap.getJSON()
+            const docContent = Array.isArray(json?.content) ? json.content : []
+            const firstBlock = docContent[0]
+            const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+            const firstMention = blockContent.find((n: any) => n && n.type === 'mention')
+
+            if (firstMention) {
+              // Keep the mention and add a single space after it
+              tiptap.commands.setContent({
+                type: 'doc',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [firstMention, { type: 'text', text: ' ' }],
+                  },
+                ],
+              })
+              // Reset enforcement tracking so the space gets properly enforced
+              lastEnforcedAgentIdRef.current = null
+              // Position cursor after the space
+              setTimeout(() => {
+                tiptap.commands.focus()
+                tiptap.commands.setTextSelection(2) // Position after mention + space
+                // Trigger enforcement to ensure proper spacing
+                setTimeout(() => {
+                  try {
+                    ensureLeadingAgentMention()
+                  } catch {}
+                }, 20)
+              }, 10)
+            } else {
+              clearEditorRef.current()
+            }
+          }
+        } catch {
+          try {
+            clearEditorRef.current()
+          } catch {}
+        }
 
         /* optimistic append skipped (server-SSE will add user message) */
 
@@ -365,40 +408,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      return promptAgent ? `Ask ${promptAgent.name}...` : 'Type @ to choose an agent, then ask your question'
+      return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to choose an agent, then ask your question'
     }
 
-    // Require balance; server also enforces funds. Reverted per request.
-    const canSend = Boolean(message.trim()) && !disabled && !sending && !isStreamingEffective && Boolean(selectedAgent) && hasFunds
+    // Track if there's actual content beyond just the mention and space
+    const [hasActualContent, setHasActualContent] = useState(false)
 
-    // Debug why the send button is disabled (dev-only)
-    useEffect(() => {
-      if (typeof window === 'undefined') return
-      const reasons: string[] = []
-      if (!Boolean(message.trim())) reasons.push('empty_message')
-      if (disabled) reasons.push('input_disabled_prop')
-      if (sending) reasons.push('sending_true')
-      if (isStreamingEffective) reasons.push('streaming_active')
-      if (!Boolean(selectedAgent)) reasons.push('no_selected_agent')
-      if (!hasFunds) reasons.push('insufficient_funds')
-      const summary = {
-        canSend,
-        reasons,
-        flags: {
-          hasMessage: Boolean(message.trim()),
-          disabled,
-          sending,
-          isStreamingEffective,
-          hasSelectedAgent: Boolean(selectedAgent),
-          hasFunds,
-          conversationId: conversationId || null,
-        },
-      }
-      try {
-        // Only log when disabled to reduce noise
-        if (!canSend) console.debug('[MessageInput] send disabled:', summary)
-      } catch {}
-    }, [canSend, message, disabled, sending, isStreamingEffective, selectedAgent, hasFunds, conversationId])
+    // Require balance; server also enforces funds. Reverted per request.
+    const canSend = hasActualContent && !disabled && !sending && !isStreamingEffective && Boolean(selectedAgent) && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
@@ -430,7 +447,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })()
         : 0
       const left = rect ? Math.min(Math.max(8, rect.left), vw - menuWidth - 8) : 0
-      const style: React.CSSProperties | undefined = anchorRect ? { position: 'fixed', left, top, zIndex: 1000, width: menuWidth, willChange: 'transform' } : undefined
+      const style: React.CSSProperties | undefined = anchorRect ? { position: 'fixed', left, top, zIndex: 9999, width: menuWidth, willChange: 'transform' } : undefined
       return (
         <div
           style={style}
@@ -500,21 +517,32 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const cleanupTrailingQueryAfterMention = (ed: any, query: string) => {
           try {
             if (!ed) return
-            const q = String(query || '')
+            const q = String(query || '').trim()
             if (!q) return
+
             const state = ed.state
-            const pos = state.selection?.from || state.selection?.to || 0
-            if (!pos) return
-            // Skip a single space after the mention if present
-            const firstChar = state.doc.textBetween(pos, pos + 1, '\n')
-            let start = pos
-            if (firstChar === ' ') start = pos + 1
-            const ahead = state.doc.textBetween(start, start + q.length, '\n')
-            if (ahead && ahead.toLowerCase() === q.toLowerCase()) {
-              ed.chain()
-                ?.setTextSelection({ from: start, to: start + q.length })
-                ?.deleteSelection()
-                ?.run()
+            const pos = state.selection?.from || 0
+            if (pos < 1) return
+
+            // Look for the query text immediately after cursor, accounting for optional space
+            const checkRange = Math.min(20, q.length + 2) // Safety limit
+            const textAhead = state.doc.textBetween(pos, pos + checkRange, '\n')
+
+            // Try to find the query with or without leading space
+            let matchStart = -1
+            let matchEnd = -1
+
+            if (textAhead.startsWith(q)) {
+              matchStart = pos
+              matchEnd = pos + q.length
+            } else if (textAhead.startsWith(' ' + q)) {
+              matchStart = pos + 1
+              matchEnd = pos + 1 + q.length
+            }
+
+            // Only delete if we found an exact match
+            if (matchStart >= 0 && matchEnd > matchStart) {
+              ed.chain()?.setTextSelection({ from: matchStart, to: matchEnd })?.deleteSelection()?.run()
             }
           } catch {}
         }
@@ -646,7 +674,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               interactive: true,
               trigger: 'manual',
               placement: 'bottom-start',
-              zIndex: 1000,
+              zIndex: 9999,
             })
 
             // Capture keyboard navigation globally while menu is open
@@ -820,40 +848,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         return () => {}
       }, [])
       return (
-        <NodeViewWrapper as="span" className="inline-flex items-baseline align-baseline text-foreground" data-mention-node>
+        <NodeViewWrapper as="span" className="inline text-foreground" data-mention-node>
           <span
-            className="inline whitespace-nowrap align-baseline cursor-pointer rounded-md px-2 py-0.5 bg-white/90 hover:bg-white dark:bg-white/20 dark:hover:bg-white/25 ring-1 ring-border/60 shadow-sm transition-colors"
+            className={cn(
+              'inline-flex items-center gap-1 whitespace-nowrap cursor-pointer rounded px-1.5 py-[2px] bg-white/90 hover:bg-white dark:bg-white/20 dark:hover:bg-white/25 ring-1 ring-border/60 shadow-sm transition-all duration-200',
+              isMentionEnforcing && 'scale-105 ring-2 ring-primary/40'
+            )}
             contentEditable={false}
-            style={{ pointerEvents: 'auto' }}
+            style={{ pointerEvents: 'auto', verticalAlign: '-2px' }}
             ref={anchorRef}
             role="button"
             tabIndex={0}
             onMouseDown={e => {
-              try {
-                console.debug('[mention] onMouseDown', { isTrusted: (e as any)?.isTrusted, button: e.button, phase: e.eventPhase })
-              } catch {}
               e.preventDefault()
               e.stopPropagation()
-              // Defer to avoid ProseMirror selection interfering
-              setTimeout(() => {
-                startInlineMentionEdit()
-              }, 0)
+              // Don't allow inline editing - it creates confusing plain text instead of mention
+              // Users should delete and retype to change mention
             }}
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') {
-                try {
-                  console.debug('[mention] onKeyDown', { key: e.key })
-                } catch {}
                 e.preventDefault()
                 e.stopPropagation()
-                startInlineMentionEdit()
+                // Don't allow inline editing - it creates confusing plain text instead of mention
               }
             }}
           >
-            <span className="inline-block align-text-bottom mr-1 h-5 w-5 rounded-[3px] overflow-hidden">
-              <AgentAvatar seed={display} size={20} />
+            <span className="flex-shrink-0 h-4 w-4 rounded-sm overflow-hidden">
+              <AgentAvatar seed={display} size={16} />
             </span>
-            <strong className="font-semibold">@{display}</strong>
+            <span className="font-medium text-sm">@{display}</span>
           </span>
         </NodeViewWrapper>
       )
@@ -1128,36 +1151,40 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
           }
-          // Block Backspace when the cursor is within the leading mention or immediately after it
-          if (event.key === 'Backspace') {
+          // Cmd/Ctrl+K to clear input
+          if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault()
             try {
+              tiptap?.commands.clearContent()
+              tiptap?.commands.focus()
+            } catch {}
+            return true
+          }
+          // Block Backspace only when cursor is ON the mention node itself
+          // But allow deletion when there's a selection range (e.g., Ctrl+A)
+          if (event.key === 'Backspace' || event.key === 'Delete') {
+            try {
+              const state = (tiptap as any)?.state
+              const selFrom = state?.selection?.from || 0
+              const selTo = state?.selection?.to || 0
+              const hasSelection = selFrom !== selTo
+
+              // If user has selected text (like Ctrl+A), allow deletion
+              if (hasSelection) {
+                return false
+              }
+
+              // Otherwise, protect the mention from single backspace at position 0 or 1
               const json: any = (tiptap as any)?.getJSON?.()
               const docContent = Array.isArray(json?.content) ? json.content : []
               const firstBlock = docContent[0]
               const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
               const first = blockContent[0]
-              const second = blockContent[1]
               const firstIsMention = first && first.type === 'mention'
-              // If selection is at the very start or right after a single space following the mention, prevent deletion
-              const selFrom = (tiptap as any)?.state?.selection?.from || 0
-              const posAtStart = selFrom <= 1
-              if (firstIsMention) {
-                if (posAtStart) {
-                  event.preventDefault()
-                  return true
-                }
-                // If immediately after the mention + space, prevent deleting the mention/space pair
-                try {
-                  const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
-                  if (hasLeadingSpace) {
-                    // Rough heuristic: forbid backspace for the first two typed positions
-                    const anchor = (tiptap as any)?.state?.selection?.anchor || 0
-                    if (anchor <= 2) {
-                      event.preventDefault()
-                      return true
-                    }
-                  }
-                } catch {}
+
+              if (firstIsMention && selFrom <= 1 && event.key === 'Backspace') {
+                event.preventDefault()
+                return true
               }
             } catch {}
           }
@@ -1170,23 +1197,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         },
       },
       onUpdate: ({ editor }) => {
-        // Enforce leading mention on every update (deferred to next tick to avoid flushSync during lifecycle)
-        try {
-          if (!enforcingMentionRef.current && !isSuggestionActiveRef.current && !isEditingMentionRef.current) {
-            // Schedule to avoid synchronous mutations during TipTap update lifecycle
-            if (enforceTimeoutRef.current) {
-              clearTimeout(enforceTimeoutRef.current)
-              enforceTimeoutRef.current = null
-            }
-            enforceTimeoutRef.current = window.setTimeout(() => {
-              try {
-                ensureLeadingAgentMention()
-              } catch {}
-              enforceTimeoutRef.current = null
-            }, 0)
-          }
-        } catch {}
+        // Don't enforce on every update - this causes cursor jumps and text to appear backward
+        // Enforcement only happens on agent selection change (see useEffect below)
         setMessage(editor.getText())
+
+        // Check if there's actual content beyond just the mention and space
+        try {
+          const json = editor.getJSON()
+          const docContent = Array.isArray(json?.content) ? json.content : []
+          const firstBlock = docContent[0]
+          const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+
+          // Filter out mention nodes and check if there's any meaningful text
+          const textContent = blockContent
+            .filter((n: any) => n && n.type === 'text')
+            .map((n: any) => n.text || '')
+            .join('')
+            .trim()
+
+          setHasActualContent(textContent.length > 0)
+        } catch {
+          setHasActualContent(Boolean(editor.getText().trim()))
+        }
+
         // Detect and update the leading mention agent used for preview prompts
         try {
           const mentioned = getLeadingMentionAgentFromEditor(editor as any)
@@ -1295,6 +1328,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       (content: any) => {
         if (!tiptap) return
         enforcingMentionRef.current = true
+        setIsMentionEnforcing(true)
         if (enforceTimeoutRef.current) {
           clearTimeout(enforceTimeoutRef.current)
           enforceTimeoutRef.current = null
@@ -1304,9 +1338,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Preserve cursor position during content reconstruction
             const currentSelection = tiptap.state.selection
             const cursorPos = currentSelection.from
-            
+
             tiptap?.commands.setContent(content)
-            
+
             // Restore cursor position if possible
             const newDocSize = tiptap.state.doc.content.size
             const safePos = Math.min(cursorPos, newDocSize)
@@ -1315,6 +1349,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             }
           } finally {
             enforcingMentionRef.current = false
+            // Keep visual feedback for a bit longer
+            setTimeout(() => setIsMentionEnforcing(false), 300)
           }
           enforceTimeoutRef.current = null
         }, 0)
@@ -1328,11 +1364,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       try {
         // Do not enforce while user is editing the mention inline
         if (isEditingMentionRef.current) return
+
+        // Save cursor position before rebuilding
+        const cursorPos = tiptap.state.selection.from
+
         const json: any = tiptap.getJSON()
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
-        const first = blockContent[0]
 
         // Collect all mention nodes in the first paragraph
         const mentionNodes = blockContent.filter((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
@@ -1341,25 +1380,65 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const desiredMention = mentionNodes[mentionNodes.length - 1]
           // Build remaining content excluding all mention nodes
           let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
-          // Ensure exactly one leading space after the mention if there is following text
-          let contentAfterMention: any[]
-          const second = rest[0]
-          const hasLeadingSpace = Boolean(second && second.type === 'text' && typeof second.text === 'string' && second.text.startsWith(' '))
-          if (hasLeadingSpace) {
-            contentAfterMention = rest
-          } else if (second && second.type === 'text' && typeof second.text === 'string') {
-            contentAfterMention = [{ type: 'text', text: ' ' + second.text }, ...rest.slice(1)]
-          } else if (rest.length > 0) {
-            contentAfterMention = [{ type: 'text', text: ' ' }, ...rest]
+
+          // Normalize whitespace: ensure exactly one space after mention, preserve content structure
+          let contentAfterMention: any[] = []
+
+          if (rest.length === 0) {
+            // No content - just one space
+            contentAfterMention = [{ type: 'text', text: ' ' }]
           } else {
-            contentAfterMention = []
+            // Find first node with actual content
+            let firstContentIdx = -1
+            for (let i = 0; i < rest.length; i++) {
+              const node = rest[i]
+              if (node && node.type === 'text' && typeof node.text === 'string' && node.text.trim().length > 0) {
+                firstContentIdx = i
+                break
+              } else if (node && node.type !== 'text') {
+                firstContentIdx = i
+                break
+              }
+            }
+
+            if (firstContentIdx === -1) {
+              // Only whitespace
+              contentAfterMention = [{ type: 'text', text: ' ' }]
+            } else {
+              // Get content from first real content onwards
+              const contentNodes = rest.slice(firstContentIdx)
+              const firstNode = contentNodes[0]
+
+              if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
+                // Trim start of first text node, add exactly one space
+                const updatedFirst = { ...firstNode, text: ' ' + firstNode.text.trimStart() }
+                contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
+              } else {
+                // Non-text first node - add space before it
+                contentAfterMention = [{ type: 'text', text: ' ' }, ...contentNodes]
+              }
+            }
           }
+
           const newParagraph = {
             type: 'paragraph',
             content: [desiredMention, ...contentAfterMention],
           }
           const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
           scheduleSetContent(newDoc)
+
+          // Mark this agent as enforced to prevent re-enforcement
+          lastEnforcedAgentIdRef.current = desiredMention.attrs.id
+
+          // Position cursor after the mention and space
+          setTimeout(() => {
+            try {
+              tiptap?.commands.focus()
+              // Position after mention (1) + space (1) = position 2
+              const newPos = 2
+              tiptap?.commands.setTextSelection(newPos)
+            } catch {}
+          }, 10)
           return
         }
 
@@ -1368,29 +1447,52 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return
+
+        // Always add space after mention
+        const spaceNode = [{ type: 'text', text: ' ' }]
         const newParagraph = {
           type: 'paragraph',
-          content: [desiredMention, { type: 'text', text: ' ' }, ...blockContent],
+          content: [desiredMention, ...spaceNode, ...blockContent],
         }
         const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
         scheduleSetContent(newDoc)
+
+        // Mark this agent as enforced
+        if (currentAgent) {
+          lastEnforcedAgentIdRef.current = currentAgent.id
+        }
+
+        // Position cursor after the mention and space
+        setTimeout(() => {
+          try {
+            tiptap?.commands.focus()
+            // Position after mention (1) + space (1) = position 2
+            const newPos = 2 + blockContent.length
+            tiptap?.commands.setTextSelection(Math.min(newPos, tiptap?.state.doc.content.size - 1))
+          } catch {}
+        }, 10)
       } catch {}
     }, [tiptap, scheduleSetContent])
 
     // Insert or update the leading mention whenever the editor or selected agent changes
     useEffect(() => {
-      if (!tiptap) return
-      // Defer enforcement to avoid synchronous mutations during mount/prop change lifecycles
-      if (enforceTimeoutRef.current) {
-        clearTimeout(enforceTimeoutRef.current)
-        enforceTimeoutRef.current = null
+      if (!tiptap || !selectedAgent) return
+
+      // Reset enforcement tracking when agent actually changes from external source
+      if (selectedAgent.id !== lastEnforcedAgentIdRef.current) {
+        // Defer enforcement to avoid synchronous mutations during mount/prop change lifecycles
+        if (enforceTimeoutRef.current) {
+          clearTimeout(enforceTimeoutRef.current)
+          enforceTimeoutRef.current = null
+        }
+        enforceTimeoutRef.current = window.setTimeout(() => {
+          try {
+            ensureLeadingAgentMention()
+          } catch {}
+          enforceTimeoutRef.current = null
+        }, 0)
       }
-      enforceTimeoutRef.current = window.setTimeout(() => {
-        try {
-          ensureLeadingAgentMention()
-        } catch {}
-        enforceTimeoutRef.current = null
-      }, 0)
+
       return () => {
         if (enforceTimeoutRef.current) {
           clearTimeout(enforceTimeoutRef.current)
@@ -1442,8 +1544,56 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       [handleSuggestionSubmit, tiptap]
     )
 
+    // Calculate context usage percentage for progress indicator
+    const contextUsagePercent = contextLimit > 0 ? Math.min(100, (tokensUsed / contextLimit) * 100) : 0
+    const contextWarningLevel = contextUsagePercent >= 90 ? 'critical' : contextUsagePercent >= 75 ? 'warning' : 'normal'
+
     return (
       <div className="relative opacity-100">
+        {/* Context Limit Progress Indicator - Show when context limit is active and usage > 50% */}
+        {hardLimitActive && contextUsagePercent > 50 && !minimal && (
+          <div className="mb-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/40">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <div className="flex items-center gap-2">
+                <Icon
+                  name="database"
+                  className={cn('h-3.5 w-3.5', contextWarningLevel === 'critical' ? 'text-red-500' : contextWarningLevel === 'warning' ? 'text-orange-500' : 'text-muted-foreground')}
+                />
+                <span className="text-xs font-medium text-foreground">Context Usage</span>
+              </div>
+              <span
+                className={cn(
+                  'text-xs font-mono',
+                  contextWarningLevel === 'critical'
+                    ? 'text-red-600 dark:text-red-400 font-semibold'
+                    : contextWarningLevel === 'warning'
+                      ? 'text-orange-600 dark:text-orange-400'
+                      : 'text-muted-foreground'
+                )}
+              >
+                {tokensUsed.toLocaleString()} / {contextLimit.toLocaleString()} tokens
+              </span>
+            </div>
+            <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
+                  contextWarningLevel === 'critical'
+                    ? 'bg-gradient-to-r from-red-500 to-red-600'
+                    : contextWarningLevel === 'warning'
+                      ? 'bg-gradient-to-r from-orange-400 to-orange-500'
+                      : 'bg-gradient-to-r from-primary/60 to-primary'
+                )}
+                style={{ width: `${contextUsagePercent}%` }}
+              />
+            </div>
+            {contextWarningLevel !== 'normal' && (
+              <p className={cn('mt-1.5 text-xs', contextWarningLevel === 'critical' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400')}>
+                {contextWarningLevel === 'critical' ? '⚠️ Context limit almost reached. Consider starting a new conversation.' : '⚡ Approaching context limit. Messages may be truncated soon.'}
+              </p>
+            )}
+          </div>
+        )}
         {/* Professional insufficient balance indicator - Show when there is conversation ID */}
         {!hasFunds && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">

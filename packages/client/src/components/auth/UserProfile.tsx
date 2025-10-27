@@ -90,15 +90,23 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
       }}
     >
       <div className="relative">
-        <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
-          {isImageUrl(userAvatar) ? (
-            <Avatar className="w-4 h-4">
-              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" />
+        {isImageUrl(userAvatar) ? (
+          <div className="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-primary/10 group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
+            <Avatar className="w-full h-full rounded-none">
+              <AvatarImage 
+                src={userAvatar!} 
+                alt={userName || userEmail || 'User avatar'} 
+                referrerPolicy="no-referrer" 
+                crossOrigin="anonymous"
+                className="w-full h-full object-cover"
+              />
             </Avatar>
-          ) : (
-            <LordIcon src={getLordiconUrl('user')} width={16} height={16} className="w-4 h-4 text-primary" trigger="click" />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="w-8 h-8 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300 flex items-center justify-center">
+            <LordIcon src={getLordiconUrl('user')} width={20} height={20} className="w-5 h-5 text-primary" trigger="click" />
+          </div>
+        )}
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-background animate-pulse"></div>
       </div>
       <div className="flex-1 min-w-0">

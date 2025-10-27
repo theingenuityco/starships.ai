@@ -233,12 +233,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Reset conversation when external conversation ID changes
   useEffect(() => {
     if (externalConversationId === undefined) return
-    setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
-    // Allow auto-restore again on new conversation
-    userSelectedAgentRef.current = false
+    setCurrentConversationId(prev => {
+      if (prev !== externalConversationId) {
+        // Allow auto-restore again on new conversation
+        userSelectedAgentRef.current = false
+      }
+      return prev === externalConversationId ? prev : externalConversationId
+    })
   }, [externalConversationId])
 
   useEffect(() => {
+    // Reset user selection flag when conversation actually changes
+    if (currentConversationIdRef.current !== currentConversationId && currentConversationId) {
+      userSelectedAgentRef.current = false
+    }
     currentConversationIdRef.current = currentConversationId
   }, [currentConversationId])
 

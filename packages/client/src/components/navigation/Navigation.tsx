@@ -137,7 +137,7 @@ export function Navigation() {
             />
           </div>
           <div className="flex-1">
-            <h1 className={`${orbitron.className} text-lg font-normal tracking-tight text-white`}>starships.ai</h1>
+            <h1 className={`${orbitron.className} text-xl font-normal tracking-tight text-white`}>starships.ai</h1>
           </div>
         </div>
 

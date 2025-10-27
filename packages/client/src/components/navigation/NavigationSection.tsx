@@ -8,6 +8,7 @@ interface NavigationSectionItem {
   label: string
   icon: string
   isActive?: boolean
+  onClick?: () => void
 }
 
 type RenderAfterFn = (item: NavigationSectionItem, index: number) => React.ReactNode
@@ -17,9 +18,11 @@ interface NavigationSectionProps {
   items: NavigationSectionItem[]
   pathname: string
   renderAfter?: RenderAfterFn
+  showLabels?: boolean
+  expanded?: boolean
 }
 
-export function NavigationSection({ title, items, pathname, renderAfter }: NavigationSectionProps) {
+export function NavigationSection({ title, items, pathname, renderAfter, showLabels = false, expanded = false }: NavigationSectionProps) {
   return (
     <motion.div className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
       {items.map((item, index) => {
@@ -28,7 +31,7 @@ export function NavigationSection({ title, items, pathname, renderAfter }: Navig
 
         return (
           <motion.div key={item.href} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, delay: index * 0.05 }}>
-            <NavigationItem {...rest} isActive={isActive} />
+            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} />
             {renderAfter ? renderAfter(item, index) : null}
           </motion.div>
         )

@@ -98,7 +98,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           {!shouldHideNavigation && (
             <div className="fixed top-6 left-6 z-[1000]">
               <aside className="relative" style={{ zIndex: 1000 }}>
-                <Navigation isMobile={isMobile} />
+                <Navigation />
               </aside>
             </div>
           )}
@@ -140,7 +140,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             {!shouldHideNavigation && (
               <div className="fixed top-6 left-6 z-[1000]">
                 <aside className="relative" style={{ zIndex: 1000 }}>
-                  <Navigation isMobile={isMobile} />
+                  <Navigation />
                 </aside>
               </div>
             )}

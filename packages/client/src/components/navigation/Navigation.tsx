@@ -4,42 +4,26 @@ import { LordIcon } from '@/components/animated/LordIcon'
 import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 
 import { UserProfile } from '@/components/auth/UserProfile'
-import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
-import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
-import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 
-interface NavigationProps {
-  isMobile?: boolean
-}
-
 // (All items are composed into a single NavigationSection below)
 
-export function Navigation(props: NavigationProps) {
+export function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, user, logout } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
-  // State for conversation list toggle
-  const [showConversationList, setShowConversationList] = useState(false)
-  // State for user subnav toggle
-  const [showUserSubnav, setShowUserSubnav] = useState(false)
-  // Smooth height animation: measure content height
-  const [userSubnavHeight, setUserSubnavHeight] = useState(0)
-  const userSubnavContentRef = useRef<HTMLDivElement>(null)
-  const userSectionRef = useRef<HTMLDivElement>(null)
-  // Smooth height animation (conversations)
-  const [conversationSubnavHeight, setConversationSubnavHeight] = useState(0)
-  const conversationSubnavContentRef = useRef<HTMLDivElement>(null)
+  // Navigation is always expanded like Claude - clean and simple
+  const expanded = true
+  const showLabels = false
   // Smooth height animation (overview submenu)
   const [overviewSubnavHeight, setOverviewSubnavHeight] = useState(0)
   const overviewSubnavContentRef = useRef<HTMLDivElement>(null)
@@ -89,50 +73,12 @@ export function Navigation(props: NavigationProps) {
     }
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 
-  // Click outside to close conversation sidebar
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showConversationList && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        setShowConversationList(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showConversationList])
-
-  // Close conversation sidebar when pathname changes (tab navigation)
-  useEffect(() => {
-    setShowConversationList(false)
-  }, [pathname])
 
   const starshipSlug = navigationStarshipSlug
 
-  // Re-measure user subnav content when opened or on resize
-  useEffect(() => {
-    const measure = () => {
-      const el = userSubnavContentRef.current
-      if (!el) return
-      setUserSubnavHeight(el.offsetHeight)
-    }
-    if (showUserSubnav) {
-      measure()
-      window.addEventListener('resize', measure)
-    } else {
-      setUserSubnavHeight(0)
-    }
-    return () => window.removeEventListener('resize', measure)
-  }, [showUserSubnav])
-
-  // Measure conversation subnav content height (declared after route flags below)
-
-  // Check if we're on a conversation route
-  const isConversationRoute = pathname.includes('/conversations')
+  // Route checking for active states
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
   const isSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings`) : false
-  const isUsageSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/usage`) : false
   const isEnvironmentSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/environment`) : false
   const isAgentsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agents`) : false
   const isAgentBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agent/`) : false
@@ -140,47 +86,6 @@ export function Navigation(props: NavigationProps) {
   const isToolBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tool/`) : false
   const overviewExpanded = isOverviewRoute || isAgentsRoute || isAgentBuilderRoute || isToolsRoute || isToolBuilderRoute
 
-  // Get starship data to access starship ID
-  const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
-
-  // Collapse user subnav on outside click when not on settings route
-  useEffect(() => {
-    const handleDocClick = (e: MouseEvent) => {
-      if (!showUserSubnav) return
-      if (isSettingsRoute) return // keep expanded on settings routes
-      const container = userSectionRef.current
-      const target = e.target as Node | null
-      if (container && target && !container.contains(target)) {
-        setShowUserSubnav(false)
-      }
-    }
-    document.addEventListener('mousedown', handleDocClick)
-    return () => document.removeEventListener('mousedown', handleDocClick)
-  }, [showUserSubnav, isSettingsRoute])
-
-  // Collapse user subnav on route changes away from settings
-  useEffect(() => {
-    if (!isSettingsRoute) {
-      setShowUserSubnav(false)
-    }
-  }, [pathname, isSettingsRoute])
-
-  // Measure conversation subnav content height
-  useEffect(() => {
-    const measure = () => {
-      const el = conversationSubnavContentRef.current
-      if (!el) return
-      setConversationSubnavHeight(el.offsetHeight)
-    }
-    if (isConversationRoute) {
-      // Measure on next frame to ensure subnav content is mounted
-      requestAnimationFrame(measure)
-      window.addEventListener('resize', measure)
-    } else {
-      setConversationSubnavHeight(0)
-    }
-    return () => window.removeEventListener('resize', measure)
-  }, [isConversationRoute, starshipSlug])
 
   // Measure overview subnav content height
   useEffect(() => {
@@ -198,48 +103,15 @@ export function Navigation(props: NavigationProps) {
     return () => window.removeEventListener('resize', measure)
   }, [overviewExpanded])
 
-  // Conversation action handlers
-  const deleteConversationMutation = useDeleteConversation()
-  const updateConversationStatusMutation = useUpdateConversationStatus()
-
-  const handleConversationDelete = async (conversationId: string) => {
-    try {
-      await deleteConversationMutation.mutateAsync(conversationId)
-    } catch (error) {
-      // Error handling is done in the mutation hook
-    }
-  }
-
-  const handleConversationArchive = async (conversationId: string) => {
-    try {
-      await updateConversationStatusMutation.mutateAsync({
-        conversationId,
-        status: 'archived',
-      })
-    } catch (error) {
-      // Error handling is done in the mutation hook
-    }
-  }
-
   // Handle new conversation
   const handleNewConversation = () => {
     router.push(`/ship/${starshipSlug}/conversations`)
   }
 
-  // Handle conversation history toggle
-  const handleToggleConversationHistory = () => {
-    setShowConversationList(!showConversationList)
-  }
-
-  // Handle conversation selection - hide history pane
-  const handleConversationSelect = (conversationId: string) => {
-    setShowConversationList(false)
-  }
-
   // Build a single unified navigation section list
   const mainNavigationItems = [
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
-    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'Conversations', icon: 'message-square', isActive: isConversationRoute }] : []),
+    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation }] : []),
     { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
@@ -248,27 +120,27 @@ export function Navigation(props: NavigationProps) {
   const handleLogoClick = () => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
-    
+
     // Always go to landing screen
     router.push('/')
   }
 
   // Floating mode - expandable layout
   return (
-    <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out">
+    <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg">
       <div
-        className="flex flex-col items-center justify-center w-14 flex-shrink-0 transition-all duration-300 ease-in-out"
+        className="flex flex-col flex-shrink-0 w-48"
         style={{
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
         }}
       >
-        {/* Compact Header with Theme Toggle */}
-        <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground" onClick={handleLogoClick} title="Go to Landing Screen">
+        {/* Header */}
+        <div className="px-4 py-3 flex-shrink-0 flex items-center space-x-3 bg-black">
+          <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Go to Landing Screen">
             <StarshipsLogo
-              width={36}
-              height={36}
-              className="opacity-70"
+              width={20}
+              height={20}
+              className="text-white"
               gradientId="nav-gradient"
               animationDelay={1}
               repeatDelay={20}
@@ -277,221 +149,99 @@ export function Navigation(props: NavigationProps) {
               playOnMountOnce={false}
             />
           </div>
+          <div className="flex-1">
+            <h1 className="text-base font-medium text-white">starships.ai</h1>
+          </div>
         </div>
 
         {/* Navigation Content */}
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
-          <div className="p-3 space-y-4">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 px-3 py-4 space-y-4">
+            {/* Main Navigation */}
             <NavigationSection
               title="Navigation"
               items={mainNavigationItems}
               pathname={pathname}
+              showLabels={showLabels}
+              expanded={expanded}
               renderAfter={item => {
                 const isOverviewItem = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}`
-                const isConversationsItem = isAuthenticated && starshipSlug && item.href === `/ship/${starshipSlug}/conversations`
                 if (isOverviewItem) {
                   return (
                     <motion.div
                       initial={false}
                       animate={{ height: overviewExpanded ? overviewSubnavHeight : 0, opacity: overviewExpanded ? 1 : 0, y: overviewExpanded ? 0 : 4 }}
                       transition={{ duration: 0.24, ease: 'easeInOut' }}
-                      className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
+                      className="overflow-hidden mt-1 bg-muted/20 rounded-lg mx-3"
                       style={{ willChange: 'height, opacity, transform' }}
                     >
-                      <div ref={overviewSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-2">
+                      <div ref={overviewSubnavContentRef} className="px-3 py-2 space-y-1">
                         {/* Agents */}
-                        <Tooltip delayDuration={300}>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={() => {
-                                if (!starshipSlug) return
-                                router.push(`/ship/${starshipSlug}/agents`)
-                              }}
-                              className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
-                                isAgentsRoute || isAgentBuilderRoute
-                                  ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
-                                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                              }`}
-                            >
-                              <LordIcon src={getLordiconUrl('agents')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                            Agents
-                          </TooltipContent>
-                        </Tooltip>
+                        <button
+                          onClick={() => {
+                            if (!starshipSlug) return
+                            router.push(`/ship/${starshipSlug}/agents`)
+                          }}
+                          className={`group relative transition-all duration-300 rounded-lg flex items-center justify-start w-full px-3 py-2 h-10 border ${
+                            isAgentsRoute || isAgentBuilderRoute
+                              ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
+                              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                          }`}
+                        >
+                          <LordIcon src={getLordiconUrl('agents')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
+                          <span className="ml-3 text-sm font-medium">Agents</span>
+                        </button>
 
                         {/* Tools */}
-                        <Tooltip delayDuration={300}>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={() => {
-                                if (!starshipSlug) return
-                                router.push(`/ship/${starshipSlug}/tools`)
-                              }}
-                              className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
-                                isToolsRoute || isToolBuilderRoute
-                                  ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
-                                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                              }`}
-                            >
-                              <LordIcon src={getLordiconUrl('tools')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                            Tools
-                          </TooltipContent>
-                        </Tooltip>
+                        <button
+                          onClick={() => {
+                            if (!starshipSlug) return
+                            router.push(`/ship/${starshipSlug}/tools`)
+                          }}
+                          className={`group relative transition-all duration-300 rounded-lg flex items-center justify-start w-full px-3 py-2 h-10 border ${
+                            isToolsRoute || isToolBuilderRoute
+                              ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
+                              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                          }`}
+                        >
+                          <LordIcon src={getLordiconUrl('tools')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
+                          <span className="ml-3 text-sm font-medium">Tools</span>
+                        </button>
                       </div>
                     </motion.div>
-                  )
-                }
-
-                if (isConversationsItem) {
-                  return (
-                    isConversationRoute && (
-                      <motion.div
-                        initial={false}
-                        animate={{ height: isConversationRoute ? conversationSubnavHeight : 0, opacity: isConversationRoute ? 1 : 0, y: isConversationRoute ? 0 : 4 }}
-                        transition={{ duration: 0.24, ease: 'easeInOut' }}
-                        className="rounded-bl-xl rounded-br-xl mx-1.5 overflow-hidden mt-2 bg-muted/40"
-                        style={{ willChange: 'height, opacity, transform' }}
-                      >
-                        <div ref={conversationSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-1">
-                          {/* New Conversation Icon */}
-                          <Tooltip delayDuration={300}>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={handleNewConversation}
-                                className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                              >
-                                <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                              New Conversation
-                            </TooltipContent>
-                          </Tooltip>
-
-                          {/* Conversation History Toggle Icon */}
-                          <Tooltip delayDuration={300}>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={handleToggleConversationHistory}
-                                className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                              >
-                                {showConversationList ? (
-                                  <LordIcon src={getLordiconUrl('x')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
-                                ) : (
-                                  <LordIcon src={getLordiconUrl('history')} width={18} height={18} className="w-[18px] h-[18px]" trigger="click" />
-                                )}
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                              {showConversationList ? 'Hide' : 'Show'} History
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </motion.div>
-                    )
                   )
                 }
 
                 return null
               }}
             />
+
+            {/* Recents Section */}
+            {isAuthenticated && (
+              <div>
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">Recents</h3>
+                <div className="px-3 text-sm text-muted-foreground">
+                  No recent conversations
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* User Profile Section - Collapsed Mode with upward subnav */}
-        <div ref={userSectionRef} className="flex-shrink-0 p-2 flex flex-col items-center justify-center relative">
-          {/* Upward subnav - renders ABOVE the user icon */}
-          <motion.div
-            initial={false}
-            animate={{ height: userSubnavHeight, opacity: showUserSubnav ? 1 : 0, y: showUserSubnav ? 0 : 4 }}
-            transition={{ duration: 0.24, ease: 'easeInOut' }}
-            className="rounded-tl-xl rounded-tr-xl mx-1.5 overflow-hidden mb-2 bg-muted/40"
-            style={{ willChange: 'height, opacity, transform' }}
-          >
-            <div ref={userSubnavContentRef} className="pt-2 pb-2 px-0 w-10 flex flex-col items-center space-y-2">
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <motion.button
-                    onClick={() => {
-                      if (!starshipSlug) return
-                      router.push(`/ship/${starshipSlug}/settings`)
-                      // keep subnav expanded; do not setShowUserSubnav(false)
-                    }}
-                    className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${
-                      isSettingsRoute
-                        ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-md border-primary/30'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                    }`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <LordIcon src={getLordiconUrl('settings')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
-                  </motion.button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                  Settings
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <motion.button
-                    onClick={async () => {
-                      try {
-                        await logout()
-                      } finally {
-                        router.push('/')
-                      }
-                    }}
-                    className="group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border border-transparent text-destructive hover:text-destructive hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <LordIcon src={getLordiconUrl('logout')} width={20} height={20} className="w-[20px] h-[20px]" trigger="click" />
-                  </motion.button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                  Sign out
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </motion.div>
-          {/* Profile icon (click to toggle) */}
+        {/* User Profile Section */}
+        <div className="flex-shrink-0 px-3 py-4 border-t border-border/20">
           <UserProfile
-            mode="collapsed"
-            active={showUserSubnav || isSettingsRoute}
+            mode="expanded"
+            active={isSettingsRoute}
             onClick={() => {
-              setShowConversationList(false)
-              setShowUserSubnav(prev => !prev)
+              if (starshipSlug) {
+                router.push(`/ship/${starshipSlug}/settings`)
+              }
             }}
           />
         </div>
       </div>
 
-      {/* Right Side - Conversation List (conditionally rendered) */}
-      <AnimatePresence>
-        {showConversationList && starshipData?.id && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 'min(320px, calc(100vw - 8rem))', opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="border-l border-border/20 overflow-hidden"
-          >
-            <ConversationList
-              starshipId={starshipData.id}
-              onConversationDelete={handleConversationDelete}
-              onConversationArchive={handleConversationArchive}
-              onConversationSelect={handleConversationSelect}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

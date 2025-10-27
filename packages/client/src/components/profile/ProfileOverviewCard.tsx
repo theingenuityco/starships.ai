@@ -21,7 +21,19 @@ const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '
 export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
   // Determine what to show in avatar: priority order is emoji > OAuth image > initials
   const hasSelectedEmoji = !!selectedEmoji
-  const hasProfileImage = !!profileImageUrl && (profileImageUrl.startsWith('https://') || profileImageUrl.startsWith('http://localhost'))
+  // Validate profile image URL safely
+  const hasProfileImage = useMemo(() => {
+    if (!profileImageUrl) return false
+    
+    try {
+      const url = new URL(profileImageUrl)
+      // Only allow HTTPS URLs or localhost for development
+      return url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
+    } catch {
+      // Invalid URL format
+      return false
+    }
+  }, [profileImageUrl])
   const shouldShowImage = !hasSelectedEmoji && hasProfileImage
   const hintMode = !hasSelectedEmoji && !hasProfileImage
 

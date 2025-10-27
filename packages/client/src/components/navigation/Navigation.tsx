@@ -419,7 +419,7 @@ export function Navigation(props: NavigationProps) {
                   <motion.button
                     onClick={() => {
                       if (!starshipSlug) return
-                      router.push(`/ship/${starshipSlug}/settings/usage`)
+                      router.push(`/ship/${starshipSlug}/settings`)
                       // keep subnav expanded; do not setShowUserSubnav(false)
                     }}
                     className={`group relative transition-all duration-300 rounded-lg flex items-center justify-center w-8 h-8 border ${

@@ -287,7 +287,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   className="flex-1"
                   onClick={() => {
                     setIsDetailsModalOpen(false)
-                    router.push(`/ship/${slug}/conversations?agent=${selectedAgent.id}`)
+                    router.push(`/ship/${slug}/conversations?agent=${selectedAgent.slug}`)
                   }}
                 >
                   <Icon name="message-square" className="h-4 w-4 mr-2" />

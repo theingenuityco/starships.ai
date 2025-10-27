@@ -72,15 +72,29 @@ export function useAccountForm() {
 
   const [passwordErrors, setPasswordErrors] = useState<PasswordErrors>({})
 
-  // Sync when user data arrives
+  // Track if user has made changes to prevent overwriting during typing
+  const [hasUserChanges, setHasUserChanges] = useState(false)
+
+  // Sync when user data arrives, but only if user hasn't made changes
   useEffect(() => {
-    setForm(prev => ({
-      ...prev,
-      displayName: initial.displayName,
-      avatar: initial.avatar,
-      email: initial.email,
-    }))
-  }, [initial.displayName, initial.avatar, initial.email])
+    if (!hasUserChanges) {
+      setForm(prev => ({
+        ...prev,
+        displayName: initial.displayName,
+        avatar: initial.avatar,
+        email: initial.email,
+      }))
+    }
+  }, [initial.displayName, initial.avatar, initial.email, hasUserChanges])
+
+  // Mark user changes when form is modified
+  useEffect(() => {
+    if (form.displayName !== initial.displayName || 
+        form.avatar !== initial.avatar || 
+        form.email !== initial.email) {
+      setHasUserChanges(true)
+    }
+  }, [form.displayName, form.avatar, form.email, initial.displayName, initial.avatar, initial.email])
 
   const saving = updateProfile.isPending
   const deleting = deleteUser.isPending
@@ -186,6 +200,7 @@ export function useAccountForm() {
       setForm(f => ({ ...f, currentPassword: '', newPassword: '', confirmNewPassword: '' }))
       setPasswordErrors({})
       setShowPassword(false)
+      setHasUserChanges(false) // Reset user changes flag after successful save
       toast.success('Profile updated', { description: 'Your changes have been saved.' })
     } catch (err: any) {
       const apiError = err?.response?.data?.error
@@ -212,6 +227,7 @@ export function useAccountForm() {
       setShowPassword(false)
       setPendingUpdates(null)
       setShowConfirmUpdate(false)
+      setHasUserChanges(false) // Reset user changes flag after successful save
       toast.success('Changes applied', { description: 'Your account details were updated.' })
     } catch (err: any) {
       const apiError = err?.response?.data?.error
@@ -254,6 +270,7 @@ export function useAccountForm() {
     })
     setPasswordErrors({})
     setShowPassword(false)
+    setHasUserChanges(false) // Reset user changes flag when reverting
   }
 
   const cancelPasswordEdit = () => {

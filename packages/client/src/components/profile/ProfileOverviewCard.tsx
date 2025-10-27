@@ -21,7 +21,7 @@ const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '
 export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
   // Determine what to show in avatar: priority order is emoji > OAuth image > initials
   const hasSelectedEmoji = !!selectedEmoji
-  const hasProfileImage = !!profileImageUrl && profileImageUrl.startsWith('http')
+  const hasProfileImage = !!profileImageUrl && (profileImageUrl.startsWith('https://') || profileImageUrl.startsWith('http://localhost'))
   const shouldShowImage = !hasSelectedEmoji && hasProfileImage
   const hintMode = !hasSelectedEmoji && !hasProfileImage
 

@@ -58,19 +58,20 @@ export async function seedAgentTemplates(): Promise<void> {
       } catch (error) {
         errorCount++;
         logger.warn(
-          `Agent template error processing ${template.name} (slug: ${template.slug}): ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Agent template error processing ${template.name} (slug: ${template.slug})`,
+          {
+            component: 'seed-agent-templates',
+            operation: 'create',
+            metadata: { templateName: template.name, slug: template.slug },
+          },
+          error as Error
         );
       }
     }
 
     logger.info(`✅ Agent template seeding completed: ${addedCount} new, ${existingCount} skipped, ${errorCount} errors`);
   } catch (error) {
-    logger.error(`Failed to seed agent templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    if (error instanceof Error) {
-      logger.error('Agent template seeding error details', {
-        stack: error.stack || 'No stack trace available',
-      });
-    }
+    logger.error('Failed to seed agent templates', { component: 'seed-agent-templates' }, error as Error);
     // Don't throw - we don't want to prevent server startup if template seeding fails
   }
 }

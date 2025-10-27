@@ -94,10 +94,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return (
       <StarTheme theme="dark">
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-          {/* Floating Navigation - conditionally rendered */}
+          {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
-            <div className="fixed top-6 left-3 z-[1000]">
-              <aside className="relative" style={{ zIndex: 1000 }}>
+            <div className="flex-shrink-0 p-3">
+              <aside className="relative h-full">
                 <Navigation />
               </aside>
             </div>
@@ -117,8 +117,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </motion.button>
           )}
 
-          {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-          <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+          {/* Main Content Area - takes remaining space */}
+          <main className="relative flex-1 min-h-full w-full overflow-auto">
             {children}
           </main>
         </div>
@@ -136,10 +136,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <WelcomeModalProvider>
         <StarTheme theme="dark">
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-            {/* Floating Navigation - conditionally rendered */}
+            {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
-              <div className="fixed top-6 left-3 z-[1000]">
-                <aside className="relative" style={{ zIndex: 1000 }}>
+              <div className="flex-shrink-0 p-3">
+                <aside className="relative h-full">
                   <Navigation />
                 </aside>
               </div>
@@ -159,8 +159,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               </motion.button>
             )}
 
-            {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-            <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '4.5rem' }}>
+            {/* Main Content Area - takes remaining space */}
+            <main className="relative flex-1 min-h-full w-full overflow-auto">
               {children}
             </main>
           </div>

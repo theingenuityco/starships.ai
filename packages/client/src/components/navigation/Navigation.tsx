@@ -7,12 +7,13 @@ import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
-import { useStarshipConversations } from '@/hooks/useConversations'
+import { useStarshipConversations, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 
 import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
+import Icon from '@/components/primitives/Icon'
 
 // (All items are composed into a single NavigationSection below)
 
@@ -219,7 +220,7 @@ export function Navigation() {
 
             {/* Recents Section */}
             {isAuthenticated && starshipSlug && (
-              <div className="mt-6">
+              <div className="mt-8">
                 <RecentsSection starshipSlug={starshipSlug} />
               </div>
             )}
@@ -283,14 +284,11 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
       <div className="px-2 space-y-1">
         {recentConversations.length > 0 ? (
           recentConversations.map((conversation) => (
-            <button
+            <ConversationItem
               key={conversation.id}
+              conversation={conversation}
               onClick={() => handleConversationClick(conversation.id)}
-              className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors truncate"
-              title={conversation.title || 'Untitled conversation'}
-            >
-              {conversation.title || 'Untitled conversation'}
-            </button>
+            />
           ))
         ) : (
           <div className="text-sm text-muted-foreground">
@@ -298,6 +296,84 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ConversationItem component with three-dot menu
+interface ConversationItemProps {
+  conversation: any
+  onClick: () => void
+}
+
+function ConversationItem({ conversation, onClick }: ConversationItemProps) {
+  const [showMenu, setShowMenu] = useState(false)
+  const deleteConversationMutation = useDeleteConversation()
+  const updateConversationStatusMutation = useUpdateConversationStatus()
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await deleteConversationMutation.mutateAsync(conversation.id)
+      setShowMenu(false)
+    } catch (error) {
+      // Error handling is done in the mutation hook
+    }
+  }
+
+  const handleArchive = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await updateConversationStatusMutation.mutateAsync({
+        conversationId: conversation.id,
+        status: 'archived',
+      })
+      setShowMenu(false)
+    } catch (error) {
+      // Error handling is done in the mutation hook
+    }
+  }
+
+  return (
+    <div className="relative group">
+      <button
+        onClick={onClick}
+        className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors truncate pr-8"
+        title={conversation.title || 'Untitled conversation'}
+      >
+        {conversation.title || 'Untitled conversation'}
+      </button>
+      
+      {/* Three-dot menu button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setShowMenu(!showMenu)
+        }}
+        className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-all"
+      >
+        <Icon name="more-horizontal" className="w-3 h-3" />
+      </button>
+
+      {/* Dropdown menu */}
+      {showMenu && (
+        <div className="absolute right-0 top-full mt-1 w-32 bg-popover border border-border rounded-lg shadow-lg z-10">
+          <button
+            onClick={handleArchive}
+            className="w-full text-left px-3 py-2 text-xs hover:bg-muted rounded-t-lg transition-colors"
+            disabled={updateConversationStatusMutation.isPending}
+          >
+            Archive
+          </button>
+          <button
+            onClick={handleDelete}
+            className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted rounded-b-lg transition-colors"
+            disabled={deleteConversationMutation.isPending}
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }

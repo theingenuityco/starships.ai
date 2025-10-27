@@ -37,7 +37,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   const router = useRouter()
   const params = useParams()
   const starshipSlug = params.slug as string
-  
+
   // TanStack Query hooks
   const { data, isLoading: loading, error: agentsError } = useStarshipAgents(starshipId || '', !!starshipId)
   const agents = useMemo(() => data ?? [], [data])
@@ -204,24 +204,12 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   }
 
   const handleChatWithAgent = async (agent: AgentModel) => {
-    if (!starshipId) {
-      setError('No starship available to create conversation')
-      return
-    }
-
+    // Do not pre-create a conversation; navigate to fresh-start with agent preselected
     try {
-      // Create a new conversation with the selected agent
-      const conversation = await createConversationMutation.mutateAsync({
-        starshipId,
-        agentId: agent.id,
-        title: `Chat with ${agent.name}`
-      })
-
-      // Navigate to the new conversation with agent parameter (use slug for clean URLs)
-      router.push(`/ship/${starshipSlug}/conversations/${conversation.id}?agent=${agent.slug}`)
+      router.push(`/ship/${starshipSlug}/conversations${agent.slug ? `?agent=${agent.slug}` : ''}`)
     } catch (error) {
-      console.error('Failed to create conversation:', error)
-      setError('Failed to start conversation with agent')
+      console.error('Failed to navigate to conversation:', error)
+      setError('Failed to open chat with agent')
     }
   }
 

@@ -274,6 +274,56 @@ describe('AgentTemplateEntity', () => {
       ).rejects.toThrow();
     });
 
+    it('should validate timeout constraints', async () => {
+      await expect(
+        AgentTemplateEntity.validate(
+          {
+            slug: 'test-template',
+            name: 'Test Template',
+            model: 'gpt-4',
+            timeout: 999,
+            state: { messages: [], tools: [] },
+            blueprint: { nodes: [], edges: [] },
+            category: 'general',
+            usageCount: 0,
+          },
+          'create'
+        )
+      ).rejects.toThrow();
+
+      await expect(
+        AgentTemplateEntity.validate(
+          {
+            slug: 'test-template',
+            name: 'Test Template',
+            model: 'gpt-4',
+            timeout: 600001,
+            state: { messages: [], tools: [] },
+            blueprint: { nodes: [], edges: [] },
+            category: 'general',
+            usageCount: 0,
+          },
+          'create'
+        )
+      ).rejects.toThrow();
+
+      await expect(
+        AgentTemplateEntity.validate(
+          {
+            slug: 'test-template',
+            name: 'Test Template',
+            model: 'gpt-4',
+            timeout: 600000,
+            state: { messages: [], tools: [] },
+            blueprint: { nodes: [], edges: [] },
+            category: 'general',
+            usageCount: 0,
+          },
+          'create'
+        )
+      ).resolves.not.toThrow();
+    });
+
     it('should validate icon length constraints', async () => {
       await expect(
         AgentTemplateEntity.validate({

@@ -313,7 +313,7 @@ describe('AgentEntity', () => {
           name: 'Test Agent',
           slug: 'test-agent',
           model: 'gpt-4',
-          timeout: 300001,
+          timeout: 600001,
           starshipId: 'starship-123',
           state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },

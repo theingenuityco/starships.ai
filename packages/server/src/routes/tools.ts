@@ -77,6 +77,29 @@ const CreateToolTemplateSchema = z.object({
     .optional(),
 });
 
+// Separate schema for updates without defaults to avoid overwriting unspecified fields
+const UpdateToolSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional(),
+  description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional(),
+  slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters').optional(),
+  parameters: z
+    .object({
+      type: z.literal('object'),
+      properties: z.record(z.string(), z.unknown()),
+      required: z.array(z.string()).optional(),
+    })
+    .optional(),
+  blueprint: z
+    .object({
+      nodes: z.array(z.unknown()),
+      edges: z.array(z.unknown()),
+    })
+    .optional(),
+  configuration: z.record(z.string(), z.unknown()).optional(),
+  isEnabled: z.boolean().optional(),
+  status: z.enum(['draft', 'active']).optional(),
+});
+
 // Balance validation middleware for tool operations
 const validateToolBalance = async (req: Request, res: Response, next: any) => {
   try {
@@ -312,7 +335,7 @@ router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response):
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'tool parameter');
     if (!paramValidation) return;
 
-    const bodyValidation = validateData(CreateToolSchema.partial(), req.body, res, 'tool update data');
+    const bodyValidation = validateData(UpdateToolSchema, req.body, res, 'tool update data');
     if (!bodyValidation) return;
 
     const toolRepository = new ToolRepository();

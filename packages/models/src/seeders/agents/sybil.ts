@@ -77,5 +77,5 @@ export const sybilTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updat
   ],
   blueprint: createStarshipNavigatorBlueprint(),
   ...createSybilConfig(),
-  timeout: 45000,
+  timeout: 600000,
 };

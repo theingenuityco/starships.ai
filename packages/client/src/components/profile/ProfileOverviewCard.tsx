@@ -2,7 +2,7 @@
 
 
 import React, { useMemo } from 'react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
@@ -11,14 +11,31 @@ type ProfileOverviewCardProps = {
   displayName?: string
   email?: string
   selectedEmoji?: string
+  profileImageUrl?: string
   onSelectEmoji: (emoji: string) => void
   emojiOptions?: string[]
 }
 
 const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '🐱', '⚡']
 
-export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
-  const hintMode = !selectedEmoji
+export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
+  // Determine what to show in avatar: priority order is emoji > OAuth image > initials
+  const hasSelectedEmoji = !!selectedEmoji
+  // Validate profile image URL safely
+  const hasProfileImage = useMemo(() => {
+    if (!profileImageUrl) return false
+    
+    try {
+      const url = new URL(profileImageUrl)
+      // Only allow HTTPS URLs or localhost for development
+      return url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
+    } catch {
+      // Invalid URL format
+      return false
+    }
+  }, [profileImageUrl])
+  const shouldShowImage = !hasSelectedEmoji && hasProfileImage
+  const hintMode = !hasSelectedEmoji && !hasProfileImage
 
   // Positions for orbiting emojis when no emoji is set
   const orbitPositions = useMemo(() => {
@@ -31,13 +48,18 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
   }, [emojiOptions])
 
   return (
-    <Card className="lg:col-span-1 border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
-      <CardHeader>
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+      <CardHeader className="pb-4">
         <CardTitle className="text-base">Profile overview</CardTitle>
-        <CardDescription>Select an emoji avatar or keep initials.</CardDescription>
+        <CardDescription className="text-sm">
+          {hasProfileImage 
+            ? "Select an emoji avatar or keep your profile image." 
+            : "Select an emoji avatar or keep initials."
+          }
+        </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         {/* Profile identity with animated ring hint when no emoji is set */}
         <div className="flex flex-col items-center gap-3">
           <div className="relative h-20 w-20">
@@ -64,9 +86,29 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
               </div>
             )}
 
-            <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'} bg-background`}>
-              <AvatarFallback className="text-xl">{selectedEmoji ? selectedEmoji : initials || 'U'}</AvatarFallback>
-            </Avatar>
+            {hasSelectedEmoji ? (
+              <div className={`h-20 w-20 relative z-0 ring-2 ring-primary/30 bg-background rounded-full flex items-center justify-center text-xl`}>
+                {selectedEmoji}
+              </div>
+            ) : (
+              <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'}`}>
+                {shouldShowImage && profileImageUrl && (
+                  <AvatarImage 
+                    src={profileImageUrl} 
+                    alt={displayName || 'Profile'} 
+                    className="object-cover"
+                    onLoadingStatusChange={(status) => {
+                      if (status === 'error') {
+                        console.warn('Failed to load profile image:', profileImageUrl)
+                      }
+                    }}
+                  />
+                )}
+                <AvatarFallback className="text-xl font-semibold text-white bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500">
+                  {initials || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            )}
           </div>
 
           <div className="text-sm font-medium">{displayName || 'Your name'}</div>
@@ -75,10 +117,13 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
 
         <Separator />
 
-        {/* Emoji selector */}
-        <div className="space-y-2">
-          <div className="text-xs text-muted-foreground">Choose your avatar emoji</div>
-          <div className="grid grid-cols-8 gap-2">
+        {/* Avatar selector */}
+        <div className="space-y-3">
+          
+          {/* Emoji Options */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-3">Pick an emoji</div>
+            <div className="grid grid-cols-8 gap-2">
             {emojiOptions.map(emoji => {
               const selected = selectedEmoji === emoji
               return (
@@ -97,10 +142,20 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                 </button>
               )
             })}
-          </div>
+            </div>
 
-          {/* Small hint when no emoji chosen */}
-          {hintMode && <p className="pt-1 text-[11px] text-muted-foreground">Tip: Pick an emoji to personalize your avatar.</p>}
+            {/* Small hint when no emoji chosen */}
+            {hintMode && !hasProfileImage && (
+              <p className="pt-2 text-[11px] text-muted-foreground">
+                Tip: Pick an emoji to personalize your avatar.
+              </p>
+            )}
+            {hintMode && hasProfileImage && (
+              <p className="pt-2 text-[11px] text-muted-foreground">
+                Your OAuth profile image is displayed. Pick an emoji to override it.
+              </p>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

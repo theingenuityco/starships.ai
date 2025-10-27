@@ -17,10 +17,10 @@ type AccountDetailsCardProps = {
 
 export default function AccountDetailsCard({ form, setForm, saving }: AccountDetailsCardProps) {
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
-      <CardHeader>
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+      <CardHeader className="pb-4">
         <CardTitle className="text-base">Account details</CardTitle>
-        <CardDescription>Keep your personal information accurate.</CardDescription>
+        <CardDescription className="text-sm">Keep your personal information accurate.</CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="space-y-2">

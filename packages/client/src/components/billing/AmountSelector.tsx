@@ -143,8 +143,8 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
           </div>
           <Input
             type="number"
-            placeholder="20.00"
-            value={customAmount}
+            placeholder={useCustom ? "20.00" : selectedAmount.toFixed(2)}
+            value={useCustom ? customAmount : selectedAmount.toFixed(2)}
             onChange={e => handleCustomChange(e.target.value)}
             min="5"
             max="1000"

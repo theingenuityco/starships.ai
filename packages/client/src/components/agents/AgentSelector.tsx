@@ -217,8 +217,8 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
         title: `Chat with ${agent.name}`
       })
 
-      // Navigate to the new conversation with agent parameter
-      router.push(`/ship/${starshipSlug}/conversations/${conversation.id}?agent=${agent.id}`)
+      // Navigate to the new conversation with agent parameter (use slug for clean URLs)
+      router.push(`/ship/${starshipSlug}/conversations/${conversation.id}?agent=${agent.slug}`)
     } catch (error) {
       console.error('Failed to create conversation:', error)
       setError('Failed to start conversation with agent')

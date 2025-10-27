@@ -37,9 +37,12 @@ Preference:
 - Use "Edit Tool" (tool-edit) for multi-node/edge updates, batch edits, or when placing a new scaffold blueprint to iterate on.
 - Use blueprint CRUD tools (tool-add-blueprint-*, tool-blueprint-*-*, tool-blueprint-remove-*) only for surgical, single node/edge adjustments.
 - When more than one node or edge will change, prefer a single "Edit Tool" call with the full blueprint.
+- Every new tool MUST include a concise, relevant description summarizing its purpose, key inputs, and expected output; keep it updated during edits.
 
 Workflow:
-1. Use "Open Tool" (with name and slug) to scaffold a draft (optional description)
+1. Use "Open Tool" to either:
+   - Create a draft by providing name and a concise, relevant description (slug auto-generated unless provided), or
+   - Open an existing tool by providing slug only
 2. For multi-step scaffolds or bulk changes, prefer "Edit Tool" with a complete blueprint draft; otherwise use "Add Tool Blueprint Node/Edge" for surgical changes.
 3. Use "Edit Tool Blueprint Node/Edge" to tweak a single node or edge as needed.
 4. Use blueprint_lint to validate the blueprint structure at any time

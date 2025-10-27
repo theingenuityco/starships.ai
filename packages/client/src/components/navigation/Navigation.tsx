@@ -212,7 +212,7 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
   const { data: conversationsData } = useStarshipConversations(starship?.id || '', !!starship?.id)
   const conversations = conversationsData?.conversations || []
 
-  // Take the most recent conversations (increased to show more)
+  // Show ALL conversations sorted by most recent
   const recentConversations = conversations
     .slice()
     .sort((a, b) => {
@@ -220,7 +220,6 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
       const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
       return bTime - aTime
     })
-    .slice(0, 15)
 
   const handleConversationClick = (conversationId: string) => {
     router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)

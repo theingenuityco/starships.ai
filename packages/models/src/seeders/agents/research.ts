@@ -123,5 +123,5 @@ export const researchTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   ],
   blueprint: createResearchBlueprint(),
   ...createResearchConfig(),
-  timeout: 90000,
+  timeout: 600000,
 };

@@ -151,5 +151,5 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   ],
   blueprint: createDaedalusDefaultBlueprint(),
   ...createDaedalusConfig(),
-  timeout: 60000,
+  timeout: 600000,
 };

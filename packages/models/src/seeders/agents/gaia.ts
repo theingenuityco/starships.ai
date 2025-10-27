@@ -259,5 +259,5 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
   ],
   blueprint: createGaiaDefaultBlueprint(),
   ...createGaiaConfig(),
-  timeout: 60000,
+  timeout: 600000,
 };

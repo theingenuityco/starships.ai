@@ -2,7 +2,7 @@
 
 
 import React, { useMemo } from 'react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
@@ -11,14 +11,19 @@ type ProfileOverviewCardProps = {
   displayName?: string
   email?: string
   selectedEmoji?: string
+  profileImageUrl?: string
   onSelectEmoji: (emoji: string) => void
   emojiOptions?: string[]
 }
 
 const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '🐱', '⚡']
 
-export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
-  const hintMode = !selectedEmoji
+export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
+  // Determine what to show in avatar: emoji takes priority, then profile image, then initials
+  const hasSelectedEmoji = !!selectedEmoji
+  const hasProfileImage = !!profileImageUrl && profileImageUrl.startsWith('http')
+  const shouldShowImage = !hasSelectedEmoji && hasProfileImage
+  const hintMode = !hasSelectedEmoji && !hasProfileImage
 
   // Positions for orbiting emojis when no emoji is set
   const orbitPositions = useMemo(() => {
@@ -34,7 +39,12 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
     <Card className="lg:col-span-1 border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Profile overview</CardTitle>
-        <CardDescription>Select an emoji avatar or keep initials.</CardDescription>
+        <CardDescription>
+          {hasProfileImage 
+            ? "Your profile image from OAuth or select an emoji avatar." 
+            : "Select an emoji avatar or keep initials."
+          }
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-5">
@@ -65,7 +75,16 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
             )}
 
             <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'} bg-background`}>
-              <AvatarFallback className="text-xl">{selectedEmoji ? selectedEmoji : initials || 'U'}</AvatarFallback>
+              {shouldShowImage && (
+                <AvatarImage 
+                  src={profileImageUrl} 
+                  alt={displayName || 'Profile'} 
+                  className="object-cover"
+                />
+              )}
+              <AvatarFallback className="text-xl">
+                {selectedEmoji ? selectedEmoji : initials || 'U'}
+              </AvatarFallback>
             </Avatar>
           </div>
 
@@ -100,7 +119,16 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
           </div>
 
           {/* Small hint when no emoji chosen */}
-          {hintMode && <p className="pt-1 text-[11px] text-muted-foreground">Tip: Pick an emoji to personalize your avatar.</p>}
+          {hintMode && !hasProfileImage && (
+            <p className="pt-1 text-[11px] text-muted-foreground">
+              Tip: Pick an emoji to personalize your avatar.
+            </p>
+          )}
+          {hintMode && hasProfileImage && (
+            <p className="pt-1 text-[11px] text-muted-foreground">
+              Your OAuth profile image is displayed. Pick an emoji to override it.
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -17,7 +17,7 @@ import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import AccountFormSkeleton from './AccountFormSkeleton'
 
 export default function AccountForm() {
-  const { hasPassword, authMethods, isOAuthOnly } = useAuth()
+  const { hasPassword, authMethods, isOAuthOnly, userAvatar } = useAuth()
   const [showSetPassword, setShowSetPassword] = useState(false)
   
   const {
@@ -68,6 +68,7 @@ export default function AccountForm() {
           displayName={form.displayName || currentUser?.displayName}
           email={form.email || currentUser?.email}
           selectedEmoji={form.avatar || ''}
+          profileImageUrl={userAvatar}
           onSelectEmoji={emoji => setForm(prev => ({ ...prev, avatar: emoji }))}
         />
 

@@ -41,7 +41,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         <CardTitle className="text-base">Profile overview</CardTitle>
         <CardDescription className="text-sm">
           {hasProfileImage 
-            ? "Your profile image from OAuth or select an emoji avatar." 
+            ? "Select an emoji avatar or keep your profile image." 
             : "Select an emoji avatar or keep initials."
           }
         </CardDescription>
@@ -107,7 +107,6 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
 
         {/* Avatar selector */}
         <div className="space-y-3">
-          <div className="text-xs font-medium text-muted-foreground">Choose your avatar</div>
           
           {/* Emoji Options */}
           <div>

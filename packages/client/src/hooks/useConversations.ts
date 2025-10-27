@@ -141,9 +141,21 @@ export function useDeleteConversation() {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.byStarship(context.starshipId), context.previousConversations)
       }
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete conversation'
+      // Extract error message safely
+      let errorMessage = 'Failed to delete conversation'
+      try {
+        if (error?.response?.data?.error) {
+          const errorData = error.response.data.error
+          errorMessage = typeof errorData === 'string' ? errorData : errorData?.message || errorMessage
+        } else if (error?.message) {
+          errorMessage = error.message
+        }
+      } catch (e) {
+        console.error('Error parsing delete error:', e)
+      }
+      
       toast.error('Failed to delete conversation', {
-        description: errorMessage,
+        description: String(errorMessage),
       })
     },
     onSuccess: (data, conversationId, context) => {

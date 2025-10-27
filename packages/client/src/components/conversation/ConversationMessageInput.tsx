@@ -1487,19 +1487,22 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       } catch {}
     }, [tiptap, scheduleSetContent])
 
+    // Track when we're switching conversations to prevent conflicting updates
+    const conversationSwitchRef = useRef<boolean>(false)
+    
     // Clear editor and reset mention when conversation changes
     useEffect(() => {
       if (!tiptap) return
       
-      // Clear the editor when conversation changes
-      if (conversationId) {
-        // Reset the last enforced agent to force re-enforcement
+      // Only proceed if conversation actually changed
+      if (conversationId && conversationId !== lastConversationIdRef.current) {
+        lastConversationIdRef.current = conversationId
+        conversationSwitchRef.current = true
+        
+        // Reset the last enforced agent
         lastEnforcedAgentIdRef.current = null
         
-        // Clear the editor content
-        tiptap.commands.clearContent()
-        
-        // If we have a selected agent, enforce its mention
+        // Clear the editor content and set the new agent mention
         if (selectedAgent) {
           const mentionNode = buildMentionNodeForAgent(selectedAgent)
           if (mentionNode) {
@@ -1512,16 +1515,32 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 }
               ]
             }
-            scheduleSetContent(content)
+            tiptap.commands.setContent(content)
             lastEnforcedAgentIdRef.current = selectedAgent.id
+            
+            // Focus at the end after a small delay
+            setTimeout(() => {
+              tiptap.commands.focus('end')
+              conversationSwitchRef.current = false
+            }, 100)
           }
+        } else {
+          tiptap.commands.clearContent()
+          setTimeout(() => {
+            conversationSwitchRef.current = false
+          }, 100)
         }
       }
-    }, [conversationId, tiptap, selectedAgent, buildMentionNodeForAgent, scheduleSetContent])
+    }, [conversationId, tiptap, selectedAgent, buildMentionNodeForAgent])
 
-    // Insert or update the leading mention whenever the editor or selected agent changes
+    // Insert or update the leading mention when selected agent changes (but not on conversation change)
     useEffect(() => {
       if (!tiptap || !selectedAgent) return
+
+      // Skip if we're in the middle of a conversation switch
+      if (conversationSwitchRef.current) {
+        return
+      }
 
       // Reset enforcement tracking when agent actually changes from external source
       if (selectedAgent.id !== lastEnforcedAgentIdRef.current) {
@@ -1531,11 +1550,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           enforceTimeoutRef.current = null
         }
         enforceTimeoutRef.current = window.setTimeout(() => {
-          try {
-            ensureLeadingAgentMention()
-          } catch {}
+          if (!conversationSwitchRef.current) {
+            try {
+              ensureLeadingAgentMention()
+              lastEnforcedAgentIdRef.current = selectedAgent.id
+            } catch {}
+          }
           enforceTimeoutRef.current = null
-        }, 0)
+        }, 100)
       }
 
       return () => {

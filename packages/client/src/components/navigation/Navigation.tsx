@@ -7,6 +7,7 @@ import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { useStarshipConversations } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 
 import { motion } from 'motion/react'
@@ -129,7 +130,7 @@ export function Navigation() {
   return (
     <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg">
       <div
-        className="flex flex-col flex-shrink-0 w-48"
+        className="flex flex-col flex-shrink-0 w-56"
         style={{
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
         }}
@@ -217,13 +218,8 @@ export function Navigation() {
             />
 
             {/* Recents Section */}
-            {isAuthenticated && (
-              <div>
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">Recents</h3>
-                <div className="px-3 text-sm text-muted-foreground">
-                  No recent conversations
-                </div>
-              </div>
+            {isAuthenticated && starshipSlug && (
+              <RecentsSection starshipSlug={starshipSlug} />
             )}
           </div>
         </div>
@@ -242,6 +238,64 @@ export function Navigation() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+// RecentsSection component to show recent conversations
+interface RecentsSectionProps {
+  starshipSlug: string
+}
+
+function RecentsSection({ starshipSlug }: RecentsSectionProps) {
+  const router = useRouter()
+  
+  // Get user from auth context
+  const { user } = useAuth()
+  
+  // Get starship data to get the starship ID
+  const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id)
+  const starship = userStarships?.find(s => s.slug === starshipSlug)
+  
+  // Fetch conversations for this starship
+  const { data: conversationsData } = useStarshipConversations(starship?.id || '', !!starship?.id)
+  const conversations = conversationsData?.conversations || []
+  
+  // Take the 5 most recent conversations
+  const recentConversations = conversations
+    .slice()
+    .sort((a, b) => {
+      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+      return bTime - aTime
+    })
+    .slice(0, 5)
+
+  const handleConversationClick = (conversationId: string) => {
+    router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)
+  }
+
+  return (
+    <div>
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">Recents</h3>
+      <div className="px-3 space-y-1">
+        {recentConversations.length > 0 ? (
+          recentConversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              onClick={() => handleConversationClick(conversation.id)}
+              className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors truncate"
+              title={conversation.title || 'Untitled conversation'}
+            >
+              {conversation.title || 'Untitled conversation'}
+            </button>
+          ))
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            No recent conversations
+          </div>
+        )}
+      </div>
     </div>
   )
 }

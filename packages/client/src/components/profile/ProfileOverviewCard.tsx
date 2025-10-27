@@ -5,6 +5,7 @@ import React, { useMemo } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import UserAvatar from '@/components/animated/UserAvatar'
 
 type ProfileOverviewCardProps = {
   initials: string
@@ -13,28 +14,20 @@ type ProfileOverviewCardProps = {
   selectedEmoji?: string
   profileImageUrl?: string
   onSelectEmoji: (emoji: string) => void
+  onSelectGeneratedAvatar: () => void
   emojiOptions?: string[]
 }
 
 const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '🐱', '⚡']
 
-export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
-  // Temporary debugging
-  console.log('=== ProfileOverviewCard Debug ===')
-  console.log('selectedEmoji:', selectedEmoji)
-  console.log('profileImageUrl:', profileImageUrl)
-  console.log('initials:', initials)
-  
-  // Determine what to show in avatar: emoji takes priority, then profile image, then initials
-  const hasSelectedEmoji = !!selectedEmoji
+export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, onSelectGeneratedAvatar, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
+  // Determine what to show in avatar: priority order is emoji > generated avatar > OAuth image > initials
+  const hasSelectedEmoji = !!selectedEmoji && selectedEmoji !== 'GENERATED_AVATAR'
+  const hasGeneratedAvatar = selectedEmoji === 'GENERATED_AVATAR'
   const hasProfileImage = !!profileImageUrl && profileImageUrl.startsWith('http')
-  const shouldShowImage = !hasSelectedEmoji && hasProfileImage
-  const hintMode = !hasSelectedEmoji && !hasProfileImage
-  
-  console.log('hasSelectedEmoji:', hasSelectedEmoji)
-  console.log('hasProfileImage:', hasProfileImage)
-  console.log('shouldShowImage:', shouldShowImage)
-  console.log('hintMode:', hintMode)
+  const shouldShowImage = !hasSelectedEmoji && !hasGeneratedAvatar && hasProfileImage
+  const shouldShowGeneratedAvatar = !hasSelectedEmoji && hasGeneratedAvatar
+  const hintMode = !hasSelectedEmoji && !hasGeneratedAvatar && !hasProfileImage
 
   // Positions for orbiting emojis when no emoji is set
   const orbitPositions = useMemo(() => {
@@ -85,23 +78,32 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
               </div>
             )}
 
-            <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'} bg-background`}>
-              {shouldShowImage && profileImageUrl && (
-                <AvatarImage 
-                  src={profileImageUrl} 
-                  alt={displayName || 'Profile'} 
-                  className="object-cover"
-                  onLoadingStatusChange={(status) => {
-                    if (status === 'error') {
-                      console.warn('Failed to load profile image:', profileImageUrl)
-                    }
-                  }}
-                />
-              )}
-              <AvatarFallback className="text-xl">
-                {selectedEmoji ? selectedEmoji : initials || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            {shouldShowGeneratedAvatar ? (
+              <UserAvatar 
+                seed={displayName || 'User'} 
+                size={80} 
+                className="ring-2 ring-primary/30" 
+                rounded 
+              />
+            ) : (
+              <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'} bg-background`}>
+                {shouldShowImage && profileImageUrl && (
+                  <AvatarImage 
+                    src={profileImageUrl} 
+                    alt={displayName || 'Profile'} 
+                    className="object-cover"
+                    onLoadingStatusChange={(status) => {
+                      if (status === 'error') {
+                        console.warn('Failed to load profile image:', profileImageUrl)
+                      }
+                    }}
+                  />
+                )}
+                <AvatarFallback className="text-xl">
+                  {hasSelectedEmoji ? selectedEmoji : initials || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            )}
           </div>
 
           <div className="text-sm font-medium">{displayName || 'Your name'}</div>
@@ -110,9 +112,29 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
 
         <Separator />
 
-        {/* Emoji selector */}
+        {/* Avatar selector */}
         <div className="space-y-2">
-          <div className="text-xs text-muted-foreground">Choose your avatar emoji</div>
+          <div className="text-xs text-muted-foreground">Choose your avatar</div>
+          
+          {/* Generated Avatar Option */}
+          <div className="mb-3">
+            <button
+              type="button"
+              aria-label="Use generated avatar"
+              aria-pressed={hasGeneratedAvatar}
+              onClick={onSelectGeneratedAvatar}
+              className={[
+                'flex items-center gap-2 w-full p-2 rounded-lg border transition-colors text-left',
+                hasGeneratedAvatar ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted/60',
+              ].join(' ')}
+            >
+              <UserAvatar seed={displayName || 'User'} size={24} rounded />
+              <span className="text-sm">Generated avatar</span>
+            </button>
+          </div>
+
+          {/* Emoji Options */}
+          <div className="text-xs text-muted-foreground mb-2">Or pick an emoji</div>
           <div className="grid grid-cols-8 gap-2">
             {emojiOptions.map(emoji => {
               const selected = selectedEmoji === emoji

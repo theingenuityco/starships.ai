@@ -11,7 +11,7 @@ import { useStarshipConversations, useDeleteConversation, useUpdateConversationS
 import { useAuth } from '@/hooks/useAuth'
 
 import { motion } from 'motion/react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { Orbitron } from 'next/font/google'
@@ -23,6 +23,7 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 export function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isAuthenticated, user } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
@@ -86,6 +87,7 @@ export function Navigation() {
   const isAgentBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agent/`) : false
   const isToolsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tools`) : false
   const isToolBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tool/`) : false
+  const isMarketplaceRoute = pathname === '/marketplace' && !searchParams?.get('from')
 
 
 
@@ -99,7 +101,7 @@ export function Navigation() {
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'agents', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'tools', isActive: isToolsRoute || isToolBuilderRoute }] : []),
-    { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
+    { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: isMarketplaceRoute },
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
 

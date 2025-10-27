@@ -156,10 +156,18 @@ export function Navigation() {
             <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} showLabels={showLabels} expanded={expanded} />
           </div>
 
-          {/* Scrollable Recents Section */}
+          {/* Recents Section with Fixed Header */}
           {isAuthenticated && starshipSlug && (
-            <div className="flex-1 min-h-0 mt-4 pt-6 border-t border-border/20">
-              <div className="h-full overflow-y-auto px-2">
+            <div className="flex-1 min-h-0 mt-4 pt-6 border-t border-border/20 flex flex-col">
+              {/* Fixed Recents Header */}
+              <div className="flex-shrink-0 px-2 mb-2">
+                <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <LordIcon src={getLordiconUrl('history')} width={12} height={12} className="w-3 h-3" />
+                  Recents
+                </h3>
+              </div>
+              {/* Scrollable Conversations List */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-2">
                 <RecentsSection starshipSlug={starshipSlug} />
               </div>
             </div>
@@ -220,10 +228,6 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
 
   return (
     <div>
-      <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2 flex items-center gap-2">
-        <LordIcon src={getLordiconUrl('history')} width={12} height={12} className="w-3 h-3" />
-        Recents
-      </h3>
       <div className="space-y-1">
         {recentConversations.length > 0 ? (
           recentConversations.map(conversation => {

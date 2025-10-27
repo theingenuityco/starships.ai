@@ -279,10 +279,21 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
     try {
+      // Check if this conversation is currently active before deleting
+      const pathname = window.location.pathname
+      const starshipSlug = pathname.split('/')[2] // Extract starship slug from URL
+      const isCurrentlyViewing = pathname === `/ship/${starshipSlug}/conversations/${conversation.id}`
+      
       await deleteConversationMutation.mutateAsync(conversation.id)
       setShowMenu(false)
+      
+      // If user was viewing this conversation, redirect to starship overview
+      if (isCurrentlyViewing && starshipSlug) {
+        window.location.href = `/ship/${starshipSlug}`
+      }
     } catch (error) {
       // Error handling is done in the mutation hook
+      console.error('Delete conversation error:', error)
     }
   }
 

@@ -269,7 +269,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Restore selected agent from conversation data (with stable guard to avoid loops)
   useEffect(() => {
     // If user explicitly chose an agent, do not override until conversation changes
-    if (userSelectedAgentRef.current && selectedAgent) {
+    if (userSelectedAgentRef.current) {
       return
     }
     
@@ -279,7 +279,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (storedAgent) {
         const currentId = selectedAgent?.id || null
         const targetId = storedAgent.id
-        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+        if (currentId !== targetId) {
           lastAutoSelectedAgentIdRef.current = targetId
           setSelectedAgent(storedAgent)
           return
@@ -293,7 +293,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (conversationAgent && typeof conversationAgent.id === 'string') {
         const currentId = selectedAgent?.id || null
         const targetId = conversationAgent.id
-        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+        if (currentId !== targetId) {
           lastAutoSelectedAgentIdRef.current = targetId
           setSelectedAgent(conversationAgent)
           return
@@ -312,9 +312,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         }
       }
     }
-  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData])
+  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData, selectedAgent])
 
-  // Keep guard ref in sync with user-driven agent changes
+  // Keep guard ref in sync with agent changes
   useEffect(() => {
     if (selectedAgent?.id) {
       lastAutoSelectedAgentIdRef.current = selectedAgent.id

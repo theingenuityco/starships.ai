@@ -91,7 +91,8 @@ export default function AccountForm() {
 
           <OAuthAccountsSettings />
 
-          <DangerZoneCard deleting={deleting} onDelete={onDelete} />
+          {/* TODO: Temporarily disabled - Delete account functionality */}
+          {/* <DangerZoneCard deleting={deleting} onDelete={onDelete} /> */}
         </div>
       </form>
 

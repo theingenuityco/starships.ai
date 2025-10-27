@@ -5,7 +5,6 @@ import React, { useMemo } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import UserAvatar from '@/components/animated/UserAvatar'
 
 type ProfileOverviewCardProps = {
   initials: string
@@ -14,20 +13,17 @@ type ProfileOverviewCardProps = {
   selectedEmoji?: string
   profileImageUrl?: string
   onSelectEmoji: (emoji: string) => void
-  onSelectGeneratedAvatar: () => void
   emojiOptions?: string[]
 }
 
 const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '🐱', '⚡']
 
-export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, onSelectGeneratedAvatar, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
-  // Determine what to show in avatar: priority order is emoji > generated avatar > OAuth image > initials
-  const hasSelectedEmoji = !!selectedEmoji && selectedEmoji !== 'GENERATED_AVATAR'
-  const hasGeneratedAvatar = selectedEmoji === 'GENERATED_AVATAR'
+export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
+  // Determine what to show in avatar: priority order is emoji > OAuth image > initials
+  const hasSelectedEmoji = !!selectedEmoji
   const hasProfileImage = !!profileImageUrl && profileImageUrl.startsWith('http')
-  const shouldShowImage = !hasSelectedEmoji && !hasGeneratedAvatar && hasProfileImage
-  const shouldShowGeneratedAvatar = !hasSelectedEmoji && hasGeneratedAvatar
-  const hintMode = !hasSelectedEmoji && !hasGeneratedAvatar && !hasProfileImage
+  const shouldShowImage = !hasSelectedEmoji && hasProfileImage
+  const hintMode = !hasSelectedEmoji && !hasProfileImage
 
   // Positions for orbiting emojis when no emoji is set
   const orbitPositions = useMemo(() => {
@@ -78,15 +74,12 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
               </div>
             )}
 
-            {shouldShowGeneratedAvatar ? (
-              <UserAvatar 
-                seed={displayName || 'User'} 
-                size={80} 
-                className="ring-2 ring-primary/30" 
-                rounded 
-              />
+            {hasSelectedEmoji ? (
+              <div className={`h-20 w-20 relative z-0 ring-2 ring-primary/30 bg-background rounded-full flex items-center justify-center text-xl`}>
+                {selectedEmoji}
+              </div>
             ) : (
-              <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'} bg-background`}>
+              <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'}`}>
                 {shouldShowImage && profileImageUrl && (
                   <AvatarImage 
                     src={profileImageUrl} 
@@ -99,8 +92,8 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                     }}
                   />
                 )}
-                <AvatarFallback className="text-xl">
-                  {hasSelectedEmoji ? selectedEmoji : initials || 'U'}
+                <AvatarFallback className="text-xl font-semibold text-white bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500">
+                  {initials || 'U'}
                 </AvatarFallback>
               </Avatar>
             )}
@@ -116,25 +109,9 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">Choose your avatar</div>
           
-          {/* Generated Avatar Option */}
-          <div className="mb-3">
-            <button
-              type="button"
-              aria-label="Use generated avatar"
-              aria-pressed={hasGeneratedAvatar}
-              onClick={onSelectGeneratedAvatar}
-              className={[
-                'flex items-center gap-2 w-full p-2 rounded-lg border transition-colors text-left',
-                hasGeneratedAvatar ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted/60',
-              ].join(' ')}
-            >
-              <UserAvatar seed={displayName || 'User'} size={24} rounded />
-              <span className="text-sm">Generated avatar</span>
-            </button>
-          </div>
 
           {/* Emoji Options */}
-          <div className="text-xs text-muted-foreground mb-2">Or pick an emoji</div>
+          <div className="text-xs text-muted-foreground mb-2">Pick an emoji</div>
           <div className="grid grid-cols-8 gap-2">
             {emojiOptions.map(emoji => {
               const selected = selectedEmoji === emoji

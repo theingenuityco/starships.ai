@@ -70,7 +70,6 @@ export default function AccountForm() {
           selectedEmoji={form.avatar && !form.avatar.startsWith('http') ? form.avatar : ''}
           profileImageUrl={userAvatar}
           onSelectEmoji={emoji => setForm(prev => ({ ...prev, avatar: emoji }))}
-          onSelectGeneratedAvatar={() => setForm(prev => ({ ...prev, avatar: 'GENERATED_AVATAR' }))}
         />
 
         <div className="lg:col-span-2 space-y-6">

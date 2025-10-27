@@ -46,9 +46,9 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         <CardTitle className="text-base">Profile overview</CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Profile identity with animated ring hint when no emoji is set */}
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-4">
           <div className="relative h-20 w-20">
             {/* Animated orbit when no emoji selected */}
             {hintMode && (
@@ -107,12 +107,12 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         <Separator />
 
         {/* Avatar selector */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           
           {/* Emoji Options */}
           <div>
-            <div className="text-xs text-muted-foreground mb-3">Pick an emoji</div>
-            <div className="grid grid-cols-8 gap-2">
+            <div className="text-xs text-muted-foreground mb-4">Pick an emoji</div>
+            <div className="grid grid-cols-8 gap-3">
             {emojiOptions.map(emoji => {
               const selected = selectedEmoji === emoji
               return (

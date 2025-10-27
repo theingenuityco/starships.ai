@@ -13,13 +13,14 @@ interface UserProfileProps {
   mode?: 'collapsed' | 'expanded'
   onClick?: () => void
   active?: boolean
+  starshipName?: string
 }
 
 /**
  * User profile component for navigation bottom
- * Shows user name and email with logout functionality via tooltip
+ * Shows user name and starship name with logout functionality via tooltip
  */
-export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick, active = false }: UserProfileProps) {
+export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick, active = false, starshipName }: UserProfileProps) {
   const { user, userName, userEmail, isAuthenticated, logout, userAvatar } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -102,7 +103,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-foreground truncate">{userName}</p>
-        <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+        <p className="text-xs text-muted-foreground truncate">{starshipName || 'No starship selected'}</p>
       </div>
     </div>
   )

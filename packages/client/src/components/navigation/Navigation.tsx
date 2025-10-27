@@ -6,7 +6,7 @@ import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { useSelectedStarship, useUserStarships, useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipConversations, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -75,8 +75,10 @@ export function Navigation() {
     }
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 
-
   const starshipSlug = navigationStarshipSlug
+
+  // Get current starship data to pass starship name to UserProfile
+  const { data: currentStarship } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
 
   // Route checking for active states
   const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
@@ -86,8 +88,6 @@ export function Navigation() {
   const isAgentBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agent/`) : false
   const isToolsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tools`) : false
   const isToolBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tool/`) : false
-
-
 
   // Handle new conversation
   const handleNewConversation = () => {
@@ -112,15 +112,10 @@ export function Navigation() {
     router.push('/')
   }
 
-  // Floating mode - expandable layout
+  // Full height mode - touching top, bottom, and left edges
   return (
-    <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg bg-background/95 backdrop-blur-md relative z-[100]">
-      <div
-        className="flex flex-col flex-shrink-0 w-56"
-        style={{
-          height: 'calc(100vh - 2rem)', // Full height minus top (1rem) and bottom (1rem) padding
-        }}
-      >
+    <div ref={sidebarRef} className="flex flex-row overflow-hidden shadow-frosted-lg bg-muted/50 backdrop-blur-md relative z-[100] h-screen border-r border-border/30">
+      <div className="flex flex-col flex-shrink-0 w-56 h-full">
         {/* Header */}
         <div className="px-3 py-3 flex-shrink-0 flex items-center space-x-3 bg-black relative z-[101]">
           <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Go to Landing Screen">
@@ -146,29 +141,22 @@ export function Navigation() {
           <div className="flex-1 px-2 py-3 space-y-4">
             {/* New Chat Button */}
             {isAuthenticated && starshipSlug && (
-              <button
-                onClick={handleNewConversation}
-                className="group relative w-full transition-all duration-300 flex items-center px-2 py-2 hover:bg-muted/30 rounded-lg"
-              >
+              <button onClick={handleNewConversation} className="group relative w-full transition-all duration-300 flex items-center px-2 py-2 hover:bg-muted/30 rounded-lg">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 transition-all duration-300 transform group-hover:scale-105" style={{ backgroundColor: '#F5A61F' }}>
                   <LordIcon src={getLordiconUrl('plus')} width={16} height={16} className="w-[16px] h-[16px] text-white" trigger="click" />
                 </div>
-                <span className="text-sm font-medium transition-colors duration-300" style={{ color: '#F5A61F' }}>New Chat</span>
+                <span className="text-sm font-medium transition-colors duration-300" style={{ color: '#F5A61F' }}>
+                  New Chat
+                </span>
               </button>
             )}
 
             {/* Main Navigation */}
-            <NavigationSection
-              title="Navigation"
-              items={mainNavigationItems}
-              pathname={pathname}
-              showLabels={showLabels}
-              expanded={expanded}
-            />
+            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} showLabels={showLabels} expanded={expanded} />
 
             {/* Recents Section */}
             {isAuthenticated && starshipSlug && (
-              <div className="mt-8">
+              <div className="mt-8 pt-6 border-t border-border/20">
                 <RecentsSection starshipSlug={starshipSlug} />
               </div>
             )}
@@ -180,6 +168,7 @@ export function Navigation() {
           <UserProfile
             mode="expanded"
             active={isSettingsRoute}
+            starshipName={currentStarship?.name}
             onClick={() => {
               if (starshipSlug) {
                 router.push(`/ship/${starshipSlug}/settings`)
@@ -188,7 +177,6 @@ export function Navigation() {
           />
         </div>
       </div>
-
     </div>
   )
 }
@@ -200,18 +188,18 @@ interface RecentsSectionProps {
 
 function RecentsSection({ starshipSlug }: RecentsSectionProps) {
   const router = useRouter()
-  
+
   // Get user from auth context
   const { user } = useAuth()
-  
+
   // Get starship data to get the starship ID
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id)
   const starship = userStarships?.find(s => s.slug === starshipSlug)
-  
+
   // Fetch conversations for this starship
   const { data: conversationsData } = useStarshipConversations(starship?.id || '', !!starship?.id)
   const conversations = conversationsData?.conversations || []
-  
+
   // Take the 5 most recent conversations
   const recentConversations = conversations
     .slice()
@@ -228,20 +216,15 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
 
   return (
     <div>
-      <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2">Recents</h3>
-      <div className="px-2 space-y-1">
+      <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2 flex items-center gap-2">
+        <LordIcon src={getLordiconUrl('history')} width={12} height={12} className="w-3 h-3" />
+        Recents
+      </h3>
+      <div className="space-y-1">
         {recentConversations.length > 0 ? (
-          recentConversations.map((conversation) => (
-            <ConversationItem
-              key={conversation.id}
-              conversation={conversation}
-              onClick={() => handleConversationClick(conversation.id)}
-            />
-          ))
+          recentConversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} onClick={() => handleConversationClick(conversation.id)} />)
         ) : (
-          <div className="text-sm text-muted-foreground">
-            No recent conversations
-          </div>
+          <div className="text-sm text-muted-foreground px-2">No recent conversations</div>
         )}
       </div>
     </div>
@@ -306,10 +289,10 @@ function ConversationItem({ conversation, onClick }: ConversationItemProps) {
       >
         {conversation.title || 'Untitled conversation'}
       </button>
-      
+
       {/* Three-dot menu button */}
       <button
-        onClick={(e) => {
+        onClick={e => {
           e.stopPropagation()
           setShowMenu(!showMenu)
         }}

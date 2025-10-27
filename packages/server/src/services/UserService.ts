@@ -300,7 +300,22 @@ export class UserService {
 
     // All users are now approved automatically
 
-    // Check if user exists by email (for account linking)
+    // PRIORITY 1: Check if this OAuth account is already linked to an existing user
+    const existingOAuthAccount = await this.oauthRepository.findByProviderAndUser(profile.provider, profile.providerId);
+    if (existingOAuthAccount) {
+      // OAuth account exists - get the linked user
+      const user = await this.getUserById(existingOAuthAccount.userId);
+      if (!user) {
+        throw new ValidationError('OAuth account linked to non-existent user', 'oauth');
+      }
+      
+      // Update email verification for existing users (OAuth providers verify emails)
+      await this.updateUserProfile(user.id, { emailVerified: true });
+      
+      return { user };
+    }
+
+    // PRIORITY 2: Check if user exists by email (for new OAuth account linking to existing email-based account)
     let user = await this.getUserByEmail(profile.email);
     let isNewUser = false;
 

@@ -19,11 +19,22 @@ type ProfileOverviewCardProps = {
 const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '🐱', '⚡']
 
 export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
+  // Temporary debugging
+  console.log('=== ProfileOverviewCard Debug ===')
+  console.log('selectedEmoji:', selectedEmoji)
+  console.log('profileImageUrl:', profileImageUrl)
+  console.log('initials:', initials)
+  
   // Determine what to show in avatar: emoji takes priority, then profile image, then initials
   const hasSelectedEmoji = !!selectedEmoji
   const hasProfileImage = !!profileImageUrl && profileImageUrl.startsWith('http')
   const shouldShowImage = !hasSelectedEmoji && hasProfileImage
   const hintMode = !hasSelectedEmoji && !hasProfileImage
+  
+  console.log('hasSelectedEmoji:', hasSelectedEmoji)
+  console.log('hasProfileImage:', hasProfileImage)
+  console.log('shouldShowImage:', shouldShowImage)
+  console.log('hintMode:', hintMode)
 
   // Positions for orbiting emojis when no emoji is set
   const orbitPositions = useMemo(() => {
@@ -75,11 +86,16 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
             )}
 
             <Avatar className={`h-20 w-20 relative z-0 ring-2 ${hintMode ? 'ring-primary/60 animate-pulse' : 'ring-primary/30'} bg-background`}>
-              {shouldShowImage && (
+              {shouldShowImage && profileImageUrl && (
                 <AvatarImage 
                   src={profileImageUrl} 
                   alt={displayName || 'Profile'} 
                   className="object-cover"
+                  onLoadingStatusChange={(status) => {
+                    if (status === 'error') {
+                      console.warn('Failed to load profile image:', profileImageUrl)
+                    }
+                  }}
                 />
               )}
               <AvatarFallback className="text-xl">

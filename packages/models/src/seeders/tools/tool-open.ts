@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Open Tool (Create or Open)
- * Creates a new draft tool when provided name + slug, or opens an existing tool by slug
+ * Creates a new draft tool when provided name (+ description; slug optional), or opens an existing tool by slug
  */
 export const toolOpenTool: ToolParams = {
   name: 'Open Tool',
@@ -11,7 +11,7 @@ export const toolOpenTool: ToolParams = {
   description: `Creates or opens a tool on the current starship.
 
 ## Modes
-- Create new draft: provide "name" and "slug" (optional "description")
+- Create new draft: provide "name" and "description" (slug auto-generated from name unless provided)
 - Open existing: provide only "slug"
 
 ## Environment Dependencies
@@ -39,10 +39,10 @@ Automatically inferred from agent state (do not pass manually):
       },
       description: {
         type: 'string',
-        description: 'Optional description (used only when creating a new tool)',
+        description: 'Description (required when creating a new tool)',
       },
     },
-    required: ['slug'],
+    required: [],
   },
   blueprint: {
     nodes: [
@@ -62,15 +62,25 @@ Automatically inferred from agent state (do not pass manually):
             if (!starshipId) throw new Error('starshipId is required');
 
             const hasName = input && typeof input.name === 'string' && input.name.trim().length > 0;
-            const slug = input && input.slug;
-            if (!slug || typeof slug !== 'string') throw new Error('slug is required');
+            const hasSlug = input && typeof input.slug === 'string' && input.slug.trim().length > 0;
 
             if (hasName) {
               // Create draft
+              const name = input.name.trim();
+              const description = (input && typeof input.description === 'string' ? input.description.trim() : '');
+              if (!description) throw new Error('description is required when creating a new tool');
+              const slug = hasSlug
+                ? input.slug.trim()
+                : name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .replace(/--+/g, '-');
+
               const body = {
-                name: input.name,
+                name,
                 slug,
-                description: (input && input.description) || '',
+                description,
                 status: 'draft'
               };
               return {
@@ -86,8 +96,9 @@ Automatically inferred from agent state (do not pass manually):
             }
 
             // Open existing
+            if (!hasSlug) throw new Error('slug is required to open an existing tool');
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
+              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${input.slug}\`,
               method: 'GET',
               headers: {
                 'Authorization': \`Bearer \${authToken}\`,
@@ -143,7 +154,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   slug: 'tool-open',
   category: 'automation',
   exampleUsage:
-    '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "slug": "my-tool", "description": "Does something useful" } // create draft; env inferred',
+    '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create draft (slug auto-generated from name; env inferred)\n{ "name": "My Tool", "slug": "my-tool", "description": "Does something useful" } // create draft with explicit slug',
   requiresApiKey: false,
   configurationFields: [],
 };

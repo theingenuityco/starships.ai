@@ -102,7 +102,7 @@ export class ConversationService {
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
     memoryLimitMB: 256, // 256MB memory limit
-    timeoutMs: 60000, // 60 second timeout
+    timeoutMs: 600000, // 10 minute timeout
     killGraceMs: 5000, // 5 second grace period
   };
 

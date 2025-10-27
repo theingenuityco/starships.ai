@@ -1487,52 +1487,56 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       } catch {}
     }, [tiptap, scheduleSetContent])
 
-    // When conversation OR selected agent changes, update the editor
+    // When conversation changes, clear the editor and prepare for new agent
     useEffect(() => {
       if (!tiptap) return
+      if (!conversationId) return
       
-      // Check if conversation changed
-      const conversationChanged = conversationId && conversationId !== lastConversationIdRef.current
-      
-      // Check if agent changed
-      const agentChanged = selectedAgent && selectedAgent.id !== lastEnforcedAgentIdRef.current
-      
-      // If either changed, update the editor
-      if (conversationChanged || agentChanged) {
-        // Update tracking refs
-        if (conversationChanged) {
-          lastConversationIdRef.current = conversationId
-        }
-        if (selectedAgent) {
-          lastEnforcedAgentIdRef.current = selectedAgent.id
-        }
+      // Check if conversation actually changed
+      if (conversationId !== lastConversationIdRef.current) {
+        lastConversationIdRef.current = conversationId
         
-        // Clear and rebuild editor content with correct agent
-        if (selectedAgent) {
+        // Clear the editor content when switching conversations
+        // We'll let the agent effect handle setting the mention
+        requestAnimationFrame(() => {
+          tiptap.commands.clearContent()
+          lastEnforcedAgentIdRef.current = null
+        })
+      }
+    }, [conversationId, tiptap])
+    
+    // When selected agent changes, update the mention
+    useEffect(() => {
+      if (!tiptap || !selectedAgent) return
+      
+      // Check if we need to update the mention
+      if (selectedAgent.id !== lastEnforcedAgentIdRef.current) {
+        lastEnforcedAgentIdRef.current = selectedAgent.id
+        
+        // Schedule the update to avoid React lifecycle conflicts
+        requestAnimationFrame(() => {
           const mentionNode = buildMentionNodeForAgent(selectedAgent)
-          if (mentionNode) {
-            // Get current text content (excluding mention)
-            const json: any = tiptap.getJSON()
-            const docContent = Array.isArray(json?.content) ? json.content : []
-            const firstBlock = docContent[0]
-            const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
-            
-            // Extract text after any existing mention
-            let textContent = ''
-            for (const node of blockContent) {
-              if (node && node.type === 'text' && typeof node.text === 'string') {
-                textContent += node.text
-              }
+          if (!mentionNode) return
+          
+          // Check current content
+          const json: any = tiptap.getJSON()
+          const docContent = Array.isArray(json?.content) ? json.content : []
+          const firstBlock = docContent[0]
+          const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+          
+          // Check if there's already a mention
+          const existingMention = blockContent.find((n: any) => n?.type === 'mention')
+          
+          // Get any text content (excluding existing mention)
+          let textContent = ''
+          for (const node of blockContent) {
+            if (node && node.type === 'text' && typeof node.text === 'string') {
+              textContent += node.text
             }
-            
-            // If it's just a space or empty, clear it
-            if (textContent.trim() === '') {
-              textContent = ' '
-            } else if (!textContent.startsWith(' ')) {
-              textContent = ' ' + textContent.trimStart()
-            }
-            
-            // Build new content with updated mention
+          }
+          
+          // If conversation just switched or no content, set fresh
+          if (!existingMention && textContent.trim() === '') {
             const content = {
               type: 'doc',
               content: [
@@ -1540,26 +1544,57 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   type: 'paragraph',
                   content: [
                     mentionNode,
-                    { type: 'text', text: textContent }
+                    { type: 'text', text: ' ' }
                   ]
                 }
               ]
             }
             
-            // Set content directly
             tiptap.commands.setContent(content)
             
-            // Position cursor after mention and space
-            setTimeout(() => {
+            // Focus at position 2 (after mention and space)
+            requestAnimationFrame(() => {
               try {
-                const pos = Math.min(2, tiptap.state.doc.content.size - 1)
-                tiptap.commands.setTextSelection(pos)
+                tiptap.commands.focus()
+                tiptap.commands.setTextSelection(2)
               } catch {}
-            }, 10)
+            })
+          } else if (existingMention) {
+            // Replace existing mention while preserving text
+            const newContent = blockContent.map((node: any) => {
+              if (node?.type === 'mention') {
+                return mentionNode
+              }
+              return node
+            })
+            
+            const content = {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: newContent.length > 0 ? newContent : [mentionNode, { type: 'text', text: ' ' }]
+                }
+              ]
+            }
+            
+            // Preserve cursor position if possible
+            const currentPos = tiptap.state.selection.from
+            tiptap.commands.setContent(content)
+            
+            requestAnimationFrame(() => {
+              try {
+                const maxPos = tiptap.state.doc.content.size - 1
+                const safePos = Math.min(currentPos, maxPos)
+                if (safePos > 0) {
+                  tiptap.commands.setTextSelection(safePos)
+                }
+              } catch {}
+            })
           }
-        }
+        })
       }
-    }, [conversationId, selectedAgent, tiptap, buildMentionNodeForAgent])
+    }, [selectedAgent, tiptap, buildMentionNodeForAgent])
 
     // Clear any pending enforcement when unmounting
     useEffect(() => {

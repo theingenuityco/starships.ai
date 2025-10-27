@@ -45,11 +45,8 @@ export const metadata: Metadata = {
 export default function MarketplacePage() {
   return (
     <>
-      <PublicHeader />
       <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
-        <div className="pt-16 sm:pt-20">
-          <MarketplacePageClient />
-        </div>
+        <MarketplacePageClient />
       </Suspense>
     </>
   )

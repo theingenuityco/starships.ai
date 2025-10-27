@@ -111,9 +111,9 @@ export function useAccountForm() {
     const anyPasswordEdit = !!(f.currentPassword || f.newPassword || f.confirmNewPassword)
 
     if (anyPasswordEdit) {
-      // Current password
-      if (!f.currentPassword || f.currentPassword.length < 6) {
-        errs.current = 'Current password must be at least 6 characters'
+      // Current password - just check if provided when changing password
+      if (!f.currentPassword) {
+        errs.current = 'Current password is required to change password'
       }
 
       // New password - use comprehensive validation

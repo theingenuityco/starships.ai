@@ -58,7 +58,7 @@ export function ForgotPasswordForm() {
           </CardHeader>
           
           <CardContent>
-            <Alert className="mb-4 border-2 border-emerald-500 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
+            <Alert className="mb-4 border border-emerald-400 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />

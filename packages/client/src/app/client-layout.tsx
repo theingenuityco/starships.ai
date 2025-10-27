@@ -96,7 +96,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
-            <div className="flex-shrink-0 p-2">
+            <div className="flex-shrink-0 p-2 relative z-50">
               <aside className="relative h-full">
                 <Navigation />
               </aside>
@@ -138,7 +138,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
-              <div className="flex-shrink-0 p-2">
+              <div className="flex-shrink-0 p-2 relative z-50">
                 <aside className="relative h-full">
                   <Navigation />
                 </aside>

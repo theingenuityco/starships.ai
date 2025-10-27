@@ -21,18 +21,11 @@ const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '
 export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
   // Determine what to show in avatar: priority order is emoji > OAuth image > initials
   const hasSelectedEmoji = !!selectedEmoji
-  // Validate profile image URL safely
+  // Validate profile image URL using same logic as navigation
   const hasProfileImage = useMemo(() => {
-    if (!profileImageUrl) return false
-    
-    try {
-      const url = new URL(profileImageUrl)
-      // Only allow HTTPS URLs or localhost for development
-      return url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
-    } catch {
-      // Invalid URL format
-      return false
-    }
+    if (!profileImageUrl || typeof profileImageUrl !== 'string') return false
+    const trimmed = profileImageUrl.trim()
+    return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
   }, [profileImageUrl])
   const shouldShowImage = !hasSelectedEmoji && hasProfileImage
   const hintMode = !hasSelectedEmoji && !hasProfileImage
@@ -97,6 +90,8 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                     src={profileImageUrl} 
                     alt={displayName || 'Profile'} 
                     className="object-cover"
+                    referrerPolicy="no-referrer" 
+                    crossOrigin="anonymous"
                     onLoadingStatusChange={(status) => {
                       if (status === 'error') {
                         console.warn('Failed to load profile image:', profileImageUrl)

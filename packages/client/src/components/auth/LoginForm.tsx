@@ -222,7 +222,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
           {emailVerificationStatus && (
-            <Alert className="mb-3 border border-emerald-600/20 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
+            <Alert className="mb-3 border-2 border-emerald-500 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
@@ -279,8 +279,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password
-                  </Label>
+                  <Label htmlFor="login-password">Password</Label>
                   <div className="relative">
                     <Input
                       id="login-password"
@@ -313,16 +312,8 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
                 {/* Terms acceptance checkbox */}
                 <div className="flex items-center justify-center gap-3 mt-6 mb-4">
-                  <Checkbox
-                    id="terms-login"
-                    checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="terms-login"
-                    className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
+                  <Checkbox id="terms-login" checked={acceptTerms} onCheckedChange={checked => setAcceptTerms(checked === true)} disabled={isLoading} />
+                  <label htmlFor="terms-login" className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
                     I agree to the{' '}
                     <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
                       Terms of Service
@@ -344,12 +335,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                     </>
                   )}
                 </Button>
-                
+
                 <div className="text-center">
-                  <Link 
-                    href="/forgot-password" 
-                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
-                  >
+                  <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
                     Forgot your password?
                   </Link>
                 </div>
@@ -411,9 +399,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                       {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
-                  {registerData.password && (
-                    <PasswordStrengthMeter password={registerData.password} />
-                  )}
+                  {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
                 </div>
 
                 <div className="space-y-1">
@@ -450,16 +436,8 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
                 {/* Terms acceptance checkbox */}
                 <div className="flex items-center justify-center gap-3 mt-6 mb-4">
-                  <Checkbox
-                    id="terms-register"
-                    checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="terms-register"
-                    className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
+                  <Checkbox id="terms-register" checked={acceptTerms} onCheckedChange={checked => setAcceptTerms(checked === true)} disabled={isLoading} />
+                  <label htmlFor="terms-register" className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
                     I agree to the{' '}
                     <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
                       Terms of Service

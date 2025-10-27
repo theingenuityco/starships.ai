@@ -162,24 +162,24 @@ function LoginContent() {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 bg-gradient-to-br from-gray-950 to-black">
+        <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-6 bg-gradient-to-br from-gray-950 to-black min-h-screen max-h-screen overflow-y-auto">
           <div className="w-full max-w-md">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="mb-8 text-center"
+              className="mb-4 text-center"
             >
               <motion.div
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="mb-6"
+                className="mb-3"
               >
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold text-primary">
                   {activeTab === 'login' ? 'Welcome Back' : 'Join Starships'}
                 </h1>
-                <p className="text-muted-foreground mt-2">
+                <p className="text-muted-foreground mt-1">
                   {activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}
                 </p>
               </motion.div>

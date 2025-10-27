@@ -47,13 +47,13 @@ export default function SecurityCard({
   const errorInput = 'border-destructive focus-visible:ring-destructive aria-[invalid=true]:border-destructive'
 
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
-      <CardHeader>
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+      <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Account Security
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           Manage your authentication methods and security settings.
         </CardDescription>
       </CardHeader>

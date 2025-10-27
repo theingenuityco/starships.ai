@@ -15,7 +15,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     () => ({
       slug: params.slug as string,
       conversationId: params.conversationId as string | undefined,
-      agentId: searchParams.get('agent') || undefined,
+      agentIdOrSlug: searchParams.get('agent') || undefined,
     }),
     [params.slug, params.conversationId, searchParams]
   )
@@ -44,7 +44,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         starshipId={starshipData.id}
         conversationId={routeParams.conversationId || null}
         onConversationChange={handleConversationChange}
-        initialAgentId={routeParams.agentId}
+        initialAgentId={routeParams.agentIdOrSlug}
         starshipSlug={routeParams.slug}
       />
       {/* Hide children since ConversationInterface now handles everything */}

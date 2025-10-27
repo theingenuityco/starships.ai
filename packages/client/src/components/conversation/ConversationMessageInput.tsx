@@ -1208,13 +1208,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       },
     })
 
-    // Force a lightweight re-render so Placeholder re-evaluates its function when text changes
-    useEffect(() => {
-      if (!tiptap) return
-      try {
-        ;(tiptap as any).view?.dispatch?.((tiptap as any).state?.tr)
-      } catch {}
-    }, [tiptap, placeholderText])
+    // Note: Removed forced dispatch that was causing cursor jumping issues
+    // Modern TipTap should handle placeholder updates automatically
 
     // Bridge editor focus/blur to parent callbacks for overlay control and local focus state
     useEffect(() => {
@@ -1306,7 +1301,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
         enforceTimeoutRef.current = window.setTimeout(() => {
           try {
+            // Preserve cursor position during content reconstruction
+            const currentSelection = tiptap.state.selection
+            const cursorPos = currentSelection.from
+            
             tiptap?.commands.setContent(content)
+            
+            // Restore cursor position if possible
+            const newDocSize = tiptap.state.doc.content.size
+            const safePos = Math.min(cursorPos, newDocSize)
+            if (safePos > 0) {
+              tiptap.commands.setTextSelection(safePos)
+            }
           } finally {
             enforcingMentionRef.current = false
           }

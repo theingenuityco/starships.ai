@@ -242,15 +242,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     currentConversationIdRef.current = currentConversationId
   }, [currentConversationId])
 
-  // Handle initial agent selection from URL parameter
+  // Handle initial agent selection from URL parameter (supports both ID and slug)
   useEffect(() => {
     if (initialAgentId && starshipAgentsData.length > 0 && !selectedAgent) {
-      const agent = starshipAgentsData.find(a => a.id === initialAgentId)
+      // Try to find by slug first (preferred), then fall back to ID for backward compatibility
+      const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || 
+                   starshipAgentsData.find(a => a.id === initialAgentId)
       if (agent) {
         setSelectedAgent(agent)
+        // Also update the UI store so that this agent is remembered for this conversation
+        if (currentConversationId) {
+          setConversationAgentStore(currentConversationId, agent.id, agent.name)
+        }
       }
     }
-  }, [initialAgentId, starshipAgentsData, selectedAgent])
+  }, [initialAgentId, starshipAgentsData, selectedAgent, currentConversationId, setConversationAgentStore])
 
   // Restore selected agent from conversation data (with stable guard to avoid loops)
   useEffect(() => {
@@ -258,21 +264,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (userSelectedAgentRef.current && selectedAgent) {
       return
     }
-    // Priority 1: first linked conversation agent
-    if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
-      const conversationAgent = conversationAgents[0]
-      if (conversationAgent && typeof conversationAgent.id === 'string') {
-        const currentId = selectedAgent?.id || null
-        const targetId = conversationAgent.id
-        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
-          lastAutoSelectedAgentIdRef.current = targetId
-          setSelectedAgent(conversationAgent)
-          return
-        }
-      }
-    }
-
-    // Priority 2: agent id from conversation store
+    
+    // Priority 1: agent id from conversation store (this should reflect the intended agent for the conversation)
     if (conversationData?.agentId && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
       const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId) || null
       if (storedAgent) {
@@ -286,7 +279,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
 
-    // Priority 3: fallback to first starship agent when none selected
+    // Priority 2: first linked conversation agent (fallback to message history)
+    if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
+      const conversationAgent = conversationAgents[0]
+      if (conversationAgent && typeof conversationAgent.id === 'string') {
+        const currentId = selectedAgent?.id || null
+        const targetId = conversationAgent.id
+        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
+          lastAutoSelectedAgentIdRef.current = targetId
+          setSelectedAgent(conversationAgent)
+          return
+        }
+      }
+    }
+
+    // Priority 3: fallback to first starship agent when none selected  
     if (!selectedAgent && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
       const fallback = starshipAgentsData[0]
       if (fallback && typeof fallback.id === 'string') {

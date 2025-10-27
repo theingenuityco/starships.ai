@@ -9,7 +9,7 @@ import { StarTheme } from '@/components/theme-context'
 import { WelcomeModalProvider } from '@/components/auth/WelcomeModalProvider'
 
 import { motion } from 'motion/react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
@@ -44,6 +44,7 @@ interface ClientLayoutProps {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
   const isMarketplace = pathname === '/marketplace'
@@ -87,8 +88,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       )
     }
 
-    // Authenticated users: show navigation like protected pages (without auth gate)
-    const shouldHideNavigation = false
+    // Simple: hide navigation only when explicitly coming from public context
+    const shouldHideNavigation = searchParams?.get('from') === 'public'
 
     return (
       <StarTheme theme="dark">

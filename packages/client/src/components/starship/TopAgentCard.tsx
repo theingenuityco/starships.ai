@@ -49,7 +49,7 @@ export function TopAgentCard({ starshipSlug, recentConversationId, className }: 
               </div>
             </div>
             <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
-              <Link href={`/ship/${starshipSlug}/conversations${topAgent.id ? `?agent=${topAgent.id}` : ''}`}>
+              <Link href={`/ship/${starshipSlug}/conversations${topAgent.slug ? `?agent=${topAgent.slug}` : ''}`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Message Agent
               </Link>

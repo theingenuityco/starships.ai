@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
 
 
 type SecurityCardProps = {
@@ -112,6 +113,9 @@ export default function SecurityCard({
                       aria-invalid={!!passwordErrors.new}
                       className={passwordErrors.new ? errorInput : ''}
                     />
+                    {form.newPassword && (
+                      <PasswordStrengthMeter password={form.newPassword} />
+                    )}
                     {passwordErrors.new && <p className="text-xs text-destructive">{passwordErrors.new}</p>}
                   </div>
 

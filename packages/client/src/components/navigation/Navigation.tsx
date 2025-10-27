@@ -136,7 +136,7 @@ export function Navigation() {
         }}
       >
         {/* Header */}
-        <div className="px-4 py-3 flex-shrink-0 flex items-center space-x-3 bg-black">
+        <div className="px-3 py-3 flex-shrink-0 flex items-center space-x-3 bg-black">
           <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Go to Landing Screen">
             <StarshipsLogo
               width={20}
@@ -157,7 +157,7 @@ export function Navigation() {
 
         {/* Navigation Content */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 px-3 py-4 space-y-4">
+          <div className="flex-1 px-2 py-3 space-y-4">
             {/* Main Navigation */}
             <NavigationSection
               title="Navigation"
@@ -219,13 +219,15 @@ export function Navigation() {
 
             {/* Recents Section */}
             {isAuthenticated && starshipSlug && (
-              <RecentsSection starshipSlug={starshipSlug} />
+              <div className="mt-6">
+                <RecentsSection starshipSlug={starshipSlug} />
+              </div>
             )}
           </div>
         </div>
 
         {/* User Profile Section */}
-        <div className="flex-shrink-0 px-3 py-4 border-t border-border/20">
+        <div className="flex-shrink-0 px-2 py-3 border-t border-border/20">
           <UserProfile
             mode="expanded"
             active={isSettingsRoute}
@@ -277,8 +279,8 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
 
   return (
     <div>
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">Recents</h3>
-      <div className="px-3 space-y-1">
+      <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2">Recents</h3>
+      <div className="px-2 space-y-1">
         {recentConversations.length > 0 ? (
           recentConversations.map((conversation) => (
             <button

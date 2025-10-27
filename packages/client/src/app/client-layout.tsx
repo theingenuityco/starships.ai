@@ -96,7 +96,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Floating Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
-            <div className="fixed top-6 left-6 z-[1000]">
+            <div className="fixed top-6 left-3 z-[1000]">
               <aside className="relative" style={{ zIndex: 1000 }}>
                 <Navigation />
               </aside>
@@ -138,7 +138,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
             {/* Floating Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
-              <div className="fixed top-6 left-6 z-[1000]">
+              <div className="fixed top-6 left-3 z-[1000]">
                 <aside className="relative" style={{ zIndex: 1000 }}>
                   <Navigation />
                 </aside>
@@ -151,7 +151,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="fixed top-4 left-4 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+                className="fixed top-4 left-2 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
                 aria-label="Open navigation menu"
                 style={{ zIndex: 999 }}
               >
@@ -160,7 +160,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             )}
 
             {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-            <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+            <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '4.5rem' }}>
               {children}
             </main>
           </div>

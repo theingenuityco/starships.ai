@@ -190,13 +190,13 @@ export function OAuthAccountsSettings() {
   }
 
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
-      <CardHeader>
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+      <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Connected Accounts
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf
         </CardDescription>
       </CardHeader>

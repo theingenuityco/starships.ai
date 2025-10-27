@@ -36,10 +36,10 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
   }, [emojiOptions])
 
   return (
-    <Card className="lg:col-span-1 border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
-      <CardHeader>
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+      <CardHeader className="pb-4">
         <CardTitle className="text-base">Profile overview</CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           {hasProfileImage 
             ? "Your profile image from OAuth or select an emoji avatar." 
             : "Select an emoji avatar or keep initials."
@@ -47,7 +47,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         {/* Profile identity with animated ring hint when no emoji is set */}
         <div className="flex flex-col items-center gap-3">
           <div className="relative h-20 w-20">
@@ -106,13 +106,13 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         <Separator />
 
         {/* Avatar selector */}
-        <div className="space-y-2">
-          <div className="text-xs text-muted-foreground">Choose your avatar</div>
+        <div className="space-y-3">
+          <div className="text-xs font-medium text-muted-foreground">Choose your avatar</div>
           
-
           {/* Emoji Options */}
-          <div className="text-xs text-muted-foreground mb-2">Pick an emoji</div>
-          <div className="grid grid-cols-8 gap-2">
+          <div>
+            <div className="text-xs text-muted-foreground mb-3">Pick an emoji</div>
+            <div className="grid grid-cols-8 gap-2">
             {emojiOptions.map(emoji => {
               const selected = selectedEmoji === emoji
               return (
@@ -131,19 +131,20 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                 </button>
               )
             })}
-          </div>
+            </div>
 
-          {/* Small hint when no emoji chosen */}
-          {hintMode && !hasProfileImage && (
-            <p className="pt-1 text-[11px] text-muted-foreground">
-              Tip: Pick an emoji to personalize your avatar.
-            </p>
-          )}
-          {hintMode && hasProfileImage && (
-            <p className="pt-1 text-[11px] text-muted-foreground">
-              Your OAuth profile image is displayed. Pick an emoji to override it.
-            </p>
-          )}
+            {/* Small hint when no emoji chosen */}
+            {hintMode && !hasProfileImage && (
+              <p className="pt-2 text-[11px] text-muted-foreground">
+                Tip: Pick an emoji to personalize your avatar.
+              </p>
+            )}
+            {hintMode && hasProfileImage && (
+              <p className="pt-2 text-[11px] text-muted-foreground">
+                Your OAuth profile image is displayed. Pick an emoji to override it.
+              </p>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

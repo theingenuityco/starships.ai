@@ -62,17 +62,19 @@ export default function AccountForm() {
     <>
       <AccountTopBar dirty={dirty} saving={saving} onReset={onRevertAll} formId="account-form" />
 
-      <form id="account-form" onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <ProfileOverviewCard
-          initials={initials}
-          displayName={form.displayName || currentUser?.displayName}
-          email={form.email || currentUser?.email}
-          selectedEmoji={form.avatar && !form.avatar.startsWith('http') ? form.avatar : ''}
-          profileImageUrl={userAvatar}
-          onSelectEmoji={emoji => setForm(prev => ({ ...prev, avatar: emoji }))}
-        />
+      <form id="account-form" onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 xl:gap-8">
+        <div className="lg:col-span-4">
+          <ProfileOverviewCard
+            initials={initials}
+            displayName={form.displayName || currentUser?.displayName}
+            email={form.email || currentUser?.email}
+            selectedEmoji={form.avatar && !form.avatar.startsWith('http') ? form.avatar : ''}
+            profileImageUrl={userAvatar}
+            onSelectEmoji={emoji => setForm(prev => ({ ...prev, avatar: emoji }))}
+          />
+        </div>
 
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-8 space-y-6">
           <AccountDetailsCard form={form} setForm={setForm} saving={saving} />
 
           <SecurityCard

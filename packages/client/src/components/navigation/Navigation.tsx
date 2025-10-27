@@ -113,7 +113,6 @@ export function Navigation() {
   // Build a single unified navigation section list
   const mainNavigationItems = [
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
-    ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/conversations`, label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation }] : []),
     { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
   ]
@@ -133,7 +132,7 @@ export function Navigation() {
       <div
         className="flex flex-col flex-shrink-0 w-56"
         style={{
-          height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
+          height: 'calc(100vh - 2rem)', // Full height minus top (1rem) and bottom (1rem) padding
         }}
       >
         {/* Header */}
@@ -159,6 +158,17 @@ export function Navigation() {
         {/* Navigation Content */}
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 px-2 py-3 space-y-4">
+            {/* New Chat Button */}
+            {isAuthenticated && starshipSlug && (
+              <button
+                onClick={handleNewConversation}
+                className="group relative w-full transition-all duration-300 rounded-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <LordIcon src={getLordiconUrl('plus')} width={18} height={18} className="w-[18px] h-[18px] mr-2" trigger="click" />
+                <span className="text-sm font-medium">New Chat</span>
+              </button>
+            )}
+
             {/* Main Navigation */}
             <NavigationSection
               title="Navigation"
@@ -174,10 +184,10 @@ export function Navigation() {
                       initial={false}
                       animate={{ height: overviewExpanded ? overviewSubnavHeight : 0, opacity: overviewExpanded ? 1 : 0, y: overviewExpanded ? 0 : 4 }}
                       transition={{ duration: 0.24, ease: 'easeInOut' }}
-                      className="overflow-hidden mt-1 bg-muted/20 rounded-lg mx-3"
+                      className="overflow-hidden mt-1 bg-muted/20 rounded-lg mx-2"
                       style={{ willChange: 'height, opacity, transform' }}
                     >
-                      <div ref={overviewSubnavContentRef} className="px-3 py-2 space-y-1">
+                      <div ref={overviewSubnavContentRef} className="px-2 py-2 space-y-1">
                         {/* Agents */}
                         <button
                           onClick={() => {
@@ -310,6 +320,21 @@ function ConversationItem({ conversation, onClick }: ConversationItemProps) {
   const [showMenu, setShowMenu] = useState(false)
   const deleteConversationMutation = useDeleteConversation()
   const updateConversationStatusMutation = useUpdateConversationStatus()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -335,7 +360,7 @@ function ConversationItem({ conversation, onClick }: ConversationItemProps) {
   }
 
   return (
-    <div className="relative group">
+    <div className="relative group" ref={menuRef}>
       <button
         onClick={onClick}
         className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors truncate pr-8"
@@ -350,26 +375,32 @@ function ConversationItem({ conversation, onClick }: ConversationItemProps) {
           e.stopPropagation()
           setShowMenu(!showMenu)
         }}
-        className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-all"
+        className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-all duration-200"
       >
-        <Icon name="more-horizontal" className="w-3 h-3" />
+        <div className="flex flex-col space-y-0.5">
+          <div className="w-1 h-1 bg-current rounded-full"></div>
+          <div className="w-1 h-1 bg-current rounded-full"></div>
+          <div className="w-1 h-1 bg-current rounded-full"></div>
+        </div>
       </button>
 
       {/* Dropdown menu */}
       {showMenu && (
-        <div className="absolute right-0 top-full mt-1 w-32 bg-popover border border-border rounded-lg shadow-lg z-10">
+        <div className="absolute right-0 top-full mt-1 w-28 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
           <button
             onClick={handleArchive}
-            className="w-full text-left px-3 py-2 text-xs hover:bg-muted rounded-t-lg transition-colors"
+            className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 transition-colors flex items-center gap-2"
             disabled={updateConversationStatusMutation.isPending}
           >
+            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
             Archive
           </button>
           <button
             onClick={handleDelete}
-            className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted rounded-b-lg transition-colors"
+            className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted/50 transition-colors flex items-center gap-2"
             disabled={deleteConversationMutation.isPending}
           >
+            <div className="w-2 h-2 rounded-full bg-red-500"></div>
             Delete
           </button>
         </div>

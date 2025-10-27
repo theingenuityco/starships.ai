@@ -62,13 +62,13 @@ export function ForgotPasswordForm() {
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-900 font-medium text-sm">Request processed</span>
+                  <span className="text-emerald-800 font-medium text-sm">Request processed</span>
                 </div>
                 <AlertDescription>
-                  <p className="text-sm text-gray-600 font-medium mb-2">
-                    We&apos;ll send reset instructions to <span className="font-semibold text-gray-600">{email}</span> if an account exists.
+                  <p className="text-sm text-emerald-700 font-medium mb-2">
+                    We&apos;ll send reset instructions to <span className="font-semibold text-emerald-700">{email}</span> if an account exists.
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-emerald-700">
                     The link expires in 1 hour.
                   </p>
                 </AlertDescription>

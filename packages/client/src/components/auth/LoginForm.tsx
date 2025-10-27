@@ -226,8 +226,8 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-gray-600 text-sm break-all">{emailVerificationStatus.email}</span>
+                  <span className="text-emerald-800 font-medium text-sm">We&apos;ve sent a verification email to:</span>
+                  <span className="font-medium text-emerald-700 text-sm break-all">{emailVerificationStatus.email}</span>
                 </div>
                 <AlertDescription>
                   <div className="flex justify-center">
@@ -312,7 +312,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 )}
 
                 {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3 my-4">
+                <div className="flex items-center justify-center gap-3 mt-6 mb-4">
                   <Checkbox
                     id="terms-login"
                     checked={acceptTerms}
@@ -449,7 +449,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 )}
 
                 {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3 my-4">
+                <div className="flex items-center justify-center gap-3 mt-6 mb-4">
                   <Checkbox
                     id="terms-register"
                     checked={acceptTerms}

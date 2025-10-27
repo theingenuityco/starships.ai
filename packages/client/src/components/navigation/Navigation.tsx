@@ -114,7 +114,7 @@ export function Navigation() {
 
   // Floating mode - expandable layout
   return (
-    <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg">
+    <div ref={sidebarRef} className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg bg-background/95 backdrop-blur-md relative z-[100]">
       <div
         className="flex flex-col flex-shrink-0 w-56"
         style={{
@@ -122,7 +122,7 @@ export function Navigation() {
         }}
       >
         {/* Header */}
-        <div className="px-3 py-3 flex-shrink-0 flex items-center space-x-3 bg-black">
+        <div className="px-3 py-3 flex-shrink-0 flex items-center space-x-3 bg-black relative z-[101]">
           <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Go to Landing Screen">
             <StarshipsLogo
               width={20}

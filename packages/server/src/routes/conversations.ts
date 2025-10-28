@@ -54,6 +54,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
 
+      // Send initial turn state snapshot so clients know if a turn is active after refresh
+      try {
+        const conversationService = new ConversationService();
+        const conversation = await conversationService.getConversationById(conversationId);
+        const convState = ((conversation as any)?.state as any) || {};
+        await streamingService.broadcastTurnState(conversationId, {
+          conversationId,
+          turnActive: !!convState.turnActive,
+          lastCompleteAt: convState.lastCompleteAt,
+        });
+      } catch (err) {
+        console.warn('[ROUTE] Failed to emit initial turn_state snapshot', err);
+      }
+
       // If this is a reconnection with Last-Event-ID, prefer event replay from buffer
       // to avoid duplicating already-processed baseline messages. Otherwise send
       // initial baseline snapshot messages.
@@ -141,6 +155,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const participants = agents.map((agent) => agent.id);
 
       // Structure response to match client expectations
+      const state = ((conversation as any)?.state as any) || {};
       const responseData = {
         conversationId,
         messages,
@@ -149,6 +164,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         startedAt: conversation.createdAt,
         lastActivityAt: conversation.updatedAt || conversation.createdAt,
         agents, // Include full agent information for client
+        // Server-authoritative turn state for non-streaming baseline consumers
+        turnActive: !!state.turnActive,
+        lastCompleteAt: state.lastCompleteAt,
       };
 
       sendSuccess(res, responseData, 200);
@@ -188,94 +206,99 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
 /**
  * POST /conversations/:conversationId/messages - Send message to agent (supports unified streaming)
  */
-router.post('/conversations/:conversationId/messages', rateLimiters.messaging, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
-    if (!paramValidation) return;
+router.post(
+  '/conversations/:conversationId/messages',
+  rateLimiters.messaging,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Validate conversationId parameter
+      const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!paramValidation) return;
 
-    // Validate request body
-    const bodyValidation = validateData(
-      z.object({
-        content: z.string().min(1, 'content is required'),
-        // baselineLength is no longer used on POST (streaming happens over GET SSE)
-        baselineLength: z.coerce.number().int().min(0).optional(),
-      }),
-      req.body,
-      res,
-      'conversation message'
-    );
-    if (!bodyValidation) return;
+      // Validate request body
+      const bodyValidation = validateData(
+        z.object({
+          content: z.string().min(1, 'content is required'),
+          // baselineLength is no longer used on POST (streaming happens over GET SSE)
+          baselineLength: z.coerce.number().int().min(0).optional(),
+        }),
+        req.body,
+        res,
+        'conversation message'
+      );
+      if (!bodyValidation) return;
 
-    const { conversationId } = paramValidation;
-    const { content } = bodyValidation;
+      const { conversationId } = paramValidation;
+      const { content } = bodyValidation;
 
-    // Preflight billing gate: block when wallet balance is <= 0
-    const conversationService = new ConversationService();
+      // Preflight billing gate: block when wallet balance is <= 0
+      const conversationService = new ConversationService();
 
-    // Verify conversation exists
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
-        resource: 'conversation',
-        id: conversationId,
-      });
-      return;
-    }
+      // Verify conversation exists
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+          resource: 'conversation',
+          id: conversationId,
+        });
+        return;
+      }
 
-    // Resolve starship and wallet, then enforce non-zero balance
-    const starship = await conversationService.getConversationStarship(conversationId);
-    if (!starship) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found for conversation', 404, {
-        resource: 'starship',
-        conversationId,
-      });
-      return;
-    }
-
-    const walletService = new WalletService();
-    const wallet = await walletService.getByStarshipId(starship.id);
-
-    if (!wallet) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
-        starshipId: starship.id,
-      });
-      return;
-    }
-
-    // Use centralized balance validation service with $0.05 threshold
-    const balanceValidation = BalanceValidationService.validateBalance({
-      id: wallet.id,
-      balance: wallet.balance,
-    });
-
-    if (!balanceValidation.isValid) {
-      const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
-      sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
-      return;
-    }
-
-    // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
-    conversationService
-      .addConversationMessage(
-        {
+      // Resolve starship and wallet, then enforce non-zero balance
+      const starship = await conversationService.getConversationStarship(conversationId);
+      if (!starship) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found for conversation', 404, {
+          resource: 'starship',
           conversationId,
-          content,
-          role: 'user',
-          messageType: 'user_input',
-        },
-        { authorization: req.headers.authorization as string | undefined }
-      )
-      .catch((error) => {
-        console.error('[ROUTE] Conversation processing failed:', error);
+        });
+        return;
+      }
+
+      const walletService = new WalletService();
+      const wallet = await walletService.getByStarshipId(starship.id);
+
+      if (!wallet) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
+          starshipId: starship.id,
+        });
+        return;
+      }
+
+      // Use centralized balance validation service with $0.05 threshold
+      const balanceValidation = BalanceValidationService.validateBalance({
+        id: wallet.id,
+        balance: wallet.balance,
       });
 
-    // Acknowledge request; client should be listening on GET SSE channel for updates
-    sendSuccess(res, { status: 'accepted', streaming: true, conversationId }, 202);
-  } catch (error) {
-    handleError(error, res, 'processing conversation message');
+      if (!balanceValidation.isValid) {
+        const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
+        sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
+        return;
+      }
+
+      // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
+      conversationService
+        .addConversationMessage(
+          {
+            conversationId,
+            content,
+            role: 'user',
+            messageType: 'user_input',
+          },
+          { authorization: req.headers.authorization as string | undefined }
+        )
+        .catch((error) => {
+          console.error('[ROUTE] Conversation processing failed:', error);
+        });
+
+      // Acknowledge request; client should be listening on GET SSE channel for updates
+      sendSuccess(res, { status: 'accepted', streaming: true, conversationId }, 202);
+    } catch (error) {
+      handleError(error, res, 'processing conversation message');
+    }
   }
-});
+);
 
 /**
  * GET /conversations/:conversationId - Get conversation details with messages

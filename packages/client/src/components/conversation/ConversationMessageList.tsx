@@ -262,18 +262,34 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     }
     if (lastToolTs < 0) return false
 
-    // Most recent assistant token (content/reasoning) timestamp after the user
-    let lastAssistantChunkTs = -1
+    // Most recent assistant textual progress timestamp after the user.
+    // Consider chunk timestamps when present; otherwise fall back to the finalized message timestamp
+    // if the assistant has content or reasoning (common after refresh/baseline load).
+    let lastAssistantProgressTs = -1
     for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
       const m: any = displayMessages[i]
       if (m?.role !== 'assistant') continue
-      const lastC = Array.isArray(m?.chunks) && m.chunks.length > 0 ? Number(m.chunks[m.chunks.length - 1]?.timestamp) : -1
-      const lastR = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0 ? Number(m.reasoningChunks[m.reasoningChunks.length - 1]?.timestamp) : -1
-      lastAssistantChunkTs = Math.max(lastAssistantChunkTs, lastC, lastR)
+
+      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
+      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
+      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
+      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
+
+      const lastC = hasChunks ? Number(m.chunks[m.chunks.length - 1]?.timestamp) : -1
+      const lastR = hasRChunks ? Number(m.reasoningChunks[m.reasoningChunks.length - 1]?.timestamp) : -1
+
+      // Fallback to message updatedAt/createdAt when finalized text/reasoning exists but no chunks are present (e.g., after refresh)
+      let finalTs = -1
+      if ((hasContent || hasReasoning) && !(hasChunks || hasRChunks)) {
+        const t = Date.parse(String(m?.updatedAt || m?.createdAt || ''))
+        if (!Number.isNaN(t)) finalTs = t
+      }
+
+      lastAssistantProgressTs = Math.max(lastAssistantProgressTs, lastC, lastR, finalTs)
     }
 
-    // Gap exists if no assistant tokens have arrived AFTER the last tool result
-    return lastAssistantChunkTs < 0 || lastAssistantChunkTs <= lastToolTs
+    // Gap exists if no assistant textual progress has arrived AFTER the last tool result
+    return lastAssistantProgressTs < 0 || lastAssistantProgressTs <= lastToolTs
   }, [displayMessages])
 
   // Final GAP loader decision: show if we're responding AND either:
@@ -281,11 +297,11 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   //  - we are waiting for the assistant to resume after tool results.
   const shouldShowGapLoader = useMemo(() => {
     // Show while actively responding (pre-first tokens or during resume after tools),
-    // OR if we're in a tool gap and the stream is fetching and the turn hasn't completed yet.
+    // OR during a tool gap while the turn is still in progress.
     const responding = isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
-    const toolGapFetching = awaitingResumeAfterTools && isFetching && !hasCompleteEvent
+    const toolGapFetching = awaitingResumeAfterTools && isResponding
     return responding || toolGapFetching
-  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools, isFetching, hasCompleteEvent])
+  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
@@ -376,12 +392,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="max-w-4xl mx-auto space-y-2 bg-transparent">
           {renderMessages.map(message => (
-            <MemoizedMessageBubble
-              key={message.id}
-              message={message}
-              agentName={message.agentName || agentName}
-              isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-            />
+            <MemoizedMessageBubble key={message.id} message={message} agentName={message.agentName || agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} />
           ))}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
@@ -449,7 +460,7 @@ const MemoizedMessageBubble = memo(
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
               <AgentAvatar seed={agentName || 'assistant'} size={32} />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="flex-1 w-full">
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}

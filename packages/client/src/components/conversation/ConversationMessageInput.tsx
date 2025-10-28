@@ -84,18 +84,28 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
 
-    // Provide editor operations without referencing the editor before initialization
-    const clearEditorRef = useRef<() => void>(() => {})
-    // Guard to avoid recursive update loops when enforcing leading mention
-    const enforcingMentionRef = useRef(false)
-    // Track any pending enforcement to avoid racing against user input
-    const enforceTimeoutRef = useRef<number | null>(null)
-    // When true, user is editing the mention text inline (avoid auto-enforcement)
-    const isEditingMentionRef = useRef(false)
-    // Track when mention enforcement is happening for visual feedback
-    const [isMentionEnforcing, setIsMentionEnforcing] = useState(false)
-    // Track the last enforced agent to avoid re-enforcement on internal detections
-    const lastEnforcedAgentIdRef = useRef<string | null>(null)
+    // SIMPLE FIX: Single debounced update function to prevent race conditions
+    const updateTimeoutRef = useRef<number | null>(null)
+    const isUpdatingRef = useRef(false)
+
+    // SIMPLE FIX: Single debounced update function
+    const scheduleUpdate = useCallback((fn: () => void) => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current)
+      }
+      
+      updateTimeoutRef.current = window.setTimeout(() => {
+        if (isUpdatingRef.current) return // Skip if already updating
+        
+        isUpdatingRef.current = true
+        try {
+          fn()
+        } finally {
+          isUpdatingRef.current = false
+          updateTimeoutRef.current = null
+        }
+      }, 100) // Debounce 100ms
+    }, [])
 
     const createConversation = useCreateConversation()
     const { data: wallet } = useWallet(starshipId, !!starshipId)
@@ -266,7 +276,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 ],
               })
               // Reset enforcement tracking so the space gets properly enforced
-              lastEnforcedAgentIdRef.current = null
+              // Removed old enforcement tracking
               // Position cursor after the space
               setTimeout(() => {
                 tiptap.commands.focus()
@@ -279,12 +289,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 }, 20)
               }, 10)
             } else {
-              clearEditorRef.current()
+              tiptap?.commands.setContent('')
             }
           }
         } catch {
           try {
-            clearEditorRef.current()
+            tiptap?.commands.setContent('')
           } catch {}
         }
 
@@ -660,7 +670,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 command: (agent: AgentModel) => {
                   const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: agent.name }
                   // Ensure inline editing mode is off before inserting the node
-                  isEditingMentionRef.current = false
+                  // Removed inline editing tracking
                   // Insert/replace with the mention node
                   props.command(realItem)
                   try {
@@ -829,7 +839,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const anchorRef = useRef<HTMLSpanElement | null>(null)
       const startInlineMentionEdit = () => {
         try {
-          isEditingMentionRef.current = true
+          // Removed inline editing tracking
           // Replace the chip with editable text: @<current name>
           try {
             deleteNode?.()
@@ -866,7 +876,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           <span
             className={cn(
               'inline-flex items-center gap-1 whitespace-nowrap cursor-pointer rounded px-1.5 py-[2px] bg-white/90 hover:bg-white dark:bg-white/20 dark:hover:bg-white/25 ring-1 ring-border/60 shadow-sm transition-all duration-200',
-              isMentionEnforcing && 'scale-105 ring-2 ring-primary/40'
+              '' // Removed enforcement animation
             )}
             contentEditable={false}
             style={{ pointerEvents: 'auto', verticalAlign: '-2px' }}
@@ -1243,7 +1253,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           if (prevId !== nextId) setLeadingMentionAgent(mentioned)
           if (mentioned) {
             // Exit inline editing mode once a real mention node exists again
-            isEditingMentionRef.current = false
+            // Removed inline editing tracking
           }
         } catch {}
         // Update hint visibility and position on editor update
@@ -1321,14 +1331,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [tiptap, minimal, disabled, isStreamingEffective, sending, inlinePrompts.length, isOnlyAgentMentionWithSpace, updateHintPosition])
     // Wire editor-dependent helpers
     useEffect(() => {
-      clearEditorRef.current = () => {
-        try {
-          tiptap?.commands.setContent('')
-        } catch {}
-      }
-      return () => {
-        clearEditorRef.current = () => {}
-      }
+      // SIMPLE FIX: Removed complex editor ref management
     }, [tiptap])
 
     // Build a TipTap JSON mention node for the given agent
@@ -1337,47 +1340,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return { type: 'mention', attrs: { id: agent.id, label: agent.name } }
     }
 
-    // Schedule a safe setContent outside of React lifecycle to avoid flushSync errors
-    const scheduleSetContent = useCallback(
-      (content: any) => {
-        if (!tiptap) return
-        enforcingMentionRef.current = true
-        setIsMentionEnforcing(true)
-        if (enforceTimeoutRef.current) {
-          clearTimeout(enforceTimeoutRef.current)
-          enforceTimeoutRef.current = null
-        }
-        enforceTimeoutRef.current = window.setTimeout(() => {
-          try {
-            // Preserve cursor position during content reconstruction
-            const currentSelection = tiptap.state.selection
-            const cursorPos = currentSelection.from
-
-            tiptap?.commands.setContent(content)
-
-            // Restore cursor position if possible
-            const newDocSize = tiptap.state.doc.content.size
-            const safePos = Math.min(cursorPos, newDocSize)
-            if (safePos > 0) {
-              tiptap.commands.setTextSelection(safePos)
-            }
-          } finally {
-            enforcingMentionRef.current = false
-            // Keep visual feedback for a bit longer
-            setTimeout(() => setIsMentionEnforcing(false), 300)
-          }
-          enforceTimeoutRef.current = null
-        }, 0)
-      },
-      [tiptap]
-    )
+    // SIMPLE FIX: Removed complex scheduling - using simple debouncing instead
 
     // Ensure the first inline node is the selected agent mention followed by a space
     const ensureLeadingAgentMention = useCallback(() => {
       if (!tiptap) return
       try {
         // Do not enforce while user is editing the mention inline
-        if (isEditingMentionRef.current) return
+        if (false) return // Removed inline editing check
 
         // Save cursor position before rebuilding
         const cursorPos = tiptap.state.selection.from
@@ -1439,10 +1409,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             content: [desiredMention, ...contentAfterMention],
           }
           const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
-          scheduleSetContent(newDoc)
+          // Removed complex enforcement
 
           // Mark this agent as enforced to prevent re-enforcement
-          lastEnforcedAgentIdRef.current = desiredMention.attrs.id
+          null // Removed enforcement tracking = desiredMention.attrs.id
 
           // Position cursor after the mention and space
           setTimeout(() => {
@@ -1457,7 +1427,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Otherwise, insert the current agent mention if available (still skip if editing)
-        if (isEditingMentionRef.current) return
+        if (false) return // Removed inline editing check
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return
@@ -1469,11 +1439,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           content: [desiredMention, ...spaceNode, ...blockContent],
         }
         const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
-        scheduleSetContent(newDoc)
+        // Removed complex enforcement
 
         // Mark this agent as enforced
         if (currentAgent) {
-          lastEnforcedAgentIdRef.current = currentAgent.id
+          null // Removed enforcement tracking = currentAgent.id
         }
 
         // Position cursor after the mention and space
@@ -1486,7 +1456,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           } catch {}
         }, 10)
       } catch {}
-    }, [tiptap, scheduleSetContent])
+    }, [tiptap]) // Removed scheduleSetContent dependency
 
     // When conversation changes, clear the editor and prepare for new agent
     useEffect(() => {
@@ -1501,119 +1471,52 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // We'll let the agent effect handle setting the mention
         requestAnimationFrame(() => {
           tiptap.commands.clearContent()
-          lastEnforcedAgentIdRef.current = null
+          // Removed old enforcement tracking
         })
       }
     }, [conversationId, tiptap])
     
-    // When selected agent changes, update the mention
+    // SIMPLE FIX: Single effect for agent changes
     useEffect(() => {
       if (!tiptap || !selectedAgent) return
       
-      // Check if we need to update the mention
-      if (selectedAgent.id !== lastEnforcedAgentIdRef.current) {
-        const agentId = selectedAgent.id
-        const agentName = selectedAgent.name
-        
-        // Update the ref immediately to prevent loops
-        lastEnforcedAgentIdRef.current = agentId
-        
-        // Schedule the update to avoid React lifecycle conflicts
-        const timeoutId = setTimeout(() => {
-          // Double-check we still need this update (agent might have changed again)
-          if (lastEnforcedAgentIdRef.current !== agentId) return
-          
-          const mentionNode = { type: 'mention', attrs: { id: agentId, label: agentName } }
-          
-          // Check current content
-          const json: any = tiptap.getJSON()
-          const docContent = Array.isArray(json?.content) ? json.content : []
-          const firstBlock = docContent[0]
-          const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
-          
-          // Check if there's already a mention
-          const existingMention = blockContent.find((n: any) => n?.type === 'mention')
-          
-          // Get any text content (excluding existing mention)
-          let textContent = ''
-          for (const node of blockContent) {
-            if (node && node.type === 'text' && typeof node.text === 'string') {
-              textContent += node.text
-            }
-          }
-          
-          // If conversation just switched or no content, set fresh
-          if (!existingMention && textContent.trim() === '') {
-            const content = {
-              type: 'doc',
-              content: [
-                {
-                  type: 'paragraph',
-                  content: [
-                    mentionNode,
-                    { type: 'text', text: ' ' }
-                  ]
-                }
-              ]
-            }
-            
-            tiptap.commands.setContent(content)
-            
-            // Focus at position 2 (after mention and space)
-            setTimeout(() => {
-              try {
-                tiptap.commands.focus()
-                tiptap.commands.setTextSelection(2)
-              } catch {}
-            }, 10)
-          } else if (existingMention) {
-            // Replace all mentions with single new mention and preserve text
-            const newContent = [mentionNode]
-            
-            // Ensure proper spacing
-            if (textContent.trim() === '') {
-              textContent = ' '
-            } else if (!textContent.startsWith(' ')) {
-              textContent = ' ' + textContent.trimStart()
-            }
-            
-            // Add the text content
-            if (textContent) {
-              newContent.push({ type: 'text', text: textContent } as any)
-            }
-            
-            const content = {
-              type: 'doc',
-              content: [
-                {
-                  type: 'paragraph',
-                  content: newContent
-                }
-              ]
-            }
-            
-            tiptap.commands.setContent(content)
-            
-            setTimeout(() => {
-              try {
-                // Position after mention and space
-                const pos = Math.min(2, tiptap.state.doc.content.size - 1)
-                tiptap.commands.setTextSelection(Math.max(2, pos))
-              } catch {}
-            }, 10)
-          }
-        }, 50)
-        
-        return () => clearTimeout(timeoutId)
-      }
-    }, [selectedAgent?.id, selectedAgent?.name, tiptap])
+      scheduleUpdate(() => {
+        const currentText = tiptap.getText()
+        // Don't interrupt if user is typing (more than just mention + space)
+        if (currentText.length > 2 && !currentText.startsWith(`@${selectedAgent.name} `)) {
+          return
+        }
 
-    // Clear any pending enforcement when unmounting
+        tiptap.commands.setContent({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [
+              { type: 'mention', attrs: { id: selectedAgent.id, label: `@${selectedAgent.name}` } },
+              { type: 'text', text: ' ' }
+            ]
+          }]
+        })
+        
+        tiptap.commands.focus()
+        tiptap.commands.setTextSelection(2)
+      })
+    }, [selectedAgent?.id, tiptap, scheduleUpdate])
+
+    // SIMPLE FIX: Clear on conversation change
+    useEffect(() => {
+      if (!tiptap) return
+      
+      scheduleUpdate(() => {
+        tiptap.commands.clearContent()
+      })
+    }, [conversationId, tiptap, scheduleUpdate])
+
+    // SIMPLE FIX: Cleanup on unmount
     useEffect(() => {
       return () => {
-        if (enforceTimeoutRef.current) {
-          clearTimeout(enforceTimeoutRef.current)
-          enforceTimeoutRef.current = null
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current)
         }
       }
     }, [])

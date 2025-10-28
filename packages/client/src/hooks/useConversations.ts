@@ -112,7 +112,27 @@ export function useDeleteConversation() {
     onMutate: async conversationId => {
       // Get conversation details to know which starship it belongs to
       const conversationData = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(conversationId)) as any
-      const starshipId = conversationData?.conversation?.starshipId
+      let starshipId = conversationData?.conversation?.starshipId
+
+      // If starshipId is not available from cached conversation, try to find it from starship conversations cache
+      if (!starshipId) {
+        const allQueryData = queryClient.getQueriesData({ queryKey: CONVERSATION_QUERY_KEYS.all })
+        for (const [queryKey, data] of allQueryData) {
+          const key = queryKey as string[]
+          if (key.includes('starship') && data && typeof data === 'object' && 'conversations' in data) {
+            const conversations = (data as { conversations: ConversationModel[] }).conversations
+            const foundConversation = conversations.find((conv: ConversationModel) => conv.id === conversationId)
+            if (foundConversation) {
+              // Extract starshipId from the query key since it's part of CONVERSATION_QUERY_KEYS.byStarship(starshipId)
+              const starshipIndex = key.indexOf('starship')
+              if (starshipIndex !== -1 && starshipIndex + 1 < key.length) {
+                starshipId = key[starshipIndex + 1]
+              }
+              break
+            }
+          }
+        }
+      }
 
       // Cancel any outgoing refetches
       if (starshipId) {
@@ -166,12 +186,22 @@ export function useDeleteConversation() {
       toast.success('Conversation deleted successfully!')
     },
     onSettled: (data, error, conversationId, context) => {
-      // Always refetch to ensure consistency
+      // Always refetch to ensure consistency - use both starshipId from context and current starship
       if (context?.starshipId) {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(context.starshipId),
         })
       }
+      
+      // Also invalidate all starship conversation queries as a fallback
+      // This ensures UI updates even if starshipId detection failed
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+        predicate: (query) => {
+          const key = query.queryKey as string[]
+          return key.includes('starship') && key.includes('list')
+        }
+      })
     },
   })
 }

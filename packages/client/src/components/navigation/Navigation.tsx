@@ -289,7 +289,7 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
       
       // If user was viewing this conversation, redirect to + New Chat
       if (isCurrentlyViewing && starshipSlug) {
-        window.location.href = `/ship/${starshipSlug}/chat`
+        window.location.href = `/ship/${starshipSlug}/conversations`
       }
     } catch (error) {
       // Error handling is done in the mutation hook

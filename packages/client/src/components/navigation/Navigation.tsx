@@ -287,9 +287,9 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
       await deleteConversationMutation.mutateAsync(conversation.id)
       setShowMenu(false)
       
-      // If user was viewing this conversation, redirect to starship overview
+      // If user was viewing this conversation, redirect to + New Chat
       if (isCurrentlyViewing && starshipSlug) {
-        window.location.href = `/ship/${starshipSlug}`
+        window.location.href = `/ship/${starshipSlug}/chat`
       }
     } catch (error) {
       // Error handling is done in the mutation hook

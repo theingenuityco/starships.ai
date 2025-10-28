@@ -67,6 +67,17 @@ const SingleToolAssignmentSchema = z.object({
   toolSlug: z.string().min(1, 'Tool slug is required'),
 });
 
+const TestAgentSchema = z.object({
+  input: z.union([
+    z.string(), // Simple text input
+    z.array(z.object({ // Messages array
+      role: z.enum(['user', 'assistant', 'system', 'tool']),
+      content: z.string(),
+      reasoning: z.string().optional(),
+    }))
+  ])
+});
+
 
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -343,6 +354,69 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
   } catch (error) {
     console.error('[AGENTS] Error deleting agent:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete agent');
+  }
+});
+
+// POST /starships/:starshipId/agents/:slug/test - Test agent execution
+router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate parameters
+    const paramValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+        slug: z.string().min(1).max(255),
+      }),
+      req.params,
+      res,
+      'starship and slug parameters'
+    );
+    if (!paramValidation) return;
+
+    // Validate test input
+    const bodyValidation = validateData(TestAgentSchema, req.body, res, 'test input data');
+    if (!bodyValidation) return;
+
+    const { starshipId, slug } = paramValidation;
+    const { input } = bodyValidation;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+
+    // Validate access to the starship
+    const hasAccess = await agentService.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
+      return;
+    }
+
+    // Get agent by slug
+    const starshipAgents = await agentService.getAgentsByStarship(starshipId);
+    const agent = starshipAgents.find((a) => a.slug === slug);
+
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { 
+        resource: 'agent', 
+        slug, 
+        starshipId 
+      });
+      return;
+    }
+
+    // Extract auth token from request for agent execution
+    const authHeader = req.headers.authorization;
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+
+    // Execute agent test
+    const testResult = await agentService.testAgent(agent.id, input, starshipId, authToken);
+
+    sendSuccess(res, {
+      success: testResult.success,
+      data: testResult
+    });
+
+  } catch (error) {
+    console.error('[AGENTS] Error testing agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to test agent');
   }
 });
 

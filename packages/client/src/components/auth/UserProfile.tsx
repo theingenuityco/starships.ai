@@ -2,6 +2,7 @@
 
 import { LordIcon } from '@/components/animated/LordIcon'
 import { getLordiconUrl } from '@/components/primitives/lordiconMap'
+import Icon from '@/components/primitives/Icon'
 
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
@@ -113,6 +114,10 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
         <p className="text-sm font-bold text-foreground truncate">{userName}</p>
         <p className="text-xs text-muted-foreground truncate">{starshipName || 'No starship selected'}</p>
       </div>
+      <Icon 
+        name="chevron-right" 
+        className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300 flex-shrink-0" 
+      />
     </div>
   )
 })

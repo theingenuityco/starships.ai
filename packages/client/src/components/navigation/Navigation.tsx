@@ -158,7 +158,7 @@ export function Navigation() {
 
           {/* Recents Section with Fixed Header */}
           {isAuthenticated && starshipSlug && (
-            <div className="flex-1 min-h-0 mt-4 pt-6 border-t border-border/20 flex flex-col">
+            <div className="flex-1 min-h-0 mt-3 pt-4 border-t border-border/20 flex flex-col">
               {/* Fixed Recents Header */}
               <div className="flex-shrink-0 px-2 mb-2">
                 <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
@@ -175,7 +175,7 @@ export function Navigation() {
         </div>
 
         {/* User Profile Section */}
-        <div className="flex-shrink-0 px-2 py-3 border-t border-border/20">
+        <div className="flex-shrink-0 px-1 py-1 border-t border-border/20">
           <UserProfile
             mode="expanded"
             active={isSettingsRoute}
@@ -212,14 +212,13 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
   const { data: conversationsData } = useStarshipConversations(starship?.id || '', !!starship?.id)
   const conversations = conversationsData?.conversations || []
 
-  // Show ALL conversations sorted by most recent
-  const recentConversations = conversations
-    .slice()
-    .sort((a, b) => {
-      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-      return bTime - aTime
-    })
+  // Show ALL conversations sorted by creation date (most recent first)
+  // Use createdAt instead of updatedAt to prevent reordering when conversations are renamed
+  const recentConversations = conversations.slice().sort((a, b) => {
+    const aTime = new Date(a.createdAt).getTime()
+    const bTime = new Date(b.createdAt).getTime()
+    return bTime - aTime
+  })
 
   const handleConversationClick = (conversationId: string) => {
     router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)
@@ -232,14 +231,7 @@ function RecentsSection({ starshipSlug }: RecentsSectionProps) {
           recentConversations.map(conversation => {
             // Check if this conversation is currently active
             const isActive = pathname === `/ship/${starshipSlug}/conversations/${conversation.id}`
-            return (
-              <ConversationItem 
-                key={conversation.id} 
-                conversation={conversation} 
-                onClick={() => handleConversationClick(conversation.id)}
-                isActive={isActive}
-              />
-            )
+            return <ConversationItem key={conversation.id} conversation={conversation} onClick={() => handleConversationClick(conversation.id)} isActive={isActive} />
           })
         ) : (
           <div className="text-sm text-muted-foreground px-2">No recent conversations</div>
@@ -294,10 +286,10 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
       const pathname = window.location.pathname
       const starshipSlug = pathname.split('/')[2] // Extract starship slug from URL
       const isCurrentlyViewing = pathname === `/ship/${starshipSlug}/conversations/${conversation.id}`
-      
+
       await deleteConversationMutation.mutateAsync(conversation.id)
       setShowMenu(false)
-      
+
       // If user was viewing this conversation, redirect to + New Chat
       if (isCurrentlyViewing && starshipSlug) {
         window.location.href = `/ship/${starshipSlug}/conversations`
@@ -348,7 +340,7 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
         <input
           ref={inputRef}
           value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
+          onChange={e => setNewTitle(e.target.value)}
           onBlur={handleRenameSubmit}
           onKeyDown={handleKeyDown}
           className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
@@ -360,9 +352,7 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
           <button
             onClick={onClick}
             className={`w-full text-left px-2 py-1.5 text-sm rounded-lg transition-colors truncate pr-8 ${
-              isActive 
-                ? 'bg-primary/20 text-primary border border-primary/30' 
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              isActive ? 'bg-primary/20 text-primary border border-primary/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
             }`}
             title={conversation.title || 'Untitled conversation'}
           >
@@ -391,11 +381,7 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
       {/* Dropdown menu */}
       {showMenu && !isRenaming && (
         <div className="absolute right-0 top-full mt-1 w-32 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
-          <button
-            onClick={handleRename}
-            className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 transition-colors flex items-center gap-2"
-            disabled={updateConversationMutation.isPending}
-          >
+          <button onClick={handleRename} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 transition-colors flex items-center gap-2" disabled={updateConversationMutation.isPending}>
             <Icon name="edit" className="w-3 h-3" />
             Rename
           </button>

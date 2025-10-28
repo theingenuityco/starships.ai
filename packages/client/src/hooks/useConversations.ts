@@ -314,14 +314,22 @@ export function useUpdateConversation() {
         }
       })
 
-      // Update conversation in all starship conversation lists
-      queryClient.invalidateQueries({
-        queryKey: CONVERSATION_QUERY_KEYS.all,
-        predicate: (query) => {
-          const key = query.queryKey as string[]
-          return key.includes('starship') && key.includes('list')
+      // Update conversation in all starship conversation lists directly
+      queryClient.setQueriesData(
+        { queryKey: CONVERSATION_QUERY_KEYS.all },
+        (oldData: any) => {
+          if (!oldData || !oldData.conversations) return oldData
+          
+          return {
+            ...oldData,
+            conversations: oldData.conversations.map((conv: any) => 
+              conv.id === variables.conversationId 
+                ? { ...conv, title: updatedConversation.title, updatedAt: updatedConversation.updatedAt }
+                : conv
+            )
+          }
         }
-      })
+      )
 
       toast.success('Conversation renamed successfully!')
     },

@@ -592,9 +592,9 @@ export class AgentService {
       } as any);
 
       console.log('🔍 Post-execution state:', {
-        messagesCount: exec.state.messages?.length || 0,
-        lastMessageRole: exec.state.messages?.[exec.state.messages.length - 1]?.role,
-        lastMessageContentLength: exec.state.messages?.[exec.state.messages.length - 1]?.content?.length || 0,
+        messagesCount: Array.isArray(exec.state.messages) ? exec.state.messages.length : 0,
+        lastMessageRole: Array.isArray(exec.state.messages) && exec.state.messages.length > 0 ? exec.state.messages[exec.state.messages.length - 1]?.role : undefined,
+        lastMessageContentLength: Array.isArray(exec.state.messages) && exec.state.messages.length > 0 ? exec.state.messages[exec.state.messages.length - 1]?.content?.length || 0 : 0,
         capturedOutputLength: output.length,
         toolsUsed: toolsUsed
       });

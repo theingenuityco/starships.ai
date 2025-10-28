@@ -4,7 +4,6 @@ import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -45,10 +44,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
   // OAuth initiation function - uses relative URL like regular auth
   const initiateOAuth = (provider: 'google' | 'github') => {
-    if (!acceptTerms) {
-      toast.error('Please accept the Terms of Service and Privacy Policy to continue')
-      return
-    }
     window.location.href = `/api/v1/auth/${provider}`
   }
 
@@ -74,7 +69,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     message: string
   } | null>(null)
   const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
-  const [acceptTerms, setAcceptTerms] = useState(false)
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
@@ -254,7 +248,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
               setFormError(null) // Clear form errors when switching tabs
-              setAcceptTerms(false) // Reset terms checkbox when switching tabs
             }}
           >
             <TabsList className="grid w-full grid-cols-2">
@@ -279,8 +272,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password
-                  </Label>
+                  <Label htmlFor="login-password">Password</Label>
                   <div className="relative">
                     <Input
                       id="login-password"
@@ -311,30 +303,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </Alert>
                 )}
 
-                {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3 my-4">
-                  <Checkbox
-                    id="terms-login"
-                    checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="terms-login"
-                    className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    I agree to the{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Privacy Policy
-                    </a>
-                  </label>
-                </div>
-
-                <Button type="submit" className="w-full h-12" disabled={isLoading || !acceptTerms}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Signing in...</>
                   ) : (
@@ -344,12 +313,19 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                     </>
                   )}
                 </Button>
-                
-                <div className="text-center">
-                  <Link 
-                    href="/forgot-password" 
-                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
-                  >
+
+                <div className="text-center space-y-2">
+                  <p className="text-xs text-muted-foreground/80">
+                    By signing in, you agree to our{' '}
+                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                      Privacy Policy
+                    </a>
+                  </p>
+                  <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
                     Forgot your password?
                   </Link>
                 </div>
@@ -411,9 +387,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                       {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                     </Button>
                   </div>
-                  {registerData.password && (
-                    <PasswordStrengthMeter password={registerData.password} />
-                  )}
+                  {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
                 </div>
 
                 <div className="space-y-1">
@@ -448,30 +422,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </Alert>
                 )}
 
-                {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3 my-4">
-                  <Checkbox
-                    id="terms-register"
-                    checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="terms-register"
-                    className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    I agree to the{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Privacy Policy
-                    </a>
-                  </label>
-                </div>
-
-                <Button type="submit" className="w-full h-12" disabled={isLoading || !acceptTerms}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Creating account...</>
                   ) : (
@@ -481,6 +432,17 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                     </>
                   )}
                 </Button>
+
+                <p className="text-xs text-muted-foreground/80 text-center">
+                  By creating an account, you agree to our{' '}
+                  <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                    Terms of Service
+                  </a>{' '}
+                  and{' '}
+                  <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                    Privacy Policy
+                  </a>
+                </p>
               </form>
             </TabsContent>
           </Tabs>

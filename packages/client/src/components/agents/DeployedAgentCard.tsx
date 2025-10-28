@@ -63,7 +63,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                 </DropdownMenuItem>
               )}
               
-              {onDelete && isSystemAgent && (
+              {onDelete != null && isSystemAgent && (
                 <DropdownMenuItem
                   disabled
                   className="flex items-center gap-2 opacity-50"

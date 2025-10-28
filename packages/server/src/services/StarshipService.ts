@@ -40,7 +40,7 @@ export class StarshipService {
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
-      maxAgents: data.maxAgents ?? 3,
+      maxAgents: data.maxAgents ?? 100,
       status: 'active',
     });
 
@@ -287,7 +287,7 @@ export class StarshipService {
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
-      maxAgents: 3,
+      maxAgents: 100,
       initialWalletBalance: 10, // $10 welcome credit for new users
     });
 

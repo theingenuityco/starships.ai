@@ -675,6 +675,25 @@ export class ConversationService {
             error: err instanceof Error ? err.message : String(err),
           });
         }
+        // Persist server-authoritative end-of-turn state and notify listeners before closing SSE
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as any) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STOP] Failed to persist turn_completed state on stop', err);
+        }
+        try {
+          await this.streamingService.broadcastTurnCompleted(conversationId, {
+            conversationId,
+            at: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STOP] Failed to broadcast turn_completed on stop', err);
+        }
         try {
           this.streamingService.closeConnection(conversationId);
         } catch (err) {
@@ -698,6 +717,25 @@ export class ConversationService {
             conversationId,
             error: err instanceof Error ? err.message : String(err),
           });
+        }
+        // Persist server-authoritative end-of-turn state even without active SSE connections
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as any) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STOP] Failed to persist turn_completed state on stop (no active conn)', err);
+        }
+        try {
+          await this.streamingService.broadcastTurnCompleted(conversationId, {
+            conversationId,
+            at: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STOP] Failed to broadcast turn_completed on stop (no active conn)', err);
         }
       }
     }
@@ -956,6 +994,27 @@ export class ConversationService {
           const baselineIndex = msgs.length - 1;
           this.lastPersistedIndex.set(conversationId, baselineIndex);
         }
+
+        // Persist turn_started state and notify clients
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as any) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: true },
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STREAMING] Failed to persist turn_started state', err);
+        }
+        try {
+          await this.streamingService.broadcastTurnStarted(conversationId, {
+            conversationId,
+            at: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STREAMING] Failed to broadcast turn_started', err);
+        }
+
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -1826,6 +1885,26 @@ export class ConversationService {
               });
             }
           }
+        }
+
+        // Persist turn_completed state and notify clients
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as any) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STREAMING] Failed to persist turn_completed state', err);
+        }
+        try {
+          await this.streamingService.broadcastTurnCompleted(conversationId, {
+            conversationId,
+            at: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('[STREAMING] Failed to broadcast turn_completed', err);
         }
 
         // Clear streaming trackers now that the workflow turn has fully completed

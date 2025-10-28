@@ -98,7 +98,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const lastEnforcedAgentIdRef = useRef<string | null>(null)
 
     const createConversation = useCreateConversation()
-    const { data: wallet } = useWallet(starshipId, !!starshipId)
+    const { data: wallet, isLoading } = useWallet(starshipId, !!starshipId)
     const MINIMUM_THRESHOLD = 0.05
     const hasFunds = Number(wallet?.balance ?? '0') >= MINIMUM_THRESHOLD
 
@@ -1608,7 +1608,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           </div>
         )}
         {/* Professional insufficient balance indicator - Show when there is conversation ID */}
-        {!hasFunds && conversationId && (
+        {!hasFunds && !isLoading && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">

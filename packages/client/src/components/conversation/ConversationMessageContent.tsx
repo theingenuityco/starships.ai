@@ -240,7 +240,7 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div className={cn('relative group', className)}>
+    <div className={cn('relative group w-full', className)}>
       {/* Reasoning (thinking) collapsible */}
       {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
@@ -265,7 +265,7 @@ export function ConversationMessageContent({
 
       {/* Unified markdown rendering - message content at normal size */}
       {messageType !== 'tool_result' && (
-        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none break-words message-content')}>
+        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content', enableCopy && !isStreaming && 'pr-6')}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {displayContent}
           </ReactMarkdown>
@@ -277,7 +277,7 @@ export function ConversationMessageContent({
         <div className="my-2.5">
           {/* Tools panel: keep collapsed by default and preserve user toggle state */}
           <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+            <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
@@ -338,13 +338,13 @@ export function ConversationMessageContent({
                   return (
                     <div key={idx}>
                       <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
-                        <div className="flex items-center justify-between px-3 py-2 border-b">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Function</span>
-                            <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
+                        <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="text-xs text-muted-foreground flex-shrink-0">Function</span>
+                            <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted truncate">{funcName}</span>
                             {/* ID removed from header */}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             <Button
                               variant="ghost"
                               size="icon"

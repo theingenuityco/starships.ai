@@ -37,7 +37,10 @@ export class StreamingService {
   private connections: Map<string, Set<ConnectionInfo>> = new Map();
 
   // Resume ring buffer: store recent logical events per conversation (no per-event IDs)
-  private eventBuffers: Map<string, Array<{ type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action'; payload: any }>> = new Map();
+  private eventBuffers: Map<
+    string,
+    Array<{ type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action' | 'turn_started' | 'turn_completed'; payload: any }>
+  > = new Map();
   private readonly bufferLimit: number = 300; // retain recent events per conversation
   private suppressBuffering: boolean = false; // used during replay to avoid re-buffering
 
@@ -86,14 +89,13 @@ export class StreamingService {
       }
     } catch (e: unknown) {
       // Non-fatal: some environments do not expose flushHeaders
-       
+
       console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, e);
     }
     // SSE prelude/comment to ensure the connection is established before first event
     try {
       res.write(':ok\n\n');
     } catch (e: unknown) {
-       
       console.debug(`[StreamingService] prelude write failed for ${streamId}:`, e);
     }
 
@@ -212,6 +214,53 @@ export class StreamingService {
   async broadcastUIActionToAll(payload: any): Promise<void> {
     const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastUIAction(streamId, payload));
     await Promise.all(broadcastPromises);
+  }
+
+  /**
+   * Broadcast initial turn state to current connections (not buffered)
+   */
+  async broadcastTurnState(streamId: string, payload: any): Promise<void> {
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'turn_state', payload);
+        }
+      })
+    );
+  }
+
+  /**
+   * Broadcast turn_started and buffer it for replay
+   */
+  async broadcastTurnStarted(streamId: string, payload: any): Promise<void> {
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    this.bufferLogicalEvent(streamId, 'turn_started', payload);
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'turn_started', payload);
+        }
+      })
+    );
+  }
+
+  /**
+   * Broadcast turn_completed and buffer it for replay
+   */
+  async broadcastTurnCompleted(streamId: string, payload: any): Promise<void> {
+    const conns = this.connections.get(streamId);
+    if (!conns || conns.size === 0) return;
+    this.bufferLogicalEvent(streamId, 'turn_completed', payload);
+    await Promise.all(
+      Array.from(conns).map(async (connection) => {
+        if (connection && !connection.res.destroyed) {
+          this.sendEventToStream(streamId, connection.res, 'turn_completed', payload);
+        }
+      })
+    );
   }
 
   /**
@@ -341,7 +390,6 @@ export class StreamingService {
           if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
         }
       } catch (flushError: unknown) {
-         
         console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
       }
 
@@ -353,7 +401,6 @@ export class StreamingService {
         const maybe = res as unknown as { flush?: () => void };
         if (typeof maybe.flush === 'function') maybe.flush();
       } catch (flushError: unknown) {
-         
         console.debug(`[StreamingService] flush failed for ${streamId}:`, flushError);
       }
     } catch (error) {
@@ -414,6 +461,14 @@ export class StreamingService {
               this.sendEventToStream(streamId, connection.res, 'ui_action', evt.payload);
               break;
             }
+            case 'turn_started': {
+              this.sendEventToStream(streamId, connection.res, 'turn_started', evt.payload);
+              break;
+            }
+            case 'turn_completed': {
+              this.sendEventToStream(streamId, connection.res, 'turn_completed', evt.payload);
+              break;
+            }
           }
         }
       }
@@ -423,7 +478,11 @@ export class StreamingService {
   }
 
   /** Buffer a logical event for potential replay */
-  private bufferLogicalEvent(streamId: string, type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action', payload: any): void {
+  private bufferLogicalEvent(
+    streamId: string,
+    type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action' | 'turn_started' | 'turn_completed',
+    payload: any
+  ): void {
     if (this.suppressBuffering) return;
     let buf = this.eventBuffers.get(streamId);
     if (!buf) {
@@ -618,6 +677,14 @@ export class StreamingService {
             }
             case 'ui_action': {
               this.sendEventToStream(streamId, connection.res, 'ui_action', evt.payload);
+              break;
+            }
+            case 'turn_started': {
+              this.sendEventToStream(streamId, connection.res, 'turn_started', evt.payload);
+              break;
+            }
+            case 'turn_completed': {
+              this.sendEventToStream(streamId, connection.res, 'turn_completed', evt.payload);
               break;
             }
           }

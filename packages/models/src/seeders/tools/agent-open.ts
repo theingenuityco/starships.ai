@@ -64,7 +64,8 @@ Automatically inferred from agent state (do not pass manually):
       },
       systemPrompt: {
         type: 'string',
-        description: 'System instructions for the agent',
+        description:
+          'System instructions for the agent. Must begin with <character name="AGENT_NAME">ROLE</character> as the first line (name + role only).',
       },
       temperature: {
         type: 'number',

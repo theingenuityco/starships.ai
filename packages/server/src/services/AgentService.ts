@@ -452,8 +452,20 @@ export class AgentService {
         throw new NotFoundError('Agent', agentId);
       }
 
+      console.log('🤖 Agent loaded:', {
+        id: agentModel.id,
+        name: agentModel.name,
+        slug: agentModel.slug,
+        model: agentModel.model,
+        hasSystemPrompt: !!agentModel.systemPrompt,
+        systemPromptLength: agentModel.systemPrompt?.length || 0,
+        stateType: typeof agentModel.state,
+        stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array'
+      });
+
       // 2. Get deployed tools for this agent
       const resolvedTools = await this.getAgentTools(agentModel.id, starshipId);
+      console.log('🔧 Tools resolved:', resolvedTools.length, 'tools found');
 
       // 3. Prepare agent params (same pattern as ConversationService)
       const baseState = agentModel.state && typeof agentModel.state === 'object' 
@@ -543,27 +555,77 @@ export class AgentService {
       exec.state.tools = resolvedTools;
 
       // 9. Execute the agent
+      console.log('🚀 Starting agent execution:', {
+        agentName: agentModel.name,
+        inputMessages: llmMessages.length,
+        totalMessages: orderedMessages.length,
+        systemPrompt: agentModel.systemPrompt ? agentModel.systemPrompt.substring(0, 100) + '...' : 'NO SYSTEM PROMPT',
+        toolsCount: resolvedTools.length
+      });
+
       await runner.run(blueprint, exec, {
         eventCallback: async (event: any) => {
+          console.log('📡 Event received:', event.type, event.data ? Object.keys(event.data) : 'no data');
+          
+          // Capture content from streaming chunks
+          if (event.type === 'content_chunk') {
+            // Extract content from the chunk structure: event.data.chunk.choices[0].delta.content
+            const chunkContent = event.data?.chunk?.choices?.[0]?.delta?.content;
+            if (chunkContent && typeof chunkContent === 'string') {
+              console.log('📝 Content chunk:', chunkContent.substring(0, 100));
+              output += chunkContent;
+            }
+          }
+          
           // Additional event handling for capturing results
           if (event.type === 'tool_started' && event.data?.name) {
             if (!toolsUsed.includes(event.data.name)) {
               toolsUsed.push(event.data.name);
             }
           }
+          
+          if (event.type === 'content_complete') {
+            console.log('✅ Content complete:', event.data);
+          }
         },
         secureEnv,
       } as any);
 
+      console.log('🔍 Post-execution state:', {
+        messagesCount: exec.state.messages?.length || 0,
+        lastMessageRole: exec.state.messages?.[exec.state.messages.length - 1]?.role,
+        lastMessageContentLength: exec.state.messages?.[exec.state.messages.length - 1]?.content?.length || 0,
+        capturedOutputLength: output.length,
+        toolsUsed: toolsUsed
+      });
+
       // 10. Try to extract final response from execution state
       if (exec.state.messages && Array.isArray(exec.state.messages)) {
+        console.log('🔍 All messages in final state:');
+        exec.state.messages.forEach((msg, idx) => {
+          console.log(`  ${idx}: ${msg.role} - ${msg.content?.substring(0, 100)}${msg.content?.length > 100 ? '...' : ''}`);
+        });
+        
         const lastMessage = exec.state.messages[exec.state.messages.length - 1];
+        console.log('🔍 Last message analysis:', {
+          exists: !!lastMessage,
+          role: lastMessage?.role,
+          hasContent: !!lastMessage?.content,
+          contentPreview: lastMessage?.content?.substring(0, 200) + '...',
+          hasReasoning: !!lastMessage?.reasoning
+        });
+        
         if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content) {
           output = lastMessage.content;
           if (lastMessage.reasoning) {
             reasoning = lastMessage.reasoning;
           }
+          console.log('✅ Successfully extracted output from last message');
+        } else {
+          console.log('❌ Could not extract output from last message');
         }
+      } else {
+        console.log('❌ No messages array in execution state');
       }
 
       const executionTime = Date.now() - startTime;

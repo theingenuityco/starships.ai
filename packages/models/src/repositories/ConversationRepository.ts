@@ -105,40 +105,9 @@ export class ConversationRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        
-        // Use transaction for robust deletion with detailed logging
-        return await connection.transaction(async (client) => {
-          console.log(`[ConversationRepository] Starting transaction to delete conversation ${id}`);
-          
-          // First verify the conversation exists
-          const existsResult = await client.query('SELECT id FROM conversations WHERE id = $1', [id]);
-          if (existsResult.rows.length === 0) {
-            console.log(`[ConversationRepository] Conversation ${id} not found`);
-            return false;
-          }
-          
-          console.log(`[ConversationRepository] Found conversation ${id}, proceeding with deletion`);
-          
-          // Check related records before deletion for debugging
-          const messagesCount = await client.query('SELECT COUNT(*) as count FROM messages WHERE conversation_id = $1', [id]);
-          const usageCount = await client.query('SELECT COUNT(*) as count FROM usage WHERE conversation_id = $1', [id]);
-          const agentsCount = await client.query('SELECT COUNT(*) as count FROM conversation_agents WHERE conversation_id = $1', [id]);
-          
-          console.log(`[ConversationRepository] Related records - Messages: ${messagesCount.rows[0].count}, Usage: ${usageCount.rows[0].count}, Agents: ${agentsCount.rows[0].count}`);
-          
-          // Delete the conversation - CASCADE should handle related records
-          const deleteResult = await client.query('DELETE FROM conversations WHERE id = $1', [id]);
-          const deleted = (deleteResult.rowCount ?? 0) > 0;
-          
-          if (deleted) {
-            console.log(`[ConversationRepository] Successfully deleted conversation ${id} and ${deleteResult.rowCount} row(s)`);
-          } else {
-            console.log(`[ConversationRepository] No rows deleted for conversation ${id}`);
-          }
-          
-          return deleted;
-        });
+        // Use standard deleteEntity method like other repositories
+        // CASCADE constraints will handle related records automatically
+        return await this.deleteEntity('conversations', id);
       },
       'delete',
       'Conversation',

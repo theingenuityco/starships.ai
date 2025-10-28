@@ -375,7 +375,9 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
               e.stopPropagation()
               setShowMenu(!showMenu)
             }}
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-all duration-200"
+            className={`absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center hover:bg-muted rounded transition-all duration-200 ${
+              showMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}
           >
             <div className="flex space-x-0.5">
               <div className="w-1 h-1 bg-current rounded-full"></div>
@@ -402,7 +404,7 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
             className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted/50 transition-colors flex items-center gap-2"
             disabled={deleteConversationMutation.isPending}
           >
-            <Icon name="delete" className="w-3 h-3" />
+            <Icon name="trash" className="w-3 h-3" />
             Delete
           </button>
         </div>

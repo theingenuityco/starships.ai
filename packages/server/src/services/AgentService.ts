@@ -7,8 +7,8 @@
  */
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
-import { NotFoundError } from '@starships/errors';
-import { AgentRepository } from '@starships/models';
+import { NotFoundError, ValidationError } from '@starships/errors';
+import { AgentRepository, StarshipRepository } from '@starships/models';
 import { generateSimpleAgentSlug } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
@@ -43,11 +43,13 @@ export interface ConversationStreamingRequest extends ConversationRequest {
  */
 export class AgentService {
   private agentRepository: AgentRepository;
+  private starshipRepository: StarshipRepository;
   private messageService: MessageService;
   private environmentService: EnvironmentService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
+    this.starshipRepository = new StarshipRepository();
     this.messageService = new MessageService();
     this.environmentService = new EnvironmentService();
   }
@@ -64,6 +66,28 @@ export class AgentService {
     return agent.starshipId;
   }
 
+  /**
+   * Validate that the starship can accommodate a new agent
+   * @param starshipId The starship ID to check
+   * @throws ValidationError if the agent limit is exceeded
+   */
+  private async validateAgentLimit(starshipId: string): Promise<void> {
+    // Get the starship to check its maxAgents limit
+    const starship = await this.starshipRepository.findById(starshipId);
+    if (!starship) {
+      throw new NotFoundError('Starship', starshipId);
+    }
+
+    // Get current deployed agents count
+    const currentAgents = await this.starshipRepository.getDeployedAgents(starshipId);
+    
+    if (currentAgents.length >= starship.maxAgents) {
+      throw new ValidationError(
+        `Agent limit reached. Maximum ${starship.maxAgents} agents allowed per starship. Currently deployed: ${currentAgents.length}`
+      );
+    }
+  }
+
   // ============================================================================
   // AGENT MANAGEMENT APIs
   // ============================================================================
@@ -72,6 +96,9 @@ export class AgentService {
    * Create a new agent and return as AgentModel
    */
   async createAgent(data: CreateAgentRequest & { starshipId: string }): Promise<AgentModel> {
+    // Validate agent limit before creating
+    await this.validateAgentLimit(data.starshipId);
+
     // Use provided slug if present; otherwise generate a simple unique slug
     const slug = data.slug && data.slug.trim().length > 0 ? data.slug : await generateSimpleAgentSlug(this.agentRepository);
 

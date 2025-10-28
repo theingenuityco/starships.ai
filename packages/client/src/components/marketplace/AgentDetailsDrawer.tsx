@@ -227,7 +227,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                     <div className="space-y-4">
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 border border-muted-foreground/20">
                         <div className="p-2 rounded-lg bg-primary/10">
-                          <Icon name="user" s className="w-4 h-4 text-primary" />
+                          <Icon name="user" className="w-4 h-4 text-primary" />
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Deploy to</p>

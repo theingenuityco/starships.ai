@@ -522,7 +522,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const mentionSuggestion = {
       char: '@',
       allowSpaces: false,
-      allowedPrefixes: null, // Allow @ mentions anywhere, not just after spaces
+      startOfLine: false, // Allow @ mentions anywhere using TipTap's official method
       items: ({ query }: any) =>
         ((mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || [])
           .filter(a => {

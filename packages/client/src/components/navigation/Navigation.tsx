@@ -7,7 +7,7 @@ import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useSelectedStarship, useUserStarships, useStarshipBySlug } from '@/hooks/useStarships'
-import { useStarshipConversations, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
+import { useStarshipConversations, useDeleteConversation, useUpdateConversation } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 
 import { motion } from 'motion/react'
@@ -258,9 +258,12 @@ interface ConversationItemProps {
 
 function ConversationItem({ conversation, onClick, isActive = false }: ConversationItemProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [newTitle, setNewTitle] = useState(conversation.title || 'Untitled conversation')
   const deleteConversationMutation = useDeleteConversation()
-  const updateConversationStatusMutation = useUpdateConversationStatus()
+  const updateConversationMutation = useUpdateConversation()
   const menuRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -275,6 +278,14 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showMenu])
+
+  // Focus input when entering rename mode
+  useEffect(() => {
+    if (isRenaming && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isRenaming])
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -297,65 +308,101 @@ function ConversationItem({ conversation, onClick, isActive = false }: Conversat
     }
   }
 
-  const handleArchive = async (e: React.MouseEvent) => {
+  const handleRename = (e: React.MouseEvent) => {
     e.stopPropagation()
-    try {
-      await updateConversationStatusMutation.mutateAsync({
-        conversationId: conversation.id,
-        status: 'archived',
-      })
-      setShowMenu(false)
-    } catch (error) {
-      // Error handling is done in the mutation hook
+    setIsRenaming(true)
+    setShowMenu(false)
+  }
+
+  const handleRenameSubmit = async () => {
+    if (newTitle.trim() && newTitle.trim() !== conversation.title) {
+      try {
+        await updateConversationMutation.mutateAsync({
+          conversationId: conversation.id,
+          title: newTitle.trim(),
+        })
+      } catch (error) {
+        // Error handling is done in the mutation hook
+        setNewTitle(conversation.title || 'Untitled conversation') // Reset on error
+      }
+    }
+    setIsRenaming(false)
+  }
+
+  const handleRenameCancel = () => {
+    setNewTitle(conversation.title || 'Untitled conversation')
+    setIsRenaming(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRenameSubmit()
+    } else if (e.key === 'Escape') {
+      handleRenameCancel()
     }
   }
 
   return (
     <div className="relative group" ref={menuRef}>
-      <button
-        onClick={onClick}
-        className={`w-full text-left px-2 py-1.5 text-sm rounded-lg transition-colors truncate pr-8 ${
-          isActive 
-            ? 'bg-primary/20 text-primary border border-primary/30' 
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-        }`}
-        title={conversation.title || 'Untitled conversation'}
-      >
-        {conversation.title || 'Untitled conversation'}
-      </button>
+      {isRenaming ? (
+        <input
+          ref={inputRef}
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          onBlur={handleRenameSubmit}
+          onKeyDown={handleKeyDown}
+          className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+          maxLength={100}
+          disabled={updateConversationMutation.isPending}
+        />
+      ) : (
+        <>
+          <button
+            onClick={onClick}
+            className={`w-full text-left px-2 py-1.5 text-sm rounded-lg transition-colors truncate pr-8 ${
+              isActive 
+                ? 'bg-primary/20 text-primary border border-primary/30' 
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+            }`}
+            title={conversation.title || 'Untitled conversation'}
+          >
+            {conversation.title || 'Untitled conversation'}
+          </button>
 
-      {/* Three-dot menu button */}
-      <button
-        onClick={e => {
-          e.stopPropagation()
-          setShowMenu(!showMenu)
-        }}
-        className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-all duration-200"
-      >
-        <div className="flex flex-col space-y-0.5">
-          <div className="w-1 h-1 bg-current rounded-full"></div>
-          <div className="w-1 h-1 bg-current rounded-full"></div>
-          <div className="w-1 h-1 bg-current rounded-full"></div>
-        </div>
-      </button>
+          {/* Three-dot menu button - horizontal dots */}
+          <button
+            onClick={e => {
+              e.stopPropagation()
+              setShowMenu(!showMenu)
+            }}
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-all duration-200"
+          >
+            <div className="flex space-x-0.5">
+              <div className="w-1 h-1 bg-current rounded-full"></div>
+              <div className="w-1 h-1 bg-current rounded-full"></div>
+              <div className="w-1 h-1 bg-current rounded-full"></div>
+            </div>
+          </button>
+        </>
+      )}
 
       {/* Dropdown menu */}
-      {showMenu && (
-        <div className="absolute right-0 top-full mt-1 w-28 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+      {showMenu && !isRenaming && (
+        <div className="absolute right-0 top-full mt-1 w-32 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
           <button
-            onClick={handleArchive}
+            onClick={handleRename}
             className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 transition-colors flex items-center gap-2"
-            disabled={updateConversationStatusMutation.isPending}
+            disabled={updateConversationMutation.isPending}
           >
-            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-            Archive
+            <Icon name="edit" className="w-3 h-3" />
+            Rename
           </button>
           <button
             onClick={handleDelete}
             className="w-full text-left px-3 py-2 text-xs text-destructive hover:bg-muted/50 transition-colors flex items-center gap-2"
             disabled={deleteConversationMutation.isPending}
           >
-            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+            <Icon name="delete" className="w-3 h-3" />
             Delete
           </button>
         </div>

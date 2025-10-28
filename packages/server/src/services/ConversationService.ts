@@ -308,6 +308,32 @@ export class ConversationService {
   }
 
   /**
+   * Update conversation details (title, etc.)
+   */
+  async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
+    try {
+      console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
+      
+      // Use the repository's update method
+      const updatedConversation = await this.conversationRepository.update(conversationId, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+      
+      if (updatedConversation) {
+        console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
+      } else {
+        console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
+      }
+      
+      return updatedConversation;
+    } catch (error) {
+      console.error(`[ConversationService] Error updating conversation ${conversationId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Extract persistable state fields from execution state
    */
   private extractPersistableState(executionState: Record<string, unknown> | undefined): Record<string, unknown> | null {

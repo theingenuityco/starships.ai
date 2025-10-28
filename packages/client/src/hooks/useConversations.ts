@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -79,7 +80,7 @@ export function useCreateConversation() {
       }
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create conversation'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to create conversation', {
         description: errorMessage,
       })
@@ -161,21 +162,11 @@ export function useDeleteConversation() {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.byStarship(context.starshipId), context.previousConversations)
       }
 
-      // Extract error message safely
-      let errorMessage = 'Failed to delete conversation'
-      try {
-        if (error?.response?.data?.error) {
-          const errorData = error.response.data.error
-          errorMessage = typeof errorData === 'string' ? errorData : errorData?.message || errorMessage
-        } else if (error?.message) {
-          errorMessage = error.message
-        }
-      } catch (e) {
-        console.error('Error parsing delete error:', e)
-      }
+      // SIMPLE FIX: Use simple error sanitization
+      const errorMessage = getSafeErrorMessage(error);
       
       toast.error('Failed to delete conversation', {
-        description: String(errorMessage),
+        description: errorMessage,
       })
     },
     onSuccess: (data, conversationId, context) => {
@@ -234,7 +225,7 @@ export function useDeleteMessage() {
         queryKey: CONVERSATION_QUERY_KEYS.all,
       })
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete message'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to delete message', {
         description: errorMessage,
       })
@@ -285,7 +276,7 @@ export function useUpdateConversationStatus() {
       toast.success(`Conversation ${variables.status} successfully!`)
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update conversation status'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to update status', {
         description: errorMessage,
       })
@@ -334,7 +325,7 @@ export function useUpdateConversation() {
       toast.success('Conversation renamed successfully!')
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update conversation'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to rename conversation', {
         description: errorMessage,
       })
@@ -368,7 +359,7 @@ export function useConversationStop() {
         // Signal server to persist partials and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
       } catch (error: any) {
-        const msg = error?.response?.data?.error || error?.message || 'Failed to stop'
+        const msg = getSafeErrorMessage(error);
         toast.error('Failed to stop response', { description: msg })
         return
       }
@@ -420,11 +411,12 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   }
   let closed = false
 
-  // Controller to explicitly close SSE on completion or aborts
-  const localController = new AbortController()
+  const controller = new AbortController()
 
-  // Track if we've seen a complete event (for state tracking, but don't close connection)
-  let seenComplete = false
+  // SIMPLE FIX: Auto-cleanup after 5 minutes to prevent resource leaks
+  const timeoutId = setTimeout(() => {
+    controller.abort()
+  }, 5 * 60 * 1000)
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
   const queue: StreamedChunk[] = []
@@ -440,28 +432,27 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
     }
   }
 
-  const end = () => {
+  const cleanup = () => {
     if (closed) return
     closed = true
+    clearTimeout(timeoutId)
+    controller.abort()
     while (resolvers.length > 0) {
       const resolve = resolvers.shift()!
       resolve({ value: undefined as any, done: true })
     }
+    queue.length = 0 // Clear queue to prevent memory leaks
   }
 
-  if (signal) {
-    // Ensure aborts (e.g., refetch, unmount) close both the iterable and the SSE connection
-    const abortBoth = () => {
-      end()
-      try {
-        localController.abort()
-      } catch {}
-    }
-    if (signal.aborted) {
-      abortBoth()
-    } else {
-      signal.addEventListener('abort', abortBoth, { once: true })
-    }
+  // SIMPLE FIX: Combine signals properly 
+  const combinedSignal = signal ? 
+    AbortSignal.any([signal, controller.signal]) : 
+    controller.signal
+
+  if (signal?.aborted) {
+    cleanup()
+  } else if (signal) {
+    signal.addEventListener('abort', cleanup, { once: true })
   }
 
   // Start SSE subscription
@@ -469,7 +460,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
     method: 'GET',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     openWhenHidden: true,
-    signal: localController.signal,
+    signal: combinedSignal,
     async onopen(response) {
       if (!response.ok) {
         push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
@@ -580,9 +571,6 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             // Ensure we flip streaming=false before completion (UI caret off)
             push({ type: 'mark_last_assistant_streaming', streaming: false })
             push({ type: 'complete' })
-            // Mark that we've seen complete, but don't close the connection
-            // The connection should stay open for the entire conversation
-            seenComplete = true
             break
           }
           case 'ui_action': {
@@ -611,12 +599,11 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
       }
     },
     onclose() {
-      end()
+      cleanup()
     },
     onerror(err) {
       push({ type: 'error', error: err })
-      // Let the stream finish; streamedQuery will treat further chunks/end accordingly
-      end()
+      cleanup()
     },
   })
 
@@ -636,11 +623,11 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
           })
         },
         return: () => {
-          end()
+          cleanup()
           return Promise.resolve({ value: undefined as any, done: true })
         },
         throw: e => {
-          end()
+          cleanup()
           return Promise.reject(e)
         },
       }
@@ -1033,7 +1020,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         return
       }
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to send message', { description: errorMessage })
     },
   })

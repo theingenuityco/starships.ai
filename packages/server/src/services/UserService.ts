@@ -309,8 +309,8 @@ export class UserService {
         throw new ValidationError('OAuth account linked to non-existent user', 'oauth');
       }
       
-      // Update email verification for existing users (OAuth providers verify emails)
-      await this.updateUserProfile(user.id, { emailVerified: true });
+      // SIMPLE FIX: Don't auto-verify emails from OAuth - be conservative
+      // Users can verify via email if needed
       
       return { user };
     }
@@ -324,8 +324,8 @@ export class UserService {
       user = await this.createUserFromOAuthProfile(profile);
       isNewUser = true;
     } else {
-      // Update email verification for existing users
-      await this.updateUserProfile(user.id, { emailVerified: true });
+      // SIMPLE FIX: Don't auto-verify emails from OAuth - be conservative
+      // Users can verify via email if needed
     }
 
     // Link OAuth account using business logic
@@ -364,7 +364,7 @@ export class UserService {
       email: profile.email,
       displayName: profile.name,
       avatar: profile.avatar,
-      emailVerified: true, // OAuth providers verify emails
+      emailVerified: false, // SIMPLE FIX: Don't auto-verify OAuth emails, be conservative
     };
 
     // Create user using proper service layer method

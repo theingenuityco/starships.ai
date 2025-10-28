@@ -20,7 +20,7 @@ Apply partial updates to any agent by providing its slug. Supports updating indi
 - **name**: Update agent name
 - **description**: Update agent description
 - **model**: Update LLM model
-- **systemPrompt**: Update system instructions
+- **systemPrompt**: Update system instructions. Must begin with <character name="AGENT_NAME">ROLE</character> as the first line and preserve this header unless explicitly changing name/role.
 - **temperature**: Update temperature (0-2)
 - **maxTokens**: Update max tokens
 - **blueprint**: Update Autopilot blueprint
@@ -59,7 +59,8 @@ Automatically inferred from agent state (do not pass manually):
       },
       systemPrompt: {
         type: 'string',
-        description: 'New system instructions',
+        description:
+          'New system instructions. Must begin with <character name="AGENT_NAME">ROLE</character> as the first line and preserve this header unless explicitly changing name/role.',
       },
       temperature: {
         type: 'number',

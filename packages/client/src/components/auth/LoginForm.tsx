@@ -4,7 +4,6 @@ import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -45,10 +44,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
   // OAuth initiation function - uses relative URL like regular auth
   const initiateOAuth = (provider: 'google' | 'github') => {
-    if (!acceptTerms) {
-      toast.error('Please accept the Terms of Service and Privacy Policy to continue')
-      return
-    }
     window.location.href = `/api/v1/auth/${provider}`
   }
 
@@ -74,7 +69,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     message: string
   } | null>(null)
   const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
-  const [acceptTerms, setAcceptTerms] = useState(false)
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
@@ -91,19 +85,13 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     try {
       const authCode = searchParams.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
       const oauthError = searchParams.get('oauth_error')
-      const verification = searchParams.get('verification')
+      const verificationError = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
 
       // Handle password reset success message
       if (resetSuccess === 'success' && !successToastShownRef.current) {
         successToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
-      }
-
-      // Handle email verification success message
-      if (verification === 'success' && !successToastShownRef.current) {
-        successToastShownRef.current = true
-        toast.success('Email verified successfully! You can now log in to your account.')
       }
 
       // Prevent duplicate handling (synchronous check with ref)
@@ -117,7 +105,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
         oauthLogin(authCode)
       } else if (oauthError) {
         setFormError(getOAuthErrorMessage(oauthError))
-      } else if (verification === 'error') {
+      } else if (verificationError === 'error') {
         setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
       }
     } catch (error) {
@@ -228,27 +216,29 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
           {emailVerificationStatus && (
-            <div className="mb-3 border-2 border-emerald-400 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg p-4 text-center">
-              <div className="w-full space-y-2 border-emerald-400">
+            <Alert className="mb-3 border-emerald-200 bg-emerald-50/50 backdrop-blur-sm text-center">
+              <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="font-medium text-sm text-emerald-600">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-sm text-emerald-600 break-all">{emailVerificationStatus.email}</span>
+                  <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
+                  <span className="font-medium text-gray-600 text-sm break-all">{emailVerificationStatus.email}</span>
                 </div>
-                <div className="flex justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleResendVerification(emailVerificationStatus.email)}
-                    disabled={isLoading}
-                    className="border-emerald-400 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
-                  >
-                    <Icon name="mail" className="h-4 w-4 mr-2" />
-                    {isLoading ? 'Sending...' : 'Resend Email'}
-                  </Button>
-                </div>
+                <AlertDescription>
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResendVerification(emailVerificationStatus.email)}
+                      disabled={isLoading}
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      <Icon name="mail" className="h-4 w-4 mr-2" />
+                      {isLoading ? 'Sending...' : 'Resend Email'}
+                    </Button>
+                  </div>
+                </AlertDescription>
               </div>
-            </div>
+            </Alert>
           )}
 
           <Tabs
@@ -258,7 +248,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
               setFormError(null) // Clear form errors when switching tabs
-              setAcceptTerms(false) // Reset terms checkbox when switching tabs
             }}
           >
             <TabsList className="grid w-full grid-cols-2">
@@ -314,22 +303,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </Alert>
                 )}
 
-                {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3 mt-6 mb-4">
-                  <Checkbox id="terms-login" checked={acceptTerms} onCheckedChange={checked => setAcceptTerms(checked === true)} disabled={isLoading} />
-                  <label htmlFor="terms-login" className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                    I agree to the{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Privacy Policy
-                    </a>
-                  </label>
-                </div>
-
-                <Button type="submit" className="w-full h-12" disabled={isLoading || !acceptTerms}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Signing in...</>
                   ) : (
@@ -340,7 +314,17 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   )}
                 </Button>
 
-                <div className="text-center">
+                <div className="text-center space-y-2">
+                  <p className="text-xs text-muted-foreground/80">
+                    By signing in, you agree to our{' '}
+                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                      Privacy Policy
+                    </a>
+                  </p>
                   <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
                     Forgot your password?
                   </Link>
@@ -438,22 +422,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </Alert>
                 )}
 
-                {/* Terms acceptance checkbox */}
-                <div className="flex items-center justify-center gap-3 mt-6 mb-4">
-                  <Checkbox id="terms-register" checked={acceptTerms} onCheckedChange={checked => setAcceptTerms(checked === true)} disabled={isLoading} />
-                  <label htmlFor="terms-register" className="text-xs text-muted-foreground/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                    I agree to the{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
-                      Privacy Policy
-                    </a>
-                  </label>
-                </div>
-
-                <Button type="submit" className="w-full h-12" disabled={isLoading || !acceptTerms}>
+                <Button type="submit" className="w-full h-12" disabled={isLoading}>
                   {isLoading ? (
                     <>Creating account...</>
                   ) : (
@@ -463,6 +432,17 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                     </>
                   )}
                 </Button>
+
+                <p className="text-xs text-muted-foreground/80 text-center">
+                  By creating an account, you agree to our{' '}
+                  <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                    Terms of Service
+                  </a>{' '}
+                  and{' '}
+                  <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                    Privacy Policy
+                  </a>
+                </p>
               </form>
             </TabsContent>
           </Tabs>

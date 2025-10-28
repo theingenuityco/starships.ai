@@ -8,8 +8,8 @@ const router: Router = Router();
 
 /**
  * GET /openrouter/models
- * Proxies OpenRouter models (unfiltered to get ALL available models).
- * Calls https://openrouter.ai/api/v1/models
+ * Proxies OpenRouter models (filtered by account Provider Preferences).
+ * Calls https://openrouter.ai/api/v1/models/user
  */
 router.get('/openrouter/models', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -20,8 +20,8 @@ router.get('/openrouter/models', jwtAuthMiddleware, async (req: Request, res: Re
       return;
     }
 
-    // Use unfiltered endpoint to get ALL models, not just filtered by provider preferences
-    const endpoint = 'https://openrouter.ai/api/v1/models';
+    // Use /models/user endpoint to get only models filtered by provider preferences
+    const endpoint = 'https://openrouter.ai/api/v1/models/user';
 
     const resp = await fetch(endpoint, {
       method: 'GET',
@@ -44,7 +44,34 @@ router.get('/openrouter/models', jwtAuthMiddleware, async (req: Request, res: Re
         ? (payload as OpenRouterModel[])
         : [];
 
-    sendSuccess<OpenRouterModel[]>(res, models);
+    // Filter out openrouter/auto model
+    const filteredByType = models.filter((model) => model.id !== 'openrouter/auto');
+
+    // Check if filter query parameter is provided
+    const filter = req.query.filter as string | undefined;
+    const includePricing = filter?.includes('pricing');
+    const includeTopProvider = filter?.includes('top_provider');
+
+    // Return filtered fields based on query parameter
+    const filteredModels = filteredByType.map((model) => {
+      const result: Record<string, unknown> = {
+        canonical_slug: model.canonical_slug,
+        id: model.id,
+        name: model.name,
+      };
+
+      if (includePricing) {
+        result.pricing = model.pricing;
+      }
+
+      if (includeTopProvider) {
+        result.top_provider = model.top_provider;
+      }
+
+      return result;
+    });
+
+    sendSuccess(res, filteredModels);
   } catch (error) {
     handleError(error, res, 'fetching OpenRouter models (filtered)');
   }

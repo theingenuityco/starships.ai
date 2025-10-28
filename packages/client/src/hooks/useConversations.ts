@@ -393,6 +393,9 @@ type StreamedChunk =
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
   | { type: 'replace_whole_assistant'; message: ClientMessage }
   | { type: 'ui_action'; payload: any }
+  | { type: 'turn_state'; payload: any }
+  | { type: 'turn_started'; payload?: any }
+  | { type: 'turn_completed'; payload?: any }
   | { type: 'complete' }
   | { type: 'error'; error: any }
 
@@ -575,6 +578,18 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
           }
           case 'ui_action': {
             push({ type: 'ui_action', payload: parsed })
+            break
+          }
+          case 'turn_state': {
+            push({ type: 'turn_state', payload: parsed })
+            break
+          }
+          case 'turn_started': {
+            push({ type: 'turn_started', payload: parsed })
+            break
+          }
+          case 'turn_completed': {
+            push({ type: 'turn_completed', payload: parsed })
             break
           }
           case 'resume_token': {
@@ -903,49 +918,30 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return false
   }, [chunks])
 
+  // Server-authoritative turn state: derive from latest turn_* or turn_state events
+  const serverTurnActive = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (!c) continue
+      if (c.type === 'turn_started') return true
+      if (c.type === 'turn_completed') return false
+      if (c.type === 'turn_state') return Boolean(c.payload?.turnActive)
+    }
+    return false
+  }, [chunks])
+
   // Derived streaming flags - ensure we stop streaming when complete event is received
   const isAssistantStreaming = useMemo(() => {
     if (hasCompleteEvent) return false
     return computedMessages.some(m => (m as any)?.streaming === true)
   }, [computedMessages, hasCompleteEvent])
 
-  // Awaiting assistant = after the last user message, no assistant progress yet and the stream is open
+  // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
   const isAwaitingAssistant = useMemo(() => {
-    // If we've received a complete event, we're no longer awaiting
     if (hasCompleteEvent) return false
-    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
-
-    let lastUserIdx = -1
-    for (let i = computedMessages.length - 1; i >= 0; i--) {
-      if (computedMessages[i].role === 'user') {
-        lastUserIdx = i
-        break
-      }
-    }
-    if (lastUserIdx === -1) return false
-
-    let hasAssistantAfter = false
-    let hasAssistantProgress = false
-    for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
-      const m: any = computedMessages[i]
-      if (m?.role !== 'assistant') continue
-      hasAssistantAfter = true
-      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
-      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
-      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
-      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
-      if (hasChunks || hasRChunks || hasReasoning || hasContent) {
-        hasAssistantProgress = true
-        break
-      }
-    }
-
-    // Show awaiting immediately after a user turn until first assistant progress.
-    // Keep it on during the initial pre-stream window, or anytime we have a live-stream hint, or active fetching.
-    if (!hasAssistantAfter) return !preStreamExpired || hasLiveStreamHint || messagesQuery.fetchStatus === 'fetching'
-    if (!hasAssistantProgress) return !preStreamExpired || hasLiveStreamHint || messagesQuery.fetchStatus === 'fetching'
-    return false
-  }, [computedMessages, messagesQuery.fetchStatus, hasCompleteEvent, preStreamExpired, hasLiveStreamHint])
+    return serverTurnActive && !isAssistantStreaming
+  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant

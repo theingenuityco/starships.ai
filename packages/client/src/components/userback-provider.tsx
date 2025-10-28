@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import Userback from '@userback/widget'
-import type { UserbackWidget } from '@userback/widget'
+import type { UserbackWidget, UserbackOptions } from '@userback/widget'
 import { useAuthContext } from '@/providers/auth-provider'
 
 // Create the context
@@ -15,15 +15,21 @@ interface UserbackProviderProps {
 
 export function UserbackProvider({ children, token }: UserbackProviderProps) {
   const [userback, setUserback] = useState<UserbackWidget | null>(null)
-  const { isAuthenticated, userId, userEmail, userName } = useAuthContext()
+  const [initialized, setInitialized] = useState(false)
+  const { userId, userEmail, userName } = useAuthContext()
 
+  // Initialize Userback widget once with initial user data
   useEffect(() => {
+    if (initialized || !token) return
+
     const init = async () => {
       try {
-        const options: any = {}
+        const options: UserbackOptions = {
+          autohide: true,
+        }
 
-        // Identify logged-in users
-        if (isAuthenticated && userId && userEmail) {
+        // Set user data if available during initialization
+        if (userId && userEmail) {
           options.user_data = {
             id: userId,
             info: {
@@ -33,18 +39,28 @@ export function UserbackProvider({ children, token }: UserbackProviderProps) {
           }
         }
 
-        // Initialize Userback widget and get the instance
         const instance = await Userback(token, options)
         setUserback(instance)
+        setInitialized(true)
       } catch (error) {
         console.error('Failed to initialize Userback:', error)
       }
     }
 
-    if (token) {
-      init()
-    }
-  }, [token, isAuthenticated, userId, userEmail, userName])
+    init()
+  }, [token, initialized])
+
+  // Update user identification when auth data changes (after initialization)
+  useEffect(() => {
+    if (!userback || !initialized || !userId || !userEmail) return
+
+    // Use identify() for real-time user updates after widget is initialized
+    userback.identify(userId, {
+      name: userName || userEmail,
+      email: userEmail,
+      userId: userId,
+    })
+  }, [userback, initialized, userId, userEmail, userName, userId])
 
   return <UserbackContext.Provider value={userback}>{children}</UserbackContext.Provider>
 }

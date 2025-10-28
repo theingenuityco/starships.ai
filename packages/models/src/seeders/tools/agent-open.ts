@@ -167,6 +167,60 @@ Automatically inferred from agent state (do not pass manually):
           body: '{{ $lastOutputOf("prepare")[0].json.body }}',
           timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
         },
+        onError: {
+          ref: 'handle_error',
+        }
+      },
+      {
+        ref: 'handle_error',
+        type: 'javascript',
+        name: 'Handle Error',
+        description: 'Extract meaningful error message from HTTP failure',
+        parameters: {
+          code: `
+            const httpError = $lastOutputOf("http_exec")[0];
+            
+            // Check if this is a validation error (agent limit reached)
+            if (httpError && httpError.error) {
+              const errorMsg = httpError.error;
+              
+              // Extract validation error message
+              if (typeof errorMsg === 'string' && errorMsg.includes('Agent limit reached')) {
+                return {
+                  error: errorMsg,
+                  code: 'AGENT_LIMIT_REACHED',
+                  userMessage: errorMsg
+                };
+              }
+              
+              // Extract from structured error response
+              if (errorMsg.message && errorMsg.message.includes('Agent limit reached')) {
+                return {
+                  error: errorMsg.message,
+                  code: 'AGENT_LIMIT_REACHED', 
+                  userMessage: errorMsg.message
+                };
+              }
+              
+              // Generic validation error
+              if (errorMsg.code === 'VALIDATION_ERROR') {
+                return {
+                  error: errorMsg.message || 'Validation failed',
+                  code: 'VALIDATION_ERROR',
+                  userMessage: errorMsg.message || 'Agent creation failed validation'
+                };
+              }
+            }
+            
+            // Default error handling
+            return {
+              error: 'Failed to create agent - please try again',
+              code: 'UNKNOWN_ERROR',
+              userMessage: 'Failed to create agent. Please check your agent configuration and try again.'
+            };
+          `,
+          timeout: 1000,
+        },
       },
       {
         ref: 'end_1',
@@ -177,11 +231,21 @@ Automatically inferred from agent state (do not pass manually):
           output: '{{ $lastOutputOf("http_exec")[0].json }}',
         },
       },
+      {
+        ref: 'end_error',
+        type: 'end',
+        name: 'End with Error',
+        description: 'Return user-friendly error message',
+        parameters: {
+          output: '{{ $lastOutputOf("handle_error")[0] }}',
+        },
+      },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'http_exec' },
       { ref: 'e3', from: 'http_exec', to: 'end_1' },
+      { ref: 'e4', from: 'handle_error', to: 'end_error' },
     ],
     metadata: {},
   },

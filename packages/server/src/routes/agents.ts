@@ -306,7 +306,7 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
     sendSuccess(res, agent, 201);
   } catch (error) {
     console.error('[AGENTS] Error creating agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create agent');
+    handleError(error, res, 'creating agent');
   }
 });
 

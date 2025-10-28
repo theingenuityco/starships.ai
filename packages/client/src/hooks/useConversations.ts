@@ -293,6 +293,47 @@ export function useUpdateConversationStatus() {
   })
 }
 
+// Update conversation details
+export function useUpdateConversation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: { conversationId: string; title?: string }) => {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}`, {
+        title: data.title,
+      })
+      return response.data.data
+    },
+    onSuccess: (updatedConversation, variables) => {
+      // Update the conversation in detail cache
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.detail(variables.conversationId), (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          conversation: updatedConversation,
+        }
+      })
+
+      // Update conversation in all starship conversation lists
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+        predicate: (query) => {
+          const key = query.queryKey as string[]
+          return key.includes('starship') && key.includes('list')
+        }
+      })
+
+      toast.success('Conversation renamed successfully!')
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update conversation'
+      toast.error('Failed to rename conversation', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 // Stop an in-flight streamed conversation turn across layers
 export function useConversationStop() {
   const queryClient = useQueryClient()

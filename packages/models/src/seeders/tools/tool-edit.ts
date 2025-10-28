@@ -80,12 +80,16 @@ Automatically inferred from agent state (do not pass manually):
               throw new Error('slug is required');
             }
 
-            // Build partial update body with only provided fields
+            // Build partial update body with only provided and non-empty fields
             const body = {};
-            if (input.name !== undefined) body.name = input.name;
-            if (input.description !== undefined) body.description = input.description;
-            if (input.parameters !== undefined) body.parameters = input.parameters;
-            if (input.blueprint !== undefined) body.blueprint = input.blueprint;
+            if (typeof input.name === 'string' && input.name.trim().length > 0) body.name = input.name.trim();
+            if (typeof input.description === 'string' && input.description.trim().length > 0) body.description = input.description.trim();
+            if (input.parameters && typeof input.parameters === 'object' && Object.keys(input.parameters).length > 0) body.parameters = input.parameters;
+            if (input.blueprint && typeof input.blueprint === 'object') {
+              const hasNodes = Array.isArray(input.blueprint.nodes) && input.blueprint.nodes.length > 0;
+              const hasEdges = Array.isArray(input.blueprint.edges) && input.blueprint.edges.length > 0;
+              if (hasNodes || hasEdges) body.blueprint = input.blueprint;
+            }
 
             if (Object.keys(body).length === 0) {
               throw new Error('At least one field must be provided for update');

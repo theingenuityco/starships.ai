@@ -102,7 +102,7 @@ export class ConversationService {
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
     memoryLimitMB: 256, // 256MB memory limit
-    timeoutMs: 60000, // 60 second timeout
+    timeoutMs: 600000, // 10 minute timeout
     killGraceMs: 5000, // 5 second grace period
   };
 
@@ -499,8 +499,21 @@ export class ConversationService {
         const engineConfig = { eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event), secureEnv } as any;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
-        // Seed execution state with ordered conversation messages for LLM node validation
-        (exec.state as Record<string, unknown>)['messages'] = llmMessages;
+        // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages
+        const orderedForState: LlmMessage[] = [];
+        if (agentWithTools.systemPrompt && typeof agentWithTools.systemPrompt === 'string' && agentWithTools.systemPrompt.length > 0) {
+          orderedForState.push({ role: 'system', content: agentWithTools.systemPrompt } as LlmMessage);
+        }
+        if (Array.isArray((agentWithTools as { state?: { messages?: unknown[] } }).state?.messages)) {
+          const stateMsgs = ((agentWithTools as { state?: { messages?: LlmMessage[] } }).state?.messages || []).filter(
+            (m): m is LlmMessage => !!m && typeof (m as any).role === 'string' && typeof (m as any).content === 'string'
+          );
+          if (stateMsgs.length > 0) orderedForState.push(...stateMsgs);
+        }
+        if (Array.isArray(llmMessages) && llmMessages.length > 0) {
+          orderedForState.push(...llmMessages);
+        }
+        (exec.state as Record<string, unknown>)['messages'] = orderedForState;
         (exec.state as Record<string, unknown>)['tools'] = (agentWithTools.state as any)?.tools ?? [];
 
         const ctl = (runner as any).runWithController?.(blueprint, exec, engineConfig);

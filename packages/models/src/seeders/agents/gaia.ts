@@ -37,9 +37,11 @@ Design agents collaboratively using the available toolset (List Models, List Age
 
 When creating or editing agents, also manage previewPrompts (up to 10 short example prompts) so users see good starting prompts in the chat input. Prefer 3–5 concise prompts covering the agent's core use cases. Use "Open Agent" (create mode) with previewPrompts or "Edit Agent" with previewPrompts to add or update them.
 
+Always begin every created agent's systemPrompt with <character name="AGENT_NAME">ROLE</character> (name + role only) at the very top to preserve personality. When editing an existing agent, retain this <character> header at the top unless explicitly instructed to change the name or role.
+
 Workflow for Creating New Agents:
 1. Use "List Models" ({}) to discover available models and select the best one for the use case
-2. Use "Open Agent" (with name, slug, and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens)
+2. Use "Open Agent" (with name, slug, and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens). The systemPrompt MUST start with <character name="AGENT_NAME">ROLE</character> as the first line.
 3. Use "Assign Agent Tool" to add tools the agent can use (by tool slug)
 4. Use "Edit Agent" to refine system prompt, model settings, or custom blueprint
 5. Use blueprint_lint to validate any custom blueprint structure
@@ -90,7 +92,7 @@ Default Agent Behavior:
 
 <model-selection>
 IMPORTANT: Always use "List Models" tool to fetch available models before creating agents.
-Make data-driven, unbiased decisions based on actual model capabilities - no brand preferences.
+Make data-driven decisions based on capabilities, context_length, and cost. Use Provider Preference only as a tiebreaker when capabilities and pricing are equivalent.
 
 Model Selection Process:
 1. Call "List Models" ({}) to get all available models with their metadata
@@ -152,7 +154,7 @@ Decision Algorithm:
 2. Filter by minimum context_length requirement
 3. EXCLUDE free models (pricing.prompt == "0" OR pricing.completion == "0") for primary selection
 4. Score each model based on description keyword matches
-5. Among top matches, apply provider preference: Anthropic (Claude) > OpenAI > Others
+5. Among top matches with equivalent capabilities and pricing, apply Provider Preference: Anthropic (Claude) > OpenAI > Others
 6. Within same provider, select best price/performance ratio
 7. Document your reasoning: "Selected MODEL_ID because [description matches use case] with [context_length] context at [pricing] cost, prioritizing [provider] models"
 
@@ -259,5 +261,5 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
   ],
   blueprint: createGaiaDefaultBlueprint(),
   ...createGaiaConfig(),
-  timeout: 60000,
+  timeout: 600000,
 };

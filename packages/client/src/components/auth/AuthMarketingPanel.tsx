@@ -10,61 +10,107 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Deep space base */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Central nebula glow - dreamy purple/blue galaxy effect */}
+      {/* Tighter central nebula glow - more concentrated */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          // Central bright glow - purple to blue
-          'radial-gradient(ellipse 1200px 800px at 50% 45%, rgba(168,85,247,0.55), transparent 65%)',
-          'radial-gradient(ellipse 1400px 900px at 50% 45%, rgba(139,92,246,0.45), transparent 70%)',
-          // Secondary blue layer
-          'radial-gradient(ellipse 1000px 700px at 48% 48%, rgba(99,102,241,0.35), transparent 65%)',
-          // Soft cyan accent
-          'radial-gradient(ellipse 1100px 750px at 52% 42%, rgba(59,130,246,0.28), transparent 68%)',
-          // Outer fade with subtle color variation
-          'radial-gradient(ellipse 1600px 1000px at 50% 45%, rgba(124,58,237,0.20), transparent 75%)',
+          // Core bright glow - purple (tighter)
+          'radial-gradient(ellipse 800px 550px at 50% 45%, rgba(168,85,247,0.60), transparent 55%)',
+          'radial-gradient(ellipse 950px 650px at 50% 45%, rgba(139,92,246,0.48), transparent 60%)',
+          // Secondary blue layer (tighter)
+          'radial-gradient(ellipse 700px 500px at 48% 48%, rgba(99,102,241,0.38), transparent 58%)',
+          // Soft cyan accent (tighter)
+          'radial-gradient(ellipse 750px 520px at 52% 42%, rgba(59,130,246,0.30), transparent 60%)',
+          // Outer fade (much tighter)
+          'radial-gradient(ellipse 1100px 750px at 50% 45%, rgba(124,58,237,0.22), transparent 65%)',
         ].join(', '),
       }} />
 
-      {/* Subtle ambient bottom glow */}
+      {/* Subtle ambient bottom glow (reduced) */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          'radial-gradient(ellipse 1200px 500px at 50% 100%, rgba(217,70,239,0.12), transparent 70%)',
-          'radial-gradient(ellipse 1000px 450px at 50% 100%, rgba(245,158,11,0.08), transparent 65%)',
+          'radial-gradient(ellipse 900px 350px at 50% 100%, rgba(217,70,239,0.10), transparent 65%)',
+          'radial-gradient(ellipse 750px 300px at 50% 100%, rgba(245,158,11,0.06), transparent 60%)',
         ].join(', '),
       }} />
 
-      {/* Star field overlay */}
+      {/* Star field and particles overlay */}
       <svg className="absolute inset-0 w-full h-full" aria-hidden="true" preserveAspectRatio="none">
         <defs>
-          {/* Star noise filter for scattered stars */}
+          {/* Fine star noise */}
           <filter id="starNoise" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
-            <feTurbulence type="fractalNoise" baseFrequency="2.0" numOctaves="5" seed="256" result="noise" />
+            <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="5" seed="256" result="noise" />
             <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" in="noise" />
             <feComponentTransfer>
-              <feFuncA type="table" tableValues="0 0 0 0 0 0 .04 .15 .4 .7 .95 1" />
+              <feFuncA type="table" tableValues="0 0 0 0 0 0 .03 .12 .35 .65 .9 1" />
             </feComponentTransfer>
           </filter>
           
-          {/* Brighter star clusters */}
+          {/* Brighter star clusters in center */}
           <filter id="brightStars" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
-            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="512" result="noise" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="512" result="noise" />
             <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" in="noise" />
             <feComponentTransfer>
-              <feFuncA type="table" tableValues="0 0 0 0 0 0 0 .1 .5 .9 1" />
+              <feFuncA type="table" tableValues="0 0 0 0 0 0 0 .08 .4 .85 1" />
             </feComponentTransfer>
           </filter>
+
+          {/* Star glow effect */}
+          <radialGradient id="starGlow" r="50%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </radialGradient>
         </defs>
 
-        {/* Fine star field */}
-        <rect x="0" y="0" width="100%" height="100%" filter="url(#starNoise)" opacity="0.25" />
+        {/* Fine star field across entire background */}
+        <rect x="0" y="0" width="100%" height="100%" filter="url(#starNoise)" opacity="0.28" />
         
-        {/* Brighter star accents in the nebula center */}
-        <rect x="20%" y="20%" width="60%" height="50%" filter="url(#brightStars)" opacity="0.30" />
+        {/* Brighter star accents in nebula center */}
+        <rect x="25%" y="25%" width="50%" height="40%" filter="url(#brightStars)" opacity="0.35" />
+
+        {/* Individual visible star particles scattered throughout */}
+        <g opacity="0.8">
+          {/* Top left region */}
+          <circle cx="12%" cy="18%" r="0.8" fill="#ffffff" />
+          <circle cx="8%" cy="12%" r="1.2" fill="url(#starGlow)" />
+          <circle cx="18%" cy="22%" r="0.6" fill="#ffffff" />
+          <circle cx="15%" cy="28%" r="1" fill="url(#starGlow)" />
+          
+          {/* Top right region */}
+          <circle cx="82%" cy="15%" r="0.9" fill="#ffffff" />
+          <circle cx="88%" cy="20%" r="1.1" fill="url(#starGlow)" />
+          <circle cx="78%" cy="25%" r="0.7" fill="#ffffff" />
+          <circle cx="92%" cy="12%" r="0.8" fill="#ffffff" />
+          
+          {/* Center scattered */}
+          <circle cx="35%" cy="35%" r="1" fill="url(#starGlow)" />
+          <circle cx="45%" cy="30%" r="0.7" fill="#ffffff" />
+          <circle cx="55%" cy="38%" r="0.9" fill="#ffffff" />
+          <circle cx="62%" cy="32%" r="1.2" fill="url(#starGlow)" />
+          <circle cx="48%" cy="50%" r="0.8" fill="#ffffff" />
+          
+          {/* Bottom left region */}
+          <circle cx="15%" cy="68%" r="0.9" fill="#ffffff" />
+          <circle cx="10%" cy="75%" r="1" fill="url(#starGlow)" />
+          <circle cx="22%" cy="72%" r="0.7" fill="#ffffff" />
+          <circle cx="18%" cy="82%" r="0.8" fill="#ffffff" />
+          
+          {/* Bottom right region */}
+          <circle cx="78%" cy="70%" r="1.1" fill="url(#starGlow)" />
+          <circle cx="85%" cy="65%" r="0.8" fill="#ffffff" />
+          <circle cx="82%" cy="78%" r="0.9" fill="#ffffff" />
+          <circle cx="88%" cy="75%" r="0.7" fill="#ffffff" />
+          
+          {/* Additional scattered particles */}
+          <circle cx="28%" cy="45%" r="0.6" fill="#ffffff" />
+          <circle cx="70%" cy="48%" r="0.8" fill="#ffffff" />
+          <circle cx="40%" cy="62%" r="0.7" fill="#ffffff" />
+          <circle cx="58%" cy="58%" r="0.9" fill="url(#starGlow)" />
+        </g>
       </svg>
 
-      {/* Subtle vignette to darken edges */}
+      {/* Stronger vignette to darken edges more */}
       <div className="absolute inset-0" style={{
-        background: 'radial-gradient(ellipse 70% 60% at 50% 45%, transparent 30%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.7) 100%)',
+        background: 'radial-gradient(ellipse 65% 55% at 50% 45%, transparent 25%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0.85) 100%)',
       }} />
     </div>
   )

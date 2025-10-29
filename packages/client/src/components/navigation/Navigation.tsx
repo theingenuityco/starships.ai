@@ -259,7 +259,7 @@ export function Navigation(props: NavigationProps) {
       <div
         className="flex flex-col items-center justify-center w-14 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{
-          height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
+          height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding from layout
         }}
       >
         {/* Compact Header with Theme Toggle */}

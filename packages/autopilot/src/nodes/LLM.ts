@@ -88,9 +88,58 @@ export class LLM extends BaseNode<LlmParams> {
         // Prevent multiple tool calls within a single assistant response
         // OpenAI/compatible providers honor `parallel_tool_calls: false`
         requestOptions.parallel_tool_calls = false;
+      } else {
+        // No tools configured; leave provider defaults
       }
 
-      // console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
+      // Condensed request log: essential params only, with truncated message previews
+      // const truncate = (text: unknown, max = 160): string => {
+      //   if (typeof text !== 'string') return typeof text === 'undefined' ? '' : '[non-text content]';
+      //   const compact = text.replace(/\s+/g, ' ').trim();
+      //   return compact.length > max ? `${compact.slice(0, max)}…` : compact;
+      // };
+
+      // const summarizedMessages = sourceMessages.map((m, i) => {
+      //   const summary: {
+      //     index: number;
+      //     role: LLMMessageRole;
+      //     contentPreview?: string;
+      //     toolCalls?: string[];
+      //   } = { index: i, role: m.role };
+
+      //   if (typeof m.content === 'string') {
+      //     summary.contentPreview = truncate(m.content);
+      //   }
+      //   if (Array.isArray(m.toolCalls)) {
+      //     summary.toolCalls = m.toolCalls.map((tc) => tc.function.name).filter((name): name is string => Boolean(name));
+      //   }
+      //   return summary;
+      // });
+
+      // const requestSummary = {
+      //   model: requestOptions.model,
+      //   stream: requestOptions.stream === true,
+      //   params: {
+      //     temperature: typeof requestOptions.temperature === 'number' ? requestOptions.temperature : 'default',
+      //     top_p: typeof requestOptions.top_p === 'number' ? requestOptions.top_p : 'default',
+      //     max_tokens: typeof requestOptions.max_tokens === 'number' ? requestOptions.max_tokens : 'default',
+      //     presence_penalty: typeof requestOptions.presence_penalty === 'number' ? requestOptions.presence_penalty : 'default',
+      //     frequency_penalty: typeof requestOptions.frequency_penalty === 'number' ? requestOptions.frequency_penalty : 'default',
+      //   },
+      //   tools: requestOptions.tools
+      //     ? {
+      //         count: requestOptions.tools.length,
+      //         parallel: requestOptions.parallel_tool_calls ?? false,
+      //         choice: requestOptions.tool_choice ?? 'auto',
+      //         slugs: requestOptions.tools
+      //           .map((t) => (t.type === 'function' ? t.function.name : undefined))
+      //           .filter((name): name is string => Boolean(name)),
+      //       }
+      //     : undefined,
+      //   messages: summarizedMessages,
+      // };
+
+      // console.log('>>> REQUEST >>>', JSON.stringify(requestSummary, null, 2));
       // Stream with OpenAI SDK (handles all accumulation reliably)
       const stream = await client.chat.completions.create(requestOptions);
       const llmResponse = await this.processOpenAIStream(stream);

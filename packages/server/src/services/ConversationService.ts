@@ -22,7 +22,8 @@ import { getEnvConfig } from '@starships/env';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
-import { parseTree, getNodeValue, ParseError } from 'jsonc-parser';
+import { parser as jsonLezerParser } from '@lezer/json';
+import type { SyntaxNode } from '@lezer/common';
 
 /**
  * Autopilot child process configuration
@@ -138,30 +139,367 @@ export class ConversationService {
   }
 
   /**
-   * Extract completed top-level properties from a JSON-like string buffer.
-   * This is a tolerant, incremental extractor: it only returns props whose values are balanced
-   * (strings closed, brackets/braces balanced) at depth 1.
+   * Extract completed properties from a JSON-like string buffer.
+   * Tolerant, incremental, and deep: collects any keys whose values can be confidently
+   * reconstructed from the partial parse tree, recursively. Falls back to partial
+   * strings and numbers where possible.
    */
   private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     if (typeof jsonLike !== 'string' || jsonLike.length === 0) return out;
-    const errors: ParseError[] = [];
-    const root = parseTree(jsonLike, errors, { allowTrailingComma: true, disallowComments: false });
-    if (!root || root.type !== 'object' || !Array.isArray(root.children)) return out;
-    for (const prop of root.children) {
-      // Each property node typically has [keyNode, valueNode]
-      if (!prop || prop.type !== 'property' || !Array.isArray(prop.children) || prop.children.length < 2) continue;
-      const keyNode = prop.children[0];
-      const valueNode = prop.children[1];
-      if (!keyNode || keyNode.type !== 'string' || !valueNode) continue;
-      // getNodeValue returns undefined for incomplete values; skip those
-      const value = getNodeValue(valueNode);
-      if (typeof value === 'undefined') continue;
-      const key = getNodeValue(keyNode);
-      if (typeof key !== 'string' || key.length === 0) continue;
-      out[key] = value as unknown;
+    const tree = jsonLezerParser.parse(jsonLike);
+    const top = tree.topNode;
+
+    // Find the root Object node (top-level)
+    let objectNode: SyntaxNode | null = null;
+    if (top.name === 'Object') {
+      objectNode = top;
+    } else {
+      for (let c = top.firstChild; c; c = c.nextSibling) {
+        if (c.name === 'Object') {
+          objectNode = c;
+          break;
+        }
+      }
     }
-    return out;
+    if (!objectNode) return out;
+
+    const nodeHasError = (n: SyntaxNode): boolean => {
+      if (n.type.isError) return true;
+      for (let c = n.firstChild; c; c = c.nextSibling) {
+        if (nodeHasError(c)) return true;
+      }
+      return false;
+    };
+
+    const indexOfNextNonWhitespace = (s: string, i: number): number => {
+      let p = i;
+      while (p < s.length) {
+        const ch = s.charCodeAt(p);
+        if (ch !== 32 && ch !== 9 && ch !== 10 && ch !== 13) return p; // space, tab, lf, cr
+        p++;
+      }
+      return p;
+    };
+
+    const findValueStartAfterColon = (full: string, keyEnd: number, propEnd: number): number | null => {
+      let i = keyEnd;
+      while (i < propEnd && i < full.length) {
+        if (full[i] === ':') {
+          const start = indexOfNextNonWhitespace(full, i + 1);
+          return start < full.length ? start : null;
+        }
+        i++;
+      }
+      return null;
+    };
+
+    const findPartialStringInner = (full: string, start: number): string | null => {
+      // start points at the opening '"' of the value
+      if (start >= full.length || full[start] !== '"') return null;
+      let i = start + 1;
+      let last = start + 1;
+      let inEscape = false;
+      while (i < full.length) {
+        const c = full[i];
+        if (inEscape) {
+          inEscape = false;
+        } else if (c === '\\') {
+          inEscape = true;
+        } else if (c === '"') {
+          // We actually found closing quote; return complete inner
+          return full.slice(start + 1, i);
+        }
+        last = i;
+        i++;
+      }
+      // No closing quote yet; return everything collected so far
+      return full.slice(start + 1, last + 1);
+    };
+
+    const findPartialNumber = (full: string, start: number): number | null => {
+      const isNumChar = (ch: string) => ch === '-' || ch === '+' || ch === '.' || ch === 'e' || ch === 'E' || (ch >= '0' && ch <= '9');
+      let end = start;
+      while (end < full.length && isNumChar(full[end])) end++;
+      // Try longest-to-shortest parseable prefix
+      for (let j = end; j > start; j--) {
+        const slice = full.slice(start, j);
+        try {
+          const val = JSON.parse(slice);
+          if (typeof val === 'number' && Number.isFinite(val)) return val as number;
+        } catch {
+          void 0;
+        }
+      }
+      return null;
+    };
+
+    const parsePrimitive = (n: SyntaxNode): { present: boolean; value?: unknown } => {
+      if (nodeHasError(n)) return { present: false };
+      try {
+        const raw = jsonLike.slice(n.from, n.to);
+        return { present: true, value: JSON.parse(raw) as unknown };
+      } catch {
+        return { present: false };
+      }
+    };
+
+    const parseValue = (n: SyntaxNode): { present: boolean; value?: unknown } => {
+      switch (n.name) {
+        case 'String':
+        case 'Number':
+        case 'True':
+        case 'False':
+        case 'Null':
+          return parsePrimitive(n);
+        case 'Array': {
+          // Collect completed items only
+          const items: unknown[] = [];
+          for (let ch = n.firstChild; ch; ch = ch.nextSibling) {
+            if (
+              ch.name === 'Array' ||
+              ch.name === 'Object' ||
+              ch.name === 'Number' ||
+              ch.name === 'String' ||
+              ch.name === 'True' ||
+              ch.name === 'False' ||
+              ch.name === 'Null'
+            ) {
+              const parsed = parseValue(ch);
+              if (parsed.present) items.push(parsed.value as unknown);
+            }
+          }
+          return items.length > 0 ? { present: true, value: items } : { present: false };
+        }
+        case 'Object': {
+          // Build partial object from completed or partially recoverable properties within
+          const obj: Record<string, unknown> = {};
+          for (let prop = n.firstChild; prop; prop = prop.nextSibling) {
+            if (prop.name !== 'Property') continue;
+            let k: SyntaxNode | null = null;
+            for (let ch = prop.firstChild; ch; ch = ch.nextSibling) {
+              if (ch.name === 'PropertyName' || ch.name === 'String') {
+                k = ch;
+                break;
+              }
+            }
+            if (!k) continue;
+            const key = jsonLike.slice(k.from + 1, k.to - 1);
+            if (!key) continue;
+            // Skip obviously invalid/incomplete keys (e.g., ", " seen during partial parsing)
+            if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) continue;
+            let vNode: SyntaxNode | null = null;
+            for (let ch = k.nextSibling; ch; ch = ch.nextSibling) {
+              if (
+                ch.name === 'Array' ||
+                ch.name === 'Object' ||
+                ch.name === 'Number' ||
+                ch.name === 'String' ||
+                ch.name === 'True' ||
+                ch.name === 'False' ||
+                ch.name === 'Null'
+              ) {
+                vNode = ch;
+                break;
+              }
+            }
+            if (vNode) {
+              const parsed = parseValue(vNode);
+              if (parsed.present) {
+                obj[key] = parsed.value as unknown;
+              } else {
+                // Deep fallback for partially streaming values
+                // Search to end of buffer; prop.to may end before value starts in partial streams
+                const valueStart = findValueStartAfterColon(jsonLike, k.to, jsonLike.length);
+                if (valueStart !== null && valueStart < jsonLike.length) {
+                  const ch = jsonLike[valueStart];
+                  if (ch === '"') {
+                    const inner = findPartialStringInner(jsonLike, valueStart);
+                    if (inner !== null && inner.length >= 0) {
+                      obj[key] = inner as unknown;
+                    }
+                  } else if ((ch >= '0' && ch <= '9') || ch === '-') {
+                    const num = findPartialNumber(jsonLike, valueStart);
+                    if (num !== null) {
+                      obj[key] = num as unknown;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          return Object.keys(obj).length > 0 ? { present: true, value: obj } : { present: false };
+        }
+        default:
+          return { present: false };
+      }
+    };
+
+    // Iterate direct children, collect complete Property entries
+    for (let prop = objectNode.firstChild; prop; prop = prop.nextSibling) {
+      if (prop.name !== 'Property') continue;
+
+      // Extract key
+      let keyNode: SyntaxNode | null = null;
+      for (let ch = prop.firstChild; ch; ch = ch.nextSibling) {
+        if (ch.name === 'PropertyName' || ch.name === 'String') {
+          keyNode = ch;
+          break;
+        }
+      }
+      if (!keyNode) continue;
+      const keyText = jsonLike.slice(keyNode.from + 1, keyNode.to - 1);
+      if (!keyText) continue;
+      // Skip invalid keys that are clearly incomplete artifacts of streaming
+      if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(keyText)) continue;
+
+      // Find value node
+      let valueNode: SyntaxNode | null = null;
+      for (let ch = keyNode.nextSibling; ch; ch = ch.nextSibling) {
+        if (
+          ch.name === 'Array' ||
+          ch.name === 'Object' ||
+          ch.name === 'Number' ||
+          ch.name === 'String' ||
+          ch.name === 'True' ||
+          ch.name === 'False' ||
+          ch.name === 'Null'
+        ) {
+          valueNode = ch;
+          break;
+        }
+      }
+      if (!valueNode) continue;
+      const parsed = parseValue(valueNode);
+      if (parsed.present) {
+        out[keyText] = parsed.value as unknown;
+      } else {
+        // Try partial string fallback when value is still streaming
+        // Search to end of buffer; prop.to may end before value starts in partial streams
+        const valueStart = findValueStartAfterColon(jsonLike, keyNode.to, jsonLike.length);
+        if (valueStart !== null && valueStart < jsonLike.length) {
+          const ch = jsonLike[valueStart];
+          if (ch === '"') {
+            const inner = findPartialStringInner(jsonLike, valueStart);
+            if (inner !== null && inner.length >= 0) {
+              out[keyText] = inner;
+            }
+          } else if ((ch >= '0' && ch <= '9') || ch === '-') {
+            const num = findPartialNumber(jsonLike, valueStart);
+            if (num !== null) {
+              out[keyText] = num as unknown;
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback: tolerant textual scan at top level to capture early string/number values
+    // when the parser hasn't yet formed Property nodes due to incomplete structure.
+    try {
+      const hasAny = Object.keys(out).length > 0;
+      // Always attempt to enrich with textual scan without overriding parsed keys
+      const result: Record<string, unknown> = { ...out };
+
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+
+      const isTopLevel = () => depth === 1; // inside the root object
+      const isIdentifierKey = (k: string) => /^[A-Za-z][A-Za-z0-9_]*$/.test(k);
+      const nextNonWs = (s: string, start: number): number => {
+        let p = start;
+        while (p < s.length) {
+          const ch = s.charCodeAt(p);
+          if (ch !== 32 && ch !== 9 && ch !== 10 && ch !== 13) return p;
+          p++;
+        }
+        return p;
+      };
+
+      const parseJSONStringKey = (s: string, start: number): { key: string | null; end: number } => {
+        // start at opening quote
+        let i = start + 1;
+        escape = false;
+        while (i < s.length) {
+          const c = s[i];
+          if (escape) {
+            escape = false;
+          } else if (c === '\\') {
+            escape = true;
+          } else if (c === '"') {
+            const inner = s.slice(start + 1, i);
+            return { key: inner, end: i + 1 };
+          }
+          i++;
+        }
+        return { key: null, end: i };
+      };
+
+      const tryCaptureAt = (s: string, keyStart: number): { consumed: number } => {
+        const { key, end } = parseJSONStringKey(s, keyStart);
+        if (key === null) return { consumed: end - keyStart };
+        if (!isIdentifierKey(key)) return { consumed: end - keyStart };
+        const colonPos = s.indexOf(':', end);
+        if (colonPos === -1) return { consumed: end - keyStart };
+        const vStart = nextNonWs(s, colonPos + 1);
+        if (vStart >= s.length) return { consumed: vStart - keyStart };
+        const ch = s[vStart];
+        if (ch === '"') {
+          const inner = findPartialStringInner(s, vStart);
+          if (inner !== null && !(key in result)) {
+            result[key] = inner;
+          }
+        } else if ((ch >= '0' && ch <= '9') || ch === '-') {
+          const num = findPartialNumber(s, vStart);
+          if (num !== null && !(key in result)) {
+            result[key] = num as unknown;
+          }
+        }
+        return { consumed: Math.max(vStart + 1 - keyStart, 1) };
+      };
+
+      for (let i = 0; i < jsonLike.length; i++) {
+        const c = jsonLike[i];
+        if (inString) {
+          if (escape) {
+            escape = false;
+          } else if (c === '\\') {
+            escape = true;
+          } else if (c === '"') {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (c === '"' && isTopLevel()) {
+          // Potential key start at top-level
+          const { consumed } = tryCaptureAt(jsonLike, i);
+          // Advance i by consumed-1 to let for-loop increment place us after consumed span
+          i += consumed - 1;
+          continue;
+        }
+
+        if (c === '"') {
+          inString = true;
+          escape = false;
+          continue;
+        }
+        if (c === '{' || c === '[') {
+          depth++;
+          continue;
+        }
+        if (c === '}' || c === ']') {
+          if (depth > 0) depth--;
+          continue;
+        }
+      }
+
+      return result;
+    } catch {
+      // On any failure, return whatever we parsed from the syntax tree
+      return out;
+    }
   }
 
   /** Persist the currently active streaming assistant partial (content/reasoning only) if any. */
@@ -446,10 +784,10 @@ export class ConversationService {
           // Optional: UI action for future clients to react immediately
           try {
             await this.streamingService.broadcastUIAction(conversationId, { __ui_action: 'insufficient_balance' });
-          } catch (e) {
+          } catch {
             /* non-fatal: ui_action is best-effort */
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: system message emission failure */
         }
 
@@ -817,6 +1155,7 @@ export class ConversationService {
             console.warn('[STOP] Billing debit failed for mid-turn usage', {
               conversationId,
               usageId: usageRow.id,
+              error: e instanceof Error ? e.message : String(e),
             });
           }
         }
@@ -1204,7 +1543,7 @@ export class ConversationService {
           if (stoppedAtStart) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop check at workflow start */
         }
 
@@ -1251,7 +1590,7 @@ export class ConversationService {
           if (stopped) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop check failure */
         }
         // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
@@ -1260,7 +1599,7 @@ export class ConversationService {
           if (stopped) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop check failure */
         }
         // Stream content chunks in real-time (supports both delta.* and message.* providers)
@@ -1611,24 +1950,20 @@ export class ConversationService {
                   .map(({ tc }) => {
                     const argsStr = tc.function?.arguments;
                     let argsObj: unknown = {};
-                    if (typeof argsStr === 'string' && argsStr) {
-                      // Prefer jsonc-parser for completed properties; no partial-json fallback
-                      argsObj = {};
-                    }
-                    // Merge in any completed top-level properties detected from buffer
                     if (typeof argsStr === 'string' && argsStr.length > 0) {
                       try {
-                        const completed = ConversationService.extractCompletedTopLevelProperties(argsStr);
-                        if (completed && typeof completed === 'object') {
-                          const base =
-                            argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj) ? (argsObj as Record<string, unknown>) : {};
-                          for (const k of Object.keys(completed)) {
-                            base[k] = completed[k];
-                          }
-                          argsObj = base;
-                        }
+                        // If the buffer is already complete JSON, use it directly
+                        argsObj = JSON.parse(argsStr);
                       } catch {
-                        void 0;
+                        // Otherwise, build a deep partial from the parse tree
+                        try {
+                          const completed = ConversationService.extractCompletedTopLevelProperties(argsStr);
+                          if (completed && typeof completed === 'object') {
+                            argsObj = completed;
+                          }
+                        } catch {
+                          argsObj = {};
+                        }
                       }
                     }
                     let debugKeysCount = 0;
@@ -2303,7 +2638,7 @@ export class ConversationService {
           if (stoppedTool) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop during tool_call_detected */
         }
         const toolEvt = event as ToolEvent;
@@ -2330,7 +2665,7 @@ export class ConversationService {
           if (stoppedToolStart) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop during tool_started */
         }
         const toolEvt = event as ToolEvent;

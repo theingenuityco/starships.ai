@@ -67,6 +67,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
+    // On first render, record initial message count and don't process
+    if (initialMessageCountRef.current === null) {
+      initialMessageCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process if new messages have arrived
+    if (liveMessages.length <= initialMessageCountRef.current) {
+      return
+    }
+
     // Eligible tool slugs that should drive the Agent Builder
     // Note: We intentionally exclude assignment calls from driving UI state to avoid
     // reflecting changes before the server confirms them.
@@ -97,10 +108,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       return v
     }
 
-    // Collect only new toolCalls across all assistant messages in chronological order
+    // Collect only new toolCalls across assistant messages since mount in chronological order
+    const considerationMessages = (liveMessages as any[]).slice(initialMessageCountRef.current)
     const newCalls: { name: string; args: any }[] = []
-    for (let mi = 0; mi < liveMessages.length; mi++) {
-      const msg = liveMessages[mi] as any
+    for (let mi = 0; mi < considerationMessages.length; mi++) {
+      const msg = considerationMessages[mi] as any
       if (msg.role !== 'assistant') continue
       const calls = (msg as any).toolCalls
       if (!Array.isArray(calls)) continue
@@ -210,8 +222,19 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
-    // Check last few messages for tool results
-    const recentMessages = (liveMessages as any[]).slice(-10)
+    // On first render, record initial message count and don't process
+    if (initialMessageCountRef.current === null) {
+      initialMessageCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process if new messages have arrived
+    if (liveMessages.length <= initialMessageCountRef.current) {
+      return
+    }
+
+    // Check only NEW messages for tool results
+    const recentMessages = (liveMessages as any[]).slice(initialMessageCountRef.current)
 
     for (const msg of recentMessages) {
       if (msg.role === 'tool' && msg.toolCallId) {

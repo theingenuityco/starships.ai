@@ -68,7 +68,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
     // Eligible tool slugs that should drive the Agent Builder
-    const builderToolSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+    // Note: We intentionally exclude assignment calls from driving UI state to avoid
+    // reflecting changes before the server confirms them.
+    const builderToolSlugs = new Set(['agent-open', 'agent-edit'])
 
     const form = agentBuilderRef.current.getFormData?.()
     if (!form) return
@@ -165,9 +167,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as any[]).filter(p => typeof p === 'string' && p.trim()).slice(0, 10) as string[]
         if (args?.icon !== undefined) compose.icon = args.icon
         if (args?.timeout !== undefined) compose.timeout = args.timeout
-        if (args?.assignedToolSlugs !== undefined) {
-          compose.assignedToolSlugs = Array.isArray(args.assignedToolSlugs) ? args.assignedToolSlugs : []
-        }
+        // Do not apply assignedToolSlugs from streaming arguments. We only
+        // reflect tool assignments after confirmed tool completion and a
+        // fresh fetch from the server.
         if (args?.blueprint !== undefined) {
           const incoming = normalizeJson(args.blueprint) || {}
           if (!Array.isArray(incoming.nodes)) incoming.nodes = []
@@ -181,26 +183,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         continue
       }
 
-      // Handle tool assignment/unassignment
-      if (toolName === 'agent-assign-tool') {
-        const toolSlug = args?.toolSlug
-        if (toolSlug && typeof toolSlug === 'string') {
-          const current = compose.assignedToolSlugs ?? form.assignedToolSlugs ?? []
-          if (!current.includes(toolSlug)) {
-            compose.assignedToolSlugs = [...current, toolSlug]
-          }
-        }
-        continue
-      }
-
-      if (toolName === 'agent-unassign-tool') {
-        const toolSlug = args?.toolSlug
-        if (toolSlug && typeof toolSlug === 'string') {
-          const current = compose.assignedToolSlugs ?? form.assignedToolSlugs ?? []
-          compose.assignedToolSlugs = current.filter(s => s !== toolSlug)
-        }
-        continue
-      }
+      // Ignore agent-assign-tool and agent-unassign-tool here. We will sync
+      // assignments only after tool completion via server fetch below.
     }
 
     // Write back composed updates once

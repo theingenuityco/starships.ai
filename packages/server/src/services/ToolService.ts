@@ -68,8 +68,17 @@ export class ToolService {
           continue; // Skip disabled tools
         }
 
-        // Skip draft tools (they don't have complete parameters/blueprint)
-        if (dbTool.status === 'draft' || !dbTool.parameters || !dbTool.blueprint) {
+        // Skip tools not ready for execution: draft OR missing/incomplete params/blueprint
+        const hasParams = !!(
+          dbTool.parameters &&
+          dbTool.parameters.type === 'object' &&
+          dbTool.parameters.properties &&
+          Object.keys(dbTool.parameters.properties).length > 0
+        );
+
+        const hasBlueprint = !!(dbTool.blueprint && Array.isArray(dbTool.blueprint.nodes) && dbTool.blueprint.nodes.length > 0);
+
+        if (dbTool.status === 'draft' || !hasParams || !hasBlueprint) {
           continue;
         }
 

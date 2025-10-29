@@ -9,7 +9,7 @@ import { StarTheme } from '@/components/theme-context'
 import { WelcomeModalProvider } from '@/components/auth/WelcomeModalProvider'
 
 import { motion } from 'motion/react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
@@ -44,7 +44,6 @@ interface ClientLayoutProps {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
   const isMarketplace = pathname === '/marketplace'
@@ -88,8 +87,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       )
     }
 
-    // Simple: hide navigation only when explicitly coming from public context
-    const shouldHideNavigation = searchParams?.get('from') === 'public'
+    // Always show navigation for authenticated users on marketplace
+    const shouldHideNavigation = false
 
     return (
       <StarTheme theme="dark">
@@ -97,7 +96,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <div className="flex-shrink-0 relative z-50">
-              <aside className="relative h-full">
+              <aside className="relative h-full p-6">
                 <Navigation />
               </aside>
             </div>
@@ -139,7 +138,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
               <div className="flex-shrink-0 relative z-50">
-                <aside className="relative h-full">
+                <aside className="relative h-full p-6">
                   <Navigation />
                 </aside>
               </div>

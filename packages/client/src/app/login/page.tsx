@@ -27,10 +27,7 @@ function LoginContent() {
   const searchParams = useSearchParams()
 
   // Fetch user's starships when authenticated
-  const { data: starships, isLoading: starshipsLoading } = useUserStarships(
-    user?.id || '',
-    isAuthenticated && !!user?.id
-  )
+  const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {
@@ -70,7 +67,7 @@ function LoginContent() {
       <div className="min-h-screen bg-black relative overflow-hidden flex">
         {/* Full-screen background */}
         <AuthMarketingPanel className="absolute inset-0" />
-        
+
         {/* Header with logo */}
         <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
           <div className="px-4 sm:px-8 flex items-center justify-between h-8">
@@ -91,52 +88,31 @@ function LoginContent() {
             </button>
           </div>
         </header>
-        
+
         {/* Left copy overlay */}
         <div className="hidden lg:flex lg:w-1/2 relative z-10">
           <div className="relative z-10 flex flex-col justify-center px-16 text-white">
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-            >
+            <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }}>
               <h1 className="text-5xl font-bold mb-6 text-white">
-                Build intelligent agent
+                Turn ideas into intelligent
                 <br />
                 workflows
               </h1>
-              <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-                Design, deploy, and monitor AI agents with complete visibility and control
-              </p>
+              <p className="text-xl text-gray-300 mb-8 leading-relaxed">Design, deploy, and monitor AI agents with complete visibility and control</p>
               <div className="space-y-4">
-                <motion.div
-                  className="flex items-center gap-3"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                >
+                <motion.div className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
                   <div className="w-10 h-10 rounded-md border border-white/10 bg-white/5 flex items-center justify-center">
                     <Icon name="rocket-launch" className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-gray-200">Rapid agent development & deployment</span>
                 </motion.div>
-                <motion.div
-                  className="flex items-center gap-3"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6, delay: 0.6 }}
-                >
+                <motion.div className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.6 }}>
                   <div className="w-10 h-10 rounded-md border border-white/10 bg-white/5 flex items-center justify-center">
                     <Icon name="wrench" className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-gray-200">Pre-built tools & customization</span>
                 </motion.div>
-                <motion.div
-                  className="flex items-center gap-3"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6, delay: 0.8 }}
-                >
+                <motion.div className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.8 }}>
                   <div className="w-10 h-10 rounded-md border border-white/10 bg-white/5 flex items-center justify-center">
                     <Icon name="store" className="w-5 h-5 text-primary" />
                   </div>
@@ -150,24 +126,10 @@ function LoginContent() {
         {/* Right Side - Login Form overlay */}
         <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-6 min-h-screen max-h-screen overflow-y-auto relative z-10">
           <div className="w-full max-w-md">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="mb-4 text-center"
-            >
-              <motion.div
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="mb-3"
-              >
-                <h1 className="text-3xl font-bold text-primary">
-                  {activeTab === 'login' ? 'Welcome Back' : 'Join Starships'}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  {activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}
-                </p>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-4 text-center">
+              <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-3">
+                <h1 className="text-3xl font-bold text-primary">{activeTab === 'login' ? 'Welcome Back' : 'Join Starships'}</h1>
+                <p className="text-muted-foreground mt-1">{activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}</p>
               </motion.div>
             </motion.div>
 

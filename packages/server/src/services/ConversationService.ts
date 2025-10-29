@@ -21,6 +21,8 @@ import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
 import { parse as parsePartialJson } from 'partial-json';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
+import { WalletService } from '@/services/WalletService';
+import { BalanceValidationService } from '@/services/BalanceValidationService';
 
 /**
  * Autopilot child process configuration
@@ -54,6 +56,10 @@ export class ConversationService {
   private environmentService!: EnvironmentService;
   private usageService!: UsageService;
   private billingService!: BillingService;
+  private walletService!: WalletService;
+  // Auto-stop guards for low balance
+  private lowBalanceStopTriggered: Set<string> = new Set();
+  private lastLowBalanceCheckAt: Map<string, number> = new Map();
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Resume state per conversation generation
@@ -118,6 +124,7 @@ export class ConversationService {
     this.environmentService = new EnvironmentService();
     this.usageService = new UsageService();
     this.billingService = new BillingService();
+    this.walletService = new WalletService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
 
@@ -290,6 +297,86 @@ export class ConversationService {
     }
 
     return Object.keys(persistable).length > 0 ? persistable : null;
+  }
+
+  /**
+   * Auto-stop an active turn when wallet balance drops below minimum threshold.
+   * Returns true if a stop was triggered.
+   */
+  private async maybeAutoStopForLowBalance(conversationId: string): Promise<boolean> {
+    try {
+      // Avoid repeat stops in the same turn
+      if (this.lowBalanceStopTriggered.has(conversationId)) {
+        return false;
+      }
+
+      // Throttle balance checks to at most once per second per conversation
+      const now = Date.now();
+      const last = this.lastLowBalanceCheckAt.get(conversationId) ?? 0;
+      if (now - last < 250) {
+        return false;
+      }
+      this.lastLowBalanceCheckAt.set(conversationId, now);
+
+      const starship = await this.getConversationStarship(conversationId);
+      if (!starship) return false;
+
+      // Load wallet and validate against centralized threshold
+      const wallet = await this.walletService.getByStarshipId(starship.id);
+      if (!wallet) return false;
+
+      const validation = BalanceValidationService.validateBalance({
+        id: wallet.id,
+        balance: wallet.balance,
+      });
+
+      if (!validation.isValid) {
+        // Mark as triggered before broadcasting to de-dup system messages
+        this.lowBalanceStopTriggered.add(conversationId);
+
+        // Best-effort: inline system message for clear CTA in chat
+        try {
+          const sys = await this.messageService.createMessage({
+            conversationId,
+            role: 'system',
+            content: 'Insufficient balance. Add credits from Billing to continue.',
+            messageType: 'error',
+          });
+          if (this.streamingService && this.streamingService.isActive(conversationId)) {
+            await this.streamingService.broadcastDelta(conversationId, {
+              op: 'add',
+              path: '/messages/-',
+              value: sys,
+            });
+          }
+          // Optional: UI action for future clients to react immediately
+          try {
+            await this.streamingService.broadcastUIAction(conversationId, { __ui_action: 'insufficient_balance' });
+          } catch (e) {
+            /* non-fatal: ui_action is best-effort */
+          }
+        } catch (e) {
+          /* non-fatal: system message emission failure */
+        }
+
+        // Trigger stop pipeline (cancel runner, persist partials, finalize SSE)
+        try {
+          await this.stopConversation(conversationId);
+        } catch (err) {
+          console.warn('[STOP] Auto-stop due to low balance failed', {
+            conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('[BALANCE] Auto-stop check failed', {
+        conversationId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+    return false;
   }
 
   /**
@@ -1015,6 +1102,18 @@ export class ConversationService {
           console.warn('[STREAMING] Failed to broadcast turn_started', err);
         }
 
+        // Reset per-turn balance enforcement guards and enforce immediately
+        this.lowBalanceStopTriggered.delete(conversationId);
+        this.lastLowBalanceCheckAt.delete(conversationId);
+        try {
+          const stoppedAtStart = await this.maybeAutoStopForLowBalance(conversationId);
+          if (stoppedAtStart) {
+            break;
+          }
+        } catch (e) {
+          /* non-fatal: balance auto-stop check at workflow start */
+        }
+
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -1051,6 +1150,24 @@ export class ConversationService {
         // Drop nested LLM content streams (depth>0) from conversation timeline
         if ((event.executionDepth ?? 0) > 0) {
           break;
+        }
+        // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
+        try {
+          const stopped = await this.maybeAutoStopForLowBalance(conversationId);
+          if (stopped) {
+            break;
+          }
+        } catch (e) {
+          /* non-fatal: balance auto-stop check failure */
+        }
+        // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
+        try {
+          const stopped = await this.maybeAutoStopForLowBalance(conversationId);
+          if (stopped) {
+            break;
+          }
+        } catch (e) {
+          /* non-fatal: balance auto-stop check failure */
         }
         // Stream content chunks in real-time (supports both delta.* and message.* providers)
         const chunkContent = (event as LLMEvent).data?.chunk;
@@ -1556,6 +1673,15 @@ export class ConversationService {
                   } catch (emitErr) {
                     console.error('[BILLING] Failed to emit insufficient funds system message:', emitErr);
                   }
+                  // Force stop the turn on insufficient funds (guarded)
+                  try {
+                    if (!this.lowBalanceStopTriggered.has(conversationId)) {
+                      this.lowBalanceStopTriggered.add(conversationId);
+                      await this.stopConversation(conversationId);
+                    }
+                  } catch (stopErr) {
+                    console.warn('[BILLING] Auto-stop on insufficient funds failed', stopErr);
+                  }
                 } else {
                   console.error('[BILLING] Debit failed', {
                     error: e instanceof Error ? e.message : String(e),
@@ -1944,6 +2070,15 @@ export class ConversationService {
           break;
         }
 
+        // Enforce balance before executing any tool logic
+        try {
+          const stoppedTool = await this.maybeAutoStopForLowBalance(conversationId);
+          if (stoppedTool) {
+            break;
+          }
+        } catch (e) {
+          /* non-fatal: balance auto-stop during tool_call_detected */
+        }
         const toolEvt = event as ToolEvent;
 
         // Broadcast tool_call_detected via ui_action event channel
@@ -1962,6 +2097,15 @@ export class ConversationService {
       }
 
       case 'tool_started': {
+        // Enforce balance at the moment tool execution starts
+        try {
+          const stoppedToolStart = await this.maybeAutoStopForLowBalance(conversationId);
+          if (stoppedToolStart) {
+            break;
+          }
+        } catch (e) {
+          /* non-fatal: balance auto-stop during tool_started */
+        }
         const toolEvt = event as ToolEvent;
         console.log('[STREAMING] Tool started:', toolEvt.data?.toolName);
         break;

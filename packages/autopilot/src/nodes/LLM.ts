@@ -15,6 +15,56 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
 
+// Typed view over the normalized streaming chunk we forward to the ConversationService
+type NormalizedToolCallDelta = {
+  index?: number;
+  id?: string;
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+};
+
+type NormalizedDelta = {
+  content?: string;
+  role?: string;
+  toolCalls?: NormalizedToolCallDelta[];
+};
+
+type NormalizedMessage = {
+  role?: string;
+  content?: string;
+  reasoning?: string;
+  toolCalls?: Array<{
+    id?: string;
+    type: 'function';
+    function: { name: string; arguments: string };
+  }>;
+};
+
+type NormalizedChoice = {
+  index: number;
+  finishReason?: string;
+  delta?: NormalizedDelta;
+  message?: NormalizedMessage;
+};
+
+type NormalizedUsage = {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  completionTokensDetails?: { reasoningTokens?: number };
+};
+
+type NormalizedChunk = {
+  id?: string;
+  object?: string;
+  created?: number;
+  model?: string;
+  choices: NormalizedChoice[];
+  usage?: NormalizedUsage;
+};
+
 export class LLM extends BaseNode<LlmParams> {
   private emittedToolCalls: Set<string> = new Set();
 
@@ -390,7 +440,9 @@ export class LLM extends BaseNode<LlmParams> {
                   totalLenBefore: beforeLen,
                   totalLenAfter: beforeLen + addLen,
                 });
-              } catch {}
+              } catch {
+                void 0;
+              }
               target.function.arguments += toolCallDelta.function.arguments;
             }
 
@@ -425,17 +477,39 @@ export class LLM extends BaseNode<LlmParams> {
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls
         if (eventCallback) {
           const normalizedChunk = this.normalizeChunkToolCalls(chunk);
+
+          // Synthesize snapshot of current toolCalls into choices[0].message.toolCalls so consumers
+          // can render incremental arguments even when provider doesn't emit delta.tool_calls.
           try {
-            const anyChunk = normalizedChunk as any;
-            const deltas = anyChunk?.choices?.[0]?.delta?.toolCalls;
+            if (Array.isArray(normalizedChunk.choices) && normalizedChunk.choices.length > 0) {
+              const choice0 = normalizedChunk.choices[0];
+              const current: NonNullable<NormalizedMessage['toolCalls']> = toolCalls
+                .filter((tc) => tc.function.name && tc.function.name.length > 0)
+                .map((tc) => ({
+                  id: tc.id,
+                  type: 'function' as const,
+                  function: { name: tc.function.name, arguments: tc.function.arguments },
+                }));
+              if (current.length > 0) {
+                choice0.message = { ...(choice0.message ?? {}), toolCalls: current };
+              }
+            }
+          } catch {
+            void 0;
+          }
+          try {
+            const first = normalizedChunk.choices && normalizedChunk.choices.length > 0 ? normalizedChunk.choices[0] : undefined;
+            const deltas = first?.delta?.toolCalls;
             const count = Array.isArray(deltas) ? deltas.length : 0;
-            const hasArgs =
-              Array.isArray(deltas) &&
-              deltas.some((d: any) => typeof d?.function?.arguments === 'string' && d.function.arguments.length > 0);
+            const hasArgs = Array.isArray(deltas)
+              ? deltas.some((d) => typeof d.function?.arguments === 'string' && (d.function!.arguments as string).length > 0)
+              : false;
             if (count > 0) {
               console.debug('[LLM Stream] chunk toolCalls', { count, hasArgs });
             }
-          } catch {}
+          } catch {
+            void 0;
+          }
           await eventCallback({
             type: 'content_chunk',
             timestamp: new Date().toISOString(),
@@ -523,13 +597,13 @@ export class LLM extends BaseNode<LlmParams> {
    * Converts: finish_reason → finishReason, tool_calls → toolCalls, etc.
    * This ensures compatibility with ConversationService expectations
    */
-  private normalizeChunkToolCalls(chunk: OpenAI.Chat.Completions.ChatCompletionChunk): Record<string, unknown> {
+  private normalizeChunkToolCalls(chunk: OpenAI.Chat.Completions.ChatCompletionChunk): NormalizedChunk {
     if (!chunk.choices || !Array.isArray(chunk.choices)) {
-      return chunk as unknown as Record<string, unknown>;
+      return chunk as unknown as NormalizedChunk;
     }
 
-    const normalizedChoices = chunk.choices.map((choice) => {
-      const normalized: Record<string, unknown> = {
+    const normalizedChoices: NormalizedChoice[] = chunk.choices.map((choice) => {
+      const normalized: NormalizedChoice = {
         index: choice.index,
       };
 
@@ -541,11 +615,11 @@ export class LLM extends BaseNode<LlmParams> {
       // Normalize delta object
       if (choice.delta && typeof choice.delta === 'object') {
         const delta = choice.delta as Record<string, unknown>;
-        const normalizedDelta: Record<string, unknown> = {};
+        const normalizedDelta: NormalizedDelta = {};
 
         // Copy standard fields
-        if (delta.content) normalizedDelta.content = delta.content;
-        if (delta.role) normalizedDelta.role = delta.role;
+        if (typeof delta.content === 'string') normalizedDelta.content = delta.content as string;
+        if (typeof delta.role === 'string') normalizedDelta.role = delta.role as string;
 
         // Normalize tool_calls → toolCalls
         if ('tool_calls' in delta && Array.isArray(delta.tool_calls)) {
@@ -555,7 +629,7 @@ export class LLM extends BaseNode<LlmParams> {
         // Handle any other delta fields
         Object.keys(delta).forEach((key) => {
           if (!['content', 'role', 'tool_calls'].includes(key)) {
-            normalizedDelta[key] = delta[key];
+            (normalizedDelta as unknown as Record<string, unknown>)[key] = delta[key];
           }
         });
 
@@ -566,20 +640,19 @@ export class LLM extends BaseNode<LlmParams> {
     });
 
     // Normalize usage from snake_case to camelCase
-    let normalizedUsage: Record<string, unknown> | undefined;
+    let normalizedUsage: NormalizedUsage | undefined;
     if (chunk.usage) {
-      normalizedUsage = {
+      const base: NormalizedUsage = {
         promptTokens: chunk.usage.prompt_tokens ?? 0,
         completionTokens: chunk.usage.completion_tokens ?? 0,
         totalTokens: chunk.usage.total_tokens ?? 0,
-        ...(typeof chunk.usage.completion_tokens_details === 'object' && chunk.usage.completion_tokens_details !== null
-          ? {
-              completionTokensDetails: {
-                reasoningTokens: (chunk.usage.completion_tokens_details as Record<string, unknown>).reasoning_tokens ?? 0,
-              },
-            }
-          : {}),
       };
+      if (typeof chunk.usage.completion_tokens_details === 'object' && chunk.usage.completion_tokens_details !== null) {
+        const details = chunk.usage.completion_tokens_details as Record<string, unknown>;
+        const r = details?.reasoning_tokens;
+        base.completionTokensDetails = { reasoningTokens: typeof r === 'number' ? r : 0 };
+      }
+      normalizedUsage = base;
     }
 
     return {
@@ -590,7 +663,7 @@ export class LLM extends BaseNode<LlmParams> {
       choices: normalizedChoices,
       // Include normalized usage if present
       ...(normalizedUsage ? { usage: normalizedUsage } : {}),
-    };
+    } as NormalizedChunk;
   }
 
   /**

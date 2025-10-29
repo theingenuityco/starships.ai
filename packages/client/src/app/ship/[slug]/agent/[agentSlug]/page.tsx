@@ -11,6 +11,8 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import type { MessageModel } from '@starships/protocol'
+import type { LlmToolCall } from '@starships/autopilot'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -73,8 +75,12 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       return
     }
 
-    // Only process if new messages have arrived
-    if (liveMessages.length <= initialMessageCountRef.current) {
+    // Only process if new messages have arrived; however, on /agent/new allow
+    // a one-time interception of the current in-flight assistant tool call
+    // that may have started before mount.
+    const hasNewMessages = liveMessages.length > initialMessageCountRef.current
+    const allowBootstrapOnNewRoute = agentSlug === 'new' && appliedToolCallKeysRef.current.size === 0
+    if (!hasNewMessages && !allowBootstrapOnNewRoute) {
       return
     }
 
@@ -109,22 +115,32 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
 
     // Collect only new toolCalls across assistant messages since mount in chronological order
-    const considerationMessages = (liveMessages as any[]).slice(initialMessageCountRef.current)
-    const newCalls: { name: string; args: any }[] = []
+    let considerationMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
+    if (considerationMessages.length === 0 && allowBootstrapOnNewRoute) {
+      // Take only the most recent assistant message to seed the builder
+      for (let i = liveMessages.length - 1; i >= 0; i--) {
+        const m = liveMessages[i] as MessageModel
+        if (m.role === 'assistant') {
+          considerationMessages = [m]
+          break
+        }
+      }
+    }
+    const newCalls: { name: string; args: unknown }[] = []
     for (let mi = 0; mi < considerationMessages.length; mi++) {
-      const msg = considerationMessages[mi] as any
+      const msg = considerationMessages[mi]
       if (msg.role !== 'assistant') continue
-      const calls = (msg as any).toolCalls
+      const calls = msg.toolCalls as LlmToolCall[] | undefined
       if (!Array.isArray(calls)) continue
       for (let ci = 0; ci < calls.length; ci++) {
         const call = calls[ci]
-        const name = call?.function?.name as string
+        const name = call?.function?.name
         if (!builderToolSlugs.has(name)) continue
-        let raw = call?.function?.arguments
-        const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
+        const raw = call?.function?.arguments as unknown
+        const key = `${name}|${typeof raw === 'string' ? String(raw) : JSON.stringify(raw ?? null)}`
         if (appliedToolCallKeysRef.current.has(key)) continue
         // parse args after key computation to keep key stable on parse errors
-        let parsed = raw
+        let parsed: unknown = raw
         if (typeof parsed === 'string') {
           try {
             parsed = JSON.parse(parsed)
@@ -133,7 +149,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           }
         }
         // skip clearly empty args to avoid wiping state
-        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0) {
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed as Record<string, unknown>).length === 0) {
           continue
         }
         newCalls.push({ name, args: parsed })
@@ -165,25 +181,25 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     // Apply each new call in order
     for (const call of newCalls) {
       const toolName = call.name
-      const args = call.args
+      const args = call.args as Record<string, unknown> | undefined
 
       if (toolName === 'agent-open' || toolName === 'agent-edit') {
-        if (args?.name !== undefined) compose.name = args.name
-        if (args?.slug !== undefined) compose.slug = args.slug
-        if (args?.description !== undefined) compose.description = args.description
-        if (args?.category !== undefined) compose.category = args.category
-        if (args?.model !== undefined) compose.model = args.model
-        if (args?.temperature !== undefined) compose.temperature = args.temperature
-        if (args?.maxTokens !== undefined) compose.maxTokens = args.maxTokens
-        if (args?.systemPrompt !== undefined) compose.systemPrompt = args.systemPrompt
-        if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as any[]).filter(p => typeof p === 'string' && p.trim()).slice(0, 10) as string[]
-        if (args?.icon !== undefined) compose.icon = args.icon
-        if (args?.timeout !== undefined) compose.timeout = args.timeout
+        if (typeof args?.name === 'string') compose.name = args.name
+        if (typeof args?.slug === 'string') compose.slug = args.slug
+        if (typeof args?.description === 'string') compose.description = args.description
+        if (typeof args?.category === 'string') compose.category = args.category
+        if (typeof args?.model === 'string') compose.model = args.model
+        if (typeof args?.temperature === 'number') compose.temperature = args.temperature
+        if (typeof args?.maxTokens === 'number') compose.maxTokens = args.maxTokens
+        if (typeof args?.systemPrompt === 'string') compose.systemPrompt = args.systemPrompt
+        if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
+        if (typeof args?.icon === 'string') compose.icon = args.icon
+        if (typeof args?.timeout === 'number') compose.timeout = args.timeout
         // Do not apply assignedToolSlugs from streaming arguments. We only
         // reflect tool assignments after confirmed tool completion and a
         // fresh fetch from the server.
-        if (args?.blueprint !== undefined) {
-          const incoming = normalizeJson(args.blueprint) || {}
+        if (args && 'blueprint' in args) {
+          const incoming = normalizeJson((args as Record<string, unknown>).blueprint) || {}
           if (!Array.isArray(incoming.nodes)) incoming.nodes = []
           if (!Array.isArray(incoming.edges)) incoming.edges = []
           // Only replace blueprint if incoming has content OR current bp is empty
@@ -234,7 +250,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
 
     // Check only NEW messages for tool results
-    const recentMessages = (liveMessages as any[]).slice(initialMessageCountRef.current)
+    const recentMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
 
     for (const msg of recentMessages) {
       if (msg.role === 'tool' && msg.toolCallId) {
@@ -242,9 +258,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (processedToolResultIdsRef.current.has(id)) continue
 
         // Find the assistant tool call corresponding to this tool result
-        const assistantMsg = (liveMessages as any[]).find(m => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === id)) as any
+        const assistantMsg = (liveMessages as MessageModel[]).find(m => m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.some((tc: LlmToolCall) => tc.id === id))
         if (!assistantMsg) continue
-        const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === id)
+        const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
         const agentTools = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
         if (!agentTools.has(funcName)) {
@@ -252,16 +268,20 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           continue
         }
 
-        // Parse arguments to extract slug if present
-        let args: any = toolCall?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // ignore
+        // Extract slug strictly from tool result HTTP response shape: body.data.slug
+        let slugArg: string | undefined
+        {
+          const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
+          if (content) {
+            try {
+              const parsed = JSON.parse(content) as Record<string, unknown>
+              const body = parsed.body as Record<string, unknown> | undefined
+              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
+              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
+              slugArg = slugVal
+            } catch {}
           }
         }
-        const slugArg = args?.slug
         if (!slugArg || typeof slugArg !== 'string') {
           processedToolResultIdsRef.current.add(id)
           continue
@@ -397,26 +417,31 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
     // Look at last few messages for tool results associated with agent-* calls
-    const recentMessages = (liveMessages as any[]).slice(-10)
+    const recentMessages = (liveMessages as MessageModel[]).slice(-10)
     for (const msg of recentMessages) {
       if (msg.role === 'tool' && msg.toolCallId) {
         const id = msg.toolCallId as string
         // Find the assistant tool call corresponding to this tool result
-        const assistantMsg = (liveMessages as any[]).find(m => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === id)) as any
+        const assistantMsg = (liveMessages as MessageModel[]).find(m => m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.some((tc: LlmToolCall) => tc.id === id))
         if (!assistantMsg) continue
-        const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === id)
+        const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
         const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
         if (!agentTools.includes(funcName)) continue
-        let args: any = toolCall?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // ignore
+        // Extract slug strictly from tool result HTTP response shape: body.data.slug
+        let slugArg: string | undefined
+        {
+          const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
+          if (content) {
+            try {
+              const parsed = JSON.parse(content) as Record<string, unknown>
+              const body = parsed.body as Record<string, unknown> | undefined
+              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
+              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
+              slugArg = slugVal
+            } catch {}
           }
         }
-        const slugArg = args?.slug
         if (agentSlug === 'new' && typeof slugArg === 'string' && slugArg && !routeUpdatedRef.current) {
           const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
           router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)

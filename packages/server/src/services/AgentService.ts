@@ -9,7 +9,7 @@
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository, StarshipRepository } from '@starships/models';
-import { generateSimpleAgentSlug } from '@starships/models';
+import { generateSimpleAgentSlug, generateUniqueAgentSlug } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
@@ -80,7 +80,7 @@ export class AgentService {
 
     // Get current deployed agents count
     const currentAgents = await this.starshipRepository.getDeployedAgents(starshipId);
-    
+
     if (currentAgents.length >= starship.maxAgents) {
       throw new ValidationError(
         `Agent limit reached. Maximum ${starship.maxAgents} agents allowed per starship. Currently deployed: ${currentAgents.length}`
@@ -99,8 +99,19 @@ export class AgentService {
     // Validate agent limit before creating
     await this.validateAgentLimit(data.starshipId);
 
-    // Use provided slug if present; otherwise generate a simple unique slug
-    const slug = data.slug && data.slug.trim().length > 0 ? data.slug : await generateSimpleAgentSlug(this.agentRepository);
+    // Ensure unique slug:
+    // - If a slug is provided, use it if unique; otherwise append a random suffix based on the provided slug.
+    // - If no slug is provided, generate a unique slug from the name (kebab-case + suffix).
+    const requestedSlug = (data.slug || '').trim();
+    let slug: string;
+    if (requestedSlug.length > 0) {
+      const base = requestedSlug.toLowerCase();
+      const existing = await this.agentRepository.findBySlug(base);
+      slug = existing ? await generateUniqueAgentSlug(base, this.agentRepository) : base;
+    } else {
+      const baseFromName = (data.name || 'agent').toLowerCase().trim().replace(/\s+/g, '-') || 'agent';
+      slug = await generateUniqueAgentSlug(baseFromName, this.agentRepository);
+    }
 
     // Create agent parameters for the Agent class
     const agentParams: AgentParams = {
@@ -485,9 +496,9 @@ export class AgentService {
    * Executes agent in isolated environment without persisting to conversation
    */
   async testAgent(
-    agentId: string, 
-    testInput: string | LlmMessage[], 
-    starshipId: string, 
+    agentId: string,
+    testInput: string | LlmMessage[],
+    starshipId: string,
     authToken?: string
   ): Promise<{
     success: boolean;
@@ -520,7 +531,7 @@ export class AgentService {
         hasSystemPrompt: !!agentModel.systemPrompt,
         systemPromptLength: agentModel.systemPrompt?.length || 0,
         stateType: typeof agentModel.state,
-        stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array'
+        stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array',
       });
 
       // 2. Get deployed tools for this agent
@@ -528,9 +539,7 @@ export class AgentService {
       console.log('🔧 Tools resolved:', resolvedTools.length, 'tools found');
 
       // 3. Prepare agent params (same pattern as ConversationService)
-      const baseState = agentModel.state && typeof agentModel.state === 'object' 
-        ? agentModel.state 
-        : { messages: [], tools: [] };
+      const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
 
       const agentWithTools: AgentParams = {
         ...agentModel,
@@ -551,7 +560,7 @@ export class AgentService {
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const openRouterKey = env.OPENROUTER_API_KEY || '';
       const starshipEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
-      
+
       const secureEnv: Record<string, string> = {
         STARSHIP_ID: starshipId,
         BASE_URL: baseUrl,
@@ -589,7 +598,7 @@ export class AgentService {
 
       // 8. Seed execution state with ordered messages
       const orderedMessages: LlmMessage[] = [];
-      
+
       // Add system prompt if present
       if (agentWithTools.systemPrompt && typeof agentWithTools.systemPrompt === 'string' && agentWithTools.systemPrompt.length > 0) {
         orderedMessages.push({ role: 'system', content: agentWithTools.systemPrompt });
@@ -620,13 +629,13 @@ export class AgentService {
         inputMessages: llmMessages.length,
         totalMessages: orderedMessages.length,
         systemPrompt: agentModel.systemPrompt ? agentModel.systemPrompt.substring(0, 100) + '...' : 'NO SYSTEM PROMPT',
-        toolsCount: resolvedTools.length
+        toolsCount: resolvedTools.length,
       });
 
       await runner.run(blueprint, exec, {
         eventCallback: async (event: any) => {
           console.log('📡 Event received:', event.type, event.data ? Object.keys(event.data) : 'no data');
-          
+
           // Capture content from streaming chunks
           if (event.type === 'content_chunk') {
             // Extract content from the chunk structure: event.data.chunk.choices[0].delta.content
@@ -636,14 +645,14 @@ export class AgentService {
               output += chunkContent;
             }
           }
-          
+
           // Additional event handling for capturing results
           if (event.type === 'tool_started' && event.data?.name) {
             if (!toolsUsed.includes(event.data.name)) {
               toolsUsed.push(event.data.name);
             }
           }
-          
+
           if (event.type === 'content_complete') {
             console.log('✅ Content complete:', event.data);
           }
@@ -653,10 +662,16 @@ export class AgentService {
 
       console.log('🔍 Post-execution state:', {
         messagesCount: Array.isArray(exec.state.messages) ? exec.state.messages.length : 0,
-        lastMessageRole: Array.isArray(exec.state.messages) && exec.state.messages.length > 0 ? exec.state.messages[exec.state.messages.length - 1]?.role : undefined,
-        lastMessageContentLength: Array.isArray(exec.state.messages) && exec.state.messages.length > 0 ? exec.state.messages[exec.state.messages.length - 1]?.content?.length || 0 : 0,
+        lastMessageRole:
+          Array.isArray(exec.state.messages) && exec.state.messages.length > 0
+            ? exec.state.messages[exec.state.messages.length - 1]?.role
+            : undefined,
+        lastMessageContentLength:
+          Array.isArray(exec.state.messages) && exec.state.messages.length > 0
+            ? exec.state.messages[exec.state.messages.length - 1]?.content?.length || 0
+            : 0,
         capturedOutputLength: output.length,
-        toolsUsed: toolsUsed
+        toolsUsed: toolsUsed,
       });
 
       // 10. Try to extract final response from execution state
@@ -665,16 +680,16 @@ export class AgentService {
         exec.state.messages.forEach((msg, idx) => {
           console.log(`  ${idx}: ${msg.role} - ${msg.content?.substring(0, 100)}${msg.content?.length > 100 ? '...' : ''}`);
         });
-        
+
         const lastMessage = exec.state.messages[exec.state.messages.length - 1];
         console.log('🔍 Last message analysis:', {
           exists: !!lastMessage,
           role: lastMessage?.role,
           hasContent: !!lastMessage?.content,
           contentPreview: lastMessage?.content?.substring(0, 200) + '...',
-          hasReasoning: !!lastMessage?.reasoning
+          hasReasoning: !!lastMessage?.reasoning,
         });
-        
+
         if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content) {
           output = lastMessage.content;
           if (lastMessage.reasoning) {
@@ -700,10 +715,9 @@ export class AgentService {
         executionTime,
         model: agentModel.model,
       };
-
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
-      
+
       return {
         success: false,
         agent: agentId,

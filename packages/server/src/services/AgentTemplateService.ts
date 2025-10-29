@@ -15,6 +15,28 @@ export class AgentTemplateService {
     this.toolRepository = new ToolRepository();
   }
 
+  /**
+   * Validate that the starship can accommodate a new agent
+   * @param starshipId The starship ID to check
+   * @throws ValidationError if the agent limit is exceeded
+   */
+  private async validateAgentLimit(starshipId: string): Promise<void> {
+    // Get the starship to check its maxAgents limit
+    const starship = await this.starshipRepository.findById(starshipId);
+    if (!starship) {
+      throw new NotFoundError('Starship', starshipId);
+    }
+
+    // Get current deployed agents count
+    const currentAgents = await this.starshipRepository.getDeployedAgents(starshipId);
+    
+    if (currentAgents.length >= starship.maxAgents) {
+      throw new ValidationError(
+        `Agent limit reached. Maximum ${starship.maxAgents} agents allowed per starship. Currently deployed: ${currentAgents.length}`
+      );
+    }
+  }
+
   async getAllTemplates(): Promise<AgentTemplateModel[]> {
     return this.templateRepository.findAll();
   }
@@ -56,6 +78,9 @@ export class AgentTemplateService {
   }
 
   async createAgentFromTemplate(templateId: string, starshipId: string): Promise<AgentModel> {
+    // Validate agent limit before creating
+    await this.validateAgentLimit(starshipId);
+
     // Get the template to use as a base
     const template = await this.templateRepository.findById(templateId);
     if (!template) {

@@ -300,7 +300,22 @@ export class UserService {
 
     // All users are now approved automatically
 
-    // Check if user exists by email (for account linking)
+    // PRIORITY 1: Check if this OAuth account is already linked to an existing user
+    const existingOAuthAccount = await this.oauthRepository.findByProviderAndUser(profile.provider, profile.providerId);
+    if (existingOAuthAccount) {
+      // OAuth account exists - get the linked user
+      const user = await this.getUserById(existingOAuthAccount.userId);
+      if (!user) {
+        throw new ValidationError('OAuth account linked to non-existent user', 'oauth');
+      }
+      
+      // SIMPLE FIX: Don't auto-verify emails from OAuth - be conservative
+      // Users can verify via email if needed
+      
+      return { user };
+    }
+
+    // PRIORITY 2: Check if user exists by email (for new OAuth account linking to existing email-based account)
     let user = await this.getUserByEmail(profile.email);
     let isNewUser = false;
 
@@ -309,8 +324,8 @@ export class UserService {
       user = await this.createUserFromOAuthProfile(profile);
       isNewUser = true;
     } else {
-      // Update email verification for existing users
-      await this.updateUserProfile(user.id, { emailVerified: true });
+      // SIMPLE FIX: Don't auto-verify emails from OAuth - be conservative
+      // Users can verify via email if needed
     }
 
     // Link OAuth account using business logic
@@ -349,7 +364,7 @@ export class UserService {
       email: profile.email,
       displayName: profile.name,
       avatar: profile.avatar,
-      emailVerified: true, // OAuth providers verify emails
+      emailVerified: false, // SIMPLE FIX: Don't auto-verify OAuth emails, be conservative
     };
 
     // Create user using proper service layer method

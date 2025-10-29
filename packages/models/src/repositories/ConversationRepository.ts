@@ -105,7 +105,8 @@ export class ConversationRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        // PostgreSQL CASCADE rules will handle relationships automatically
+        // Use standard deleteEntity method like other repositories
+        // CASCADE constraints will handle related records automatically
         return await this.deleteEntity('conversations', id);
       },
       'delete',

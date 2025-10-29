@@ -167,7 +167,7 @@ Automatically inferred from agent state (do not pass manually):
           body: '{{ $lastOutputOf("prepare")[0].json.body }}',
           timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
         },
-      },
+},
       {
         ref: 'end_1',
         type: 'end',
@@ -176,7 +176,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           output: '{{ $lastOutputOf("http_exec")[0].json }}',
         },
-      },
+},
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },

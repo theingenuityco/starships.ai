@@ -34,3 +34,11 @@ export function isSubscriptionCancellationError(error: unknown): boolean {
   const apiError = error as ApiError
   return apiError?.response?.data?.error?.toLowerCase().includes('subscription') || false
 }
+
+/**
+ * Super simple error sanitization - KISS approach
+ */
+export function getSafeErrorMessage(error: any): string {
+  // SIMPLE: Just grab whatever error message exists, or use fallback
+  return error?.response?.data?.error || 'Something went wrong';
+}

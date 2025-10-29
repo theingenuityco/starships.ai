@@ -21,18 +21,11 @@ const DEFAULT_EMOJI_OPTIONS = ['😊', '😎', '🚀', '🌟', '🧠', '🔥', '
 export default function ProfileOverviewCard({ initials, displayName, email, selectedEmoji, profileImageUrl, onSelectEmoji, emojiOptions = DEFAULT_EMOJI_OPTIONS }: ProfileOverviewCardProps) {
   // Determine what to show in avatar: priority order is emoji > OAuth image > initials
   const hasSelectedEmoji = !!selectedEmoji
-  // Validate profile image URL safely
+  // Validate profile image URL using same logic as navigation
   const hasProfileImage = useMemo(() => {
-    if (!profileImageUrl) return false
-    
-    try {
-      const url = new URL(profileImageUrl)
-      // Only allow HTTPS URLs or localhost for development
-      return url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
-    } catch {
-      // Invalid URL format
-      return false
-    }
+    if (!profileImageUrl || typeof profileImageUrl !== 'string') return false
+    const trimmed = profileImageUrl.trim()
+    return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
   }, [profileImageUrl])
   const shouldShowImage = !hasSelectedEmoji && hasProfileImage
   const hintMode = !hasSelectedEmoji && !hasProfileImage
@@ -51,17 +44,11 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
     <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
       <CardHeader className="pb-4">
         <CardTitle className="text-base">Profile overview</CardTitle>
-        <CardDescription className="text-sm">
-          {hasProfileImage 
-            ? "Select an emoji avatar or keep your profile image." 
-            : "Select an emoji avatar or keep initials."
-          }
-        </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Profile identity with animated ring hint when no emoji is set */}
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-4">
           <div className="relative h-20 w-20">
             {/* Animated orbit when no emoji selected */}
             {hintMode && (
@@ -97,6 +84,8 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                     src={profileImageUrl} 
                     alt={displayName || 'Profile'} 
                     className="object-cover"
+                    referrerPolicy="no-referrer" 
+                    crossOrigin="anonymous"
                     onLoadingStatusChange={(status) => {
                       if (status === 'error') {
                         console.warn('Failed to load profile image:', profileImageUrl)
@@ -118,12 +107,12 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
         <Separator />
 
         {/* Avatar selector */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           
           {/* Emoji Options */}
           <div>
-            <div className="text-xs text-muted-foreground mb-3">Pick an emoji</div>
-            <div className="grid grid-cols-8 gap-2">
+            <div className="text-xs text-muted-foreground mb-4">Pick an emoji</div>
+            <div className="grid grid-cols-8 gap-3">
             {emojiOptions.map(emoji => {
               const selected = selectedEmoji === emoji
               return (

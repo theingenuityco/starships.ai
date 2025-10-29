@@ -40,7 +40,7 @@ const mockConnection = {
   name: 'Test Starship',
   slug: 'test-starship',
   ownerId: 'user-123',
-  maxAgents: 3,
+  maxAgents: 8,
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',

@@ -311,8 +311,8 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
     const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
     await registrationOrchestrator.completeEmailVerification(token);
 
-    // Redirect to home page with success parameter for toast notification
-    const redirectUrl = `${env.PUBLIC_URL}/?verification=success`;
+    // Redirect to login page with success parameter for toast notification
+    const redirectUrl = `${env.PUBLIC_URL}/login?verification=success`;
     return res.redirect(redirectUrl);
   } catch (error) {
     logger.error('[EMAIL-VERIFY] Error:', { error });

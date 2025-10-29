@@ -475,4 +475,51 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
   }
 });
 
+/**
+ * PATCH /conversations/:conversationId - Update conversation details
+ */
+router.patch('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate conversationId parameter
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    // Validate request body
+    const bodyValidation = validateData(
+      z.object({
+        title: z.string().min(1).max(100).optional(),
+      }),
+      req.body,
+      res,
+      'conversation update data'
+    );
+    if (!bodyValidation) return;
+
+    const { conversationId } = paramValidation;
+    const updateData = bodyValidation;
+
+    // Verify conversation exists
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+
+    // Update conversation
+    const updatedConversation = await conversationService.updateConversation(conversationId, updateData);
+    if (!updatedConversation) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update conversation');
+      return;
+    }
+
+    sendSuccess(res, updatedConversation, 200);
+  } catch (error) {
+    handleError(error, res, 'updating conversation');
+  }
+});
+
 export default router;

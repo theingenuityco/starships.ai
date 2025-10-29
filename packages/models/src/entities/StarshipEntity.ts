@@ -88,7 +88,7 @@ export class StarshipEntity implements StarshipModel {
         slug: dataRecord.slug || '',
         ownerId: dataRecord.ownerId || '',
         name: dataRecord.name || '',
-        maxAgents: dataRecord.maxAgents ?? 3,
+        maxAgents: dataRecord.maxAgents ?? 8,
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),

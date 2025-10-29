@@ -9,7 +9,7 @@ import { StarTheme } from '@/components/theme-context'
 import { WelcomeModalProvider } from '@/components/auth/WelcomeModalProvider'
 
 import { motion } from 'motion/react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
@@ -44,7 +44,6 @@ interface ClientLayoutProps {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
   const isMarketplace = pathname === '/marketplace'
@@ -88,17 +87,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       )
     }
 
-    // Simple: hide navigation only when explicitly coming from public context
-    const shouldHideNavigation = searchParams?.get('from') === 'public'
+    // Always show navigation for authenticated users on marketplace
+    const shouldHideNavigation = false
 
     return (
       <StarTheme theme="dark">
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-          {/* Floating Navigation - conditionally rendered */}
+          {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
-            <div className="fixed top-6 left-6 z-[1000]">
-              <aside className="relative" style={{ zIndex: 1000 }}>
-                <Navigation isMobile={isMobile} />
+            <div className="flex-shrink-0 relative z-50">
+              <aside className="relative h-full p-6">
+                <Navigation />
               </aside>
             </div>
           )}
@@ -117,8 +116,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </motion.button>
           )}
 
-          {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-          <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+          {/* Main Content Area - takes remaining space */}
+          <main className="relative flex-1 min-h-full w-full overflow-auto">
             {children}
           </main>
         </div>
@@ -136,11 +135,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <WelcomeModalProvider>
         <StarTheme theme="dark">
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-            {/* Floating Navigation - conditionally rendered */}
+            {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
-              <div className="fixed top-6 left-6 z-[1000]">
-                <aside className="relative" style={{ zIndex: 1000 }}>
-                  <Navigation isMobile={isMobile} />
+              <div className="flex-shrink-0 relative z-50">
+                <aside className="relative h-full p-6">
+                  <Navigation />
                 </aside>
               </div>
             )}
@@ -151,7 +150,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="fixed top-4 left-4 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+                className="fixed top-4 left-2 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
                 aria-label="Open navigation menu"
                 style={{ zIndex: 999 }}
               >
@@ -159,8 +158,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               </motion.button>
             )}
 
-            {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-            <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto" style={{ paddingLeft: isMobile || shouldHideNavigation ? 0 : '5.5rem' }}>
+            {/* Main Content Area - takes remaining space */}
+            <main className="relative flex-1 min-h-full w-full overflow-auto">
               {children}
             </main>
           </div>

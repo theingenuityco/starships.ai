@@ -19,10 +19,10 @@ import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
-import { parse as parsePartialJson } from 'partial-json';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
+import { parseTree, getNodeValue, ParseError } from 'jsonc-parser';
 
 /**
  * Autopilot child process configuration
@@ -41,6 +41,8 @@ type StreamingToolCallAccum = {
     arguments: string; // accumulating JSON string during streaming
   };
 };
+
+// Parser state for incremental tool argument parsing per conversation/index
 
 /**
  * Clean conversation service with proper error handling
@@ -69,8 +71,11 @@ export class ConversationService {
   private ringBuffer: Map<string, Array<{ position: number; content: string; ts: number }>> = new Map();
   // Track accumulated toolCalls during streaming per conversation
   private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
+
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
+  // Track last broadcasted toolCalls snapshot (serialized) to avoid duplicate replace spam
+  private lastToolCallsBroadcastHash: Map<string, string> = new Map();
   // Track whether the currently active streaming assistant placeholder has been persisted
   private activeStreamPersisted: Set<string> = new Set();
   // Track latest provider-reported usage during streaming for mid-turn persistence
@@ -130,6 +135,33 @@ export class ConversationService {
 
     ConversationService.instance = this;
     return this;
+  }
+
+  /**
+   * Extract completed top-level properties from a JSON-like string buffer.
+   * This is a tolerant, incremental extractor: it only returns props whose values are balanced
+   * (strings closed, brackets/braces balanced) at depth 1.
+   */
+  private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    if (typeof jsonLike !== 'string' || jsonLike.length === 0) return out;
+    const errors: ParseError[] = [];
+    const root = parseTree(jsonLike, errors, { allowTrailingComma: true, disallowComments: false });
+    if (!root || root.type !== 'object' || !Array.isArray(root.children)) return out;
+    for (const prop of root.children) {
+      // Each property node typically has [keyNode, valueNode]
+      if (!prop || prop.type !== 'property' || !Array.isArray(prop.children) || prop.children.length < 2) continue;
+      const keyNode = prop.children[0];
+      const valueNode = prop.children[1];
+      if (!keyNode || keyNode.type !== 'string' || !valueNode) continue;
+      // getNodeValue returns undefined for incomplete values; skip those
+      const value = getNodeValue(valueNode);
+      if (typeof value === 'undefined') continue;
+      const key = getNodeValue(keyNode);
+      if (typeof key !== 'string' || key.length === 0) continue;
+      out[key] = value as unknown;
+    }
+    return out;
   }
 
   /** Persist the currently active streaming assistant partial (content/reasoning only) if any. */
@@ -277,7 +309,7 @@ export class ConversationService {
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
       console.log(`[ConversationService] Starting deletion process for conversation ${conversationId}`);
-      
+
       // Verify conversation exists first
       const conversation = await this.conversationRepository.findById(conversationId);
       if (!conversation) {
@@ -286,16 +318,16 @@ export class ConversationService {
       }
 
       console.log(`[ConversationService] Found conversation ${conversationId} (title: "${conversation.title}"), proceeding with deletion`);
-      
+
       // Use the repository's delete method which should handle CASCADE properly
       const deleted = await this.conversationRepository.delete(conversationId);
-      
+
       if (deleted) {
         console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
       }
-      
+
       return deleted;
     } catch (error) {
       // Enhanced error logging with more details
@@ -304,8 +336,8 @@ export class ConversationService {
           message: error.message,
           name: error.name,
           stack: error.stack,
-          ...(error as any).code && { code: (error as any).code },
-          ...(error as any).constraint && { constraint: (error as any).constraint },
+          ...((error as any).code && { code: (error as any).code }),
+          ...((error as any).constraint && { constraint: (error as any).constraint }),
         });
       } else {
         console.error(`[ConversationService] Unknown error deleting conversation ${conversationId}:`, error);
@@ -320,19 +352,19 @@ export class ConversationService {
   async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
     try {
       console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
-      
+
       // Use the repository's update method
       const updatedConversation = await this.conversationRepository.update(conversationId, {
         ...updates,
         updatedAt: new Date().toISOString(),
       });
-      
+
       if (updatedConversation) {
         console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
       }
-      
+
       return updatedConversation;
     } catch (error) {
       console.error(`[ConversationService] Error updating conversation ${conversationId}:`, error);
@@ -1549,75 +1581,154 @@ export class ConversationService {
                   if (rawTc?.id) target.id = rawTc.id;
                   if (rawTc?.function?.name) target.function.name = rawTc.function.name;
 
-                  // Accumulate arguments as string, parse later when complete
+                  // Accumulate arguments as string
                   if (typeof rawTc?.function?.arguments === 'string') {
+                    try {
+                      const addLen = (rawTc.function!.arguments as string).length;
+                      const beforeLen = typeof target.function.arguments === 'string' ? (target.function.arguments as string).length : 0;
+                      console.debug('[ConversationService] tool_calls_accumulate', {
+                        conversationId,
+                        idx,
+                        id: rawTc?.id,
+                        name: rawTc?.function?.name,
+                        addLen,
+                        totalLenBefore: beforeLen,
+                        totalLenAfter: beforeLen + addLen,
+                      });
+                    } catch {
+                      /* noop */
+                    }
                     target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
                   }
                 }
 
                 this.streamingToolCalls.set(conversationId, acc);
 
-                // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
+                // Build toolCalls value preferring incremental parsed objects per index
                 const toolCallsValue = acc
-                  .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                  .map((tc) => {
-                    let argsObj: unknown = {};
+                  .map((tc) => ({ tc }))
+                  .filter(({ tc }) => !!tc && typeof tc.function?.name === 'string' && (tc.function.name as string).length > 0)
+                  .map(({ tc }) => {
                     const argsStr = tc.function?.arguments;
+                    let argsObj: unknown = {};
                     if (typeof argsStr === 'string' && argsStr) {
+                      // Prefer jsonc-parser for completed properties; no partial-json fallback
+                      argsObj = {};
+                    }
+                    // Merge in any completed top-level properties detected from buffer
+                    if (typeof argsStr === 'string' && argsStr.length > 0) {
                       try {
-                        // Try full JSON.parse first for complete JSON
-                        argsObj = JSON.parse(argsStr);
-                      } catch {
-                        try {
-                          // Use partial-json for incomplete JSON during streaming
-                          argsObj = parsePartialJson(argsStr);
-                        } catch {
-                          // If both fail, use empty object
-                          argsObj = {};
+                        const completed = ConversationService.extractCompletedTopLevelProperties(argsStr);
+                        if (completed && typeof completed === 'object') {
+                          const base =
+                            argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj) ? (argsObj as Record<string, unknown>) : {};
+                          for (const k of Object.keys(completed)) {
+                            base[k] = completed[k];
+                          }
+                          argsObj = base;
                         }
+                      } catch {
+                        void 0;
                       }
+                    }
+                    let debugKeysCount = 0;
+                    let debugRawLen = 0;
+                    try {
+                      debugKeysCount =
+                        argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj)
+                          ? Object.keys(argsObj as Record<string, unknown>).length
+                          : 0;
+                      debugRawLen = typeof argsStr === 'string' ? argsStr.length : 0;
+                      console.debug('[ConversationService] tool_calls_parse', {
+                        conversationId,
+                        id: tc.id,
+                        name: tc.function.name,
+                        rawLen: debugRawLen,
+                        keysCount: debugKeysCount,
+                      });
+                    } catch {
+                      /* noop */
                     }
                     return {
                       id: tc.id,
                       type: tc.type,
                       function: {
                         name: tc.function.name,
-                        arguments: argsObj, // Parsed object (may be partial)
+                        arguments: argsObj,
+                        // progress metadata to surface streaming increments even before values complete
+                        argumentsProgress: debugRawLen,
+                        argumentsKeysCount: debugKeysCount,
                       },
-                    };
+                    } as any;
                   });
 
-                await this.streamingService.broadcastDelta(conversationId, {
-                  op: 'replace',
-                  path: '/messages/-1/toolCalls',
-                  value: toolCallsValue,
-                });
-              } else if (toolCallsFromMessage.length > 0) {
-                // Snapshot toolCalls from message node (no incremental indices)
-                // Parse arguments using partial-json for robustness
-                const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
-                  const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
-                  const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
-                  let argsObj: unknown = {};
-                  if (argsStr) {
+                // Dedupe identical broadcasts
+                try {
+                  const serialized = JSON.stringify(toolCallsValue);
+                  const prev = this.lastToolCallsBroadcastHash.get(conversationId);
+                  if (prev !== serialized) {
                     try {
-                      argsObj = JSON.parse(argsStr);
+                      console.debug('[ConversationService] tool_calls_broadcast', {
+                        conversationId,
+                        entries: toolCallsValue.length,
+                        serializedLen: serialized.length,
+                        dedupHit: false,
+                      });
                     } catch {
-                      try {
-                        argsObj = parsePartialJson(argsStr);
-                      } catch {
-                        argsObj = {};
-                      }
+                      /* noop */
+                    }
+                    await this.streamingService.broadcastDelta(conversationId, {
+                      op: 'replace',
+                      path: '/messages/-1/toolCalls',
+                      value: toolCallsValue,
+                    });
+                    this.lastToolCallsBroadcastHash.set(conversationId, serialized);
+                  } else {
+                    try {
+                      console.debug('[ConversationService] tool_calls_broadcast_skip', {
+                        conversationId,
+                        entries: toolCallsValue.length,
+                        serializedLen: serialized.length,
+                        dedupHit: true,
+                      });
+                    } catch {
+                      /* noop */
                     }
                   }
+                } catch {
+                  // On serialization failure, fall back to broadcasting
+                  await this.streamingService.broadcastDelta(conversationId, {
+                    op: 'replace',
+                    path: '/messages/-1/toolCalls',
+                    value: toolCallsValue,
+                  });
+                }
+              } else if (toolCallsFromMessage.length > 0) {
+                // Snapshot toolCalls from message node (no incremental indices)
+                // Always provide parsed (possibly partial) object in function.arguments
+                const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
+                  const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
+                  const rawArgsUnknown = tc?.function?.arguments as unknown;
+                  let argsObj: unknown = {};
+                  if (typeof rawArgsUnknown === 'string') {
+                    const s = rawArgsUnknown;
+                    if (s) {
+                      // Use jsonc-parser completed extraction for snapshot as well
+                      const completed = ConversationService.extractCompletedTopLevelProperties(s);
+                      argsObj = completed && typeof completed === 'object' ? completed : {};
+                    }
+                  } else if (rawArgsUnknown && typeof rawArgsUnknown === 'object') {
+                    argsObj = rawArgsUnknown;
+                  }
+
                   return {
                     id: tc?.id,
                     type: 'function' as const,
                     function: {
                       name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
-                      arguments: argsObj, // Store as parsed object for UI
+                      arguments: argsObj,
                     },
-                  };
+                  } as any;
                 });
 
                 // Maintain streaming accumulator with string arguments form
@@ -1626,23 +1737,77 @@ export class ConversationService {
                   type: 'function',
                   function: {
                     name: tc.function.name,
-                    arguments: (() => {
-                      try {
-                        return JSON.stringify(tc.function.arguments ?? {});
-                      } catch {
-                        return '{}';
-                      }
-                    })(),
+                    arguments:
+                      typeof (tc as any)?.function?.arguments === 'string'
+                        ? String((tc as any).function.arguments)
+                        : (() => {
+                            try {
+                              return JSON.stringify((tc as any)?.function?.arguments ?? {});
+                            } catch {
+                              return '{}';
+                            }
+                          })(),
                   },
                 }));
                 this.streamingToolCalls.set(conversationId, accumFromSnapshot);
 
-                // Broadcast only valid entries (non-empty function name)
-                await this.streamingService.broadcastDelta(conversationId, {
-                  op: 'replace',
-                  path: '/messages/-1/toolCalls',
-                  value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
-                });
+                // Broadcast only valid entries (non-empty function name) and dedupe
+                const filtered = normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0);
+                try {
+                  for (const x of filtered) {
+                    try {
+                      const keysCount =
+                        x?.function?.arguments && typeof x.function.arguments === 'object' && !Array.isArray(x.function.arguments)
+                          ? Object.keys(x.function.arguments as Record<string, unknown>).length
+                          : 0;
+                      console.debug('[ConversationService] tool_calls_snapshot', {
+                        conversationId,
+                        id: x.id,
+                        name: x.function.name,
+                        keysCount,
+                      });
+                    } catch {
+                      /* noop */
+                    }
+                  }
+                  const serialized = JSON.stringify(filtered);
+                  const prev = this.lastToolCallsBroadcastHash.get(conversationId);
+                  if (prev !== serialized) {
+                    try {
+                      console.debug('[ConversationService] tool_calls_broadcast', {
+                        conversationId,
+                        entries: filtered.length,
+                        serializedLen: serialized.length,
+                        dedupHit: false,
+                      });
+                    } catch {
+                      /* noop */
+                    }
+                    await this.streamingService.broadcastDelta(conversationId, {
+                      op: 'replace',
+                      path: '/messages/-1/toolCalls',
+                      value: filtered,
+                    });
+                    this.lastToolCallsBroadcastHash.set(conversationId, serialized);
+                  } else {
+                    try {
+                      console.debug('[ConversationService] tool_calls_broadcast_skip', {
+                        conversationId,
+                        entries: filtered.length,
+                        serializedLen: serialized.length,
+                        dedupHit: true,
+                      });
+                    } catch {
+                      /* noop */
+                    }
+                  }
+                } catch {
+                  await this.streamingService.broadcastDelta(conversationId, {
+                    op: 'replace',
+                    path: '/messages/-1/toolCalls',
+                    value: filtered,
+                  });
+                }
               }
             } catch {
               // ignore toolCall parse errors to avoid breaking streaming

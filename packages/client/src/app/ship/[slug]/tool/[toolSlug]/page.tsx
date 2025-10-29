@@ -11,6 +11,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import type { LlmToolCall } from '@starships/autopilot'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -98,7 +99,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     for (let mi = 0; mi < liveMessages.length; mi++) {
       const msg = liveMessages[mi] as any
       if (msg.role !== 'assistant') continue
-      const calls = (msg as any).toolCalls
+      const calls = (msg as any).toolCalls as LlmToolCall[] | undefined
       if (!Array.isArray(calls)) continue
       for (let ci = 0; ci < calls.length; ci++) {
         const call = calls[ci]

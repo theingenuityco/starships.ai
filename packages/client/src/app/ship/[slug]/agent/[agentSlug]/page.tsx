@@ -40,6 +40,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // Track applied tool call keys to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
 
+  // Track last applied args per toolCall id for incremental updates during streaming
+  const lastAppliedArgsByToolCallIdRef = useRef<Map<string, string>>(new Map())
+
   // After tool execution completes, fetch and sync agent data once
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
 
@@ -69,10 +72,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
-    // On first render, record initial message count and don't process
+    // On first render, record initial message count (but don't early-return; allow bootstrap on /agent/new)
     if (initialMessageCountRef.current === null) {
       initialMessageCountRef.current = liveMessages.length
-      return
     }
 
     // Only process if new messages have arrived; however, on /agent/new allow
@@ -80,14 +82,16 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     // that may have started before mount.
     const hasNewMessages = liveMessages.length > initialMessageCountRef.current
     const allowBootstrapOnNewRoute = agentSlug === 'new' && appliedToolCallKeysRef.current.size === 0
-    if (!hasNewMessages && !allowBootstrapOnNewRoute) {
+    // Also allow incremental processing while assistant is responding to capture partial JSON updates
+    const allowWhileStreaming = isResponding === true
+    if (!hasNewMessages && !allowBootstrapOnNewRoute && !allowWhileStreaming) {
       return
     }
 
     // Eligible tool slugs that should drive the Agent Builder
     // Note: We intentionally exclude assignment calls from driving UI state to avoid
     // reflecting changes before the server confirms them.
-    const builderToolSlugs = new Set(['agent-open', 'agent-edit'])
+    const builderToolSlugs = new Set(['agent-open', 'agent-edit', 'open agent', 'edit agent'])
 
     const form = agentBuilderRef.current.getFormData?.()
     if (!form) return
@@ -114,50 +118,134 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       return v
     }
 
-    // Collect only new toolCalls across assistant messages since mount in chronological order
-    let considerationMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
-    if (considerationMessages.length === 0 && allowBootstrapOnNewRoute) {
-      // Take only the most recent assistant message to seed the builder
-      for (let i = liveMessages.length - 1; i >= 0; i--) {
-        const m = liveMessages[i] as MessageModel
-        if (m.role === 'assistant') {
-          considerationMessages = [m]
-          break
+    const stableStringify = (input: unknown): string => {
+      const sorter = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(sorter)
+        if (value && typeof value === 'object') {
+          const obj = value as Record<string, unknown>
+          const keys = Object.keys(obj).sort()
+          const out: Record<string, unknown> = {}
+          for (const k of keys) out[k] = sorter(obj[k])
+          return out
+        }
+        return value
+      }
+      try {
+        return JSON.stringify(sorter(input))
+      } catch {
+        try {
+          return JSON.stringify(input)
+        } catch {
+          return ''
         }
       }
     }
+
+    // No partial JSON extraction on client; server guarantees parsed objects
+
+    // Collect only new toolCalls across assistant messages since mount in chronological order
+    let considerationMessages: MessageModel[] = []
+    if (hasNewMessages) {
+      considerationMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
+    } else if (allowWhileStreaming) {
+      // While streaming, prefer the most recent assistant message that already has toolCalls
+      const list = liveMessages as MessageModel[]
+      let picked: MessageModel | null = null
+      for (let i = list.length - 1; i >= 0; i--) {
+        const m = list[i]
+        if (m.role === 'assistant' && Array.isArray((m as any).toolCalls) && (m as any).toolCalls.length > 0) {
+          picked = m
+          break
+        }
+      }
+      if (!picked) {
+        // Fallback: use the most recent assistant shell
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i]
+          if (m.role === 'assistant') {
+            picked = m
+            break
+          }
+        }
+      }
+      if (picked) considerationMessages = [picked]
+    } else if (allowBootstrapOnNewRoute) {
+      // Bootstrap by scanning all assistant messages for in-flight tool calls
+      considerationMessages = (liveMessages as MessageModel[]).filter(m => m.role === 'assistant')
+    }
     const newCalls: { name: string; args: unknown }[] = []
+    try {
+      console.debug('[AgentBuilderStream] scan:start', {
+        considerationCount: considerationMessages.length,
+        sampleIds: considerationMessages.slice(-3).map(m => m.id),
+      })
+    } catch {}
     for (let mi = 0; mi < considerationMessages.length; mi++) {
       const msg = considerationMessages[mi]
       if (msg.role !== 'assistant') continue
       const calls = msg.toolCalls as LlmToolCall[] | undefined
-      if (!Array.isArray(calls)) continue
+      if (!Array.isArray(calls)) {
+        try {
+          console.debug('[AgentBuilderStream] no-toolCalls', { msgId: (msg as any).id })
+        } catch {}
+        continue
+      }
       for (let ci = 0; ci < calls.length; ci++) {
         const call = calls[ci]
-        const name = call?.function?.name
-        if (!builderToolSlugs.has(name)) continue
-        const raw = call?.function?.arguments as unknown
-        const key = `${name}|${typeof raw === 'string' ? String(raw) : JSON.stringify(raw ?? null)}`
-        if (appliedToolCallKeysRef.current.has(key)) continue
+        const rawName = call?.function?.name
+        const nameLc = typeof rawName === 'string' ? rawName.toLowerCase() : ''
+        try {
+          console.debug('[AgentBuilderStream] toolCall', { idx: ci, id: call?.id, name: rawName, nameLc, hasArgs: !!call?.function?.arguments })
+        } catch {}
+        if (!builderToolSlugs.has(nameLc)) continue
+        const raw = (call as any)?.function?.arguments as unknown
+        const callId = typeof call?.id === 'string' ? call.id : undefined
+        const key = `${nameLc}|${typeof raw === 'string' ? String(raw) : JSON.stringify(raw ?? null)}`
+        // Incremental gating: if we have a toolCallId, compare last applied args snapshot
+        if (callId) {
+          let parsedForCompare: unknown = raw
+          if (typeof parsedForCompare === 'string') {
+            try {
+              parsedForCompare = JSON.parse(parsedForCompare)
+            } catch {}
+          }
+          const snapshot = stableStringify(parsedForCompare)
+          const last = lastAppliedArgsByToolCallIdRef.current.get(callId)
+          if (last && last === snapshot) {
+            // No change since last application
+            continue
+          }
+          // Proceed and update snapshot after applying
+        } else {
+          // Legacy dedupe for calls without id
+          if (appliedToolCallKeysRef.current.has(key)) continue
+        }
         // parse args after key computation to keep key stable on parse errors
         let parsed: unknown = raw
         if (typeof parsed === 'string') {
           try {
-            parsed = JSON.parse(parsed)
-          } catch {
-            // keep as-is (may still be partial)
-          }
+            parsed = JSON.parse(parsed as string)
+          } catch {}
         }
+        try {
+          const preview = typeof parsed === 'object' && parsed ? Object.keys(parsed as Record<string, unknown>).slice(0, 6) : typeof parsed
+          console.debug('[AgentBuilderStream] args-parsed', { callId, keys: preview })
+        } catch {}
         // skip clearly empty args to avoid wiping state
         if (parsed && typeof parsed === 'object' && Object.keys(parsed as Record<string, unknown>).length === 0) {
           continue
         }
-        newCalls.push({ name, args: parsed })
-        appliedToolCallKeysRef.current.add(key)
+        newCalls.push({ name: nameLc, args: parsed, id: callId || undefined, snapshot: callId ? stableStringify(parsed) : undefined } as unknown as { name: string; args: unknown })
+        if (!callId) appliedToolCallKeysRef.current.add(key)
       }
     }
 
-    if (newCalls.length === 0) return
+    if (newCalls.length === 0) {
+      try {
+        console.debug('[AgentBuilderStream] scan:done:no-new-calls')
+      } catch {}
+      return
+    }
 
     // Compose pending scalar field updates
     const compose = {
@@ -179,7 +267,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     const hasContent = (b: any) => (Array.isArray(b?.nodes) && b.nodes.length > 0) || (Array.isArray(b?.edges) && b.edges.length > 0)
 
     // Apply each new call in order
-    for (const call of newCalls) {
+    for (const call of newCalls as Array<{ name: string; args: unknown; id?: string; snapshot?: string }>) {
       const toolName = call.name
       const args = call.args as Record<string, unknown> | undefined
 
@@ -198,24 +286,51 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         // Do not apply assignedToolSlugs from streaming arguments. We only
         // reflect tool assignments after confirmed tool completion and a
         // fresh fetch from the server.
-        if (args && 'blueprint' in args) {
-          const incoming = normalizeJson((args as Record<string, unknown>).blueprint) || {}
-          if (!Array.isArray(incoming.nodes)) incoming.nodes = []
-          if (!Array.isArray(incoming.edges)) incoming.edges = []
+        if (args && typeof args === 'object' && !Array.isArray(args) && 'blueprint' in args) {
+          const rawBp = (args as Record<string, unknown>).blueprint
+          const incoming = normalizeJson(rawBp)
+          if (!incoming || typeof incoming !== 'object') {
+            // Skip until we have an object blueprint
+            if (call.id && call.snapshot !== undefined) {
+              lastAppliedArgsByToolCallIdRef.current.set(call.id, call.snapshot)
+            }
+            continue
+          }
+          if (!Array.isArray((incoming as any).nodes)) (incoming as any).nodes = []
+          if (!Array.isArray((incoming as any).edges)) (incoming as any).edges = []
           // Only replace blueprint if incoming has content OR current bp is empty
-          if (hasContent(incoming) || !hasContent(bp)) {
-            bp = incoming
+          if (hasContent(incoming as any) || !hasContent(bp)) {
+            bp = incoming as any
             compose.blueprintChanged = true
           }
+        }
+        // Persist latest snapshot for incremental gating
+        if (call.id && call.snapshot !== undefined) {
+          lastAppliedArgsByToolCallIdRef.current.set(call.id, call.snapshot)
         }
         continue
       }
 
       // Ignore agent-assign-tool and agent-unassign-tool here. We will sync
       // assignments only after tool completion via server fetch below.
+      // Persist latest snapshot for incremental gating
+      if (call.id && call.snapshot !== undefined) {
+        lastAppliedArgsByToolCallIdRef.current.set(call.id, call.snapshot)
+      }
     }
 
     // Write back composed updates once
+    try {
+      console.debug('[AgentBuilderStream] apply:compose', {
+        name: compose.name,
+        slug: compose.slug,
+        model: compose.model,
+        temperature: compose.temperature,
+        maxTokens: compose.maxTokens,
+        timeout: compose.timeout,
+        blueprintChanged: compose.blueprintChanged,
+      })
+    } catch {}
     if (compose.name !== undefined) agentBuilderRef.current?.updateField('name', compose.name)
     if (compose.slug !== undefined) agentBuilderRef.current?.updateField('slug', compose.slug)
     if (compose.description !== undefined) agentBuilderRef.current?.updateField('description', compose.description)
@@ -232,7 +347,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       const bpStr = JSON.stringify(bp, null, 2)
       agentBuilderRef.current?.updateField('blueprint', bpStr)
     }
-  }, [conversationId, liveMessages])
+  }, [conversationId, liveMessages, isResponding])
 
   // After agent tool execution completes, fetch and sync agent data once
   useEffect(() => {

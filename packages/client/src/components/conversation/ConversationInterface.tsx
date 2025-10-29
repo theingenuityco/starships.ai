@@ -352,14 +352,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Set Gaia as default ONLY on initial mount - use stable deps to avoid re-runs
   useEffect(() => {
-    // Check flag synchronously - this prevents the effect body from running at all
+    // Don't run if already set
     if (hasSetInitialDefaultAgentRef.current) {
       return
     }
 
-    // Set flag immediately to prevent concurrent calls
-    hasSetInitialDefaultAgentRef.current = true
-
+    // Wait for agents to load
     if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) {
       return
     }
@@ -369,6 +367,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const fallback = gaiaAgent || starshipAgentsData[0]
 
     if (fallback && typeof fallback.id === 'string') {
+      console.log('[Gaia Fallback] Setting initial default agent:', fallback.name)
+
+      // Set flags BEFORE state update to prevent re-runs
+      hasSetInitialDefaultAgentRef.current = true
       hasEverSetAnyAgentRef.current = true
       lastAutoSelectedAgentIdRef.current = fallback.id
 

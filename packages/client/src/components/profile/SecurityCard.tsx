@@ -10,13 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 
-
 type SecurityCardProps = {
   // Authentication state
   hasPassword: boolean
   authMethods: string[]
   isOAuthOnly: boolean
-  
+
   // Password change functionality
   showPassword: boolean
   setShowPassword: (v: boolean) => void
@@ -26,27 +25,27 @@ type SecurityCardProps = {
   saving: boolean
   cancelPasswordEdit: () => void
   currentPasswordRef?: React.RefObject<HTMLInputElement | null>
-  
+
   // New OAuth functionality
   onSetPassword: () => void
 }
 
-export default function SecurityCard({ 
+export default function SecurityCard({
   hasPassword,
   authMethods,
   isOAuthOnly,
-  showPassword, 
-  setShowPassword, 
-  form, 
-  setForm, 
-  passwordErrors, 
-  saving, 
-  cancelPasswordEdit, 
+  showPassword,
+  setShowPassword,
+  form,
+  setForm,
+  passwordErrors,
+  saving,
+  cancelPasswordEdit,
   currentPasswordRef,
-  onSetPassword
+  onSetPassword,
 }: SecurityCardProps) {
   const errorInput = 'border-destructive focus-visible:ring-destructive aria-[invalid=true]:border-destructive'
-  
+
   // Password visibility toggles for each field
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -59,11 +58,9 @@ export default function SecurityCard({
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Account Security
         </CardTitle>
-        <CardDescription className="text-sm">
-          Manage your authentication methods and security settings.
-        </CardDescription>
+        <CardDescription className="text-sm">Manage your authentication methods and security settings.</CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {/* PASSWORD SECTION */}
         {hasPassword && (
@@ -74,9 +71,7 @@ export default function SecurityCard({
                   <Icon name="lock" className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Password</p>
-                    <p className="text-xs text-muted-foreground">
-                      Change your password when necessary
-                    </p>
+                    <p className="text-xs text-muted-foreground">Change your password when necessary</p>
                   </div>
                 </div>
                 <Button type="button" variant="outline" onClick={() => setShowPassword(true)} disabled={saving}>
@@ -142,9 +137,7 @@ export default function SecurityCard({
                         {showNewPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
                       </Button>
                     </div>
-                    {form.newPassword && (
-                      <PasswordStrengthMeter password={form.newPassword} />
-                    )}
+                    {form.newPassword && <PasswordStrengthMeter password={form.newPassword} />}
                     {passwordErrors.new && <p className="text-xs text-destructive">{passwordErrors.new}</p>}
                   </div>
 
@@ -199,9 +192,7 @@ export default function SecurityCard({
                 <Icon name="lock" className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Password (Optional)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Add password for backup access
-                  </p>
+                  <p className="text-xs text-muted-foreground">Add password for backup access</p>
                 </div>
               </div>
               <Button type="button" variant="outline" onClick={onSetPassword}>
@@ -211,7 +202,6 @@ export default function SecurityCard({
             </div>
           </div>
         )}
-
       </CardContent>
     </Card>
   )

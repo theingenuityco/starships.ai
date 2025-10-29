@@ -14,7 +14,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 import { validatePassword } from '@/utils/passwordStrength'
 
 /**
@@ -207,11 +207,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
   return (
     <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
       <Card>
-        <CardHeader className="text-center">
-          <CardDescription>Access your starship or create a new account</CardDescription>
-        </CardHeader>
-
-        <CardContent>
+        <CardContent className="pt-6">
           {/* OAuth buttons ABOVE existing tabs */}
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
@@ -363,7 +359,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="register-password">Password</Label>
+                  <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
                   <div className="relative">
                     <Input
                       id="register-password"
@@ -373,7 +369,6 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                       placeholder="Create a strong password"
                       disabled={isLoading}
                       required
-                      minLength={8}
                       className="h-12"
                     />
                     <Button

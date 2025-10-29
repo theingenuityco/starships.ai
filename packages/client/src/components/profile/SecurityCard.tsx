@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 
 
 type SecurityCardProps = {
@@ -101,7 +101,7 @@ export default function SecurityCard({
 
                   {/* New password */}
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">New password</Label>
+                    <PasswordLabelWithTooltip htmlFor="newPassword" label="New password" password={form.newPassword} />
                     <Input
                       id="newPassword"
                       type="password"

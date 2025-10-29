@@ -142,9 +142,29 @@ export class AgentService {
   }
 
   /**
+   * Check if an agent is a system agent (Gaia or Daedalus)
+   */
+  private isSystemAgent(agent: AgentModel): boolean {
+    return agent.name === 'Gaia' || agent.name === 'Daedalus';
+  }
+
+  /**
    * Update agent and return as AgentModel
    */
   async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
+    // First get the current agent to check if it's a system agent
+    const currentAgent = await this.agentRepository.findById(agentId);
+    if (!currentAgent) {
+      return null;
+    }
+
+    // Prevent editing system agents
+    if (this.isSystemAgent(currentAgent)) {
+      throw new ValidationError(
+        `Cannot edit system agent "${currentAgent.name}". System agents (Gaia and Daedalus) are protected and cannot be modified.`
+      );
+    }
+
     return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
   }
 
@@ -180,6 +200,19 @@ export class AgentService {
    * Delete agent
    */
   async deleteAgent(agentId: string): Promise<boolean> {
+    // First get the current agent to check if it's a system agent
+    const currentAgent = await this.agentRepository.findById(agentId);
+    if (!currentAgent) {
+      return false;
+    }
+
+    // Prevent deleting system agents
+    if (this.isSystemAgent(currentAgent)) {
+      throw new ValidationError(
+        `Cannot delete system agent "${currentAgent.name}". System agents (Gaia and Daedalus) are protected and cannot be deleted.`
+      );
+    }
+
     return await this.agentRepository.delete(agentId);
   }
 

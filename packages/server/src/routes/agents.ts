@@ -335,7 +335,7 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
     sendSuccess(res, agent);
   } catch (error) {
     console.error('[AGENTS] Error updating agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent');
+    handleError(error, res, 'updating agent');
   }
 });
 
@@ -353,7 +353,7 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     sendSuccess(res, { message: 'Agent deleted successfully' }, 200);
   } catch (error) {
     console.error('[AGENTS] Error deleting agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete agent');
+    handleError(error, res, 'deleting agent');
   }
 });
 

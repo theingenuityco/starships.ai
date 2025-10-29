@@ -379,6 +379,18 @@ export class LLM extends BaseNode<LlmParams> {
             if (toolCallDelta.id) target.id = toolCallDelta.id;
             if (toolCallDelta.function?.name) target.function.name = toolCallDelta.function.name;
             if (toolCallDelta.function?.arguments) {
+              try {
+                const addLen = typeof toolCallDelta.function.arguments === 'string' ? toolCallDelta.function.arguments.length : 0;
+                const beforeLen = typeof target.function.arguments === 'string' ? target.function.arguments.length : 0;
+                console.debug('[LLM Stream] tool_call_delta', {
+                  idx: index,
+                  id: toolCallDelta.id,
+                  name: toolCallDelta.function?.name,
+                  addLen,
+                  totalLenBefore: beforeLen,
+                  totalLenAfter: beforeLen + addLen,
+                });
+              } catch {}
               target.function.arguments += toolCallDelta.function.arguments;
             }
 
@@ -413,6 +425,17 @@ export class LLM extends BaseNode<LlmParams> {
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls
         if (eventCallback) {
           const normalizedChunk = this.normalizeChunkToolCalls(chunk);
+          try {
+            const anyChunk = normalizedChunk as any;
+            const deltas = anyChunk?.choices?.[0]?.delta?.toolCalls;
+            const count = Array.isArray(deltas) ? deltas.length : 0;
+            const hasArgs =
+              Array.isArray(deltas) &&
+              deltas.some((d: any) => typeof d?.function?.arguments === 'string' && d.function.arguments.length > 0);
+            if (count > 0) {
+              console.debug('[LLM Stream] chunk toolCalls', { count, hasArgs });
+            }
+          } catch {}
           await eventCallback({
             type: 'content_chunk',
             timestamp: new Date().toISOString(),

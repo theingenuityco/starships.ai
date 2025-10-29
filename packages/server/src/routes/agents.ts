@@ -70,14 +70,16 @@ const SingleToolAssignmentSchema = z.object({
 const TestAgentSchema = z.object({
   input: z.union([
     z.string(), // Simple text input
-    z.array(z.object({ // Messages array
-      role: z.enum(['user', 'assistant', 'system', 'tool']),
-      content: z.string(),
-      reasoning: z.string().optional(),
-    }))
-  ])
+    z.array(
+      z.object({
+        // Messages array
+        role: z.enum(['user', 'assistant', 'system', 'tool']),
+        content: z.string(),
+        reasoning: z.string().optional(),
+      })
+    ),
+  ]),
 });
-
 
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -208,6 +210,14 @@ router.get('/agents/:slugOrId', jwtAuthMiddleware, async (req: Request, res: Res
         resource: 'agent',
         slugOrId: paramValidation.slugOrId,
       });
+      return;
+    }
+
+    // Enforce access: user must have access to the agent's starship
+    const userId = req.user!.id;
+    const hasAccess = await agentService.validateStarshipAccess(agent.starshipId, userId);
+    if (!hasAccess) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this agent', 403, { starshipId: agent.starshipId });
       return;
     }
 
@@ -394,10 +404,10 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
     const agent = starshipAgents.find((a) => a.slug === slug);
 
     if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { 
-        resource: 'agent', 
-        slug, 
-        starshipId 
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+        resource: 'agent',
+        slug,
+        starshipId,
       });
       return;
     }
@@ -411,9 +421,8 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
 
     sendSuccess(res, {
       success: testResult.success,
-      data: testResult
+      data: testResult,
     });
-
   } catch (error) {
     console.error('[AGENTS] Error testing agent:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to test agent');

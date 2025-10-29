@@ -29,7 +29,7 @@ const checkAuth = (req: Request, res: Response): boolean => {
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
-    const { name, maxAgents = 100 } = req.body;
+    const { name, maxAgents = 3 } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 

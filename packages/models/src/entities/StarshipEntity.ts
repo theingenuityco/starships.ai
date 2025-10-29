@@ -55,7 +55,7 @@ export class StarshipEntity implements StarshipModel {
   @Expose()
   @IsNumber()
   @Min(1)
-  @Max(200) // Reasonable upper limit
+  @Max(50) // Reasonable upper limit
   maxAgents!: number;
 
   @Expose()
@@ -88,7 +88,7 @@ export class StarshipEntity implements StarshipModel {
         slug: dataRecord.slug || '',
         ownerId: dataRecord.ownerId || '',
         name: dataRecord.name || '',
-        maxAgents: dataRecord.maxAgents ?? 100,
+        maxAgents: dataRecord.maxAgents ?? 3,
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),

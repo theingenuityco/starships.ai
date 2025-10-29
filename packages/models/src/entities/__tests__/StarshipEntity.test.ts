@@ -173,7 +173,7 @@ describe('StarshipEntity', () => {
           slug: 'test-starship',
           ownerId: 'user-456',
           name: 'Test Starship',
-          maxAgents: 201,
+          maxAgents: 51,
           status: 'active',
         })
       ).rejects.toThrow();

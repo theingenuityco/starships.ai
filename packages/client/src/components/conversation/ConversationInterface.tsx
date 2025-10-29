@@ -7,7 +7,7 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
 import { ConversationStreamProvider, useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -31,13 +31,69 @@ interface ConversationInterfaceProps {
   starshipSlug?: string
 }
 
+// Helper function to extract the most recent agent ID from messages
+function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: string, agents?: any[]): string | null {
+  if (!Array.isArray(messages) || messages.length === 0) return null
+
+  // If conversationId is provided, verify messages belong to this conversation
+  if (conversationId) {
+    // Check if any message has a conversationId field and verify it matches
+    const hasConversationId = messages.some(m => m?.conversationId)
+    if (hasConversationId) {
+      const belongsToConversation = messages.some(m => m?.conversationId === conversationId)
+      if (!belongsToConversation) {
+        // Messages don't belong to this conversation, skip
+        return null
+      }
+    }
+  }
+
+  // Search backwards through messages to find the most recent agent
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (!msg) continue
+
+    // Check assistant messages for agentId
+    if (msg.role === 'assistant' && msg.agentId) {
+      return msg.agentId
+    }
+
+    // Check user messages for agentId
+    if (msg.role === 'user' && msg.agentId) {
+      return msg.agentId
+    }
+
+    // Fallback: Parse @mention from user message content if agents list is provided
+    if (msg.role === 'user' && msg.content && Array.isArray(agents)) {
+      const mentionMatch = String(msg.content).match(/^\s*@([A-Za-z0-9_-]+)/)
+      if (mentionMatch) {
+        const handle = mentionMatch[1].toLowerCase()
+        const mentionedAgent = agents.find(a => a.slug?.toLowerCase() === handle || a.name?.toLowerCase() === handle)
+        if (mentionedAgent) {
+          return mentionedAgent.id
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+
+  // Wrapper to log all agent changes
+  const setSelectedAgentWithLogging = useCallback((agent: Agent | null) => {
+    setSelectedAgent(agent)
+  }, [])
+
   const lastAutoSelectedAgentIdRef = useRef<string | null>(null)
+  const hasSetInitialDefaultAgentRef = useRef<boolean>(false)
+  const hasEverSetAnyAgentRef = useRef<boolean>(false)
   const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model)
   const budgetTokens = agentContextLength
 
@@ -77,9 +133,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
 
-  // Get agents data from starship and conversation
+  // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
-  const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
@@ -210,18 +265,26 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const handleAgentChange = useCallback(
     (agent: Agent | null) => {
       userSelectedAgentRef.current = true
-      setSelectedAgent(agent)
+      setSelectedAgentWithLogging(agent)
+      // Mark that user has interacted with agent selection - never show Gaia fallback again
+      if (agent) {
+        hasSetInitialDefaultAgentRef.current = true
+        hasEverSetAnyAgentRef.current = true
+        lastAutoSelectedAgentIdRef.current = agent.id
+      }
       // Persist to UI store immediately so other UI reads reflect the change
       if (agent && currentConversationId) {
         setConversationAgentStore(currentConversationId, agent.id as any, agent.name as any)
       }
     },
-    [currentConversationId, setConversationAgentStore]
+    [currentConversationId, setConversationAgentStore, setSelectedAgentWithLogging]
   )
 
   // Handle conversation start - receive actual database conversation ID
   const handleConversationStart = useCallback(
     (conversationId: string) => {
+      // Mark that we've moved beyond initial landing - prevent Gaia fallback
+      hasEverSetAnyAgentRef.current = true
       setCurrentConversationId(conversationId)
       onConversationChange?.(conversationId)
     },
@@ -232,11 +295,38 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const handleToggleOverlay = useCallback(() => {}, [])
 
   // Reset conversation when external conversation ID changes
+  const lastConversationIdForResetRef = useRef<string | null>(null)
+  const [inputKey, setInputKey] = useState<string>('input-stable')
+
   useEffect(() => {
     if (externalConversationId === undefined) return
+
+    const wasNull = lastConversationIdForResetRef.current === null
+    const isNowSet = externalConversationId !== null
+    const isSwitchingBetweenExisting = lastConversationIdForResetRef.current !== null && externalConversationId !== null && lastConversationIdForResetRef.current !== externalConversationId
+
+    // When switching between existing conversations - REMOUNT INPUT
+    if (isSwitchingBetweenExisting) {
+      // Change key to force remount
+      setInputKey(`input-${externalConversationId}`)
+      lastConversationIdForResetRef.current = externalConversationId
+      // Allow auto-restore again on new conversation
+      userSelectedAgentRef.current = false
+      // Reset the auto-select guard so messages can update the agent
+      lastAutoSelectedAgentIdRef.current = null
+      // Clear the selected agent so it gets re-selected from new conversation's messages
+      setSelectedAgentWithLogging(null)
+    } else if (wasNull && isNowSet) {
+      // First conversation created - DON'T change key, DON'T remount input
+      // Keep stable key so input preserves the user's @mention
+      lastConversationIdForResetRef.current = externalConversationId
+      // DON'T reset userSelectedAgentRef - preserve user's choice
+      // Allow messages to update naturally without remounting
+    } else {
+      lastConversationIdForResetRef.current = externalConversationId
+    }
+
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
-    // Allow auto-restore again on new conversation
-    userSelectedAgentRef.current = false
   }, [externalConversationId])
 
   useEffect(() => {
@@ -249,7 +339,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Try to find by slug first (preferred), then fall back to ID for backward compatibility
       const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || starshipAgentsData.find(a => a.id === initialAgentId)
       if (agent) {
-        setSelectedAgent(agent)
+        setSelectedAgentWithLogging(agent)
+        hasEverSetAnyAgentRef.current = true
+        lastAutoSelectedAgentIdRef.current = agent.id
         // Also update the UI store so that this agent is remembered for this conversation
         if (currentConversationId) {
           setConversationAgentStore(currentConversationId, agent.id, agent.name)
@@ -258,53 +350,31 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent, currentConversationId, setConversationAgentStore])
 
-  // Restore selected agent from conversation data (with stable guard to avoid loops)
+  // Set Gaia as default ONLY on initial mount - use stable deps to avoid re-runs
   useEffect(() => {
-    // If user explicitly chose an agent, do not override until conversation changes
-    if (userSelectedAgentRef.current && selectedAgent) {
+    // Check flag synchronously - this prevents the effect body from running at all
+    if (hasSetInitialDefaultAgentRef.current) {
       return
     }
 
-    // Priority 1: agent id from conversation store (this should reflect the intended agent for the conversation)
-    if (conversationData?.agentId && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
-      const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId) || null
-      if (storedAgent) {
-        const currentId = selectedAgent?.id || null
-        const targetId = storedAgent.id
-        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
-          lastAutoSelectedAgentIdRef.current = targetId
-          setSelectedAgent(storedAgent)
-          return
-        }
-      }
+    // Set flag immediately to prevent concurrent calls
+    hasSetInitialDefaultAgentRef.current = true
+
+    if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) {
+      return
     }
 
-    // Priority 2: first linked conversation agent (fallback to message history)
-    if (currentConversationId && Array.isArray(conversationAgents) && conversationAgents.length > 0) {
-      const conversationAgent = conversationAgents[0]
-      if (conversationAgent && typeof conversationAgent.id === 'string') {
-        const currentId = selectedAgent?.id || null
-        const targetId = conversationAgent.id
-        if (currentId !== targetId && lastAutoSelectedAgentIdRef.current !== targetId) {
-          lastAutoSelectedAgentIdRef.current = targetId
-          setSelectedAgent(conversationAgent)
-          return
-        }
-      }
-    }
+    // Set Gaia as default for initial landing page
+    const gaiaAgent = starshipAgentsData.find(a => a.slug?.toLowerCase() === 'gaia' || a.name?.toLowerCase() === 'gaia')
+    const fallback = gaiaAgent || starshipAgentsData[0]
 
-    // Priority 3: fallback to first starship agent when none selected
-    if (!selectedAgent && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
-      const fallback = starshipAgentsData[0]
-      if (fallback && typeof fallback.id === 'string') {
-        const targetId = fallback.id
-        if (lastAutoSelectedAgentIdRef.current !== targetId) {
-          lastAutoSelectedAgentIdRef.current = targetId
-          setSelectedAgent(fallback)
-        }
-      }
+    if (fallback && typeof fallback.id === 'string') {
+      hasEverSetAnyAgentRef.current = true
+      lastAutoSelectedAgentIdRef.current = fallback.id
+
+      setSelectedAgentWithLogging(fallback)
     }
-  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData])
+  }, [starshipAgentsData, setSelectedAgentWithLogging])
 
   // Keep guard ref in sync with user-driven agent changes
   useEffect(() => {
@@ -498,6 +568,49 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const lastUIAction = (ctx as any)?.lastUIAction
     const prevStreamingRef = useRef(false)
 
+    // Track last processed state to avoid redundant updates
+    const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)
+
+    // Track message count per conversation to detect when messages have loaded
+    const conversationMessageCountRef = useRef<Record<string, number>>({})
+
+    // Auto-restore agent from messages - PRIORITY 1: Most recent agent from messages
+    useEffect(() => {
+      // Always update from messages - they are authoritative
+      if (!currentConversationId) return
+      if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) return
+
+      // Track message count for this conversation
+      const messageCount = liveMessages?.length || 0
+      const lastCount = conversationMessageCountRef.current[currentConversationId] || 0
+
+      // Skip if no messages yet or count hasn't changed (avoid processing same data)
+      if (messageCount === 0) return
+
+      // Update the count tracker
+      conversationMessageCountRef.current[currentConversationId] = messageCount
+
+      // Extract most recent agent from loaded messages, verifying they belong to this conversation
+      const recentAgentId = getMostRecentAgentIdFromMessages(liveMessages, currentConversationId, starshipAgentsData)
+
+      if (recentAgentId) {
+        const messageAgent = starshipAgentsData.find(agent => agent.id === recentAgentId) || null
+        if (messageAgent) {
+          // Always update when messages show a different agent than currently selected
+          if (selectedAgent?.id !== messageAgent.id) {
+            lastAutoSelectedAgentIdRef.current = messageAgent.id
+            setSelectedAgentWithLogging(messageAgent)
+            // Mark that an agent has been set - prevent Gaia fallback
+            hasEverSetAnyAgentRef.current = true
+            // Update the store so it's remembered for this conversation
+            setConversationAgentStore(currentConversationId, messageAgent.id, messageAgent.name)
+            // Reset user selection flag so messages remain authoritative
+            userSelectedAgentRef.current = false
+          }
+        }
+      }
+    }, [liveMessages, currentConversationId, starshipAgentsData, selectedAgent])
+
     // Focus input when streaming transitions from true -> false
     useEffect(() => {
       const was = prevStreamingRef.current
@@ -661,7 +774,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
-        <ConversationStreamProvider conversationId={currentConversationId} starshipId={starshipId}>
+        {/* Key prop forces provider to remount and create fresh stream when conversation changes */}
+        <ConversationStreamProvider key={currentConversationId || 'no-conversation'} conversationId={currentConversationId} starshipId={starshipId}>
           {/* Messages Area or Welcome Screen */}
           {showMessagesArea ? (
             <>
@@ -688,6 +802,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             style={{ willChange: 'transform' }}
           >
             <ConversationMessageInput
+              key={inputKey}
               ref={messageInputRef}
               selectedAgent={selectedAgent}
               starshipId={starshipId}

@@ -3,6 +3,7 @@ import type { ApiResponse, CreateStarshipRequest, StarshipModel, UpdateStarshipR
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 // Extended Starship interface for client compatibility with optimistic updates
 export interface ClientStarship extends StarshipModel {
@@ -116,7 +117,7 @@ export function useCreateStarship() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create starship'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to create starship', {
         description: errorMessage,
       })
@@ -150,7 +151,7 @@ export function useUpdateStarship() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update starship'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to update starship', {
         description: errorMessage,
       })
@@ -207,7 +208,7 @@ export function useDeleteStarship() {
         })
       }
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete starship'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to delete starship', {
         description: errorMessage,
       })

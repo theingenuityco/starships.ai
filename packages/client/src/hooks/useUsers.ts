@@ -10,6 +10,7 @@ import type { ApiResponse, CreateUserRequest, UpdateUserRequest, UserModel } fro
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { validatePassword as centralValidatePassword } from '@/utils/passwordStrength'
 
 // Extended User interface for client compatibility with optimistic updates
 export interface ClientUser extends UserModel {
@@ -450,35 +451,7 @@ export function useUserValidation() {
     return email.includes('@') && email.length > 0
   }
 
-  const validatePassword = (
-    password: string
-  ): {
-    isValid: boolean
-    errors: string[]
-  } => {
-    const errors: string[] = []
-
-    if (password.length < 6) {
-      errors.push('Password must be at least 6 characters long')
-    }
-
-    if (!/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter')
-    }
-
-    if (!/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter')
-    }
-
-    if (!/\d/.test(password)) {
-      errors.push('Password must contain at least one number')
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    }
-  }
+  const validatePassword = centralValidatePassword
 
   return {
     validateEmail,

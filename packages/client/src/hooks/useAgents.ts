@@ -267,8 +267,8 @@ export function useDeleteAgent() {
       // Remove from detail cache
       queryClient.removeQueries({ queryKey: AGENT_QUERY_KEYS.detail(agentId) })
 
-      // Invalidate related caches
-      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.lists() })
+      // Invalidate all related caches including starship-specific caches
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
 
       if (context?.agent) {
         toast.success('Agent deleted successfully!', {

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCurrentUser, useDeleteUser, useUpdateUserProfile } from '@/hooks/useUsers'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { validatePassword } from '@/utils/passwordStrength'
 
 export type FormState = {
   displayName: string
@@ -110,21 +111,26 @@ export function useAccountForm() {
     const anyPasswordEdit = !!(f.currentPassword || f.newPassword || f.confirmNewPassword)
 
     if (anyPasswordEdit) {
-      // Current password
-      if (!f.currentPassword || f.currentPassword.length < 6) {
-        errs.current = 'Current password must be at least 6 characters'
+      // Current password - just check if provided when changing password
+      if (!f.currentPassword) {
+        errs.current = 'Current password is required to change password'
       }
 
-      // New password
-      if (!f.newPassword || f.newPassword.length < 6) {
-        errs.new = 'New password must be at least 6 characters'
-      } else if (f.currentPassword && f.newPassword === f.currentPassword) {
-        errs.new = 'New password must be different from current password'
+      // New password - use comprehensive validation
+      if (!f.newPassword) {
+        errs.new = 'New password is required'
+      } else {
+        const passwordValidation = validatePassword(f.newPassword)
+        if (!passwordValidation.isValid) {
+          errs.new = passwordValidation.errors[0]
+        } else if (f.currentPassword && f.newPassword === f.currentPassword) {
+          errs.new = 'New password must be different from current password'
+        }
       }
 
       // Confirm new password
-      if (!f.confirmNewPassword || f.confirmNewPassword.length < 6) {
-        errs.confirm = 'Re-entered password must be at least 6 characters'
+      if (!f.confirmNewPassword) {
+        errs.confirm = 'Please confirm your new password'
       } else if (f.newPassword && f.confirmNewPassword !== f.newPassword) {
         errs.confirm = 'Passwords do not match'
       }

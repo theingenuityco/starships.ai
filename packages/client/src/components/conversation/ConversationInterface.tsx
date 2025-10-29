@@ -330,6 +330,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }, [externalConversationId])
 
   useEffect(() => {
+    // Reset user selection flag when conversation actually changes
+    if (currentConversationIdRef.current !== currentConversationId && currentConversationId) {
+      userSelectedAgentRef.current = false
+    }
     currentConversationIdRef.current = currentConversationId
   }, [currentConversationId])
 
@@ -376,7 +380,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [starshipAgentsData, setSelectedAgentWithLogging])
 
-  // Keep guard ref in sync with user-driven agent changes
+  // Keep guard ref in sync with agent changes
   useEffect(() => {
     if (selectedAgent?.id) {
       lastAutoSelectedAgentIdRef.current = selectedAgent.id

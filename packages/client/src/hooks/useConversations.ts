@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -79,7 +80,7 @@ export function useCreateConversation() {
       }
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create conversation'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to create conversation', {
         description: errorMessage,
       })
@@ -112,7 +113,27 @@ export function useDeleteConversation() {
     onMutate: async conversationId => {
       // Get conversation details to know which starship it belongs to
       const conversationData = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(conversationId)) as any
-      const starshipId = conversationData?.conversation?.starshipId
+      let starshipId = conversationData?.conversation?.starshipId
+
+      // If starshipId is not available from cached conversation, try to find it from starship conversations cache
+      if (!starshipId) {
+        const allQueryData = queryClient.getQueriesData({ queryKey: CONVERSATION_QUERY_KEYS.all })
+        for (const [queryKey, data] of allQueryData) {
+          const key = queryKey as string[]
+          if (key.includes('starship') && data && typeof data === 'object' && 'conversations' in data) {
+            const conversations = (data as { conversations: ConversationModel[] }).conversations
+            const foundConversation = conversations.find((conv: ConversationModel) => conv.id === conversationId)
+            if (foundConversation) {
+              // Extract starshipId from the query key since it's part of CONVERSATION_QUERY_KEYS.byStarship(starshipId)
+              const starshipIndex = key.indexOf('starship')
+              if (starshipIndex !== -1 && starshipIndex + 1 < key.length) {
+                starshipId = key[starshipIndex + 1]
+              }
+              break
+            }
+          }
+        }
+      }
 
       // Cancel any outgoing refetches
       if (starshipId) {
@@ -141,7 +162,9 @@ export function useDeleteConversation() {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.byStarship(context.starshipId), context.previousConversations)
       }
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete conversation'
+      // SIMPLE FIX: Use simple error sanitization
+      const errorMessage = getSafeErrorMessage(error);
+      
       toast.error('Failed to delete conversation', {
         description: errorMessage,
       })
@@ -154,12 +177,22 @@ export function useDeleteConversation() {
       toast.success('Conversation deleted successfully!')
     },
     onSettled: (data, error, conversationId, context) => {
-      // Always refetch to ensure consistency
+      // Always refetch to ensure consistency - use both starshipId from context and current starship
       if (context?.starshipId) {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(context.starshipId),
         })
       }
+      
+      // Also invalidate all starship conversation queries as a fallback
+      // This ensures UI updates even if starshipId detection failed
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+        predicate: (query) => {
+          const key = query.queryKey as string[]
+          return key.includes('starship') && key.includes('list')
+        }
+      })
     },
   })
 }
@@ -192,7 +225,7 @@ export function useDeleteMessage() {
         queryKey: CONVERSATION_QUERY_KEYS.all,
       })
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete message'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to delete message', {
         description: errorMessage,
       })
@@ -243,8 +276,57 @@ export function useUpdateConversationStatus() {
       toast.success(`Conversation ${variables.status} successfully!`)
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update conversation status'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to update status', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
+// Update conversation details
+export function useUpdateConversation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: { conversationId: string; title?: string }) => {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}`, {
+        title: data.title,
+      })
+      return response.data.data
+    },
+    onSuccess: (updatedConversation, variables) => {
+      // Update the conversation in detail cache
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.detail(variables.conversationId), (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          conversation: updatedConversation,
+        }
+      })
+
+      // Update conversation in all starship conversation lists directly
+      queryClient.setQueriesData(
+        { queryKey: CONVERSATION_QUERY_KEYS.all },
+        (oldData: any) => {
+          if (!oldData || !oldData.conversations) return oldData
+          
+          return {
+            ...oldData,
+            conversations: oldData.conversations.map((conv: any) => 
+              conv.id === variables.conversationId 
+                ? { ...conv, title: updatedConversation.title, updatedAt: updatedConversation.updatedAt }
+                : conv
+            )
+          }
+        }
+      )
+
+      toast.success('Conversation renamed successfully!')
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error);
+      toast.error('Failed to rename conversation', {
         description: errorMessage,
       })
     },
@@ -277,7 +359,7 @@ export function useConversationStop() {
         // Signal server to persist partials and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
       } catch (error: any) {
-        const msg = error?.response?.data?.error || error?.message || 'Failed to stop'
+        const msg = getSafeErrorMessage(error);
         toast.error('Failed to stop response', { description: msg })
         return
       }
@@ -332,11 +414,12 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   }
   let closed = false
 
-  // Controller to explicitly close SSE on completion or aborts
-  const localController = new AbortController()
+  const controller = new AbortController()
 
-  // Track if we've seen a complete event (for state tracking, but don't close connection)
-  let seenComplete = false
+  // SIMPLE FIX: Auto-cleanup after 5 minutes to prevent resource leaks
+  const timeoutId = setTimeout(() => {
+    controller.abort()
+  }, 5 * 60 * 1000)
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
   const queue: StreamedChunk[] = []
@@ -352,28 +435,27 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
     }
   }
 
-  const end = () => {
+  const cleanup = () => {
     if (closed) return
     closed = true
+    clearTimeout(timeoutId)
+    controller.abort()
     while (resolvers.length > 0) {
       const resolve = resolvers.shift()!
       resolve({ value: undefined as any, done: true })
     }
+    queue.length = 0 // Clear queue to prevent memory leaks
   }
 
-  if (signal) {
-    // Ensure aborts (e.g., refetch, unmount) close both the iterable and the SSE connection
-    const abortBoth = () => {
-      end()
-      try {
-        localController.abort()
-      } catch {}
-    }
-    if (signal.aborted) {
-      abortBoth()
-    } else {
-      signal.addEventListener('abort', abortBoth, { once: true })
-    }
+  // SIMPLE FIX: Combine signals properly 
+  const combinedSignal = signal ? 
+    AbortSignal.any([signal, controller.signal]) : 
+    controller.signal
+
+  if (signal?.aborted) {
+    cleanup()
+  } else if (signal) {
+    signal.addEventListener('abort', cleanup, { once: true })
   }
 
   // Start SSE subscription
@@ -381,7 +463,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
     method: 'GET',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     openWhenHidden: true,
-    signal: localController.signal,
+    signal: combinedSignal,
     async onopen(response) {
       if (!response.ok) {
         push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
@@ -492,9 +574,6 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             // Ensure we flip streaming=false before completion (UI caret off)
             push({ type: 'mark_last_assistant_streaming', streaming: false })
             push({ type: 'complete' })
-            // Mark that we've seen complete, but don't close the connection
-            // The connection should stay open for the entire conversation
-            seenComplete = true
             break
           }
           case 'ui_action': {
@@ -535,12 +614,11 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
       }
     },
     onclose() {
-      end()
+      cleanup()
     },
     onerror(err) {
       push({ type: 'error', error: err })
-      // Let the stream finish; streamedQuery will treat further chunks/end accordingly
-      end()
+      cleanup()
     },
   })
 
@@ -560,11 +638,11 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
           })
         },
         return: () => {
-          end()
+          cleanup()
           return Promise.resolve({ value: undefined as any, done: true })
         },
         throw: e => {
-          end()
+          cleanup()
           return Promise.reject(e)
         },
       }
@@ -939,7 +1017,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         return
       }
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
+      const errorMessage = getSafeErrorMessage(error);
       toast.error('Failed to send message', { description: errorMessage })
     },
   })

@@ -197,9 +197,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const messageToSend = message.trim()
       if (!messageToSend || sending || disabled) return
 
-      // Support leading @agent mention to switch/select agent
-      let effectiveAgent: AgentModel | null | undefined = selectedAgent
+      // Enforce presence of a leading @mention chip in the editor
+      const mentionAgentInEditor = getLeadingMentionAgentFromEditor(tiptap as any)
+      if (!mentionAgentInEditor) {
+        toast.error('Mention required', { description: 'Type @ to mention an agent before sending.' })
+        return
+      }
+
+      // Resolve agent to send to, prioritizing the actual mention node
+      let effectiveAgent: AgentModel | null | undefined = mentionAgentInEditor
       let contentToSend = messageToSend
+      // Also support plain-text leading @handle for safety
       const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
       if (mentionMatch && starshipAgents.length > 0) {
         const handle = mentionMatch[1]
@@ -422,8 +430,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Track if there's actual content beyond just the mention and space
     const [hasActualContent, setHasActualContent] = useState(false)
 
-    // Require balance; server also enforces funds. Reverted per request.
-    const canSend = hasActualContent && !disabled && !sending && !isStreamingEffective && Boolean(selectedAgent) && hasFunds
+    // Require balance; server also enforces funds. Also require a leading @mention.
+    const hasLeadingMention = Boolean(leadingMentionAgent)
+    const canSend = hasActualContent && !disabled && !sending && !isStreamingEffective && hasLeadingMention && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
@@ -1730,7 +1739,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                   )}
                   aria-label="Send"
-                  title="Send"
+                  title={canSend ? 'Send' : !hasLeadingMention ? 'Mention an agent with @ to send' : 'Send'}
                 >
                   {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
                 </Button>

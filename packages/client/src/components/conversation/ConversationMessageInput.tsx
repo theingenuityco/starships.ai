@@ -682,11 +682,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   try {
                     cleanupTrailingQueryAfterMention(props.editor, lastQuery)
                   } catch {}
-                  // Then update selected agent
+                  // Then update selected agent and mark as user-driven choice
                   try {
                     const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
                     currentAgentRef.current = selected
-                    onAgentChange?.(selected)
+                    if (onAgentChange) {
+                      onAgentChange(selected)
+                    }
                   } catch {}
                 },
                 anchorRect: null,
@@ -804,9 +806,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     try {
                       const lower = String(label).toLowerCase()
                       const agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
-                      if (agent) {
+                      if (agent && onAgentChange) {
                         currentAgentRef.current = agent
-                        onAgentChange?.(agent)
+                        onAgentChange(agent)
                       }
                     } catch {}
                   } catch {}

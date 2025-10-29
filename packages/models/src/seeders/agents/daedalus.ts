@@ -41,7 +41,7 @@ Preference:
 
 Workflow:
 1. Use "Open Tool" to either:
-   - Create a draft by providing name and a concise, relevant description (slug auto-generated unless provided), or
+   - Create a new tool (active by default) by providing name and a concise, relevant description (slug auto-generated unless provided), or
    - Open an existing tool by providing slug only
 2. For multi-step scaffolds or bulk changes, prefer "Edit Tool" with a complete blueprint draft; otherwise use "Add Tool Blueprint Node/Edge" for surgical changes.
 3. Use "Edit Tool Blueprint Node/Edge" to tweak a single node or edge as needed.
@@ -57,7 +57,7 @@ Alternative Workflow for Existing Tools:
 4. Use "Edit Tool" to apply the final blueprint updates
 5. Use Test Tool to validate changes
 
-All tool manipulation commands (Open Tool, Edit Tool, and all blueprint CRUD operations) automatically update state.focusedTool with complete tool details. Tool call responses are minimal confirmations - always access complete tool data (id, parameters, blueprint, etc.) directly from state.focusedTool without additional API calls. The focused tool stays synchronized as you modify it. Draft tools (status='draft') are excluded from agent execution until activated.
+All tool manipulation commands (Open Tool, Edit Tool, and all blueprint CRUD operations) automatically update state.focusedTool with complete tool details. Tool call responses are minimal confirmations - always access complete tool data (id, parameters, blueprint, etc.) directly from state.focusedTool without additional API calls. The focused tool stays synchronized as you modify it. Tools are created active by default and are available for agent execution.
 
 Function names use their display name (e.g., "Open Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open, tool-edit, tool-add-blueprint-node).
 </protocol>

@@ -37,15 +37,14 @@ const CreateToolSchema = z
   })
   .refine(
     (data) => {
-      // For active tools, parameters and blueprint are required
-      if (data.status === 'active' || !data.status) {
-        return !!data.parameters && !!data.blueprint;
+      // If either parameters or blueprint is provided, the other must also be provided
+      if ((!!data.parameters && !data.blueprint) || (!data.parameters && !!data.blueprint)) {
+        return false;
       }
-      // For draft tools, they are optional
       return true;
     },
     {
-      message: 'Active tools must have parameters and blueprint defined',
+      message: 'Parameters and blueprint must both be provided together when setting either one',
       path: ['parameters'],
     }
   );

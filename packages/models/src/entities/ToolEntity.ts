@@ -112,12 +112,13 @@ export class ToolEntity implements ToolModel {
 
     // For create operations, validate all required fields
     if (operation === 'create') {
-      const status = dataRecord.status || 'active';
+      const status = (dataRecord.status as 'draft' | 'active' | undefined) || 'active';
 
-      // For draft tools, parameters and blueprint are optional
-      // For active tools, they are required
-      if (status === 'active' && (!dataRecord.parameters || !dataRecord.blueprint)) {
-        throw new Error('Validation failed: Active tools must have parameters and blueprint defined');
+      // If either parameters or blueprint is provided, the other must also be provided
+      const hasParams = !!dataRecord.parameters;
+      const hasBlueprint = !!dataRecord.blueprint;
+      if ((hasParams && !hasBlueprint) || (!hasParams && hasBlueprint)) {
+        throw new Error('Validation failed: Parameters and blueprint must both be provided together when setting either one');
       }
 
       Object.assign(entity, {

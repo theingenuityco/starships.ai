@@ -74,12 +74,36 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
           <circle cx="8%" cy="12%" r="1.2" fill="url(#starGlow)" />
           <circle cx="18%" cy="22%" r="0.6" fill="#ffffff" />
           <circle cx="15%" cy="28%" r="1" fill="url(#starGlow)" />
+          <circle cx="5%" cy="20%" r="0.7" fill="#ffffff" />
+          <circle cx="10%" cy="35%" r="0.8" fill="#ffffff" />
+          <circle cx="20%" cy="15%" r="0.6" fill="#ffffff" />
+          <circle cx="14%" cy="8%" r="0.9" fill="url(#starGlow)" />
+          <circle cx="6%" cy="30%" r="0.7" fill="#ffffff" />
+          
+          {/* Top center region */}
+          <circle cx="35%" cy="10%" r="0.8" fill="#ffffff" />
+          <circle cx="42%" cy="15%" r="1" fill="url(#starGlow)" />
+          <circle cx="50%" cy="12%" r="0.7" fill="#ffffff" />
+          <circle cx="58%" cy="18%" r="0.9" fill="#ffffff" />
+          <circle cx="48%" cy="8%" r="0.6" fill="#ffffff" />
+          <circle cx="52%" cy="20%" r="0.8" fill="url(#starGlow)" />
           
           {/* Top right region */}
           <circle cx="82%" cy="15%" r="0.9" fill="#ffffff" />
           <circle cx="88%" cy="20%" r="1.1" fill="url(#starGlow)" />
           <circle cx="78%" cy="25%" r="0.7" fill="#ffffff" />
           <circle cx="92%" cy="12%" r="0.8" fill="#ffffff" />
+          <circle cx="85%" cy="10%" r="0.7" fill="#ffffff" />
+          <circle cx="90%" cy="28%" r="0.9" fill="#ffffff" />
+          <circle cx="94%" cy="22%" r="0.6" fill="#ffffff" />
+          <circle cx="80%" cy="8%" r="1" fill="url(#starGlow)" />
+          
+          {/* Center left */}
+          <circle cx="8%" cy="45%" r="0.9" fill="#ffffff" />
+          <circle cx="12%" cy="52%" r="0.7" fill="#ffffff" />
+          <circle cx="18%" cy="48%" r="1.1" fill="url(#starGlow)" />
+          <circle cx="15%" cy="55%" r="0.6" fill="#ffffff" />
+          <circle cx="10%" cy="60%" r="0.8" fill="#ffffff" />
           
           {/* Center scattered */}
           <circle cx="35%" cy="35%" r="1" fill="url(#starGlow)" />
@@ -87,24 +111,58 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
           <circle cx="55%" cy="38%" r="0.9" fill="#ffffff" />
           <circle cx="62%" cy="32%" r="1.2" fill="url(#starGlow)" />
           <circle cx="48%" cy="50%" r="0.8" fill="#ffffff" />
+          <circle cx="38%" cy="45%" r="0.7" fill="#ffffff" />
+          <circle cx="52%" cy="42%" r="0.9" fill="#ffffff" />
+          <circle cx="42%" cy="52%" r="0.6" fill="#ffffff" />
+          <circle cx="58%" cy="48%" r="1" fill="url(#starGlow)" />
+          <circle cx="32%" cy="52%" r="0.7" fill="#ffffff" />
+          <circle cx="65%" cy="45%" r="0.8" fill="#ffffff" />
+          <circle cx="40%" cy="38%" r="0.6" fill="#ffffff" />
+          
+          {/* Center right */}
+          <circle cx="85%" cy="45%" r="0.8" fill="#ffffff" />
+          <circle cx="90%" cy="52%" r="1" fill="url(#starGlow)" />
+          <circle cx="82%" cy="50%" r="0.7" fill="#ffffff" />
+          <circle cx="88%" cy="58%" r="0.9" fill="#ffffff" />
+          <circle cx="92%" cy="48%" r="0.6" fill="#ffffff" />
           
           {/* Bottom left region */}
           <circle cx="15%" cy="68%" r="0.9" fill="#ffffff" />
           <circle cx="10%" cy="75%" r="1" fill="url(#starGlow)" />
           <circle cx="22%" cy="72%" r="0.7" fill="#ffffff" />
           <circle cx="18%" cy="82%" r="0.8" fill="#ffffff" />
+          <circle cx="8%" cy="80%" r="0.9" fill="#ffffff" />
+          <circle cx="12%" cy="88%" r="0.7" fill="#ffffff" />
+          <circle cx="20%" cy="85%" r="1.1" fill="url(#starGlow)" />
+          <circle cx="6%" cy="70%" r="0.6" fill="#ffffff" />
+          
+          {/* Bottom center */}
+          <circle cx="35%" cy="75%" r="0.8" fill="#ffffff" />
+          <circle cx="42%" cy="80%" r="1" fill="url(#starGlow)" />
+          <circle cx="48%" cy="72%" r="0.7" fill="#ffffff" />
+          <circle cx="52%" cy="82%" r="0.9" fill="#ffffff" />
+          <circle cx="58%" cy="78%" r="0.6" fill="#ffffff" />
+          <circle cx="45%" cy="88%" r="0.8" fill="#ffffff" />
           
           {/* Bottom right region */}
           <circle cx="78%" cy="70%" r="1.1" fill="url(#starGlow)" />
           <circle cx="85%" cy="65%" r="0.8" fill="#ffffff" />
           <circle cx="82%" cy="78%" r="0.9" fill="#ffffff" />
           <circle cx="88%" cy="75%" r="0.7" fill="#ffffff" />
+          <circle cx="90%" cy="82%" r="1" fill="url(#starGlow)" />
+          <circle cx="92%" cy="72%" r="0.6" fill="#ffffff" />
+          <circle cx="80%" cy="85%" r="0.8" fill="#ffffff" />
+          <circle cx="86%" cy="88%" r="0.7" fill="#ffffff" />
           
           {/* Additional scattered particles */}
           <circle cx="28%" cy="45%" r="0.6" fill="#ffffff" />
           <circle cx="70%" cy="48%" r="0.8" fill="#ffffff" />
           <circle cx="40%" cy="62%" r="0.7" fill="#ffffff" />
           <circle cx="58%" cy="58%" r="0.9" fill="url(#starGlow)" />
+          <circle cx="25%" cy="60%" r="0.6" fill="#ffffff" />
+          <circle cx="68%" cy="62%" r="0.8" fill="#ffffff" />
+          <circle cx="32%" cy="68%" r="0.7" fill="#ffffff" />
+          <circle cx="72%" cy="55%" r="0.9" fill="url(#starGlow)" />
         </g>
       </svg>
 

@@ -10,26 +10,19 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Deep space base */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Tighter central nebula glow - more concentrated */}
+      {/* Bottom-center glow spreading upward and outward */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          // Core bright glow - purple (tighter)
-          'radial-gradient(ellipse 800px 550px at 50% 45%, rgba(168,85,247,0.60), transparent 55%)',
-          'radial-gradient(ellipse 950px 650px at 50% 45%, rgba(139,92,246,0.48), transparent 60%)',
-          // Secondary blue layer (tighter)
-          'radial-gradient(ellipse 700px 500px at 48% 48%, rgba(99,102,241,0.38), transparent 58%)',
-          // Soft cyan accent (tighter)
-          'radial-gradient(ellipse 750px 520px at 52% 42%, rgba(59,130,246,0.30), transparent 60%)',
-          // Outer fade (much tighter)
-          'radial-gradient(ellipse 1100px 750px at 50% 45%, rgba(124,58,237,0.22), transparent 65%)',
-        ].join(', '),
-      }} />
-
-      {/* Subtle ambient bottom glow (reduced) */}
-      <div className="absolute inset-0" style={{
-        backgroundImage: [
-          'radial-gradient(ellipse 900px 350px at 50% 100%, rgba(217,70,239,0.10), transparent 65%)',
-          'radial-gradient(ellipse 750px 300px at 50% 100%, rgba(245,158,11,0.06), transparent 60%)',
+          // Core bottom glow - purple/violet (brightest)
+          'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.65), transparent 65%)',
+          // Secondary layer - blue/purple blend
+          'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.50), transparent 70%)',
+          // Outer spread - indigo/blue
+          'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.38), transparent 75%)',
+          // Soft cyan accent
+          'radial-gradient(ellipse 1300px 950px at 50% 103%, rgba(59,130,246,0.28), transparent 72%)',
+          // Farthest fade - subtle purple
+          'radial-gradient(ellipse 1600px 1150px at 50% 108%, rgba(124,58,237,0.18), transparent 78%)',
         ].join(', '),
       }} />
 
@@ -64,7 +57,7 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
         {/* Fine star field across entire background */}
         <rect x="0" y="0" width="100%" height="100%" filter="url(#starNoise)" opacity="0.28" />
         
-        {/* Brighter star accents in nebula center */}
+        {/* Brighter star accents in center */}
         <rect x="25%" y="25%" width="50%" height="40%" filter="url(#brightStars)" opacity="0.35" />
 
         {/* Individual visible star particles scattered throughout */}
@@ -194,9 +187,9 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
         </g>
       </svg>
 
-      {/* Stronger vignette to darken edges more */}
+      {/* Subtle vignette on sides and top only */}
       <div className="absolute inset-0" style={{
-        background: 'radial-gradient(ellipse 65% 55% at 50% 45%, transparent 25%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0.85) 100%)',
+        background: 'radial-gradient(ellipse 100% 120% at 50% 100%, transparent 40%, rgba(0,0,0,0.3) 75%, rgba(0,0,0,0.7) 100%)',
       }} />
     </div>
   )

@@ -12,12 +12,15 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Premium space background (static): deep black + nebula + planet silhouette + star noise */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Nebula washes */}
+      {/* Nebula washes — tuned to match landing gradients (purple/pink, blue/cyan, violet/fuchsia) */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          'radial-gradient(1000px 600px at 18% 32%, rgba(124,58,237,0.22), transparent 60%)',
-          'radial-gradient(900px 520px at 75% 30%, rgba(59,130,246,0.18), transparent 60%)',
-          'radial-gradient(800px 500px at 70% 80%, rgba(16,185,129,0.12), transparent 60%)',
+          // purple-500/pink-500
+          'radial-gradient(1000px 600px at 18% 32%, rgba(168,85,247,0.22), transparent 60%)',
+          // blue-500/cyan-500
+          'radial-gradient(900px 520px at 75% 30%, rgba(59,130,246,0.20), transparent 60%)',
+          // violet-500/fuchsia-500
+          'radial-gradient(800px 500px at 70% 80%, rgba(139,92,246,0.16), transparent 60%)',
         ].join(', '),
       }} />
 
@@ -31,10 +34,11 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
             <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.0" />
           </radialGradient>
           <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.0" />
-            <stop offset="40%" stopColor="#22d3ee" stopOpacity="0.35" />
-            <stop offset="60%" stopColor="#a78bfa" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.0" />
+            {/* cyan-500 to fuchsia-500, subtle */}
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.0" />
+            <stop offset="40%" stopColor="#06b6d4" stopOpacity="0.28" />
+            <stop offset="60%" stopColor="#d946ef" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#d946ef" stopOpacity="0.0" />
           </linearGradient>
           {/* Procedural star noise */}
           <filter id="starNoise" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">

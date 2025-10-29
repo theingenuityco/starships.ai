@@ -367,8 +367,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const fallback = gaiaAgent || starshipAgentsData[0]
 
     if (fallback && typeof fallback.id === 'string') {
-      console.log('[Gaia Fallback] Setting initial default agent:', fallback.name)
-
       // Set flags BEFORE state update to prevent re-runs
       hasSetInitialDefaultAgentRef.current = true
       hasEverSetAnyAgentRef.current = true

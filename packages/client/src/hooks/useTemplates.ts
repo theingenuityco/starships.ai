@@ -123,7 +123,28 @@ export function useCreateAgentFromTemplate() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to deploy agent'
+      // Extract error message with better handling for ValidationError
+      let errorMessage = 'Failed to deploy agent'
+      let isValidationError = false
+      
+      if (error?.response?.data?.error) {
+        // Handle structured error response from server
+        const serverError = error.response.data.error
+        if (typeof serverError === 'string') {
+          errorMessage = serverError
+        } else if (serverError.message) {
+          errorMessage = serverError.message
+          isValidationError = serverError.code === 'VALIDATION_ERROR'
+        }
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      // Only log unexpected errors to console to avoid noise
+      if (!isValidationError || error?.response?.status !== 400) {
+        console.error('Agent deployment error:', error)
+      }
+      
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })

@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { PageLayout } from '@/components/layout/PageLayout'
+import { useAuth } from '@/hooks/useAuth'
+import PublicHeader from '@/components/navigation/PublicHeader'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
@@ -16,6 +18,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel } from '@starships/protocol'
 
 export default function MarketplacePageClient() {
+  const { isAuthenticated } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -67,8 +70,10 @@ export default function MarketplacePageClient() {
   }
 
   return (
-    <PageLayout requireAuth={false}>
-      <div className="bg-background">
+    <>
+      {!isAuthenticated && <PublicHeader />}
+      <PageLayout requireAuth={false}>
+        <div className={`bg-background ${!isAuthenticated ? 'pt-16 sm:pt-20' : ''}`}>
         <div className="flex flex-col items-center px-4 sm:px-6 py-6 sm:py-8">
           <div className="w-full max-w-6xl mx-auto space-y-6 sm:space-y-8">
             {/* Page title */}
@@ -156,5 +161,6 @@ export default function MarketplacePageClient() {
       {/* Agent Details Drawer */}
       <AgentDetailsDrawer template={selectedAgent} open={isAgentDrawerOpen} onOpenChange={handleAgentDrawerClose} onDeploy={handleAgentDeploy} />
     </PageLayout>
+    </>
   )
 }

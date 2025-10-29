@@ -275,7 +275,69 @@ export class ConversationService {
    * Delete a conversation
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
-    return this.conversationRepository.delete(conversationId);
+    try {
+      console.log(`[ConversationService] Starting deletion process for conversation ${conversationId}`);
+      
+      // Verify conversation exists first
+      const conversation = await this.conversationRepository.findById(conversationId);
+      if (!conversation) {
+        console.log(`[ConversationService] Conversation ${conversationId} not found for deletion`);
+        return false;
+      }
+
+      console.log(`[ConversationService] Found conversation ${conversationId} (title: "${conversation.title}"), proceeding with deletion`);
+      
+      // Use the repository's delete method which should handle CASCADE properly
+      const deleted = await this.conversationRepository.delete(conversationId);
+      
+      if (deleted) {
+        console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
+      } else {
+        console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
+      }
+      
+      return deleted;
+    } catch (error) {
+      // Enhanced error logging with more details
+      if (error instanceof Error) {
+        console.error(`[ConversationService] Error deleting conversation ${conversationId}:`, {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+          ...(error as any).code && { code: (error as any).code },
+          ...(error as any).constraint && { constraint: (error as any).constraint },
+        });
+      } else {
+        console.error(`[ConversationService] Unknown error deleting conversation ${conversationId}:`, error);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Update conversation details (title, etc.)
+   */
+  async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
+    try {
+      console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
+      
+      // Use the repository's update method
+      const updatedConversation = await this.conversationRepository.update(conversationId, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+      
+      if (updatedConversation) {
+        console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
+      } else {
+        console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
+      }
+      
+      return updatedConversation;
+    } catch (error) {
+      console.error(`[ConversationService] Error updating conversation ${conversationId}:`, error);
+      throw error;
+    }
   }
 
   /**

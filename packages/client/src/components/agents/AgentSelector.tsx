@@ -10,7 +10,7 @@ import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector
 import { AgentTester } from '@/components/agents/AgentTester'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateConversation } from '@/hooks/useConversations'
@@ -58,6 +58,10 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   // Analytics state
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [analyticsAgent, setAnalyticsAgent] = useState<AgentModel | null>(null)
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [agentToDelete, setAgentToDelete] = useState<AgentModel | null>(null)
 
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -150,22 +154,33 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     setShowForm(true)
   }
 
-  const handleDeleteAgent = async (agent: AgentModel) => {
-    if (!confirm(`Are you sure you want to delete "${agent.name}"?`)) {
-      return
-    }
+  const handleDeleteAgent = (agent: AgentModel) => {
+    setAgentToDelete(agent)
+    setShowDeleteConfirm(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!agentToDelete) return
 
     try {
-      await deleteAgentMutation.mutateAsync(agent.id)
+      await deleteAgentMutation.mutateAsync(agentToDelete.id)
 
       // If the deleted agent was selected, clear selection
-      if (selectedAgent?.id === agent.id) {
+      if (selectedAgent?.id === agentToDelete.id) {
         onAgentSelect(null as any) // Clear selection
       }
+
+      setShowDeleteConfirm(false)
+      setAgentToDelete(null)
     } catch (error) {
       console.error('Failed to delete agent:', error)
       setError('Failed to delete agent')
     }
+  }
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false)
+    setAgentToDelete(null)
   }
 
   const handleFormSave = async (savedAgent: AgentModel) => {
@@ -310,7 +325,14 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
-            <DeployedAgentCard key={agent.id} agent={agent} onClick={() => onAgentSelect(agent)} onChat={() => handleChatWithAgent(agent)} />
+            <DeployedAgentCard 
+              key={agent.id} 
+              agent={agent} 
+              onClick={() => onAgentSelect(agent)} 
+              onChat={() => handleChatWithAgent(agent)}
+              onDelete={handleDeleteAgent}
+              showActions={true}
+            />
           ))}
         </div>
       )}
@@ -334,6 +356,43 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       <Dialog open={showAnalytics} onOpenChange={setShowAnalytics}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           {analyticsAgent && <AgentAnalytics agentId={analyticsAgent.id} agentName={analyticsAgent.name} onClose={handleAnalyticsClose} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="alert-triangle" className="h-5 w-5 text-destructive" />
+              Delete Agent
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              Are you sure you want to delete <strong>&ldquo;{agentToDelete?.name}&rdquo;</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleCancelDelete}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              disabled={deleteAgentMutation.isPending}
+            >
+              {deleteAgentMutation.isPending ? (
+                <>
+                  <Icon name="loading" className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Icon name="trash" className="w-4 h-4 mr-2" />
+                  Delete Agent
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

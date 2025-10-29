@@ -20,15 +20,17 @@ export function UserbackProvider({ children, token }: UserbackProviderProps) {
   useEffect(() => {
     const init = async () => {
       try {
-        const options: any = {}
-
-        options.identify(userId, {
-          name: userName || userEmail,
-          email: userEmail,
-        })
-
         // Initialize Userback widget and get the instance
-        const instance = await Userback(token, options)
+        const instance = await Userback(token, { autohide: false })
+
+        // Identify the user after initialization if userId is available
+        if (userId) {
+          instance.identify(userId, {
+            name: userName || userEmail,
+            email: userEmail,
+          })
+        }
+
         setUserback(instance)
       } catch (error) {
         console.error('Failed to initialize Userback:', error)

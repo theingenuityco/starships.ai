@@ -9,17 +9,40 @@ interface AuthMarketingPanelProps {
 export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
   return (
     <div className={className}>
-      {/* Minimal background grid (no gradients, no animation) */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundColor: 'rgba(0,0,0,1)',
-          backgroundImage:
-            'radial-gradient(transparent 1px, rgba(255,255,255,0.02) 1px)',
-          backgroundSize: '12px 12px',
-          backgroundPosition: '0 0',
-        }}
-      />
+      {/* Spacey background: deep black base with subtle static starfield (no animation) */}
+      <div className="absolute inset-0 bg-black" />
+      <svg className="absolute inset-0 w-full h-full opacity-70" role="img" aria-hidden="true" preserveAspectRatio="none">
+        <defs>
+          <radialGradient id="starGlow" r="50%">
+            <stop offset="0%" stopColor="white" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        {/* small stars */}
+        <g fill="white" opacity="0.5">
+          <circle cx="5%" cy="12%" r="0.6" />
+          <circle cx="18%" cy="28%" r="0.7" />
+          <circle cx="12%" cy="66%" r="0.6" />
+          <circle cx="28%" cy="78%" r="0.5" />
+          <circle cx="42%" cy="18%" r="0.6" />
+          <circle cx="57%" cy="12%" r="0.7" />
+          <circle cx="63%" cy="34%" r="0.5" />
+          <circle cx="71%" cy="22%" r="0.6" />
+          <circle cx="76%" cy="68%" r="0.6" />
+          <circle cx="84%" cy="46%" r="0.5" />
+          <circle cx="90%" cy="30%" r="0.6" />
+          <circle cx="93%" cy="82%" r="0.5" />
+          <circle cx="36%" cy="54%" r="0.6" />
+          <circle cx="48%" cy="72%" r="0.6" />
+          <circle cx="24%" cy="12%" r="0.5" />
+        </g>
+        {/* glow clusters for subtle nebula-like feel */}
+        <g opacity="0.18">
+          <circle cx="22%" cy="35%" r="180" fill="url(#starGlow)" />
+          <circle cx="68%" cy="24%" r="140" fill="url(#starGlow)" />
+          <circle cx="78%" cy="72%" r="160" fill="url(#starGlow)" />
+        </g>
+      </svg>
 
       {/* Content */}
       <div className="relative z-10 flex h-full w-full flex-col justify-center px-10 xl:px-16 text-white">
@@ -60,12 +83,7 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
           </div>
         </div>
 
-        {/* Footer links */}
-        <div className="mt-10 text-xs text-white/60">
-          <a className="hover:text-white/80" href="/privacy" target="_blank" rel="noreferrer">Privacy</a>
-          <span className="mx-2">•</span>
-          <a className="hover:text-white/80" href="/terms" target="_blank" rel="noreferrer">Terms</a>
-        </div>
+        {/* Footer links intentionally removed per request */}
       </div>
     </div>
   )

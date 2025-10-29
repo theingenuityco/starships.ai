@@ -10,26 +10,26 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Deep space base */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Extra tight central nebula glow - narrow beam */}
+      {/* Tighter central nebula glow - more concentrated */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          // Core bright glow - purple (narrower)
-          'radial-gradient(ellipse 600px 480px at 50% 45%, rgba(168,85,247,0.62), transparent 52%)',
-          'radial-gradient(ellipse 720px 560px at 50% 45%, rgba(139,92,246,0.50), transparent 57%)',
-          // Secondary blue layer (narrower)
-          'radial-gradient(ellipse 550px 450px at 48% 48%, rgba(99,102,241,0.40), transparent 55%)',
-          // Soft cyan accent (narrower)
-          'radial-gradient(ellipse 600px 470px at 52% 42%, rgba(59,130,246,0.32), transparent 57%)',
-          // Outer fade (narrower)
-          'radial-gradient(ellipse 850px 650px at 50% 45%, rgba(124,58,237,0.24), transparent 62%)',
+          // Core bright glow - purple (tighter)
+          'radial-gradient(ellipse 800px 550px at 50% 45%, rgba(168,85,247,0.60), transparent 55%)',
+          'radial-gradient(ellipse 950px 650px at 50% 45%, rgba(139,92,246,0.48), transparent 60%)',
+          // Secondary blue layer (tighter)
+          'radial-gradient(ellipse 700px 500px at 48% 48%, rgba(99,102,241,0.38), transparent 58%)',
+          // Soft cyan accent (tighter)
+          'radial-gradient(ellipse 750px 520px at 52% 42%, rgba(59,130,246,0.30), transparent 60%)',
+          // Outer fade (much tighter)
+          'radial-gradient(ellipse 1100px 750px at 50% 45%, rgba(124,58,237,0.22), transparent 65%)',
         ].join(', '),
       }} />
 
-      {/* Subtle ambient bottom glow (reduced and narrower) */}
+      {/* Subtle ambient bottom glow (reduced) */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          'radial-gradient(ellipse 700px 300px at 50% 100%, rgba(217,70,239,0.10), transparent 62%)',
-          'radial-gradient(ellipse 580px 250px at 50% 100%, rgba(245,158,11,0.06), transparent 58%)',
+          'radial-gradient(ellipse 900px 350px at 50% 100%, rgba(217,70,239,0.10), transparent 65%)',
+          'radial-gradient(ellipse 750px 300px at 50% 100%, rgba(245,158,11,0.06), transparent 60%)',
         ].join(', '),
       }} />
 

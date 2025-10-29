@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Open Tool (Create or Open)
- * Creates a new draft tool when provided name (+ description; slug optional), or opens an existing tool by slug
+ * Creates a new tool (active) when provided name (+ description; slug optional), or opens an existing tool by slug
  */
 export const toolOpenTool: ToolParams = {
   name: 'Open Tool',
@@ -11,7 +11,7 @@ export const toolOpenTool: ToolParams = {
   description: `Creates or opens a tool on the current starship.
 
 ## Modes
-- Create new draft: provide "name" and "description" (slug auto-generated from name unless provided)
+- Create new: provide "name" and "description" (slug auto-generated from name unless provided)
 - Open existing: provide only "slug"
 
 ## Environment Dependencies
@@ -65,7 +65,7 @@ Automatically inferred from agent state (do not pass manually):
             const hasSlug = input && typeof input.slug === 'string' && input.slug.trim().length > 0;
 
             if (hasName) {
-              // Create draft
+              // Create tool (active by default)
               const name = input.name.trim();
               const description = (input && typeof input.description === 'string' ? input.description.trim() : '');
               if (!description) throw new Error('description is required when creating a new tool');
@@ -81,7 +81,7 @@ Automatically inferred from agent state (do not pass manually):
                 name,
                 slug,
                 description,
-                status: 'draft'
+                status: 'active'
               };
               return {
                 url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
@@ -154,7 +154,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   slug: 'tool-open',
   category: 'automation',
   exampleUsage:
-    '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create draft (slug auto-generated from name; env inferred)\n{ "name": "My Tool", "slug": "my-tool", "description": "Does something useful" } // create draft with explicit slug',
+    '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (slug auto-generated from name; env inferred)\n{ "name": "My Tool", "slug": "my-tool", "description": "Does something useful" } // create new with explicit slug',
   requiresApiKey: false,
   configurationFields: [],
 };

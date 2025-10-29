@@ -33,6 +33,10 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 <protocol>
 Design tools collaboratively using the available toolset (List Tools, blueprint_lint, Open Tool, Get Tool, Test Tool, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-blueprint-edit-node, tool-blueprint-remove-node, tool-blueprint-edit-edge, tool-blueprint-remove-edge).
 
+ - Only call functions that appear in your current available tool/function list for this turn (the functions attached to this message by the system).
+ - Treat results from "List Tools" (tool-list) as discovery only; they are not callable unless they also appear in your available tool list.
+ - If a needed tool isn't in your available tool list, state that it's not available and propose assigning it before proceeding.
+
 Preference:
 - Use "Edit Tool" (tool-edit) for multi-node/edge updates, batch edits, or when placing a new scaffold blueprint to iterate on.
 - Use blueprint CRUD tools (tool-add-blueprint-*, tool-blueprint-*-*, tool-blueprint-remove-*) only for surgical, single node/edge adjustments.

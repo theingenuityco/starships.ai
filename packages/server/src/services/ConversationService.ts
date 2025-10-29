@@ -646,25 +646,14 @@ export class ConversationService {
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
-      console.log(`[ConversationService] Starting deletion process for conversation ${conversationId}`);
-
       // Verify conversation exists first
       const conversation = await this.conversationRepository.findById(conversationId);
       if (!conversation) {
-        console.log(`[ConversationService] Conversation ${conversationId} not found for deletion`);
         return false;
       }
 
-      console.log(`[ConversationService] Found conversation ${conversationId} (title: "${conversation.title}"), proceeding with deletion`);
-
       // Use the repository's delete method which should handle CASCADE properly
       const deleted = await this.conversationRepository.delete(conversationId);
-
-      if (deleted) {
-        console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
-      } else {
-        console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
-      }
 
       return deleted;
     } catch (error) {
@@ -689,17 +678,13 @@ export class ConversationService {
    */
   async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
     try {
-      console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
-
       // Use the repository's update method
       const updatedConversation = await this.conversationRepository.update(conversationId, {
         ...updates,
         updatedAt: new Date().toISOString(),
       });
 
-      if (updatedConversation) {
-        console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
-      } else {
+      if (!updatedConversation) {
         console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
       }
 
@@ -821,7 +806,6 @@ export class ConversationService {
       const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
 
       if (deployedTools.length === 0) {
-        console.log(`[CONVERSATION-SERVICE] No tools found for agent ${agentId} on starship ${starshipId} via relationships`);
         return [];
       }
 
@@ -840,7 +824,6 @@ export class ConversationService {
           ...(tool.condition && { condition: tool.condition }),
         }));
 
-      console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} tools via Agent→Tool relationships for agent ${agentId}`);
       return toolParams;
     } catch (error) {
       console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
@@ -873,19 +856,14 @@ export class ConversationService {
       if (convo) {
         const t = (convo.title || '').trim().toLowerCase();
         const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
-        console.log('[TITLE] Early check:', {
-          conversationId: convo.id,
-          currentTitle: convo.title,
-          needsTitle: needs,
-          contentPreview: String(data.content || '').slice(0, 80),
-        });
+
         if (needs) {
           const star = await this.getConversationStarship(data.conversationId);
           if (star) {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
             if (gen && gen.trim()) {
               await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
-              console.log('[TITLE] Updated conversation title:', { conversationId: convo.id, title: gen.trim() });
+
               if (this.streamingService && this.streamingService.isActive(convo.id)) {
                 await this.streamingService.broadcastUIAction(convo.id, {
                   __ui_action: 'conversation_title_updated',
@@ -1308,7 +1286,7 @@ export class ConversationService {
         },
         { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
       );
-      console.log('[TITLE] Using model:', model);
+
       const items = await llm.execute();
       const res = (items?.[0]?.json || {}) as {
         model?: string;
@@ -1453,9 +1431,7 @@ export class ConversationService {
           resolvedLog.push({ raw });
         }
       }
-      if (resolvedLog.length > 0) {
-        console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
-      }
+
       return out;
     } catch {
       return [];
@@ -1922,21 +1898,6 @@ export class ConversationService {
 
                   // Accumulate arguments as string
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    try {
-                      const addLen = (rawTc.function!.arguments as string).length;
-                      const beforeLen = typeof target.function.arguments === 'string' ? (target.function.arguments as string).length : 0;
-                      console.debug('[ConversationService] tool_calls_accumulate', {
-                        conversationId,
-                        idx,
-                        id: rawTc?.id,
-                        name: rawTc?.function?.name,
-                        addLen,
-                        totalLenBefore: beforeLen,
-                        totalLenAfter: beforeLen + addLen,
-                      });
-                    } catch {
-                      /* noop */
-                    }
                     target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
                   }
                 }
@@ -1974,13 +1935,6 @@ export class ConversationService {
                           ? Object.keys(argsObj as Record<string, unknown>).length
                           : 0;
                       debugRawLen = typeof argsStr === 'string' ? argsStr.length : 0;
-                      console.debug('[ConversationService] tool_calls_parse', {
-                        conversationId,
-                        id: tc.id,
-                        name: tc.function.name,
-                        rawLen: debugRawLen,
-                        keysCount: debugKeysCount,
-                      });
                     } catch {
                       /* noop */
                     }
@@ -2002,33 +1956,12 @@ export class ConversationService {
                   const serialized = JSON.stringify(toolCallsValue);
                   const prev = this.lastToolCallsBroadcastHash.get(conversationId);
                   if (prev !== serialized) {
-                    try {
-                      console.debug('[ConversationService] tool_calls_broadcast', {
-                        conversationId,
-                        entries: toolCallsValue.length,
-                        serializedLen: serialized.length,
-                        dedupHit: false,
-                      });
-                    } catch {
-                      /* noop */
-                    }
                     await this.streamingService.broadcastDelta(conversationId, {
                       op: 'replace',
                       path: '/messages/-1/toolCalls',
                       value: toolCallsValue,
                     });
                     this.lastToolCallsBroadcastHash.set(conversationId, serialized);
-                  } else {
-                    try {
-                      console.debug('[ConversationService] tool_calls_broadcast_skip', {
-                        conversationId,
-                        entries: toolCallsValue.length,
-                        serializedLen: serialized.length,
-                        dedupHit: true,
-                      });
-                    } catch {
-                      /* noop */
-                    }
                   }
                 } catch {
                   // On serialization failure, fall back to broadcasting
@@ -2095,12 +2028,6 @@ export class ConversationService {
                         x?.function?.arguments && typeof x.function.arguments === 'object' && !Array.isArray(x.function.arguments)
                           ? Object.keys(x.function.arguments as Record<string, unknown>).length
                           : 0;
-                      console.debug('[ConversationService] tool_calls_snapshot', {
-                        conversationId,
-                        id: x.id,
-                        name: x.function.name,
-                        keysCount,
-                      });
                     } catch {
                       /* noop */
                     }
@@ -2108,33 +2035,12 @@ export class ConversationService {
                   const serialized = JSON.stringify(filtered);
                   const prev = this.lastToolCallsBroadcastHash.get(conversationId);
                   if (prev !== serialized) {
-                    try {
-                      console.debug('[ConversationService] tool_calls_broadcast', {
-                        conversationId,
-                        entries: filtered.length,
-                        serializedLen: serialized.length,
-                        dedupHit: false,
-                      });
-                    } catch {
-                      /* noop */
-                    }
                     await this.streamingService.broadcastDelta(conversationId, {
                       op: 'replace',
                       path: '/messages/-1/toolCalls',
                       value: filtered,
                     });
                     this.lastToolCallsBroadcastHash.set(conversationId, serialized);
-                  } else {
-                    try {
-                      console.debug('[ConversationService] tool_calls_broadcast_skip', {
-                        conversationId,
-                        entries: filtered.length,
-                        serializedLen: serialized.length,
-                        dedupHit: true,
-                      });
-                    } catch {
-                      /* noop */
-                    }
                   }
                 } catch {
                   await this.streamingService.broadcastDelta(conversationId, {
@@ -2372,8 +2278,6 @@ export class ConversationService {
 
             // Get last persisted index for this conversation
             const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
-
-            console.log(`[STREAMING] node_completed: Checking messages. Last index: ${lastIndex}, Current count: ${stateMessages.length}`);
 
             // Type guard for state messages coming from Autopilot mutations
             const isStateMsg = (m: unknown): m is LlmMessage => {
@@ -2628,7 +2532,6 @@ export class ConversationService {
       case 'tool_call_detected': {
         // Drop nested tool call detections (only emit from top-level LLM)
         if ((event.executionDepth ?? 0) > 0) {
-          console.log('[STREAMING] Skipping nested tool_call_detected at depth', event.executionDepth);
           break;
         }
 
@@ -2669,7 +2572,6 @@ export class ConversationService {
           /* non-fatal: balance auto-stop during tool_started */
         }
         const toolEvt = event as ToolEvent;
-        console.log('[STREAMING] Tool started:', toolEvt.data?.toolName);
         break;
       }
 
@@ -2677,7 +2579,6 @@ export class ConversationService {
         // Tool completion is now handled via state-based message persistence in node_completed
         // No persistence needed here - messages are added to state via mutations and persisted automatically
         const toolEvt = event as ToolEvent;
-        console.log('[STREAMING] Tool completed:', toolEvt.data?.toolName);
         break;
       }
 

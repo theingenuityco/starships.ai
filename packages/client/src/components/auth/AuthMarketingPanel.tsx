@@ -10,26 +10,21 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Deep space base */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Tighter central nebula glow - more concentrated */}
+      {/* App-matched nebula gradient: blue-purple-magenta shades */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          // Core bright glow - purple (tighter)
-          'radial-gradient(ellipse 800px 550px at 50% 45%, rgba(168,85,247,0.60), transparent 55%)',
-          'radial-gradient(ellipse 950px 650px at 50% 45%, rgba(139,92,246,0.48), transparent 60%)',
-          // Secondary blue layer (tighter)
-          'radial-gradient(ellipse 700px 500px at 48% 48%, rgba(99,102,241,0.38), transparent 58%)',
-          // Soft cyan accent (tighter)
-          'radial-gradient(ellipse 750px 520px at 52% 42%, rgba(59,130,246,0.30), transparent 60%)',
-          // Outer fade (much tighter)
-          'radial-gradient(ellipse 1100px 750px at 50% 45%, rgba(124,58,237,0.22), transparent 65%)',
-        ].join(', '),
-      }} />
-
-      {/* Subtle ambient bottom glow (reduced) */}
-      <div className="absolute inset-0" style={{
-        backgroundImage: [
-          'radial-gradient(ellipse 900px 350px at 50% 100%, rgba(217,70,239,0.10), transparent 65%)',
-          'radial-gradient(ellipse 750px 300px at 50% 100%, rgba(245,158,11,0.06), transparent 60%)',
+          // Top: blue tones (#5865c9 region)
+          'radial-gradient(ellipse 850px 580px at 50% 25%, rgba(88,101,201,0.65), transparent 60%)',
+          'radial-gradient(ellipse 1000px 680px at 50% 22%, rgba(88,101,201,0.48), transparent 65%)',
+          // Mid-upper: purple transition (#7b5db8 region)
+          'radial-gradient(ellipse 900px 650px at 48% 38%, rgba(123,93,184,0.55), transparent 62%)',
+          'radial-gradient(ellipse 950px 700px at 52% 40%, rgba(123,93,184,0.42), transparent 65%)',
+          // Mid-lower: magenta tones (#a855a8 region)
+          'radial-gradient(ellipse 850px 620px at 50% 58%, rgba(168,85,168,0.48), transparent 63%)',
+          'radial-gradient(ellipse 950px 680px at 50% 62%, rgba(168,85,168,0.38), transparent 66%)',
+          // Bottom: deeper magenta with pink accent (#c94873 region)
+          'radial-gradient(ellipse 800px 500px at 50% 85%, rgba(201,72,115,0.40), transparent 65%)',
+          'radial-gradient(ellipse 900px 550px at 50% 88%, rgba(201,72,115,0.28), transparent 68%)',
         ].join(', '),
       }} />
 
@@ -166,9 +161,9 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
         </g>
       </svg>
 
-      {/* Stronger vignette to darken edges more */}
+      {/* Stronger vignette to match reference */}
       <div className="absolute inset-0" style={{
-        background: 'radial-gradient(ellipse 65% 55% at 50% 45%, transparent 25%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0.85) 100%)',
+        background: 'radial-gradient(ellipse 65% 60% at 50% 50%, transparent 20%, rgba(0,0,0,0.45) 65%, rgba(0,0,0,0.85) 100%)',
       }} />
     </div>
   )

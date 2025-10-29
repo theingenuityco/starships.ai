@@ -9,52 +9,56 @@ interface AuthMarketingPanelProps {
 export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
   return (
     <div className={className}>
-      {/* Futuristic background: vignette + dot grid + constellation lines (no animation) */}
+      {/* Premium space background (static): deep black + nebula + planet silhouette + star noise */}
       <div className="absolute inset-0 bg-black" />
-      {/* Vignette */}
+
+      {/* Nebula washes */}
       <div className="absolute inset-0" style={{
-        backgroundImage:
-          'radial-gradient(1200px 600px at 20% 30%, rgba(44,44,84,0.35), transparent 60%), radial-gradient(900px 500px at 80% 70%, rgba(28,64,88,0.28), transparent 60%)',
+        backgroundImage: [
+          'radial-gradient(1000px 600px at 18% 32%, rgba(124,58,237,0.22), transparent 60%)',
+          'radial-gradient(900px 520px at 75% 30%, rgba(59,130,246,0.18), transparent 60%)',
+          'radial-gradient(800px 500px at 70% 80%, rgba(16,185,129,0.12), transparent 60%)',
+        ].join(', '),
       }} />
-      {/* Dot grid */}
-      <div className="absolute inset-0 opacity-30" style={{
-        backgroundImage:
-          'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
-        backgroundSize: '18px 18px',
-        backgroundPosition: '0 0',
-      }} />
-      {/* Constellation layer */}
-      <svg className="absolute inset-0 w-full h-full" role="img" aria-hidden="true" preserveAspectRatio="none">
+
+      {/* Planet silhouette with limb glow */}
+      <svg className="absolute inset-0 w-full h-full" aria-hidden="true" preserveAspectRatio="none">
         <defs>
-          <linearGradient id="lineGlow" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.0" />
-            <stop offset="50%" stopColor="#60a5fa" stopOpacity="0.55" />
+          <radialGradient id="planet" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#0b0f17" />
+            <stop offset="70%" stopColor="#0b0f17" />
+            <stop offset="95%" stopColor="#3b82f6" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.0" />
+          </radialGradient>
+          <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.0" />
+            <stop offset="40%" stopColor="#22d3ee" stopOpacity="0.35" />
+            <stop offset="60%" stopColor="#a78bfa" stopOpacity="0.35" />
             <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.0" />
           </linearGradient>
-          <radialGradient id="nodeGlow" r="60%">
-            <stop offset="0%" stopColor="#e2e8f0" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#e2e8f0" stopOpacity="0" />
-          </radialGradient>
+          {/* Procedural star noise */}
+          <filter id="starNoise" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="8" result="noise" />
+            <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.85 0" in="noise" result="high" />
+            <feComponentTransfer>
+              <feFuncA type="table" tableValues="0 0 0 0 .05 .2 .6 .9 1 1" />
+            </feComponentTransfer>
+          </filter>
         </defs>
-        {/* soft guide lines */}
-        <g stroke="url(#lineGlow)" strokeWidth="1.2" opacity="0.55">
-          <path d="M10% 25% L 28% 38% L 44% 22% L 58% 30% L 74% 18%" />
-          <path d="M18% 72% L 32% 56% L 48% 68% L 62% 52% L 80% 66%" />
-          <path d="M22% 40% L 36% 50% L 52% 42% L 70% 48%" />
+
+        {/* planet positioned off-screen bottom-right for a cinematic limb */}
+        <g opacity="0.9">
+          <circle cx="88%" cy="92%" r="420" fill="url(#planet)" />
         </g>
-        {/* nodes with glow */}
-        <g>
-          {[
-            ['10%','25%'],['28%','38%'],['44%','22%'],['58%','30%'],['74%','18%'],
-            ['18%','72%'],['32%','56%'],['48%','68%'],['62%','52%'],['80%','66%'],
-            ['22%','40%'],['36%','50%'],['52%','42%'],['70%','48%'],
-          ].map(([cx, cy], i) => (
-            <g key={i} opacity={0.9}>
-              <circle cx={cx} cy={cy} r="10" fill="url(#nodeGlow)" />
-              <circle cx={cx} cy={cy} r="1.6" fill="#ffffff" />
-            </g>
-          ))}
+
+        {/* orbital rings */}
+        <g opacity="0.35" stroke="url(#ring)" fill="none" strokeWidth="1.2">
+          <path d="M8% 70% C 35% 60%, 65% 80%, 92% 62%" />
+          <path d="M10% 78% C 38% 68%, 62% 88%, 90% 70%" />
         </g>
+
+        {/* star noise overlay */}
+        <rect x="0" y="0" width="100%" height="100%" filter="url(#starNoise)" opacity="0.18" />
       </svg>
 
       {/* Content */}

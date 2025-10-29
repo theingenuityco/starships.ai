@@ -41,7 +41,7 @@ Always begin every created agent's systemPrompt with <character name="AGENT_NAME
 
 Workflow for Creating New Agents:
 1. Use "List Models" ({}) to discover available models and select the best one for the use case
-2. Use "Open Agent" (with name, slug, and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens). The systemPrompt MUST start with <character name="AGENT_NAME">ROLE</character> as the first line.
+2. Use "Open Agent" (with name and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens). The systemPrompt MUST start with <character name="AGENT_NAME">ROLE</character> as the first line.
 3. Use "Assign Agent Tool" to add tools the agent can use (by tool slug)
 4. Use "Edit Agent" to refine system prompt, model settings, or custom blueprint
 5. Use blueprint_lint to validate any custom blueprint structure

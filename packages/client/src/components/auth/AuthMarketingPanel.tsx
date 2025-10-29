@@ -10,26 +10,26 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Deep space base */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Tighter central nebula glow - more concentrated */}
+      {/* Extra tight central nebula glow - narrow beam */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          // Core bright glow - purple (tighter)
-          'radial-gradient(ellipse 800px 550px at 50% 45%, rgba(168,85,247,0.60), transparent 55%)',
-          'radial-gradient(ellipse 950px 650px at 50% 45%, rgba(139,92,246,0.48), transparent 60%)',
-          // Secondary blue layer (tighter)
-          'radial-gradient(ellipse 700px 500px at 48% 48%, rgba(99,102,241,0.38), transparent 58%)',
-          // Soft cyan accent (tighter)
-          'radial-gradient(ellipse 750px 520px at 52% 42%, rgba(59,130,246,0.30), transparent 60%)',
-          // Outer fade (much tighter)
-          'radial-gradient(ellipse 1100px 750px at 50% 45%, rgba(124,58,237,0.22), transparent 65%)',
+          // Core bright glow - purple (narrower)
+          'radial-gradient(ellipse 600px 480px at 50% 45%, rgba(168,85,247,0.62), transparent 52%)',
+          'radial-gradient(ellipse 720px 560px at 50% 45%, rgba(139,92,246,0.50), transparent 57%)',
+          // Secondary blue layer (narrower)
+          'radial-gradient(ellipse 550px 450px at 48% 48%, rgba(99,102,241,0.40), transparent 55%)',
+          // Soft cyan accent (narrower)
+          'radial-gradient(ellipse 600px 470px at 52% 42%, rgba(59,130,246,0.32), transparent 57%)',
+          // Outer fade (narrower)
+          'radial-gradient(ellipse 850px 650px at 50% 45%, rgba(124,58,237,0.24), transparent 62%)',
         ].join(', '),
       }} />
 
-      {/* Subtle ambient bottom glow (reduced) */}
+      {/* Subtle ambient bottom glow (reduced and narrower) */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          'radial-gradient(ellipse 900px 350px at 50% 100%, rgba(217,70,239,0.10), transparent 65%)',
-          'radial-gradient(ellipse 750px 300px at 50% 100%, rgba(245,158,11,0.06), transparent 60%)',
+          'radial-gradient(ellipse 700px 300px at 50% 100%, rgba(217,70,239,0.10), transparent 62%)',
+          'radial-gradient(ellipse 580px 250px at 50% 100%, rgba(245,158,11,0.06), transparent 58%)',
         ].join(', '),
       }} />
 
@@ -163,6 +163,34 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
           <circle cx="68%" cy="62%" r="0.8" fill="#ffffff" />
           <circle cx="32%" cy="68%" r="0.7" fill="#ffffff" />
           <circle cx="72%" cy="55%" r="0.9" fill="url(#starGlow)" />
+          
+          {/* Extra stars - more density */}
+          <circle cx="3%" cy="15%" r="0.5" fill="#ffffff" />
+          <circle cx="7%" cy="42%" r="0.6" fill="#ffffff" />
+          <circle cx="11%" cy="65%" r="0.5" fill="#ffffff" />
+          <circle cx="16%" cy="38%" r="0.7" fill="url(#starGlow)" />
+          <circle cx="19%" cy="58%" r="0.5" fill="#ffffff" />
+          <circle cx="23%" cy="32%" r="0.6" fill="#ffffff" />
+          <circle cx="26%" cy="78%" r="0.7" fill="#ffffff" />
+          <circle cx="30%" cy="18%" r="0.5" fill="#ffffff" />
+          <circle cx="33%" cy="65%" r="0.8" fill="url(#starGlow)" />
+          <circle cx="37%" cy="25%" r="0.6" fill="#ffffff" />
+          <circle cx="43%" cy="68%" r="0.5" fill="#ffffff" />
+          <circle cx="46%" cy="22%" r="0.7" fill="#ffffff" />
+          <circle cx="53%" cy="65%" r="0.6" fill="#ffffff" />
+          <circle cx="56%" cy="25%" r="0.8" fill="url(#starGlow)" />
+          <circle cx="60%" cy="72%" r="0.5" fill="#ffffff" />
+          <circle cx="63%" cy="52%" r="0.6" fill="#ffffff" />
+          <circle cx="67%" cy="35%" r="0.7" fill="#ffffff" />
+          <circle cx="73%" cy="68%" r="0.5" fill="#ffffff" />
+          <circle cx="76%" cy="42%" r="0.8" fill="url(#starGlow)" />
+          <circle cx="81%" cy="55%" r="0.6" fill="#ffffff" />
+          <circle cx="84%" cy="38%" r="0.5" fill="#ffffff" />
+          <circle cx="87%" cy="68%" r="0.7" fill="#ffffff" />
+          <circle cx="91%" cy="35%" r="0.6" fill="#ffffff" />
+          <circle cx="93%" cy="58%" r="0.5" fill="#ffffff" />
+          <circle cx="95%" cy="42%" r="0.7" fill="url(#starGlow)" />
+          <circle cx="96%" cy="68%" r="0.5" fill="#ffffff" />
         </g>
       </svg>
 

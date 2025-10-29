@@ -12,15 +12,14 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
       {/* Premium space background (static): deep black + nebula + planet silhouette + star noise */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Nebula washes — tuned to match landing gradients (purple/pink, blue/cyan, violet/fuchsia) */}
+      {/* Edge glow gradients to match landing hero (top purple, bottom amber→magenta) */}
       <div className="absolute inset-0" style={{
         backgroundImage: [
-          // purple-500/pink-500
-          'radial-gradient(1000px 600px at 18% 32%, rgba(168,85,247,0.22), transparent 60%)',
-          // blue-500/cyan-500
-          'radial-gradient(900px 520px at 75% 30%, rgba(59,130,246,0.20), transparent 60%)',
-          // violet-500/fuchsia-500
-          'radial-gradient(800px 500px at 70% 80%, rgba(139,92,246,0.16), transparent 60%)',
+          // top rim glow: purple/violet
+          'radial-gradient(1200px 420px at 50% -10%, rgba(139,92,246,0.35), transparent 65%)',
+          // bottom rim glow: amber → magenta sweep
+          'radial-gradient(1400px 520px at 50% 105%, rgba(245,158,11,0.30), transparent 62%)',
+          'radial-gradient(1200px 480px at 60% 110%, rgba(217,70,239,0.28), transparent 60%)',
         ].join(', '),
       }} />
 
@@ -34,10 +33,10 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
             <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.0" />
           </radialGradient>
           <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
-            {/* cyan-500 to fuchsia-500, subtle */}
-            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.0" />
-            <stop offset="40%" stopColor="#06b6d4" stopOpacity="0.28" />
-            <stop offset="60%" stopColor="#d946ef" stopOpacity="0.28" />
+            {/* amber → magenta transition like bottom glow */}
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.0" />
+            <stop offset="35%" stopColor="#f59e0b" stopOpacity="0.32" />
+            <stop offset="65%" stopColor="#d946ef" stopOpacity="0.32" />
             <stop offset="100%" stopColor="#d946ef" stopOpacity="0.0" />
           </linearGradient>
           {/* Procedural star noise */}

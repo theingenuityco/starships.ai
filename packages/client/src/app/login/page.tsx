@@ -12,11 +12,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { isValidRedirectUrl } from '@/lib/utils'
 import { useUserStarships } from '@/hooks/useStarships'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { Orbitron } from 'next/font/google'
+import Link from 'next/link'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 function LoginContent() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const [activeTab, setActiveTab] = useState('login')
   const [mounted, setMounted] = useState(false)
+  const [logoTrigger, setLogoTrigger] = useState(0)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -64,6 +70,27 @@ function LoginContent() {
       <div className="min-h-screen bg-black relative overflow-hidden flex">
         {/* Full-screen background */}
         <AuthMarketingPanel className="absolute inset-0" />
+        
+        {/* Header with logo */}
+        <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
+          <div className="px-4 sm:px-8 flex items-center justify-between h-8">
+            <button
+              className="cursor-pointer select-none h-8 flex items-center"
+              onClick={() => {
+                setLogoTrigger(v => v + 1)
+                router.push('/')
+              }}
+              title="Go to home"
+            >
+              <span className="flex items-center gap-2">
+                <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
+                <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none transition-all duration-200 ease-out opacity-100 translate-x-0`}>
+                  starships.ai
+                </span>
+              </span>
+            </button>
+          </div>
+        </header>
         
         {/* Left copy overlay */}
         <div className="hidden lg:flex lg:w-1/2 relative z-10">

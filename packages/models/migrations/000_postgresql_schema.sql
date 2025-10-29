@@ -24,6 +24,7 @@ CREATE TABLE users (
     has_password BOOLEAN NOT NULL DEFAULT false,
     auth_methods TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
     primary_auth_method VARCHAR(10) NOT NULL DEFAULT 'password' CHECK (primary_auth_method IN ('password', 'oauth')),
+    last_login_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -36,6 +37,7 @@ CREATE INDEX idx_users_has_password ON users(has_password);
 CREATE INDEX idx_users_auth_methods ON users USING GIN(auth_methods);
 CREATE INDEX idx_users_primary_auth_method ON users(primary_auth_method);
 CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX idx_users_last_login_at ON users(last_login_at);
 
 -- ============================================================================
 -- OAUTH ACCOUNTS TABLE
@@ -80,6 +82,46 @@ CREATE INDEX idx_oauth_auth_codes_expires_at ON oauth_auth_codes(expires_at);
 CREATE INDEX idx_oauth_auth_codes_user_id ON oauth_auth_codes(user_id);
 
 -- Note: OAuth cleanup is handled by OAuthAuthCodeRepository.cleanupExpiredCodes()
+
+-- =========================================================================
+-- EMAIL VERIFICATION TOKENS TABLE
+-- =========================================================================
+
+CREATE TABLE email_verification_tokens (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    token VARCHAR(64) UNIQUE NOT NULL,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    consumed BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+-- Email verification token indexes
+CREATE INDEX idx_email_verification_tokens_token ON email_verification_tokens(token) WHERE NOT consumed;
+CREATE INDEX idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
+CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+CREATE INDEX idx_email_verification_tokens_email ON email_verification_tokens(email);
+
+-- =========================================================================
+-- PASSWORD RESET TOKENS TABLE
+-- =========================================================================
+
+CREATE TABLE password_reset_tokens (
+  id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  token VARCHAR(64) UNIQUE NOT NULL,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email VARCHAR(255) NOT NULL,
+  consumed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (NOW() + INTERVAL '1 hour')
+);
+
+-- Indexes following email verification pattern
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token) WHERE NOT consumed;
+CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+CREATE INDEX idx_password_reset_tokens_email ON password_reset_tokens(email);
 
 -- ============================================================================
 -- STARSHIPS TABLE
@@ -142,6 +184,7 @@ CREATE INDEX idx_agent_templates_tags ON agent_templates USING GIN(tags);
 
 CREATE TABLE agents (
     id VARCHAR(255) PRIMARY KEY,
+    slug VARCHAR(100) NOT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(500),
     model VARCHAR(100) NOT NULL,
@@ -149,6 +192,7 @@ CREATE TABLE agents (
     max_tokens INTEGER,
     timeout INTEGER NOT NULL DEFAULT 30000,
     system_prompt TEXT,
+    preview_prompts TEXT[] DEFAULT ARRAY[]::TEXT[],
     state JSONB NOT NULL,
     blueprint JSONB NOT NULL,
     starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE SET NULL,
@@ -163,6 +207,8 @@ CREATE INDEX idx_agents_starship_id ON agents(starship_id);
 CREATE INDEX idx_agents_template_id ON agents(template_id);
 CREATE INDEX idx_agents_name ON agents(name);
 CREATE INDEX idx_agents_created_at ON agents(created_at);
+CREATE UNIQUE INDEX idx_agents_slug_unique ON agents(slug);
+CREATE INDEX idx_agents_slug ON agents(slug);
 
 -- ============================================================================
 -- TOOL TEMPLATES TABLE
@@ -267,6 +313,8 @@ CREATE TABLE messages (
     reasoning TEXT,
     tool_calls JSONB,
     tool_call_id VARCHAR(255),
+    agent_id VARCHAR(255) REFERENCES agents(id) ON DELETE SET NULL,
+    agent_name VARCHAR(100),
     starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE CASCADE,
     conversation_id VARCHAR(255) REFERENCES conversations(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -279,6 +327,7 @@ CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_messages_role ON messages(role);
 CREATE INDEX idx_messages_message_type ON messages(message_type);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
+CREATE INDEX idx_messages_agent_id ON messages(agent_id);
 
 -- ============================================================================
 -- ENVIRONMENTS TABLE
@@ -406,6 +455,30 @@ ALTER TABLE usage
   REFERENCES ledger_entries(id)
   ON DELETE SET NULL;
 
+-- =========================================================================
+-- PROMO REDEMPTIONS TABLE
+-- =========================================================================
+
+CREATE TABLE promo_redemptions (
+  id VARCHAR(255) PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  promo_code VARCHAR(100) NOT NULL,
+  stripe_coupon_id VARCHAR(255),
+  stripe_promotion_id VARCHAR(255),
+  reward_amount DECIMAL(18,6),
+  status VARCHAR(20) NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failed')),
+  message TEXT,
+  redeemed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Case-insensitive uniqueness per user
+CREATE UNIQUE INDEX uq_promo_redemptions_user_code_ci
+  ON promo_redemptions(user_id, lower(promo_code));
+
+-- Helpful indexes
+CREATE INDEX idx_promo_redemptions_user_id ON promo_redemptions(user_id);
+CREATE INDEX idx_promo_redemptions_promo_code ON promo_redemptions(promo_code);
+
 -- ============================================================================
 -- JUNCTION TABLES FOR RELATIONSHIPS
 -- ============================================================================
@@ -473,3 +546,9 @@ COMMENT ON TABLE topups IS 'Payment topup records for wallet funding via Stripe'
 COMMENT ON TABLE agent_tools IS 'Many-to-many relationship between agents and tools';
 COMMENT ON TABLE agent_template_tool_templates IS 'Many-to-many relationship between agent templates and tool templates';
 COMMENT ON TABLE conversation_agents IS 'Many-to-many relationship between conversations and agents';
+COMMENT ON TABLE email_verification_tokens IS 'Email verification tokens for user registration - separate from OAuth for clean architecture';
+COMMENT ON TABLE password_reset_tokens IS 'Password reset tokens for account recovery - 1 hour expiry for security';
+COMMENT ON TABLE promo_redemptions IS 'Records when a user redeems a Stripe promo code for wallet credits (per-user scope)';
+COMMENT ON COLUMN users.last_login_at IS 'Timestamp of user''s last successful login - used for welcome modal (first login detection) and security features';
+COMMENT ON COLUMN messages.agent_id IS 'ID of the agent that generated this message (assistant messages only)';
+COMMENT ON COLUMN messages.agent_name IS 'Denormalized agent name for display without join (assistant messages only)';

@@ -891,11 +891,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return null
   }, [chunks])
 
-  // Invalidate usage totals on end-of-turn (SSE 'complete') to update context bar post-turn
+  // Invalidate usage totals when a turn completes.
+  // Robust across both legacy 'complete' and newer 'turn_completed' SSE events.
   useEffect(() => {
     if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
     const last = chunks[chunks.length - 1]
-    if (last.type === 'complete') {
+    if (last.type === 'turn_completed') {
       // Clear resume token once a new user message arrives (not here). Keep it for seamless reconnection between chunks.
       // Refresh usage totals for this conversation
       queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
@@ -907,11 +908,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
   }, [chunks, conversationId, starshipId, queryClient])
 
-  // Check if we've received a 'complete' event in the chunk stream
+  // Check if we've received a 'turn_completed' event in the chunk stream
   const hasCompleteEvent = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return false
     for (let i = chunks.length - 1; i >= 0; i--) {
-      if (chunks[i].type === 'complete') return true
+      if (chunks[i].type === 'turn_completed') return true
       // Stop checking once we hit a new 'append' of a user message (new turn started)
       if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
     }

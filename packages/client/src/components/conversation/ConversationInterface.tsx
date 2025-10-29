@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
@@ -254,8 +255,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     if (initialAgentId && starshipAgentsData.length > 0 && !selectedAgent) {
       // Try to find by slug first (preferred), then fall back to ID for backward compatibility
-      const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || 
-                   starshipAgentsData.find(a => a.id === initialAgentId)
+      const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || starshipAgentsData.find(a => a.id === initialAgentId)
       if (agent) {
         setSelectedAgent(agent)
         // Also update the UI store so that this agent is remembered for this conversation
@@ -272,7 +272,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (userSelectedAgentRef.current) {
       return
     }
-    
+
     // Priority 1: agent id from conversation store (this should reflect the intended agent for the conversation)
     if (conversationData?.agentId && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
       const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId) || null
@@ -301,7 +301,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }
 
-    // Priority 3: fallback to first starship agent when none selected  
+    // Priority 3: fallback to first starship agent when none selected
     if (!selectedAgent && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0) {
       const fallback = starshipAgentsData[0]
       if (fallback && typeof fallback.id === 'string') {
@@ -673,8 +673,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           {/* Messages Area or Welcome Screen */}
           {showMessagesArea ? (
             <>
-              <ConversationContextBar conversationId={currentConversationId} {...(budgetTokens !== undefined && { budgetTokens })} />
-              <div className="flex-1 min-h-0">
+              <ConversationSummaryBar conversationId={currentConversationId} starshipId={starshipId} />
+              <div className="relative flex-1 min-h-0">
                 <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
               </div>
               {/* Single place for stream-dependent side-effects to avoid duplicate SSE subscriptions */}
@@ -712,6 +712,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               isOverlayExpanded={false}
               budgetTokens={budgetTokens}
               onAgentChange={handleAgentChange}
+              starshipSlug={starshipSlug}
             ></ConversationMessageInput>
             <AnimatePresence initial={false} mode="wait">
               {!showMessagesArea && (

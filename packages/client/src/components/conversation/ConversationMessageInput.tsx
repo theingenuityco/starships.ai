@@ -27,7 +27,7 @@ import { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
-import TopupButton from '@/components/billing/TopupButton'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { useStarshipAgents } from '@/hooks/useAgents'
 
@@ -50,6 +50,7 @@ interface ConversationMessageInputProps {
   isOverlayExpanded?: boolean
   budgetTokens?: number
   onAgentChange?: (agent: AgentModel | null) => void
+  starshipSlug?: string
 }
 
 export interface ConversationMessageInputRef {
@@ -77,6 +78,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       isOverlayExpanded = false,
       budgetTokens,
       onAgentChange,
+      starshipSlug,
     },
     ref
   ) => {
@@ -100,7 +102,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const createConversation = useCreateConversation()
     const { data: wallet, isLoading } = useWallet(starshipId, !!starshipId)
     const MINIMUM_THRESHOLD = 0.05
-    const hasFunds = Number(wallet?.balance ?? '0') >= MINIMUM_THRESHOLD
+    const LOW_WARNING_THRESHOLD = 5.0
+    const balanceNum = Number(wallet?.balance ?? '0')
+    const hasFunds = balanceNum >= MINIMUM_THRESHOLD
+    const showLowBalanceWarning = Boolean(conversationId && !isLoading && hasFunds && balanceNum <= LOW_WARNING_THRESHOLD)
+
+    // Determine current ship slug for billing URL
+    const billingHref = `/ship/${starshipSlug}/settings/billing`
 
     // Load agents for @mention parsing
     const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
@@ -189,9 +197,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const messageToSend = message.trim()
       if (!messageToSend || sending || disabled) return
 
-      // Support leading @agent mention to switch/select agent
-      let effectiveAgent: AgentModel | null | undefined = selectedAgent
+      // Enforce presence of a leading @mention chip in the editor
+      const mentionAgentInEditor = getLeadingMentionAgentFromEditor(tiptap as any)
+      if (!mentionAgentInEditor) {
+        toast.error('Mention required', { description: 'Type @ to mention an agent before sending.' })
+        return
+      }
+
+      // Resolve agent to send to, prioritizing the actual mention node
+      let effectiveAgent: AgentModel | null | undefined = mentionAgentInEditor
       let contentToSend = messageToSend
+      // Also support plain-text leading @handle for safety
       const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
       if (mentionMatch && starshipAgents.length > 0) {
         const handle = mentionMatch[1]
@@ -414,8 +430,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Track if there's actual content beyond just the mention and space
     const [hasActualContent, setHasActualContent] = useState(false)
 
-    // Require balance; server also enforces funds. Reverted per request.
-    const canSend = hasActualContent && !disabled && !sending && !isStreamingEffective && Boolean(selectedAgent) && hasFunds
+    // Require balance; server also enforces funds. Also require a leading @mention.
+    const hasLeadingMention = Boolean(leadingMentionAgent)
+    const canSend = hasActualContent && !disabled && !sending && !isStreamingEffective && hasLeadingMention && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
@@ -1607,6 +1624,30 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             )}
           </div>
         )}
+        {/* Low balance warning banner - Show when balance <= $5 and above critical */}
+        {showLowBalanceWarning && (
+          <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-yellow-50/80 to-orange-50/60 dark:from-yellow-950/20 dark:to-orange-950/10 border border-yellow-200/50 dark:border-yellow-800/30 backdrop-blur-sm shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">Low Balance</p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 leading-relaxed">Your balance is running low. Consider adding credits to avoid interruptions.</p>
+              </div>
+              <div className="flex-shrink-0">
+                <Link href={billingHref}>
+                  <Button variant="default" size="sm" className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
+                    Manage Billing
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Professional insufficient balance indicator - Show when there is conversation ID */}
         {!hasFunds && !isLoading && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
@@ -1626,13 +1667,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">Your account balance is too low to continue. Please add credits to keep chatting.</p>
               </div>
               <div className="flex-shrink-0">
-                <TopupButton
-                  starshipId={starshipId}
-                  amount={20}
-                  variant="default"
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-                />
+                <Link href={billingHref}>
+                  <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
+                    Manage Billing
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -1700,7 +1739,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                   )}
                   aria-label="Send"
-                  title="Send"
+                  title={canSend ? 'Send' : !hasLeadingMention ? 'Mention an agent with @ to send' : 'Send'}
                 >
                   {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
                 </Button>

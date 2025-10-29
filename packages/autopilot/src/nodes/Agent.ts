@@ -122,7 +122,7 @@ export class Agent implements NodeHandler {
       description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
       parameters: {
         condition:
-          '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+          '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; const calls = last?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const allowed = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug) && t.blueprint) : false; if (slug) { return allowed ? "call_tool" : "tool_not_allowed"; } if (fr==="tool_calls") { return "tool_not_allowed"; } return Array.isArray(calls) && calls.length > 0 ? "tool_not_allowed" : "complete"; })()}}',
       },
     });
 
@@ -179,11 +179,36 @@ export class Agent implements NodeHandler {
       },
     });
 
+    // Mutate node for disallowed tool calls: append tool-style error result and continue
+    const notAllowedNodeRef = builder.addNode({
+      type: 'mutate',
+      name: 'Handle Disallowed Tool',
+      description: 'Append tool result error when tool call is not assigned to this agent',
+      parameters: {
+        reducers: [
+          `
+          (state, ctx) => {
+            const last = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json;
+            const slug = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.name ?? 'unknown';
+            const toolCallId = last?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
+            const next = { ...(state || {}) };
+            const payload = { ok: false, error: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." };
+            const content = JSON.stringify(payload);
+            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
     // Connect all nodes
     this.params.blueprint = builder
       .addEdge(startRef, llmNodeRef)
       .addEdge(llmNodeRef, conditionalNodeRef)
       .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
+      .addEdge(conditionalNodeRef, notAllowedNodeRef, 'tool_not_allowed')
+      .addEdge(notAllowedNodeRef, llmNodeRef)
       .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
       .addEdge(argsNodeRef, toolNodeRef)
       .addEdge(toolNodeRef, toolResultNodeRef)

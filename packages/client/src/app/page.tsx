@@ -38,7 +38,6 @@ export default function HomePage() {
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         <StarryBackground />
         <PublicHeader />
-        <BackToTop />
 
         {/* New Landing Sections */}
         <Hero />
@@ -74,7 +73,7 @@ export default function HomePage() {
           {/* Gradient horizontal line */}
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <div className="max-w-6xl mx-auto relative z-10">
-            <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="mb-6 md:mb-0 text-center md:text-left">
                 <p className="text-muted-foreground mb-2">© 2025 Starships.ai - Where Ideas meet Intelligence</p>
                 <p className="text-muted-foreground text-sm">
@@ -84,7 +83,8 @@ export default function HomePage() {
                   </a>
                 </p>
               </div>
-              <div className="flex space-x-6">
+              <div className="flex items-center space-x-4">
+                <BackToTop />
                 <Button variant="ghost" size="sm" onClick={() => window.open('/docs', '_blank')}>
                   <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation

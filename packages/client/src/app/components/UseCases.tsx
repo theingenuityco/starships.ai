@@ -30,7 +30,7 @@ export default function UseCases() {
       <div className="max-w-7xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Build agents and tools fast</h2>
         <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Design, connect, and iterate on agents and tools in minutes.</p>
-        <div className="space-y-12 md:space-y-16">
+        <div className="space-y-10 md:space-y-12">
           {items.map((item, idx) => {
             const isRightAligned = idx % 2 === 1
             const isWide = idx % 2 === 1
@@ -38,9 +38,9 @@ export default function UseCases() {
             return (
               <div
                 key={item.title}
-                className={`flex flex-col ${swapLayout ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-6 md:gap-8 py-6 md:py-8 frosted-glass-card rounded-2xl border border-border/40 p-4 md:p-6 shadow-[0_0_15px_rgba(168,85,247,0.15),0_0_30px_rgba(236,72,153,0.10),0_0_45px_rgba(251,146,60,0.06)] ${
+                className={`flex flex-col ${swapLayout ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-5 md:gap-6 py-4 md:py-6 frosted-glass-card rounded-xl border border-border/40 p-3 md:p-5 shadow-[0_0_15px_rgba(168,85,247,0.15),0_0_30px_rgba(236,72,153,0.10),0_0_45px_rgba(251,146,60,0.06)] ${
                   isRightAligned ? 'ml-auto' : 'mr-auto'
-                } ${isWide ? 'w-full md:w-[85%]' : 'w-full md:w-[70%]'}`}
+                } ${isWide ? 'w-full md:w-[80%]' : 'w-full md:w-[65%]'}`}
               >
                 {/* Media slot */}
                 <div className="w-full md:w-[58%] flex-shrink-0">
@@ -50,14 +50,14 @@ export default function UseCases() {
                     loading="lazy"
                     decoding="async"
                     sizes="(min-width: 768px) 58vw, 100vw"
-                    className="w-full h-[220px] sm:h-[280px] md:h-[340px] object-cover rounded-xl border border-white/10"
+                    className="w-full h-[180px] sm:h-[220px] md:h-[280px] object-cover rounded-lg border border-white/10"
                   />
                 </div>
 
                 {/* Text */}
-                <div className="flex-1 flex flex-col justify-center space-y-3">
-                  <h3 className="text-lg sm:text-xl md:text-2xl font-semibold leading-tight">{item.title}</h3>
-                  <p className="text-sm md:text-base text-muted-foreground leading-relaxed">{item.desc}</p>
+                <div className="flex-1 flex flex-col justify-center space-y-2">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold leading-tight">{item.title}</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             )

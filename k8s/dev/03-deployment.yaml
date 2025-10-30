@@ -232,6 +232,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: AWS_SES_REGION
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENCRYPTION_KEY
             - name: PGDATA
               value: '/var/lib/postgresql/data/pgdata'
 

@@ -43,7 +43,7 @@ export default function BackToTop() {
       {isVisible && (
         <motion.button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 z-50 px-4 py-3 rounded-2xl bg-gradient-to-br from-primary/90 to-purple-600/90 backdrop-blur-sm border border-white/20 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2 group"
+          className="fixed bottom-6 right-6 z-50 px-3 py-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 shadow-sm hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all duration-200 flex items-center gap-2 group"
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
           animate={
             isFlying
@@ -72,34 +72,18 @@ export default function BackToTop() {
                     transition: { duration: 1, ease: 'easeIn' },
                   }
                 : {
-                    y: [0, -4, 0],
+                    y: [0, -3, 0],
                     transition: {
-                      duration: 1.5,
+                      duration: 2,
                       repeat: Infinity,
                       ease: 'easeInOut',
                     },
                   }
             }
           >
-            <Icon name="rocket" className="w-5 h-5 text-white" />
+            <Icon name="arrow-up" className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
           </motion.div>
-          <span className="text-sm font-medium text-white whitespace-nowrap">Back to Top</span>
-
-          {/* Exhaust/flame effect */}
-          {isFlying && (
-            <motion.div
-              className="absolute bottom-0 left-6 transform -translate-x-1/2"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{
-                opacity: [0, 1, 1, 0],
-                height: [0, 20, 40, 60],
-                scaleX: [1, 1.2, 1, 0.8],
-              }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            >
-              <div className="w-4 h-full bg-gradient-to-b from-orange-400 via-red-400 to-transparent blur-sm" />
-            </motion.div>
-          )}
+          <span className="text-xs font-normal text-white/60 group-hover:text-white/90 whitespace-nowrap transition-colors">Top</span>
         </motion.button>
       )}
     </AnimatePresence>

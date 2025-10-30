@@ -29,7 +29,7 @@ export class AgentTemplateService {
 
     // Get current deployed agents count
     const currentAgents = await this.starshipRepository.getDeployedAgents(starshipId);
-    
+
     if (currentAgents.length >= starship.maxAgents) {
       throw new ValidationError(
         `Agent limit reached. Maximum ${starship.maxAgents} agents allowed per starship. Currently deployed: ${currentAgents.length}`

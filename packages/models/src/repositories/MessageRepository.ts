@@ -91,16 +91,6 @@ export class MessageRepository extends BaseRepository {
           ...(entity.agentName ? { agentName: entity.agentName } : {}),
         };
 
-        // Debug log for tool calls
-        if (entity.toolCalls) {
-          console.log('[MessageRepository] Creating message with toolCalls:', {
-            role: entity.role,
-            contentLength: entity.content?.length || 0,
-            toolCallsCount: entity.toolCalls.length,
-            toolCallsSample: JSON.stringify(entity.toolCalls[0] || null).slice(0, 200),
-          });
-        }
-
         // Validate with all required fields present (toolCalls must be an array for validation)
         await MessageEntity.validate(messageData, 'create');
 

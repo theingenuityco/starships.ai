@@ -452,12 +452,12 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
     // Tool-related tool slugs to monitor
     const toolRelatedSlugs = new Set([
-      'tool-open',
-      'tool-edit',
-      'tool-add-blueprint-node',
-      'tool-remove-blueprint-node',
-      'tool-add-blueprint-edge',
-      'tool-remove-blueprint-edge',
+      'open-tool',
+      'edit-tool',
+      'add-tool-blueprint-node',
+      'remove-tool-blueprint-node',
+      'add-tool-blueprint-edge',
+      'remove-tool-blueprint-edge',
       'tool-update-node',
       'tool-assign-mcp',
       'tool-unassign-mcp',

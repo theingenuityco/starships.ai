@@ -398,6 +398,7 @@ export class LLM extends BaseNode<LlmParams> {
     let finishReason: string | null = null;
 
     try {
+      console.info('[LLM] Streaming started');
       for await (const chunk of stream) {
         // Update metadata from first chunk
         if (chunk.id && !responseMetadata.id) responseMetadata.id = chunk.id;
@@ -409,7 +410,17 @@ export class LLM extends BaseNode<LlmParams> {
 
         // Accumulate content
         if (choice.delta?.content) {
-          content += choice.delta.content;
+          const piece = choice.delta.content;
+          content += piece;
+          try {
+            console.debug('[LLM] delta.content', {
+              pieceLength: typeof piece === 'string' ? piece.length : 0,
+              totalLength: content.length,
+              preview: typeof piece === 'string' ? piece.slice(0, 32) : '',
+            });
+          } catch {
+            /* non-fatal */
+          }
         }
 
         // Handle tool calls - OpenAI SDK properly accumulates these
@@ -429,7 +440,19 @@ export class LLM extends BaseNode<LlmParams> {
             if (toolCallDelta.id) target.id = toolCallDelta.id;
             if (toolCallDelta.function?.name) target.function.name = toolCallDelta.function.name;
             if (toolCallDelta.function?.arguments) {
+              const addLen = toolCallDelta.function.arguments.length;
               target.function.arguments += toolCallDelta.function.arguments;
+              try {
+                console.debug('[LLM] tool_call.delta', {
+                  index,
+                  id: toolCallDelta.id,
+                  name: toolCallDelta.function?.name,
+                  argsAdded: addLen,
+                  argsTotal: target.function.arguments.length,
+                });
+              } catch {
+                /* non-fatal */
+              }
             }
 
             // Emit tool_call_detected on first detection
@@ -458,6 +481,11 @@ export class LLM extends BaseNode<LlmParams> {
         // Extract usage if present
         if (chunk.usage) {
           usage = this.normalizeUsage(chunk.usage);
+          try {
+            console.debug('[LLM] usage.update', usage);
+          } catch {
+            /* non-fatal */
+          }
         }
 
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls
@@ -469,6 +497,7 @@ export class LLM extends BaseNode<LlmParams> {
           try {
             if (Array.isArray(normalizedChunk.choices) && normalizedChunk.choices.length > 0) {
               const choice0 = normalizedChunk.choices[0];
+              // Synthesize toolCalls snapshot
               const current: NonNullable<NormalizedMessage['toolCalls']> = toolCalls
                 .filter((tc) => tc.function.name && tc.function.name.length > 0)
                 .map((tc) => ({
@@ -476,14 +505,27 @@ export class LLM extends BaseNode<LlmParams> {
                   type: 'function' as const,
                   function: { name: tc.function.name, arguments: tc.function.arguments },
                 }));
+              // Always include an authoritative message.content snapshot to preserve correct ordering on the client
+              // This is the cumulatively accumulated content so far
+              const existing = choice0.message ?? {};
+              const nextMessage: NormalizedMessage = { ...existing };
+              nextMessage.content = content;
               if (current.length > 0) {
-                choice0.message = { ...(choice0.message ?? {}), toolCalls: current };
+                nextMessage.toolCalls = current;
               }
+              choice0.message = nextMessage;
             }
           } catch {
             void 0;
           }
 
+          try {
+            console.debug('[LLM] emit content_chunk', {
+              contentLen: content.length,
+            });
+          } catch {
+            /* non-fatal */
+          }
           await eventCallback({
             type: 'content_chunk',
             timestamp: new Date().toISOString(),
@@ -495,6 +537,11 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Emit completion event
       if (eventCallback && usage) {
+        try {
+          console.info('[LLM] Streaming complete', usage);
+        } catch {
+          /* non-fatal */
+        }
         await eventCallback({
           type: 'content_complete',
           timestamp: new Date().toISOString(),

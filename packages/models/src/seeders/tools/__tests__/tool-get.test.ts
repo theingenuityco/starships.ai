@@ -88,7 +88,7 @@ describe('Tool Get Tool', () => {
       expect(toolGetToolTemplate.description).toBe(toolGetTool.description);
       expect(toolGetToolTemplate.parameters).toEqual(toolGetTool.parameters);
       expect(toolGetToolTemplate.blueprint).toEqual(toolGetTool.blueprint);
-      expect(toolGetToolTemplate.slug).toBe('tool-get');
+      expect(toolGetToolTemplate.slug).toBe('get-tool');
       expect(toolGetToolTemplate.category).toBe('automation');
       expect(toolGetToolTemplate.requiresApiKey).toBe(false);
       expect(toolGetToolTemplate.exampleUsage).toBeDefined();

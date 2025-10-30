@@ -88,7 +88,7 @@ describe('Tool Test Tool', () => {
       expect(toolTestToolTemplate.description).toBe(toolTestTool.description);
       expect(toolTestToolTemplate.parameters).toEqual(toolTestTool.parameters);
       expect(toolTestToolTemplate.blueprint).toEqual(toolTestTool.blueprint);
-      expect(toolTestToolTemplate.slug).toBe('tool-test');
+      expect(toolTestToolTemplate.slug).toBe('test-tool');
       expect(toolTestToolTemplate.category).toBe('automation');
       expect(toolTestToolTemplate.requiresApiKey).toBe(false);
     });

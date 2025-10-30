@@ -72,8 +72,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
-  // Track if success message has been shown to prevent duplicates
-  const successToastShownRef = useRef(false)
+  // Track if success messages have been shown to prevent duplicates
+  const passwordResetToastShownRef = useRef(false)
+  const emailVerificationToastShownRef = useRef(false)
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
@@ -85,13 +86,19 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     try {
       const authCode = searchParams.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
       const oauthError = searchParams.get('oauth_error')
-      const verificationError = searchParams.get('verification')
+      const verification = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
 
       // Handle password reset success message
-      if (resetSuccess === 'success' && !successToastShownRef.current) {
-        successToastShownRef.current = true
+      if (resetSuccess === 'success' && !passwordResetToastShownRef.current) {
+        passwordResetToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      // Handle email verification success message
+      if (verification === 'success' && !emailVerificationToastShownRef.current) {
+        emailVerificationToastShownRef.current = true
+        toast.success('Email verified successfully! You can now log in to your account.')
       }
 
       // Prevent duplicate handling (synchronous check with ref)
@@ -105,7 +112,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
         oauthLogin(authCode)
       } else if (oauthError) {
         setFormError(getOAuthErrorMessage(oauthError))
-      } else if (verificationError === 'error') {
+      } else if (verification === 'error') {
         setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
       }
     } catch (error) {

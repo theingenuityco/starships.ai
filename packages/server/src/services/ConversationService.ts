@@ -69,6 +69,10 @@ export class ConversationService {
   // Resume state per conversation generation
   private generationId: Map<string, string> = new Map();
   private accumulatedLength: Map<string, number> = new Map();
+  // CRITICAL FIX: Track next chunk position atomically to prevent race conditions
+  private nextChunkPosition: Map<string, number> = new Map();
+  // CRITICAL FIX: Serialize chunk processing per conversation to prevent race conditions
+  private chunkProcessingLock: Map<string, Promise<void>> = new Map();
   private placeholderEmitted: Map<string, boolean> = new Map();
   private ringBuffer: Map<string, Array<{ position: number; content: string; ts: number }>> = new Map();
   // Track accumulated toolCalls during streaming per conversation
@@ -302,14 +306,24 @@ export class ConversationService {
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
+      console.log(`[ConversationService] Starting deletion process for conversation ${conversationId}`);
+
       // Verify conversation exists first
       const conversation = await this.conversationRepository.findById(conversationId);
       if (!conversation) {
         return false;
       }
 
+      console.log(`[ConversationService] Found conversation ${conversationId} (title: "${conversation.title}"), proceeding with deletion`);
+
       // Use the repository's delete method which should handle CASCADE properly
       const deleted = await this.conversationRepository.delete(conversationId);
+
+      if (deleted) {
+        console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
+      } else {
+        console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
+      }
 
       return deleted;
     } catch (error) {
@@ -334,13 +348,17 @@ export class ConversationService {
    */
   async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
     try {
+      console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
+
       // Use the repository's update method
       const updatedConversation = await this.conversationRepository.update(conversationId, {
         ...updates,
         updatedAt: new Date().toISOString(),
       });
 
-      if (!updatedConversation) {
+      if (updatedConversation) {
+        console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
+      } else {
         console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
       }
 
@@ -1131,6 +1149,8 @@ export class ConversationService {
         this.ringBuffer.set(conversationId, []);
         this.snapshotPreferred.delete(conversationId);
         this.toolCallSeq.delete(conversationId);
+        // CRITICAL FIX: Reset position counter at start of new turn
+        this.nextChunkPosition.set(conversationId, 0);
         // Reset cached usage for the new turn
         this.latestStreamingUsage.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
@@ -1217,327 +1237,343 @@ export class ConversationService {
       }
 
       case 'content_chunk': {
-        const isNested = (event.executionDepth ?? 0) > 0;
-        // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
-        try {
-          const stopped = await this.maybeAutoStopForLowBalance(conversationId);
-          if (stopped) {
-            break;
-          }
-        } catch {
-          /* non-fatal: balance auto-stop check failure */
+        // Drop nested LLM content streams (depth>0) from conversation timeline
+        if ((event.executionDepth ?? 0) > 0) {
+          break;
         }
-        // Stream content chunks in real-time (supports both delta.* and message.* providers)
-        const chunkContent = (event as LLMEvent).data?.chunk;
 
-        if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
-          type ChoiceNode = {
-            delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
-            message?: {
-              content?: unknown;
-              toolCalls?: unknown[];
-              reasoning?: unknown;
-              reasoning_details?: unknown;
-            };
-          };
-          const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
-          const delta = choice0.delta ?? {};
-          const messageNode = choice0.message ?? {};
-          // Capture provider usage from chunk if present for mid-stream accounting
+        // CRITICAL FIX: Serialize chunk processing using a lock pattern
+        // Wait for previous chunk to complete before starting this one
+        const processThisChunk = async () => {
+          // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
           try {
-            const rawUsage = (chunkContent as { usage?: unknown }).usage as
-              | { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown; cost?: unknown }
-              | undefined;
-            if (rawUsage && typeof rawUsage === 'object') {
-              const uRec = rawUsage as Record<string, unknown>;
-              const promptTokens = typeof uRec.promptTokens === 'number' ? uRec.promptTokens : 0;
-              const completionTokens = typeof uRec.completionTokens === 'number' ? uRec.completionTokens : 0;
-              const totalTokens = typeof uRec.totalTokens === 'number' ? uRec.totalTokens : Number(promptTokens) + Number(completionTokens);
-              const cost = typeof uRec.cost === 'number' ? uRec.cost : 0;
-              const model =
-                typeof (chunkContent as { model?: unknown }).model === 'string'
-                  ? ((chunkContent as { model?: string }).model as string)
-                  : undefined;
-              if (totalTokens > 0 || promptTokens > 0 || completionTokens > 0 || cost > 0) {
-                this.latestStreamingUsage.set(conversationId, {
-                  promptTokens: Number(promptTokens || 0),
-                  completionTokens: Number(completionTokens || 0),
-                  totalTokens: Number(totalTokens || 0),
-                  cost: Number(cost || 0),
-                  ...(model ? { model } : {}),
-                });
-              }
+            const stopped = await this.maybeAutoStopForLowBalance(conversationId);
+            if (stopped) {
+              return;
             }
-          } catch (err) {
-            console.warn('[STREAMING] Failed to capture usage from chunk', {
-              conversationId,
-              error: err instanceof Error ? err.message : String(err),
-            });
+          } catch (e) {
+            /* non-fatal: balance auto-stop check failure */
           }
 
-          const contentFromDelta =
-            typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
-          // Important: to preserve strict ordering, we only stream delta.content tokens.
-          // Providers may interleave snapshots that can re-order text; we avoid mixing them.
-          const hasContent = contentFromDelta && contentFromDelta.length > 0;
+          // Stream content chunks in real-time (supports both delta.* and message.* providers)
+          const chunkContent = (event as LLMEvent).data?.chunk;
 
-          const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
-            ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
-            : [];
-          const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
-            ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
-            : [];
-          const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
-
-          // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
-          const extractReasoning = (node: unknown): string => {
+          if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
+            type ChoiceNode = {
+              delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
+              message?: {
+                content?: unknown;
+                toolCalls?: unknown[];
+                reasoning?: unknown;
+                reasoning_details?: unknown;
+              };
+            };
+            const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
+            const delta = choice0.delta ?? {};
+            const messageNode = choice0.message ?? {};
+            // Capture provider usage from chunk if present for mid-stream accounting
             try {
-              if (!node || typeof node !== 'object') return '';
-              const rec = node as Record<string, unknown>;
-              const parts: string[] = [];
-
-              // Unified fields
-              const raw = (rec.reasoning ?? rec.thinking) as unknown;
-
-              const appendFromRaw = (r: unknown): void => {
-                if (!r) return;
-                if (typeof r === 'string') {
-                  parts.push(r);
-                  return;
+              const rawUsage = (chunkContent as { usage?: unknown }).usage as
+                | { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown; cost?: unknown }
+                | undefined;
+              if (rawUsage && typeof rawUsage === 'object') {
+                const uRec = rawUsage as Record<string, unknown>;
+                const promptTokens = typeof uRec.promptTokens === 'number' ? uRec.promptTokens : 0;
+                const completionTokens = typeof uRec.completionTokens === 'number' ? uRec.completionTokens : 0;
+                const totalTokens =
+                  typeof uRec.totalTokens === 'number' ? uRec.totalTokens : Number(promptTokens) + Number(completionTokens);
+                const cost = typeof uRec.cost === 'number' ? uRec.cost : 0;
+                const model =
+                  typeof (chunkContent as { model?: unknown }).model === 'string'
+                    ? ((chunkContent as { model?: string }).model as string)
+                    : undefined;
+                if (totalTokens > 0 || promptTokens > 0 || completionTokens > 0 || cost > 0) {
+                  this.latestStreamingUsage.set(conversationId, {
+                    promptTokens: Number(promptTokens || 0),
+                    completionTokens: Number(completionTokens || 0),
+                    totalTokens: Number(totalTokens || 0),
+                    cost: Number(cost || 0),
+                    ...(model ? { model } : {}),
+                  });
                 }
-                if (typeof r === 'object' && r !== null) {
-                  const obj = r as Record<string, unknown>;
-                  if (typeof obj.content === 'string') parts.push(obj.content);
-                  if (Array.isArray(obj.tokens)) {
-                    for (const t of obj.tokens as unknown[]) {
-                      if (t && typeof t === 'object') {
-                        const tr = t as Record<string, unknown>;
-                        const text = typeof tr.text === 'string' ? tr.text : '';
-                        const content = typeof tr.content === 'string' ? tr.content : '';
+              }
+            } catch (err) {
+              console.warn('[STREAMING] Failed to capture usage from chunk', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+
+            const contentFromDelta =
+              typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
+            const contentFromMessage =
+              typeof (messageNode as { content?: unknown }).content === 'string'
+                ? ((messageNode as { content?: unknown }).content as string)
+                : '';
+            const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
+
+            const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
+              ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
+              : [];
+            const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
+              ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
+              : [];
+            const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
+
+            // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
+            const extractReasoning = (node: unknown): string => {
+              try {
+                if (!node || typeof node !== 'object') return '';
+                const rec = node as Record<string, unknown>;
+                const parts: string[] = [];
+
+                // Unified fields
+                const raw = (rec.reasoning ?? rec.thinking) as unknown;
+
+                const appendFromRaw = (r: unknown): void => {
+                  if (!r) return;
+                  if (typeof r === 'string') {
+                    parts.push(r);
+                    return;
+                  }
+                  if (typeof r === 'object' && r !== null) {
+                    const obj = r as Record<string, unknown>;
+                    if (typeof obj.content === 'string') parts.push(obj.content);
+                    if (Array.isArray(obj.tokens)) {
+                      for (const t of obj.tokens as unknown[]) {
+                        if (t && typeof t === 'object') {
+                          const tr = t as Record<string, unknown>;
+                          const text = typeof tr.text === 'string' ? tr.text : '';
+                          const content = typeof tr.content === 'string' ? tr.content : '';
+                          if (text) parts.push(text);
+                          else if (content) parts.push(content);
+                        }
+                      }
+                    }
+                  }
+                  if (Array.isArray(r)) {
+                    for (const p of r as unknown[]) {
+                      if (p && typeof p === 'object') {
+                        const pr = p as Record<string, unknown>;
+                        const text = typeof pr.text === 'string' ? pr.text : '';
+                        const content = typeof pr.content === 'string' ? pr.content : '';
                         if (text) parts.push(text);
                         else if (content) parts.push(content);
                       }
                     }
                   }
-                }
-                if (Array.isArray(r)) {
-                  for (const p of r as unknown[]) {
-                    if (p && typeof p === 'object') {
-                      const pr = p as Record<string, unknown>;
-                      const text = typeof pr.text === 'string' ? pr.text : '';
-                      const content = typeof pr.content === 'string' ? pr.content : '';
-                      if (text) parts.push(text);
-                      else if (content) parts.push(content);
+                };
+
+                appendFromRaw(raw);
+
+                // OpenRouter unified 'reasoning_details' chunks
+                const details = rec.reasoning_details as unknown;
+                if (Array.isArray(details)) {
+                  for (const d of details as unknown[]) {
+                    if (d && typeof d === 'object') {
+                      const det = d as Record<string, unknown>;
+                      if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                        parts.push(det.text);
+                      }
                     }
                   }
                 }
-              };
 
-              appendFromRaw(raw);
+                return parts.join('');
+              } catch {
+                return '';
+              }
+            };
+            const reasoningFromDelta = extractReasoning(delta);
+            const reasoningFromMessage = extractReasoning(messageNode);
+            const hasReasoning =
+              (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
 
-              // OpenRouter unified 'reasoning_details' chunks
-              const details = rec.reasoning_details as unknown;
-              if (Array.isArray(details)) {
-                for (const d of details as unknown[]) {
-                  if (d && typeof d === 'object') {
-                    const det = d as Record<string, unknown>;
-                    if (det.type === 'reasoning.text' && typeof det.text === 'string') {
-                      parts.push(det.text);
-                    }
-                  }
+            // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
+            // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
+            if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
+              if (this.streamingService.isActive(conversationId)) {
+                // Acquire lock upfront to avoid race between parallel content_chunk events
+                this.streamingContent.set(conversationId, '');
+                this.placeholderEmitted.set(conversationId, true);
+                // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
+                this.streamingToolCalls.delete(conversationId);
+                // Initialize per-stream sequence counter
+                this.streamSeq.set(conversationId, 0);
+                this.snapshotPreferred.delete(conversationId);
+                this.toolCallSeq.set(conversationId, 0);
+
+                const assistantMessage: MessageModel = {
+                  id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  role: 'assistant',
+                  content: '',
+                  messageType: 'agent_response',
+                  createdAt: event.timestamp,
+                  updatedAt: event.timestamp,
+                };
+
+                const agent = this.currentAgentForConversation.get(conversationId);
+                const shell: Operation = {
+                  op: 'add',
+                  path: '/messages/-',
+                  value: {
+                    ...assistantMessage,
+                    ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
+                    streaming: true,
+                    chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
+                    reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
+                    toolCalls: [], // Initialize empty toolCalls array for replace operations
+                  },
+                };
+                await this.streamingService.broadcastDelta(conversationId, shell);
+                // Emit initial resume token
+                try {
+                  const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                  const svc = ResumeTokenService.getInstance();
+                  const token = svc.sign({
+                    c: conversationId,
+                    g: this.generationId.get(conversationId) || 'g',
+                    p: 0,
+                    m: '0',
+                    exp: Math.floor(Date.now() / 1000) + 600,
+                  });
+                  this.streamingService.sendResumeToken(conversationId, token);
+                } catch (err) {
+                  console.warn('[STREAMING] Failed to emit initial resume token', {
+                    conversationId,
+                    error: err instanceof Error ? err.message : String(err),
+                  });
                 }
+              } else {
+                // No active SSE client: still initialize accumulators so stop can persist partials.
+                this.streamingContent.set(conversationId, '');
+                this.placeholderEmitted.set(conversationId, true);
+                this.streamingToolCalls.delete(conversationId);
+                if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
+                // Skip shell broadcast; continue accumulating for persistence
               }
-
-              return parts.join('');
-            } catch {
-              return '';
             }
-          };
-          const reasoningFromDelta = extractReasoning(delta);
-          const reasoningFromMessage = extractReasoning(messageNode);
-          const hasReasoning =
-            (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
-
-          // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
-          // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
-          if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
-            if (this.streamingService.isActive(conversationId)) {
-              // Acquire lock upfront to avoid race between parallel content_chunk events
-              this.streamingContent.set(conversationId, '');
-              this.placeholderEmitted.set(conversationId, true);
-              // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
-              this.streamingToolCalls.delete(conversationId);
-              // Initialize per-stream sequence counter
-              this.streamSeq.set(conversationId, 0);
-              this.snapshotPreferred.delete(conversationId);
-              this.toolCallSeq.set(conversationId, 0);
-
-              const assistantMessage: MessageModel = {
-                id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                role: 'assistant',
-                content: '',
-                messageType: 'agent_response',
-                createdAt: event.timestamp,
-                updatedAt: event.timestamp,
-              };
-
-              const agent = this.currentAgentForConversation.get(conversationId);
-              const shell: Operation = {
-                op: 'add',
-                path: '/messages/-',
-                value: {
-                  ...assistantMessage,
-                  ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-                  streaming: true,
-                  chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
-                  reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
-                  toolCalls: [], // Initialize empty toolCalls array for replace operations
-                },
-              };
-              await this.streamingService.broadcastDelta(conversationId, shell);
-              // Emit initial resume token
-              try {
-                const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                const svc = ResumeTokenService.getInstance();
-                const token = svc.sign({
-                  c: conversationId,
-                  g: this.generationId.get(conversationId) || 'g',
-                  p: 0,
-                  m: '0',
-                  exp: Math.floor(Date.now() / 1000) + 600,
-                });
-                this.streamingService.sendResumeToken(conversationId, token);
-              } catch (err) {
-                console.warn('[STREAMING] Failed to emit initial resume token', {
-                  conversationId,
-                  error: err instanceof Error ? err.message : String(err),
-                });
-              }
-            } else {
-              // No active SSE client: still initialize accumulators so stop can persist partials.
-              this.streamingContent.set(conversationId, '');
-              this.placeholderEmitted.set(conversationId, true);
-              this.streamingToolCalls.delete(conversationId);
-              if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
-              // Skip shell broadcast; continue accumulating for persistence
-            }
-          }
 
           // Process content: prefer message snapshot if present; otherwise, append deltas only until first snapshot is seen
-          if (!isNested) {
-            const latestBase = this.streamingContent.get(conversationId) || '';
-            const currentLength = latestBase.length;
+          const latestBase = this.streamingContent.get(conversationId) || '';
+          const currentLength = latestBase.length;
 
-            // Extract snapshot once per chunk
-            let snapshot: string = '';
-            try {
-              snapshot =
-                typeof (messageNode as { content?: unknown }).content === 'string'
-                  ? ((messageNode as { content?: unknown }).content as string)
-                  : '';
-            } catch {
-              snapshot = '';
-            }
+          // Extract snapshot once per chunk
+          let snapshot: string = '';
+          try {
+            snapshot =
+              typeof (messageNode as { content?: unknown }).content === 'string'
+                ? ((messageNode as { content?: unknown }).content as string)
+                : '';
+          } catch {
+            snapshot = '';
+          }
 
-            const hasSnapshot = typeof snapshot === 'string' && snapshot.length > 0;
+          const hasSnapshot = typeof snapshot === 'string' && snapshot.length > 0;
 
-            if (hasSnapshot && snapshot.length >= currentLength) {
-              // Enter snapshot-preferred mode and adopt snapshot immediately
-              this.snapshotPreferred.add(conversationId);
-              if (snapshot.length > currentLength) {
-                // Adopt provider snapshot as the source of truth even if it reorders text
-                this.streamingContent.set(conversationId, snapshot);
-                try {
-                  this.accumulatedLength.set(conversationId, snapshot.length);
-                } catch {
-                  /* non-fatal */
-                }
-                try {
-                  this.ringBuffer.set(conversationId, []);
-                } catch {
-                  /* non-fatal */
-                }
+          if (hasSnapshot && snapshot.length >= currentLength) {
+            // Enter snapshot-preferred mode and adopt snapshot immediately
+            this.snapshotPreferred.add(conversationId);
+            if (snapshot.length > currentLength) {
+              // Adopt provider snapshot as the source of truth even if it reorders text
+              this.streamingContent.set(conversationId, snapshot);
+              try {
+                this.accumulatedLength.set(conversationId, snapshot.length);
+              } catch {
+                /* non-fatal */
+              }
+              try {
+                this.ringBuffer.set(conversationId, []);
+              } catch {
+                /* non-fatal */
+              }
+              try {
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/content',
+                  value: snapshot,
+                });
                 try {
                   await this.streamingService.broadcastDelta(conversationId, {
                     op: 'replace',
-                    path: '/messages/-1/content',
-                    value: snapshot,
+                    path: '/messages/-1/chunks',
+                    value: [],
                   });
-                  try {
-                    await this.streamingService.broadcastDelta(conversationId, {
-                      op: 'replace',
-                      path: '/messages/-1/chunks',
-                      value: [],
-                    });
-                  } catch {
-                    /* non-fatal */
-                  }
                 } catch {
                   /* non-fatal */
                 }
+              } catch {
+                /* non-fatal */
               }
-            } else if (hasContent) {
-              // Only append deltas if we have not yet seen a snapshot for this stream
-              if (this.snapshotPreferred.has(conversationId)) {
-                // Ignore delta to avoid reordering until next snapshot arrives
-              } else {
-                const incremental = contentFromDelta || '';
-                const append = incremental;
-                if (append) {
-                  const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
-                  if (normalized.length > 0) {
-                    const newContent = latestBase + normalized;
-                    this.streamingContent.set(conversationId, newContent);
-                    const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
-                    this.accumulatedLength.set(conversationId, newLen);
-                    const rb = this.ringBuffer.get(conversationId) || [];
-                    rb.push({ position: currentLength, content: normalized, ts: Date.now() });
-                    if (rb.length > 200) rb.splice(0, rb.length - 200);
-                    this.ringBuffer.set(conversationId, rb);
+            }
+          } else if (hasContent) {
+            // Only append deltas if we have not yet seen a snapshot for this stream
+            if (this.snapshotPreferred.has(conversationId)) {
+              // Ignore delta to avoid reordering until next snapshot arrives
+            } else {
+              const incremental = contentFromDelta || '';
+              const append = incremental;
+              if (append) {
+                const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
+                if (normalized.length > 0) {
+                  const newContent = latestBase + normalized;
+                  this.streamingContent.set(conversationId, newContent);
+                  const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
+                  this.accumulatedLength.set(conversationId, newLen);
+                  const rb = this.ringBuffer.get(conversationId) || [];
+                  rb.push({ position: currentLength, content: normalized, ts: Date.now() });
+                  if (rb.length > 200) rb.splice(0, rb.length - 200);
+                  this.ringBuffer.set(conversationId, rb);
 
-                    // Stream delta chunk as JSON Patch add into chunks array
-                    const seq1 = (this.streamSeq.get(conversationId) || 0) + 1;
-                    this.streamSeq.set(conversationId, seq1);
+                  // Stream delta chunk as JSON Patch add into chunks array
+                  const seq1 = (this.streamSeq.get(conversationId) || 0) + 1;
+                  this.streamSeq.set(conversationId, seq1);
 
-                    const chunkDelta: Operation = {
-                      op: 'add',
-                      path: '/messages/-1/chunks/-',
-                      value: {
-                        seq: seq1,
-                        content: normalized,
-                        position: currentLength,
-                        timestamp: Date.now(),
-                      },
-                    };
-                    await this.streamingService.broadcastDelta(conversationId, chunkDelta);
-                    // Periodically emit resume token (every ~2s)
-                    try {
-                      if (Math.random() < 0.15) {
-                        const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                        const svc = ResumeTokenService.getInstance();
-                        const token = svc.sign({
-                          c: conversationId,
-                          g: this.generationId.get(conversationId) || 'g',
-                          p: newLen,
-                          m: '0',
-                          exp: Math.floor(Date.now() / 1000) + 600,
-                        });
-                        this.streamingService.sendResumeToken(conversationId, token);
-                      }
-                    } catch (err) {
-                      console.warn('[STREAMING] Failed to emit periodic resume token', {
-                        conversationId,
-                        error: err instanceof Error ? err.message : String(err),
+                  const chunkDelta: Operation = {
+                    op: 'add',
+                    path: '/messages/-1/chunks/-',
+                    value: {
+                      seq: seq1,
+                      content: normalized,
+                      position: currentLength,
+                      timestamp: Date.now(),
+                    },
+                  };
+                  await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+                  // Periodically emit resume token (every ~2s)
+                  try {
+                    if (Math.random() < 0.15) {
+                      const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                      const svc = ResumeTokenService.getInstance();
+                      const token = svc.sign({
+                        c: conversationId,
+                        g: this.generationId.get(conversationId) || 'g',
+                        p: newLen,
+                        m: '0',
+                        exp: Math.floor(Date.now() / 1000) + 600,
                       });
+                      this.streamingService.sendResumeToken(conversationId, token);
                     }
+                  } catch (err) {
+                    console.warn('[STREAMING] Failed to emit periodic resume token', {
+                      conversationId,
+                      error: err instanceof Error ? err.message : String(err),
+                    });
                   }
                 }
               }
             }
+          } else {
+            // No active SSE client: still initialize accumulators so stop can persist partials.
+            this.streamingContent.set(conversationId, '');
+            this.placeholderEmitted.set(conversationId, true);
+            this.streamingToolCalls.delete(conversationId);
+            if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
+            // Skip shell broadcast; continue accumulating for persistence
           }
 
           // Process reasoning if present (stream as delta chunks; persist final reasoning on completion)
-          if (hasReasoning && !isNested) {
+          if (hasReasoning) {
             const incrementalR = reasoningFromDelta || '';
             const snapshotR = reasoningFromMessage || '';
 
@@ -1583,211 +1619,131 @@ export class ConversationService {
                 const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
 
                 for (const raw of toolCallsFromDelta) {
-                  const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
-                  const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
+                    const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
+                    const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
 
-                  // Ensure slot only for the referenced index; do not pre-fill earlier indices
-                  if (!acc[idx]) {
-                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
-                  }
+                    // Ensure slot only for the referenced index; do not pre-fill earlier indices
+                    if (!acc[idx]) {
+                      acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
+                    }
 
-                  const target = acc[idx];
-                  if (rawTc?.id) target.id = rawTc.id;
-                  if (rawTc?.function?.name) target.function.name = rawTc.function.name;
-                  // Accumulate arguments text in strict arrival order (OpenAI SDK preserves order)
-                  if (typeof rawTc?.function?.arguments === 'string') {
-                    const current = String(target.function.arguments || '');
-                    const incoming = String(rawTc.function.arguments);
-                    let append = incoming;
-                    // Align start to first JSON brace for a clean head and to avoid preamble junk
-                    if (current.length === 0) {
-                      const iBrace = incoming.indexOf('{');
-                      const iBracket = incoming.indexOf('[');
-                      const braceIdx = iBrace === -1 ? iBracket : iBracket === -1 ? iBrace : Math.min(iBrace, iBracket);
-                      append = braceIdx >= 0 ? incoming.slice(braceIdx) : '';
-                    }
-                    if (append) {
-                      const normalized = ConversationService.computeNonOverlappingAppend(current, append);
-                      if (normalized) {
-                        target.function.arguments = current + normalized;
-                      }
-                    }
-                    // Emit concise visibility log: head string and seq
-                    if (DEBUG_TOOLCALLS) {
-                      try {
-                        const seq = (this.toolCallSeq.get(conversationId) || 0) + 1;
-                        this.toolCallSeq.set(conversationId, seq);
-                        const head = (target.function.arguments as string).slice(0, 120);
-                        console.debug('[STREAMING] toolCalls.args', { seq, head });
-                      } catch {
-                        /* noop */
-                      }
+                    const target = acc[idx];
+                    if (rawTc?.id) target.id = rawTc.id;
+                    if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+
+                    // Accumulate arguments as string, parse later when complete
+                    if (typeof rawTc?.function?.arguments === 'string') {
+                      target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
                     }
                   }
-                }
 
-                this.streamingToolCalls.set(conversationId, acc);
+                  this.streamingToolCalls.set(conversationId, acc);
 
-                // Build toolCalls value preferring incremental parsed objects per index
-                const toolCallsValue = acc
-                  .map((tc) => ({ tc }))
-                  .filter(({ tc }) => !!tc && typeof tc.function?.name === 'string' && (tc.function.name as string).length > 0)
-                  .map(({ tc }) => {
-                    const argsStr = tc.function?.arguments;
-                    let argsObj: unknown | undefined = undefined;
-                    if (typeof argsStr === 'string' && argsStr.length > 0) {
-                      // Incremental extraction: only include fully completed top-level properties
-                      const extracted = ConversationService.extractCompletedTopLevelProperties(argsStr);
-                      if (extracted && typeof extracted === 'object' && !Array.isArray(extracted)) {
-                        argsObj = extracted;
+                  // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
+                  const toolCallsValue = acc
+                    .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
+                    .map((tc) => {
+                      let argsObj: unknown = {};
+                      const argsStr = tc.function?.arguments;
+                      if (typeof argsStr === 'string' && argsStr) {
+                        try {
+                          // Try full JSON.parse first for complete JSON
+                          argsObj = JSON.parse(argsStr);
+                        } catch {
+                          try {
+                            // Use partial-json for incomplete JSON during streaming
+                            argsObj = parsePartialJson(argsStr);
+                          } catch {
+                            // If both fail, use empty object
+                            argsObj = {};
+                          }
+                        }
                       }
-                    }
-                    let debugKeysCount = 0;
-                    let debugRawLen = 0;
-                    try {
-                      debugKeysCount =
-                        typeof argsStr === 'string'
-                          ? argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj)
-                            ? Object.keys(argsObj as Record<string, unknown>).length
-                            : 0
-                          : 0;
-                      debugRawLen = typeof argsStr === 'string' ? argsStr.length : 0;
-                    } catch {
-                      /* noop */
-                    }
-                    const out: any = {
-                      id: tc.id,
-                      type: tc.type,
-                      function: {
-                        name: tc.function.name,
-                        argumentsProgress: debugRawLen,
-                        argumentsKeysCount: debugKeysCount,
-                      },
-                    } as any;
-                    // Emit only objects (or {}) per strict reliance on partial-json-parser
-                    out.function.arguments =
-                      argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj) ? (argsObj as Record<string, unknown>) : {};
-                    return out;
-                  });
-
-                // Dedupe identical broadcasts
-                try {
-                  const serialized = JSON.stringify(toolCallsValue);
-                  const prev = this.lastToolCallsBroadcastHash.get(conversationId);
-                  if (prev !== serialized) {
-                    await this.streamingService.broadcastDelta(conversationId, {
-                      op: 'replace',
-                      path: '/messages/-1/toolCalls',
-                      value: toolCallsValue,
+                      return {
+                        id: tc.id,
+                        type: tc.type,
+                        function: {
+                          name: tc.function.name,
+                          arguments: argsObj, // Parsed object (may be partial)
+                        },
+                      };
                     });
-                    this.lastToolCallsBroadcastHash.set(conversationId, serialized);
-                  }
-                } catch {
-                  // On serialization failure, fall back to broadcasting
+
                   await this.streamingService.broadcastDelta(conversationId, {
                     op: 'replace',
                     path: '/messages/-1/toolCalls',
                     value: toolCallsValue,
                   });
-                }
-              } else if (toolCallsFromMessage.length > 0) {
-                // Snapshot toolCalls from message node: update id/name and adopt arguments snapshot to correct any ordering drift
-                const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
-                for (let i = 0; i < toolCallsFromMessage.length; i++) {
-                  const raw = (toolCallsFromMessage[i] ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
-                  if (!acc[i]) {
-                    acc[i] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
-                  }
-                  if (raw?.id) acc[i].id = raw.id;
-                  const nm = raw?.function?.name;
-                  if (typeof nm === 'string' && nm.length > 0) acc[i].function.name = nm;
-                  // Adopt snapshot arguments if it extends current buffer (corrects out-of-order delta fragments)
-                  try {
-                    const rawSnap = raw?.function && typeof raw.function.arguments === 'string' ? (raw.function.arguments as string) : '';
-                    const cur = String(acc[i].function.arguments || '');
-                    // Align snapshot to first brace
-                    const iBrace = rawSnap.indexOf('{');
-                    const iBracket = rawSnap.indexOf('[');
-                    const braceIdx = iBrace === -1 ? iBracket : iBracket === -1 ? iBrace : Math.min(iBrace, iBracket);
-                    const snapArgs = braceIdx >= 0 ? rawSnap.slice(braceIdx) : '';
-                    if (snapArgs && snapArgs.length >= cur.length) {
-                      acc[i].function.arguments = snapArgs;
-                      if (DEBUG_TOOLCALLS) {
+                } else if (toolCallsFromMessage.length > 0) {
+                  // Snapshot toolCalls from message node (no incremental indices)
+                  // Parse arguments using partial-json for robustness
+                  const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
+                    const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
+                    const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
+                    let argsObj: unknown = {};
+                    if (argsStr) {
+                      try {
+                        argsObj = JSON.parse(argsStr);
+                      } catch {
                         try {
-                          const seq = (this.toolCallSeq.get(conversationId) || 0) + 1;
-                          this.toolCallSeq.set(conversationId, seq);
-                          const head = snapArgs.slice(0, 120);
-                          console.debug('[STREAMING] toolCalls.args', { seq, head });
+                          argsObj = parsePartialJson(argsStr);
                         } catch {
-                          /* noop */
+                          argsObj = {};
                         }
                       }
                     }
-                  } catch {
-                    /* non-fatal */
-                  }
-                }
-                this.streamingToolCalls.set(conversationId, acc);
-
-                // Broadcast current accumulator view (parsed args object or {}), deduped
-                const toolCallsValue = acc
-                  .map((tc) => ({ tc }))
-                  .filter(({ tc }) => !!tc && typeof tc.function?.name === 'string' && (tc.function.name as string).length > 0)
-                  .map(({ tc }) => {
-                    const argsStr = tc.function?.arguments;
-                    let argsObj: unknown | undefined = undefined;
-                    if (typeof argsStr === 'string' && argsStr.length > 0) {
-                      // Incremental extraction: only include fully completed top-level properties
-                      const extracted = ConversationService.extractCompletedTopLevelProperties(argsStr);
-                      if (extracted && typeof extracted === 'object' && !Array.isArray(extracted)) {
-                        argsObj = extracted;
-                      }
-                    }
-                    const out: any = {
-                      id: tc.id,
-                      type: tc.type,
-                      function: { name: tc.function.name },
+                    return {
+                      id: tc?.id,
+                      type: 'function' as const,
+                      function: {
+                        name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
+                        arguments: argsObj, // Store as parsed object for UI
+                      },
                     } as any;
-                    out.function.arguments =
-                      argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj)
-                        ? (argsObj as Record<string, unknown>)
-                        : ({} as Record<string, unknown>);
-                    out.function.argumentsProgress = typeof argsStr === 'string' ? argsStr.length : 0;
-                    try {
-                      out.function.argumentsKeysCount =
-                        out.function.arguments && typeof out.function.arguments === 'object' && !Array.isArray(out.function.arguments)
-                          ? Object.keys(out.function.arguments as Record<string, unknown>).length
-                          : 0;
-                    } catch {
-                      out.function.argumentsKeysCount = 0;
-                    }
-                    return out;
                   });
 
-                try {
-                  const serialized = JSON.stringify(toolCallsValue);
-                  const prev = this.lastToolCallsBroadcastHash.get(conversationId);
-                  if (prev !== serialized) {
-                    await this.streamingService.broadcastDelta(conversationId, {
-                      op: 'replace',
-                      path: '/messages/-1/toolCalls',
-                      value: toolCallsValue,
-                    });
-                    this.lastToolCallsBroadcastHash.set(conversationId, serialized);
-                  }
-                } catch {
+                  // Maintain streaming accumulator with string arguments form
+                  const accumFromSnapshot: StreamingToolCallAccum[] = normalized.map((tc) => ({
+                    id: tc.id,
+                    type: 'function',
+                    function: {
+                      name: tc.function.name,
+                      arguments: (() => {
+                        try {
+                          return JSON.stringify(tc.function.arguments ?? {});
+                        } catch {
+                          return '{}';
+                        }
+                      })(),
+                    },
+                  }));
+                  this.streamingToolCalls.set(conversationId, accumFromSnapshot);
+
+                  // Broadcast only valid entries (non-empty function name)
                   await this.streamingService.broadcastDelta(conversationId, {
                     op: 'replace',
                     path: '/messages/-1/toolCalls',
-                    value: toolCallsValue,
+                    value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
                   });
                 }
+              } catch {
+                // ignore toolCall parse errors to avoid breaking streaming
               }
-            } catch {
-              // ignore toolCall parse errors to avoid breaking streaming
             }
           }
-        }
+        };
+
+        // CRITICAL FIX: Chain this chunk after the previous one completes
+        const previousLock = this.chunkProcessingLock.get(conversationId) || Promise.resolve();
+        const currentLock = previousLock
+          .then(() => processThisChunk())
+          .catch((err) => {
+            console.error('[STREAMING] Chunk processing error:', err);
+          });
+        this.chunkProcessingLock.set(conversationId, currentLock);
+
+        // Wait for this chunk to complete
+        await currentLock;
         break;
       }
 

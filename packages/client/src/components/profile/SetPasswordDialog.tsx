@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
-import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 import { validatePassword } from '@/utils/passwordStrength'
 
 
@@ -78,7 +78,7 @@ export function SetPasswordDialog({ open, onOpenChange }: SetPasswordDialogProps
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
+            <PasswordLabelWithTooltip htmlFor="password" label="New password" password={formData.password} />
             <div className="relative">
               <Input
                 id="password"

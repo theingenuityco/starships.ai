@@ -27,7 +27,7 @@ describe('Blueprint Lint Tool (E2E)', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(blueprintLintTool.name).toBe('blueprint_lint');
+      expect(blueprintLintTool.name).toBe('Test Tool Blueprint');
       expect(blueprintLintTool.description).toContain('Validate');
       expect(blueprintLintTool.parameters).toBeDefined();
       expect(blueprintLintTool.blueprint).toBeDefined();
@@ -45,7 +45,7 @@ describe('Blueprint Lint Tool (E2E)', () => {
       expect(blueprintLintToolTemplate.description).toBe(blueprintLintTool.description);
       expect(blueprintLintToolTemplate.parameters).toEqual(blueprintLintTool.parameters);
       expect(blueprintLintToolTemplate.blueprint).toEqual(blueprintLintTool.blueprint);
-      expect(blueprintLintToolTemplate.slug).toBe('blueprint-lint');
+      expect(blueprintLintToolTemplate.slug).toBe('test-tool-blueprint');
       expect(blueprintLintToolTemplate.category).toBe('automation');
       expect(blueprintLintToolTemplate.requiresApiKey).toBe(false);
     });

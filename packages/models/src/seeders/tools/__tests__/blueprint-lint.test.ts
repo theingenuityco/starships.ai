@@ -10,7 +10,7 @@ describe('Blueprint Lint Tool', () => {
   let testHelper: ToolTestHelper;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'blueprint_lint');
+    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'Test Tool Blueprint');
     testHelper.clearEventLogs();
   });
 
@@ -22,7 +22,7 @@ describe('Blueprint Lint Tool', () => {
     });
 
     it('should have correct tool name', () => {
-      expect(blueprintLintTool.name).toBe('blueprint_lint');
+      expect(blueprintLintTool.name).toBe('Test Tool Blueprint');
     });
 
     it('should have descriptive description', () => {
@@ -94,7 +94,7 @@ describe('Blueprint Lint Tool', () => {
     });
 
     it('should have correct template metadata', () => {
-      expect(blueprintLintToolTemplate.slug).toBe('blueprint-lint');
+      expect(blueprintLintToolTemplate.slug).toBe('test-tool-blueprint');
       expect(blueprintLintToolTemplate.category).toBe('automation');
       expect(blueprintLintToolTemplate.requiresApiKey).toBe(false);
     });

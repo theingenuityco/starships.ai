@@ -72,8 +72,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
-  // Track if success message has been shown to prevent duplicates
-  const successToastShownRef = useRef(false)
+  // Track if success messages have been shown to prevent duplicates
+  const passwordResetToastShownRef = useRef(false)
+  const emailVerificationToastShownRef = useRef(false)
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
@@ -85,13 +86,19 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     try {
       const authCode = searchParams.get('auth_code') // ✅ SECURE: authorization code instead of JWT token
       const oauthError = searchParams.get('oauth_error')
-      const verificationError = searchParams.get('verification')
+      const verification = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
 
       // Handle password reset success message
-      if (resetSuccess === 'success' && !successToastShownRef.current) {
-        successToastShownRef.current = true
+      if (resetSuccess === 'success' && !passwordResetToastShownRef.current) {
+        passwordResetToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      // Handle email verification success message
+      if (verification === 'success' && !emailVerificationToastShownRef.current) {
+        emailVerificationToastShownRef.current = true
+        toast.success('Email verified successfully! You can now log in to your account.')
       }
 
       // Prevent duplicate handling (synchronous check with ref)
@@ -105,7 +112,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
         oauthLogin(authCode)
       } else if (oauthError) {
         setFormError(getOAuthErrorMessage(oauthError))
-      } else if (verificationError === 'error') {
+      } else if (verification === 'error') {
         setFormError('Email verification failed. The verification link may be invalid or expired. Please try requesting a new verification email.')
       }
     } catch (error) {
@@ -212,12 +219,12 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
           {emailVerificationStatus && (
-            <Alert className="mb-3 border-emerald-200 bg-emerald-50/50 backdrop-blur-sm text-center">
+            <Alert className="mb-3 border-emerald-500/50 bg-emerald-900/20 backdrop-blur-sm text-center">
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
-                  <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-gray-600 text-sm break-all">{emailVerificationStatus.email}</span>
+                  <Icon name="check-circle" className="h-4 w-4 text-emerald-400" />
+                  <span className="text-white font-semibold text-sm">We&apos;ve sent a verification email to:</span>
+                  <span className="font-semibold text-emerald-200 text-sm break-all">{emailVerificationStatus.email}</span>
                 </div>
                 <AlertDescription>
                   <div className="flex justify-center">

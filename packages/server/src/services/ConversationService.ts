@@ -90,6 +90,8 @@ export class ConversationService {
   private streamSeq: Map<string, number> = new Map();
   // Once we've seen a message.content snapshot for a stream, prefer snapshots and ignore delta tokens to avoid reordering
   private snapshotPreferred: Set<string> = new Set();
+  // Sequence for tool-call argument deltas (per conversation)
+  private toolCallSeq: Map<string, number> = new Map();
   /**
    * Compute a non-overlapping append by trimming any prefix of 'fragment' that
    * already exists as a suffix of 'base'. This guards against providers that
@@ -634,7 +636,7 @@ export class ConversationService {
           }
           return baseMessage;
         });
-        const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
+        // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
         this.currentAgentForConversation.set(data.conversationId, { id: agentModel.id, name: agentModel.name });
@@ -1129,6 +1131,7 @@ export class ConversationService {
         this.placeholderEmitted.set(conversationId, false);
         this.ringBuffer.set(conversationId, []);
         this.snapshotPreferred.delete(conversationId);
+        this.toolCallSeq.delete(conversationId);
         // Reset cached usage for the new turn
         this.latestStreamingUsage.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
@@ -1368,14 +1371,7 @@ export class ConversationService {
               // Initialize per-stream sequence counter
               this.streamSeq.set(conversationId, 0);
               this.snapshotPreferred.delete(conversationId);
-              try {
-                console.debug('[STREAMING] placeholder.created', {
-                  conversationId,
-                  generationId: this.generationId.get(conversationId),
-                });
-              } catch {
-                /* non-fatal */
-              }
+              this.toolCallSeq.set(conversationId, 0);
 
               const assistantMessage: MessageModel = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1450,16 +1446,6 @@ export class ConversationService {
               // Enter snapshot-preferred mode and adopt snapshot immediately
               this.snapshotPreferred.add(conversationId);
               if (snapshot.length > currentLength) {
-                try {
-                  console.debug('[STREAMING] snapshot.adopt', {
-                    conversationId,
-                    prevLength: currentLength,
-                    normalizedLen: snapshot.length - currentLength,
-                    snapshotLength: snapshot.length,
-                  });
-                } catch {
-                  /* non-fatal */
-                }
                 // Adopt provider snapshot as the source of truth even if it reorders text
                 this.streamingContent.set(conversationId, snapshot);
                 try {
@@ -1513,17 +1499,7 @@ export class ConversationService {
                     // Stream delta chunk as JSON Patch add into chunks array
                     const seq1 = (this.streamSeq.get(conversationId) || 0) + 1;
                     this.streamSeq.set(conversationId, seq1);
-                    try {
-                      console.debug('[STREAMING] chunk.append', {
-                        conversationId,
-                        seq: seq1,
-                        pos: currentLength,
-                        len: normalized.length,
-                        preview: normalized.slice(0, 32),
-                      });
-                    } catch {
-                      /* non-fatal */
-                    }
+
                     const chunkDelta: Operation = {
                       op: 'add',
                       path: '/messages/-1/chunks/-',
@@ -1585,17 +1561,7 @@ export class ConversationService {
                 // Stream delta chunk for reasoning
                 const seq2 = (this.streamSeq.get(conversationId) || 0) + 1;
                 this.streamSeq.set(conversationId, seq2);
-                try {
-                  console.debug('[STREAMING] reasoning.append', {
-                    conversationId,
-                    seq: seq2,
-                    pos: currentRLength,
-                    len: normalizedR.length,
-                    preview: normalizedR.slice(0, 32),
-                  });
-                } catch {
-                  /* non-fatal */
-                }
+
                 const rChunkDelta: Operation = {
                   op: 'add',
                   path: '/messages/-1/reasoningChunks/-',
@@ -1629,10 +1595,35 @@ export class ConversationService {
                   const target = acc[idx];
                   if (rawTc?.id) target.id = rawTc.id;
                   if (rawTc?.function?.name) target.function.name = rawTc.function.name;
-
-                  // Accumulate arguments as string
+                  // Accumulate arguments text in strict arrival order (OpenAI SDK preserves order)
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
+                    const current = String(target.function.arguments || '');
+                    const incoming = String(rawTc.function.arguments);
+                    let append = incoming;
+                    // Align start to first JSON brace for a clean head and to avoid preamble junk
+                    if (current.length === 0) {
+                      const iBrace = incoming.indexOf('{');
+                      const iBracket = incoming.indexOf('[');
+                      const braceIdx = iBrace === -1 ? iBracket : iBracket === -1 ? iBrace : Math.min(iBrace, iBracket);
+                      append = braceIdx >= 0 ? incoming.slice(braceIdx) : '';
+                    }
+                    if (append) {
+                      const normalized = ConversationService.computeNonOverlappingAppend(current, append);
+                      if (normalized) {
+                        target.function.arguments = current + normalized;
+                      }
+                    }
+                    // Emit concise visibility log: head string and seq
+                    if (DEBUG_TOOLCALLS) {
+                      try {
+                        const seq = (this.toolCallSeq.get(conversationId) || 0) + 1;
+                        this.toolCallSeq.set(conversationId, seq);
+                        const head = (target.function.arguments as string).slice(0, 120);
+                        console.debug('[STREAMING] toolCalls.args', { seq, head });
+                      } catch {
+                        /* noop */
+                      }
+                    }
                   }
                 }
 
@@ -1685,22 +1676,6 @@ export class ConversationService {
                   const serialized = JSON.stringify(toolCallsValue);
                   const prev = this.lastToolCallsBroadcastHash.get(conversationId);
                   if (prev !== serialized) {
-                    try {
-                      if (DEBUG_TOOLCALLS) {
-                        const summary = toolCallsValue.map((t: unknown) => {
-                          const o = t as { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
-                          const name = o.function && typeof o.function.name === 'string' ? (o.function.name as string) : undefined;
-                          const argsKeys =
-                            o.function && o.function.arguments && typeof o.function.arguments === 'object'
-                              ? Object.keys(o.function.arguments as Record<string, unknown>).length
-                              : 0;
-                          return { id: o.id as string | undefined, name, argsKeys };
-                        });
-                        console.debug('[STREAMING] toolCalls.replace', { conversationId, count: summary.length, summary });
-                      }
-                    } catch {
-                      /* non-fatal */
-                    }
                     await this.streamingService.broadcastDelta(conversationId, {
                       op: 'replace',
                       path: '/messages/-1/toolCalls',
@@ -1717,17 +1692,41 @@ export class ConversationService {
                   });
                 }
               } else if (toolCallsFromMessage.length > 0) {
-                // Snapshot toolCalls from message node: use ONLY to update id/name metadata.
-                // Do NOT overwrite or seed arguments from snapshots to preserve strict delta ordering.
+                // Snapshot toolCalls from message node: update id/name and adopt arguments snapshot to correct any ordering drift
                 const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
                 for (let i = 0; i < toolCallsFromMessage.length; i++) {
-                  const raw = (toolCallsFromMessage[i] ?? {}) as { id?: string; function?: { name?: string } };
+                  const raw = (toolCallsFromMessage[i] ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
                   if (!acc[i]) {
                     acc[i] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
                   }
                   if (raw?.id) acc[i].id = raw.id;
                   const nm = raw?.function?.name;
                   if (typeof nm === 'string' && nm.length > 0) acc[i].function.name = nm;
+                  // Adopt snapshot arguments if it extends current buffer (corrects out-of-order delta fragments)
+                  try {
+                    const rawSnap = raw?.function && typeof raw.function.arguments === 'string' ? (raw.function.arguments as string) : '';
+                    const cur = String(acc[i].function.arguments || '');
+                    // Align snapshot to first brace
+                    const iBrace = rawSnap.indexOf('{');
+                    const iBracket = rawSnap.indexOf('[');
+                    const braceIdx = iBrace === -1 ? iBracket : iBracket === -1 ? iBrace : Math.min(iBrace, iBracket);
+                    const snapArgs = braceIdx >= 0 ? rawSnap.slice(braceIdx) : '';
+                    if (snapArgs && snapArgs.length >= cur.length) {
+                      acc[i].function.arguments = snapArgs;
+                      if (DEBUG_TOOLCALLS) {
+                        try {
+                          const seq = (this.toolCallSeq.get(conversationId) || 0) + 1;
+                          this.toolCallSeq.set(conversationId, seq);
+                          const head = snapArgs.slice(0, 120);
+                          console.debug('[STREAMING] toolCalls.args', { seq, head });
+                        } catch {
+                          /* noop */
+                        }
+                      }
+                    }
+                  } catch {
+                    /* non-fatal */
+                  }
                 }
                 this.streamingToolCalls.set(conversationId, acc);
 
@@ -1754,6 +1753,15 @@ export class ConversationService {
                       argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj)
                         ? (argsObj as Record<string, unknown>)
                         : ({} as Record<string, unknown>);
+                    out.function.argumentsProgress = typeof argsStr === 'string' ? argsStr.length : 0;
+                    try {
+                      out.function.argumentsKeysCount =
+                        out.function.arguments && typeof out.function.arguments === 'object' && !Array.isArray(out.function.arguments)
+                          ? Object.keys(out.function.arguments as Record<string, unknown>).length
+                          : 0;
+                    } catch {
+                      out.function.argumentsKeysCount = 0;
+                    }
                     return out;
                   });
 
@@ -2299,14 +2307,12 @@ export class ConversationService {
         } catch {
           /* non-fatal: balance auto-stop during tool_started */
         }
-        const toolEvt = event as ToolEvent;
         break;
       }
 
       case 'tool_complete': {
         // Tool completion is now handled via state-based message persistence in node_completed
         // No persistence needed here - messages are added to state via mutations and persisted automatically
-        const toolEvt = event as ToolEvent;
         break;
       }
 

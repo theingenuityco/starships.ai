@@ -67,6 +67,28 @@ type NormalizedChunk = {
 
 export class LLM extends BaseNode<LlmParams> {
   private emittedToolCalls: Set<string> = new Set();
+  private static readonly DEBUG_TOOLCALLS = false;
+
+  // Normalize tool-call argument accumulation to avoid jumbled starts and overlaps
+  private static trimToJsonStart(text: string): string {
+    if (typeof text !== 'string' || text.length === 0) return '';
+    const iBrace = text.indexOf('{');
+    const iBracket = text.indexOf('[');
+    const idx = iBrace === -1 ? iBracket : iBracket === -1 ? iBrace : Math.min(iBrace, iBracket);
+    return idx >= 0 ? text.slice(idx) : '';
+  }
+
+  private static nonOverlappingAppend(base: string, fragment: string): string {
+    if (!fragment) return base;
+    const maxCheck = Math.min(base.length, fragment.length);
+    for (let k = maxCheck; k > 0; k--) {
+      if (base.endsWith(fragment.slice(0, k))) {
+        return base + fragment.slice(k);
+      }
+    }
+    // No detectable overlap; append entire fragment (duplicates, if any, will be corrected by server snapshot adoption)
+    return base + fragment;
+  }
 
   constructor(params: LlmParams, options?: NodeHandlerOptions) {
     super(params, options);
@@ -398,7 +420,6 @@ export class LLM extends BaseNode<LlmParams> {
     let finishReason: string | null = null;
 
     try {
-      console.info('[LLM] Streaming started');
       for await (const chunk of stream) {
         // Update metadata from first chunk
         if (chunk.id && !responseMetadata.id) responseMetadata.id = chunk.id;
@@ -412,15 +433,6 @@ export class LLM extends BaseNode<LlmParams> {
         if (choice.delta?.content) {
           const piece = choice.delta.content;
           content += piece;
-          try {
-            console.debug('[LLM] delta.content', {
-              pieceLength: typeof piece === 'string' ? piece.length : 0,
-              totalLength: content.length,
-              preview: typeof piece === 'string' ? piece.slice(0, 32) : '',
-            });
-          } catch {
-            /* non-fatal */
-          }
         }
 
         // Handle tool calls - OpenAI SDK properly accumulates these
@@ -440,18 +452,24 @@ export class LLM extends BaseNode<LlmParams> {
             if (toolCallDelta.id) target.id = toolCallDelta.id;
             if (toolCallDelta.function?.name) target.function.name = toolCallDelta.function.name;
             if (toolCallDelta.function?.arguments) {
-              const addLen = toolCallDelta.function.arguments.length;
-              target.function.arguments += toolCallDelta.function.arguments;
-              try {
-                console.debug('[LLM] tool_call.delta', {
-                  index,
-                  id: toolCallDelta.id,
-                  name: toolCallDelta.function?.name,
-                  argsAdded: addLen,
-                  argsTotal: target.function.arguments.length,
-                });
-              } catch {
-                /* non-fatal */
+              const incomingRaw = toolCallDelta.function.arguments;
+              const base = typeof target.function.arguments === 'string' ? target.function.arguments : '';
+              const incoming = base.length === 0 ? LLM.trimToJsonStart(incomingRaw) : incomingRaw;
+              const prevLen = base.length;
+              const next = LLM.nonOverlappingAppend(base, incoming);
+              target.function.arguments = next;
+              if (LLM.DEBUG_TOOLCALLS) {
+                try {
+                  console.debug('[LLM] tool_call.delta', {
+                    index,
+                    id: toolCallDelta.id,
+                    name: toolCallDelta.function?.name,
+                    argsAdded: Math.max(0, next.length - prevLen),
+                    argsTotal: next.length,
+                  });
+                } catch {
+                  /* non-fatal */
+                }
               }
             }
 
@@ -481,11 +499,6 @@ export class LLM extends BaseNode<LlmParams> {
         // Extract usage if present
         if (chunk.usage) {
           usage = this.normalizeUsage(chunk.usage);
-          try {
-            console.debug('[LLM] usage.update', usage);
-          } catch {
-            /* non-fatal */
-          }
         }
 
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls
@@ -519,13 +532,6 @@ export class LLM extends BaseNode<LlmParams> {
             void 0;
           }
 
-          try {
-            console.debug('[LLM] emit content_chunk', {
-              contentLen: content.length,
-            });
-          } catch {
-            /* non-fatal */
-          }
           await eventCallback({
             type: 'content_chunk',
             timestamp: new Date().toISOString(),
@@ -537,11 +543,6 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Emit completion event
       if (eventCallback && usage) {
-        try {
-          console.info('[LLM] Streaming complete', usage);
-        } catch {
-          /* non-fatal */
-        }
         await eventCallback({
           type: 'content_complete',
           timestamp: new Date().toISOString(),

@@ -43,7 +43,7 @@ export default function BackToTop() {
       {isVisible && (
         <motion.button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-primary/90 to-purple-600/90 backdrop-blur-sm border border-white/20 shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center group"
+          className="fixed bottom-8 right-8 z-50 px-4 py-3 rounded-2xl bg-gradient-to-br from-primary/90 to-purple-600/90 backdrop-blur-sm border border-white/20 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2 group"
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
           animate={
             isFlying
@@ -60,7 +60,7 @@ export default function BackToTop() {
                 }
           }
           exit={{ opacity: 0, scale: 0.8, y: 20 }}
-          whileHover={{ scale: 1.1 }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
           <motion.div
@@ -81,13 +81,14 @@ export default function BackToTop() {
                   }
             }
           >
-            <Icon name="rocket" className="w-6 h-6 text-white" />
+            <Icon name="rocket" className="w-5 h-5 text-white" />
           </motion.div>
+          <span className="text-sm font-medium text-white whitespace-nowrap">Back to Top</span>
 
           {/* Exhaust/flame effect */}
           {isFlying && (
             <motion.div
-              className="absolute bottom-2 left-1/2 transform -translate-x-1/2"
+              className="absolute bottom-0 left-6 transform -translate-x-1/2"
               initial={{ opacity: 0, height: 0 }}
               animate={{
                 opacity: [0, 1, 1, 0],

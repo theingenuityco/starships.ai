@@ -11,6 +11,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import type { LlmToolCall } from '@starships/autopilot'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -56,17 +57,17 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !toolBuilderRef.current) return
 
-    // Eligible tool slugs that should drive the Tool Builder
-    const builderToolSlugs = new Set([
-      'tool-open',
-      'tool-edit',
-      'tool-add-blueprint-node',
-      'tool-add-blueprint-edge',
-      'tool-blueprint-edit-node',
-      'tool-blueprint-remove-node',
-      'tool-blueprint-edit-edge',
-      'tool-blueprint-remove-edge',
-    ])
+    // Eligible tool slug fragments that should drive the Tool Builder
+    const builderToolSlugFragments = [
+      'open-tool',
+      'edit-tool',
+      'add-tool-blueprint-node',
+      'add-tool-blueprint-edge',
+      'edit-tool-blueprint-node',
+      'remove-tool-blueprint-node',
+      'edit-tool-blueprint-edge',
+      'remove-tool-blueprint-edge',
+    ]
 
     const form = toolBuilderRef.current.getFormData?.()
     if (!form) return
@@ -98,12 +99,13 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     for (let mi = 0; mi < liveMessages.length; mi++) {
       const msg = liveMessages[mi] as any
       if (msg.role !== 'assistant') continue
-      const calls = (msg as any).toolCalls
+      const calls = (msg as any).toolCalls as LlmToolCall[] | undefined
       if (!Array.isArray(calls)) continue
       for (let ci = 0; ci < calls.length; ci++) {
         const call = calls[ci]
         const name = call?.function?.name as string
-        if (!(builderToolSlugs.has(name) || name?.startsWith?.('tool-blueprint-'))) continue
+        const nameLc = typeof name === 'string' ? name.toLowerCase() : ''
+        if (!(builderToolSlugFragments.some(s => nameLc.includes(s)) || nameLc.includes('tool-blueprint-'))) continue
         let raw = call?.function?.arguments
         const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
         if (appliedToolCallKeysRef.current.has(key)) continue
@@ -145,7 +147,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       const toolName = call.name
       const args = call.args
 
-      if (toolName === 'tool-open' || toolName === 'tool-edit') {
+      if (toolName === 'open-tool' || toolName === 'edit-tool') {
         if (args?.name !== undefined) compose.name = args.name
         if (args?.description !== undefined) compose.description = args.description
         if (args?.category !== undefined) compose.category = args.category
@@ -168,7 +170,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       }
 
       switch (toolName) {
-        case 'tool-add-blueprint-node': {
+        case 'add-tool-blueprint-node': {
           const node = normalizeJson(args?.node)
           if (!node || typeof node !== 'object') break
           bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== node.ref)
@@ -176,7 +178,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           compose.blueprintChanged = true
           break
         }
-        case 'tool-add-blueprint-edge': {
+        case 'add-tool-blueprint-edge': {
           const edge = normalizeJson(args?.edge)
           if (!edge || typeof edge !== 'object') break
           bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edge.ref)
@@ -184,7 +186,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           compose.blueprintChanged = true
           break
         }
-        case 'tool-blueprint-edit-node': {
+        case 'edit-tool-blueprint-node': {
           const nodeRef = args?.nodeRef
           const updates = normalizeJson(args?.updates) || {}
           if (!nodeRef) break
@@ -200,7 +202,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           }
           break
         }
-        case 'tool-blueprint-edit-edge': {
+        case 'edit-tool-blueprint-edge': {
           const edgeRef = args?.edgeRef
           const updates = normalizeJson(args?.updates) || {}
           if (!edgeRef) break
@@ -215,7 +217,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           }
           break
         }
-        case 'tool-blueprint-remove-node': {
+        case 'remove-tool-blueprint-node': {
           const nodeRef = args?.nodeRef
           if (!nodeRef) break
           bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== nodeRef)
@@ -223,7 +225,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           compose.blueprintChanged = true
           break
         }
-        case 'tool-blueprint-remove-edge': {
+        case 'remove-tool-blueprint-edge': {
           const edgeRef = args?.edgeRef
           if (!edgeRef) break
           bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edgeRef)
@@ -264,24 +266,25 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         if (!assistantMsg) continue
         const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === id)
         const funcName = toolCall?.function?.name as string
+        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
 
-        const toolTools = new Set([
-          'tool-open',
-          'tool-edit',
-          'tool-add-blueprint-node',
-          'tool-add-blueprint-edge',
-          'tool-blueprint-edit-node',
-          'tool-blueprint-remove-node',
-          'tool-blueprint-edit-edge',
-          'tool-blueprint-remove-edge',
-        ])
+        const toolToolSlugFragments = [
+          'open-tool',
+          'edit-tool',
+          'add-tool-blueprint-node',
+          'add-tool-blueprint-edge',
+          'edit-tool-blueprint-node',
+          'remove-tool-blueprint-node',
+          'edit-tool-blueprint-edge',
+          'remove-tool-blueprint-edge',
+        ]
 
-        if (!toolTools.has(funcName)) {
+        if (!toolToolSlugFragments.some(s => funcNameLc.includes(s))) {
           processedToolResultIdsRef.current.add(id)
           continue
         }
 
-        // Parse arguments to extract slug if present
+        // Attempt to extract slug from tool call arguments
         let args: any = toolCall?.function?.arguments
         if (typeof args === 'string') {
           try {
@@ -290,7 +293,22 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
             // ignore
           }
         }
-        const slugArg = args?.slug
+        let slugArg: string | undefined = typeof args?.slug === 'string' ? args.slug : undefined
+
+        // Fallback: extract slug from tool result HTTP response shape: body.data.slug
+        if (!slugArg) {
+          const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
+          if (content) {
+            try {
+              const parsed = JSON.parse(content) as Record<string, unknown>
+              const body = parsed.body as Record<string, unknown> | undefined
+              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
+              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
+              slugArg = slugVal
+            } catch {}
+          }
+        }
+
         if (!slugArg || typeof slugArg !== 'string') {
           processedToolResultIdsRef.current.add(id)
           continue
@@ -299,7 +317,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         // Fetch complete tool data by slug and sync form
         ;(async () => {
           try {
-            const tool = await toolAPI.getBySlug(starship.id, slugArg)
+            const tool = await toolAPI.getBySlug(starship.id, slugArg as string)
             if (tool && toolBuilderRef.current) {
               toolBuilderRef.current.updateField('name', tool.name || '')
               if (tool.description) toolBuilderRef.current.updateField('description', tool.description)
@@ -320,7 +338,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         })()
       }
     }
-  }, [conversationId, liveMessages, starship?.id])
+  }, [conversationId, liveMessages, starship?.id, toolSlug, router, slug])
 
   // Navigate to agent page when agent-related tool calls are detected
   useEffect(() => {
@@ -337,7 +355,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       return
     }
 
-    const agentToolSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+    const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
 
     // Process only NEW messages (those after initial count)
     const newMessages = liveMessages.slice(initialMessageCountRef.current)
@@ -349,7 +367,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
       for (const call of toolCalls) {
         const funcName = call?.function?.name as string
-        if (!agentToolSlugs.has(funcName)) continue
+        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
+        if (!agentToolSlugFragments.some(s => funcNameLc.includes(s))) continue
 
         // Parse arguments to extract agent slug
         let args: any = call?.function?.arguments

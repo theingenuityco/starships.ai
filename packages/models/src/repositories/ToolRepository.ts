@@ -3,6 +3,7 @@ import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { ToolModel, CreateToolRequest, UpdateToolRequest, ToolSearchParams, ToolTemplateModel } from '@starships/protocol';
+import { generateUniqueToolSlug } from '@/utils/slugGenerator';
 
 export class ToolRepository extends BaseRepository {
   constructor() {
@@ -29,6 +30,19 @@ export class ToolRepository extends BaseRepository {
       'findById',
       'Tool',
       id
+    );
+  }
+
+  async findBySlug(slug: string): Promise<ToolModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tools WHERE slug = $1', [slug]);
+        return result ? fromDatabase(ToolEntity, result) : null;
+      },
+      'findBySlug',
+      'Tool',
+      slug
     );
   }
 
@@ -60,6 +74,34 @@ export class ToolRepository extends BaseRepository {
       'findBySlugAndStarship',
       'Tool',
       `${slug}@${starshipId}`
+    );
+  }
+
+  /**
+   * Find an existing tool for a starship that was created from a given tool template slug
+   */
+  async findByTemplateSlugAndStarship(templateSlug: string, starshipId: string): Promise<ToolModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        // Resolve template id from slug
+        const template = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [templateSlug]);
+
+        if (!template) {
+          return null;
+        }
+
+        const result = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM tools WHERE template_id = $1 AND starship_id = $2 ORDER BY created_at DESC LIMIT 1',
+          [template.id, starshipId]
+        );
+
+        return result ? fromDatabase(ToolEntity, result) : null;
+      },
+      'findByTemplateSlugAndStarship',
+      'Tool',
+      `${templateSlug}@${starshipId}`
     );
   }
 
@@ -117,6 +159,16 @@ export class ToolRepository extends BaseRepository {
       async () => {
         const now = new Date().toISOString();
 
+        // Determine a globally-unique slug
+        // Creation no longer accepts client-provided slug; derive from name and ensure uniqueness with suffix
+        const baseFromName = (data.name || 'tool')
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .replace(/--+/g, '-');
+        const slug = await generateUniqueToolSlug(baseFromName || 'tool', this);
+
         // Create tool properties including starship relationship
         const toolProps = {
           // Core ToolParams fields
@@ -129,13 +181,14 @@ export class ToolRepository extends BaseRepository {
           condition: data.condition,
 
           // Tool instance fields
-          slug: data.slug,
+          slug,
           configuration: data.configuration,
           isEnabled: data.isEnabled ?? true,
           status: data.status || 'active',
 
           // Relationship field
           starshipId: starshipId,
+          ...(data.templateId ? { templateId: data.templateId } : {}),
 
           // Database-specific fields
           createdAt: now,
@@ -243,11 +296,14 @@ export class ToolRepository extends BaseRepository {
           transforms: template.transforms,
           mutations: template.mutations,
           condition: template.condition,
-          slug: template.slug, // Copy slug from template
+          // Use unique slug derived from template slug (always suffix like agents)
+          slug: await generateUniqueToolSlug(template.slug, this),
+          templateId: template.id,
           configuration: configuration || {},
           isEnabled: true,
         };
 
+        // Ensure global uniqueness via create and return tool
         const tool = await this.create(toolData, starshipId);
 
         // Record the template relationship and increment usage count
@@ -274,7 +330,7 @@ export class ToolRepository extends BaseRepository {
         const result = await connection.queryOne<Record<string, unknown>>(
           `SELECT tt.*
            FROM tool_templates tt
-           JOIN tools t ON t.slug = tt.slug
+           JOIN tools t ON t.template_id = tt.id
            WHERE t.id = $1`,
           [toolId]
         );

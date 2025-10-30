@@ -68,6 +68,9 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   createdAt: string;
   updatedAt: string;
 
+  // Template relationship (optional)
+  templateId?: string;
+
   // ToolParams fields (made optional for draft support)
   parameters?: ToolParams['parameters'];
   blueprint?: ToolParams['blueprint'];
@@ -117,12 +120,13 @@ export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blue
   configuration?: Record<string, unknown>;
   isEnabled?: boolean;
   status?: ToolStatus; // Tool status: 'draft' or 'active'
+  templateId?: string; // optional template reference when creating directly from a template
 }
 
 /**
  * Request to update a tool instance
  */
-export type UpdateToolRequest = Partial<CreateToolRequest>;
+export type UpdateToolRequest = Partial<CreateToolRequest> & { templateId?: string };
 
 // ============================================================================
 // SEARCH/FILTER TYPES

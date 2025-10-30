@@ -11,6 +11,8 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import type { MessageModel } from '@starships/protocol'
+import type { LlmToolCall } from '@starships/autopilot'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -22,6 +24,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
   const conversationId = searchParams.get('conversationId') || null
+  const [agentOpenError, setAgentOpenError] = useState<string | null>(null)
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
   const selectedAgent = useMemo(() => {
@@ -37,6 +40,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Track applied tool call keys to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
+
+  // Track last applied args per toolCall id for incremental updates during streaming
+  const lastAppliedArgsByToolCallIdRef = useRef<Map<string, string>>(new Map())
 
   // After tool execution completes, fetch and sync agent data once
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
@@ -67,10 +73,26 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
+    // On first render, record initial message count (but don't early-return; allow bootstrap on /agent/new)
+    if (initialMessageCountRef.current === null) {
+      initialMessageCountRef.current = liveMessages.length
+    }
+
+    // Only process if new messages have arrived; however, on /agent/new allow
+    // a one-time interception of the current in-flight assistant tool call
+    // that may have started before mount.
+    const hasNewMessages = liveMessages.length > initialMessageCountRef.current
+    const allowBootstrapOnNewRoute = agentSlug === 'new' && appliedToolCallKeysRef.current.size === 0
+    // Also allow incremental processing while assistant is responding to capture partial JSON updates
+    const allowWhileStreaming = isResponding === true
+    if (!hasNewMessages && !allowBootstrapOnNewRoute && !allowWhileStreaming) {
+      return
+    }
+
     // Eligible tool slugs that should drive the Agent Builder
     // Note: We intentionally exclude assignment calls from driving UI state to avoid
     // reflecting changes before the server confirms them.
-    const builderToolSlugs = new Set(['agent-open', 'agent-edit'])
+    const builderToolSlugFragments = ['open-agent', 'edit-agent']
 
     const form = agentBuilderRef.current.getFormData?.()
     if (!form) return
@@ -97,39 +119,134 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       return v
     }
 
-    // Collect only new toolCalls across all assistant messages in chronological order
-    const newCalls: { name: string; args: any }[] = []
-    for (let mi = 0; mi < liveMessages.length; mi++) {
-      const msg = liveMessages[mi] as any
-      if (msg.role !== 'assistant') continue
-      const calls = (msg as any).toolCalls
-      if (!Array.isArray(calls)) continue
-      for (let ci = 0; ci < calls.length; ci++) {
-        const call = calls[ci]
-        const name = call?.function?.name as string
-        if (!builderToolSlugs.has(name)) continue
-        let raw = call?.function?.arguments
-        const key = `${name}|${typeof raw === 'string' ? raw : JSON.stringify(raw || null)}`
-        if (appliedToolCallKeysRef.current.has(key)) continue
-        // parse args after key computation to keep key stable on parse errors
-        let parsed = raw
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed)
-          } catch {
-            // keep as-is (may still be partial)
-          }
+    const stableStringify = (input: unknown): string => {
+      const sorter = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(sorter)
+        if (value && typeof value === 'object') {
+          const obj = value as Record<string, unknown>
+          const keys = Object.keys(obj).sort()
+          const out: Record<string, unknown> = {}
+          for (const k of keys) out[k] = sorter(obj[k])
+          return out
         }
-        // skip clearly empty args to avoid wiping state
-        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0) {
-          continue
+        return value
+      }
+      try {
+        return JSON.stringify(sorter(input))
+      } catch {
+        try {
+          return JSON.stringify(input)
+        } catch {
+          return ''
         }
-        newCalls.push({ name, args: parsed })
-        appliedToolCallKeysRef.current.add(key)
       }
     }
 
-    if (newCalls.length === 0) return
+    // No partial JSON extraction on client; server guarantees parsed objects
+
+    // Collect only new toolCalls across assistant messages since mount in chronological order
+    let considerationMessages: MessageModel[] = []
+    if (hasNewMessages) {
+      considerationMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
+    } else if (allowWhileStreaming) {
+      // While streaming, prefer the most recent assistant message that already has toolCalls
+      const list = liveMessages as MessageModel[]
+      let picked: MessageModel | null = null
+      for (let i = list.length - 1; i >= 0; i--) {
+        const m = list[i]
+        if (m.role === 'assistant' && Array.isArray((m as any).toolCalls) && (m as any).toolCalls.length > 0) {
+          picked = m
+          break
+        }
+      }
+      if (!picked) {
+        // Fallback: use the most recent assistant shell
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i]
+          if (m.role === 'assistant') {
+            picked = m
+            break
+          }
+        }
+      }
+      if (picked) considerationMessages = [picked]
+    } else if (allowBootstrapOnNewRoute) {
+      // Bootstrap by scanning all assistant messages for in-flight tool calls
+      considerationMessages = (liveMessages as MessageModel[]).filter(m => m.role === 'assistant')
+    }
+    const newCalls: { name: string; args: unknown }[] = []
+    try {
+      console.debug('[AgentBuilderStream] scan:start', {
+        considerationCount: considerationMessages.length,
+        sampleIds: considerationMessages.slice(-3).map(m => m.id),
+      })
+    } catch {}
+    for (let mi = 0; mi < considerationMessages.length; mi++) {
+      const msg = considerationMessages[mi]
+      if (msg.role !== 'assistant') continue
+      const calls = msg.toolCalls as LlmToolCall[] | undefined
+      if (!Array.isArray(calls)) {
+        try {
+          console.debug('[AgentBuilderStream] no-toolCalls', { msgId: (msg as any).id })
+        } catch {}
+        continue
+      }
+      for (let ci = 0; ci < calls.length; ci++) {
+        const call = calls[ci]
+        const rawName = call?.function?.name
+        const nameLc = typeof rawName === 'string' ? rawName.toLowerCase() : ''
+        try {
+          console.debug('[AgentBuilderStream] toolCall', { idx: ci, id: call?.id, name: rawName, nameLc, hasArgs: !!call?.function?.arguments })
+        } catch {}
+        if (!builderToolSlugFragments.some(s => nameLc.includes(s))) continue
+        const raw = (call as any)?.function?.arguments as unknown
+        const callId = typeof call?.id === 'string' ? call.id : undefined
+        const key = `${nameLc}|${typeof raw === 'string' ? String(raw) : JSON.stringify(raw ?? null)}`
+        // Incremental gating: if we have a toolCallId, compare last applied args snapshot
+        if (callId) {
+          let parsedForCompare: unknown = raw
+          if (typeof parsedForCompare === 'string') {
+            try {
+              parsedForCompare = JSON.parse(parsedForCompare)
+            } catch {}
+          }
+          const snapshot = stableStringify(parsedForCompare)
+          const last = lastAppliedArgsByToolCallIdRef.current.get(callId)
+          if (last && last === snapshot) {
+            // No change since last application
+            continue
+          }
+          // Proceed and update snapshot after applying
+        } else {
+          // Legacy dedupe for calls without id
+          if (appliedToolCallKeysRef.current.has(key)) continue
+        }
+        // parse args after key computation to keep key stable on parse errors
+        let parsed: unknown = raw
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed as string)
+          } catch {}
+        }
+        try {
+          const preview = typeof parsed === 'object' && parsed ? Object.keys(parsed as Record<string, unknown>).slice(0, 6) : typeof parsed
+          console.debug('[AgentBuilderStream] args-parsed', { callId, keys: preview })
+        } catch {}
+        // skip clearly empty args to avoid wiping state
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed as Record<string, unknown>).length === 0) {
+          continue
+        }
+        newCalls.push({ name: nameLc, args: parsed, id: callId || undefined, snapshot: callId ? stableStringify(parsed) : undefined } as unknown as { name: string; args: unknown })
+        if (!callId) appliedToolCallKeysRef.current.add(key)
+      }
+    }
+
+    if (newCalls.length === 0) {
+      try {
+        console.debug('[AgentBuilderStream] scan:done:no-new-calls')
+      } catch {}
+      return
+    }
 
     // Compose pending scalar field updates
     const compose = {
@@ -151,43 +268,70 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     const hasContent = (b: any) => (Array.isArray(b?.nodes) && b.nodes.length > 0) || (Array.isArray(b?.edges) && b.edges.length > 0)
 
     // Apply each new call in order
-    for (const call of newCalls) {
+    for (const call of newCalls as Array<{ name: string; args: unknown; id?: string; snapshot?: string }>) {
       const toolName = call.name
-      const args = call.args
+      const args = call.args as Record<string, unknown> | undefined
 
-      if (toolName === 'agent-open' || toolName === 'agent-edit') {
-        if (args?.name !== undefined) compose.name = args.name
-        if (args?.slug !== undefined) compose.slug = args.slug
-        if (args?.description !== undefined) compose.description = args.description
-        if (args?.category !== undefined) compose.category = args.category
-        if (args?.model !== undefined) compose.model = args.model
-        if (args?.temperature !== undefined) compose.temperature = args.temperature
-        if (args?.maxTokens !== undefined) compose.maxTokens = args.maxTokens
-        if (args?.systemPrompt !== undefined) compose.systemPrompt = args.systemPrompt
-        if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as any[]).filter(p => typeof p === 'string' && p.trim()).slice(0, 10) as string[]
-        if (args?.icon !== undefined) compose.icon = args.icon
-        if (args?.timeout !== undefined) compose.timeout = args.timeout
+      if (toolName === 'open-agent' || toolName === 'edit-agent') {
+        if (typeof args?.name === 'string') compose.name = args.name
+        if (typeof args?.slug === 'string') compose.slug = args.slug
+        if (typeof args?.description === 'string') compose.description = args.description
+        if (typeof args?.category === 'string') compose.category = args.category
+        if (typeof args?.model === 'string') compose.model = args.model
+        if (typeof args?.temperature === 'number') compose.temperature = args.temperature
+        if (typeof args?.maxTokens === 'number') compose.maxTokens = args.maxTokens
+        if (typeof args?.systemPrompt === 'string') compose.systemPrompt = args.systemPrompt
+        if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
+        if (typeof args?.icon === 'string') compose.icon = args.icon
+        if (typeof args?.timeout === 'number') compose.timeout = args.timeout
         // Do not apply assignedToolSlugs from streaming arguments. We only
         // reflect tool assignments after confirmed tool completion and a
         // fresh fetch from the server.
-        if (args?.blueprint !== undefined) {
-          const incoming = normalizeJson(args.blueprint) || {}
-          if (!Array.isArray(incoming.nodes)) incoming.nodes = []
-          if (!Array.isArray(incoming.edges)) incoming.edges = []
+        if (args && typeof args === 'object' && !Array.isArray(args) && 'blueprint' in args) {
+          const rawBp = (args as Record<string, unknown>).blueprint
+          const incoming = normalizeJson(rawBp)
+          if (!incoming || typeof incoming !== 'object') {
+            // Skip until we have an object blueprint
+            if (call.id && call.snapshot !== undefined) {
+              lastAppliedArgsByToolCallIdRef.current.set(call.id, call.snapshot)
+            }
+            continue
+          }
+          if (!Array.isArray((incoming as any).nodes)) (incoming as any).nodes = []
+          if (!Array.isArray((incoming as any).edges)) (incoming as any).edges = []
           // Only replace blueprint if incoming has content OR current bp is empty
-          if (hasContent(incoming) || !hasContent(bp)) {
-            bp = incoming
+          if (hasContent(incoming as any) || !hasContent(bp)) {
+            bp = incoming as any
             compose.blueprintChanged = true
           }
+        }
+        // Persist latest snapshot for incremental gating
+        if (call.id && call.snapshot !== undefined) {
+          lastAppliedArgsByToolCallIdRef.current.set(call.id, call.snapshot)
         }
         continue
       }
 
       // Ignore agent-assign-tool and agent-unassign-tool here. We will sync
       // assignments only after tool completion via server fetch below.
+      // Persist latest snapshot for incremental gating
+      if (call.id && call.snapshot !== undefined) {
+        lastAppliedArgsByToolCallIdRef.current.set(call.id, call.snapshot)
+      }
     }
 
     // Write back composed updates once
+    try {
+      console.debug('[AgentBuilderStream] apply:compose', {
+        name: compose.name,
+        slug: compose.slug,
+        model: compose.model,
+        temperature: compose.temperature,
+        maxTokens: compose.maxTokens,
+        timeout: compose.timeout,
+        blueprintChanged: compose.blueprintChanged,
+      })
+    } catch {}
     if (compose.name !== undefined) agentBuilderRef.current?.updateField('name', compose.name)
     if (compose.slug !== undefined) agentBuilderRef.current?.updateField('slug', compose.slug)
     if (compose.description !== undefined) agentBuilderRef.current?.updateField('description', compose.description)
@@ -204,14 +348,25 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       const bpStr = JSON.stringify(bp, null, 2)
       agentBuilderRef.current?.updateField('blueprint', bpStr)
     }
-  }, [conversationId, liveMessages])
+  }, [conversationId, liveMessages, isResponding])
 
   // After agent tool execution completes, fetch and sync agent data once
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
-    // Check last few messages for tool results
-    const recentMessages = (liveMessages as any[]).slice(-10)
+    // On first render, record initial message count and don't process
+    if (initialMessageCountRef.current === null) {
+      initialMessageCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process if new messages have arrived
+    if (liveMessages.length <= initialMessageCountRef.current) {
+      return
+    }
+
+    // Check only NEW messages for tool results
+    const recentMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
 
     for (const msg of recentMessages) {
       if (msg.role === 'tool' && msg.toolCallId) {
@@ -219,26 +374,30 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (processedToolResultIdsRef.current.has(id)) continue
 
         // Find the assistant tool call corresponding to this tool result
-        const assistantMsg = (liveMessages as any[]).find(m => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === id)) as any
+        const assistantMsg = (liveMessages as MessageModel[]).find(m => m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.some((tc: LlmToolCall) => tc.id === id))
         if (!assistantMsg) continue
-        const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === id)
+        const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        const agentTools = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-        if (!agentTools.has(funcName)) {
+        const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+        if (!agentToolSlugFragments.some(s => (funcName || '').toLowerCase().includes(s))) {
           processedToolResultIdsRef.current.add(id)
           continue
         }
 
-        // Parse arguments to extract slug if present
-        let args: any = toolCall?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // ignore
+        // Extract slug strictly from tool result HTTP response shape: body.data.slug
+        let slugArg: string | undefined
+        {
+          const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
+          if (content) {
+            try {
+              const parsed = JSON.parse(content) as Record<string, unknown>
+              const body = parsed.body as Record<string, unknown> | undefined
+              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
+              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
+              slugArg = slugVal
+            } catch {}
           }
         }
-        const slugArg = args?.slug
         if (!slugArg || typeof slugArg !== 'string') {
           processedToolResultIdsRef.current.add(id)
           continue
@@ -293,12 +452,12 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
     // Tool-related tool slugs to monitor
     const toolRelatedSlugs = new Set([
-      'tool-open',
-      'tool-edit',
-      'tool-add-blueprint-node',
-      'tool-remove-blueprint-node',
-      'tool-add-blueprint-edge',
-      'tool-remove-blueprint-edge',
+      'open-tool',
+      'edit-tool',
+      'add-tool-blueprint-node',
+      'remove-tool-blueprint-node',
+      'add-tool-blueprint-edge',
+      'remove-tool-blueprint-edge',
       'tool-update-node',
       'tool-assign-mcp',
       'tool-unassign-mcp',
@@ -369,36 +528,94 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     doPrefill()
   }, [agentSlug])
 
-  // Detect agent creation via streaming completion and replace URL when slug becomes available
+  // Detect agent creation via streaming completion and handle success/failure
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
     // Look at last few messages for tool results associated with agent-* calls
-    const recentMessages = (liveMessages as any[]).slice(-10)
+    const recentMessages = (liveMessages as MessageModel[]).slice(-10)
     for (const msg of recentMessages) {
       if (msg.role === 'tool' && msg.toolCallId) {
         const id = msg.toolCallId as string
         // Find the assistant tool call corresponding to this tool result
-        const assistantMsg = (liveMessages as any[]).find(m => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === id)) as any
+        const assistantMsg = (liveMessages as MessageModel[]).find(m => m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.some((tc: LlmToolCall) => tc.id === id))
         if (!assistantMsg) continue
-        const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === id)
+        const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
-        if (!agentTools.includes(funcName)) continue
-        let args: any = toolCall?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // ignore
+        if (funcName !== 'open-agent') continue
+        // Extract slug strictly from tool result HTTP response shape: body.data.slug
+        let slugArg: string | undefined
+        let errorText: string | undefined
+        {
+          const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
+          if (content) {
+            try {
+              const parsed = JSON.parse(content) as Record<string, unknown>
+              const body = parsed.body as Record<string, unknown> | undefined
+              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
+              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
+              slugArg = slugVal
+              // Infer a friendly error message if present
+              if (!slugVal) {
+                const pickFirstString = (arr: unknown[]): string | undefined => {
+                  for (const item of arr) {
+                    if (typeof item === 'string' && item) return item
+                    if (item && typeof item === 'object') {
+                      const o = item as Record<string, unknown>
+                      const m = (o.message as string) || (o.msg as string) || (o.description as string)
+                      if (typeof m === 'string' && m) return m
+                    }
+                  }
+                  return undefined
+                }
+                const maybeError = (body && (body as any).error) || (parsed as any).error
+                const maybeMessage = (body && (body as any).message) || (parsed as any).message
+                const maybeDataError = data && (data as any).error
+                const statusCode = (parsed as any).statusCode || (parsed as any).status
+
+                if (typeof maybeError === 'string' && maybeError) {
+                  errorText = maybeError
+                } else if (maybeError && typeof maybeError === 'object') {
+                  const errObj = maybeError as Record<string, unknown>
+                  errorText = (errObj.message as string) || (errObj.description as string) || undefined
+                  if (!errorText) {
+                    const arr = (errObj.errors as unknown[]) || (errObj.details as unknown[]) || (errObj.issues as unknown[])
+                    if (Array.isArray(arr)) errorText = pickFirstString(arr)
+                  }
+                }
+                if (!errorText && typeof maybeMessage === 'string' && maybeMessage) {
+                  errorText = maybeMessage
+                }
+                if (!errorText && maybeDataError) {
+                  if (typeof maybeDataError === 'string') errorText = maybeDataError
+                  else if (typeof maybeDataError === 'object') {
+                    const de = maybeDataError as Record<string, unknown>
+                    errorText = (de.message as string) || (de.description as string) || undefined
+                    if (!errorText) {
+                      const arr = (de.errors as unknown[]) || (de.details as unknown[]) || (de.issues as unknown[])
+                      if (Array.isArray(arr)) errorText = pickFirstString(arr)
+                    }
+                  }
+                }
+                if (!errorText && statusCode && Number(statusCode) >= 400) {
+                  errorText = 'Failed to open agent'
+                }
+              }
+            } catch {}
           }
         }
-        const slugArg = args?.slug
-        if (agentSlug === 'new' && typeof slugArg === 'string' && slugArg && !routeUpdatedRef.current) {
-          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-          router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)
-          routeUpdatedRef.current = true
-          break
+        if (agentSlug === 'new' && !routeUpdatedRef.current) {
+          if (typeof slugArg === 'string' && slugArg) {
+            // Success: navigate to agents list for this starship
+            router.replace(`/ship/${slug}/agents`)
+            routeUpdatedRef.current = true
+            setAgentOpenError(null)
+            break
+          } else if (errorText) {
+            // Failure: show error message on builder
+            setAgentOpenError(errorText || 'Failed to open agent')
+            break
+          }
         }
       }
     }
@@ -416,7 +633,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined} />
+      <AgentBuilderView
+        ref={agentBuilderRef}
+        starshipId={starship.id}
+        onCancel={handleCancel}
+        initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
+        errorMessage={agentOpenError || undefined}
+      />
       {conversationId && (
         <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">

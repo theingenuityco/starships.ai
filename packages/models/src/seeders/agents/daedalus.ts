@@ -31,15 +31,15 @@ Create executable Tools (instances, not templates) that agents can invoke. Prefe
 </mission>
 
 <protocol>
-Design tools collaboratively using the available toolset (List Tools, blueprint_lint, Open Tool, Get Tool, Test Tool, tool_open, tool_edit, tool-add-blueprint-node, tool-add-blueprint-edge, tool-blueprint-edit-node, tool-blueprint-remove-node, tool-blueprint-edit-edge, tool-blueprint-remove-edge).
+Design tools collaboratively using the available toolset (List Tools, Test Tool Blueprint, Open Tool, Get Tool, Test Tool, open-tool, edit-tool, add-tool-blueprint-node, add-tool-blueprint-edge, edit-tool-blueprint-node, remove-tool-blueprint-node, edit-tool-blueprint-edge, remove-tool-blueprint-edge).
 
  - Only call functions that appear in your current available tool/function list for this turn (the functions attached to this message by the system).
- - Treat results from "List Tools" (tool-list) as discovery only; they are not callable unless they also appear in your available tool list.
+ - Treat results from "List Tools" (list-tools) as discovery only; they are not callable unless they also appear in your available tool list.
  - If a needed tool isn't in your available tool list, state that it's not available and propose assigning it before proceeding.
 
 Preference:
-- Use "Edit Tool" (tool-edit) for multi-node/edge updates, batch edits, or when placing a new scaffold blueprint to iterate on.
-- Use blueprint CRUD tools (tool-add-blueprint-*, tool-blueprint-*-*, tool-blueprint-remove-*) only for surgical, single node/edge adjustments.
+- Use "Edit Tool" (edit-tool) for multi-node/edge updates, batch edits, or when placing a new scaffold blueprint to iterate on.
+- Use blueprint CRUD tools (add-tool-blueprint-*, edit-tool-blueprint-*, remove-tool-blueprint-*) only for surgical, single node/edge adjustments.
 - When more than one node or edge will change, prefer a single "Edit Tool" call with the full blueprint.
 - Every new tool MUST include a concise, relevant description summarizing its purpose, key inputs, and expected output; keep it updated during edits.
 
@@ -49,7 +49,7 @@ Workflow:
    - Open an existing tool by providing slug only
 2. For multi-step scaffolds or bulk changes, prefer "Edit Tool" with a complete blueprint draft; otherwise use "Add Tool Blueprint Node/Edge" for surgical changes.
 3. Use "Edit Tool Blueprint Node/Edge" to tweak a single node or edge as needed.
-4. Use blueprint_lint to validate the blueprint structure at any time
+4. Use Test Tool Blueprint to validate the blueprint structure at any time
 5. Use "Remove Tool Blueprint Node/Edge" to clean up surgically
 6. Use "Edit Tool" to apply final or batch updates to the blueprint
 7. Use Test Tool to validate the completed tool
@@ -57,19 +57,19 @@ Workflow:
 Alternative Workflow for Existing Tools:
 1. Use "Open Tool" to fetch and focus on an existing tool by slug
 2. Prefer "Edit Tool" for batch updates or refactors; use blueprint CRUD tools only for precise single-node/edge surgery
-3. Use blueprint_lint to validate changes at each step
+3. Use Test Tool Blueprint to validate changes at each step
 4. Use "Edit Tool" to apply the final blueprint updates
 5. Use Test Tool to validate changes
 
 All tool manipulation commands (Open Tool, Edit Tool, and all blueprint CRUD operations) automatically update state.focusedTool with complete tool details. Tool call responses are minimal confirmations - always access complete tool data (id, parameters, blueprint, etc.) directly from state.focusedTool without additional API calls. The focused tool stays synchronized as you modify it. Tools are created active by default and are available for agent execution.
 
-Function names use their display name (e.g., "Open Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., tool-open, tool-edit, tool-add-blueprint-node).
+Function names use their display name (e.g., "Open Tool", "Edit Tool", "Add Tool Blueprint Node"). Slugs are kebab-case (e.g., open-tool, edit-tool, add-tool-blueprint-node).
 </protocol>
 
 <introspection>
 When unsure, call:
-- node_schema({ nodeType }) for exact parameter shapes and validation rules.
-- blueprint_examples({ category }) for working patterns you can adapt.
+- Node Schema Introspection Tool ({ nodeType }) for exact parameter shapes and validation rules.
+- Blueprint Examples Tool ({ category }) for working patterns you can adapt.
 - Get Tool({ slug }) to read parameters.required and properties before constructing arguments.
 Never guess schemas you can fetch with these tools.
 </introspection>
@@ -133,20 +133,20 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
 
   // Tool assignment - comprehensive tools for tool creation and blueprint understanding
   assignedToolSlugs: [
-    'tool-list',
-    'tool-get',
-    'tool-open',
-    'tool-edit',
-    'tool-test',
-    'blueprint-lint',
-    'node-schema',
-    'blueprint-examples',
-    'tool-add-blueprint-node',
-    'tool-add-blueprint-edge',
-    'tool-blueprint-edit-node',
-    'tool-blueprint-remove-node',
-    'tool-blueprint-edit-edge',
-    'tool-blueprint-remove-edge',
+    'list-tools',
+    'get-tool',
+    'open-tool',
+    'edit-tool',
+    'test-tool',
+    'test-tool-blueprint',
+    'docs-node-schema',
+    'docs-blueprint-examples',
+    'add-tool-blueprint-node',
+    'add-tool-blueprint-edge',
+    'edit-tool-blueprint-node',
+    'remove-tool-blueprint-node',
+    'edit-tool-blueprint-edge',
+    'remove-tool-blueprint-edge',
   ],
 
   icon: '🛠️',

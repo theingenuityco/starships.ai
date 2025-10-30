@@ -20,10 +20,10 @@ This test suite provides comprehensive testing for all tool templates in the `se
 - [`calculator.test.ts`](./calculator.test.ts) - Mathematical expression evaluation tool
 - [`echo.test.ts`](./echo.test.ts) - Simple input/output testing utility
 - [`time.test.ts`](./time.test.ts) - Current time generation with timezone support
-- [`blueprint-lint.test.ts`](./blueprint-lint.test.ts) - Blueprint validation tool
-- [`tool-create.test.ts`](./tool-create.test.ts) - Create Tool instance via REST API (E2E with mocked HTTP)
-- [`tool-test.test.ts`](./tool-test.test.ts) - Fetch and execute another tool’s blueprint (E2E with mocked HTTP)
-- [`blueprint-lint-e2e.test.ts`](./blueprint-lint-e2e.test.ts) - E2E runtime validation of blueprint_lint (no HTTP)
+- [`blueprint-lint.test.ts`](./blueprint-lint.test.ts) - Blueprint validation tool (test-tool-blueprint)
+- [`tool-create.test.ts`](./tool-create.test.ts) - Create Tool instance via REST API (open-tool) (E2E with mocked HTTP)
+- [`tool-test.test.ts`](./tool-test.test.ts) - Fetch and execute another tool's blueprint (test-tool) (E2E with mocked HTTP)
+- [`blueprint-lint-e2e.test.ts`](./blueprint-lint-e2e.test.ts) - E2E runtime validation of test-tool-blueprint (no HTTP)
 
 ### Test Infrastructure
 

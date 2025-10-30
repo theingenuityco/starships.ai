@@ -16,6 +16,7 @@ import remarkGfm from 'remark-gfm'
 import { getMarkdownComponents } from '@/components/markdown/markdownComponents'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
+import type { LlmToolCall } from '@starships/autopilot'
 
 interface StreamChunk {
   content: string
@@ -62,7 +63,7 @@ export function ConversationMessageContent({
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
-  const normalizedToolCalls = useMemo(() => (Array.isArray(toolCalls) ? toolCalls.filter(tc => typeof tc === 'object' && tc !== null) : []), [toolCalls])
+  const normalizedToolCalls = useMemo<LlmToolCall[]>(() => (Array.isArray(toolCalls) ? (toolCalls as unknown as LlmToolCall[]).filter(tc => typeof tc === 'object' && tc !== null) : []), [toolCalls])
 
   // Tool call header icon state handling
   const totalToolCalls = normalizedToolCalls.length
@@ -290,25 +291,26 @@ export function ConversationMessageContent({
             <CollapsibleContent>
               <div className="space-y-1.5">
                 {normalizedToolCalls.map((tc, idx) => {
-                  const rawArgs = (tc as any)?.function?.arguments ?? ''
+                  const rawArgsAny = (tc as any)?.function?.arguments ?? ''
                   let prettyArgs = ''
                   try {
                     // Handle case where arguments might already be an object
-                    if (typeof rawArgs === 'object' && rawArgs !== null) {
-                      prettyArgs = JSON.stringify(rawArgs, null, 2)
+                    if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                      prettyArgs = JSON.stringify(rawArgsAny, null, 2)
                     } else {
-                      prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
+                      const asStr = String(rawArgsAny)
+                      prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
                     }
                   } catch {
-                    prettyArgs = String(rawArgs)
+                    prettyArgs = String(rawArgsAny)
                   }
                   const hasArgs = (() => {
                     // Handle case where arguments might already be an object
-                    if (typeof rawArgs === 'object' && rawArgs !== null) {
-                      return Array.isArray(rawArgs) ? rawArgs.length > 0 : Object.keys(rawArgs).length > 0
+                    if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                      return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
                     }
 
-                    const raw = typeof rawArgs === 'string' ? rawArgs.trim() : ''
+                    const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
                     if (!raw) return false
                     try {
                       const parsed = JSON.parse(raw)
@@ -352,11 +354,15 @@ export function ConversationMessageContent({
                               onClick={() => {
                                 // Build a single payload that includes function, id, arguments and (optional) result
                                 let argsParsed: any
-                                try {
-                                  argsParsed = JSON.parse(rawArgs)
-                                } catch {
-                                  // Fallback to the prettified string for non-JSON args
-                                  argsParsed = prettyArgs
+                                if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                                  argsParsed = rawArgsAny
+                                } else {
+                                  try {
+                                    argsParsed = JSON.parse(String(rawArgsAny))
+                                  } catch {
+                                    // Fallback to the prettified string for non-JSON args
+                                    argsParsed = prettyArgs
+                                  }
                                 }
 
                                 let resultParsed: any = undefined

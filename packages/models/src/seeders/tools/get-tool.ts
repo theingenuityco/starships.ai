@@ -2,21 +2,16 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: agent_get
- * Fetch a specific agent by slug with full details
+ * Tool: Get Tool
+ * Get full tool details (including blueprint) by slug for the specified starship using server REST API
  */
-export const agentGetTool: ToolParams = {
-  name: 'Get Agent',
-  slug: 'agent-get',
-  description: `Fetch complete agent details by slug from the current starship.
-
-When to use:
-- Inspect agent configuration before modification
-- Retrieve full agent details including blueprint, system prompt, assigned tools
-- Validate agent existence before operations
+export const toolGetTool: ToolParams = {
+  name: 'Get Tool',
+  slug: 'get-tool',
+  description: `Get full details for a tool on the current starship by slug.
 
 Inputs:
-- slug (required): Agent slug to fetch
+- slug: string (tool slug on this starship)
 
 Implicit environment (do not pass as arguments):
 - BASE_URL: derived from agent.state.baseUrl
@@ -24,19 +19,16 @@ Implicit environment (do not pass as arguments):
 - STARSHIP_ID: derived from agent.state.starshipId
 
 Output:
-- Complete agent object with all fields (id, name, slug, description, model, systemPrompt, temperature, maxTokens, blueprint, assignedToolSlugs, status, etc.)
+- Full tool model as returned by GET /starships/:starshipId/tools/:slug (includes blueprint)
 
 Behavior and limits:
 - Read-only and idempotent
 - Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, 404 (agent not found), network errors`,
+- Typical failures: missing env, 401/403, not found (404), network errors`,
   parameters: {
     type: 'object',
     properties: {
-      slug: {
-        type: 'string',
-        description: 'Unique kebab-case identifier of the agent to fetch',
-      },
+      slug: { type: 'string', description: 'Tool slug to fetch' },
     },
     required: ['slug'],
   },
@@ -47,7 +39,7 @@ Behavior and limits:
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL and headers',
+        description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
         parameters: {
           code: `
             const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
@@ -61,7 +53,7 @@ Behavior and limits:
             if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/agents/\${slug}\`,
+              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
               method: 'GET',
               headers: {
                 'Authorization': \`Bearer \${authToken}\`,
@@ -75,8 +67,8 @@ Behavior and limits:
       {
         ref: 'http_get',
         type: 'http_request',
-        name: 'Get Agent',
-        description: 'GET /starships/:starshipId/agents/:slug',
+        name: 'Get Tool',
+        description: 'GET /starships/:starshipId/tools/:slug',
         parameters: {
           url: '{{ $lastOutputOf("prepare")[0].json.url }}',
           method: '{{ $lastOutputOf("prepare")[0].json.method }}',
@@ -85,33 +77,52 @@ Behavior and limits:
         },
       },
       {
+        ref: 'extract',
+        type: 'code',
+        name: 'Extract Payload',
+        description: 'Return the tool model (prefer body.data when present)',
+        parameters: {
+          code: `
+            const http = input;
+            const body = http && typeof http === 'object' ? http.body : http;
+            // Server sendSuccess returns { data: T }, prefer data when present
+            if (body && typeof body === 'object' && body.data !== undefined) {
+              return body.data;
+            }
+            return body;
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return complete agent details',
+        description: '',
         parameters: {
-          output: '{{ $lastOutputOf("http_get")[0].json }}',
+          output: '{{ $lastOutputOf("extract")[0].json }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'http_get' },
-      { ref: 'e3', from: 'http_get', to: 'end_1' },
+      { ref: 'e3', from: 'http_get', to: 'extract' },
+      { ref: 'e4', from: 'extract', to: 'end_1' },
     ],
     metadata: {},
   },
 };
 
-export const agentGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentGetTool.name,
-  description: agentGetTool.description,
-  parameters: agentGetTool.parameters,
-  blueprint: agentGetTool.blueprint,
+export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
+  name: toolGetTool.name,
+  description: toolGetTool.description,
+  parameters: toolGetTool.parameters,
+  blueprint: toolGetTool.blueprint,
 
-  slug: 'agent-get',
+  slug: 'get-tool',
   category: 'automation',
-  exampleUsage: '{ "slug": "customer-support" } // returns complete agent details',
+  exampleUsage: '{ "slug": "calc" } // returns full tool model; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,
   configurationFields: [],
 };

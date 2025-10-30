@@ -3,7 +3,7 @@
  * End-to-end tests using real autopilot Tool execution with minimal HTTP mocking
  */
 
-import { toolListTool, toolListToolTemplate } from '../tool-list';
+import { toolListTool, toolListToolTemplate } from '../list-tools';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
 
@@ -110,7 +110,7 @@ describe('Tool List Tool', () => {
       expect(toolListToolTemplate.parameters).toEqual(toolListTool.parameters);
       expect(toolListToolTemplate.blueprint).toEqual(toolListTool.blueprint);
 
-      expect(toolListToolTemplate.slug).toBe('tool-list');
+      expect(toolListToolTemplate.slug).toBe('list-tools');
       expect(toolListToolTemplate.category).toBe('automation');
       expect(toolListToolTemplate.requiresApiKey).toBe(false);
       expect(toolListToolTemplate.exampleUsage).toBeDefined();
@@ -372,7 +372,7 @@ describe('Tool List Tool', () => {
   });
 });
 
-describe('Tool.execute return value - tool_list', () => {
+describe('Tool.execute return value - list-tools', () => {
   it('should return a single ExecutionItem with summarized tool list and preserved pairedItem', async () => {
     const mockEnv = {
       BASE_URL: 'https://api.test.com',

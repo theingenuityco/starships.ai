@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentUnassignToolTool: ToolParams = {
   name: 'Unassign Agent Tool',
-  slug: 'agent-unassign-tool',
+  slug: 'unassign-agent-tool',
   description: `Remove a tool from an agent by deleting the Agent→Tool relationship.
 
 ## Purpose
@@ -159,7 +159,7 @@ Returns server response.
 };
 
 /**
- * Tool Template: agent-unassign-tool
+ * Tool Template: unassign-agent-tool
  */
 export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: agentUnassignToolTool.name,
@@ -167,7 +167,7 @@ export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   parameters: agentUnassignToolTool.parameters,
   blueprint: agentUnassignToolTool.blueprint,
 
-  slug: 'agent-unassign-tool',
+  slug: 'unassign-agent-tool',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
   requiresApiKey: false,

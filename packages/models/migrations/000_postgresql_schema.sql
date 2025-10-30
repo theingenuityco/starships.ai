@@ -271,6 +271,7 @@ CREATE INDEX idx_tools_starship_id ON tools(starship_id);
 CREATE INDEX idx_tools_template_id ON tools(template_id);
 CREATE INDEX idx_tools_name ON tools(name);
 CREATE INDEX idx_tools_slug ON tools(slug);
+CREATE UNIQUE INDEX idx_tools_slug_unique ON tools(slug);
 CREATE INDEX idx_tools_enabled ON tools(is_enabled);
 CREATE INDEX idx_tools_status ON tools(status);
 

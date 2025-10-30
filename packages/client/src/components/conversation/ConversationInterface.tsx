@@ -463,6 +463,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         }
         case 'tool_call_detected': {
           const toolName = (payload as any).toolName
+          const toolNameLc = typeof toolName === 'string' ? toolName.toLowerCase() : ''
           const toolCallId = (payload as any).toolCallId
 
           // Store tool call info for later completion handling
@@ -471,17 +472,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           // Navigate to tool builder route for tool actions
-          const openToolBuilderSlugs = new Set([
-            'tool-open',
-            'tool-edit',
-            'tool-add-blueprint-node',
-            'tool-add-blueprint-edge',
-            'tool-blueprint-edit-node',
-            'tool-blueprint-remove-node',
-            'tool-blueprint-edit-edge',
-            'tool-blueprint-remove-edge',
-          ])
-          if (openToolBuilderSlugs.has(toolName) || toolName?.startsWith?.('tool-blueprint-')) {
+          const toolBuilderSlugFragments = [
+            'open-tool',
+            'edit-tool',
+            'add-tool-blueprint-node',
+            'add-tool-blueprint-edge',
+            'edit-tool-blueprint-node',
+            'remove-tool-blueprint-node',
+            'edit-tool-blueprint-edge',
+            'remove-tool-blueprint-edge',
+          ]
+          if (toolBuilderSlugFragments.some(s => toolNameLc.includes(s)) || toolNameLc.includes('tool-blueprint-')) {
             try {
               const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
               const slug = starshipSlug
@@ -498,8 +499,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           // Navigate to agent builder for agent actions
-          const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-          if (openAgentBuilderSlugs.has(toolName)) {
+          const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+          if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
             try {
               const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
               const slug = starshipSlug
@@ -532,7 +533,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     async (toolName: string, toolArgs: any) => {
       try {
         // Agent tools - fetch and sync agent data
-        const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+        const agentTools = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
         if (agentTools.includes(toolName) && toolArgs?.slug) {
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
@@ -542,14 +543,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
         // Tool tools - fetch and sync tool data
         const toolTools = [
-          'tool-open',
-          'tool-edit',
-          'tool-add-blueprint-node',
-          'tool-add-blueprint-edge',
-          'tool-blueprint-edit-node',
-          'tool-blueprint-remove-node',
-          'tool-blueprint-edit-edge',
-          'tool-blueprint-remove-edge',
+          'open-tool',
+          'edit-tool',
+          'add-tool-blueprint-node',
+          'add-tool-blueprint-edge',
+          'edit-tool-blueprint-node',
+          'remove-tool-blueprint-node',
+          'edit-tool-blueprint-edge',
+          'remove-tool-blueprint-edge',
         ]
         if (toolTools.includes(toolName) && toolArgs?.slug) {
           // Fetch complete tool data by slug
@@ -629,9 +630,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // Back-compat UI actions parsed from assistant message JSON
     useEffect(() => {
       if (!currentConversationId || !liveMessages.length) return
-      if (!uiStreaming) return
-      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-      if (!hasStreamingAssistant) return
       const lastMessage = liveMessages[liveMessages.length - 1]
       if (lastMessage?.role === 'assistant' && lastMessage?.content) {
         try {
@@ -639,14 +637,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           handleUIPayload(payload)
         } catch {}
       }
-    }, [currentConversationId, liveMessages, uiStreaming])
+    }, [currentConversationId, liveMessages])
 
-    // Proactive navigation on tool calls
+    // Proactive navigation on tool calls (contains-based slug matching)
     useEffect(() => {
       if (!currentConversationId || !liveMessages.length || !starshipSlug) return
-      if (!uiStreaming) return
-      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-      if (!hasStreamingAssistant) return
       const recent = (liveMessages as any[]).slice(-10)
       for (let i = recent.length - 1; i >= 0; i--) {
         const msg = recent[i] as any
@@ -654,26 +649,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         for (const tc of msg.toolCalls as any[]) {
           const id = tc?.id as string | undefined
           if (!id || navigatedToolCallIdsRef.current.has(id)) continue
-          const name = tc?.function?.name as string | undefined
+          const rawName = tc?.function?.name as string | undefined
+          const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
           if (!name) continue
-          const openToolBuilderSlugs = new Set([
-            'tool-open',
-            'tool-edit',
-            'tool-add-blueprint-node',
-            'tool-add-blueprint-edge',
-            'tool-blueprint-edit-node',
-            'tool-blueprint-remove-node',
-            'tool-blueprint-edit-edge',
-            'tool-blueprint-remove-edge',
-          ])
-          const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+
+          const toolFragments = [
+            'open-tool',
+            'edit-tool',
+            'add-tool-blueprint-node',
+            'add-tool-blueprint-edge',
+            'edit-tool-blueprint-node',
+            'remove-tool-blueprint-node',
+            'edit-tool-blueprint-edge',
+            'remove-tool-blueprint-edge',
+          ]
+          const agentFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
             try {
               args = JSON.parse(args)
             } catch {}
           }
-          if (openToolBuilderSlugs.has(name) || name?.startsWith?.('tool-blueprint-')) {
+
+          if (toolFragments.some(f => name.includes(f)) || name.includes('tool-blueprint-')) {
             const toolSlug = args?.slug || args?.toolSlug || 'new'
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
@@ -683,7 +682,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             navigatedToolCallIdsRef.current.add(id)
             return
           }
-          if (openAgentBuilderSlugs.has(name)) {
+          if (agentFragments.some(f => name.includes(f))) {
             const agentSlug = args?.slug || args?.agentSlug || 'new'
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
@@ -695,7 +694,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
         }
       }
-    }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router, uiStreaming])
+    }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router])
 
     // Tool completion follow-ups
     useEffect(() => {
@@ -722,13 +721,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // Consume clean ui_action channel
     useEffect(() => {
       if (!currentConversationId || !lastUIAction) return
-      if (!uiStreaming) return
-      const hasStreamingAssistant = (liveMessages as any[]).some(m => m?.role === 'assistant' && (m as any)?.streaming === true)
-      if (!hasStreamingAssistant) return
       try {
         handleUIPayload(lastUIAction as any)
       } catch {}
-    }, [currentConversationId, lastUIAction, uiStreaming, liveMessages])
+    }, [currentConversationId, lastUIAction])
 
     return null
   }
@@ -861,7 +857,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                                   <div className="flex items-center gap-1 shrink-0">
                                     {participants.slice(0, 3).map((agent: any) => (
                                       <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
-                                        <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
+                                        <AgentAvatar seed={agent?.name || agent?.slug || undefined} size={16} />
                                       </Avatar>
                                     ))}
                                   </div>

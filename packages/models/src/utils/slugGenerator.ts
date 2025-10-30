@@ -6,6 +6,7 @@
  */
 
 import { AgentRepository } from '../repositories/AgentRepository';
+import { ToolRepository } from '../repositories/ToolRepository';
 
 /**
  * Generate a random suffix for slugs
@@ -78,4 +79,33 @@ export async function generateSimpleAgentSlug(agentRepository: AgentRepository):
   // Fallback: use timestamp if we can't generate a unique slug
   const timestamp = Date.now().toString(36);
   return `agent-${timestamp}`;
+}
+
+/**
+ * Generate a unique tool slug
+ * Format: {base-slug}-{random-suffix}
+ *
+ * @param baseSlug - Suggested base slug (often the template slug or provided slug)
+ * @param toolRepository - Repository instance for checking uniqueness
+ */
+export async function generateUniqueToolSlug(baseSlug: string, toolRepository: ToolRepository): Promise<string> {
+  const base = baseSlug;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    const randomSuffix = generateRandomSuffix();
+    const candidateSlug = `${base}-${randomSuffix}`;
+
+    // Check if slug is unique across all tools
+    const existingTool = await toolRepository.findBySlug(candidateSlug);
+    if (!existingTool) {
+      return candidateSlug;
+    }
+
+    attempts++;
+  }
+
+  const timestamp = Date.now().toString(36);
+  return `${base}-${timestamp}`;
 }

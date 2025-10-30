@@ -10,7 +10,7 @@ describe('Blueprint Lint Tool', () => {
   let testHelper: ToolTestHelper;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'Test Tool Blueprint');
+    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'blueprint_lint');
     testHelper.clearEventLogs();
   });
 

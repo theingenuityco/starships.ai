@@ -13,7 +13,7 @@ export default function UseCases() {
       icon: 'bot',
     },
     {
-      title: 'Create tools or start from templates',
+      title: 'Create tools that fit your needs',
       desc: 'Spin up tools with parameters and blueprints, or deploy a template and customize.',
       icon: 'wrench',
     },

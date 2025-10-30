@@ -219,12 +219,12 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 
           {emailVerificationStatus && (
-            <Alert className="mb-3 border-emerald-200 bg-emerald-50/50 backdrop-blur-sm text-center">
+            <Alert className="mb-3 border-emerald-500/50 bg-emerald-900/20 backdrop-blur-sm text-center">
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
-                  <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-900 font-medium text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-medium text-gray-600 text-sm break-all">{emailVerificationStatus.email}</span>
+                  <Icon name="check-circle" className="h-4 w-4 text-emerald-400" />
+                  <span className="text-white font-semibold text-sm">We&apos;ve sent a verification email to:</span>
+                  <span className="font-semibold text-emerald-200 text-sm break-all">{emailVerificationStatus.email}</span>
                 </div>
                 <AlertDescription>
                   <div className="flex justify-center">

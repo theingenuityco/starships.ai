@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: agent_get
+ * Tool: get-agent
  * Fetch a specific agent by slug with full details
  */
 export const agentGetTool: ToolParams = {

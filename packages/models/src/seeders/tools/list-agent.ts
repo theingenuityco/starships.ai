@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: agent_list
+ * Tool: list-agent
  * List all agents for the specified starship using server REST API
  */
 export const agentListTool: ToolParams = {

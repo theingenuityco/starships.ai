@@ -159,7 +159,7 @@ Returns server response.
 };
 
 /**
- * Tool Template: agent-unassign-tool
+ * Tool Template: unassign-agent-tool
  */
 export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: agentUnassignToolTool.name,

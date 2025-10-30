@@ -38,7 +38,7 @@ export default function UseCases() {
             return (
               <div
                 key={item.title}
-                className={`flex flex-col ${swapLayout ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-6 md:gap-8 py-6 md:py-8 frosted-glass-card rounded-2xl border border-border/40 p-4 md:p-6 shadow-[0_0_20px_rgba(168,85,247,0.25),0_0_40px_rgba(236,72,153,0.18),0_0_60px_rgba(251,146,60,0.12)] ${
+                className={`flex flex-col ${swapLayout ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-6 md:gap-8 py-6 md:py-8 frosted-glass-card rounded-2xl border border-border/40 p-4 md:p-6 shadow-[0_0_15px_rgba(168,85,247,0.15),0_0_30px_rgba(236,72,153,0.10),0_0_45px_rgba(251,146,60,0.06)] ${
                   isRightAligned ? 'ml-auto' : 'mr-auto'
                 } ${isWide ? 'w-full md:w-[85%]' : 'w-full md:w-[70%]'}`}
               >

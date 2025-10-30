@@ -1,5 +1,8 @@
+'use client'
+
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
+import { track } from '@/lib/analytics'
 
 export default function FinalCTA() {
   return (
@@ -10,6 +13,16 @@ export default function FinalCTA() {
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
           <Button size="lg" variant="outline" onClick={() => (window.location.href = 'mailto:tech@theingenuity.co')}>
             <Icon name="chat" className="w-4 h-4 mr-2" /> Contact us
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => {
+              track({ type: 'discord_cta_clicked' })
+              window.open('https://discord.gg/wzF7xfjrKv', '_blank')
+            }}
+          >
+            <Icon name="discord" className="w-4 h-4 mr-2" /> Join Discord
           </Button>
         </div>
       </div>

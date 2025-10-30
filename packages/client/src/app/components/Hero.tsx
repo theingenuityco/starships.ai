@@ -73,7 +73,21 @@ export default function Hero() {
               View Docs
             </Button>
           </div>
-          <div className="mt-3 mb-8 md:mb-12 text-sm text-muted-foreground">Get started for free • No credit card required • $10 credit on signup</div>
+          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • $10 credit on signup</div>
+          <div className="mt-3 mb-8 md:mb-12">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-sm h-9 px-4 hover:bg-primary/10 hover:text-primary transition-colors"
+              onClick={() => {
+                track({ type: 'discord_hero_clicked' })
+                window.open('https://discord.gg/wzF7xfjrKv', '_blank')
+              }}
+            >
+              <Icon name="discord" className="w-4 h-4 mr-2" />
+              Join our Discord community
+            </Button>
+          </div>
         </div>
 
         {/* Demo video replacing blueprint visualization */}

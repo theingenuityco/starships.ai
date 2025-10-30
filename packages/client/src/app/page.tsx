@@ -49,6 +49,9 @@ export default function HomePage() {
 
         {/* Replaced old CTA with FinalCTA component above */}
 
+        {/* Bottom gradient fade */}
+        <div className="fixed bottom-0 left-0 right-0 h-[300px] pointer-events-none z-0 bg-gradient-to-t from-[#a855f7] via-[#ec4899]/30 to-transparent opacity-20" />
+
         {/* Footer */}
         <footer className="py-16 px-4 relative z-10">
           {/* Gradient horizontal line */}

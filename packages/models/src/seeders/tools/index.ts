@@ -22,13 +22,13 @@ export { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
 export { toolRemoveBlueprintNodeToolTemplate } from './remove-tool-blueprint-node';
 export { toolEditBlueprintEdgeToolTemplate } from './edit-tool-blueprint-edge';
 export { toolRemoveBlueprintEdgeToolTemplate } from './remove-tool-blueprint-edge';
-export { agentListToolTemplate } from './agent-list';
-export { agentGetToolTemplate } from './agent-get';
-export { agentOpenToolTemplate } from './agent-open';
-export { agentEditToolTemplate } from './agent-edit';
-export { agentTestToolTemplate } from './agent-test';
-export { agentAssignToolToolTemplate } from './agent-assign-tool';
-export { agentUnassignToolToolTemplate } from './agent-unassign-tool';
+export { agentListToolTemplate } from './list-agent';
+export { agentGetToolTemplate } from './get-agent';
+export { agentOpenToolTemplate } from './open-agent';
+export { agentEditToolTemplate } from './edit-agent';
+export { agentTestToolTemplate } from './test-agent';
+export { agentAssignToolToolTemplate } from './assign-agent-tool';
+export { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 export { modelsListToolTemplate } from './models-list';
 
 // Re-export all tool templates as a single array for convenience
@@ -51,13 +51,13 @@ import { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
 import { toolRemoveBlueprintNodeToolTemplate } from './remove-tool-blueprint-node';
 import { toolEditBlueprintEdgeToolTemplate } from './edit-tool-blueprint-edge';
 import { toolRemoveBlueprintEdgeToolTemplate } from './remove-tool-blueprint-edge';
-import { agentListToolTemplate } from './agent-list';
-import { agentGetToolTemplate } from './agent-get';
-import { agentOpenToolTemplate } from './agent-open';
-import { agentEditToolTemplate } from './agent-edit';
-import { agentTestToolTemplate } from './agent-test';
-import { agentAssignToolToolTemplate } from './agent-assign-tool';
-import { agentUnassignToolToolTemplate } from './agent-unassign-tool';
+import { agentListToolTemplate } from './list-agent';
+import { agentGetToolTemplate } from './get-agent';
+import { agentOpenToolTemplate } from './open-agent';
+import { agentEditToolTemplate } from './edit-agent';
+import { agentTestToolTemplate } from './test-agent';
+import { agentAssignToolToolTemplate } from './assign-agent-tool';
+import { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 import { modelsListToolTemplate } from './models-list';
 
 export const ALL_TOOL_TEMPLATES = [

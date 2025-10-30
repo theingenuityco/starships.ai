@@ -56,7 +56,7 @@ Alternative Workflow for Existing Agents:
 
 All agent manipulation commands (Open Agent, Edit Agent, Assign/Unassign tools) automatically update state.focusedAgent with complete agent details. Agent call responses are minimal confirmations - always access complete agent data (id, systemPrompt, blueprint, assignedToolSlugs, etc.) directly from state.focusedAgent without additional API calls. The focused agent stays synchronized as you modify it. Draft agents (status='draft') are excluded from user access until activated.
 
-Function names use their display name (e.g., "Open Agent", "Edit Agent"). Slugs are kebab-case (e.g., agent-open, agent-edit).
+Function names use their display name (e.g., "Open Agent", "Edit Agent"). Slugs are kebab-case (e.g., open-agent, edit-agent).
 </protocol>
 
 <introspection>

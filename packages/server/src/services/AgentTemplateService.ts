@@ -95,14 +95,14 @@ export class AgentTemplateService {
 
       for (const toolSlug of template.assignedToolSlugs) {
         try {
-          // Check if tool is already deployed to this starship
-          let existingTool = await this.toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+          // Check if any tool from this template is already deployed to this starship
+          let existingTool = await this.toolRepository.findByTemplateSlugAndStarship(toolSlug, starshipId);
           if (!existingTool) {
-            // Deploy tool from template
+            // Deploy tool from template (slug will be suffixed for uniqueness)
             existingTool = await this.toolRepository.createFromTemplate(toolSlug, starshipId);
-            console.log(`[AGENT-TEMPLATE-SERVICE] Deployed tool '${toolSlug}' to starship ${starshipId}`);
+            console.log(`[AGENT-TEMPLATE-SERVICE] Deployed tool from template '${toolSlug}' to starship ${starshipId}`);
           } else {
-            console.log(`[AGENT-TEMPLATE-SERVICE] Tool '${toolSlug}' already deployed to starship ${starshipId}`);
+            console.log(`[AGENT-TEMPLATE-SERVICE] Tool from template '${toolSlug}' already deployed to starship ${starshipId}`);
           }
 
           // Track deployed tool ID for relationship creation

@@ -86,10 +86,7 @@ export class ToolRepository extends BaseRepository {
         const connection = this.getConnection();
 
         // Resolve template id from slug
-        const template = await connection.queryOne<{ id: string }>(
-          'SELECT id FROM tool_templates WHERE slug = $1',
-          [templateSlug]
-        );
+        const template = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [templateSlug]);
 
         if (!template) {
           return null;

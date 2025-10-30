@@ -2,21 +2,20 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React from 'react'
+import React, { useState } from 'react'
 import type { FormState, PasswordErrors } from '@/hooks/useAccountForm'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
-
+import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 
 type SecurityCardProps = {
   // Authentication state
   hasPassword: boolean
   authMethods: string[]
   isOAuthOnly: boolean
-  
+
   // Password change functionality
   showPassword: boolean
   setShowPassword: (v: boolean) => void
@@ -26,26 +25,31 @@ type SecurityCardProps = {
   saving: boolean
   cancelPasswordEdit: () => void
   currentPasswordRef?: React.RefObject<HTMLInputElement | null>
-  
+
   // New OAuth functionality
   onSetPassword: () => void
 }
 
-export default function SecurityCard({ 
+export default function SecurityCard({
   hasPassword,
   authMethods,
   isOAuthOnly,
-  showPassword, 
-  setShowPassword, 
-  form, 
-  setForm, 
-  passwordErrors, 
-  saving, 
-  cancelPasswordEdit, 
+  showPassword,
+  setShowPassword,
+  form,
+  setForm,
+  passwordErrors,
+  saving,
+  cancelPasswordEdit,
   currentPasswordRef,
-  onSetPassword
+  onSetPassword,
 }: SecurityCardProps) {
   const errorInput = 'border-destructive focus-visible:ring-destructive aria-[invalid=true]:border-destructive'
+
+  // Password visibility toggles for each field
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   return (
     <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
@@ -54,11 +58,9 @@ export default function SecurityCard({
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Account Security
         </CardTitle>
-        <CardDescription className="text-sm">
-          Manage your authentication methods and security settings.
-        </CardDescription>
+        <CardDescription className="text-sm">Manage your authentication methods and security settings.</CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {/* PASSWORD SECTION */}
         {hasPassword && (
@@ -69,9 +71,7 @@ export default function SecurityCard({
                   <Icon name="lock" className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-medium">Password</p>
-                    <p className="text-xs text-muted-foreground">
-                      Change your password when necessary
-                    </p>
+                    <p className="text-xs text-muted-foreground">Change your password when necessary</p>
                   </div>
                 </div>
                 <Button type="button" variant="outline" onClick={() => setShowPassword(true)} disabled={saving}>
@@ -84,55 +84,89 @@ export default function SecurityCard({
                   {/* Current password */}
                   <div className="space-y-2">
                     <Label htmlFor="currentPassword">Current password</Label>
-                    <Input
-                      id="currentPassword"
-                      ref={currentPasswordRef}
-                      type="password"
-                      placeholder="Current password"
-                      value={form.currentPassword}
-                      onChange={e => setForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                      disabled={saving}
-                      autoComplete="current-password"
-                      aria-invalid={!!passwordErrors.current}
-                      className={passwordErrors.current ? errorInput : ''}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="currentPassword"
+                        ref={currentPasswordRef}
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        placeholder="Current password"
+                        value={form.currentPassword}
+                        onChange={e => setForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                        disabled={saving}
+                        autoComplete="current-password"
+                        aria-invalid={!!passwordErrors.current}
+                        className={passwordErrors.current ? errorInput : ''}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        disabled={saving}
+                      >
+                        {showCurrentPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     {passwordErrors.current && <p className="text-xs text-destructive">{passwordErrors.current}</p>}
                   </div>
 
                   {/* New password */}
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">New password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      placeholder="New password"
-                      value={form.newPassword}
-                      onChange={e => setForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                      disabled={saving}
-                      autoComplete="new-password"
-                      aria-invalid={!!passwordErrors.new}
-                      className={passwordErrors.new ? errorInput : ''}
-                    />
-                    {form.newPassword && (
-                      <PasswordStrengthMeter password={form.newPassword} />
-                    )}
+                    <PasswordLabelWithTooltip htmlFor="newPassword" label="New password" password={form.newPassword} />
+                    <div className="relative">
+                      <Input
+                        id="newPassword"
+                        type={showNewPassword ? 'text' : 'password'}
+                        placeholder="New password"
+                        value={form.newPassword}
+                        onChange={e => setForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                        disabled={saving}
+                        autoComplete="new-password"
+                        aria-invalid={!!passwordErrors.new}
+                        className={passwordErrors.new ? errorInput : ''}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        disabled={saving}
+                      >
+                        {showNewPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {form.newPassword && <PasswordStrengthMeter password={form.newPassword} />}
                     {passwordErrors.new && <p className="text-xs text-destructive">{passwordErrors.new}</p>}
                   </div>
 
                   {/* Confirm new password */}
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="confirmNewPassword">Re-enter new password</Label>
-                    <Input
-                      id="confirmNewPassword"
-                      type="password"
-                      placeholder="Re-enter new password"
-                      value={form.confirmNewPassword}
-                      onChange={e => setForm(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                      disabled={saving}
-                      autoComplete="new-password"
-                      aria-invalid={!!passwordErrors.confirm}
-                      className={passwordErrors.confirm ? errorInput : ''}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="confirmNewPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Re-enter new password"
+                        value={form.confirmNewPassword}
+                        onChange={e => setForm(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                        disabled={saving}
+                        autoComplete="new-password"
+                        aria-invalid={!!passwordErrors.confirm}
+                        className={passwordErrors.confirm ? errorInput : ''}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        disabled={saving}
+                      >
+                        {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     {passwordErrors.confirm && <p className="text-xs text-destructive">{passwordErrors.confirm}</p>}
                   </div>
                 </div>
@@ -158,9 +192,7 @@ export default function SecurityCard({
                 <Icon name="lock" className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Password (Optional)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Add password for backup access
-                  </p>
+                  <p className="text-xs text-muted-foreground">Add password for backup access</p>
                 </div>
               </div>
               <Button type="button" variant="outline" onClick={onSetPassword}>
@@ -170,7 +202,6 @@ export default function SecurityCard({
             </div>
           </div>
         )}
-
       </CardContent>
     </Card>
   )

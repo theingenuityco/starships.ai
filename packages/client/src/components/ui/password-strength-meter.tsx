@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/primitives/Icon'
-import { Progress } from '@/components/ui/progress'
+import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { 
   calculatePasswordStrength, 
   checkPasswordRequirements,
@@ -84,81 +85,84 @@ export function PasswordStrengthMeter({
           {strength.label}
         </span>
       </div>
-
-      {/* Requirements in two columns */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        <RequirementItem
-          met={requirements.minLength}
-          text="At least 8 characters"
-          compact
-        />
-        <RequirementItem
-          met={requirements.hasUppercase}
-          text="One uppercase letter"
-          compact
-        />
-        <RequirementItem
-          met={requirements.hasLowercase}
-          text="One lowercase letter"
-          compact
-        />
-        <RequirementItem
-          met={requirements.hasNumber}
-          text="One number"
-          compact
-        />
-        <RequirementItem
-          met={requirements.hasSpecial}
-          text="One special character"
-          compact
-        />
-        {/* Empty div to balance the grid if needed */}
-        <div></div>
-      </div>
     </div>
   )
 }
 
-function RequirementDot({ met, text }: { met: boolean; text: string }) {
+function RequirementTooltipItem({ met, text }: { met: boolean; text: string }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-xs',
-        met ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-      )}
-    >
-      <Icon
-        name={met ? 'check' : 'x'}
-        className="h-2.5 w-2.5"
-      />
-      <span className="text-xs font-medium">{text}</span>
-    </span>
-  )
-}
-
-function RequirementItem({ met, text, compact = false }: { met: boolean; text: string; compact?: boolean }) {
-  return (
-    <div className={cn("flex items-center gap-2", compact && "min-h-[18px]")}>
+    <div className="flex items-center gap-2">
       <div className={cn(
-        "flex items-center justify-center rounded-full flex-shrink-0",
-        compact ? 'h-3 w-3' : 'h-4 w-4',
-        met ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+        "flex items-center justify-center rounded-full flex-shrink-0 h-3.5 w-3.5",
+        met ? 'bg-green-500/20 text-green-600' : 'bg-muted text-muted-foreground'
       )}>
         <Icon
           name={met ? 'check' : 'x'}
-          className={cn(
-            compact ? 'h-2 w-2' : 'h-2.5 w-2.5'
-          )}
+          className="h-2.5 w-2.5"
         />
       </div>
-      <span
-        className={cn(
-          'text-sm',
-          met ? 'text-green-700' : 'text-red-600'
-        )}
-      >
+      <span className={cn(
+        'text-xs',
+        met ? 'text-foreground' : 'text-muted-foreground'
+      )}>
         {text}
       </span>
     </div>
+  )
+}
+
+interface PasswordLabelWithTooltipProps {
+  htmlFor: string
+  label?: string
+  password?: string
+}
+
+export function PasswordLabelWithTooltip({ 
+  htmlFor, 
+  label = 'Password',
+  password = ''
+}: PasswordLabelWithTooltipProps) {
+  const requirements = checkPasswordRequirements(password)
+  
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={htmlFor}>{label}</Label>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="flex items-center justify-center">
+              <Icon name="info" className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-[260px] px-3 py-2.5 bg-popover text-popover-foreground border">
+            <div className="space-y-2">
+              <p className="font-semibold text-xs mb-2">Password Requirements:</p>
+              <div className="space-y-1.5">
+                <RequirementTooltipItem 
+                  met={requirements.minLength} 
+                  text="At least 8 characters" 
+                />
+                <RequirementTooltipItem 
+                  met={requirements.hasUppercase} 
+                  text="One uppercase letter" 
+                />
+                <RequirementTooltipItem 
+                  met={requirements.hasLowercase} 
+                  text="One lowercase letter" 
+                />
+                <RequirementTooltipItem 
+                  met={requirements.hasNumber} 
+                  text="One number" 
+                />
+                <RequirementTooltipItem 
+                  met={requirements.hasSpecial} 
+                  text="One special character" 
+                />
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   )
 }

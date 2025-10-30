@@ -303,11 +303,11 @@ export class StarshipService {
 
       // Deploy the host tools that Daedalus needs
       const defaultToolSlugs = [
-        'tool-list',
-        'tool-get',
+        'list-tools',
+        'get-tool',
         'open-tool',
         'edit-tool',
-        'tool-test',
+        'test-tool',
         'blueprint-lint',
         'node-schema',
         'blueprint-examples',

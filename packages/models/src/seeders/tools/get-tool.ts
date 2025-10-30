@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolGetTool: ToolParams = {
   name: 'Get Tool',
-  slug: 'tool-get',
+  slug: 'get-tool',
   description: `Get full details for a tool on the current starship by slug.
 
 Inputs:
@@ -53,10 +53,10 @@ Behavior and limits:
             if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
+              url: \`${baseUrl}/starships/${starshipId}/tools/${slug}\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer \${authToken}\`,
+                'Authorization': \`Bearer ${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };
@@ -120,7 +120,7 @@ export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | '
   parameters: toolGetTool.parameters,
   blueprint: toolGetTool.blueprint,
 
-  slug: 'tool-get',
+  slug: 'get-tool',
   category: 'automation',
   exampleUsage: '{ "slug": "calc" } // returns full tool model; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

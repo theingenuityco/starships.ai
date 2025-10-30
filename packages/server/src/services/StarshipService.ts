@@ -308,9 +308,9 @@ export class StarshipService {
         'open-tool',
         'edit-tool',
         'test-tool',
-        'blueprint-lint',
-        'node-schema',
-        'blueprint-examples',
+        'test-tool-blueprint',
+        'docs-node-schema',
+        'docs-blueprint-examples',
       ];
 
       for (const toolSlug of defaultToolSlugs) {

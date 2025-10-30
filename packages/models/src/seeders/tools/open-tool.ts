@@ -75,10 +75,10 @@ Automatically inferred from agent state (do not pass manually):
                 status: 'active'
               };
               return {
-                url: `${baseUrl}/starships/${starshipId}/tools`,
+                url: baseUrl + '/starships/' + starshipId + '/tools',
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${authToken}`,
+                  'Authorization': 'Bearer ' + authToken,
                   'Content-Type': 'application/json'
                 },
                 body,
@@ -89,10 +89,10 @@ Automatically inferred from agent state (do not pass manually):
             // Open existing
             if (!hasSlug) throw new Error('slug is required to open an existing tool');
             return {
-              url: `${baseUrl}/starships/${starshipId}/tools/${input.slug}`,
+              url: baseUrl + '/starships/' + starshipId + '/tools/' + input.slug,
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${authToken}`,
+                'Authorization': 'Bearer ' + authToken,
                 'Content-Type': 'application/json'
               },
               timeout: 5000

@@ -6,8 +6,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * Provides comprehensive blueprint examples for various use cases
  */
 export const blueprintExamplesTool: ToolParams = {
-  name: 'blueprint_examples',
-  slug: 'blueprint-examples',
+  name: 'Docs Blueprint Examples',
+  slug: 'docs-blueprint-examples',
   description: `Query a library of working blueprint examples for different scenarios and patterns.
 
 ## Purpose
@@ -260,10 +260,10 @@ Returns complete, executable blueprints with:
                         type: 'code',
                         name: 'Prepare Tool Arguments',
                         parameters: {
-                          code: \`
+                          code: `
                             const toolCall = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0];
                             return toolCall.function.arguments_json || JSON.parse(toolCall.function.arguments);
-                          \`,
+                          `,
                           timeout: 2000
                         }
                       },
@@ -332,7 +332,7 @@ Returns complete, executable blueprints with:
                         type: 'code',
                         name: 'Process Items',
                         parameters: {
-                          code: \`
+                          code: `
                             const items = $lastOutputOf("fetch_data")[0].json.body;
                             const processed = items.map(item => ({
                               ...item,
@@ -341,7 +341,7 @@ Returns complete, executable blueprints with:
                             }));
                             const total = processed.reduce((sum, item) => sum + item.score, 0);
                             return { items: processed, total };
-                          \`,
+                          `,
                           timeout: 5000
                         }
                       },
@@ -387,11 +387,11 @@ Returns complete, executable blueprints with:
                         type: 'code',
                         name: 'Validate Input',
                         parameters: {
-                          code: \`
+                          code: `
                             if (!input.query) throw new Error('Query is required');
                             if (!input.maxResults) input.maxResults = 10;
                             return input;
-                          \`,
+                          `,
                           timeout: 1000
                         }
                       },
@@ -422,10 +422,10 @@ Returns complete, executable blueprints with:
                                 type: 'code',
                                 name: 'Filter Results',
                                 parameters: {
-                                  code: \`
+                                  code: `
                                     const results = $lastOutputOf("sub_api")[0].json.body.results;
                                     return results.filter(r => r.score > 0.5);
-                                  \`
+                                  `
                                 }
                               },
                               {
@@ -524,14 +524,14 @@ Returns complete, executable blueprints with:
                         type: 'code',
                         name: 'Merge Results',
                         parameters: {
-                          code: \`
+                          code: `
                             const primary = $lastOutputOf("primary_api")[0];
                             const fallback = $lastOutputOf("fallback_api")[0];
                             
                             if (!primary.error) return { source: 'primary', data: primary.json };
                             if (!fallback.error) return { source: 'fallback', data: fallback.json };
                             return { source: 'none', error: 'Both APIs failed' };
-                          \`
+                          `
                         }
                       },
                       {
@@ -626,18 +626,17 @@ Returns complete, executable blueprints with:
   },
 };
 
-/**
- * Tool Template: blueprint_examples
- */
 export const blueprintExamplesToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: blueprintExamplesTool.name,
   description: blueprintExamplesTool.description,
   parameters: blueprintExamplesTool.parameters,
   blueprint: blueprintExamplesTool.blueprint,
 
-  slug: 'blueprint-examples',
+  slug: 'docs-blueprint-examples',
   category: 'automation',
   exampleUsage: '{ "category": "llm_patterns" } // returns all LLM pattern examples',
   requiresApiKey: false,
   configurationFields: [],
 };
+
+

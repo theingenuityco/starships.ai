@@ -101,7 +101,7 @@ Automatically inferred from agent state (do not pass manually):
               slug: input.slug,
               body,
               headers: {
-                'Authorization': `Bearer ${authToken}`,
+                'Authorization': 'Bearer ' + authToken,
                 'Content-Type': 'application/json'
               }
             };
@@ -138,7 +138,7 @@ Automatically inferred from agent state (do not pass manually):
             const ctx = $lastOutputOf('prepare')[0].json;
 
             return {
-              url: `${ctx.baseUrl}/tools/${toolData.id}`,
+              url: ctx.baseUrl + '/tools/' + toolData.id,
               method: 'PUT',
               headers: ctx.headers,
               body: ctx.body

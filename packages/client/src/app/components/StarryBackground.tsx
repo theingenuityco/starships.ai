@@ -27,6 +27,28 @@ export default function StarryBackground() {
         /* Small stars - Static */
         .stars-small {
           box-shadow:
+            /* Additional top area stars */
+            320px 180px #fff,
+            890px 120px #fff,
+            1450px 95px #fff,
+            560px 210px #fff,
+            1120px 145px #fff,
+            230px 85px #fff,
+            1680px 160px #fff,
+            420px 75px #fff,
+            980px 195px #fff,
+            1540px 110px #fff,
+            670px 135px #fff,
+            1230px 90px #fff,
+            790px 220px #fff,
+            1350px 175px #fff,
+            510px 105px #fff,
+            1070px 65px #fff,
+            150px 190px #fff,
+            1710px 125px #fff,
+            860px 155px #fff,
+            1420px 80px #fff,
+            /* Existing stars */
             179px 1235px #fff,
             1289px 1123px #fff,
             1440px 1585px #fff,
@@ -138,6 +160,18 @@ export default function StarryBackground() {
         /* Medium stars - Static */
         .stars-medium {
           box-shadow:
+            /* Additional top area medium stars */
+            450px 140px #fff,
+            1050px 185px #fff,
+            1650px 115px #fff,
+            750px 95px #fff,
+            1350px 205px #fff,
+            350px 165px #fff,
+            950px 75px #fff,
+            1550px 135px #fff,
+            650px 225px #fff,
+            1250px 155px #fff,
+            /* Existing stars */
             1679px 1123px #fff,
             979px 1523px #fff,
             1279px 423px #fff,
@@ -196,6 +230,14 @@ export default function StarryBackground() {
         /* Large stars - Static */
         .stars-large {
           box-shadow:
+            /* Additional top area large stars */
+            600px 130px #fff,
+            1200px 170px #fff,
+            1800px 100px #fff,
+            400px 200px #fff,
+            1000px 85px #fff,
+            1600px 145px #fff,
+            /* Existing stars */
             1479px 923px #fff,
             879px 1323px #fff,
             1179px 523px #fff,

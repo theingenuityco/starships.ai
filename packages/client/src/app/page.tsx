@@ -21,7 +21,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
-
 export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const pathname = usePathname()

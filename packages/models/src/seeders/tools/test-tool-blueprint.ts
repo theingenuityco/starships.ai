@@ -2,12 +2,12 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: blueprint_lint
+ * Tool: Test Tool Blueprint
  * Validate an Autopilot blueprint structure (nodes/edges, types, refs).
  */
 export const blueprintLintTool: ToolParams = {
-  name: 'blueprint_lint',
-  slug: 'blueprint-lint',
+  name: 'Test Tool Blueprint',
+  slug: 'test-tool-blueprint',
   description: `Validates Autopilot blueprint structure and connectivity with comprehensive error reporting.
 
 ## Purpose
@@ -126,14 +126,14 @@ Returns structured validation result:
               if (!n.ref || typeof n.ref !== 'string') {
                 issues.push('Node missing valid "ref"');
               } else {
-                if (seenRefs.has(n.ref)) issues.push(\`Duplicate node ref: \${n.ref}\`);
+                if (seenRefs.has(n.ref)) issues.push('Duplicate node ref: ' + n.ref);
                 seenRefs.add(n.ref);
               }
 
               if (!n.type || typeof n.type !== 'string') {
-                issues.push(\`\${n.ref ?? '?'} missing "type"\`);
+                issues.push((n.ref ?? '?') + ' missing "type"');
               } else if (!allowedTypes.includes(n.type)) {
-                issues.push(\`Unsupported node type "\${n.type}" at \${n.ref}\`);
+                issues.push('Unsupported node type "' + n.type + '" at ' + n.ref);
               }
             }
 
@@ -153,23 +153,23 @@ Returns structured validation result:
               if (!e.ref || typeof e.ref !== 'string') {
                 issues.push('Edge missing valid "ref"');
               } else {
-                if (seenEdgeRefs.has(e.ref)) issues.push(\`Duplicate edge ref: \${e.ref}\`);
+                if (seenEdgeRefs.has(e.ref)) issues.push('Duplicate edge ref: ' + e.ref);
                 seenEdgeRefs.add(e.ref);
               }
               if (!e.from || typeof e.from !== 'string' || !e.to || typeof e.to !== 'string') {
-                issues.push(\`\${e.ref ?? '?'} missing "from" or "to"\`);
+                issues.push((e.ref ?? '?') + ' missing "from" or "to"');
                 continue;
               }
-              if (!seenRefs.has(e.from)) issues.push(\`\${e.ref ?? '?'} "from" references unknown node: \${e.from}\`);
-              if (!seenRefs.has(e.to)) issues.push(\`\${e.ref ?? '?'} "to" references unknown node: \${e.to}\`);
+              if (!seenRefs.has(e.from)) issues.push((e.ref ?? '?') + ' "from" references unknown node: ' + e.from);
+              if (!seenRefs.has(e.to)) issues.push((e.ref ?? '?') + ' "to" references unknown node: ' + e.to);
               if (e.condition !== undefined && typeof e.condition !== 'string') {
-                issues.push(\`\${e.ref ?? '?'} condition must be a string\`);
+                issues.push((e.ref ?? '?') + ' condition must be a string"');
               }
               if (e.label !== undefined && typeof e.label !== 'string') {
-                issues.push(\`\${e.ref ?? '?'} label must be a string\`);
+                issues.push((e.ref ?? '?') + ' label must be a string"');
               }
               if (e.metadata !== undefined && (typeof e.metadata !== 'object' || Array.isArray(e.metadata))) {
-                issues.push(\`\${e.ref ?? '?'} metadata must be an object\`);
+                issues.push((e.ref ?? '?') + ' metadata must be an object"');
               }
             }
 
@@ -220,7 +220,7 @@ export const blueprintLintToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
   parameters: blueprintLintTool.parameters,
   blueprint: blueprintLintTool.blueprint,
 
-  slug: 'blueprint-lint',
+  slug: 'test-tool-blueprint',
   category: 'automation',
   exampleUsage: '{ "blueprint": { "nodes": [...], "edges": [...] } } // returns { ok, issues, summary }',
   requiresApiKey: false,

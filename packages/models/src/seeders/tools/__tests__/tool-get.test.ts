@@ -3,7 +3,7 @@
  * E2E tests using real autopilot execution with mocked HTTP
  */
 
-import { toolGetTool, toolGetToolTemplate } from '../tool-get';
+import { toolGetTool, toolGetToolTemplate } from '../get-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -88,7 +88,7 @@ describe('Tool Get Tool', () => {
       expect(toolGetToolTemplate.description).toBe(toolGetTool.description);
       expect(toolGetToolTemplate.parameters).toEqual(toolGetTool.parameters);
       expect(toolGetToolTemplate.blueprint).toEqual(toolGetTool.blueprint);
-      expect(toolGetToolTemplate.slug).toBe('tool-get');
+      expect(toolGetToolTemplate.slug).toBe('get-tool');
       expect(toolGetToolTemplate.category).toBe('automation');
       expect(toolGetToolTemplate.requiresApiKey).toBe(false);
       expect(toolGetToolTemplate.exampleUsage).toBeDefined();

@@ -344,11 +344,14 @@ Comprehensive test coverage for Daedalus's tools with specialized testing utilit
 | **Utility Tools**   | `calculator`       | Mathematical expression evaluation with security validation  |
 |                     | `echo`             | Simple input/output testing and debugging utility            |
 |                     | `get_current_time` | Timezone-aware date/time generation with multiple formats    |
-| **Blueprint Tools** | `blueprint_lint`   | Autopilot blueprint structure validation and error reporting |
-| **Tool Management** | `tool_create`      | Create new tool instances via REST API                       |
-|                     | `List Tools`       | List all tools for a starship with lean summaries            |
-|                     | `tool_edit`        | Edit existing tools by slug resolution                       |
-|                     | `Test Tool`        | Execute tools with timing and pass/fail reporting            |
+| **Blueprint Tools** | `test-tool-blueprint` | Autopilot blueprint structure validation and error reporting |
+|                     | `docs-node-schema` | Node type schema introspection and validation rules          |
+|                     | `docs-blueprint-examples` | Working blueprint examples for different patterns       |
+| **Tool Management** | `open-tool`        | Create or open tool instances via REST API                   |
+|                     | `list-tools`       | List all tools for a starship with lean summaries            |
+|                     | `get-tool`         | Get full tool details by slug                                |
+|                     | `edit-tool`        | Edit existing tools by slug resolution                       |
+|                     | `test-tool`        | Execute tools with timing and pass/fail reporting            |
 
 ### Running Tool Tests
 

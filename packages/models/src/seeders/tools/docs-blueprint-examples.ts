@@ -2,12 +2,12 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: blueprint_examples
+ * Tool: Blueprint Examples
  * Provides comprehensive blueprint examples for various use cases
  */
 export const blueprintExamplesTool: ToolParams = {
-  name: 'blueprint_examples',
-  slug: 'blueprint-examples',
+  name: 'Docs Blueprint Examples',
+  slug: 'docs-blueprint-examples',
   description: `Query a library of working blueprint examples for different scenarios and patterns.
 
 ## Purpose
@@ -626,16 +626,13 @@ Returns complete, executable blueprints with:
   },
 };
 
-/**
- * Tool Template: blueprint_examples
- */
 export const blueprintExamplesToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: blueprintExamplesTool.name,
   description: blueprintExamplesTool.description,
   parameters: blueprintExamplesTool.parameters,
   blueprint: blueprintExamplesTool.blueprint,
 
-  slug: 'blueprint-examples',
+  slug: 'docs-blueprint-examples',
   category: 'automation',
   exampleUsage: '{ "category": "llm_patterns" } // returns all LLM pattern examples',
   requiresApiKey: false,

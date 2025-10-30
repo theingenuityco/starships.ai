@@ -1,9 +1,9 @@
 /**
- * Blueprint Lint Tool - E2E
- * Executes blueprint_lint using real Autopilot Tool execution (no HTTP mocking needed)
+ * Test Tool Blueprint - E2E
+ * Executes test-tool-blueprint using real Autopilot Tool execution (no HTTP mocking needed)
  */
 
-import { blueprintLintTool, blueprintLintToolTemplate } from '../blueprint-lint';
+import { blueprintLintTool, blueprintLintToolTemplate } from '../test-tool-blueprint';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -27,7 +27,7 @@ describe('Blueprint Lint Tool (E2E)', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(blueprintLintTool.name).toBe('blueprint_lint');
+      expect(blueprintLintTool.name).toBe('Test Tool Blueprint');
       expect(blueprintLintTool.description).toContain('Validate');
       expect(blueprintLintTool.parameters).toBeDefined();
       expect(blueprintLintTool.blueprint).toBeDefined();
@@ -45,7 +45,7 @@ describe('Blueprint Lint Tool (E2E)', () => {
       expect(blueprintLintToolTemplate.description).toBe(blueprintLintTool.description);
       expect(blueprintLintToolTemplate.parameters).toEqual(blueprintLintTool.parameters);
       expect(blueprintLintToolTemplate.blueprint).toEqual(blueprintLintTool.blueprint);
-      expect(blueprintLintToolTemplate.slug).toBe('blueprint-lint');
+      expect(blueprintLintToolTemplate.slug).toBe('test-tool-blueprint');
       expect(blueprintLintToolTemplate.category).toBe('automation');
       expect(blueprintLintToolTemplate.requiresApiKey).toBe(false);
     });
@@ -122,7 +122,7 @@ describe('Blueprint Lint Tool (E2E)', () => {
   });
 });
 
-describe('Tool.execute return value - blueprint_lint', () => {
+describe('Tool.execute return value - test-tool-blueprint', () => {
   it('should return a single ExecutionItem with lint result and preserve pairedItem', async () => {
     const VALID_BLUEPRINT = {
       nodes: [

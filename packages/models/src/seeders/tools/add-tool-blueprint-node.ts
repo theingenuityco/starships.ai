@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolAddBlueprintNodeTool: ToolParams = {
   name: 'Add Tool Blueprint Node',
-  slug: 'tool-add-blueprint-node',
+  slug: 'add-tool-blueprint-node',
   description: `Adds a new node to an existing tool's blueprint with automatic validation and conflict detection.
 
 ## Purpose
@@ -222,7 +222,7 @@ Returns updated tool with new node in blueprint, or validation errors if additio
 };
 
 /**
- * Tool Template: tool-add-blueprint-node
+ * Tool Template: add-tool-blueprint-node
  */
 export const toolAddBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: toolAddBlueprintNodeTool.name,
@@ -230,10 +230,12 @@ export const toolAddBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' | 'c
   parameters: toolAddBlueprintNodeTool.parameters,
   blueprint: toolAddBlueprintNodeTool.blueprint,
 
-  slug: 'tool-add-blueprint-node',
+  slug: 'add-tool-blueprint-node',
   category: 'automation',
   exampleUsage:
     '{ "toolSlug": "my-tool", "node": { "ref": "process", "type": "code", "name": "Process Data", "parameters": { "code": "return input;" } } }',
   requiresApiKey: false,
   configurationFields: [],
 };
+
+

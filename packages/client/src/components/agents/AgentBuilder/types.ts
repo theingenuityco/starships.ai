@@ -21,6 +21,7 @@ export interface AgentBuilderViewProps {
   onCancel?: () => void
   starshipId?: string
   initialSlug?: string
+  errorMessage?: string
 }
 
 export interface AgentBuilderViewRef {

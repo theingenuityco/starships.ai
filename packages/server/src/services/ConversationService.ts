@@ -5,7 +5,6 @@ import { UsageService } from '@/services/UsageService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM } from '@starships/autopilot';
 import type {
   ToolParams,
-  ExecutionItem,
   AgentParams,
   ExecutionEvent,
   LLMEvent,
@@ -19,10 +18,13 @@ import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
-import { parse as parsePartialJson } from 'partial-json';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
+import { parse, Allow } from 'partial-json-parser';
+
+// Debug flags
+const DEBUG_TOOLCALLS = false;
 
 /**
  * Autopilot child process configuration
@@ -41,6 +43,8 @@ type StreamingToolCallAccum = {
     arguments: string; // accumulating JSON string during streaming
   };
 };
+
+// Parser state for incremental tool argument parsing per conversation/index
 
 /**
  * Clean conversation service with proper error handling
@@ -73,8 +77,11 @@ export class ConversationService {
   private ringBuffer: Map<string, Array<{ position: number; content: string; ts: number }>> = new Map();
   // Track accumulated toolCalls during streaming per conversation
   private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
+
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
+  // Track last broadcasted toolCalls snapshot (serialized) to avoid duplicate replace spam
+  private lastToolCallsBroadcastHash: Map<string, string> = new Map();
   // Track whether the currently active streaming assistant placeholder has been persisted
   private activeStreamPersisted: Set<string> = new Set();
   // Track latest provider-reported usage during streaming for mid-turn persistence
@@ -82,6 +89,12 @@ export class ConversationService {
     string,
     { promptTokens: number; completionTokens: number; totalTokens: number; cost: number; model?: string }
   > = new Map();
+  // Monotonic per-active-stream sequence for streamed chunks within the current assistant placeholder
+  private streamSeq: Map<string, number> = new Map();
+  // Once we've seen a message.content snapshot for a stream, prefer snapshots and ignore delta tokens to avoid reordering
+  private snapshotPreferred: Set<string> = new Set();
+  // Sequence for tool-call argument deltas (per conversation)
+  private toolCallSeq: Map<string, number> = new Map();
   /**
    * Compute a non-overlapping append by trimming any prefix of 'fragment' that
    * already exists as a suffix of 'base'. This guards against providers that
@@ -134,6 +147,19 @@ export class ConversationService {
 
     ConversationService.instance = this;
     return this;
+  }
+
+  /**
+   * Extract completed properties from a JSON-like string buffer using partial-json-parser only.
+   */
+  private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
+    if (typeof jsonLike !== 'string' || jsonLike.length === 0) return {};
+    try {
+      const v = parse(jsonLike, Allow.ALL as number) as unknown;
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
   }
 
   /** Persist the currently active streaming assistant partial (content/reasoning only) if any. */
@@ -285,7 +311,6 @@ export class ConversationService {
       // Verify conversation exists first
       const conversation = await this.conversationRepository.findById(conversationId);
       if (!conversation) {
-        console.log(`[ConversationService] Conversation ${conversationId} not found for deletion`);
         return false;
       }
 
@@ -418,10 +443,10 @@ export class ConversationService {
           // Optional: UI action for future clients to react immediately
           try {
             await this.streamingService.broadcastUIAction(conversationId, { __ui_action: 'insufficient_balance' });
-          } catch (e) {
+          } catch {
             /* non-fatal: ui_action is best-effort */
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: system message emission failure */
         }
 
@@ -455,7 +480,6 @@ export class ConversationService {
       const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
 
       if (deployedTools.length === 0) {
-        console.log(`[CONVERSATION-SERVICE] No tools found for agent ${agentId} on starship ${starshipId} via relationships`);
         return [];
       }
 
@@ -474,7 +498,6 @@ export class ConversationService {
           ...(tool.condition && { condition: tool.condition }),
         }));
 
-      console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} tools via Agent→Tool relationships for agent ${agentId}`);
       return toolParams;
     } catch (error) {
       console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
@@ -507,19 +530,14 @@ export class ConversationService {
       if (convo) {
         const t = (convo.title || '').trim().toLowerCase();
         const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
-        console.log('[TITLE] Early check:', {
-          conversationId: convo.id,
-          currentTitle: convo.title,
-          needsTitle: needs,
-          contentPreview: String(data.content || '').slice(0, 80),
-        });
+
         if (needs) {
           const star = await this.getConversationStarship(data.conversationId);
           if (star) {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
             if (gen && gen.trim()) {
               await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
-              console.log('[TITLE] Updated conversation title:', { conversationId: convo.id, title: gen.trim() });
+
               if (this.streamingService && this.streamingService.isActive(convo.id)) {
                 await this.streamingService.broadcastUIAction(convo.id, {
                   __ui_action: 'conversation_title_updated',
@@ -635,7 +653,7 @@ export class ConversationService {
           }
           return baseMessage;
         });
-        const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
+        // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
         this.currentAgentForConversation.set(data.conversationId, { id: agentModel.id, name: agentModel.name });
@@ -789,6 +807,7 @@ export class ConversationService {
             console.warn('[STOP] Billing debit failed for mid-turn usage', {
               conversationId,
               usageId: usageRow.id,
+              error: e instanceof Error ? e.message : String(e),
             });
           }
         }
@@ -898,6 +917,7 @@ export class ConversationService {
     this.streamingToolCalls.delete(conversationId);
     this.streamingReasoning.delete(conversationId);
     // Leave assistantPersistedThisTurn as-is until next workflow_started clears it
+    this.streamSeq.delete(conversationId);
   }
 
   /**
@@ -941,7 +961,7 @@ export class ConversationService {
         },
         { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
       );
-      console.log('[TITLE] Using model:', model);
+
       const items = await llm.execute();
       const res = (items?.[0]?.json || {}) as {
         model?: string;
@@ -1086,9 +1106,7 @@ export class ConversationService {
           resolvedLog.push({ raw });
         }
       }
-      if (resolvedLog.length > 0) {
-        console.log('[CONVERSATION-SERVICE] Mentions resolved:', resolvedLog);
-      }
+
       return out;
     } catch {
       return [];
@@ -1129,12 +1147,16 @@ export class ConversationService {
         this.accumulatedLength.set(conversationId, 0);
         this.placeholderEmitted.set(conversationId, false);
         this.ringBuffer.set(conversationId, []);
+        this.snapshotPreferred.delete(conversationId);
+        this.toolCallSeq.delete(conversationId);
         // CRITICAL FIX: Reset position counter at start of new turn
         this.nextChunkPosition.set(conversationId, 0);
         // Reset cached usage for the new turn
         this.latestStreamingUsage.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
+        // Reset per-stream sequence when a new turn begins (will be set on first placeholder)
+        this.streamSeq.delete(conversationId);
         // Clear assistant-persisted flag at the start of a new top-level turn
         this.assistantPersistedThisTurn.delete(conversationId);
         // Reset active stream persisted guard for this new turn
@@ -1178,7 +1200,7 @@ export class ConversationService {
           if (stoppedAtStart) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop check at workflow start */
         }
 
@@ -1376,6 +1398,10 @@ export class ConversationService {
                 this.placeholderEmitted.set(conversationId, true);
                 // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
                 this.streamingToolCalls.delete(conversationId);
+                // Initialize per-stream sequence counter
+                this.streamSeq.set(conversationId, 0);
+                this.snapshotPreferred.delete(conversationId);
+                this.toolCallSeq.set(conversationId, 0);
 
                 const assistantMessage: MessageModel = {
                   id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1581,13 +1607,8 @@ export class ConversationService {
                           // Try full JSON.parse first for complete JSON
                           argsObj = JSON.parse(argsStr);
                         } catch {
-                          try {
-                            // Use partial-json for incomplete JSON during streaming
-                            argsObj = parsePartialJson(argsStr);
-                          } catch {
-                            // If both fail, use empty object
-                            argsObj = {};
-                          }
+                          // If parse fails, use empty object
+                          argsObj = {};
                         }
                       }
                       return {
@@ -1616,11 +1637,7 @@ export class ConversationService {
                       try {
                         argsObj = JSON.parse(argsStr);
                       } catch {
-                        try {
-                          argsObj = parsePartialJson(argsStr);
-                        } catch {
-                          argsObj = {};
-                        }
+                        argsObj = {};
                       }
                     }
                     return {
@@ -1630,7 +1647,7 @@ export class ConversationService {
                         name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
                         arguments: argsObj, // Store as parsed object for UI
                       },
-                    };
+                    } as any;
                   });
 
                   // Maintain streaming accumulator with string arguments form
@@ -1899,8 +1916,6 @@ export class ConversationService {
             // Get last persisted index for this conversation
             const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
 
-            console.log(`[STREAMING] node_completed: Checking messages. Last index: ${lastIndex}, Current count: ${stateMessages.length}`);
-
             // Type guard for state messages coming from Autopilot mutations
             const isStateMsg = (m: unknown): m is LlmMessage => {
               if (!m || typeof m !== 'object') return false;
@@ -1964,6 +1979,7 @@ export class ConversationService {
                   this.streamingReasoning.delete(conversationId);
                   this.streamingToolCalls.delete(conversationId);
                   this.ringBuffer.delete(conversationId);
+                  this.streamSeq.delete(conversationId);
                   this.activeStreamPersisted.delete(conversationId);
                 }
 
@@ -2125,6 +2141,7 @@ export class ConversationService {
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
+        this.streamSeq.delete(conversationId);
         break;
       }
 
@@ -2154,7 +2171,6 @@ export class ConversationService {
       case 'tool_call_detected': {
         // Drop nested tool call detections (only emit from top-level LLM)
         if ((event.executionDepth ?? 0) > 0) {
-          console.log('[STREAMING] Skipping nested tool_call_detected at depth', event.executionDepth);
           break;
         }
 
@@ -2164,7 +2180,7 @@ export class ConversationService {
           if (stoppedTool) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop during tool_call_detected */
         }
         const toolEvt = event as ToolEvent;
@@ -2191,19 +2207,15 @@ export class ConversationService {
           if (stoppedToolStart) {
             break;
           }
-        } catch (e) {
+        } catch {
           /* non-fatal: balance auto-stop during tool_started */
         }
-        const toolEvt = event as ToolEvent;
-        console.log('[STREAMING] Tool started:', toolEvt.data?.toolName);
         break;
       }
 
       case 'tool_complete': {
         // Tool completion is now handled via state-based message persistence in node_completed
         // No persistence needed here - messages are added to state via mutations and persisted automatically
-        const toolEvt = event as ToolEvent;
-        console.log('[STREAMING] Tool completed:', toolEvt.data?.toolName);
         break;
       }
 

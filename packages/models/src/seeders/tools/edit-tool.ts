@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolEditTool: ToolParams = {
   name: 'Edit Tool',
-  slug: 'tool-edit',
+  slug: 'edit-tool',
   description: `Updates an existing tool by slug with partial changes. Designed for incremental tool development and refinement.
 
 ## Purpose
@@ -101,7 +101,7 @@ Automatically inferred from agent state (do not pass manually):
               slug: input.slug,
               body,
               headers: {
-                'Authorization': \`Bearer \${authToken}\`,
+                'Authorization': 'Bearer ' + authToken,
                 'Content-Type': 'application/json'
               }
             };
@@ -138,7 +138,7 @@ Automatically inferred from agent state (do not pass manually):
             const ctx = $lastOutputOf('prepare')[0].json;
 
             return {
-              url: \`\${ctx.baseUrl}/tools/\${toolData.id}\`,
+              url: ctx.baseUrl + '/tools/' + toolData.id,
               method: 'PUT',
               headers: ctx.headers,
               body: ctx.body
@@ -182,7 +182,7 @@ Automatically inferred from agent state (do not pass manually):
 };
 
 /**
- * Tool Template: tool-edit
+ * Tool Template: edit-tool
  */
 export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: toolEditTool.name,
@@ -190,7 +190,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   parameters: toolEditTool.parameters,
   blueprint: toolEditTool.blueprint,
 
-  slug: 'tool-edit',
+  slug: 'edit-tool',
   category: 'automation',
   exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,

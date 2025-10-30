@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentAssignToolTool: ToolParams = {
   name: 'Assign Agent Tool',
-  slug: 'agent-assign-tool',
+  slug: 'assign-agent-tool',
   description: `Assign a tool to an agent by creating an Agent→Tool relationship.
 
 ## Purpose
@@ -160,7 +160,7 @@ Returns server response indicating success.
 };
 
 /**
- * Tool Template: agent-assign-tool
+ * Tool Template: assign-agent-tool
  */
 export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: agentAssignToolTool.name,
@@ -168,7 +168,7 @@ export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'create
   parameters: agentAssignToolTool.parameters,
   blueprint: agentAssignToolTool.blueprint,
 
-  slug: 'agent-assign-tool',
+  slug: 'assign-agent-tool',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
   requiresApiKey: false,

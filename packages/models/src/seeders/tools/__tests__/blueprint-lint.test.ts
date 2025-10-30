@@ -1,16 +1,16 @@
 /**
- * Blueprint Lint Tool Tests
- * End-to-end tests for the blueprint_lint tool using autopilot Tool node
+ * Test Tool Blueprint Tests
+ * End-to-end tests for the test-tool-blueprint tool using autopilot Tool node
  */
 
-import { blueprintLintTool, blueprintLintToolTemplate } from '../blueprint-lint';
+import { blueprintLintTool, blueprintLintToolTemplate } from '../test-tool-blueprint';
 import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
 
 describe('Blueprint Lint Tool', () => {
   let testHelper: ToolTestHelper;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'blueprint_lint');
+    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'test-tool-blueprint');
     testHelper.clearEventLogs();
   });
 
@@ -22,7 +22,7 @@ describe('Blueprint Lint Tool', () => {
     });
 
     it('should have correct tool name', () => {
-      expect(blueprintLintTool.name).toBe('blueprint_lint');
+      expect(blueprintLintTool.name).toBe('Test Tool Blueprint');
     });
 
     it('should have descriptive description', () => {
@@ -94,7 +94,7 @@ describe('Blueprint Lint Tool', () => {
     });
 
     it('should have correct template metadata', () => {
-      expect(blueprintLintToolTemplate.slug).toBe('blueprint-lint');
+      expect(blueprintLintToolTemplate.slug).toBe('test-tool-blueprint');
       expect(blueprintLintToolTemplate.category).toBe('automation');
       expect(blueprintLintToolTemplate.requiresApiKey).toBe(false);
     });

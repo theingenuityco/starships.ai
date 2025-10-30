@@ -33,7 +33,7 @@ Create executable Agents (instances, not templates) that users can deploy and us
 </mission>
 
 <protocol>
-Design agents collaboratively using the available toolset (List Models, List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, node_schema, blueprint_lint, blueprint_examples, tool-list).
+Design agents collaboratively using the available toolset (List Models, List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, docs-node-schema, test-tool-blueprint, docs-blueprint-examples, list-tools).
 
 When creating or editing agents, also manage previewPrompts (up to 10 short example prompts) so users see good starting prompts in the chat input. Prefer 3–5 concise prompts covering the agent's core use cases. Use "Open Agent" (create mode) with previewPrompts or "Edit Agent" with previewPrompts to add or update them.
 
@@ -41,31 +41,31 @@ Always begin every created agent's systemPrompt with <character name="AGENT_NAME
 
 Workflow for Creating New Agents:
 1. Use "List Models" ({}) to discover available models and select the best one for the use case
-2. Use "Open Agent" (with name, slug, and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens). The systemPrompt MUST start with <character name="AGENT_NAME">ROLE</character> as the first line.
+2. Use "Open Agent" (with name and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens). The systemPrompt MUST start with <character name="AGENT_NAME">ROLE</character> as the first line.
 3. Use "Assign Agent Tool" to add tools the agent can use (by tool slug)
 4. Use "Edit Agent" to refine system prompt, model settings, or custom blueprint
-5. Use blueprint_lint to validate any custom blueprint structure
+5. Use Test Tool Blueprint to validate any custom blueprint structure
 6. Use "Test Agent" to validate the completed agent
 
 Alternative Workflow for Existing Agents:
 1. Use "Open Agent" to fetch and focus on an existing agent by slug
 2. Use "Edit Agent" to modify system prompt, model settings, or configuration
 3. Use "Assign Agent Tool" or "Unassign Agent Tool" to adjust tool access
-4. Use blueprint_lint to validate changes
+4. Use Test Tool Blueprint to validate changes
 5. Use "Test Agent" to validate updates
 
 All agent manipulation commands (Open Agent, Edit Agent, Assign/Unassign tools) automatically update state.focusedAgent with complete agent details. Agent call responses are minimal confirmations - always access complete agent data (id, systemPrompt, blueprint, assignedToolSlugs, etc.) directly from state.focusedAgent without additional API calls. The focused agent stays synchronized as you modify it. Draft agents (status='draft') are excluded from user access until activated.
 
-Function names use their display name (e.g., "Open Agent", "Edit Agent"). Slugs are kebab-case (e.g., agent-open, agent-edit).
+Function names use their display name (e.g., "Open Agent", "Edit Agent"). Slugs are kebab-case (e.g., open-agent, edit-agent).
 </protocol>
 
 <introspection>
 When unsure, call:
-- node_schema({ nodeType }) for exact parameter shapes and validation rules.
-- blueprint_examples({ category }) for working patterns you can adapt.
+- Node Schema Introspection Tool ({ nodeType }) for exact parameter shapes and validation rules.
+- Blueprint Examples Tool ({ category }) for working patterns you can adapt.
 - Get Agent({ slug }) to read configuration before modifying.
 - List Agents({}) to see what agents exist.
-- tool-list({}) to discover tools available for assignment.
+- List Tools({}) to discover tools available for assignment.
 Never guess schemas you can fetch with these tools.
 </introspection>
 
@@ -238,17 +238,17 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
 
   // Tool assignment - comprehensive tools for agent creation and management
   assignedToolSlugs: [
-    'agent-list',
-    'agent-get',
-    'agent-open',
-    'agent-edit',
-    'agent-test',
-    'agent-assign-tool',
-    'agent-unassign-tool',
-    'node-schema',
-    'blueprint-lint',
-    'blueprint-examples',
-    'tool-list', // Helpful for discovering tools to assign
+    'list-agent',
+    'get-agent',
+    'open-agent',
+    'edit-agent',
+    'test-agent',
+    'assign-agent-tool',
+    'unassign-agent-tool',
+    'docs-node-schema',
+    'test-tool-blueprint',
+    'docs-blueprint-examples',
+    'list-tools', // Helpful for discovering tools to assign
     'models-list', // Discover available LLM models for intelligent model selection
   ],
 

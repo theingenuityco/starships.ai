@@ -1,9 +1,9 @@
 /**
- * Tool Test - E2E
- * Executes tool_test using real Autopilot execution with mocked HTTP only
+ * Test Tool - E2E
+ * Executes test-tool using real Autopilot execution with mocked HTTP only
  */
 
-import { toolTestTool, toolTestToolTemplate } from '../tool-test';
+import { toolTestTool, toolTestToolTemplate } from '../test-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -88,7 +88,7 @@ describe('Tool Test Tool', () => {
       expect(toolTestToolTemplate.description).toBe(toolTestTool.description);
       expect(toolTestToolTemplate.parameters).toEqual(toolTestTool.parameters);
       expect(toolTestToolTemplate.blueprint).toEqual(toolTestTool.blueprint);
-      expect(toolTestToolTemplate.slug).toBe('tool-test');
+      expect(toolTestToolTemplate.slug).toBe('test-tool');
       expect(toolTestToolTemplate.category).toBe('automation');
       expect(toolTestToolTemplate.requiresApiKey).toBe(false);
     });
@@ -290,7 +290,7 @@ describe('Tool Test Tool', () => {
   });
 });
 
-describe('Tool.execute return value - tool_test', () => {
+describe('Tool.execute return value - test-tool', () => {
   it('should return a single ExecutionItem with final test result and preserve pairedItem', async () => {
     const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
 

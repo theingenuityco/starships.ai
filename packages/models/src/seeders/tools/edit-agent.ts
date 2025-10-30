@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentEditTool: ToolParams = {
   name: 'Edit Agent',
-  slug: 'agent-edit',
+  slug: 'edit-agent',
   description: `Updates an existing agent by slug with partial changes. Designed for incremental agent development and refinement.
 
 ## Purpose
@@ -213,7 +213,7 @@ Automatically inferred from agent state (do not pass manually):
 };
 
 /**
- * Tool Template: agent-edit
+ * Tool Template: edit-agent
  */
 export const agentEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: agentEditTool.name,
@@ -221,7 +221,7 @@ export const agentEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   parameters: agentEditTool.parameters,
   blueprint: agentEditTool.blueprint,
 
-  slug: 'agent-edit',
+  slug: 'edit-agent',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "systemPrompt": "Updated instructions", "previewPrompts": ["New example 1", "New example 2"] } // partial updates by slug',

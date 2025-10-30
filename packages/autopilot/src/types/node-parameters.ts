@@ -158,6 +158,14 @@ export interface ToolParams extends BaseParams {
     type: 'object';
     properties: Record<string, ToolParameterSchema>;
     required?: string[];
+    // Allow root-level JSON Schema combinators/conditionals
+    allOf?: ToolParameterSchema[];
+    anyOf?: ToolParameterSchema[];
+    oneOf?: ToolParameterSchema[];
+    not?: ToolParameterSchema;
+    if?: ToolParameterSchema;
+    then?: ToolParameterSchema;
+    else?: ToolParameterSchema;
   };
   blueprint: Blueprint; // Required: Tool executes this nested workflow
   toolCallId?: string; // Optional: ID linking this execution to the originating assistant tool_call

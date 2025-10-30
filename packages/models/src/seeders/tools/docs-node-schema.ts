@@ -2,12 +2,12 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: node_schema
+ * Tool: Node Schema Introspection
  * Provides comprehensive schema information for Autopilot node types
  */
 export const nodeSchemaIntrospectionTool: ToolParams = {
-  name: 'node_schema',
-  slug: 'node-schema',
+  name: 'Docs Node Schema',
+  slug: 'docs-node-schema',
   description: `Query detailed schema information for Autopilot node types including parameters, validation rules, and execution behavior.
 
 ## Purpose
@@ -600,7 +600,7 @@ Returns comprehensive schema with:
 };
 
 /**
- * Tool Template: node_schema
+ * Tool Template: docs-node-schema
  */
 export const nodeSchemaIntrospectionToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: nodeSchemaIntrospectionTool.name,
@@ -608,7 +608,7 @@ export const nodeSchemaIntrospectionToolTemplate: Omit<ToolTemplateModel, 'id' |
   parameters: nodeSchemaIntrospectionTool.parameters,
   blueprint: nodeSchemaIntrospectionTool.blueprint,
 
-  slug: 'node-schema',
+  slug: 'docs-node-schema',
   category: 'automation',
   exampleUsage: '{ "nodeType": "llm", "detail": "full" } // returns complete LLM node schema',
   requiresApiKey: false,

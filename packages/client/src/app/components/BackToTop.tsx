@@ -24,12 +24,13 @@ export default function BackToTop() {
   }
 
   return (
-    <motion.button
-      onClick={scrollToTop}
-      className="relative px-3 py-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 shadow-sm hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all duration-200 flex items-center gap-2 group overflow-hidden"
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-    >
+    <div className="relative z-10">
+      <motion.button
+        onClick={scrollToTop}
+        className="relative px-3 py-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 shadow-sm hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all duration-200 flex items-center gap-2 group"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
           {/* Arrow (default state) */}
           {!isFlying && (
             <motion.div
@@ -49,6 +50,8 @@ export default function BackToTop() {
           {/* Rocket (flying state) */}
           {isFlying && (
             <motion.div
+              className="absolute left-3"
+              initial={{ y: 0 }}
               animate={{
                 y: -1000,
                 rotate: [0, -10, 10, -5, 5, 0],
@@ -64,7 +67,7 @@ export default function BackToTop() {
           {/* Exhaust/flame effect for rocket */}
           {isFlying && (
             <motion.div
-              className="absolute bottom-0 left-3 transform -translate-x-1/2"
+              className="absolute bottom-2 left-3 pointer-events-none"
               initial={{ opacity: 0, height: 0 }}
               animate={{
                 opacity: [0, 1, 1, 0],
@@ -76,7 +79,8 @@ export default function BackToTop() {
               <div className="w-3 h-full bg-gradient-to-b from-orange-400 via-red-400 to-transparent blur-sm" />
             </motion.div>
           )}
-    </motion.button>
+      </motion.button>
+    </div>
   )
 }
 

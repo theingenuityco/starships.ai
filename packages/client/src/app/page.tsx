@@ -88,11 +88,11 @@ export default function HomePage() {
                   <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation
                 </Button>
-                <BackToTop />
                 <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/wzF7xfjrKv', '_blank')}>
                   <Icon name="discord" className="w-4 h-4 mr-2" />
                   Discord
                 </Button>
+                <BackToTop />
               </div>
             </div>
           </div>

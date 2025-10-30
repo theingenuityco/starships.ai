@@ -555,14 +555,49 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
               const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
               slugArg = slugVal
-              // Infer error message if present
-              const maybeError = (body && (body as any).error) || (parsed as any).error
-              if (!slugVal && maybeError) {
-                errorText = typeof maybeError === 'string' ? maybeError : (maybeError.message as string | undefined)
-              }
-              if (!slugVal && !maybeError) {
+              // Infer a friendly error message if present
+              if (!slugVal) {
+                const pickFirstString = (arr: unknown[]): string | undefined => {
+                  for (const item of arr) {
+                    if (typeof item === 'string' && item) return item
+                    if (item && typeof item === 'object') {
+                      const o = item as Record<string, unknown>
+                      const m = (o.message as string) || (o.msg as string) || (o.description as string)
+                      if (typeof m === 'string' && m) return m
+                    }
+                  }
+                  return undefined
+                }
+                const maybeError = (body && (body as any).error) || (parsed as any).error
+                const maybeMessage = (body && (body as any).message) || (parsed as any).message
+                const maybeDataError = data && (data as any).error
                 const statusCode = (parsed as any).statusCode || (parsed as any).status
-                if (statusCode && Number(statusCode) >= 400) {
+
+                if (typeof maybeError === 'string' && maybeError) {
+                  errorText = maybeError
+                } else if (maybeError && typeof maybeError === 'object') {
+                  const errObj = maybeError as Record<string, unknown>
+                  errorText = (errObj.message as string) || (errObj.description as string) || undefined
+                  if (!errorText) {
+                    const arr = (errObj.errors as unknown[]) || (errObj.details as unknown[]) || (errObj.issues as unknown[])
+                    if (Array.isArray(arr)) errorText = pickFirstString(arr)
+                  }
+                }
+                if (!errorText && typeof maybeMessage === 'string' && maybeMessage) {
+                  errorText = maybeMessage
+                }
+                if (!errorText && maybeDataError) {
+                  if (typeof maybeDataError === 'string') errorText = maybeDataError
+                  else if (typeof maybeDataError === 'object') {
+                    const de = maybeDataError as Record<string, unknown>
+                    errorText = (de.message as string) || (de.description as string) || undefined
+                    if (!errorText) {
+                      const arr = (de.errors as unknown[]) || (de.details as unknown[]) || (de.issues as unknown[])
+                      if (Array.isArray(arr)) errorText = pickFirstString(arr)
+                    }
+                  }
+                }
+                if (!errorText && statusCode && Number(statusCode) >= 400) {
                   errorText = 'Failed to open agent'
                 }
               }

@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentListTool: ToolParams = {
   name: 'List Agents',
-  slug: 'agent-list',
+  slug: 'list-agent',
   description: `List all agents on the current starship via the Starships API.
 
 When to use:
@@ -126,7 +126,7 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   parameters: agentListTool.parameters,
   blueprint: agentListTool.blueprint,
 
-  slug: 'agent-list',
+  slug: 'list-agent',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

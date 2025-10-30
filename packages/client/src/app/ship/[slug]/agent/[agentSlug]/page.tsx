@@ -92,7 +92,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     // Eligible tool slugs that should drive the Agent Builder
     // Note: We intentionally exclude assignment calls from driving UI state to avoid
     // reflecting changes before the server confirms them.
-    const builderToolSlugFragments = ['agent-open', 'agent-edit']
+    const builderToolSlugFragments = ['open-agent', 'edit-agent']
 
     const form = agentBuilderRef.current.getFormData?.()
     if (!form) return
@@ -272,7 +272,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       const toolName = call.name
       const args = call.args as Record<string, unknown> | undefined
 
-      if (toolName === 'agent-open' || toolName === 'agent-edit') {
+      if (toolName === 'open-agent' || toolName === 'edit-agent') {
         if (typeof args?.name === 'string') compose.name = args.name
         if (typeof args?.slug === 'string') compose.slug = args.slug
         if (typeof args?.description === 'string') compose.description = args.description
@@ -378,7 +378,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (!assistantMsg) continue
         const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        const agentToolSlugFragments = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+        const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
         if (!agentToolSlugFragments.some(s => (funcName || '').toLowerCase().includes(s))) {
           processedToolResultIdsRef.current.add(id)
           continue
@@ -542,7 +542,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (!assistantMsg) continue
         const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        if (funcName !== 'agent-open') continue
+        if (funcName !== 'open-agent') continue
         // Extract slug strictly from tool result HTTP response shape: body.data.slug
         let slugArg: string | undefined
         let errorText: string | undefined

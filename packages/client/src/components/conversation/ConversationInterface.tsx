@@ -499,7 +499,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           // Navigate to agent builder for agent actions
-          const agentBuilderSlugFragments = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+          const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
           if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
             try {
               const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
@@ -533,7 +533,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     async (toolName: string, toolArgs: any) => {
       try {
         // Agent tools - fetch and sync agent data
-        const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+        const agentTools = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
         if (agentTools.includes(toolName) && toolArgs?.slug) {
           // Fetch complete agent data by slug
           const agent = await agentAPI.getBySlug(toolArgs.slug)
@@ -663,7 +663,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             'edit-tool-blueprint-edge',
             'remove-tool-blueprint-edge',
           ]
-          const agentFragments = ['agent-open', 'open-agent', 'agent-edit', 'edit-agent', 'agent-assign-tool', 'assign-agent-tool', 'agent-unassign-tool', 'unassign-agent-tool']
+          const agentFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
 
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {

@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentGetTool: ToolParams = {
   name: 'Get Agent',
-  slug: 'agent-get',
+  slug: 'get-agent',
   description: `Fetch complete agent details by slug from the current starship.
 
 When to use:
@@ -109,7 +109,7 @@ export const agentGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   parameters: agentGetTool.parameters,
   blueprint: agentGetTool.blueprint,
 
-  slug: 'agent-get',
+  slug: 'get-agent',
   category: 'automation',
   exampleUsage: '{ "slug": "customer-support" } // returns complete agent details',
   requiresApiKey: false,

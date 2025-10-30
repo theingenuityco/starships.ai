@@ -473,14 +473,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
           // Navigate to tool builder route for tool actions
           const toolBuilderSlugFragments = [
-            'tool-open',
-            'tool-edit',
-            'tool-add-blueprint-node',
-            'tool-add-blueprint-edge',
-            'tool-blueprint-edit-node',
-            'tool-blueprint-remove-node',
-            'tool-blueprint-edit-edge',
-            'tool-blueprint-remove-edge',
+            'open-tool',
+            'edit-tool',
+            'add-tool-blueprint-node',
+            'add-tool-blueprint-edge',
+            'edit-tool-blueprint-node',
+            'remove-tool-blueprint-node',
+            'edit-tool-blueprint-edge',
+            'remove-tool-blueprint-edge',
           ]
           if (toolBuilderSlugFragments.some(s => toolNameLc.includes(s)) || toolNameLc.includes('tool-blueprint-')) {
             try {
@@ -543,14 +543,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
         // Tool tools - fetch and sync tool data
         const toolTools = [
-          'tool-open',
-          'tool-edit',
-          'tool-add-blueprint-node',
-          'tool-add-blueprint-edge',
-          'tool-blueprint-edit-node',
-          'tool-blueprint-remove-node',
-          'tool-blueprint-edit-edge',
-          'tool-blueprint-remove-edge',
+          'open-tool',
+          'edit-tool',
+          'add-tool-blueprint-node',
+          'add-tool-blueprint-edge',
+          'edit-tool-blueprint-node',
+          'remove-tool-blueprint-node',
+          'edit-tool-blueprint-edge',
+          'remove-tool-blueprint-edge',
         ]
         if (toolTools.includes(toolName) && toolArgs?.slug) {
           // Fetch complete tool data by slug
@@ -654,16 +654,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           if (!name) continue
 
           const toolFragments = [
-            'tool-open',
             'open-tool',
-            'tool-edit',
             'edit-tool',
-            'tool-add-blueprint-node',
-            'tool-add-blueprint-edge',
-            'tool-blueprint-edit-node',
-            'tool-blueprint-remove-node',
-            'tool-blueprint-edit-edge',
-            'tool-blueprint-remove-edge',
+            'add-tool-blueprint-node',
+            'add-tool-blueprint-edge',
+            'edit-tool-blueprint-node',
+            'remove-tool-blueprint-node',
+            'edit-tool-blueprint-edge',
+            'remove-tool-blueprint-edge',
           ]
           const agentFragments = ['agent-open', 'open-agent', 'agent-edit', 'edit-agent', 'agent-assign-tool', 'assign-agent-tool', 'agent-unassign-tool', 'unassign-agent-tool']
 

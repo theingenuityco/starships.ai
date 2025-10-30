@@ -59,14 +59,14 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
     // Eligible tool slug fragments that should drive the Tool Builder
     const builderToolSlugFragments = [
-      'tool-open',
-      'tool-edit',
-      'tool-add-blueprint-node',
-      'tool-add-blueprint-edge',
-      'tool-blueprint-edit-node',
-      'tool-blueprint-remove-node',
-      'tool-blueprint-edit-edge',
-      'tool-blueprint-remove-edge',
+      'open-tool',
+      'edit-tool',
+      'add-tool-blueprint-node',
+      'add-tool-blueprint-edge',
+      'edit-tool-blueprint-node',
+      'remove-tool-blueprint-node',
+      'edit-tool-blueprint-edge',
+      'remove-tool-blueprint-edge',
     ]
 
     const form = toolBuilderRef.current.getFormData?.()
@@ -147,7 +147,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       const toolName = call.name
       const args = call.args
 
-      if (toolName === 'tool-open' || toolName === 'tool-edit') {
+      if (toolName === 'open-tool' || toolName === 'edit-tool') {
         if (args?.name !== undefined) compose.name = args.name
         if (args?.description !== undefined) compose.description = args.description
         if (args?.category !== undefined) compose.category = args.category
@@ -170,7 +170,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       }
 
       switch (toolName) {
-        case 'tool-add-blueprint-node': {
+        case 'add-tool-blueprint-node': {
           const node = normalizeJson(args?.node)
           if (!node || typeof node !== 'object') break
           bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== node.ref)
@@ -178,7 +178,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           compose.blueprintChanged = true
           break
         }
-        case 'tool-add-blueprint-edge': {
+        case 'add-tool-blueprint-edge': {
           const edge = normalizeJson(args?.edge)
           if (!edge || typeof edge !== 'object') break
           bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edge.ref)
@@ -186,7 +186,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           compose.blueprintChanged = true
           break
         }
-        case 'tool-blueprint-edit-node': {
+        case 'edit-tool-blueprint-node': {
           const nodeRef = args?.nodeRef
           const updates = normalizeJson(args?.updates) || {}
           if (!nodeRef) break
@@ -202,7 +202,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           }
           break
         }
-        case 'tool-blueprint-edit-edge': {
+        case 'edit-tool-blueprint-edge': {
           const edgeRef = args?.edgeRef
           const updates = normalizeJson(args?.updates) || {}
           if (!edgeRef) break
@@ -217,7 +217,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           }
           break
         }
-        case 'tool-blueprint-remove-node': {
+        case 'remove-tool-blueprint-node': {
           const nodeRef = args?.nodeRef
           if (!nodeRef) break
           bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== nodeRef)
@@ -225,7 +225,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           compose.blueprintChanged = true
           break
         }
-        case 'tool-blueprint-remove-edge': {
+        case 'remove-tool-blueprint-edge': {
           const edgeRef = args?.edgeRef
           if (!edgeRef) break
           bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edgeRef)
@@ -269,14 +269,14 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
 
         const toolToolSlugFragments = [
-          'tool-open',
-          'tool-edit',
-          'tool-add-blueprint-node',
-          'tool-add-blueprint-edge',
-          'tool-blueprint-edit-node',
-          'tool-blueprint-remove-node',
-          'tool-blueprint-edit-edge',
-          'tool-blueprint-remove-edge',
+          'open-tool',
+          'edit-tool',
+          'add-tool-blueprint-node',
+          'add-tool-blueprint-edge',
+          'edit-tool-blueprint-node',
+          'remove-tool-blueprint-node',
+          'edit-tool-blueprint-edge',
+          'remove-tool-blueprint-edge',
         ]
 
         if (!toolToolSlugFragments.some(s => funcNameLc.includes(s))) {

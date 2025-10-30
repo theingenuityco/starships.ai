@@ -32,7 +32,7 @@ export const blueprintEditNodeTool: ToolParams = {
             if (!input.toolSlug) throw new Error('toolSlug is required');
             if (!input.nodeRef || typeof input.nodeRef !== 'string') throw new Error('nodeRef is required and must be a string');
             if (!input.updates || typeof input.updates !== 'object') throw new Error('updates is required and must be an object');
-            return { baseUrl, starshipId, toolSlug: input.toolSlug, nodeRef: input.nodeRef, updates: input.updates, headers: { 'Authorization': \`Bearer ${authToken}\`, 'Content-Type': 'application/json' } };
+            return { baseUrl, starshipId, toolSlug: input.toolSlug, nodeRef: input.nodeRef, updates: input.updates, headers: { 'Authorization': \`Bearer \${authToken}\`, 'Content-Type': 'application/json' } };
           `, timeout: 3000 } },
       { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/:starshipId/tools/:toolSlug', parameters: { url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', headers: '{{ $lastOutputOf("prepare")[0].json.headers }}', timeout: 5000 } },
       { ref: 'validate', type: 'code', name: 'Validate and Edit Node', description: 'Edit node properties with validation', parameters: { code: `

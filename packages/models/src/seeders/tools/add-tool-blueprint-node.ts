@@ -94,7 +94,7 @@ Returns updated tool with new node in blueprint, or validation errors if additio
               toolSlug: input.toolSlug,
               node: input.node,
               headers: {
-                'Authorization': \`Bearer ${authToken}\`,
+                'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };

@@ -861,7 +861,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                                   <div className="flex items-center gap-1 shrink-0">
                                     {participants.slice(0, 3).map((agent: any) => (
                                       <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
-                                        <AgentAvatar seed={agent?.name || agent?.slug || 'Agent'} size={16} />
+                                        <AgentAvatar seed={agent?.name || agent?.slug || undefined} size={16} />
                                       </Avatar>
                                     ))}
                                   </div>

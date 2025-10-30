@@ -22,8 +22,7 @@ import { getEnvConfig } from '@starships/env';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
-import { parser as jsonLezerParser } from '@lezer/json';
-import type { SyntaxNode } from '@lezer/common';
+import { parse, Allow } from 'partial-json-parser';
 
 /**
  * Autopilot child process configuration
@@ -139,447 +138,17 @@ export class ConversationService {
   }
 
   /**
-   * Extract completed properties from a JSON-like string buffer.
-   * Tolerant, incremental, and deep: collects any keys whose values can be confidently
-   * reconstructed from the partial parse tree, recursively. Falls back to partial
-   * strings and numbers where possible.
+   * Extract completed properties from a JSON-like string buffer using partial-json-parser only.
    */
   private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    if (typeof jsonLike !== 'string' || jsonLike.length === 0) return out;
-    // If provider streamed non-JSON prefixes (e.g., raw text before the first '{'),
-    // trim to the first top-level '{' so the AST can be constructed correctly.
-    const indexOfNextNonWhitespace = (s: string, i: number): number => {
-      let p = i;
-      while (p < s.length) {
-        const ch = s.charCodeAt(p);
-        if (ch !== 32 && ch !== 9 && ch !== 10 && ch !== 13) return p; // space, tab, lf, cr
-        p++;
-      }
-      return p;
-    };
-    // indexOfNextNonWhitespace is declared earlier in this function; avoid duplicate definitions
-    const findFirstTopLevelCurlyIndex = (s: string): number => {
-      let inString = false;
-      let inEscape = false;
-      for (let i = 0; i < s.length; i++) {
-        const c = s[i];
-        if (inString) {
-          if (inEscape) {
-            inEscape = false;
-          } else if (c === '\\') {
-            inEscape = true;
-          } else if (c === '"') {
-            inString = false;
-          }
-          continue;
-        }
-        if (c === '"') {
-          inString = true;
-          continue;
-        }
-        if (c === '{') return i;
-      }
-      return -1;
-    };
-    const firstCurly = findFirstTopLevelCurlyIndex(jsonLike);
-    if (firstCurly < 0) {
-      // No '{' yet: conservatively stream top-level string→(partial string or nested subtree) pairs
-      const readString = (s: string, start: number): { closed: boolean; inner: string; end: number } => {
-        let i = start + 1;
-        let inEscape = false;
-        while (i < s.length) {
-          const ch = s[i];
-          if (inEscape) {
-            inEscape = false;
-          } else if (ch === '\\') {
-            inEscape = true;
-          } else if (ch === '"') {
-            return { closed: true, inner: s.slice(start + 1, i), end: i + 1 };
-          }
-          i++;
-        }
-        return { closed: false, inner: s.slice(start + 1, i), end: i };
-      };
-
-      let i = 0;
-      while (i < jsonLike.length) {
-        if (jsonLike[i] !== '"') {
-          i++;
-          continue;
-        }
-        const keyStr = readString(jsonLike, i);
-        i = keyStr.end;
-        if (!keyStr.closed) continue;
-        const keyText = keyStr.inner;
-        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(keyText)) continue;
-        const afterKey = indexOfNextNonWhitespace(jsonLike, i);
-        if (afterKey >= jsonLike.length || jsonLike[afterKey] !== ':') continue;
-        const valueStart = indexOfNextNonWhitespace(jsonLike, afterKey + 1);
-        if (valueStart >= jsonLike.length) break;
-        const vc = jsonLike[valueStart];
-        if (vc === '"') {
-          const valStr = readString(jsonLike, valueStart);
-          if (valStr.inner.length > 0) out[keyText] = valStr.inner as unknown;
-          i = valStr.end;
-          continue;
-        }
-        // Skip nested structures here; we'll parse them once '{' actually appears at top-level
-        i = valueStart + 1;
-      }
-      return out;
+    if (typeof jsonLike !== 'string' || jsonLike.length === 0) return {};
+    try {
+      const v = parse(jsonLike, Allow.ALL as number) as unknown;
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    } catch {
+      return {};
     }
-    if (firstCurly > 0) jsonLike = jsonLike.slice(firstCurly);
-    const tree = jsonLezerParser.parse(jsonLike);
-    const top = tree.topNode;
-
-    // Find the root Object node (top-level)
-    let objectNode: SyntaxNode | null = null;
-    if (top.name === 'Object') {
-      objectNode = top;
-    } else {
-      for (let c = top.firstChild; c; c = c.nextSibling) {
-        if (c.name === 'Object') {
-          objectNode = c;
-          break;
-        }
-      }
-    }
-    // objectNode may be null when the root object hasn't formed yet; handled below
-
-    const nodeHasError = (n: SyntaxNode): boolean => {
-      if (n.type.isError) return true;
-      for (let c = n.firstChild; c; c = c.nextSibling) {
-        if (nodeHasError(c)) return true;
-      }
-      return false;
-    };
-
-    // (moved indexOfNextNonWhitespace earlier to avoid use-before-declaration)
-
-    const findValueStartAfterColon = (full: string, keyEnd: number, propEnd: number): number | null => {
-      let i = keyEnd;
-      while (i < propEnd && i < full.length) {
-        if (full[i] === ':') {
-          const start = indexOfNextNonWhitespace(full, i + 1);
-          return start < full.length ? start : null;
-        }
-        i++;
-      }
-      return null;
-    };
-
-    const findPartialStringInner = (full: string, start: number): string | null => {
-      // start points at the opening '"' of the value
-      if (start >= full.length || full[start] !== '"') return null;
-      let i = start + 1;
-      let last = start + 1;
-      let inEscape = false;
-      while (i < full.length) {
-        const c = full[i];
-        if (inEscape) {
-          inEscape = false;
-        } else if (c === '\\') {
-          inEscape = true;
-        } else if (c === '"') {
-          // We actually found closing quote; return complete inner
-          return full.slice(start + 1, i);
-        }
-        last = i;
-        i++;
-      }
-      // No closing quote yet; return everything collected so far
-      return full.slice(start + 1, last + 1);
-    };
-
-    const findPartialNumber = (full: string, start: number): number | null => {
-      const isNumChar = (ch: string) => ch === '-' || ch === '+' || ch === '.' || ch === 'e' || ch === 'E' || (ch >= '0' && ch <= '9');
-      let end = start;
-      while (end < full.length && isNumChar(full[end])) end++;
-      // Try longest-to-shortest parseable prefix
-      for (let j = end; j > start; j--) {
-        const slice = full.slice(start, j);
-        try {
-          const val = JSON.parse(slice);
-          if (typeof val === 'number' && Number.isFinite(val)) return val as number;
-        } catch {
-          void 0;
-        }
-      }
-      return null;
-    };
-
-    const parsePrimitive = (n: SyntaxNode): { present: boolean; value?: unknown } => {
-      if (nodeHasError(n)) return { present: false };
-      try {
-        const raw = jsonLike.slice(n.from, n.to);
-        return { present: true, value: JSON.parse(raw) as unknown };
-      } catch {
-        return { present: false };
-      }
-    };
-
-    const parseValue = (n: SyntaxNode): { present: boolean; value?: unknown } => {
-      switch (n.name) {
-        case 'String':
-        case 'Number':
-        case 'True':
-        case 'False':
-        case 'Null':
-          return parsePrimitive(n);
-        case 'Array': {
-          // Collect completed items only
-          const items: unknown[] = [];
-          for (let ch = n.firstChild; ch; ch = ch.nextSibling) {
-            if (
-              ch.name === 'Array' ||
-              ch.name === 'Object' ||
-              ch.name === 'Number' ||
-              ch.name === 'String' ||
-              ch.name === 'True' ||
-              ch.name === 'False' ||
-              ch.name === 'Null'
-            ) {
-              const parsed = parseValue(ch);
-              if (parsed.present) {
-                items.push(parsed.value as unknown);
-              } else if (ch.name === 'String') {
-                // Allow partial string items within arrays
-                const inner = findPartialStringInner(jsonLike, ch.from);
-                if (inner !== null && inner.length > 0) {
-                  items.push(inner as unknown);
-                }
-              }
-            }
-          }
-          return items.length > 0 ? { present: true, value: items } : { present: false };
-        }
-        case 'Object': {
-          // Build partial object from completed or partially recoverable properties within
-          const obj: Record<string, unknown> = {};
-          for (let prop = n.firstChild; prop; prop = prop.nextSibling) {
-            if (prop.name !== 'Property') continue;
-            let k: SyntaxNode | null = null;
-            for (let ch = prop.firstChild; ch; ch = ch.nextSibling) {
-              if (ch.name === 'PropertyName' || ch.name === 'String') {
-                k = ch;
-                break;
-              }
-            }
-            if (!k) continue;
-            // Only accept closed key strings to avoid merged identifiers like "nameription"
-            if (jsonLike[k.from] !== '"' || jsonLike[k.to - 1] !== '"') continue;
-            const key = jsonLike.slice(k.from + 1, k.to - 1);
-            if (!key) continue;
-            // Skip obviously invalid/incomplete keys (e.g., ", " seen during partial parsing)
-            if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) continue;
-            let vNode: SyntaxNode | null = null;
-            for (let ch = k.nextSibling; ch; ch = ch.nextSibling) {
-              if (
-                ch.name === 'Array' ||
-                ch.name === 'Object' ||
-                ch.name === 'Number' ||
-                ch.name === 'String' ||
-                ch.name === 'True' ||
-                ch.name === 'False' ||
-                ch.name === 'Null'
-              ) {
-                vNode = ch;
-                break;
-              }
-            }
-            if (vNode) {
-              const parsed = parseValue(vNode);
-              if (parsed.present) {
-                obj[key] = parsed.value as unknown;
-              } else {
-                // Allow safe partial strings for nested values (no numeric guessing)
-                const valueStart = findValueStartAfterColon(jsonLike, k.to, prop.to);
-                if (valueStart !== null && valueStart < jsonLike.length && jsonLike[valueStart] === '"') {
-                  const inner = findPartialStringInner(jsonLike, valueStart);
-                  if (inner !== null && inner.length > 0) {
-                    obj[key] = inner as unknown;
-                  }
-                }
-              }
-            } else {
-              // Even if AST hasn't produced a value node yet, try to surface a partial string value
-              const valueStart = findValueStartAfterColon(jsonLike, k.to, prop.to);
-              if (valueStart !== null && valueStart < jsonLike.length && jsonLike[valueStart] === '"') {
-                const inner = findPartialStringInner(jsonLike, valueStart);
-                if (inner !== null && inner.length > 0) {
-                  obj[key] = inner as unknown;
-                }
-              }
-            }
-          }
-          return Object.keys(obj).length > 0 ? { present: true, value: obj } : { present: false };
-        }
-        default:
-          return { present: false };
-      }
-    };
-
-    // Iterate direct children, collect complete Property entries
-    if (objectNode)
-      for (let prop = objectNode.firstChild; prop; prop = prop.nextSibling) {
-        if (prop.name !== 'Property') continue;
-
-        // Extract key
-        let keyNode: SyntaxNode | null = null;
-        for (let ch = prop.firstChild; ch; ch = ch.nextSibling) {
-          if (ch.name === 'PropertyName' || ch.name === 'String') {
-            keyNode = ch;
-            break;
-          }
-        }
-        if (!keyNode) continue;
-        // Only accept closed key strings to avoid merged identifiers like "nameription"
-        if (jsonLike[keyNode.from] !== '"' || jsonLike[keyNode.to - 1] !== '"') continue;
-        const keyText = jsonLike.slice(keyNode.from + 1, keyNode.to - 1);
-        if (!keyText) continue;
-        // Skip invalid keys that are clearly incomplete artifacts of streaming
-        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(keyText)) continue;
-
-        // Find value node
-        let valueNode: SyntaxNode | null = null;
-        for (let ch = keyNode.nextSibling; ch; ch = ch.nextSibling) {
-          if (
-            ch.name === 'Array' ||
-            ch.name === 'Object' ||
-            ch.name === 'Number' ||
-            ch.name === 'String' ||
-            ch.name === 'True' ||
-            ch.name === 'False' ||
-            ch.name === 'Null'
-          ) {
-            valueNode = ch;
-            break;
-          }
-        }
-        if (!valueNode) {
-          // Top-level safe partial fallback when the value node hasn't been produced yet
-          const valueStart = findValueStartAfterColon(jsonLike, keyNode.to, prop.to);
-          if (valueStart !== null && valueStart < jsonLike.length) {
-            const c = jsonLike[valueStart];
-            if (c === '"') {
-              const inner = findPartialStringInner(jsonLike, valueStart);
-              if (inner !== null && inner.length > 0) {
-                out[keyText] = inner as unknown;
-              }
-            } else if (c === '{' || c === '[') {
-              // Try parsing a subtree starting at the value start to recover nested partials
-              try {
-                const sub = jsonLezerParser.parse(jsonLike.slice(valueStart));
-                let subNode: SyntaxNode | null = null;
-                if (sub.topNode.name === 'Object' || sub.topNode.name === 'Array') {
-                  subNode = sub.topNode;
-                } else {
-                  for (let sc = sub.topNode.firstChild; sc; sc = sc.nextSibling) {
-                    if (sc.name === 'Object' || sc.name === 'Array') {
-                      subNode = sc;
-                      break;
-                    }
-                  }
-                }
-                if (subNode) {
-                  const parsedSub = parseValue(subNode);
-                  if (parsedSub.present) {
-                    out[keyText] = parsedSub.value as unknown;
-                  }
-                }
-              } catch {
-                /* noop */
-              }
-            }
-          }
-          continue;
-        }
-        const parsed = parseValue(valueNode);
-        if (parsed.present) {
-          out[keyText] = parsed.value as unknown;
-        }
-      }
-    else {
-      // Fallback: no Object node yet. Conservatively scan for closed string keys at top-level
-      const readString = (s: string, start: number): { closed: boolean; inner: string; end: number } => {
-        // start points at opening '"'
-        let i = start + 1;
-        let inEscape = false;
-        while (i < s.length) {
-          const ch = s[i];
-          if (inEscape) {
-            inEscape = false;
-          } else if (ch === '\\') {
-            inEscape = true;
-          } else if (ch === '"') {
-            return { closed: true, inner: s.slice(start + 1, i), end: i + 1 };
-          }
-          i++;
-        }
-        return { closed: false, inner: s.slice(start + 1, i), end: i };
-      };
-
-      let i = 0;
-      while (i < jsonLike.length) {
-        if (jsonLike[i] !== '"') {
-          i++;
-          continue;
-        }
-        const keyStr = readString(jsonLike, i);
-        i = keyStr.end;
-        if (!keyStr.closed) continue; // require closed key to avoid merged identifiers
-        const keyText = keyStr.inner;
-        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(keyText)) continue;
-
-        const afterKey = indexOfNextNonWhitespace(jsonLike, i);
-        if (afterKey >= jsonLike.length || jsonLike[afterKey] !== ':') continue;
-        const valueStart = indexOfNextNonWhitespace(jsonLike, afterKey + 1);
-        if (valueStart >= jsonLike.length) break;
-        const vc = jsonLike[valueStart];
-
-        if (vc === '"') {
-          const valStr = readString(jsonLike, valueStart);
-          // stream partial (inner) even if not closed yet
-          if (valStr.inner.length > 0) out[keyText] = valStr.inner as unknown;
-          i = valStr.end;
-          continue;
-        }
-
-        if (vc === '{' || vc === '[') {
-          try {
-            const sub = jsonLezerParser.parse(jsonLike.slice(valueStart));
-            let subNode: SyntaxNode | null = null;
-            if (sub.topNode.name === 'Object' || sub.topNode.name === 'Array') subNode = sub.topNode;
-            else {
-              for (let sc = sub.topNode.firstChild; sc; sc = sc.nextSibling) {
-                if (sc.name === 'Object' || sc.name === 'Array') {
-                  subNode = sc;
-                  break;
-                }
-              }
-            }
-            if (subNode) {
-              const parsedSub = parseValue(subNode);
-              if (parsedSub.present) out[keyText] = parsedSub.value as unknown;
-            }
-          } catch {
-            /* noop */
-          }
-          i = valueStart + 1;
-          continue;
-        }
-
-        // Skip numbers/booleans/null until fully parseable (prevents jumbled values)
-        i = valueStart + 1;
-      }
-    }
-
-    // No textual fallback: only emit keys/values proven safe above
-    return out;
   }
-
-  // Removed tool-specific sanitization. We rely on conservative partial parsing below.
 
   /** Persist the currently active streaming assistant partial (content/reasoning only) if any. */
   private async persistActivePartial(conversationId: string): Promise<MessageModel | null> {
@@ -1989,21 +1558,12 @@ export class ConversationService {
                     let argsObj: unknown | undefined = undefined;
                     if (typeof argsStr === 'string' && argsStr.length > 0) {
                       try {
-                        // If the buffer is already complete JSON, use it directly
-                        argsObj = JSON.parse(argsStr);
-                      } catch {
-                        // Deep nested partials: extract any fully parsed subtrees via AST (no textual guesses)
-                        try {
-                          const completed = ConversationService.extractCompletedTopLevelProperties(argsStr);
-                          const hasKeys =
-                            completed &&
-                            typeof completed === 'object' &&
-                            !Array.isArray(completed) &&
-                            Object.keys(completed as Record<string, unknown>).length > 0;
-                          argsObj = hasKeys ? (completed as unknown) : undefined;
-                        } catch {
-                          argsObj = undefined;
+                        const parsed = parse(argsStr, Allow.ALL as number) as unknown;
+                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                          argsObj = parsed;
                         }
+                      } catch {
+                        argsObj = undefined;
                       }
                     }
                     let debugKeysCount = 0;
@@ -2024,12 +1584,11 @@ export class ConversationService {
                       type: tc.type,
                       function: {
                         name: tc.function.name,
-                        // progress metadata to surface streaming increments even before values complete
                         argumentsProgress: debugRawLen,
                         argumentsKeysCount: debugKeysCount,
                       },
                     } as any;
-                    // Always include an arguments object so the client can bind to it immediately
+                    // Emit only objects (or {}) per strict reliance on partial-json-parser
                     out.function.arguments =
                       argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj) ? (argsObj as Record<string, unknown>) : {};
                     return out;
@@ -2066,19 +1625,12 @@ export class ConversationService {
                     const s = rawArgsUnknown;
                     if (s) {
                       try {
-                        argsObj = JSON.parse(s);
-                      } catch {
-                        try {
-                          const completed = ConversationService.extractCompletedTopLevelProperties(s);
-                          const hasKeys =
-                            completed &&
-                            typeof completed === 'object' &&
-                            !Array.isArray(completed) &&
-                            Object.keys(completed as Record<string, unknown>).length > 0;
-                          argsObj = hasKeys ? (completed as unknown) : undefined;
-                        } catch {
-                          argsObj = undefined;
+                        const parsed = parse(s, Allow.ALL as number) as unknown;
+                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                          argsObj = parsed;
                         }
+                      } catch {
+                        argsObj = undefined;
                       }
                     }
                   } else if (rawArgsUnknown && typeof rawArgsUnknown === 'object') {
@@ -2091,9 +1643,10 @@ export class ConversationService {
                       name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
                     },
                   } as any;
-                  // Always include an arguments object so client sees it during snapshot as well
                   out.function.arguments =
-                    argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj) ? (argsObj as Record<string, unknown>) : {};
+                    argsObj && typeof argsObj === 'object' && !Array.isArray(argsObj)
+                      ? (argsObj as Record<string, unknown>)
+                      : ({} as Record<string, unknown>);
                   return out;
                 });
 

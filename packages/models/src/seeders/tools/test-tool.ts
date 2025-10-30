@@ -8,7 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolTestTool: ToolParams = {
   name: 'Test Tool',
-  slug: 'tool-test',
+  slug: 'test-tool',
   description: `Execute another tool by slug and report pass/fail with timing.
 
   Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
@@ -43,8 +43,6 @@ export const toolTestTool: ToolParams = {
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-
-      // Build URL and headers
       {
         ref: 'prepare',
         type: 'code',
@@ -62,10 +60,10 @@ export const toolTestTool: ToolParams = {
             if (!targetSlug) throw new Error('targetSlug is required');
 
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${targetSlug}\`,
+              url: \`${baseUrl}/starships/${starshipId}/tools/${targetSlug}\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer \${authToken}\`,
+                'Authorization': \`Bearer ${authToken}\`,
                 'Content-Type': 'application/json',
               }
             };
@@ -73,8 +71,6 @@ export const toolTestTool: ToolParams = {
           timeout: 3000,
         },
       },
-
-      // Fetch the tool instance JSON (expects blueprint property)
       {
         ref: 'http_get_tool',
         type: 'http_request',
@@ -87,8 +83,6 @@ export const toolTestTool: ToolParams = {
           timeout: 8000,
         },
       },
-
-      // Simplified: Prepare test execution with timing
       {
         ref: 'prepare_test',
         type: 'code',
@@ -114,8 +108,6 @@ export const toolTestTool: ToolParams = {
           timeout: 2000,
         },
       },
-
-      // Emit only test arguments to feed the Tool node
       {
         ref: 'emit_args',
         type: 'code',
@@ -129,8 +121,6 @@ export const toolTestTool: ToolParams = {
           timeout: 1000,
         },
       },
-
-      // Execute the tool using Tool node with test arguments
       {
         ref: 'run_tool',
         type: 'tool',
@@ -143,8 +133,6 @@ export const toolTestTool: ToolParams = {
           blueprint: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.blueprint }}',
         },
       },
-
-      // Return test results with timing
       {
         ref: 'end_1',
         type: 'end',
@@ -174,16 +162,13 @@ export const toolTestTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: tool_test
- */
 export const toolTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: toolTestTool.name,
   description: toolTestTool.description,
   parameters: toolTestTool.parameters,
   blueprint: toolTestTool.blueprint,
 
-  slug: 'tool-test',
+  slug: 'test-tool',
   category: 'automation',
   exampleUsage: '{ "targetSlug": "my-tool", "arguments": { ... } } // returns { ok, durationMs, result } (env inferred)',
   requiresApiKey: false,

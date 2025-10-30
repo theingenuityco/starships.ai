@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolListTool: ToolParams = {
   name: 'List Tools',
-  slug: 'tool-list',
+  slug: 'list-tools',
   description: `List all tools deployed on the current starship. This is a discovery list; it does not indicate which tools this agent can call.
 
 When to use:
@@ -52,10 +52,10 @@ Behavior and limits:
             if (!starshipId) throw new Error('starshipId is required');
 
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
+              url: \`${baseUrl}/starships/${starshipId}/tools\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer \${authToken}\`,
+                'Authorization': \`Bearer ${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };
@@ -127,7 +127,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   parameters: toolListTool.parameters,
   blueprint: toolListTool.blueprint,
 
-  slug: 'tool-list',
+  slug: 'list-tools',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of tools; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

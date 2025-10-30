@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 // Generate random star positions
 function generateStars(count: number, maxWidth: number, maxHeight: number) {
@@ -11,10 +11,21 @@ function generateStars(count: number, maxWidth: number, maxHeight: number) {
 }
 
 export default function StarryBackground() {
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   // Generate stars once on mount
   const smallStars = useMemo(() => generateStars(80, 2000, 2000), [])
   const mediumStars = useMemo(() => generateStars(40, 2000, 2000), [])
   const largeStars = useMemo(() => generateStars(20, 2000, 2000), [])
+
+  // Don't render stars on server to avoid hydration mismatch
+  if (!isClient) {
+    return null
+  }
 
   // Create box-shadow strings for each layer
   const smallStarsShadow = useMemo(

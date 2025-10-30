@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 interface AuthMarketingPanelProps {
   className?: string
@@ -24,8 +24,14 @@ function generateStars(count: number): Star[] {
 }
 
 export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   // Generate stars once on mount
-  const stars = useMemo(() => generateStars(100), [])
+  const stars = useMemo(() => (isClient ? generateStars(100) : []), [isClient])
 
   return (
     <div className={className}>

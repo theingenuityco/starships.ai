@@ -26,37 +26,38 @@ export default function UseCases() {
   const mediaSrc = ['/landing/usecases/agents.png', '/landing/usecases/tools.png', '/landing/usecases/assign.png', '/landing/usecases/streaming.png']
 
   return (
-    <section className="py-16 px-4 md:py-20">
+    <section className="py-14 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 text-center">Build agents and tools fast</h2>
-        <p className="text-base md:text-lg text-muted-foreground text-center max-w-2xl mx-auto mb-12 md:mb-20">Design, connect, and iterate on agents and tools in minutes.</p>
-        <div className="space-y-12 md:space-y-20">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Build agents and tools fast</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Design, connect, and iterate on agents and tools in minutes.</p>
+        <div className="space-y-12 md:space-y-16">
           {items.map((item, idx) => {
-            const reverse = idx % 2 === 1
+            const isRightAligned = idx % 2 === 1
+            const isWide = idx % 2 === 1
+            const swapLayout = idx === 1 || idx === 3 // Cards 2 and 4
             return (
               <div
                 key={item.title}
-                className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-8 md:gap-12 lg:gap-16 py-8 md:py-10 lg:py-12 frosted-glass-card rounded-3xl shadow-frosted-lg border border-border/50 p-6 md:p-8 lg:p-10 hover:border-border/70 transition-all duration-300 hover:shadow-2xl`}
+                className={`flex flex-col ${swapLayout ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-6 md:gap-8 py-6 md:py-8 frosted-glass-card rounded-2xl border border-border/40 p-4 md:p-6 shadow-[0_0_15px_rgba(168,85,247,0.15),0_0_30px_rgba(236,72,153,0.1),0_0_45px_rgba(251,146,60,0.05)] ${
+                  isRightAligned ? 'ml-auto' : 'mr-auto'
+                } ${isWide ? 'w-full md:w-[85%]' : 'w-full md:w-[70%]'}`}
               >
                 {/* Media slot */}
-                <div className="w-full md:w-[55%] lg:w-[60%] flex-shrink-0">
-                  <div className="relative group">
-                    <img
-                      src={mediaSrc[idx]}
-                      alt={`${item.title} demo`}
-                      loading="lazy"
-                      decoding="async"
-                      sizes="(min-width: 1024px) 740px, (min-width: 768px) 700px, 100vw"
-                      className="w-full h-[240px] sm:h-[320px] md:h-[400px] lg:h-[460px] object-cover rounded-2xl border border-white/10 shadow-xl transition-transform duration-300 group-hover:scale-[1.02]"
-                    />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
-                  </div>
+                <div className="w-full md:w-[58%] flex-shrink-0">
+                  <img
+                    src={mediaSrc[idx]}
+                    alt={`${item.title} demo`}
+                    loading="lazy"
+                    decoding="async"
+                    sizes="(min-width: 768px) 58vw, 100vw"
+                    className="w-full h-[220px] sm:h-[280px] md:h-[340px] object-cover rounded-xl border border-white/10"
+                  />
                 </div>
 
                 {/* Text */}
-                <div className="flex-1 flex flex-col justify-center space-y-4 md:space-y-6">
-                  <h3 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold leading-tight">{item.title}</h3>
-                  <p className="text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-prose">{item.desc}</p>
+                <div className="flex-1 flex flex-col justify-center space-y-3">
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-semibold leading-tight">{item.title}</h3>
+                  <p className="text-sm md:text-base text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             )

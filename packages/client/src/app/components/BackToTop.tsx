@@ -63,27 +63,52 @@ export default function BackToTop() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <motion.div
-            animate={
-              isFlying
-                ? {
-                    y: -1000,
-                    rotate: [0, -10, 10, -5, 5, 0],
-                    transition: { duration: 1, ease: 'easeIn' },
-                  }
-                : {
-                    y: [0, -3, 0],
-                    transition: {
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    },
-                  }
-            }
-          >
-            <Icon name="arrow-up" className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
-          </motion.div>
+          {/* Arrow (default state) */}
+          {!isFlying && (
+            <motion.div
+              animate={{
+                y: [0, -3, 0],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            >
+              <Icon name="arrow-up" className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
+            </motion.div>
+          )}
+
+          {/* Rocket (flying state) */}
+          {isFlying && (
+            <motion.div
+              animate={{
+                y: -1000,
+                rotate: [0, -10, 10, -5, 5, 0],
+              }}
+              transition={{ duration: 1, ease: 'easeIn' }}
+            >
+              <Icon name="rocket" className="w-4 h-4 text-white" />
+            </motion.div>
+          )}
+
           <span className="text-xs font-normal text-white/60 group-hover:text-white/90 whitespace-nowrap transition-colors">Top</span>
+
+          {/* Exhaust/flame effect for rocket */}
+          {isFlying && (
+            <motion.div
+              className="absolute bottom-0 left-3 transform -translate-x-1/2"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{
+                opacity: [0, 1, 1, 0],
+                height: [0, 20, 40, 60],
+                scaleX: [1, 1.2, 1, 0.8],
+              }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+            >
+              <div className="w-3 h-full bg-gradient-to-b from-orange-400 via-red-400 to-transparent blur-sm" />
+            </motion.div>
+          )}
         </motion.button>
       )}
     </AnimatePresence>

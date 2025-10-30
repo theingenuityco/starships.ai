@@ -17,15 +17,10 @@ export default function StarryBackground() {
     setIsClient(true)
   }, [])
 
-  // Generate stars once on mount
+  // Generate stars once on mount - always call hooks in same order
   const smallStars = useMemo(() => generateStars(80, 2000, 2000), [])
   const mediumStars = useMemo(() => generateStars(40, 2000, 2000), [])
   const largeStars = useMemo(() => generateStars(20, 2000, 2000), [])
-
-  // Don't render stars on server to avoid hydration mismatch
-  if (!isClient) {
-    return null
-  }
 
   // Create box-shadow strings for each layer
   const smallStarsShadow = useMemo(
@@ -40,6 +35,11 @@ export default function StarryBackground() {
     () => largeStars.map(star => `${star.x}px ${star.y}px #fff`).join(', '),
     [largeStars]
   )
+
+  // Don't render stars on server to avoid hydration mismatch
+  if (!isClient) {
+    return null
+  }
 
   return (
     <>

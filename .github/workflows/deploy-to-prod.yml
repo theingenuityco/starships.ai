@@ -96,6 +96,7 @@ jobs:
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
           POSTGRES_SSL: ${{ secrets.POSTGRES_SSL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           SERVER_URL: ${{ vars.SERVER_URL }}
           CLIENT_URL: ${{ vars.CLIENT_URL }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
@@ -131,6 +132,7 @@ jobs:
             --from-literal=POSTGRES_DATABASE="$POSTGRES_DATABASE" \
             --from-literal=POSTGRES_SSL="$POSTGRES_SSL" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
             --from-literal=SERVER_URL="$SERVER_URL" \
             --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \

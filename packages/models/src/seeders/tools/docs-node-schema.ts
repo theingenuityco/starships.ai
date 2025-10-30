@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: node_schema
+ * Tool: Node Schema Introspection
  * Provides comprehensive schema information for Autopilot node types
  */
 export const nodeSchemaIntrospectionTool: ToolParams = {
@@ -600,7 +600,7 @@ Returns comprehensive schema with:
 };
 
 /**
- * Tool Template: node_schema
+ * Tool Template: docs-node-schema
  */
 export const nodeSchemaIntrospectionToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: nodeSchemaIntrospectionTool.name,

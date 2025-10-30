@@ -1,6 +1,6 @@
 /**
- * Blueprint Lint Tool Tests
- * End-to-end tests for the blueprint_lint tool using autopilot Tool node
+ * Test Tool Blueprint Tests
+ * End-to-end tests for the test-tool-blueprint tool using autopilot Tool node
  */
 
 import { blueprintLintTool, blueprintLintToolTemplate } from '../test-tool-blueprint';
@@ -10,7 +10,7 @@ describe('Blueprint Lint Tool', () => {
   let testHelper: ToolTestHelper;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'blueprint_lint');
+    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'test-tool-blueprint');
     testHelper.clearEventLogs();
   });
 

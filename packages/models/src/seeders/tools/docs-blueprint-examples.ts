@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: blueprint_examples
+ * Tool: Blueprint Examples
  * Provides comprehensive blueprint examples for various use cases
  */
 export const blueprintExamplesTool: ToolParams = {

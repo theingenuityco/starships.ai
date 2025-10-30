@@ -1,6 +1,6 @@
 /**
- * Tool Test - E2E
- * Executes tool_test using real Autopilot execution with mocked HTTP only
+ * Test Tool - E2E
+ * Executes test-tool using real Autopilot execution with mocked HTTP only
  */
 
 import { toolTestTool, toolTestToolTemplate } from '../test-tool';
@@ -290,7 +290,7 @@ describe('Tool Test Tool', () => {
   });
 });
 
-describe('Tool.execute return value - tool_test', () => {
+describe('Tool.execute return value - test-tool', () => {
   it('should return a single ExecutionItem with final test result and preserve pairedItem', async () => {
     const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
 

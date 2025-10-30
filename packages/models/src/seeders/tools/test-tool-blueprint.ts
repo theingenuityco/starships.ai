@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: blueprint_lint
+ * Tool: Test Tool Blueprint
  * Validate an Autopilot blueprint structure (nodes/edges, types, refs).
  */
 export const blueprintLintTool: ToolParams = {
@@ -226,5 +226,3 @@ export const blueprintLintToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
   requiresApiKey: false,
   configurationFields: [],
 };
-
-

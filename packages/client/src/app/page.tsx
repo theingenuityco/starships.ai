@@ -51,7 +51,7 @@ export default function HomePage() {
         {/* Replaced old CTA with FinalCTA component above */}
 
         {/* Footer */}
-        <footer className="py-16 px-4 relative z-10" style={{ overflow: 'visible' }}>
+        <footer className="py-16 px-4 relative z-10">
           {/* Bottom gradient fade - same as login screen */}
           <div
             className="absolute bottom-0 left-0 right-0 h-screen pointer-events-none -z-10"
@@ -72,8 +72,8 @@ export default function HomePage() {
           />
           {/* Gradient horizontal line */}
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-          <div className="max-w-6xl mx-auto relative z-10" style={{ overflow: 'visible' }}>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4" style={{ overflow: 'visible' }}>
+          <div className="max-w-6xl mx-auto relative z-10">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="mb-6 md:mb-0 text-center md:text-left">
                 <p className="text-muted-foreground mb-2">© 2025 Starships.ai - Where Ideas meet Intelligence</p>
                 <p className="text-muted-foreground text-sm">
@@ -83,7 +83,7 @@ export default function HomePage() {
                   </a>
                 </p>
               </div>
-              <div className="flex items-center space-x-4" style={{ overflow: 'visible' }}>
+              <div className="flex items-center space-x-4">
                 <Button variant="ghost" size="sm" onClick={() => window.open('/docs', '_blank')}>
                   <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation

@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentTestTool: ToolParams = {
   name: 'Test Agent',
-  slug: 'agent-test',
+  slug: 'test-agent',
   description: `Test an agent's execution with sample input to validate configuration and behavior.
 
 ## Purpose
@@ -177,7 +177,7 @@ export const agentTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   parameters: agentTestTool.parameters,
   blueprint: agentTestTool.blueprint,
 
-  slug: 'agent-test',
+  slug: 'test-agent',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Hello" }] } // test with messages\n{ "slug": "analyzer", "input": "Test data" } // test with simple text',

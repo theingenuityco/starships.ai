@@ -3,7 +3,7 @@
  * End-to-end tests using real autopilot Tool execution with minimal HTTP mocking
  */
 
-import { toolListTool, toolListToolTemplate } from '../tool-list';
+import { toolListTool, toolListToolTemplate } from '../list-tools';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
 

@@ -3,7 +3,7 @@
  * End-to-end tests for the blueprint_lint tool using autopilot Tool node
  */
 
-import { blueprintLintTool, blueprintLintToolTemplate } from '../blueprint-lint';
+import { blueprintLintTool, blueprintLintToolTemplate } from '../test-tool-blueprint';
 import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
 
 describe('Blueprint Lint Tool', () => {

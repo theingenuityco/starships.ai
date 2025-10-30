@@ -3,7 +3,7 @@
  * Executes blueprint_lint using real Autopilot Tool execution (no HTTP mocking needed)
  */
 
-import { blueprintLintTool, blueprintLintToolTemplate } from '../blueprint-lint';
+import { blueprintLintTool, blueprintLintToolTemplate } from '../test-tool-blueprint';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 

@@ -52,10 +52,10 @@ Behavior and limits:
             if (!starshipId) throw new Error('starshipId is required');
 
             return {
-              url: \`${baseUrl}/starships/${starshipId}/tools\`,
+              url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer ${authToken}\`,
+                'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };

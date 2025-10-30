@@ -60,10 +60,10 @@ export const toolTestTool: ToolParams = {
             if (!targetSlug) throw new Error('targetSlug is required');
 
             return {
-              url: \`${baseUrl}/starships/${starshipId}/tools/${targetSlug}\`,
+              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${targetSlug}\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer ${authToken}\`,
+                'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json',
               }
             };

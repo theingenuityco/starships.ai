@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const agentOpenTool: ToolParams = {
   name: 'Open Agent',
-  slug: 'agent-open',
+  slug: 'open-agent',
   description: `Creates or opens an agent on the current starship.
 
 ## Modes
@@ -196,7 +196,7 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   parameters: agentOpenTool.parameters,
   blueprint: agentOpenTool.blueprint,
 
-  slug: 'agent-open',
+  slug: 'open-agent',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',

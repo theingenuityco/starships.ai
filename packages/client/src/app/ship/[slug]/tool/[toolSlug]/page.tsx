@@ -355,7 +355,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       return
     }
 
-    const agentToolSlugFragments = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+    const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
 
     // Process only NEW messages (those after initial count)
     const newMessages = liveMessages.slice(initialMessageCountRef.current)

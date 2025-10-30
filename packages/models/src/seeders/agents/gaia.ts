@@ -238,13 +238,13 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
 
   // Tool assignment - comprehensive tools for agent creation and management
   assignedToolSlugs: [
-    'agent-list',
-    'agent-get',
-    'agent-open',
-    'agent-edit',
-    'agent-test',
-    'agent-assign-tool',
-    'agent-unassign-tool',
+    'list-agent',
+    'get-agent',
+    'open-agent',
+    'edit-agent',
+    'test-agent',
+    'assign-agent-tool',
+    'unassign-agent-tool',
     'docs-node-schema',
     'test-tool-blueprint',
     'docs-blueprint-examples',

@@ -8,6 +8,8 @@ import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
 import FinalCTA from '@/app/components/FinalCTA'
 import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
+import StarryBackground from '@/app/components/StarryBackground'
+import BackToTop from '@/app/components/BackToTop'
 
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
@@ -19,7 +21,6 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
-
 
 export default function HomePage() {
   const [logoTrigger, setLogoTrigger] = useState(0)
@@ -35,6 +36,7 @@ export default function HomePage() {
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
+        <StarryBackground />
         <PublicHeader />
 
         {/* New Landing Sections */}
@@ -50,10 +52,28 @@ export default function HomePage() {
 
         {/* Footer */}
         <footer className="py-16 px-4 relative z-10">
+          {/* Bottom gradient fade - same as login screen */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-screen pointer-events-none -z-10"
+            style={{
+              backgroundImage: [
+                // Core bottom glow - purple/violet (brightest)
+                'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.65), transparent 65%)',
+                // Secondary layer - blue/purple blend
+                'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.50), transparent 70%)',
+                // Outer spread - indigo/blue
+                'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.38), transparent 75%)',
+                // Soft cyan accent
+                'radial-gradient(ellipse 1300px 950px at 50% 103%, rgba(59,130,246,0.28), transparent 72%)',
+                // Farthest fade - subtle purple
+                'radial-gradient(ellipse 1600px 1150px at 50% 108%, rgba(124,58,237,0.18), transparent 78%)',
+              ].join(', '),
+            }}
+          />
           {/* Gradient horizontal line */}
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <div className="max-w-6xl mx-auto relative z-10">
-            <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="mb-6 md:mb-0 text-center md:text-left">
                 <p className="text-muted-foreground mb-2">© 2025 Starships.ai - Where Ideas meet Intelligence</p>
                 <p className="text-muted-foreground text-sm">
@@ -63,7 +83,7 @@ export default function HomePage() {
                   </a>
                 </p>
               </div>
-              <div className="flex space-x-6">
+              <div className="flex items-center space-x-4">
                 <Button variant="ghost" size="sm" onClick={() => window.open('/docs', '_blank')}>
                   <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation
@@ -72,6 +92,7 @@ export default function HomePage() {
                   <Icon name="discord" className="w-4 h-4 mr-2" />
                   Discord
                 </Button>
+                <BackToTop />
               </div>
             </div>
           </div>

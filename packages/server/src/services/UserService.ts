@@ -6,7 +6,7 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository, PasswordResetTokenRepository } from '@starships/models';
+import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository, PasswordResetTokenRepository, StarshipRepository } from '@starships/models';
 import type {
   CreateUserRequest,
   UpdateUserRequest,
@@ -318,21 +318,39 @@ export class UserService {
     // PRIORITY 2: Check if user exists by email (for new OAuth account linking to existing email-based account)
     let user = await this.getUserByEmail(profile.email);
     let isNewUser = false;
+    let needsStarshipCreation = false;
 
     if (!user) {
       // ✅ FIXED: Use proper service method - NO REPOSITORY JUMPING
       user = await this.createUserFromOAuthProfile(profile);
       isNewUser = true;
+      needsStarshipCreation = true;
     } else {
-      // SIMPLE FIX: Don't auto-verify emails from OAuth - be conservative
-      // Users can verify via email if needed
+      // User exists (from email/password registration)
+      // If they're unverified, verify them now (OAuth providers verify emails)
+      if (!user.emailVerified) {
+        logger.info('[OAUTH] Auto-verifying unverified user via OAuth', {
+          userId: user.id,
+          email: user.email,
+          provider: profile.provider,
+        });
+        
+        // Verify the email (OAuth providers verify emails)
+        await this.userRepository.update(user.id, { emailVerified: true });
+        user.emailVerified = true;
+        
+        // Check if they need a starship
+        const starshipRepo = new StarshipRepository();
+        const userStarships = await starshipRepo.findByOwner(user.id);
+        needsStarshipCreation = userStarships.length === 0;
+      }
     }
 
     // Link OAuth account using business logic
     await this.linkOAuthAccount(user.id, profile);
 
-    // Create default starship for new OAuth users (same as email/password registration)
-    if (isNewUser) {
+    // Create default starship for new users OR existing unverified users who got verified via OAuth
+    if (needsStarshipCreation) {
       try {
         const defaultStarship = await StarshipService.createDefaultStarship(user.id);
 

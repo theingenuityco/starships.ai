@@ -11,7 +11,7 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 import { validatePassword } from '@/utils/passwordStrength'
 
 interface ResetPasswordFormProps {
@@ -146,7 +146,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <PasswordLabelWithTooltip htmlFor="newPassword" label="New Password" password={newPassword} />
               <div className="relative">
                 <Input
                   id="newPassword"

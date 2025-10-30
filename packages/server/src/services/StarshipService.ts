@@ -315,8 +315,13 @@ export class StarshipService {
 
       for (const toolSlug of defaultToolSlugs) {
         try {
-          await toolRepository.createFromTemplate(toolSlug, starshipId);
-          console.log(`[STARSHIP-SERVICE] Deployed tool '${toolSlug}' to starship ${starshipId}`);
+          const existing = await toolRepository.findByTemplateSlugAndStarship(toolSlug, starshipId);
+          if (!existing) {
+            await toolRepository.createFromTemplate(toolSlug, starshipId);
+            console.log(`[STARSHIP-SERVICE] Deployed tool from template '${toolSlug}' to starship ${starshipId}`);
+          } else {
+            console.log(`[STARSHIP-SERVICE] Tool from template '${toolSlug}' already present on starship ${starshipId}`);
+          }
         } catch (error) {
           console.error(`[STARSHIP-SERVICE] Failed to deploy tool '${toolSlug}':`, error);
         }

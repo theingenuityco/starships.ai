@@ -77,6 +77,37 @@ export class ToolRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Find an existing tool for a starship that was created from a given tool template slug
+   */
+  async findByTemplateSlugAndStarship(templateSlug: string, starshipId: string): Promise<ToolModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        // Resolve template id from slug
+        const template = await connection.queryOne<{ id: string }>(
+          'SELECT id FROM tool_templates WHERE slug = $1',
+          [templateSlug]
+        );
+
+        if (!template) {
+          return null;
+        }
+
+        const result = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM tools WHERE template_id = $1 AND starship_id = $2 ORDER BY created_at DESC LIMIT 1',
+          [template.id, starshipId]
+        );
+
+        return result ? fromDatabase(ToolEntity, result) : null;
+      },
+      'findByTemplateSlugAndStarship',
+      'Tool',
+      `${templateSlug}@${starshipId}`
+    );
+  }
+
   async findBySlugs(slugs: string[], starshipId: string): Promise<ToolModel[]> {
     return this.executeWithErrorHandling(
       async () => {
@@ -132,10 +163,14 @@ export class ToolRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Determine a globally-unique slug
-        const requested = (data.slug || '').trim();
-        const baseSlug = (requested || data.name || 'tool').toLowerCase().trim().replace(/\s+/g, '-');
-        const existing = baseSlug ? await this.findBySlug(baseSlug) : null;
-        const slug = existing ? await generateUniqueToolSlug(baseSlug, this) : baseSlug;
+        // Creation no longer accepts client-provided slug; derive from name and ensure uniqueness with suffix
+        const baseFromName = (data.name || 'tool')
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .replace(/--+/g, '-');
+        const slug = await generateUniqueToolSlug(baseFromName || 'tool', this);
 
         // Create tool properties including starship relationship
         const toolProps = {
@@ -264,8 +299,8 @@ export class ToolRepository extends BaseRepository {
           transforms: template.transforms,
           mutations: template.mutations,
           condition: template.condition,
-          // Use unique slug derived from template slug
-          slug: template.slug,
+          // Use unique slug derived from template slug (always suffix like agents)
+          slug: await generateUniqueToolSlug(template.slug, this),
           templateId: template.id,
           configuration: configuration || {},
           isEnabled: true,

@@ -15,6 +15,9 @@ import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
+import { UsageService } from './UsageService';
+import { BillingService, InsufficientFundsError } from './BillingService';
+import { ConversationService } from './ConversationService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -80,7 +83,7 @@ export class AgentService {
 
     // Get current deployed agents count
     const currentAgents = await this.starshipRepository.getDeployedAgents(starshipId);
-    
+
     if (currentAgents.length >= starship.maxAgents) {
       throw new ValidationError(
         `Agent limit reached. Maximum ${starship.maxAgents} agents allowed per starship. Currently deployed: ${currentAgents.length}`
@@ -485,9 +488,9 @@ export class AgentService {
    * Executes agent in isolated environment without persisting to conversation
    */
   async testAgent(
-    agentId: string, 
-    testInput: string | LlmMessage[], 
-    starshipId: string, 
+    agentId: string,
+    testInput: string | LlmMessage[],
+    starshipId: string,
     authToken?: string
   ): Promise<{
     success: boolean;
@@ -505,6 +508,72 @@ export class AgentService {
     let output = '';
     let reasoning = '';
 
+    // Aggregate LLM usage across the test run
+    let aggUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 };
+    let modelUsedAggregate: string | undefined;
+
+    // Unified event handler to capture content, tools and usage
+    const onEvent = async (event: any) => {
+      // Capture tool usage and output during execution
+      if (event?.type === 'tool_started' && event?.data?.name) {
+        const name = String(event.data.name);
+        if (!toolsUsed.includes(name)) toolsUsed.push(name);
+      }
+
+      if (event?.type === 'content_chunk') {
+        // Extract content from the chunk structure: event.data.chunk.choices[0].delta.content
+        const chunkContent = event?.data?.chunk?.choices?.[0]?.delta?.content;
+        if (typeof chunkContent === 'string' && chunkContent) {
+          output += chunkContent;
+        }
+        // Some providers emit usage on chunks; capture if present
+        const usage = event?.data?.chunk?.usage;
+        const model = event?.data?.chunk?.model;
+        if (usage && typeof usage === 'object') {
+          const u = usage as Record<string, unknown>;
+          const pt = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
+          const ct = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
+          const tt = typeof u.totalTokens === 'number' ? u.totalTokens : pt + ct;
+          const cst = typeof u.cost === 'number' ? u.cost : 0;
+          aggUsage.promptTokens += pt;
+          aggUsage.completionTokens += ct;
+          aggUsage.totalTokens += tt;
+          aggUsage.cost += cst;
+          if (typeof model === 'string' && !modelUsedAggregate) modelUsedAggregate = model;
+        }
+      }
+
+      if (event?.type === 'content_complete') {
+        if (event?.data?.reasoning) {
+          reasoning += String(event.data.reasoning);
+        }
+        // Persist usage totals for this completion if provided
+        const usage = event?.data?.usage;
+        const model = event?.data?.model;
+        if (usage && typeof usage === 'object') {
+          const u = usage as Record<string, unknown>;
+          const pt = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
+          const ct = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
+          const tt = typeof u.totalTokens === 'number' ? u.totalTokens : pt + ct;
+          const cst = typeof u.cost === 'number' ? u.cost : 0;
+          aggUsage.promptTokens += pt;
+          aggUsage.completionTokens += ct;
+          aggUsage.totalTokens += tt;
+          aggUsage.cost += cst;
+        }
+        if (typeof model === 'string' && !modelUsedAggregate) modelUsedAggregate = model;
+      }
+
+      // Keep existing logs in non-production for diagnostics
+      try {
+        if (process?.env?.NODE_ENV !== 'production') {
+          if (event?.type) console.log('📡 Event received:', event.type, event.data ? Object.keys(event.data) : 'no data');
+        }
+      } catch (err) {
+        void err;
+      }
+    };
+
     try {
       // 1. Get agent by ID
       const agentModel = await this.agentRepository.findById(agentId);
@@ -520,7 +589,7 @@ export class AgentService {
         hasSystemPrompt: !!agentModel.systemPrompt,
         systemPromptLength: agentModel.systemPrompt?.length || 0,
         stateType: typeof agentModel.state,
-        stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array'
+        stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array',
       });
 
       // 2. Get deployed tools for this agent
@@ -528,9 +597,7 @@ export class AgentService {
       console.log('🔧 Tools resolved:', resolvedTools.length, 'tools found');
 
       // 3. Prepare agent params (same pattern as ConversationService)
-      const baseState = agentModel.state && typeof agentModel.state === 'object' 
-        ? agentModel.state 
-        : { messages: [], tools: [] };
+      const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
 
       const agentWithTools: AgentParams = {
         ...agentModel,
@@ -551,7 +618,7 @@ export class AgentService {
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const openRouterKey = env.OPENROUTER_API_KEY || '';
       const starshipEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
-      
+
       const secureEnv: Record<string, string> = {
         STARSHIP_ID: starshipId,
         BASE_URL: baseUrl,
@@ -562,18 +629,7 @@ export class AgentService {
 
       // 6. Create agent instance and prepare execution
       const agent = new Agent(agentWithTools, {
-        eventCallback: async (event) => {
-          // Capture tool usage and output during execution
-          if (event.type === 'tool_started' && (event as any).data?.name) {
-            toolsUsed.push((event as any).data.name);
-          }
-          if (event.type === 'content_chunk' && (event as any).data?.content) {
-            output += (event as any).data.content;
-          }
-          if (event.type === 'content_complete' && (event as any).data?.reasoning) {
-            reasoning += (event as any).data.reasoning;
-          }
-        },
+        eventCallback: onEvent,
         secureEnv,
       });
 
@@ -589,7 +645,7 @@ export class AgentService {
 
       // 8. Seed execution state with ordered messages
       const orderedMessages: LlmMessage[] = [];
-      
+
       // Add system prompt if present
       if (agentWithTools.systemPrompt && typeof agentWithTools.systemPrompt === 'string' && agentWithTools.systemPrompt.length > 0) {
         orderedMessages.push({ role: 'system', content: agentWithTools.systemPrompt });
@@ -620,43 +676,26 @@ export class AgentService {
         inputMessages: llmMessages.length,
         totalMessages: orderedMessages.length,
         systemPrompt: agentModel.systemPrompt ? agentModel.systemPrompt.substring(0, 100) + '...' : 'NO SYSTEM PROMPT',
-        toolsCount: resolvedTools.length
+        toolsCount: resolvedTools.length,
       });
 
       await runner.run(blueprint, exec, {
-        eventCallback: async (event: any) => {
-          console.log('📡 Event received:', event.type, event.data ? Object.keys(event.data) : 'no data');
-          
-          // Capture content from streaming chunks
-          if (event.type === 'content_chunk') {
-            // Extract content from the chunk structure: event.data.chunk.choices[0].delta.content
-            const chunkContent = event.data?.chunk?.choices?.[0]?.delta?.content;
-            if (chunkContent && typeof chunkContent === 'string') {
-              console.log('📝 Content chunk:', chunkContent.substring(0, 100));
-              output += chunkContent;
-            }
-          }
-          
-          // Additional event handling for capturing results
-          if (event.type === 'tool_started' && event.data?.name) {
-            if (!toolsUsed.includes(event.data.name)) {
-              toolsUsed.push(event.data.name);
-            }
-          }
-          
-          if (event.type === 'content_complete') {
-            console.log('✅ Content complete:', event.data);
-          }
-        },
+        eventCallback: onEvent,
         secureEnv,
       } as any);
 
       console.log('🔍 Post-execution state:', {
         messagesCount: Array.isArray(exec.state.messages) ? exec.state.messages.length : 0,
-        lastMessageRole: Array.isArray(exec.state.messages) && exec.state.messages.length > 0 ? exec.state.messages[exec.state.messages.length - 1]?.role : undefined,
-        lastMessageContentLength: Array.isArray(exec.state.messages) && exec.state.messages.length > 0 ? exec.state.messages[exec.state.messages.length - 1]?.content?.length || 0 : 0,
+        lastMessageRole:
+          Array.isArray(exec.state.messages) && exec.state.messages.length > 0
+            ? exec.state.messages[exec.state.messages.length - 1]?.role
+            : undefined,
+        lastMessageContentLength:
+          Array.isArray(exec.state.messages) && exec.state.messages.length > 0
+            ? exec.state.messages[exec.state.messages.length - 1]?.content?.length || 0
+            : 0,
         capturedOutputLength: output.length,
-        toolsUsed: toolsUsed
+        toolsUsed: toolsUsed,
       });
 
       // 10. Try to extract final response from execution state
@@ -665,16 +704,16 @@ export class AgentService {
         exec.state.messages.forEach((msg, idx) => {
           console.log(`  ${idx}: ${msg.role} - ${msg.content?.substring(0, 100)}${msg.content?.length > 100 ? '...' : ''}`);
         });
-        
+
         const lastMessage = exec.state.messages[exec.state.messages.length - 1];
         console.log('🔍 Last message analysis:', {
           exists: !!lastMessage,
           role: lastMessage?.role,
           hasContent: !!lastMessage?.content,
           contentPreview: lastMessage?.content?.substring(0, 200) + '...',
-          hasReasoning: !!lastMessage?.reasoning
+          hasReasoning: !!lastMessage?.reasoning,
         });
-        
+
         if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content) {
           output = lastMessage.content;
           if (lastMessage.reasoning) {
@@ -686,6 +725,40 @@ export class AgentService {
         }
       } else {
         console.log('❌ No messages array in execution state');
+      }
+
+      // Persist and bill aggregated usage (if any)
+      try {
+        if (aggUsage.totalTokens > 0 || aggUsage.cost > 0) {
+          const usageService = new UsageService();
+          const billingService = new BillingService();
+          const conversationService = new ConversationService();
+
+          // Create a lightweight archived conversation to satisfy FK and keep UI uncluttered
+          const testConversation = await conversationService.createConversation({
+            title: `Agent Test • ${agentModel.name ?? agentModel.slug ?? agentId}`,
+            status: 'archived',
+            starshipId,
+            agentId: agentModel.id,
+          });
+
+          const usageRow = await usageService.createUsageForTurn({
+            starshipId,
+            conversationId: testConversation.id,
+            promptTokens: aggUsage.promptTokens,
+            completionTokens: aggUsage.completionTokens,
+            totalTokens: aggUsage.totalTokens,
+            cost: aggUsage.cost,
+            ...(modelUsedAggregate ? { model: modelUsedAggregate } : {}),
+          });
+          try {
+            await billingService.debitUsage(usageRow);
+          } catch (e) {
+            console.warn('[AGENT-TEST] Billing debit failed:', e instanceof Error ? e.message : String(e));
+          }
+        }
+      } catch (e) {
+        console.error('[AGENT-TEST] Failed to persist usage for test run:', e);
       }
 
       const executionTime = Date.now() - startTime;
@@ -700,10 +773,9 @@ export class AgentService {
         executionTime,
         model: agentModel.model,
       };
-
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
-      
+
       return {
         success: false,
         agent: agentId,

@@ -6,6 +6,7 @@ import { motion } from 'motion/react'
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
+import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams()
@@ -39,9 +40,9 @@ function ResetPasswordContent() {
 
   return (
     <StarTheme theme="dark">
-      <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-        {/* Overlay for better text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/60 pointer-events-none" />
+      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
+        {/* Full-screen background - same as login page */}
+        <AuthMarketingPanel className="absolute inset-0" />
 
         <div className="relative z-10 w-full max-w-md px-6">
           <motion.div 
@@ -56,7 +57,7 @@ function ResetPasswordContent() {
               transition={{ delay: 0.2, duration: 0.5 }} 
               className="mb-6"
             >
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold text-primary">
                 New Password
               </h1>
               <p className="text-muted-foreground mt-2">

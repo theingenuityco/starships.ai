@@ -58,17 +58,17 @@ export function ForgotPasswordForm() {
           </CardHeader>
           
           <CardContent>
-            <Alert className="mb-4 border border-emerald-400 bg-background/95 backdrop-blur-sm shadow-sm rounded-lg text-center">
+            <Alert className="mb-4 border-emerald-500/50 bg-emerald-900/20 backdrop-blur-sm shadow-sm rounded-lg text-center">
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-center space-x-2 flex-wrap">
-                  <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
-                  <span className="text-emerald-800 font-medium text-sm">Request processed</span>
+                  <Icon name="check-circle" className="h-4 w-4 text-emerald-400" />
+                  <span className="text-white font-semibold text-sm">Request processed</span>
                 </div>
                 <AlertDescription>
-                  <p className="text-sm text-emerald-700 font-medium mb-2">
-                    We&apos;ll send reset instructions to <span className="font-semibold text-emerald-700">{email}</span> if an account exists.
+                  <p className="text-sm text-white font-medium mb-2">
+                    We&apos;ll send reset instructions to <span className="font-semibold text-emerald-200">{email}</span> if an account exists.
                   </p>
-                  <p className="text-sm text-emerald-700">
+                  <p className="text-sm text-gray-300">
                     The link expires in 1 hour.
                   </p>
                 </AlertDescription>

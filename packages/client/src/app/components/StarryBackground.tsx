@@ -24,7 +24,7 @@ export default function StarryBackground() {
           background: transparent;
         }
 
-        /* Small stars */
+        /* Small stars - Static */
         .stars-small {
           box-shadow:
             179px 1235px #fff,
@@ -132,11 +132,10 @@ export default function StarryBackground() {
             1559px 223px #fff;
           width: 1px;
           height: 1px;
-          animation: animateStars 100s linear infinite;
           opacity: 0.4;
         }
 
-        /* Medium stars */
+        /* Medium stars - Static */
         .stars-medium {
           box-shadow:
             1679px 1123px #fff,
@@ -191,11 +190,10 @@ export default function StarryBackground() {
             1679px 1123px #fff;
           width: 2px;
           height: 2px;
-          animation: animateStars 150s linear infinite;
           opacity: 0.5;
         }
 
-        /* Large stars */
+        /* Large stars - Static */
         .stars-large {
           box-shadow:
             1479px 923px #fff,
@@ -230,41 +228,19 @@ export default function StarryBackground() {
             879px 223px #fff;
           width: 3px;
           height: 3px;
-          animation: animateStars 200s linear infinite;
           opacity: 0.6;
         }
 
-        @keyframes animateStars {
-          from {
-            transform: translateY(0px);
-          }
-          to {
-            transform: translateY(-2000px);
-          }
-        }
-
-        /* Slower animations on mobile for better performance */
+        /* Reduce opacity on mobile for better visibility */
         @media (max-width: 768px) {
           .stars-small {
-            animation-duration: 150s;
             opacity: 0.3;
           }
           .stars-medium {
-            animation-duration: 200s;
             opacity: 0.4;
           }
           .stars-large {
-            animation-duration: 250s;
             opacity: 0.5;
-          }
-        }
-
-        /* Respect reduced motion preferences */
-        @media (prefers-reduced-motion: reduce) {
-          .stars-small,
-          .stars-medium,
-          .stars-large {
-            animation: none;
           }
         }
       `}</style>

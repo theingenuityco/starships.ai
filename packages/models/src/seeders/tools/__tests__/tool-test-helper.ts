@@ -346,7 +346,7 @@ export class ToolTestHelper {
       case 'get_current_time':
         return this.simulateTimeTool(inputObj);
 
-      case 'blueprint_lint':
+      case 'test-tool-blueprint':
         return this.simulateBlueprintLintTool(inputObj);
 
       default:

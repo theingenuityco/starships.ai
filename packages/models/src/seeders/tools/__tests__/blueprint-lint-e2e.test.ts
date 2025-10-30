@@ -1,6 +1,6 @@
 /**
- * Blueprint Lint Tool - E2E
- * Executes blueprint_lint using real Autopilot Tool execution (no HTTP mocking needed)
+ * Test Tool Blueprint - E2E
+ * Executes test-tool-blueprint using real Autopilot Tool execution (no HTTP mocking needed)
  */
 
 import { blueprintLintTool, blueprintLintToolTemplate } from '../test-tool-blueprint';
@@ -122,7 +122,7 @@ describe('Blueprint Lint Tool (E2E)', () => {
   });
 });
 
-describe('Tool.execute return value - blueprint_lint', () => {
+describe('Tool.execute return value - test-tool-blueprint', () => {
   it('should return a single ExecutionItem with lint result and preserve pairedItem', async () => {
     const VALID_BLUEPRINT = {
       nodes: [

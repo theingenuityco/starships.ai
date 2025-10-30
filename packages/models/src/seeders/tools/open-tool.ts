@@ -134,7 +134,7 @@ Automatically inferred from agent state (do not pass manually):
 };
 
 /**
- * Tool Template: tool-open
+ * Tool Template: open-tool
  */
 export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: toolOpenTool.name,

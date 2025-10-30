@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: tool_test
+ * Tool: Test Tool
  * Fetch a tool by slug from the server and execute its blueprint with provided arguments.
  * Returns { ok, durationMs, result }.
  */

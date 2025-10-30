@@ -2,7 +2,7 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: tool_get
+ * Tool: Get Tool
  * Get full tool details (including blueprint) by slug for the specified starship using server REST API
  */
 export const toolGetTool: ToolParams = {

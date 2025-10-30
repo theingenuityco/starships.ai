@@ -372,7 +372,7 @@ describe('Tool List Tool', () => {
   });
 });
 
-describe('Tool.execute return value - tool_list', () => {
+describe('Tool.execute return value - list-tools', () => {
   it('should return a single ExecutionItem with summarized tool list and preserved pairedItem', async () => {
     const mockEnv = {
       BASE_URL: 'https://api.test.com',

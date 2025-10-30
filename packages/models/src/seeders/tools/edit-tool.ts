@@ -182,7 +182,7 @@ Automatically inferred from agent state (do not pass manually):
 };
 
 /**
- * Tool Template: tool-edit
+ * Tool Template: edit-tool
  */
 export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: toolEditTool.name,

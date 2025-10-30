@@ -429,7 +429,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                 </Button>
 
                 <p className="text-xs text-muted-foreground/80 text-center">
-                  By creating an account, you agree to our{' '}
+                  By signing up, you agree to our{' '}
                   <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
                     Terms of Service
                   </a>{' '}

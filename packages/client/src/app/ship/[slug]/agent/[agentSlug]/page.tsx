@@ -92,7 +92,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     // Eligible tool slugs that should drive the Agent Builder
     // Note: We intentionally exclude assignment calls from driving UI state to avoid
     // reflecting changes before the server confirms them.
-    const builderToolSlugs = new Set(['agent-open', 'agent-edit', 'open agent', 'edit agent'])
+    const builderToolSlugFragments = ['agent-open', 'agent-edit']
 
     const form = agentBuilderRef.current.getFormData?.()
     if (!form) return
@@ -198,7 +198,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         try {
           console.debug('[AgentBuilderStream] toolCall', { idx: ci, id: call?.id, name: rawName, nameLc, hasArgs: !!call?.function?.arguments })
         } catch {}
-        if (!builderToolSlugs.has(nameLc)) continue
+        if (!builderToolSlugFragments.some(s => nameLc.includes(s))) continue
         const raw = (call as any)?.function?.arguments as unknown
         const callId = typeof call?.id === 'string' ? call.id : undefined
         const key = `${nameLc}|${typeof raw === 'string' ? String(raw) : JSON.stringify(raw ?? null)}`
@@ -378,8 +378,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (!assistantMsg) continue
         const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        const agentTools = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
-        if (!agentTools.has(funcName)) {
+        const agentToolSlugFragments = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
+        if (!agentToolSlugFragments.some(s => (funcName || '').toLowerCase().includes(s))) {
           processedToolResultIdsRef.current.add(id)
           continue
         }

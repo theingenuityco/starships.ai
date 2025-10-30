@@ -169,7 +169,7 @@ Automatically inferred from agent state (do not pass manually):
 };
 
 /**
- * Tool Template: agent-test
+ * Tool Template: test-agent
  */
 export const agentTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: agentTestTool.name,

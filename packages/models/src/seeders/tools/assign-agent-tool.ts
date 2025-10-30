@@ -160,7 +160,7 @@ Returns server response indicating success.
 };
 
 /**
- * Tool Template: agent-assign-tool
+ * Tool Template: assign-agent-tool
  */
 export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: agentAssignToolTool.name,

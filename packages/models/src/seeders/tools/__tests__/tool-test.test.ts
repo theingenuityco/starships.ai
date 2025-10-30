@@ -3,7 +3,7 @@
  * Executes tool_test using real Autopilot execution with mocked HTTP only
  */
 
-import { toolTestTool, toolTestToolTemplate } from '../tool-test';
+import { toolTestTool, toolTestToolTemplate } from '../test-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 

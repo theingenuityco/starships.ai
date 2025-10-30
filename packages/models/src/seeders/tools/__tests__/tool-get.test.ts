@@ -3,7 +3,7 @@
  * E2E tests using real autopilot execution with mocked HTTP
  */
 
-import { toolGetTool, toolGetToolTemplate } from '../tool-get';
+import { toolGetTool, toolGetToolTemplate } from '../get-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 

@@ -53,10 +53,10 @@ Behavior and limits:
             if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
             return {
-              url: \`${baseUrl}/starships/${starshipId}/tools/${slug}\`,
+              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer ${authToken}\`,
+                'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };

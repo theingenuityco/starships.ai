@@ -1,10 +1,32 @@
 'use client'
 
+import { useMemo } from 'react'
+
 interface AuthMarketingPanelProps {
   className?: string
 }
 
+interface Star {
+  cx: number
+  cy: number
+  r: number
+  useGlow: boolean
+}
+
+// Generate random stars across the viewport
+function generateStars(count: number): Star[] {
+  return Array.from({ length: count }, () => ({
+    cx: Math.random() * 100,
+    cy: Math.random() * 100,
+    r: 0.5 + Math.random() * 0.7, // radius between 0.5 and 1.2
+    useGlow: Math.random() > 0.7, // 30% chance to use glow effect
+  }))
+}
+
 export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
+  // Generate stars once on mount
+  const stars = useMemo(() => generateStars(100), [])
+
   return (
     <div className={className}>
       {/* Deep space base */}
@@ -60,130 +82,17 @@ export function AuthMarketingPanel({ className }: AuthMarketingPanelProps) {
         {/* Brighter star accents in center */}
         <rect x="25%" y="25%" width="50%" height="40%" filter="url(#brightStars)" opacity="0.35" />
 
-        {/* Individual visible star particles scattered throughout */}
+        {/* Dynamically generated individual star particles */}
         <g opacity="0.8">
-          {/* Top left region */}
-          <circle cx="12%" cy="18%" r="0.8" fill="#ffffff" />
-          <circle cx="8%" cy="12%" r="1.2" fill="url(#starGlow)" />
-          <circle cx="18%" cy="22%" r="0.6" fill="#ffffff" />
-          <circle cx="15%" cy="28%" r="1" fill="url(#starGlow)" />
-          <circle cx="5%" cy="20%" r="0.7" fill="#ffffff" />
-          <circle cx="10%" cy="35%" r="0.8" fill="#ffffff" />
-          <circle cx="20%" cy="15%" r="0.6" fill="#ffffff" />
-          <circle cx="14%" cy="8%" r="0.9" fill="url(#starGlow)" />
-          <circle cx="6%" cy="30%" r="0.7" fill="#ffffff" />
-          
-          {/* Top center region */}
-          <circle cx="35%" cy="10%" r="0.8" fill="#ffffff" />
-          <circle cx="42%" cy="15%" r="1" fill="url(#starGlow)" />
-          <circle cx="50%" cy="12%" r="0.7" fill="#ffffff" />
-          <circle cx="58%" cy="18%" r="0.9" fill="#ffffff" />
-          <circle cx="48%" cy="8%" r="0.6" fill="#ffffff" />
-          <circle cx="52%" cy="20%" r="0.8" fill="url(#starGlow)" />
-          
-          {/* Top right region */}
-          <circle cx="82%" cy="15%" r="0.9" fill="#ffffff" />
-          <circle cx="88%" cy="20%" r="1.1" fill="url(#starGlow)" />
-          <circle cx="78%" cy="25%" r="0.7" fill="#ffffff" />
-          <circle cx="92%" cy="12%" r="0.8" fill="#ffffff" />
-          <circle cx="85%" cy="10%" r="0.7" fill="#ffffff" />
-          <circle cx="90%" cy="28%" r="0.9" fill="#ffffff" />
-          <circle cx="94%" cy="22%" r="0.6" fill="#ffffff" />
-          <circle cx="80%" cy="8%" r="1" fill="url(#starGlow)" />
-          
-          {/* Center left */}
-          <circle cx="8%" cy="45%" r="0.9" fill="#ffffff" />
-          <circle cx="12%" cy="52%" r="0.7" fill="#ffffff" />
-          <circle cx="18%" cy="48%" r="1.1" fill="url(#starGlow)" />
-          <circle cx="15%" cy="55%" r="0.6" fill="#ffffff" />
-          <circle cx="10%" cy="60%" r="0.8" fill="#ffffff" />
-          
-          {/* Center scattered */}
-          <circle cx="35%" cy="35%" r="1" fill="url(#starGlow)" />
-          <circle cx="45%" cy="30%" r="0.7" fill="#ffffff" />
-          <circle cx="55%" cy="38%" r="0.9" fill="#ffffff" />
-          <circle cx="62%" cy="32%" r="1.2" fill="url(#starGlow)" />
-          <circle cx="48%" cy="50%" r="0.8" fill="#ffffff" />
-          <circle cx="38%" cy="45%" r="0.7" fill="#ffffff" />
-          <circle cx="52%" cy="42%" r="0.9" fill="#ffffff" />
-          <circle cx="42%" cy="52%" r="0.6" fill="#ffffff" />
-          <circle cx="58%" cy="48%" r="1" fill="url(#starGlow)" />
-          <circle cx="32%" cy="52%" r="0.7" fill="#ffffff" />
-          <circle cx="65%" cy="45%" r="0.8" fill="#ffffff" />
-          <circle cx="40%" cy="38%" r="0.6" fill="#ffffff" />
-          
-          {/* Center right */}
-          <circle cx="85%" cy="45%" r="0.8" fill="#ffffff" />
-          <circle cx="90%" cy="52%" r="1" fill="url(#starGlow)" />
-          <circle cx="82%" cy="50%" r="0.7" fill="#ffffff" />
-          <circle cx="88%" cy="58%" r="0.9" fill="#ffffff" />
-          <circle cx="92%" cy="48%" r="0.6" fill="#ffffff" />
-          
-          {/* Bottom left region */}
-          <circle cx="15%" cy="68%" r="0.9" fill="#ffffff" />
-          <circle cx="10%" cy="75%" r="1" fill="url(#starGlow)" />
-          <circle cx="22%" cy="72%" r="0.7" fill="#ffffff" />
-          <circle cx="18%" cy="82%" r="0.8" fill="#ffffff" />
-          <circle cx="8%" cy="80%" r="0.9" fill="#ffffff" />
-          <circle cx="12%" cy="88%" r="0.7" fill="#ffffff" />
-          <circle cx="20%" cy="85%" r="1.1" fill="url(#starGlow)" />
-          <circle cx="6%" cy="70%" r="0.6" fill="#ffffff" />
-          
-          {/* Bottom center */}
-          <circle cx="35%" cy="75%" r="0.8" fill="#ffffff" />
-          <circle cx="42%" cy="80%" r="1" fill="url(#starGlow)" />
-          <circle cx="48%" cy="72%" r="0.7" fill="#ffffff" />
-          <circle cx="52%" cy="82%" r="0.9" fill="#ffffff" />
-          <circle cx="58%" cy="78%" r="0.6" fill="#ffffff" />
-          <circle cx="45%" cy="88%" r="0.8" fill="#ffffff" />
-          
-          {/* Bottom right region */}
-          <circle cx="78%" cy="70%" r="1.1" fill="url(#starGlow)" />
-          <circle cx="85%" cy="65%" r="0.8" fill="#ffffff" />
-          <circle cx="82%" cy="78%" r="0.9" fill="#ffffff" />
-          <circle cx="88%" cy="75%" r="0.7" fill="#ffffff" />
-          <circle cx="90%" cy="82%" r="1" fill="url(#starGlow)" />
-          <circle cx="92%" cy="72%" r="0.6" fill="#ffffff" />
-          <circle cx="80%" cy="85%" r="0.8" fill="#ffffff" />
-          <circle cx="86%" cy="88%" r="0.7" fill="#ffffff" />
-          
-          {/* Additional scattered particles */}
-          <circle cx="28%" cy="45%" r="0.6" fill="#ffffff" />
-          <circle cx="70%" cy="48%" r="0.8" fill="#ffffff" />
-          <circle cx="40%" cy="62%" r="0.7" fill="#ffffff" />
-          <circle cx="58%" cy="58%" r="0.9" fill="url(#starGlow)" />
-          <circle cx="25%" cy="60%" r="0.6" fill="#ffffff" />
-          <circle cx="68%" cy="62%" r="0.8" fill="#ffffff" />
-          <circle cx="32%" cy="68%" r="0.7" fill="#ffffff" />
-          <circle cx="72%" cy="55%" r="0.9" fill="url(#starGlow)" />
-          
-          {/* Extra stars - more density */}
-          <circle cx="3%" cy="15%" r="0.5" fill="#ffffff" />
-          <circle cx="7%" cy="42%" r="0.6" fill="#ffffff" />
-          <circle cx="11%" cy="65%" r="0.5" fill="#ffffff" />
-          <circle cx="16%" cy="38%" r="0.7" fill="url(#starGlow)" />
-          <circle cx="19%" cy="58%" r="0.5" fill="#ffffff" />
-          <circle cx="23%" cy="32%" r="0.6" fill="#ffffff" />
-          <circle cx="26%" cy="78%" r="0.7" fill="#ffffff" />
-          <circle cx="30%" cy="18%" r="0.5" fill="#ffffff" />
-          <circle cx="33%" cy="65%" r="0.8" fill="url(#starGlow)" />
-          <circle cx="37%" cy="25%" r="0.6" fill="#ffffff" />
-          <circle cx="43%" cy="68%" r="0.5" fill="#ffffff" />
-          <circle cx="46%" cy="22%" r="0.7" fill="#ffffff" />
-          <circle cx="53%" cy="65%" r="0.6" fill="#ffffff" />
-          <circle cx="56%" cy="25%" r="0.8" fill="url(#starGlow)" />
-          <circle cx="60%" cy="72%" r="0.5" fill="#ffffff" />
-          <circle cx="63%" cy="52%" r="0.6" fill="#ffffff" />
-          <circle cx="67%" cy="35%" r="0.7" fill="#ffffff" />
-          <circle cx="73%" cy="68%" r="0.5" fill="#ffffff" />
-          <circle cx="76%" cy="42%" r="0.8" fill="url(#starGlow)" />
-          <circle cx="81%" cy="55%" r="0.6" fill="#ffffff" />
-          <circle cx="84%" cy="38%" r="0.5" fill="#ffffff" />
-          <circle cx="87%" cy="68%" r="0.7" fill="#ffffff" />
-          <circle cx="91%" cy="35%" r="0.6" fill="#ffffff" />
-          <circle cx="93%" cy="58%" r="0.5" fill="#ffffff" />
-          <circle cx="95%" cy="42%" r="0.7" fill="url(#starGlow)" />
-          <circle cx="96%" cy="68%" r="0.5" fill="#ffffff" />
+          {stars.map((star, i) => (
+            <circle
+              key={i}
+              cx={`${star.cx}%`}
+              cy={`${star.cy}%`}
+              r={star.r}
+              fill={star.useGlow ? 'url(#starGlow)' : '#ffffff'}
+            />
+          ))}
         </g>
       </svg>
 

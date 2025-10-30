@@ -110,7 +110,7 @@ describe('Tool List Tool', () => {
       expect(toolListToolTemplate.parameters).toEqual(toolListTool.parameters);
       expect(toolListToolTemplate.blueprint).toEqual(toolListTool.blueprint);
 
-      expect(toolListToolTemplate.slug).toBe('tool-list');
+      expect(toolListToolTemplate.slug).toBe('list-tools');
       expect(toolListToolTemplate.category).toBe('automation');
       expect(toolListToolTemplate.requiresApiKey).toBe(false);
       expect(toolListToolTemplate.exampleUsage).toBeDefined();

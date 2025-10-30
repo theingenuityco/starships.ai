@@ -52,7 +52,7 @@ export const toolAddBlueprintEdgeTool: ToolParams = {
               toolSlug: input.toolSlug,
               edge: input.edge,
               headers: {
-                'Authorization': \`Bearer ${authToken}\`,
+                'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };

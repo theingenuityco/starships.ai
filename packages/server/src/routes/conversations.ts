@@ -81,10 +81,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           const messagesToSend = conversationMessages.slice(startIndexForSend);
           if (messagesToSend.length > 0) {
             for (const message of messagesToSend) {
-              // Sanitize: Remove any streaming flags from database messages
-              const sanitized = { ...message };
-              delete (sanitized as any).streaming;
-              await streamingService.broadcastMessage(conversationId, sanitized);
+              await streamingService.broadcastMessage(conversationId, message);
             }
           }
         } else {
@@ -97,10 +94,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           const persistedTail = conversationMessages.slice(startIdx);
           if (persistedTail.length > 0) {
             for (const message of persistedTail) {
-              // Sanitize: Remove any streaming flags from database messages
-              const sanitized = { ...message };
-              delete (sanitized as any).streaming;
-              await streamingService.broadcastMessage(conversationId, sanitized);
+              await streamingService.broadcastMessage(conversationId, message);
             }
           }
 
@@ -114,30 +108,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
         if (messagesToSend.length > 0) {
           for (const message of messagesToSend) {
-            // Sanitize: Remove any streaming flags from database messages
-            // (streaming is transient SSE-only state, should never be in DB)
-            const sanitized = { ...message };
-            delete (sanitized as any).streaming;
-            await streamingService.broadcastMessage(conversationId, sanitized);
+            await streamingService.broadcastMessage(conversationId, message);
           }
         }
 
         // Also replay current turn events to cover race where streaming started just before connect
         await streamingService.replayCurrentTurn(conversationId);
-
-        // BACKEND FIX: If the last message is from assistant, the conversation is complete
-        // Send a complete event to ensure client knows the turn has ended
-        // This handles old completed chats after server restart (when ring buffer is empty)
-        const lastMessage = conversationMessages[conversationMessages.length - 1];
-        if (lastMessage && (lastMessage.role === 'assistant' || lastMessage.role === 'tool')) {
-          await streamingService.broadcastComplete(conversationId, {
-            source: 'agent',
-            content: 'Conversation complete',
-            agentId: 'system',
-            scope: 'workflow',
-            conversationId,
-          });
-        }
       }
 
       // Connection stays open for live updates via StreamingService

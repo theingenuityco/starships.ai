@@ -42,6 +42,9 @@ services:
       # Authentication
       JWT_SECRET: ${JWT_SECRET:-your-super-secure-jwt-secret-key-at-least-32-characters-long}
 
+      # Environment Variables Encryption
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
       # LLM Provider Configuration
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}

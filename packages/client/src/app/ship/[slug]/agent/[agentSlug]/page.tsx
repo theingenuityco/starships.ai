@@ -24,6 +24,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
   const conversationId = searchParams.get('conversationId') || null
+  const [agentOpenError, setAgentOpenError] = useState<string | null>(null)
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
   const selectedAgent = useMemo(() => {
@@ -527,7 +528,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     doPrefill()
   }, [agentSlug])
 
-  // Detect agent creation via streaming completion and replace URL when slug becomes available
+  // Detect agent creation via streaming completion and handle success/failure
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
@@ -541,10 +542,10 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (!assistantMsg) continue
         const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        const agentTools = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
-        if (!agentTools.includes(funcName)) continue
+        if (funcName !== 'agent-open') continue
         // Extract slug strictly from tool result HTTP response shape: body.data.slug
         let slugArg: string | undefined
+        let errorText: string | undefined
         {
           const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
           if (content) {
@@ -554,14 +555,32 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
               const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
               slugArg = slugVal
+              // Infer error message if present
+              const maybeError = (body && (body as any).error) || (parsed as any).error
+              if (!slugVal && maybeError) {
+                errorText = typeof maybeError === 'string' ? maybeError : (maybeError.message as string | undefined)
+              }
+              if (!slugVal && !maybeError) {
+                const statusCode = (parsed as any).statusCode || (parsed as any).status
+                if (statusCode && Number(statusCode) >= 400) {
+                  errorText = 'Failed to open agent'
+                }
+              }
             } catch {}
           }
         }
-        if (agentSlug === 'new' && typeof slugArg === 'string' && slugArg && !routeUpdatedRef.current) {
-          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-          router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)
-          routeUpdatedRef.current = true
-          break
+        if (agentSlug === 'new' && !routeUpdatedRef.current) {
+          if (typeof slugArg === 'string' && slugArg) {
+            // Success: navigate to agents list for this starship
+            router.replace(`/ship/${slug}/agents`)
+            routeUpdatedRef.current = true
+            setAgentOpenError(null)
+            break
+          } else if (errorText) {
+            // Failure: show error message on builder
+            setAgentOpenError(errorText || 'Failed to open agent')
+            break
+          }
         }
       }
     }
@@ -579,7 +598,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      <AgentBuilderView ref={agentBuilderRef} starshipId={starship.id} onCancel={handleCancel} initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined} />
+      <AgentBuilderView
+        ref={agentBuilderRef}
+        starshipId={starship.id}
+        onCancel={handleCancel}
+        initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
+        errorMessage={agentOpenError || undefined}
+      />
       {conversationId && (
         <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">

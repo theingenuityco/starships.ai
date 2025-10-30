@@ -6,8 +6,9 @@ import type { AgentBuilderViewProps, AgentBuilderViewRef } from './types'
 import { useAgentForm } from './hooks/useAgentForm'
 import { Button } from '@/components/ui/button'
 import { AgentDocumentEditor } from './components/AgentDocumentEditor'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
-export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId, initialSlug }, ref) => {
+export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId, initialSlug, errorMessage }, ref) => {
   const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave })
 
   // Expose methods to parent via ref
@@ -31,6 +32,12 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
     <div className="h-full flex flex-col bg-background">
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl w-full mx-auto px-6 py-6 space-y-6">
+          {errorMessage ? (
+            <Alert variant="destructive" className="flex-col">
+              <AlertTitle>Agent creation failed</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          ) : null}
           <AgentDocumentEditor
             value={formData}
             onChange={next => {

@@ -69,27 +69,6 @@ export class LLM extends BaseNode<LlmParams> {
   private emittedToolCalls: Set<string> = new Set();
   private static readonly DEBUG_TOOLCALLS = false;
 
-  // Normalize tool-call argument accumulation to avoid jumbled starts and overlaps
-  private static trimToJsonStart(text: string): string {
-    if (typeof text !== 'string' || text.length === 0) return '';
-    const iBrace = text.indexOf('{');
-    const iBracket = text.indexOf('[');
-    const idx = iBrace === -1 ? iBracket : iBracket === -1 ? iBrace : Math.min(iBrace, iBracket);
-    return idx >= 0 ? text.slice(idx) : '';
-  }
-
-  private static nonOverlappingAppend(base: string, fragment: string): string {
-    if (!fragment) return base;
-    const maxCheck = Math.min(base.length, fragment.length);
-    for (let k = maxCheck; k > 0; k--) {
-      if (base.endsWith(fragment.slice(0, k))) {
-        return base + fragment.slice(k);
-      }
-    }
-    // No detectable overlap; append entire fragment (duplicates, if any, will be corrected by server snapshot adoption)
-    return base + fragment;
-  }
-
   constructor(params: LlmParams, options?: NodeHandlerOptions) {
     super(params, options);
   }
@@ -418,6 +397,43 @@ export class LLM extends BaseNode<LlmParams> {
       };
     }> = [];
     let finishReason: string | null = null;
+    // Track provider-snapshot arguments per tool call index if present
+    const providerArgs: string[] = [];
+    // Micro-buffer and state for token-safe flushing per tool call index
+    const argStaging: string[] = [];
+    const argState: Array<{ inStr: boolean; esc: boolean; depth: number }> = [];
+
+    const flushSafePrefix = (s: string, st: { inStr: boolean; esc: boolean; depth: number }): number => {
+      let safeIdx = 0;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (st.esc) {
+          st.esc = false;
+          continue;
+        }
+        if (st.inStr) {
+          if (ch === '\\') {
+            st.esc = true;
+          } else if (ch === '"') {
+            st.inStr = false;
+          }
+        } else {
+          if (ch === '"') {
+            st.inStr = true;
+          } else if (ch === '{' || ch === '[') {
+            st.depth++;
+          } else if (ch === '}' || ch === ']') {
+            if (st.depth > 0) st.depth--;
+            // Closing a structure is safe to flush up to
+            safeIdx = i + 1;
+          } else if (ch === ',') {
+            // Comma between elements/props outside string is a safe boundary
+            safeIdx = i + 1;
+          }
+        }
+      }
+      return safeIdx;
+    };
 
     try {
       for await (const chunk of stream) {
@@ -452,23 +468,30 @@ export class LLM extends BaseNode<LlmParams> {
             if (toolCallDelta.id) target.id = toolCallDelta.id;
             if (toolCallDelta.function?.name) target.function.name = toolCallDelta.function.name;
             if (toolCallDelta.function?.arguments) {
-              const incomingRaw = toolCallDelta.function.arguments;
+              const frag = toolCallDelta.function.arguments;
+              // Initialize staging and state
+              if (typeof argStaging[index] !== 'string') argStaging[index] = '';
+              if (!argState[index]) argState[index] = { inStr: false, esc: false, depth: 0 };
+              argStaging[index] = argStaging[index] + frag;
               const base = typeof target.function.arguments === 'string' ? target.function.arguments : '';
-              const incoming = base.length === 0 ? LLM.trimToJsonStart(incomingRaw) : incomingRaw;
-              const prevLen = base.length;
-              const next = LLM.nonOverlappingAppend(base, incoming);
-              target.function.arguments = next;
-              if (LLM.DEBUG_TOOLCALLS) {
-                try {
-                  console.debug('[LLM] tool_call.delta', {
-                    index,
-                    id: toolCallDelta.id,
-                    name: toolCallDelta.function?.name,
-                    argsAdded: Math.max(0, next.length - prevLen),
-                    argsTotal: next.length,
-                  });
-                } catch {
-                  /* non-fatal */
+              const st = argState[index];
+              const cut = flushSafePrefix(argStaging[index], st);
+              if (cut > 0) {
+                const flush = argStaging[index].slice(0, cut);
+                target.function.arguments = base + flush;
+                argStaging[index] = argStaging[index].slice(cut);
+                if (LLM.DEBUG_TOOLCALLS) {
+                  try {
+                    console.debug('[LLM] tool_call.delta', {
+                      index,
+                      id: toolCallDelta.id,
+                      name: toolCallDelta.function?.name,
+                      argsAdded: flush.length,
+                      argsTotal: (target.function.arguments as string).length,
+                    });
+                  } catch {
+                    /* non-fatal */
+                  }
                 }
               }
             }
@@ -510,6 +533,23 @@ export class LLM extends BaseNode<LlmParams> {
           try {
             if (Array.isArray(normalizedChunk.choices) && normalizedChunk.choices.length > 0) {
               const choice0 = normalizedChunk.choices[0];
+              // Preserve provider-snapshot toolCalls if present, and capture their arguments for final parsing fallback
+              try {
+                const msg = (choice0 as unknown as { message?: { toolCalls?: Array<{ function?: { arguments?: unknown } }> } }).message;
+                if (msg && Array.isArray(msg.toolCalls)) {
+                  for (let i = 0; i < msg.toolCalls.length; i++) {
+                    const a =
+                      msg.toolCalls[i] && msg.toolCalls[i].function
+                        ? (msg.toolCalls[i].function as { arguments?: unknown }).arguments
+                        : undefined;
+                    if (typeof a === 'string' && a.length > 0) {
+                      providerArgs[i] = a;
+                    }
+                  }
+                }
+              } catch {
+                /* noop */
+              }
               // Synthesize toolCalls snapshot
               const current: NonNullable<NormalizedMessage['toolCalls']> = toolCalls
                 .filter((tc) => tc.function.name && tc.function.name.length > 0)
@@ -520,13 +560,14 @@ export class LLM extends BaseNode<LlmParams> {
                 }));
               // Always include an authoritative message.content snapshot to preserve correct ordering on the client
               // This is the cumulatively accumulated content so far
-              const existing = choice0.message ?? {};
-              const nextMessage: NormalizedMessage = { ...existing };
-              nextMessage.content = content;
-              if (current.length > 0) {
-                nextMessage.toolCalls = current;
+              const existing = (choice0 as unknown as { message?: NormalizedMessage }).message ?? ({} as NormalizedMessage);
+              const nextMessage: NormalizedMessage = { ...(existing as NormalizedMessage) } as NormalizedMessage;
+              (nextMessage as unknown as { content?: string }).content = content;
+              // Only synthesize toolCalls if provider didn't supply them
+              if (!existing.toolCalls || (Array.isArray(existing.toolCalls) && existing.toolCalls.length === 0)) {
+                if (current.length > 0) nextMessage.toolCalls = current;
               }
-              choice0.message = nextMessage;
+              (choice0 as unknown as { message?: NormalizedMessage }).message = nextMessage;
             }
           } catch {
             void 0;
@@ -539,6 +580,18 @@ export class LLM extends BaseNode<LlmParams> {
             data: { chunk: normalizedChunk as unknown as Record<string, unknown> },
           });
         }
+      }
+
+      // Flush any remaining staged tool-call fragments at end of stream
+      try {
+        for (let i = 0; i < toolCalls.length; i++) {
+          if (typeof argStaging[i] === 'string' && argStaging[i].length > 0) {
+            toolCalls[i].function.arguments += argStaging[i];
+            argStaging[i] = '';
+          }
+        }
+      } catch {
+        /* noop */
       }
 
       // Emit completion event
@@ -565,16 +618,20 @@ export class LLM extends BaseNode<LlmParams> {
         .map((tc, i) => {
           let argsObj: unknown = {};
 
-          if (tc.function.arguments) {
+          const prefer =
+            typeof providerArgs[i] === 'string' && providerArgs[i].length >= (tc.function.arguments?.length || 0)
+              ? providerArgs[i]
+              : tc.function.arguments;
+          if (prefer) {
             try {
-              argsObj = JSON.parse(tc.function.arguments);
+              argsObj = JSON.parse(prefer);
             } catch (parseError) {
               console.error(`[LLM FINAL] Failed to parse tool '${tc.function.name}' arguments:`, {
-                argsLength: tc.function.arguments.length,
+                argsLength: prefer.length,
                 error: parseError instanceof Error ? parseError.message : String(parseError),
               });
               // Log full args for debugging
-              console.error(`[LLM FINAL] Full arguments:`, tc.function.arguments);
+              console.error(`[LLM FINAL] Full arguments:`, prefer);
               argsObj = {};
             }
           }

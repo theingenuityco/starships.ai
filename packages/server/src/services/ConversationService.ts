@@ -65,6 +65,10 @@ export class ConversationService {
   // Resume state per conversation generation
   private generationId: Map<string, string> = new Map();
   private accumulatedLength: Map<string, number> = new Map();
+  // CRITICAL FIX: Track next chunk position atomically to prevent race conditions
+  private nextChunkPosition: Map<string, number> = new Map();
+  // CRITICAL FIX: Serialize chunk processing per conversation to prevent race conditions
+  private chunkProcessingLock: Map<string, Promise<void>> = new Map();
   private placeholderEmitted: Map<string, boolean> = new Map();
   private ringBuffer: Map<string, Array<{ position: number; content: string; ts: number }>> = new Map();
   // Track accumulated toolCalls during streaming per conversation
@@ -277,7 +281,7 @@ export class ConversationService {
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
       console.log(`[ConversationService] Starting deletion process for conversation ${conversationId}`);
-      
+
       // Verify conversation exists first
       const conversation = await this.conversationRepository.findById(conversationId);
       if (!conversation) {
@@ -286,16 +290,16 @@ export class ConversationService {
       }
 
       console.log(`[ConversationService] Found conversation ${conversationId} (title: "${conversation.title}"), proceeding with deletion`);
-      
+
       // Use the repository's delete method which should handle CASCADE properly
       const deleted = await this.conversationRepository.delete(conversationId);
-      
+
       if (deleted) {
         console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
       }
-      
+
       return deleted;
     } catch (error) {
       // Enhanced error logging with more details
@@ -304,8 +308,8 @@ export class ConversationService {
           message: error.message,
           name: error.name,
           stack: error.stack,
-          ...(error as any).code && { code: (error as any).code },
-          ...(error as any).constraint && { constraint: (error as any).constraint },
+          ...((error as any).code && { code: (error as any).code }),
+          ...((error as any).constraint && { constraint: (error as any).constraint }),
         });
       } else {
         console.error(`[ConversationService] Unknown error deleting conversation ${conversationId}:`, error);
@@ -320,19 +324,19 @@ export class ConversationService {
   async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
     try {
       console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
-      
+
       // Use the repository's update method
       const updatedConversation = await this.conversationRepository.update(conversationId, {
         ...updates,
         updatedAt: new Date().toISOString(),
       });
-      
+
       if (updatedConversation) {
         console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
       }
-      
+
       return updatedConversation;
     } catch (error) {
       console.error(`[ConversationService] Error updating conversation ${conversationId}:`, error);
@@ -1125,6 +1129,8 @@ export class ConversationService {
         this.accumulatedLength.set(conversationId, 0);
         this.placeholderEmitted.set(conversationId, false);
         this.ringBuffer.set(conversationId, []);
+        // CRITICAL FIX: Reset position counter at start of new turn
+        this.nextChunkPosition.set(conversationId, 0);
         // Reset cached usage for the new turn
         this.latestStreamingUsage.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
@@ -1213,442 +1219,462 @@ export class ConversationService {
         if ((event.executionDepth ?? 0) > 0) {
           break;
         }
-        // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
-        try {
-          const stopped = await this.maybeAutoStopForLowBalance(conversationId);
-          if (stopped) {
-            break;
-          }
-        } catch (e) {
-          /* non-fatal: balance auto-stop check failure */
-        }
-        // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
-        try {
-          const stopped = await this.maybeAutoStopForLowBalance(conversationId);
-          if (stopped) {
-            break;
-          }
-        } catch (e) {
-          /* non-fatal: balance auto-stop check failure */
-        }
-        // Stream content chunks in real-time (supports both delta.* and message.* providers)
-        const chunkContent = (event as LLMEvent).data?.chunk;
 
-        if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
-          type ChoiceNode = {
-            delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
-            message?: {
-              content?: unknown;
-              toolCalls?: unknown[];
-              reasoning?: unknown;
-              reasoning_details?: unknown;
-            };
-          };
-          const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
-          const delta = choice0.delta ?? {};
-          const messageNode = choice0.message ?? {};
-          // Capture provider usage from chunk if present for mid-stream accounting
+        // CRITICAL FIX: Serialize chunk processing using a lock pattern
+        // Wait for previous chunk to complete before starting this one
+        const processThisChunk = async () => {
+          // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
           try {
-            const rawUsage = (chunkContent as { usage?: unknown }).usage as
-              | { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown; cost?: unknown }
-              | undefined;
-            if (rawUsage && typeof rawUsage === 'object') {
-              const uRec = rawUsage as Record<string, unknown>;
-              const promptTokens = typeof uRec.promptTokens === 'number' ? uRec.promptTokens : 0;
-              const completionTokens = typeof uRec.completionTokens === 'number' ? uRec.completionTokens : 0;
-              const totalTokens = typeof uRec.totalTokens === 'number' ? uRec.totalTokens : Number(promptTokens) + Number(completionTokens);
-              const cost = typeof uRec.cost === 'number' ? uRec.cost : 0;
-              const model =
-                typeof (chunkContent as { model?: unknown }).model === 'string'
-                  ? ((chunkContent as { model?: string }).model as string)
-                  : undefined;
-              if (totalTokens > 0 || promptTokens > 0 || completionTokens > 0 || cost > 0) {
-                this.latestStreamingUsage.set(conversationId, {
-                  promptTokens: Number(promptTokens || 0),
-                  completionTokens: Number(completionTokens || 0),
-                  totalTokens: Number(totalTokens || 0),
-                  cost: Number(cost || 0),
-                  ...(model ? { model } : {}),
-                });
-              }
+            const stopped = await this.maybeAutoStopForLowBalance(conversationId);
+            if (stopped) {
+              return;
             }
-          } catch (err) {
-            console.warn('[STREAMING] Failed to capture usage from chunk', {
-              conversationId,
-              error: err instanceof Error ? err.message : String(err),
-            });
+          } catch (e) {
+            /* non-fatal: balance auto-stop check failure */
           }
 
-          const contentFromDelta =
-            typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
-          const contentFromMessage =
-            typeof (messageNode as { content?: unknown }).content === 'string'
-              ? ((messageNode as { content?: unknown }).content as string)
-              : '';
-          const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
+          // Stream content chunks in real-time (supports both delta.* and message.* providers)
+          const chunkContent = (event as LLMEvent).data?.chunk;
 
-          const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
-            ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
-            : [];
-          const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
-            ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
-            : [];
-          const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
-
-          // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
-          const extractReasoning = (node: unknown): string => {
+          if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
+            type ChoiceNode = {
+              delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
+              message?: {
+                content?: unknown;
+                toolCalls?: unknown[];
+                reasoning?: unknown;
+                reasoning_details?: unknown;
+              };
+            };
+            const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
+            const delta = choice0.delta ?? {};
+            const messageNode = choice0.message ?? {};
+            // Capture provider usage from chunk if present for mid-stream accounting
             try {
-              if (!node || typeof node !== 'object') return '';
-              const rec = node as Record<string, unknown>;
-              const parts: string[] = [];
-
-              // Unified fields
-              const raw = (rec.reasoning ?? rec.thinking) as unknown;
-
-              const appendFromRaw = (r: unknown): void => {
-                if (!r) return;
-                if (typeof r === 'string') {
-                  parts.push(r);
-                  return;
+              const rawUsage = (chunkContent as { usage?: unknown }).usage as
+                | { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown; cost?: unknown }
+                | undefined;
+              if (rawUsage && typeof rawUsage === 'object') {
+                const uRec = rawUsage as Record<string, unknown>;
+                const promptTokens = typeof uRec.promptTokens === 'number' ? uRec.promptTokens : 0;
+                const completionTokens = typeof uRec.completionTokens === 'number' ? uRec.completionTokens : 0;
+                const totalTokens =
+                  typeof uRec.totalTokens === 'number' ? uRec.totalTokens : Number(promptTokens) + Number(completionTokens);
+                const cost = typeof uRec.cost === 'number' ? uRec.cost : 0;
+                const model =
+                  typeof (chunkContent as { model?: unknown }).model === 'string'
+                    ? ((chunkContent as { model?: string }).model as string)
+                    : undefined;
+                if (totalTokens > 0 || promptTokens > 0 || completionTokens > 0 || cost > 0) {
+                  this.latestStreamingUsage.set(conversationId, {
+                    promptTokens: Number(promptTokens || 0),
+                    completionTokens: Number(completionTokens || 0),
+                    totalTokens: Number(totalTokens || 0),
+                    cost: Number(cost || 0),
+                    ...(model ? { model } : {}),
+                  });
                 }
-                if (typeof r === 'object' && r !== null) {
-                  const obj = r as Record<string, unknown>;
-                  if (typeof obj.content === 'string') parts.push(obj.content);
-                  if (Array.isArray(obj.tokens)) {
-                    for (const t of obj.tokens as unknown[]) {
-                      if (t && typeof t === 'object') {
-                        const tr = t as Record<string, unknown>;
-                        const text = typeof tr.text === 'string' ? tr.text : '';
-                        const content = typeof tr.content === 'string' ? tr.content : '';
+              }
+            } catch (err) {
+              console.warn('[STREAMING] Failed to capture usage from chunk', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+
+            const contentFromDelta =
+              typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
+            const contentFromMessage =
+              typeof (messageNode as { content?: unknown }).content === 'string'
+                ? ((messageNode as { content?: unknown }).content as string)
+                : '';
+            const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
+
+            const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
+              ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
+              : [];
+            const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
+              ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
+              : [];
+            const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
+
+            // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
+            const extractReasoning = (node: unknown): string => {
+              try {
+                if (!node || typeof node !== 'object') return '';
+                const rec = node as Record<string, unknown>;
+                const parts: string[] = [];
+
+                // Unified fields
+                const raw = (rec.reasoning ?? rec.thinking) as unknown;
+
+                const appendFromRaw = (r: unknown): void => {
+                  if (!r) return;
+                  if (typeof r === 'string') {
+                    parts.push(r);
+                    return;
+                  }
+                  if (typeof r === 'object' && r !== null) {
+                    const obj = r as Record<string, unknown>;
+                    if (typeof obj.content === 'string') parts.push(obj.content);
+                    if (Array.isArray(obj.tokens)) {
+                      for (const t of obj.tokens as unknown[]) {
+                        if (t && typeof t === 'object') {
+                          const tr = t as Record<string, unknown>;
+                          const text = typeof tr.text === 'string' ? tr.text : '';
+                          const content = typeof tr.content === 'string' ? tr.content : '';
+                          if (text) parts.push(text);
+                          else if (content) parts.push(content);
+                        }
+                      }
+                    }
+                  }
+                  if (Array.isArray(r)) {
+                    for (const p of r as unknown[]) {
+                      if (p && typeof p === 'object') {
+                        const pr = p as Record<string, unknown>;
+                        const text = typeof pr.text === 'string' ? pr.text : '';
+                        const content = typeof pr.content === 'string' ? pr.content : '';
                         if (text) parts.push(text);
                         else if (content) parts.push(content);
                       }
                     }
                   }
-                }
-                if (Array.isArray(r)) {
-                  for (const p of r as unknown[]) {
-                    if (p && typeof p === 'object') {
-                      const pr = p as Record<string, unknown>;
-                      const text = typeof pr.text === 'string' ? pr.text : '';
-                      const content = typeof pr.content === 'string' ? pr.content : '';
-                      if (text) parts.push(text);
-                      else if (content) parts.push(content);
+                };
+
+                appendFromRaw(raw);
+
+                // OpenRouter unified 'reasoning_details' chunks
+                const details = rec.reasoning_details as unknown;
+                if (Array.isArray(details)) {
+                  for (const d of details as unknown[]) {
+                    if (d && typeof d === 'object') {
+                      const det = d as Record<string, unknown>;
+                      if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                        parts.push(det.text);
+                      }
                     }
                   }
                 }
-              };
 
-              appendFromRaw(raw);
-
-              // OpenRouter unified 'reasoning_details' chunks
-              const details = rec.reasoning_details as unknown;
-              if (Array.isArray(details)) {
-                for (const d of details as unknown[]) {
-                  if (d && typeof d === 'object') {
-                    const det = d as Record<string, unknown>;
-                    if (det.type === 'reasoning.text' && typeof det.text === 'string') {
-                      parts.push(det.text);
-                    }
-                  }
-                }
+                return parts.join('');
+              } catch {
+                return '';
               }
+            };
+            const reasoningFromDelta = extractReasoning(delta);
+            const reasoningFromMessage = extractReasoning(messageNode);
+            const hasReasoning =
+              (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
 
-              return parts.join('');
-            } catch {
-              return '';
-            }
-          };
-          const reasoningFromDelta = extractReasoning(delta);
-          const reasoningFromMessage = extractReasoning(messageNode);
-          const hasReasoning =
-            (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
+            // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
+            // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
+            if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
+              if (this.streamingService.isActive(conversationId)) {
+                // Acquire lock upfront to avoid race between parallel content_chunk events
+                this.streamingContent.set(conversationId, '');
+                this.placeholderEmitted.set(conversationId, true);
+                // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
+                this.streamingToolCalls.delete(conversationId);
 
-          // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
-          // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
-          if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
-            if (this.streamingService.isActive(conversationId)) {
-              // Acquire lock upfront to avoid race between parallel content_chunk events
-              this.streamingContent.set(conversationId, '');
-              this.placeholderEmitted.set(conversationId, true);
-              // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
-              this.streamingToolCalls.delete(conversationId);
+                const assistantMessage: MessageModel = {
+                  id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  role: 'assistant',
+                  content: '',
+                  messageType: 'agent_response',
+                  createdAt: event.timestamp,
+                  updatedAt: event.timestamp,
+                };
 
-              const assistantMessage: MessageModel = {
-                id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                role: 'assistant',
-                content: '',
-                messageType: 'agent_response',
-                createdAt: event.timestamp,
-                updatedAt: event.timestamp,
-              };
-
-              const agent = this.currentAgentForConversation.get(conversationId);
-              const shell: Operation = {
-                op: 'add',
-                path: '/messages/-',
-                value: {
-                  ...assistantMessage,
-                  ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-                  streaming: true,
-                  chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
-                  reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
-                  toolCalls: [], // Initialize empty toolCalls array for replace operations
-                },
-              };
-              await this.streamingService.broadcastDelta(conversationId, shell);
-              // Emit initial resume token
-              try {
-                const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                const svc = ResumeTokenService.getInstance();
-                const token = svc.sign({
-                  c: conversationId,
-                  g: this.generationId.get(conversationId) || 'g',
-                  p: 0,
-                  m: '0',
-                  exp: Math.floor(Date.now() / 1000) + 600,
-                });
-                this.streamingService.sendResumeToken(conversationId, token);
-              } catch (err) {
-                console.warn('[STREAMING] Failed to emit initial resume token', {
-                  conversationId,
-                  error: err instanceof Error ? err.message : String(err),
-                });
-              }
-            } else {
-              // No active SSE client: still initialize accumulators so stop can persist partials.
-              this.streamingContent.set(conversationId, '');
-              this.placeholderEmitted.set(conversationId, true);
-              this.streamingToolCalls.delete(conversationId);
-              if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
-              // Skip shell broadcast; continue accumulating for persistence
-            }
-          }
-
-          // Process content if present (prefer delta token chunks; fall back to full message content snapshot with diffing)
-          if (hasContent) {
-            const incremental = contentFromDelta || '';
-            const snapshot = contentFromMessage || '';
-
-            // Compute the append text:
-            // - If incremental tokens exist, append them directly.
-            // - Else if we only have snapshot, append the new suffix beyond what we've already accumulated.
-            let append = '';
-            if (incremental) {
-              append = incremental;
-            } else if (snapshot) {
-              // Prefer using the whole snapshot with non-overlap normalization
-              const baseForSnapshot = this.streamingContent.get(conversationId) || '';
-              append = ConversationService.computeNonOverlappingAppend(baseForSnapshot, snapshot);
-            }
-
-            if (append) {
-              // Normalize against the latest base right before applying to avoid races/duplicates
-              const latestBase = this.streamingContent.get(conversationId) || '';
-              const currentLength = latestBase.length;
-              const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
-              if (normalized.length === 0) {
-                // Nothing new to append
-              } else {
-                const newContent = latestBase + normalized;
-                this.streamingContent.set(conversationId, newContent);
-                const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
-                this.accumulatedLength.set(conversationId, newLen);
-                const rb = this.ringBuffer.get(conversationId) || [];
-                rb.push({ position: currentLength, content: normalized, ts: Date.now() });
-                if (rb.length > 200) rb.splice(0, rb.length - 200);
-                this.ringBuffer.set(conversationId, rb);
-
-                // Stream delta chunk as JSON Patch add into chunks array
-                const chunkDelta: Operation = {
+                const agent = this.currentAgentForConversation.get(conversationId);
+                const shell: Operation = {
                   op: 'add',
-                  path: '/messages/-1/chunks/-',
+                  path: '/messages/-',
                   value: {
-                    content: normalized,
-                    position: currentLength,
-                    timestamp: Date.now(),
+                    ...assistantMessage,
+                    ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
+                    streaming: true,
+                    chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
+                    reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
+                    toolCalls: [], // Initialize empty toolCalls array for replace operations
                   },
                 };
-                await this.streamingService.broadcastDelta(conversationId, chunkDelta);
-                // Periodically emit resume token (every ~2s)
+                await this.streamingService.broadcastDelta(conversationId, shell);
+                // Emit initial resume token
                 try {
-                  if (Math.random() < 0.15) {
-                    const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                    const svc = ResumeTokenService.getInstance();
-                    const token = svc.sign({
-                      c: conversationId,
-                      g: this.generationId.get(conversationId) || 'g',
-                      p: newLen,
-                      m: '0',
-                      exp: Math.floor(Date.now() / 1000) + 600,
-                    });
-                    this.streamingService.sendResumeToken(conversationId, token);
-                  }
+                  const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                  const svc = ResumeTokenService.getInstance();
+                  const token = svc.sign({
+                    c: conversationId,
+                    g: this.generationId.get(conversationId) || 'g',
+                    p: 0,
+                    m: '0',
+                    exp: Math.floor(Date.now() / 1000) + 600,
+                  });
+                  this.streamingService.sendResumeToken(conversationId, token);
                 } catch (err) {
-                  console.warn('[STREAMING] Failed to emit periodic resume token', {
+                  console.warn('[STREAMING] Failed to emit initial resume token', {
                     conversationId,
                     error: err instanceof Error ? err.message : String(err),
                   });
                 }
+              } else {
+                // No active SSE client: still initialize accumulators so stop can persist partials.
+                this.streamingContent.set(conversationId, '');
+                this.placeholderEmitted.set(conversationId, true);
+                this.streamingToolCalls.delete(conversationId);
+                if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
+                // Skip shell broadcast; continue accumulating for persistence
               }
             }
-          }
 
-          // Process reasoning if present (stream as delta chunks; persist final reasoning on completion)
-          if (hasReasoning) {
-            const incrementalR = reasoningFromDelta || '';
-            const snapshotR = reasoningFromMessage || '';
+            // Process content if present (prefer delta token chunks; fall back to full message content snapshot with diffing)
+            if (hasContent) {
+              const incremental = contentFromDelta || '';
+              const snapshot = contentFromMessage || '';
 
-            const currentR = this.streamingReasoning.get(conversationId) || '';
-            const currentRLength = currentR.length;
-
-            let appendR = '';
-            if (incrementalR) {
-              appendR = incrementalR;
-            } else if (snapshotR) {
-              appendR = ConversationService.computeNonOverlappingAppend(currentR, snapshotR);
-            }
-
-            if (appendR) {
-              const normalizedR = ConversationService.computeNonOverlappingAppend(currentR, appendR);
-              if (normalizedR.length > 0) {
-                const newR = currentR + normalizedR;
-                this.streamingReasoning.set(conversationId, newR);
-
-                // Stream delta chunk for reasoning
-                const rChunkDelta: Operation = {
-                  op: 'add',
-                  path: '/messages/-1/reasoningChunks/-',
-                  value: {
-                    content: normalizedR,
-                    position: currentRLength,
-                    timestamp: Date.now(),
-                  },
-                };
-                await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
+              // Compute the append text:
+              // - If incremental tokens exist, append them directly.
+              // - Else if we only have snapshot, append the new suffix beyond what we've already accumulated.
+              let append = '';
+              if (incremental) {
+                append = incremental;
+              } else if (snapshot) {
+                // Prefer using the whole snapshot with non-overlap normalization
+                const baseForSnapshot = this.streamingContent.get(conversationId) || '';
+                append = ConversationService.computeNonOverlappingAppend(baseForSnapshot, snapshot);
               }
-            }
-          }
 
-          // Process toolCalls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
-          if (hasToolCalls) {
-            try {
-              if (toolCallsFromDelta.length > 0) {
-                const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
+              if (append) {
+                // CRITICAL FIX: Normalize content FIRST to know the chunk length
+                const latestBase = this.streamingContent.get(conversationId) || '';
+                const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
 
-                for (const raw of toolCallsFromDelta) {
-                  const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
-                  const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
+                if (normalized.length === 0) {
+                  // Nothing new to append - skip broadcasting
+                } else {
+                  // CRITICAL FIX: Read and increment position in ONE line to ensure atomicity
+                  const chunkPosition = this.nextChunkPosition.get(conversationId) || 0;
+                  this.nextChunkPosition.set(conversationId, chunkPosition + normalized.length);
 
-                  // Ensure slot only for the referenced index; do not pre-fill earlier indices
-                  if (!acc[idx]) {
-                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
-                  }
+                  // Update content
+                  const newContent = latestBase + normalized;
+                  this.streamingContent.set(conversationId, newContent);
 
-                  const target = acc[idx];
-                  if (rawTc?.id) target.id = rawTc.id;
-                  if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+                  const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
+                  this.accumulatedLength.set(conversationId, newLen);
 
-                  // Accumulate arguments as string, parse later when complete
-                  if (typeof rawTc?.function?.arguments === 'string') {
-                    target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
+                  const rb = this.ringBuffer.get(conversationId) || [];
+                  rb.push({ position: chunkPosition, content: normalized, ts: Date.now() });
+                  if (rb.length > 200) rb.splice(0, rb.length - 200);
+                  this.ringBuffer.set(conversationId, rb);
+
+                  // Build delta object synchronously
+                  const chunkDelta: Operation = {
+                    op: 'add',
+                    path: '/messages/-1/chunks/-',
+                    value: {
+                      content: normalized,
+                      position: chunkPosition,
+                      timestamp: Date.now(),
+                    },
+                  };
+
+                  // Broadcast
+                  await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+
+                  // Periodically emit resume token (every ~2s)
+                  try {
+                    if (Math.random() < 0.15) {
+                      const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
+                      const svc = ResumeTokenService.getInstance();
+                      const token = svc.sign({
+                        c: conversationId,
+                        g: this.generationId.get(conversationId) || 'g',
+                        p: newLen,
+                        m: '0',
+                        exp: Math.floor(Date.now() / 1000) + 600,
+                      });
+                      this.streamingService.sendResumeToken(conversationId, token);
+                    }
+                  } catch (err) {
+                    console.warn('[STREAMING] Failed to emit periodic resume token', {
+                      conversationId,
+                      error: err instanceof Error ? err.message : String(err),
+                    });
                   }
                 }
+              }
+            }
 
-                this.streamingToolCalls.set(conversationId, acc);
+            // Process reasoning if present (stream as delta chunks; persist final reasoning on completion)
+            if (hasReasoning) {
+              const incrementalR = reasoningFromDelta || '';
+              const snapshotR = reasoningFromMessage || '';
 
-                // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
-                const toolCallsValue = acc
-                  .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                  .map((tc) => {
+              const currentR = this.streamingReasoning.get(conversationId) || '';
+              const currentRLength = currentR.length;
+
+              let appendR = '';
+              if (incrementalR) {
+                appendR = incrementalR;
+              } else if (snapshotR) {
+                appendR = ConversationService.computeNonOverlappingAppend(currentR, snapshotR);
+              }
+
+              if (appendR) {
+                const normalizedR = ConversationService.computeNonOverlappingAppend(currentR, appendR);
+                if (normalizedR.length > 0) {
+                  const newR = currentR + normalizedR;
+                  this.streamingReasoning.set(conversationId, newR);
+
+                  // Stream delta chunk for reasoning
+                  const rChunkDelta: Operation = {
+                    op: 'add',
+                    path: '/messages/-1/reasoningChunks/-',
+                    value: {
+                      content: normalizedR,
+                      position: currentRLength,
+                      timestamp: Date.now(),
+                    },
+                  };
+                  await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
+                }
+              }
+            }
+
+            // Process toolCalls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
+            if (hasToolCalls) {
+              try {
+                if (toolCallsFromDelta.length > 0) {
+                  const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
+
+                  for (const raw of toolCallsFromDelta) {
+                    const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
+                    const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
+
+                    // Ensure slot only for the referenced index; do not pre-fill earlier indices
+                    if (!acc[idx]) {
+                      acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
+                    }
+
+                    const target = acc[idx];
+                    if (rawTc?.id) target.id = rawTc.id;
+                    if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+
+                    // Accumulate arguments as string, parse later when complete
+                    if (typeof rawTc?.function?.arguments === 'string') {
+                      target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
+                    }
+                  }
+
+                  this.streamingToolCalls.set(conversationId, acc);
+
+                  // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
+                  const toolCallsValue = acc
+                    .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
+                    .map((tc) => {
+                      let argsObj: unknown = {};
+                      const argsStr = tc.function?.arguments;
+                      if (typeof argsStr === 'string' && argsStr) {
+                        try {
+                          // Try full JSON.parse first for complete JSON
+                          argsObj = JSON.parse(argsStr);
+                        } catch {
+                          try {
+                            // Use partial-json for incomplete JSON during streaming
+                            argsObj = parsePartialJson(argsStr);
+                          } catch {
+                            // If both fail, use empty object
+                            argsObj = {};
+                          }
+                        }
+                      }
+                      return {
+                        id: tc.id,
+                        type: tc.type,
+                        function: {
+                          name: tc.function.name,
+                          arguments: argsObj, // Parsed object (may be partial)
+                        },
+                      };
+                    });
+
+                  await this.streamingService.broadcastDelta(conversationId, {
+                    op: 'replace',
+                    path: '/messages/-1/toolCalls',
+                    value: toolCallsValue,
+                  });
+                } else if (toolCallsFromMessage.length > 0) {
+                  // Snapshot toolCalls from message node (no incremental indices)
+                  // Parse arguments using partial-json for robustness
+                  const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
+                    const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
+                    const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
                     let argsObj: unknown = {};
-                    const argsStr = tc.function?.arguments;
-                    if (typeof argsStr === 'string' && argsStr) {
+                    if (argsStr) {
                       try {
-                        // Try full JSON.parse first for complete JSON
                         argsObj = JSON.parse(argsStr);
                       } catch {
                         try {
-                          // Use partial-json for incomplete JSON during streaming
                           argsObj = parsePartialJson(argsStr);
                         } catch {
-                          // If both fail, use empty object
                           argsObj = {};
                         }
                       }
                     }
                     return {
-                      id: tc.id,
-                      type: tc.type,
+                      id: tc?.id,
+                      type: 'function' as const,
                       function: {
-                        name: tc.function.name,
-                        arguments: argsObj, // Parsed object (may be partial)
+                        name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
+                        arguments: argsObj, // Store as parsed object for UI
                       },
                     };
                   });
 
-                await this.streamingService.broadcastDelta(conversationId, {
-                  op: 'replace',
-                  path: '/messages/-1/toolCalls',
-                  value: toolCallsValue,
-                });
-              } else if (toolCallsFromMessage.length > 0) {
-                // Snapshot toolCalls from message node (no incremental indices)
-                // Parse arguments using partial-json for robustness
-                const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
-                  const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
-                  const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
-                  let argsObj: unknown = {};
-                  if (argsStr) {
-                    try {
-                      argsObj = JSON.parse(argsStr);
-                    } catch {
-                      try {
-                        argsObj = parsePartialJson(argsStr);
-                      } catch {
-                        argsObj = {};
-                      }
-                    }
-                  }
-                  return {
-                    id: tc?.id,
-                    type: 'function' as const,
+                  // Maintain streaming accumulator with string arguments form
+                  const accumFromSnapshot: StreamingToolCallAccum[] = normalized.map((tc) => ({
+                    id: tc.id,
+                    type: 'function',
                     function: {
-                      name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
-                      arguments: argsObj, // Store as parsed object for UI
+                      name: tc.function.name,
+                      arguments: (() => {
+                        try {
+                          return JSON.stringify(tc.function.arguments ?? {});
+                        } catch {
+                          return '{}';
+                        }
+                      })(),
                     },
-                  };
-                });
+                  }));
+                  this.streamingToolCalls.set(conversationId, accumFromSnapshot);
 
-                // Maintain streaming accumulator with string arguments form
-                const accumFromSnapshot: StreamingToolCallAccum[] = normalized.map((tc) => ({
-                  id: tc.id,
-                  type: 'function',
-                  function: {
-                    name: tc.function.name,
-                    arguments: (() => {
-                      try {
-                        return JSON.stringify(tc.function.arguments ?? {});
-                      } catch {
-                        return '{}';
-                      }
-                    })(),
-                  },
-                }));
-                this.streamingToolCalls.set(conversationId, accumFromSnapshot);
-
-                // Broadcast only valid entries (non-empty function name)
-                await this.streamingService.broadcastDelta(conversationId, {
-                  op: 'replace',
-                  path: '/messages/-1/toolCalls',
-                  value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
-                });
+                  // Broadcast only valid entries (non-empty function name)
+                  await this.streamingService.broadcastDelta(conversationId, {
+                    op: 'replace',
+                    path: '/messages/-1/toolCalls',
+                    value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
+                  });
+                }
+              } catch {
+                // ignore toolCall parse errors to avoid breaking streaming
               }
-            } catch {
-              // ignore toolCall parse errors to avoid breaking streaming
             }
           }
-        }
+        };
+
+        // CRITICAL FIX: Chain this chunk after the previous one completes
+        const previousLock = this.chunkProcessingLock.get(conversationId) || Promise.resolve();
+        const currentLock = previousLock
+          .then(() => processThisChunk())
+          .catch((err) => {
+            console.error('[STREAMING] Chunk processing error:', err);
+          });
+        this.chunkProcessingLock.set(conversationId, currentLock);
+
+        // Wait for this chunk to complete
+        await currentLock;
         break;
       }
 

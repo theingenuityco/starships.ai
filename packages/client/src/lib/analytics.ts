@@ -3,6 +3,8 @@ export type AnalyticsEvent =
   | { type: 'demo_started'; scenario: 'enrichment' | 'copilot' }
   | { type: 'demo_completed'; scenario: 'enrichment' | 'copilot' }
   | { type: 'use_case_toggled'; scenario: 'enrichment' | 'copilot' }
+  | { type: 'discord_hero_clicked' }
+  | { type: 'discord_cta_clicked' }
 
 export function track(event: AnalyticsEvent) {
   try {

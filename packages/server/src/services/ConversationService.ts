@@ -5,7 +5,6 @@ import { UsageService } from '@/services/UsageService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM } from '@starships/autopilot';
 import type {
   ToolParams,
-  ExecutionItem,
   AgentParams,
   ExecutionEvent,
   LLMEvent,

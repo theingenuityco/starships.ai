@@ -9,6 +9,7 @@ import FAQ from '@/app/components/FAQ'
 import FinalCTA from '@/app/components/FinalCTA'
 import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 import StarryBackground from '@/app/components/StarryBackground'
+import BackToTop from '@/app/components/BackToTop'
 
 import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,7 @@ export default function HomePage() {
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
         <StarryBackground />
         <PublicHeader />
+        <BackToTop />
 
         {/* New Landing Sections */}
         <Hero />

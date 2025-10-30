@@ -266,18 +266,13 @@ export class ToolRepository extends BaseRepository {
           condition: template.condition,
           // Use unique slug derived from template slug
           slug: template.slug,
+          templateId: template.id,
           configuration: configuration || {},
           isEnabled: true,
         };
 
-        // Ensure global uniqueness and record template relationship
-        const created = await this.create(toolData, starshipId);
-        // Set templateId if not set by create
-        if (!created.templateId && template.id) {
-          const updated = await this.update(created.id, { templateId: template.id });
-          return updated || created;
-        }
-        const tool = created;
+        // Ensure global uniqueness via create and return tool
+        const tool = await this.create(toolData, starshipId);
 
         // Record the template relationship and increment usage count
         await connection.query('UPDATE tool_templates SET usage_count = usage_count + 1, updated_at = $2 WHERE slug = $1', [

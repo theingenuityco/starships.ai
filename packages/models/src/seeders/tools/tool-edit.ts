@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolEditTool: ToolParams = {
   name: 'Edit Tool',
-  slug: 'tool-edit',
+  slug: 'edit-tool',
   description: `Updates an existing tool by slug with partial changes. Designed for incremental tool development and refinement.
 
 ## Purpose
@@ -190,7 +190,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   parameters: toolEditTool.parameters,
   blueprint: toolEditTool.blueprint,
 
-  slug: 'tool-edit',
+  slug: 'edit-tool',
   category: 'automation',
   exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,

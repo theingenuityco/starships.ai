@@ -7,7 +7,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolOpenTool: ToolParams = {
   name: 'Open Tool',
-  slug: 'tool-open',
+  slug: 'open-tool',
   description: `Creates or opens a tool on the current starship.
 
 ## Modes
@@ -142,7 +142,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   parameters: toolOpenTool.parameters,
   blueprint: toolOpenTool.blueprint,
 
-  slug: 'tool-open',
+  slug: 'open-tool',
   category: 'automation',
   exampleUsage:
     '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',

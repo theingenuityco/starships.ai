@@ -499,12 +499,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           // Navigate to agent builder for agent actions
-          const agentBuilderSlugFragments = [
-            'agent-open',
-            'agent-edit',
-            'agent-assign-tool',
-            'agent-unassign-tool',
-          ]
+          const agentBuilderSlugFragments = ['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool']
           if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
             try {
               const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
@@ -644,7 +639,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }, [currentConversationId, liveMessages])
 
-    // Proactive navigation on tool calls
+    // Proactive navigation on tool calls (contains-based slug matching)
     useEffect(() => {
       if (!currentConversationId || !liveMessages.length || !starshipSlug) return
       const recent = (liveMessages as any[]).slice(-10)
@@ -654,26 +649,32 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         for (const tc of msg.toolCalls as any[]) {
           const id = tc?.id as string | undefined
           if (!id || navigatedToolCallIdsRef.current.has(id)) continue
-          const name = tc?.function?.name as string | undefined
+          const rawName = tc?.function?.name as string | undefined
+          const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
           if (!name) continue
-          const openToolBuilderSlugs = new Set([
+
+          const toolFragments = [
             'tool-open',
+            'open-tool',
             'tool-edit',
+            'edit-tool',
             'tool-add-blueprint-node',
             'tool-add-blueprint-edge',
             'tool-blueprint-edit-node',
             'tool-blueprint-remove-node',
             'tool-blueprint-edit-edge',
             'tool-blueprint-remove-edge',
-          ])
-          const openAgentBuilderSlugs = new Set(['agent-open', 'agent-edit', 'agent-assign-tool', 'agent-unassign-tool'])
+          ]
+          const agentFragments = ['agent-open', 'open-agent', 'agent-edit', 'edit-agent', 'agent-assign-tool', 'assign-agent-tool', 'agent-unassign-tool', 'unassign-agent-tool']
+
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
             try {
               args = JSON.parse(args)
             } catch {}
           }
-          if (openToolBuilderSlugs.has(name) || name?.startsWith?.('tool-blueprint-')) {
+
+          if (toolFragments.some(f => name.includes(f)) || name.includes('tool-blueprint-')) {
             const toolSlug = args?.slug || args?.toolSlug || 'new'
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
@@ -683,7 +684,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             navigatedToolCallIdsRef.current.add(id)
             return
           }
-          if (openAgentBuilderSlugs.has(name)) {
+          if (agentFragments.some(f => name.includes(f))) {
             const agentSlug = args?.slug || args?.agentSlug || 'new'
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''

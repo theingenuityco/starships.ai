@@ -44,7 +44,7 @@ export default function ProfilePage(): React.JSX.Element {
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center space-y-4">
         <h1 className="text-2xl font-bold">Welcome to Starships.ai!</h1>
-        <p className="text-muted-foreground">Your account is set up, but you don't have any starships yet.</p>
+        <p className="text-muted-foreground">Your account is set up, but you don&apos;t have any starships yet.</p>
         <p className="text-sm text-muted-foreground">Please contact support to get your first starship created.</p>
       </div>
     </div>

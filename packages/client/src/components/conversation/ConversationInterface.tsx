@@ -145,7 +145,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Prefetch participants for top 5 recent conversations when on starter state
   const prefetchRecentParticipants = useCallback(async () => {
     try {
-      const list = starshipConversationsData?.conversations || []
+      const list = (starshipConversationsData?.conversations || []).filter((c: any) => c.status !== 'archived')
       if (!Array.isArray(list) || list.length === 0) return
       const recent = list
         .slice()
@@ -830,11 +830,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               )}
             </AnimatePresence>
             <AnimatePresence initial={false} mode="wait">
-              {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.length > 0 && (
+              {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.filter((c: any) => c.status !== 'archived').length > 0 && (
                 <motion.div key="recent-list" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
                   <div className="space-y-1">
                     {starshipConversationsData!.conversations
+                      .filter((c: any) => c.status !== 'archived')
                       .slice()
                       .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
                       .slice(0, 3)

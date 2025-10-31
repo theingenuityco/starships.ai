@@ -126,6 +126,12 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
     if (!paramValidation) return;
 
+    // Authorization: Users can only view their own profile
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only view your own profile', 403);
+      return;
+    }
+
     const userService = new UserService();
     const user = await userService.getUserById(req.params.id);
 
@@ -158,6 +164,15 @@ router.get('/users/email/:email', jwtAuthMiddleware, async (req: Request, res: R
       return;
     }
 
+    // Anti-enumeration: Only allow lookup of the authenticated user's email; otherwise return 404
+    if (email.toLowerCase() !== (req.user?.email || '').toLowerCase()) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        email,
+      });
+      return;
+    }
+
     const userService = new UserService();
     const user = await userService.getUserByEmail(email);
 
@@ -175,26 +190,19 @@ router.get('/users/email/:email', jwtAuthMiddleware, async (req: Request, res: R
   }
 });
 
-// GET /users - List users with pagination (admin/internal endpoint)
+// GET /users - Self-only listing (returns only the authenticated user)
 router.get('/users', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     if (!checkAuth(req, res)) return;
 
-    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
-    if (!queryValidation) return;
-
-    const { page, limit } = queryValidation;
-
+    // Restrict enumeration: return only the authenticated user's record
     const userService = new UserService();
-    const allUsers = await userService.getAllUsers();
+    const self = await userService.getUserById(req.user!.id);
 
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const paginatedUsers = allUsers.slice(startIndex, startIndex + limit);
+    const items = self ? [self] : [];
+    const paginationMeta = createPaginationMeta(1, 1, items.length);
 
-    const paginationMeta = createPaginationMeta(page, limit, allUsers.length);
-
-    sendSuccess(res, paginatedUsers, 200, paginationMeta);
+    sendSuccess(res, items, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'listing users');
   }
@@ -239,6 +247,12 @@ router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
 
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
     if (!paramValidation) return;
+
+    // Authorization: Users can only update their own account
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only update your own account', 403);
+      return;
+    }
 
     const updates = validateData(UpdateUserSchema, req.body, res, 'user updates');
     if (!updates) return;
@@ -361,26 +375,7 @@ router.get('/users/:id/starships', jwtAuthMiddleware, async (req: Request, res: 
   }
 });
 
-// ============================================================================
-// ANALYTICS AND STATISTICS ENDPOINTS
-// ============================================================================
-
-// GET /users/stats - Get user statistics (admin endpoint)
-router.get('/users/stats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
-
-    // TODO: Add admin authorization check in the future
-    // For now, any authenticated user can view stats
-
-    const userService = new UserService();
-    const stats = await userService.getUserStats();
-
-    sendSuccess(res, stats);
-  } catch (error) {
-    handleError(error, res, 'fetching user statistics');
-  }
-});
+// (Removed) /users/stats endpoint: not used and could expose aggregated user data
 
 // ============================================================================
 // AUTHENTICATION ENDPOINTS (for internal use)

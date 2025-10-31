@@ -42,12 +42,7 @@ export interface UpdateUserProfileRequest {
   newPassword?: string
 }
 
-// User statistics response
-export interface UserStats {
-  totalUsers: number
-  newUsersLast30Days: number
-  activeUsers: number
-}
+// (Removed) UserStats - legacy type for unused /users/stats endpoint
 
 // Centralized query keys following TanStack Query best practices
 export const USER_QUERY_KEYS = {
@@ -117,19 +112,7 @@ export function useUsers(filters?: UserFilters, enabled: boolean = true) {
 /**
  * Get user statistics
  */
-export function useUserStats(enabled: boolean = true) {
-  return useQuery({
-    queryKey: USER_QUERY_KEYS.stats(),
-    queryFn: async (): Promise<UserStats> => {
-      const response: FetchResponse<ApiResponse<UserStats>> = await api.get('/api/v1/users/stats')
-      return response.data.data
-    },
-    enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
-    refetchOnWindowFocus: false,
-  })
-}
+// (Removed) useUserStats - unused and endpoint removed on server
 
 /**
  * Get current authenticated user (helper hook)

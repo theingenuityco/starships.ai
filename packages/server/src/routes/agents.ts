@@ -7,6 +7,8 @@ import { validateData } from '@/utils/validation';
 import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentModel } from '@starships/protocol';
+import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
+import { StarshipService } from '@/services/StarshipService';
 
 const router: Router = Router();
 
@@ -95,10 +97,26 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
     const { id: agentId } = paramValidation;
     const { starshipId } = bodyValidation;
 
+    const agentService = new AgentService();
+
+    // Load agent and validate existence
+    const existing = await agentService.getAgent(agentId);
+    if (!existing) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    // Verify caller owns the agent's current starship
+    const hasAgentAccess = await verifyResourceAccess(existing.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAgentAccess) return;
+
+    // Verify caller owns the destination starship
+    const hasDestAccess = await verifyStarshipAccess(starshipId, req.user!.id, res);
+    if (!hasDestAccess) return;
+
     console.log(`[AGENTS] Updating agent ${agentId} starship assignment to: ${starshipId}`);
 
     // Delegate to service layer
-    const agentService = new AgentService();
     const agent = await agentService.updateAgentStarship(agentId, starshipId);
 
     sendSuccess(res, {
@@ -246,13 +264,38 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
     const agentService = new AgentService();
 
     if (starshipId) {
-      // Get agents by starship with access control
+      // Verify access to requested starship
+      const ok = await verifyStarshipAccess(starshipId, req.user!.id, res);
+      if (!ok) return;
+
       const result = await agentService.getAgentsByStarshipWithAccess(starshipId, req.user!.id, page, limit);
       sendSuccess(res, result.agents, 200, { pagination: result.pagination });
     } else {
-      // Get all agents with pagination
-      const result = await agentService.getAgentsWithPagination(page, limit);
-      sendSuccess(res, result.agents, 200, { pagination: result.pagination });
+      // Filter to only agents from user's starships
+      const starshipService = new StarshipService();
+      const userStarships = await starshipService.getStarshipsByOwner(req.user!.id);
+      const starshipIds = userStarships.map((s) => s.id);
+
+      let allAgents: AgentModel[] = [];
+      for (const sid of starshipIds) {
+        const agents = await agentService.getAgentsByStarship(sid);
+        if (Array.isArray(agents) && agents.length > 0) {
+          allAgents = allAgents.concat(agents);
+        }
+      }
+
+      const total = allAgents.length;
+      const offset = (page - 1) * limit;
+      const paginatedAgents = allAgents.slice(offset, offset + limit);
+      const pagination = {
+        page,
+        limit,
+        total,
+        has_next: offset + limit < total,
+        has_prev: page > 1,
+      };
+
+      sendSuccess(res, paginatedAgents, 200, { pagination });
     }
   } catch (error) {
     console.error('[AGENTS] Error loading agents:', error);
@@ -309,6 +352,15 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
     const bodyValidation = validateData(CreateAgentSchema, req.body, res, 'agent creation data');
     if (!bodyValidation) return;
 
+    // Authorization: ensure caller owns the target starship
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    const hasAccess = await verifyStarshipAccess(bodyValidation.starshipId, userId, res);
+    if (!hasAccess) return;
+
     const agentService = new AgentService();
     const agent = await agentService.createAgent(req.body);
     console.log(`[AGENTS] Agent created successfully: ${agent.id}`);
@@ -338,10 +390,18 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
       console.log(`[AGENTS] Updating agent ${id} with new starshipId: ${updates.starshipId}`);
     }
 
-    // Delegate to service layer
+    // Authorization: ensure caller owns the starship that owns this agent
     const agentService = new AgentService();
-    const agent = await agentService.updateAgent(id, updates as any);
+    const existing = await agentService.getAgent(id);
+    if (!existing) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id });
+      return;
+    }
 
+    const hasAccess = await verifyResourceAccess(existing.starshipId, req.user!.id, 'agent', id, res);
+    if (!hasAccess) return;
+
+    const agent = await agentService.updateAgent(id, updates as any);
     sendSuccess(res, agent);
   } catch (error) {
     console.error('[AGENTS] Error updating agent:', error);
@@ -356,9 +416,22 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
-    // Delegate to service layer
+    // Authorization: ensure caller owns the starship that owns this agent
     const agentService = new AgentService();
+    const agent = await agentService.getAgent(paramValidation.id);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: paramValidation.id });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', paramValidation.id, res);
+    if (!hasAccess) return;
+
     const deleted = await agentService.deleteAgent(paramValidation.id);
+    if (!deleted) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: paramValidation.id });
+      return;
+    }
 
     sendSuccess(res, { message: 'Agent deleted successfully' }, 200);
   } catch (error) {

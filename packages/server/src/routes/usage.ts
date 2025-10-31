@@ -5,6 +5,8 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UsageService } from '@/services/UsageService';
 import { StarshipService } from '@/services/StarshipService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { verifyResourceAccess } from '@/middleware/verify-starship-access';
+import { ConversationService } from '@/services/ConversationService';
 
 const router: Router = Router();
 
@@ -63,6 +65,22 @@ router.get('/conversations/:conversationId/usage/totals', jwtAuthMiddleware, asy
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
     const { conversationId } = paramValidation;
+
+    // Authorization: verify user has access to this conversation's starship
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404);
+      return;
+    }
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
 
     const usageService = new UsageService();
     const totals = await usageService.getTotalsByConversation(conversationId);

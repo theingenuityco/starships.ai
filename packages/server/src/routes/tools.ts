@@ -8,6 +8,7 @@ import { ToolRepository, ToolTemplateRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
 import { sendError, sendSuccess } from '../utils/responseHelpers';
+import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 
 const router: Router = Router();
 
@@ -222,6 +223,15 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+    if (!hasAccess) return;
+
     const toolRepository = new ToolRepository();
     const tools = await toolRepository.findByStarship(paramValidation.starshipId);
 
@@ -246,6 +256,15 @@ router.get('/starships/:starshipId/tools/:slug', jwtAuthMiddleware, async (req: 
     );
     if (!paramValidation) return;
 
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+    if (!hasAccess) return;
+
     const { starshipId, slug } = paramValidation;
     const toolRepository = new ToolRepository();
     const tool = await toolRepository.findBySlugAndStarship(slug, starshipId);
@@ -267,6 +286,15 @@ router.post('/starships/:starshipId/tools', jwtAuthMiddleware, validateToolBalan
   try {
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
+
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+    if (!hasAccess) return;
 
     const bodyValidation = validateData(CreateToolSchema, req.body, res, 'tool creation data');
     if (!bodyValidation) return;
@@ -300,6 +328,15 @@ router.post(
     try {
       const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
       if (!paramValidation) return;
+
+      const userId = req.user?.id as string | undefined;
+      if (!userId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+      if (!hasAccess) return;
 
       const bodyValidation = validateData(
         z.object({
@@ -336,7 +373,23 @@ router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response):
     const bodyValidation = validateData(UpdateToolSchema, req.body, res, 'tool update data');
     if (!bodyValidation) return;
 
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
     const toolRepository = new ToolRepository();
+    const existingTool = await toolRepository.findById(paramValidation.id);
+
+    if (!existingTool) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404);
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess((existingTool as any).starshipId, userId, 'tool', paramValidation.id, res);
+    if (!hasAccess) return;
+
     const tool = await toolRepository.update(paramValidation.id, bodyValidation as any);
 
     if (!tool) {
@@ -357,7 +410,23 @@ router.delete('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Respons
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'tool parameter');
     if (!paramValidation) return;
 
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
     const toolRepository = new ToolRepository();
+    const existingTool = await toolRepository.findById(paramValidation.id);
+
+    if (!existingTool) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404);
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess((existingTool as any).starshipId, userId, 'tool', paramValidation.id, res);
+    if (!hasAccess) return;
+
     const deleted = await toolRepository.delete(paramValidation.id);
 
     if (!deleted) {

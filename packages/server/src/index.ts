@@ -3,6 +3,10 @@
  * Main server entry point with enhanced repository pattern
  */
 
+// IMPORTANT: Import Sentry instrumentation first, before any other imports
+import './instrument';
+import * as Sentry from '@sentry/node';
+
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates } from '@starships/models';
@@ -100,6 +104,9 @@ app.use('/api/v1', ledgerRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);
+
+// Sentry error handler must be registered before any other error middleware
+Sentry.setupExpressErrorHandler(app);
 
 // Add centralized error handling middleware (must be last)
 app.use(

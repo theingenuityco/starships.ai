@@ -1,6 +1,7 @@
 import { ClientLayout } from '@/app/client-layout'
 import '@/app/globals.css'
 import { AnalyticsProvider } from '@/components/analytics/analytics-provider'
+import { SentryWrapper } from '@/components/sentry-wrapper'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} app-gradient-bg`} suppressHydrationWarning>
+        <SentryWrapper />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <QueryProvider>
             <AuthProvider>

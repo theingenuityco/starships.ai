@@ -12,6 +12,7 @@ import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { getEnvConfig } from '@starships/env';
+import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 
 const router: Router = Router();
 
@@ -27,6 +28,25 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;
+
+    // Authorization: verify user has access to this conversation's starship
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    const convAuthSvc = new ConversationService();
+    const convAuth = await convAuthSvc.getConversationById(conversationId);
+    if (!convAuth) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+    if (!(await verifyResourceAccess((convAuth as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
 
     // Check if streaming is requested
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
@@ -196,6 +216,16 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       return;
     }
 
+    // Authorization: verify user has access to this conversation
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess((exists as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+
     await conversationService.stopConversation(conversationId);
     sendSuccess(res, { status: 'stopped', conversationId }, 200);
   } catch (error) {
@@ -242,6 +272,16 @@ router.post(
           resource: 'conversation',
           id: conversationId,
         });
+        return;
+      }
+
+      // Authorization: verify user has access to this conversation
+      const authUserId = (req as any).user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+      if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
         return;
       }
 
@@ -323,6 +363,16 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
+    // Authorization: verify user has access to this conversation
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+
     sendSuccess(res, conversation, 200);
   } catch (error) {
     handleError(error, res, 'fetching conversation details');
@@ -344,6 +394,16 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
 
     const { starshipId } = paramValidation;
     const { page, limit } = paginationValidation;
+
+    // Authorization: verify user owns this starship
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyStarshipAccess(starshipId, authUserId, res))) {
+      return;
+    }
 
     // Use service layer to get conversations by starship
     const conversationService = new ConversationService();
@@ -377,6 +437,16 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       'conversation creation data'
     );
     if (!bodyValidation) return;
+
+    // Authorization: verify user owns the target starship
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyStarshipAccess(bodyValidation.starshipId, authUserId, res))) {
+      return;
+    }
 
     const conversationService = new ConversationService();
     const conversation = await conversationService.createConversation(req.body);
@@ -421,6 +491,16 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
       return;
     }
 
+    // Authorization: verify user has access to this conversation
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+
     // Update status using appropriate method
     switch (status) {
       case 'completed':
@@ -460,6 +540,16 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
         resource: 'conversation',
         id: conversationId,
       });
+      return;
+    }
+
+    // Authorization: verify user has access to this conversation
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -506,6 +596,16 @@ router.patch('/conversations/:conversationId', jwtAuthMiddleware, async (req: Re
         resource: 'conversation',
         id: conversationId,
       });
+      return;
+    }
+
+    // Authorization: verify user has access to this conversation
+    const authUserId = (req as any).user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 

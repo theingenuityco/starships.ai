@@ -32,9 +32,11 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const { data, isLoading, error } = useStarshipConversations(starshipId, true)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Filter conversations based on search
+  // Filter conversations based on search and status
   const filteredConversations =
     data?.conversations?.filter(conv => {
+      // Exclude archived conversations from the UI
+      if (conv.status === 'archived') return false
       if (!searchQuery) return true
       const title = conv.title || `Conversation ${conv.id.slice(0, 8)}`
       return title.toLowerCase().includes(searchQuery.toLowerCase())

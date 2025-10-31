@@ -17,4 +17,9 @@ router.get('/health', (req: Request, res: Response): void => {
   });
 });
 
+// GET /debug-sentry - Test Sentry error reporting
+router.get('/debug-sentry', (req: Request, res: Response): void => {
+  throw new Error('Test Sentry error from server!');
+});
+
 export default router;

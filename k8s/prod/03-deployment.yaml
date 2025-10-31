@@ -224,6 +224,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SENTRY_DSN_CLIENT
+            - name: SENTRY_DSN_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SENTRY_DSN_SERVER
 
             # OAuth
             - name: GH_OAUTH_CLIENT_ID

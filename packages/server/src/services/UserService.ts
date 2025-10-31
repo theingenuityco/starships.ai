@@ -6,7 +6,13 @@
  */
 
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { OAuthAccountRepository, UserRepository, EmailVerificationTokenRepository, PasswordResetTokenRepository, StarshipRepository } from '@starships/models';
+import {
+  OAuthAccountRepository,
+  UserRepository,
+  EmailVerificationTokenRepository,
+  PasswordResetTokenRepository,
+  StarshipRepository,
+} from '@starships/models';
 import type {
   CreateUserRequest,
   UpdateUserRequest,
@@ -308,10 +314,7 @@ export class UserService {
       if (!user) {
         throw new ValidationError('OAuth account linked to non-existent user', 'oauth');
       }
-      
-      // SIMPLE FIX: Don't auto-verify emails from OAuth - be conservative
-      // Users can verify via email if needed
-      
+
       return { user };
     }
 
@@ -334,11 +337,11 @@ export class UserService {
           email: user.email,
           provider: profile.provider,
         });
-        
+
         // Verify the email (OAuth providers verify emails)
         await this.userRepository.update(user.id, { emailVerified: true });
         user.emailVerified = true;
-        
+
         // Check if they need a starship
         const starshipRepo = new StarshipRepository();
         const userStarships = await starshipRepo.findByOwner(user.id);
@@ -382,7 +385,7 @@ export class UserService {
       email: profile.email,
       displayName: profile.name,
       avatar: profile.avatar,
-      emailVerified: false, // SIMPLE FIX: Don't auto-verify OAuth emails, be conservative
+      emailVerified: true, // OAuth providers (Google, GitHub) verify emails before we receive them
     };
 
     // Create user using proper service layer method
@@ -917,27 +920,29 @@ export class UserService {
    */
   async sendPasswordReset(email: string): Promise<void> {
     const user = await this.getUserByEmail(email);
-    
+
     // SECURITY: Always return success (prevent user enumeration)
     if (!user) {
       logger.info('[UserService] Password reset requested for non-existent email', { email });
       return; // Silent success
     }
-    
+
     // BUSINESS RULE: Only users with passwords can reset passwords
     if (!user.hasPassword) {
-      logger.info('[UserService] Password reset requested for OAuth-only user', { 
-        userId: user.id, email, authMethods: user.authMethods 
+      logger.info('[UserService] Password reset requested for OAuth-only user', {
+        userId: user.id,
+        email,
+        authMethods: user.authMethods,
       });
       return; // Silent success (OAuth users use "Set Password" flow)
     }
-    
+
     // Generate and send reset token using existing email service pattern
     const token = await this.passwordResetTokenRepository.generateToken(user.id, email);
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
     await emailService.sendPasswordResetEmail(email, token);
-    
+
     logger.info('[UserService] Password reset email sent', { userId: user.id, email });
   }
 
@@ -969,12 +974,12 @@ export class UserService {
     // Update user password
     await this.userRepository.update(verification.userId, {
       password: hashedPassword,
-      hasPassword: true
+      hasPassword: true,
     });
 
-    logger.info('[UserService] Password reset successful', { 
+    logger.info('[UserService] Password reset successful', {
       userId: verification.userId,
-      email: verification.email
+      email: verification.email,
     });
   }
 }

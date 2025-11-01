@@ -56,7 +56,7 @@ interface ConversationMessageInputProps {
 export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
   focusInput: () => void
-  setLeadingMentionAgent: (agent: AgentModel) => void
+  setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -1573,12 +1573,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             tiptap?.commands.focus('end')
           } catch {}
         },
-        setLeadingMentionAgent: (agent: AgentModel) => {
+        setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => {
           try {
             if (!tiptap || !agent) return
-            // Update local current agent ref and notify parent so selectedAgent prop stays in sync
+            // Update local current agent immediately; defer external change to avoid race with enforcement
             currentAgentRef.current = agent
-            if (onAgentChange) onAgentChange(agent)
             const json: any = tiptap.getJSON()
             const docContent = Array.isArray(json?.content) ? json.content : []
             const firstBlock = docContent[0]
@@ -1587,15 +1586,27 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
             const desiredMention = buildMentionNodeForAgent(agent)
             if (!desiredMention) return
-            const spaceNode = [{ type: 'text', text: ' ' }]
-            const newParagraph = { type: 'paragraph', content: [desiredMention, ...spaceNode, ...rest] }
+            // Build minimal paragraph: mention + single space; we'll insert any prefill text via commands after content is set
+            const newParagraph = { type: 'paragraph', content: [desiredMention, { type: 'text', text: ' ' }, ...rest] }
             const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
             scheduleSetContent(newDoc)
             lastEnforcedAgentIdRef.current = agent.id
             setTimeout(() => {
               try {
                 tiptap?.commands.focus()
+                // Place caret immediately after mention + space
                 tiptap?.commands.setTextSelection(2)
+                if (typeof afterText === 'string' && afterText.trim().length > 0) {
+                  // Insert prefill text at the caret
+                  const text = afterText.trim() + ' '
+                  ;(tiptap as any).commands.insertContent?.(text)
+                }
+                // Now sync selectedAgent externally after our edits settle, to avoid enforcement racing our insert
+                setTimeout(() => {
+                  try {
+                    if (onAgentChange) onAgentChange(agent)
+                  } catch {}
+                }, 60)
               } catch {}
             }, 10)
           } catch {}

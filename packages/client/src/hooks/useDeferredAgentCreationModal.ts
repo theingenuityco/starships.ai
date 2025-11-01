@@ -17,7 +17,7 @@ export function useDeferredAgentCreationModal(options: {
   starshipSlug?: string | null
   conversationId?: string | null
   agents?: Array<{ name?: string; slug?: string }>
-  setLeadingMentionAgent?: (agent: { id?: string; name?: string; slug?: string }) => void
+  setLeadingMentionAgent?: (agent: { id?: string; name?: string; slug?: string }, afterText?: string) => void
   focusInput?: () => void
 }) {
   const isStreaming = Boolean(options?.isStreaming)
@@ -200,7 +200,7 @@ export function useDeferredAgentCreationModal(options: {
           ) ||
           null
         if (daedalus && setLeadingMentionAgent) {
-          setLeadingMentionAgent(daedalus as any)
+          setLeadingMentionAgent(daedalus as any, 'create a tool for this agent')
         }
         if (focusInput) {
           setTimeout(() => {

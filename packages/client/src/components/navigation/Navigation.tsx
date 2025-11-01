@@ -10,7 +10,7 @@ import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
+import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -118,31 +118,33 @@ export function Navigation(props: NavigationProps) {
 
   // Conversation action handlers - memoized to prevent unnecessary re-renders
   const deleteConversationMutation = useDeleteConversation()
-  const updateConversationStatusMutation = useUpdateConversationStatus()
+
+  // Extract current conversation ID from pathname
+  const currentConversationId = useMemo(() => {
+    if (pathname.startsWith('/ship/')) {
+      const pathParts = pathname.split('/')
+      // Check if path matches /ship/<slug>/conversations/<conversationId>
+      if (pathParts.length >= 5 && pathParts[3] === 'conversations' && pathParts[4]) {
+        return pathParts[4]
+      }
+    }
+    return null
+  }, [pathname])
 
   const handleConversationDelete = useCallback(
     async (conversationId: string) => {
       try {
         await deleteConversationMutation.mutateAsync(conversationId)
-      } catch (error) {
-        // Error handling is done in the mutation hook
-      }
-    },
-    [deleteConversationMutation]
-  )
 
-  const handleConversationArchive = useCallback(
-    async (conversationId: string) => {
-      try {
-        await updateConversationStatusMutation.mutateAsync({
-          conversationId,
-          status: 'archived',
-        })
+        // If we're currently viewing the deleted conversation, redirect to conversations page
+        if (currentConversationId === conversationId && starshipSlug) {
+          router.push(`/ship/${starshipSlug}/conversations`)
+        }
       } catch (error) {
         // Error handling is done in the mutation hook
       }
     },
-    [updateConversationStatusMutation]
+    [deleteConversationMutation, currentConversationId, starshipSlug, router]
   )
 
   // Handle new conversation - memoized
@@ -291,13 +293,7 @@ export function Navigation(props: NavigationProps) {
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="px-3 pb-3 space-y-1">
-                <ConversationList
-                  starshipId={starshipData.id}
-                  onConversationDelete={handleConversationDelete}
-                  onConversationArchive={handleConversationArchive}
-                  onConversationSelect={handleConversationSelect}
-                  compact={true}
-                />
+                <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
               </div>
             </div>
           </div>

@@ -10,19 +10,18 @@ import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '../ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { ScrollArea } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 
 interface ConversationListProps {
   starshipId: string
   onConversationDelete?: (conversationId: string) => void
-  onConversationArchive?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
 }
 
-export function ConversationList({ starshipId, onConversationDelete, onConversationArchive, onConversationSelect, compact = false }: ConversationListProps) {
+export function ConversationList({ starshipId, onConversationDelete, onConversationSelect, compact = false }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
@@ -122,7 +121,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                   <p className={cn('text-xs font-medium truncate', isActive && 'text-[#DD961C]')}>{title}</p>
                 </div>
                 {/* Delete button - appears on hover */}
-                {(onConversationDelete || onConversationArchive) && (
+                {onConversationDelete && (
                   <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
@@ -144,32 +143,17 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
-                        {onConversationArchive && (
-                          <DropdownMenuItem
-                            onClick={e => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              onConversationArchive(conversation.id)
-                            }}
-                          >
-                            <Icon name="archive" className="mr-2 h-3 w-3" />
-                            <span className="text-xs">Archive</span>
-                          </DropdownMenuItem>
-                        )}
-                        {onConversationArchive && onConversationDelete && <DropdownMenuSeparator />}
-                        {onConversationDelete && (
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={e => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              onConversationDelete(conversation.id)
-                            }}
-                          >
-                            <Icon name="trash" className="mr-2 h-3 w-3" />
-                            <span className="text-xs">Delete</span>
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onConversationDelete(conversation.id)
+                          }}
+                        >
+                          <Icon name="trash" className="mr-2 h-3 w-3" />
+                          <span className="text-xs">Delete</span>
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -243,35 +227,27 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                             </div>
 
                             {/* Actions Menu */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Icon name="dots-vertical" className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    onConversationArchive?.(conversation.id)
-                                  }}
-                                >
-                                  <Icon name="archive" className="mr-2 h-4 w-4" />
-                                  Archive
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    onConversationDelete?.(conversation.id)
-                                  }}
-                                >
-                                  <Icon name="trash" className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {onConversationDelete && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Icon name="dots-vertical" className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      onConversationDelete(conversation.id)
+                                    }}
+                                  >
+                                    <Icon name="trash" className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         )
                       })}

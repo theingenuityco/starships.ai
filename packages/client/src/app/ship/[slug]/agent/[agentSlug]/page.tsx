@@ -576,9 +576,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       }
     }
   }, [conversationId, liveMessages, agentSlug, slug, router])
-  // Detect tool creation via streaming and navigate to tool page
+  // Detect tool-related calls while streaming and navigate to Tool Builder
   useEffect(() => {
-    if (!conversationId || !liveMessages.length) return
+    if (!conversationId || !liveMessages.length || !isResponding) return
 
     // On first render, record initial message count and don't process
     if (toolNavInitialCountRef.current === null) {
@@ -591,18 +591,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       return
     }
 
-    // Tool-related tool slugs to monitor
-    const toolRelatedSlugs = new Set([
+    // Tool-related fragments to monitor (align with ConversationInterface)
+    const toolRelatedFragments = [
       'open-tool',
       'edit-tool',
       'add-tool-blueprint-node',
-      'remove-tool-blueprint-node',
       'add-tool-blueprint-edge',
+      'edit-tool-blueprint-node',
+      'remove-tool-blueprint-node',
+      'edit-tool-blueprint-edge',
       'remove-tool-blueprint-edge',
-      'tool-update-node',
-      'tool-assign-mcp',
-      'tool-unassign-mcp',
-    ])
+    ]
 
     // Process only NEW messages (those after initial count)
     const newMessages = liveMessages.slice(toolNavInitialCountRef.current)
@@ -612,7 +611,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
       for (const toolCall of msg.toolCalls as any[]) {
         const funcName = toolCall?.function?.name as string | undefined
-        if (!funcName || !toolRelatedSlugs.has(funcName)) continue
+        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
+        if (!funcNameLc) continue
+        if (!(toolRelatedFragments.some(s => funcNameLc.includes(s)) || funcNameLc.includes('tool-blueprint-'))) continue
 
         // Parse arguments
         let args: any = toolCall?.function?.arguments
@@ -625,20 +626,20 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         }
 
         // Extract tool slug from arguments (check both slug and toolSlug, default to 'new')
-        const toolSlug = args?.slug || args?.toolSlug || 'new'
+        const nextToolSlug: string = args?.slug || args?.toolSlug || 'new'
 
         // Don't navigate if we're somehow trying to navigate to ourselves
-        if (toolSlug === agentSlug) {
+        if (nextToolSlug === agentSlug) {
           continue
         }
 
         // Construct URL with conversationId query param if present
         const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+        router.push(`/ship/${slug}/tool/${encodeURIComponent(nextToolSlug)}${q}`)
         return
       }
     }
-  }, [conversationId, liveMessages, slug, router, agentSlug])
+  }, [conversationId, liveMessages, slug, router, agentSlug, isResponding])
 
   // Prefill when editing an existing agent
   useEffect(() => {

@@ -741,6 +741,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         onOpenChange={deferredAgentCreate.setIsOpen}
         onChatWithAgent={deferredAgentCreate.chatWithAgent}
         onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
       />
     )
   }

@@ -28,6 +28,7 @@ export function useDeferredAgentCreationModal(options: {
 
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [createdNames, setCreatedNames] = useState<string[]>([])
+  const [createdAgents, setCreatedAgents] = useState<any[]>([])
 
   // While streaming, look for assistant tool calls that represent agent creation
   useEffect(() => {
@@ -64,6 +65,18 @@ export function useDeferredAgentCreationModal(options: {
       const names = Array.from(createdNamesRef.current)
       if (names.length > 0) {
         setCreatedNames(names)
+        // Try resolve to Agent models if provided
+        if (agents && Array.isArray(agents)) {
+          const resolved: any[] = []
+          for (const n of names) {
+            const nm = String(n).toLowerCase()
+            const m = agents.find(a => String((a as any)?.name || '').toLowerCase() === nm)
+            if (m) resolved.push(m)
+          }
+          setCreatedAgents(resolved)
+        } else {
+          setCreatedAgents([])
+        }
         setIsOpen(true)
         createdNamesRef.current.clear()
       }
@@ -112,6 +125,7 @@ export function useDeferredAgentCreationModal(options: {
   return {
     isOpen,
     createdNames,
+    createdAgents,
     setIsOpen,
     chatWithAgent,
     askDaedalusCreateTools,

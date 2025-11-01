@@ -697,6 +697,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         onOpenChange={deferredAgentCreate.setIsOpen}
         onChatWithAgent={deferredAgentCreate.chatWithAgent}
         onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
       />
       <AgentBuilderView
         ref={agentBuilderRef}

@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { motion, useAnimate } from 'motion/react'
 import confetti from 'canvas-confetti'
 import Icon from '@/components/primitives/Icon'
+import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
+import type { AgentModel } from '@starships/protocol'
 
 interface AgentCreatedModalProps {
   open: boolean
@@ -10,9 +12,10 @@ interface AgentCreatedModalProps {
   onOpenChange: (open: boolean) => void
   onChatWithAgent?: (agentName: string) => void
   onAskDaedalusCreateTools?: (agentName: string) => void
+  agents?: AgentModel[]
 }
 
-export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, onAskDaedalusCreateTools }: AgentCreatedModalProps) {
+export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, onAskDaedalusCreateTools, agents }: AgentCreatedModalProps) {
   const uniqueNames = Array.isArray(names) ? Array.from(new Set(names.filter(n => typeof n === 'string' && n.trim()))).slice(0, 10) : []
   const title = uniqueNames.length > 1 ? 'Agents created' : 'Agent created'
   const [mounted, setMounted] = useState(false)
@@ -98,72 +101,67 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
               </DialogHeader>
             </div>
 
-            {/* Agents List */}
-            {uniqueNames.length > 0 && (
-              <div className="space-y-3 mb-6">
-                {uniqueNames.map((name, idx) => (
-                  <motion.div
-                    key={name}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + idx * 0.05 }}
-                    className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3 bg-gradient-to-br from-background to-muted/20"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-semibold text-primary">{(name || '?').slice(0, 1).toUpperCase()}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{name}</div>
-                        <div className="text-xs text-muted-foreground truncate">Draft agent is ready</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onChatWithAgent?.(name)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border/50 px-3 py-1.5 text-xs font-medium hover:bg-primary/10"
-                      >
-                        <Icon name="message-square" className="w-4 h-4" />
-                        Chat
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onAskDaedalusCreateTools?.(name)}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow hover:opacity-90"
-                      >
-                        <Icon name="hammer" className="w-4 h-4" />
-                        Ask Daedalus
-                      </button>
-                    </div>
+            {/* Agents Cards (preferred) or fallback list */}
+            {Array.isArray(agents) && agents.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 mb-6">
+                {agents.map((a, idx) => (
+                  <motion.div key={a.id || a.slug || a.name || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
+                    <DeployedAgentCard
+                      agent={a as AgentModel}
+                      onClick={() => onChatWithAgent?.(a.name)}
+                      onChat={() => onChatWithAgent?.(a.name)}
+                      showActions={false}
+                    />
                   </motion.div>
                 ))}
               </div>
+            ) : (
+              uniqueNames.length > 0 && (
+                <div className="space-y-3 mb-6">
+                  {uniqueNames.map((name, idx) => (
+                    <motion.div
+                      key={name}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + idx * 0.05 }}
+                      className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3 bg-gradient-to-br from-background to-muted/20"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-semibold text-primary">{(name || '?').slice(0, 1).toUpperCase()}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{name}</div>
+                          <div className="text-xs text-muted-foreground truncate">Draft agent is ready</div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )
             )}
 
-            {/* Primary CTA when single agent */}
-            {uniqueNames.length === 1 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => onChatWithAgent?.(uniqueNames[0])}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/50 px-4 py-2.5 text-sm font-medium hover:bg-primary/10"
-                  >
-                    <Icon name="message-square" className="w-4 h-4" />
-                    Chat now
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAskDaedalusCreateTools?.(uniqueNames[0])}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:opacity-90"
-                  >
-                    <Icon name="hammer" className="w-4 h-4" />
-                    Create tools
-                  </button>
-                </div>
-              </motion.div>
-            )}
+            {/* Bottom CTAs */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => onChatWithAgent?.((agents && agents[0]?.name) || uniqueNames[0])}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/50 px-4 py-2.5 text-sm font-medium hover:bg-primary/10"
+                >
+                  <Icon name="message-square" className="w-4 h-4" />
+                  Chat now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAskDaedalusCreateTools?.((agents && agents[0]?.name) || uniqueNames[0])}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:opacity-90"
+                >
+                  <Icon name="hammer" className="w-4 h-4" />
+                  Create tools
+                </button>
+              </div>
+            </motion.div>
 
             {/* Footer */}
             <div className="mt-6 flex justify-center">

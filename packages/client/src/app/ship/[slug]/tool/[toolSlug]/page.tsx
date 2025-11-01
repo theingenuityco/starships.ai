@@ -446,6 +446,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         onOpenChange={deferredAgentCreate.setIsOpen}
         onChatWithAgent={deferredAgentCreate.chatWithAgent}
         onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
       />
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { motion, useAnimate } from 'motion/react'
 import confetti from 'canvas-confetti'
@@ -17,7 +17,11 @@ interface AgentCreatedModalProps {
 
 export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, onAskDaedalusCreateTools, agents }: AgentCreatedModalProps) {
   const uniqueNames = Array.isArray(names) ? Array.from(new Set(names.filter(n => typeof n === 'string' && n.trim()))).slice(0, 10) : []
-  const title = uniqueNames.length > 1 ? 'Agents created' : 'Agent created'
+  const baseTitle = useMemo(() => {
+    if (uniqueNames.length > 1) return `You created ${uniqueNames.length} agents`
+    const single = (uniqueNames[0] || '').trim()
+    return single ? `You created ${single}` : 'You created an agent'
+  }, [uniqueNames])
   const [mounted, setMounted] = useState(false)
   const [scope, animate] = useAnimate()
 
@@ -77,27 +81,11 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
 
           <div className="relative p-8">
             <div className="text-center mb-6">
-              <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 20 }}
-                className="relative inline-block mb-4"
-              >
-                <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ delay: 0.7, duration: 0.6, ease: 'easeInOut' }} className="relative">
-                  <motion.div
-                    animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                    className="absolute inset-0 bg-gradient-to-br from-indigo-500/30 via-purple-500/30 to-pink-500/30 rounded-2xl blur-xl -z-10"
-                  />
-                  <div className="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center">
-                    <Icon name="sparkles" className="w-7 h-7 text-primary" />
-                  </div>
-                </motion.div>
-              </motion.div>
-
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">{title}</DialogTitle>
-                <DialogDescription>{uniqueNames.length > 1 ? 'The following agents were created:' : 'Agent has been created:'}</DialogDescription>
+                <DialogTitle className="text-2xl font-bold">
+                  <span className="mr-2 align-[-2px]" aria-hidden>🎉</span>
+                  <span className="bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">{baseTitle}</span>
+                </DialogTitle>
               </DialogHeader>
             </div>
 
@@ -154,16 +142,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
               </div>
             </motion.div>
 
-            {/* Footer */}
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={() => onOpenChange(false)}
-              >
-                Close
-              </button>
-            </div>
+            {/* Footer removed per design */}
           </div>
         </motion.div>
       </DialogContent>

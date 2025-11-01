@@ -22,6 +22,7 @@ import { BillingService, InsufficientFundsError } from '@/services/BillingServic
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
+import { parsePartialJSONObject } from '../utils/PartialJson';
 
 // Debug flags
 const DEBUG_TOOLCALLS = false;
@@ -1588,9 +1589,13 @@ export class ConversationService {
                     if (rawTc?.id) target.id = rawTc.id;
                     if (rawTc?.function?.name) target.function.name = rawTc.function.name;
 
-                    // Accumulate arguments as string, parse later when complete
+                    // Accumulate arguments as string, parse later when complete.
+                    // Use non-overlapping append because some providers send cumulative snapshots.
                     if (typeof rawTc?.function?.arguments === 'string') {
-                      target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
+                      const base = typeof target.function.arguments === 'string' ? (target.function.arguments as string) : '';
+                      const incoming = rawTc.function.arguments as string;
+                      const append = ConversationService.computeNonOverlappingAppend(base, incoming);
+                      target.function.arguments = base + append;
                     }
                   }
 
@@ -1604,10 +1609,9 @@ export class ConversationService {
                       const argsStr = tc.function?.arguments;
                       if (typeof argsStr === 'string' && argsStr) {
                         try {
-                          // Try full JSON.parse first for complete JSON
-                          argsObj = JSON.parse(argsStr);
+                          // Lenient parse for partial/incomplete JSON object
+                          argsObj = parsePartialJSONObject(argsStr);
                         } catch {
-                          // If parse fails, use empty object
                           argsObj = {};
                         }
                       }
@@ -1635,7 +1639,9 @@ export class ConversationService {
                     let argsObj: unknown = {};
                     if (argsStr) {
                       try {
-                        argsObj = JSON.parse(argsStr);
+                        console.log('argsStr', argsStr);
+                        argsObj = parsePartialJSONObject(argsStr);
+                        console.log('argsObj', argsObj);
                       } catch {
                         argsObj = {};
                       }

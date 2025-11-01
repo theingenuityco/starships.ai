@@ -627,9 +627,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       prevStreamingRef.current = Boolean(uiStreaming)
     }, [uiStreaming])
 
-    // Back-compat UI actions parsed from assistant message JSON
+    // Back-compat UI actions parsed from assistant message JSON (only during active streaming)
     useEffect(() => {
-      if (!currentConversationId || !liveMessages.length) return
+      if (!uiStreaming || !currentConversationId || !liveMessages.length) return
       const lastMessage = liveMessages[liveMessages.length - 1]
       if (lastMessage?.role === 'assistant' && lastMessage?.content) {
         try {
@@ -637,11 +637,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           handleUIPayload(payload)
         } catch {}
       }
-    }, [currentConversationId, liveMessages])
+    }, [uiStreaming, currentConversationId, liveMessages])
 
-    // Proactive navigation on tool calls (contains-based slug matching)
+    // Proactive navigation on tool calls (only during active streaming)
     useEffect(() => {
-      if (!currentConversationId || !liveMessages.length || !starshipSlug) return
+      if (!uiStreaming || !currentConversationId || !liveMessages.length || !starshipSlug) return
       const recent = (liveMessages as any[]).slice(-10)
       for (let i = recent.length - 1; i >= 0; i--) {
         const msg = recent[i] as any
@@ -694,7 +694,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
         }
       }
-    }, [currentConversationId, externalConversationId, liveMessages, starshipSlug, router])
+    }, [uiStreaming, currentConversationId, externalConversationId, liveMessages, starshipSlug, router])
 
     // Tool completion follow-ups
     useEffect(() => {
@@ -718,13 +718,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }, [liveMessages])
 
-    // Consume clean ui_action channel
+    // Consume clean ui_action channel (only during active streaming)
     useEffect(() => {
-      if (!currentConversationId || !lastUIAction) return
+      if (!uiStreaming || !currentConversationId || !lastUIAction) return
       try {
         handleUIPayload(lastUIAction as any)
       } catch {}
-    }, [currentConversationId, lastUIAction])
+    }, [uiStreaming, currentConversationId, lastUIAction])
 
     return null
   }

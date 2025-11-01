@@ -49,6 +49,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Track initial message count to only process NEW messages (prevents infinite loop on remount)
   const initialMessageCountRef = useRef<number | null>(null)
+  // Separate initial count for tool navigation to avoid cross-effect interference
+  const toolNavInitialCountRef = useRef<number | null>(null)
 
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
@@ -269,26 +271,44 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
     // Apply each new call in order
     for (const call of newCalls as Array<{ name: string; args: unknown; id?: string; snapshot?: string }>) {
-      const toolName = call.name
+      const rawToolName = call.name
+      const nameLc = typeof rawToolName === 'string' ? rawToolName.toLowerCase() : ''
       const args = call.args as Record<string, unknown> | undefined
 
-      if (toolName === 'open-agent' || toolName === 'edit-agent') {
-        if (typeof args?.name === 'string') compose.name = args.name
-        if (typeof args?.slug === 'string') compose.slug = args.slug
-        if (typeof args?.description === 'string') compose.description = args.description
-        if (typeof args?.category === 'string') compose.category = args.category
-        if (typeof args?.model === 'string') compose.model = args.model
-        if (typeof args?.temperature === 'number') compose.temperature = args.temperature
-        if (typeof args?.maxTokens === 'number') compose.maxTokens = args.maxTokens
-        if (typeof args?.systemPrompt === 'string') compose.systemPrompt = args.systemPrompt
-        if (Array.isArray(args?.previewPrompts)) compose.previewPrompts = (args.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
-        if (typeof args?.icon === 'string') compose.icon = args.icon
-        if (typeof args?.timeout === 'number') compose.timeout = args.timeout
+      if (nameLc.startsWith('open-agent') || nameLc.startsWith('edit-agent')) {
+        // Flatten common nesting shapes: { agent: {...} } or { data: {...} } or { payload: {...} }
+        let src: any = args && typeof args === 'object' ? (args as any) : undefined
+        if (src && typeof src === 'object') {
+          if (src.agent && typeof src.agent === 'object') src = src.agent
+          else if (src.data && typeof src.data === 'object') src = src.data
+          else if (src.payload && typeof src.payload === 'object') src = src.payload
+        }
+        // Fallback to original args if no nesting matched
+        if (!src || typeof src !== 'object') src = args
+
+        if (typeof src?.name === 'string') compose.name = src.name
+        if (typeof src?.slug === 'string') compose.slug = src.slug
+        if (typeof src?.description === 'string') compose.description = src.description
+        if (typeof src?.category === 'string') compose.category = src.category
+        if (typeof src?.model === 'string') compose.model = src.model
+        if (typeof src?.temperature === 'number') compose.temperature = src.temperature
+        if (typeof src?.maxTokens === 'number') compose.maxTokens = src.maxTokens
+        if (typeof src?.systemPrompt === 'string') compose.systemPrompt = src.systemPrompt
+        if (Array.isArray(src?.previewPrompts)) compose.previewPrompts = (src.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
+        if (typeof src?.icon === 'string') compose.icon = src.icon
+        if (typeof src?.timeout === 'number') compose.timeout = src.timeout
+
+        // If slug not provided in args, derive from function name suffix: open-agent-<slug> / edit-agent-<slug>
+        if (!compose.slug) {
+          if (nameLc.startsWith('open-agent-')) compose.slug = nameLc.slice('open-agent-'.length)
+          else if (nameLc.startsWith('edit-agent-')) compose.slug = nameLc.slice('edit-agent-'.length)
+        }
+
         // Do not apply assignedToolSlugs from streaming arguments. We only
         // reflect tool assignments after confirmed tool completion and a
         // fresh fetch from the server.
-        if (args && typeof args === 'object' && !Array.isArray(args) && 'blueprint' in args) {
-          const rawBp = (args as Record<string, unknown>).blueprint
+        if (src && typeof src === 'object' && !Array.isArray(src) && 'blueprint' in src) {
+          const rawBp = (src as Record<string, unknown>).blueprint
           const incoming = normalizeJson(rawBp)
           if (!incoming || typeof incoming !== 'object') {
             // Skip until we have an object blueprint
@@ -350,7 +370,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, isResponding])
 
-  // After agent tool execution completes, fetch and sync agent data once
+  // After agent tool execution completes, fetch and sync agent data once (and surface creation errors)
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
@@ -384,8 +404,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           continue
         }
 
-        // Extract slug strictly from tool result HTTP response shape: body.data.slug
+        // Extract slug strictly from tool result HTTP response shape: body.data.slug; collect error, if any
         let slugArg: string | undefined
+        let errorText: string | undefined
         {
           const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
           if (content) {
@@ -395,10 +416,58 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
               const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
               slugArg = slugVal
+              if (!slugVal) {
+                const pickFirstString = (arr: unknown[]): string | undefined => {
+                  for (const item of arr) {
+                    if (typeof item === 'string' && item) return item
+                    if (item && typeof item === 'object') {
+                      const o = item as Record<string, unknown>
+                      const m = (o.message as string) || (o.msg as string) || (o.description as string)
+                      if (typeof m === 'string' && m) return m
+                    }
+                  }
+                  return undefined
+                }
+                const maybeError = (body && (body as any).error) || (parsed as any).error
+                const maybeMessage = (body && (body as any).message) || (parsed as any).message
+                const maybeDataError = data && (data as any).error
+                const statusCode = (parsed as any).statusCode || (parsed as any).status
+
+                if (typeof maybeError === 'string' && maybeError) {
+                  errorText = maybeError
+                } else if (maybeError && typeof maybeError === 'object') {
+                  const errObj = maybeError as Record<string, unknown>
+                  errorText = (errObj.message as string) || (errObj.description as string) || undefined
+                  if (!errorText) {
+                    const arr = (errObj.errors as unknown[]) || (errObj.details as unknown[]) || (errObj.issues as unknown[])
+                    if (Array.isArray(arr)) errorText = pickFirstString(arr)
+                  }
+                }
+                if (!errorText && typeof maybeMessage === 'string' && maybeMessage) {
+                  errorText = maybeMessage
+                }
+                if (!errorText && maybeDataError) {
+                  if (typeof maybeDataError === 'string') errorText = maybeDataError
+                  else if (typeof maybeDataError === 'object') {
+                    const de = maybeDataError as Record<string, unknown>
+                    errorText = (de.message as string) || (de.description as string) || undefined
+                    if (!errorText) {
+                      const arr = (de.errors as unknown[]) || (de.details as unknown[]) || (de.issues as unknown[])
+                      if (Array.isArray(arr)) errorText = pickFirstString(arr)
+                    }
+                  }
+                }
+                if (!errorText && statusCode && Number(statusCode) >= 400) {
+                  errorText = 'Failed to open agent'
+                }
+              }
             } catch {}
           }
         }
         if (!slugArg || typeof slugArg !== 'string') {
+          if (funcName === 'open-agent' && agentSlug === 'new' && !routeUpdatedRef.current && errorText) {
+            setAgentOpenError(errorText || 'Failed to open agent')
+          }
           processedToolResultIdsRef.current.add(id)
           continue
         }
@@ -425,6 +494,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
               router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)
               routeUpdatedRef.current = true
+              setAgentOpenError(null)
             }
           } catch {
             // ignore fetch errors
@@ -440,13 +510,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (!conversationId || !liveMessages.length) return
 
     // On first render, record initial message count and don't process
-    if (initialMessageCountRef.current === null) {
-      initialMessageCountRef.current = liveMessages.length
+    if (toolNavInitialCountRef.current === null) {
+      toolNavInitialCountRef.current = liveMessages.length
       return
     }
 
     // Only process if new messages have arrived
-    if (liveMessages.length <= initialMessageCountRef.current) {
+    if (liveMessages.length <= toolNavInitialCountRef.current) {
       return
     }
 
@@ -464,7 +534,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     ])
 
     // Process only NEW messages (those after initial count)
-    const newMessages = liveMessages.slice(initialMessageCountRef.current)
+    const newMessages = liveMessages.slice(toolNavInitialCountRef.current)
 
     for (const msg of newMessages as any[]) {
       if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
@@ -527,100 +597,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
     doPrefill()
   }, [agentSlug])
-
-  // Detect agent creation via streaming completion and handle success/failure
-  useEffect(() => {
-    if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
-
-    // Look at last few messages for tool results associated with agent-* calls
-    const recentMessages = (liveMessages as MessageModel[]).slice(-10)
-    for (const msg of recentMessages) {
-      if (msg.role === 'tool' && msg.toolCallId) {
-        const id = msg.toolCallId as string
-        // Find the assistant tool call corresponding to this tool result
-        const assistantMsg = (liveMessages as MessageModel[]).find(m => m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.some((tc: LlmToolCall) => tc.id === id))
-        if (!assistantMsg) continue
-        const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
-        const funcName = toolCall?.function?.name as string
-        if (funcName !== 'open-agent') continue
-        // Extract slug strictly from tool result HTTP response shape: body.data.slug
-        let slugArg: string | undefined
-        let errorText: string | undefined
-        {
-          const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
-          if (content) {
-            try {
-              const parsed = JSON.parse(content) as Record<string, unknown>
-              const body = parsed.body as Record<string, unknown> | undefined
-              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
-              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
-              slugArg = slugVal
-              // Infer a friendly error message if present
-              if (!slugVal) {
-                const pickFirstString = (arr: unknown[]): string | undefined => {
-                  for (const item of arr) {
-                    if (typeof item === 'string' && item) return item
-                    if (item && typeof item === 'object') {
-                      const o = item as Record<string, unknown>
-                      const m = (o.message as string) || (o.msg as string) || (o.description as string)
-                      if (typeof m === 'string' && m) return m
-                    }
-                  }
-                  return undefined
-                }
-                const maybeError = (body && (body as any).error) || (parsed as any).error
-                const maybeMessage = (body && (body as any).message) || (parsed as any).message
-                const maybeDataError = data && (data as any).error
-                const statusCode = (parsed as any).statusCode || (parsed as any).status
-
-                if (typeof maybeError === 'string' && maybeError) {
-                  errorText = maybeError
-                } else if (maybeError && typeof maybeError === 'object') {
-                  const errObj = maybeError as Record<string, unknown>
-                  errorText = (errObj.message as string) || (errObj.description as string) || undefined
-                  if (!errorText) {
-                    const arr = (errObj.errors as unknown[]) || (errObj.details as unknown[]) || (errObj.issues as unknown[])
-                    if (Array.isArray(arr)) errorText = pickFirstString(arr)
-                  }
-                }
-                if (!errorText && typeof maybeMessage === 'string' && maybeMessage) {
-                  errorText = maybeMessage
-                }
-                if (!errorText && maybeDataError) {
-                  if (typeof maybeDataError === 'string') errorText = maybeDataError
-                  else if (typeof maybeDataError === 'object') {
-                    const de = maybeDataError as Record<string, unknown>
-                    errorText = (de.message as string) || (de.description as string) || undefined
-                    if (!errorText) {
-                      const arr = (de.errors as unknown[]) || (de.details as unknown[]) || (de.issues as unknown[])
-                      if (Array.isArray(arr)) errorText = pickFirstString(arr)
-                    }
-                  }
-                }
-                if (!errorText && statusCode && Number(statusCode) >= 400) {
-                  errorText = 'Failed to open agent'
-                }
-              }
-            } catch {}
-          }
-        }
-        if (agentSlug === 'new' && !routeUpdatedRef.current) {
-          if (typeof slugArg === 'string' && slugArg) {
-            // Success: navigate to the created agent's page
-            const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-            router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)
-            routeUpdatedRef.current = true
-            setAgentOpenError(null)
-            break
-          } else if (errorText) {
-            // Failure: show error message on builder
-            setAgentOpenError(errorText || 'Failed to open agent')
-            break
-          }
-        }
-      }
-    }
-  }, [conversationId, liveMessages, agentSlug, slug, router])
 
   const handleCancel = () => {
     if (conversationId) {

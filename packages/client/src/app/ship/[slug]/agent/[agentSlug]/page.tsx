@@ -42,9 +42,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     starshipSlug: String(slug),
     conversationId,
     agents,
-    setLeadingMentionAgent: (agent: any) => {
+    setLeadingMentionAgent: (agent: any, afterText?: string) => {
       try {
-        messageInputRef.current?.setLeadingMentionAgent?.(agent)
+        messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
       } catch {}
     },
     focusInput: () => {

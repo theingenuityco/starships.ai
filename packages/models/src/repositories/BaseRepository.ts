@@ -298,11 +298,13 @@ export abstract class BaseRepository {
    */
   protected async deleteEntity(tableName: string, id: string, connection?: PostgresConnection): Promise<boolean> {
     const conn = connection || this.getConnection();
+    const pool = conn.getPool();
 
     const query = `DELETE FROM ${tableName} WHERE id = $1`;
-    const result = await conn.query(query, [id]);
-
-    return (result as unknown as { rowCount: number }).rowCount > 0;
+    
+    // Use pool.query directly to get access to rowCount (PostgresConnection.query only returns rows array)
+    const result = await pool.query(query, [id]);
+    return (result.rowCount ?? 0) > 0;
   }
 
   /**

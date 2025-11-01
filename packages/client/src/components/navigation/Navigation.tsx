@@ -262,8 +262,11 @@ export function Navigation(props: NavigationProps) {
         </div>
 
         {/* Navigation Content - Moved to top */}
-        <div className="flex-shrink-0" style={{ paddingTop: '0.75rem', paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isHovered ? '0' : '0.75rem' }}>
-          <div className="flex flex-col space-y-1.5 w-full">
+        <div
+          className="flex-shrink-0"
+          style={{ marginTop: '0.25rem', marginBottom: '0.75rem', paddingTop: '0.75rem', paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isHovered ? '0' : '0.75rem' }}
+        >
+          <div className="flex flex-col space-y-1 w-full">
             <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isHovered} />
           </div>
         </div>

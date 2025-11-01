@@ -279,11 +279,15 @@ export function useDeleteAgent() {
       }
     },
     onError: (error: any, agentId, context) => {
-      // Rollback optimistic deletions
-      if (context?.agent) {
+      // Extract error message - handle both object and string formats
+      let errorMessage = 'Failed to delete agent'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to delete agent'
+      } else if (error?.message) {
+        errorMessage = error.message
       }
-
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete agent'
+      
       toast.error('Failed to delete agent', {
         description: errorMessage,
       })
@@ -324,7 +328,15 @@ export function useDeployAgent() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to deploy agent'
+      // Extract error message - handle both object and string formats
+      let errorMessage = 'Failed to deploy agent'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to deploy agent'
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })
@@ -353,7 +365,15 @@ export function useRateAgent() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to rate agent'
+      // Extract error message - handle both object and string formats
+      let errorMessage = 'Failed to rate agent'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to rate agent'
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
       toast.error('Failed to rate agent', {
         description: errorMessage,
       })

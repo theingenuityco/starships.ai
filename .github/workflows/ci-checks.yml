@@ -77,7 +77,7 @@ jobs:
     environment: ci
     env:
       # Node.js Memory Configuration - Applied to all child processes
-      NODE_OPTIONS: --max-old-space-size=1800
+      NODE_OPTIONS: --max-old-space-size=4096
 
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}

@@ -71,7 +71,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }, [agentSlug])
 
-  // Stream agent arguments into builder as they arrive
+  // Stream agent arguments into builder as they arrive (only while streaming)
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !agentBuilderRef.current) return
 
@@ -83,11 +83,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     // Only process if new messages have arrived; however, on /agent/new allow
     // a one-time interception of the current in-flight assistant tool call
     // that may have started before mount.
-    const hasNewMessages = liveMessages.length > initialMessageCountRef.current
-    const allowBootstrapOnNewRoute = agentSlug === 'new' && appliedToolCallKeysRef.current.size === 0
-    // Also allow incremental processing while assistant is responding to capture partial JSON updates
+    // Only intercept while assistant is actively responding
     const allowWhileStreaming = isResponding === true
-    if (!hasNewMessages && !allowBootstrapOnNewRoute && !allowWhileStreaming) {
+    if (!allowWhileStreaming) {
       return
     }
 
@@ -145,35 +143,28 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     // No partial JSON extraction on client; server guarantees parsed objects
 
     // Collect only new toolCalls across assistant messages since mount in chronological order
+    // While streaming, prefer the most recent assistant message that already has toolCalls
     let considerationMessages: MessageModel[] = []
-    if (hasNewMessages) {
-      considerationMessages = (liveMessages as MessageModel[]).slice(initialMessageCountRef.current)
-    } else if (allowWhileStreaming) {
-      // While streaming, prefer the most recent assistant message that already has toolCalls
-      const list = liveMessages as MessageModel[]
-      let picked: MessageModel | null = null
+    const list = liveMessages as MessageModel[]
+    let picked: MessageModel | null = null
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i]
+      if (m.role === 'assistant' && Array.isArray((m as any).toolCalls) && (m as any).toolCalls.length > 0) {
+        picked = m
+        break
+      }
+    }
+    if (!picked) {
+      // Fallback: use the most recent assistant shell
       for (let i = list.length - 1; i >= 0; i--) {
         const m = list[i]
-        if (m.role === 'assistant' && Array.isArray((m as any).toolCalls) && (m as any).toolCalls.length > 0) {
+        if (m.role === 'assistant') {
           picked = m
           break
         }
       }
-      if (!picked) {
-        // Fallback: use the most recent assistant shell
-        for (let i = list.length - 1; i >= 0; i--) {
-          const m = list[i]
-          if (m.role === 'assistant') {
-            picked = m
-            break
-          }
-        }
-      }
-      if (picked) considerationMessages = [picked]
-    } else if (allowBootstrapOnNewRoute) {
-      // Bootstrap by scanning all assistant messages for in-flight tool calls
-      considerationMessages = (liveMessages as MessageModel[]).filter(m => m.role === 'assistant')
     }
+    if (picked) considerationMessages = [picked]
     const newCalls: { name: string; args: unknown }[] = []
     try {
       console.debug('[AgentBuilderStream] scan:start', {

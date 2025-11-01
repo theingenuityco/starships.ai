@@ -340,9 +340,9 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, starship?.id, toolSlug, router, slug])
 
-  // Navigate to agent page when agent-related tool calls are detected
+  // Navigate to agent page when agent-related tool calls are detected (only while streaming)
   useEffect(() => {
-    if (!conversationId || !liveMessages.length) return
+    if (!conversationId || !liveMessages.length || !isResponding) return
 
     // On first render, record initial message count and don't process
     if (initialMessageCountRef.current === null) {
@@ -351,16 +351,16 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
 
     // Only process if new messages have arrived
-    if (liveMessages.length <= initialMessageCountRef.current) {
+    if (liveMessages.length <= (initialMessageCountRef.current as number)) {
       return
     }
 
     const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
 
     // Process only NEW messages (those after initial count)
-    const newMessages = liveMessages.slice(initialMessageCountRef.current)
+    const consideration: any[] = (liveMessages as any[]).slice(initialMessageCountRef.current as number)
 
-    for (const msg of newMessages as any[]) {
+    for (const msg of consideration) {
       if (msg.role !== 'assistant') continue
       const toolCalls = msg.toolCalls
       if (!Array.isArray(toolCalls)) continue
@@ -380,21 +380,23 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           }
         }
 
-        const agentSlug = args?.slug || args?.agentSlug || 'new'
+        const nextAgentSlug = args?.slug || args?.agentSlug || 'new'
 
-        // Don't navigate if we're somehow trying to navigate to ourselves
-        if (agentSlug === toolSlug) {
+        // Don't navigate if we're somehow trying to navigate to ourselves (unlikely but safe)
+        if (nextAgentSlug === toolSlug) {
           continue
         }
 
         const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`
+        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`
 
+        // Prevent duplicate attempts before unmount by advancing the baseline
+        initialMessageCountRef.current = liveMessages.length
         router.push(targetUrl)
         return
       }
     }
-  }, [conversationId, liveMessages, slug, router, toolSlug])
+  }, [conversationId, liveMessages, slug, router, toolSlug, isResponding])
 
   // Prefill when editing an existing tool
   useEffect(() => {

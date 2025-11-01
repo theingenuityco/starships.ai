@@ -1589,9 +1589,13 @@ export class ConversationService {
                     if (rawTc?.id) target.id = rawTc.id;
                     if (rawTc?.function?.name) target.function.name = rawTc.function.name;
 
-                    // Accumulate arguments as string, parse later when complete
+                    // Accumulate arguments as string, parse later when complete.
+                    // Use non-overlapping append because some providers send cumulative snapshots.
                     if (typeof rawTc?.function?.arguments === 'string') {
-                      target.function.arguments = (target.function.arguments as string) + (rawTc.function.arguments as string);
+                      const base = typeof target.function.arguments === 'string' ? (target.function.arguments as string) : '';
+                      const incoming = rawTc.function.arguments as string;
+                      const append = ConversationService.computeNonOverlappingAppend(base, incoming);
+                      target.function.arguments = base + append;
                     }
                   }
 

@@ -213,6 +213,7 @@ export function Navigation(props: NavigationProps) {
           width: isHovered ? '16rem' : '3.5rem',
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding from layout
           willChange: 'width',
+          contain: 'layout style paint',
         }}
       >
         {/* Compact Header with Theme Toggle */}
@@ -265,9 +266,9 @@ export function Navigation(props: NavigationProps) {
             <div className="w-full" style={{ paddingTop: '0.25rem' }}>
               <div className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', paddingLeft: '0.75rem', paddingRight: '0.75rem', justifyContent: 'flex-start' }}>
                 <div className="flex-shrink-0" style={{ width: '1.5rem', height: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
-                  <LordIcon src={getLordiconUrl('history')} width={24} height={24} className="w-6 h-6 flex-shrink-0" />
+                  <LordIcon src={getLordiconUrl('history')} width={24} height={24} className="w-6 h-6 flex-shrink-0" trigger="hover" key="recents-icon" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wide" style={{ marginLeft: '0.75rem' }}>Recents</span>
+                <span className="text-xs font-medium" style={{ marginLeft: '0.75rem' }}>Recents</span>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">

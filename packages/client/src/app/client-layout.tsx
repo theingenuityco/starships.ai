@@ -138,7 +138,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
               <div className="flex-shrink-0 relative z-50">
-                <aside className="relative h-full p-6">
+                <aside className="relative h-full py-6 pl-3 pr-6">
                   <Navigation />
                 </aside>
               </div>

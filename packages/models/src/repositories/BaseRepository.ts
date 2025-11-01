@@ -302,14 +302,18 @@ export abstract class BaseRepository {
 
     // Use queryWithResult to get access to rowCount
     // For mock connections in tests, check if queryWithResult exists, otherwise use query which may return { rowCount }
-    const connWithResult = conn as PostgresConnection & { queryWithResult?: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount: number }> };
+    const connWithResult = conn as PostgresConnection & {
+      queryWithResult?: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount: number }>;
+    };
     if (typeof connWithResult.queryWithResult === 'function') {
       const result = await connWithResult.queryWithResult(query, [id]);
       return (result.rowCount ?? 0) > 0;
     }
 
     // Fallback for mock connections: try to get pool and use it directly
-    const connWithPool = conn as PostgresConnection & { getPool?: () => { query: (text: string, params?: unknown[]) => Promise<{ rowCount?: number }> } };
+    const connWithPool = conn as PostgresConnection & {
+      getPool?: () => { query: (text: string, params?: unknown[]) => Promise<{ rowCount?: number }> };
+    };
     if (typeof connWithPool.getPool === 'function') {
       const pool = connWithPool.getPool();
       const result = await pool.query(query, [id]);
@@ -318,7 +322,7 @@ export abstract class BaseRepository {
 
     // Last fallback: for mock connections that return { rowCount } directly
     // In tests, query may return { rowCount } instead of an array
-    const result = await conn.query(query, [id]) as unknown;
+    const result = (await conn.query(query, [id])) as unknown;
     if (result && typeof result === 'object' && !Array.isArray(result) && 'rowCount' in result) {
       const rowCount = (result as { rowCount?: number }).rowCount;
       if (typeof rowCount === 'number') {

@@ -40,6 +40,16 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     starshipSlug: String(slug),
     conversationId,
     agents,
+    setLeadingMentionAgent: (agent: any) => {
+      try {
+        messageInputRef.current?.setLeadingMentionAgent?.(agent)
+      } catch {}
+    },
+    focusInput: () => {
+      try {
+        messageInputRef.current?.focusInput?.()
+      } catch {}
+    },
   })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming

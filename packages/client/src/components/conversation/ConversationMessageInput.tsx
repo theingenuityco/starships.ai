@@ -56,6 +56,7 @@ interface ConversationMessageInputProps {
 export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
   focusInput: () => void
+  setLeadingMentionAgent: (agent: AgentModel) => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -1570,6 +1571,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         focusInput: () => {
           try {
             tiptap?.commands.focus('end')
+          } catch {}
+        },
+        setLeadingMentionAgent: (agent: AgentModel) => {
+          try {
+            if (!tiptap || !agent) return
+            // Update local current agent ref and notify parent so selectedAgent prop stays in sync
+            currentAgentRef.current = agent
+            if (onAgentChange) onAgentChange(agent)
+            const json: any = tiptap.getJSON()
+            const docContent = Array.isArray(json?.content) ? json.content : []
+            const firstBlock = docContent[0]
+            const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+            // Remove any existing mentions from first paragraph
+            const rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+            const desiredMention = buildMentionNodeForAgent(agent)
+            if (!desiredMention) return
+            const spaceNode = [{ type: 'text', text: ' ' }]
+            const newParagraph = { type: 'paragraph', content: [desiredMention, ...spaceNode, ...rest] }
+            const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+            scheduleSetContent(newDoc)
+            lastEnforcedAgentIdRef.current = agent.id
+            setTimeout(() => {
+              try {
+                tiptap?.commands.focus()
+                tiptap?.commands.setTextSelection(2)
+              } catch {}
+            }, 10)
           } catch {}
         },
       }),

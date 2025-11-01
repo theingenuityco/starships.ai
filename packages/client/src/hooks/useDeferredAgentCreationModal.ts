@@ -17,12 +17,16 @@ export function useDeferredAgentCreationModal(options: {
   starshipSlug?: string | null
   conversationId?: string | null
   agents?: Array<{ name?: string; slug?: string }>
+  setLeadingMentionAgent?: (agent: { id?: string; name?: string; slug?: string }) => void
+  focusInput?: () => void
 }) {
   const isStreaming = Boolean(options?.isStreaming)
   const liveMessages = Array.isArray(options?.liveMessages) ? (options!.liveMessages as any[]) : []
   const starshipSlug = typeof options?.starshipSlug === 'string' ? options!.starshipSlug : undefined
   const conversationId = typeof options?.conversationId === 'string' ? options!.conversationId : undefined
   const agents = Array.isArray(options?.agents) ? options!.agents : undefined
+  const setLeadingMentionAgent = typeof options?.setLeadingMentionAgent === 'function' ? options!.setLeadingMentionAgent : undefined
+  const focusInput = typeof options?.focusInput === 'function' ? options!.focusInput : undefined
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -178,11 +182,36 @@ export function useDeferredAgentCreationModal(options: {
   )
 
   const askDaedalusCreateTools = useCallback(
-    (name: string) => {
-      navigateToAgent(name)
-      setIsOpen(false)
+    (_: string) => {
+      try {
+        setIsOpen(false)
+        const list = Array.isArray(agents) ? agents : []
+        const daedalus =
+          list.find(a => String(a?.name || '').toLowerCase() === 'daedalus') ||
+          list.find(a =>
+            String(a?.slug || '')
+              .toLowerCase()
+              .startsWith('daedalus')
+          ) ||
+          list.find(a =>
+            String(a?.name || '')
+              .toLowerCase()
+              .includes('daedalus')
+          ) ||
+          null
+        if (daedalus && setLeadingMentionAgent) {
+          setLeadingMentionAgent(daedalus as any)
+        }
+        if (focusInput) {
+          setTimeout(() => {
+            try {
+              focusInput()
+            } catch {}
+          }, 50)
+        }
+      } catch {}
     },
-    [navigateToAgent]
+    [agents, setLeadingMentionAgent, focusInput]
   )
 
   return {
@@ -194,5 +223,3 @@ export function useDeferredAgentCreationModal(options: {
     askDaedalusCreateTools,
   }
 }
-
-

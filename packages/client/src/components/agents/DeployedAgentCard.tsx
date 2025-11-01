@@ -25,9 +25,10 @@ interface DeployedAgentCardProps {
   onEdit?: (agent: AgentModel) => void
   onDelete?: (agent: AgentModel) => void
   showActions?: boolean
+  hideChatControl?: boolean
 }
 
-export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false }: DeployedAgentCardProps) {
+export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
   // Check if this is a system agent (Gaia or Daedalus)
   const isSystemAgent = agent.name === 'Gaia' || agent.name === 'Daedalus'
   
@@ -111,7 +112,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
               <Icon name="message-square" className="mr-1 h-3.5 w-3.5" />
               Chat
             </Button>
-          ) : (
+          ) : hideChatControl ? null : (
             <div className="flex items-center gap-1 text-muted-foreground">
               <Icon name="fingerprint" className="h-3.5 w-3.5" />
               <span className="text-[10px]">{agent.id.slice(0, 6)}</span>

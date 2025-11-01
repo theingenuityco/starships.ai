@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { motion, useAnimate } from 'motion/react'
 import confetti from 'canvas-confetti'
 import Icon from '@/components/primitives/Icon'
@@ -22,6 +23,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
     const single = (uniqueNames[0] || '').trim()
     return single ? `You created ${single}` : 'You created an agent'
   }, [uniqueNames])
+  const primaryName = useMemo(() => (Array.isArray(agents) && agents[0]?.name) || uniqueNames[0] || '', [agents, uniqueNames])
   const [mounted, setMounted] = useState(false)
   const [scope, animate] = useAnimate()
 
@@ -56,7 +58,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 rounded-3xl sm:rounded-3xl">
+      <DialogContent className="sm:max-w-[520px] p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 rounded-3xl sm:rounded-3xl">
         <div className="relative bg-background rounded-3xl overflow-hidden">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <motion.div
@@ -78,7 +80,9 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
             <div className="text-center mb-6">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold">
-                  <span className="mr-2 align-[-2px]" aria-hidden>🎉</span>
+                  <span className="mr-2 align-[-2px]" aria-hidden>
+                    🎉
+                  </span>
                   <span className="bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">{baseTitle}</span>
                 </DialogTitle>
               </DialogHeader>
@@ -89,12 +93,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
               <div className="grid grid-cols-1 gap-3 mb-6">
                 {agents.map((a, idx) => (
                   <motion.div key={a.id || a.slug || a.name || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
-                    <DeployedAgentCard
-                      agent={a as AgentModel}
-                      onClick={() => onChatWithAgent?.(a.name)}
-                      onChat={() => onChatWithAgent?.(a.name)}
-                      showActions={false}
-                    />
+                    <DeployedAgentCard agent={a as AgentModel} onClick={() => onChatWithAgent?.(a.name)} showActions={false} hideChatControl={true} />
                   </motion.div>
                 ))}
               </div>
@@ -106,8 +105,8 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
                       <DeployedAgentCard
                         agent={{ id: `temp-${name}-${idx}`, name, description: 'Draft agent is ready', model: 'N/A', slug: undefined } as unknown as AgentModel}
                         onClick={() => onChatWithAgent?.(name)}
-                        onChat={() => onChatWithAgent?.(name)}
                         showActions={false}
+                        hideChatControl={true}
                       />
                     </motion.div>
                   ))}
@@ -117,23 +116,24 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
 
             {/* Bottom CTAs */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <button
                   type="button"
-                  onClick={() => onChatWithAgent?.((agents && agents[0]?.name) || uniqueNames[0])}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/50 px-4 py-2.5 text-sm font-medium hover:bg-primary/10"
+                  onClick={() => onChatWithAgent?.(primaryName)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/50 px-4 py-2.5 text-sm font-medium hover:bg-primary/10 w-full"
                 >
                   <Icon name="message-square" className="w-4 h-4" />
                   Chat now
                 </button>
-                <button
+                <Button
                   type="button"
-                  onClick={() => onAskDaedalusCreateTools?.((agents && agents[0]?.name) || uniqueNames[0])}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:opacity-90"
+                  size="lg"
+                  onClick={() => onAskDaedalusCreateTools?.(primaryName)}
+                  className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground"
                 >
-                  <Icon name="hammer" className="w-4 h-4" />
-                  Create tools
-                </button>
+                  <Icon name="hammer" className="w-5 h-5 mr-2" />
+                  <span className="truncate">Create tools{primaryName ? ` for ${primaryName}` : ''}</span>
+                </Button>
               </div>
             </motion.div>
 

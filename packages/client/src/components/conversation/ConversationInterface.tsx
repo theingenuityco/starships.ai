@@ -852,7 +852,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                               <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="truncate text-foreground group-hover:text-foreground">{title}</p>
+                              <p className="truncate text-muted-foreground group-hover:text-foreground">{title}</p>
                               {participants.length > 0 && (
                                 <div className="flex items-center gap-2 mt-1 min-w-0">
                                   <div className="flex items-center gap-1 shrink-0">

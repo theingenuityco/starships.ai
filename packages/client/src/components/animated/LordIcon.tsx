@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, memo } from 'react'
 import Lottie from 'lottie-react'
 
 type Trigger = 'hover' | 'loop' | 'click' | 'none'
@@ -15,7 +15,7 @@ interface LordIconProps {
   speed?: number
 }
 
-export function LordIcon({ src, width = 20, height = 20, className, label, trigger = 'hover', speed = 1 }: LordIconProps) {
+export const LordIcon = memo(function LordIcon({ src, width = 20, height = 20, className, label, trigger = 'hover', speed = 1 }: LordIconProps) {
   const [animationData, setAnimationData] = useState<any>(null)
   const lottieRef = useRef<any>(null)
   const [totalFrames, setTotalFrames] = useState<number>(60)
@@ -121,6 +121,6 @@ export function LordIcon({ src, width = 20, height = 20, className, label, trigg
       `}</style>
     </div>
   )
-}
+})
 
 export default LordIcon

@@ -36,7 +36,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Keep conversation streaming active and capture live messages/UI actions
   const { messages: liveMessages = [], isResponding } = useConversationStreamed(conversationId, starship?.id || '')
-  const deferredAgentCreate = useDeferredAgentCreationModal({ liveMessages, isStreaming: isResponding })
+  const deferredAgentCreate = useDeferredAgentCreationModal({
+    liveMessages,
+    isStreaming: isResponding,
+    starshipSlug: String(slug),
+    conversationId,
+    agents,
+  })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
@@ -685,7 +691,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      <AgentCreatedModal open={deferredAgentCreate.isOpen} names={deferredAgentCreate.createdNames} onOpenChange={deferredAgentCreate.setIsOpen} />
+      <AgentCreatedModal
+        open={deferredAgentCreate.isOpen}
+        names={deferredAgentCreate.createdNames}
+        onOpenChange={deferredAgentCreate.setIsOpen}
+        onChatWithAgent={deferredAgentCreate.chatWithAgent}
+        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+      />
       <AgentBuilderView
         ref={agentBuilderRef}
         starshipId={starship.id}

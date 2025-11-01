@@ -573,7 +573,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const liveMessages = (ctx?.messages as any[]) || []
     const lastUIAction = (ctx as any)?.lastUIAction
     const prevStreamingRef = useRef(false)
-    const deferredAgentCreate = useDeferredAgentCreationModal({ liveMessages, isStreaming: uiStreaming })
+    const deferredAgentCreate = useDeferredAgentCreationModal({
+      liveMessages,
+      isStreaming: uiStreaming,
+      starshipSlug,
+      conversationId: currentConversationId || externalConversationId || null,
+      agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
+    })
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)
@@ -729,9 +735,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }, [uiStreaming, currentConversationId, lastUIAction])
 
     return (
-      <>
-        <AgentCreatedModal open={deferredAgentCreate.isOpen} names={deferredAgentCreate.createdNames} onOpenChange={deferredAgentCreate.setIsOpen} />
-      </>
+      <AgentCreatedModal
+        open={deferredAgentCreate.isOpen}
+        names={deferredAgentCreate.createdNames}
+        onOpenChange={deferredAgentCreate.setIsOpen}
+        onChatWithAgent={deferredAgentCreate.chatWithAgent}
+        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+      />
     )
   }
 

@@ -92,15 +92,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
 
     // Eligible tool slugs that should drive the Agent Builder
-    const builderToolSlugFragments = [
-      'open-agent',
-      'edit-agent',
-      // assignment synonyms
-      'assign-agent-tool',
-      'unassign-agent-tool',
-      'assign-tools',
-      'unassign-tools',
-    ]
+    const builderToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
 
     const form = agentBuilderRef.current.getFormData?.()
     if (!form) return
@@ -242,7 +234,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         } catch {}
         // Allow empty-argument unassign calls to be processed (interpreted as unassign-all)
         if (parsed && typeof parsed === 'object' && Object.keys(parsed as Record<string, unknown>).length === 0) {
-          const isUnassignLike = nameLc.includes('unassign-agent-tool') || nameLc.includes('unassign-tools')
+          const isUnassignLike = nameLc.includes('unassign-agent-tool')
           if (!isUnassignLike) {
             continue
           }
@@ -342,7 +334,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       }
 
       // Reflect assign/unassign tool changes during streaming (optimistic UI)
-      if (nameLc.includes('assign-agent-tool') || nameLc.includes('unassign-agent-tool') || nameLc.includes('assign-tools') || nameLc.includes('unassign-tools')) {
+      if (nameLc.includes('assign-agent-tool') || nameLc.includes('unassign-agent-tool')) {
         const src = args && typeof args === 'object' ? (args as any) : undefined
         const collectToolSlugs = (obj: any, currentAgentSlug: string | undefined): string[] => {
           const out = new Set<string>()
@@ -382,10 +374,10 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         }
 
         const toolSlugs = collectToolSlugs(src, (form as any)?.slug || (typeof agentSlug === 'string' ? agentSlug : undefined))
-        if (toolSlugs.length > 0 || nameLc.includes('unassign')) {
+        if (toolSlugs.length > 0 || nameLc.includes('unassign-agent-tool')) {
           const currentAssigned = Array.isArray((form as any).assignedToolSlugs) ? ([...(form as any).assignedToolSlugs] as string[]) : []
           const setAssigned = new Set<string>(currentAssigned)
-          if (nameLc.includes('assign-agent-tool') || nameLc.includes('assign-tools')) {
+          if (nameLc.includes('assign-agent-tool')) {
             for (const s of toolSlugs) setAssigned.add(s)
           } else {
             if (toolSlugs.length === 0) {

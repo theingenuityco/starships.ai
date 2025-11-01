@@ -56,16 +56,11 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0 border-0 bg-transparent shadow-none overflow-visible">
-        <motion.div
-          ref={scope}
-          initial={{ scale: 0.94, opacity: 0, y: 16 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30, duration: 0.6 }}
-          className="relative bg-background border border-border/50 rounded-3xl shadow-2xl overflow-hidden"
-        >
-          <div className="absolute inset-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[600px] p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 rounded-3xl sm:rounded-3xl">
+        <div className="relative bg-background rounded-3xl overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <motion.div
+              ref={scope}
               animate={{
                 background: [
                   'radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%)',
@@ -144,7 +139,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
 
             {/* Footer removed per design */}
           </div>
-        </motion.div>
+        </div>
       </DialogContent>
     </Dialog>
   )

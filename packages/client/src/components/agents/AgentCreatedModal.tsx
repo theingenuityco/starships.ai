@@ -117,24 +117,15 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
               </div>
             ) : (
               uniqueNames.length > 0 && (
-                <div className="space-y-3 mb-6">
+                <div className="grid grid-cols-1 gap-3 mb-6">
                   {uniqueNames.map((name, idx) => (
-                    <motion.div
-                      key={name}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 + idx * 0.05 }}
-                      className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3 bg-gradient-to-br from-background to-muted/20"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-semibold text-primary">{(name || '?').slice(0, 1).toUpperCase()}</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium truncate">{name}</div>
-                          <div className="text-xs text-muted-foreground truncate">Draft agent is ready</div>
-                        </div>
-                      </div>
+                    <motion.div key={name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
+                      <DeployedAgentCard
+                        agent={{ id: `temp-${name}-${idx}`, name, description: 'Draft agent is ready', model: 'N/A', slug: undefined } as unknown as AgentModel}
+                        onClick={() => onChatWithAgent?.(name)}
+                        onChat={() => onChatWithAgent?.(name)}
+                        showActions={false}
+                      />
                     </motion.div>
                   ))}
                 </div>

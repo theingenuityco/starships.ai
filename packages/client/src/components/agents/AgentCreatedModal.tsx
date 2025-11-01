@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { motion, useAnimate } from 'motion/react'
@@ -26,6 +26,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
   const primaryName = useMemo(() => (Array.isArray(agents) && agents[0]?.name) || uniqueNames[0] || '', [agents, uniqueNames])
   const [mounted, setMounted] = useState(false)
   const [scope, animate] = useAnimate()
+  const primaryCtaRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -53,12 +54,21 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
   useEffect(() => {
     if (open && mounted) {
       setTimeout(() => triggerConfetti(), 450)
+      // Direct initial focus to primary CTA to avoid focusing chat buttons in cards
+      setTimeout(() => {
+        try {
+          primaryCtaRef.current?.focus({ preventScroll: true } as any)
+        } catch {}
+      }, 200)
     }
   }, [open, mounted, triggerConfetti])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px] p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 rounded-3xl sm:rounded-3xl">
+      <DialogContent
+        onOpenAutoFocus={e => e.preventDefault()}
+        className="sm:max-w-[520px] p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 rounded-3xl sm:rounded-3xl"
+      >
         <div className="relative rounded-3xl">
           {/* Hero-style glow and blur border OUTSIDE the card */}
           <div className="absolute inset-0 rounded-3xl video-glow pointer-events-none" aria-hidden />
@@ -129,6 +139,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
                     size="lg"
                     onClick={() => onAskDaedalusCreateTools?.(primaryName)}
                     className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground gap-1.5"
+                    ref={primaryCtaRef}
                   >
                     <Icon name="wrench" className="w-8 h-8" />
                     <span className="truncate">Create tools{primaryName ? ` for ${primaryName}` : ''}</span>

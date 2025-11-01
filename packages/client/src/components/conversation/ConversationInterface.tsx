@@ -579,6 +579,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       starshipSlug,
       conversationId: currentConversationId || externalConversationId || null,
       agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
+      setLeadingMentionAgent: (agent: any) => {
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent)
+        } catch {}
+      },
+      focusInput: () => {
+        try {
+          messageInputRef.current?.focusInput?.()
+        } catch {}
+      },
     })
 
     // Track last processed state to avoid redundant updates

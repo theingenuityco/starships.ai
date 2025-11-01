@@ -218,30 +218,32 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Compact Header with Theme Toggle */}
         <div className="px-3 py-3 border-b border-border/20 flex-shrink-0 flex items-center justify-start gap-3 bg-muted/60">
-          <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground flex-shrink-0 w-9 h-9 flex items-center justify-center" onClick={handleLogoClick} title="Go to Landing Screen">
-            <StarshipsLogo
-              width={36}
-              height={36}
-              className="opacity-70"
-              gradientId="nav-gradient"
-              animationDelay={1}
-              repeatDelay={20}
-              triggerAnimation={animationTrigger}
-              idleLoop={false}
-              playOnMountOnce={false}
-            />
+          <div className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-start gap-3" onClick={handleLogoClick} title="Go to Landing Screen">
+            <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center">
+              <StarshipsLogo
+                width={36}
+                height={36}
+                className="opacity-70"
+                gradientId="nav-gradient"
+                animationDelay={1}
+                repeatDelay={20}
+                triggerAnimation={animationTrigger}
+                idleLoop={false}
+                playOnMountOnce={false}
+              />
+            </div>
+            {isHovered && (
+              <motion.span
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                className={`${orbitron.className} text-lg font-normal tracking-tight leading-none whitespace-nowrap`}
+              >
+                starships.ai
+              </motion.span>
+            )}
           </div>
-          {isHovered && (
-            <motion.span
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-              className={`${orbitron.className} text-lg font-normal tracking-tight leading-none whitespace-nowrap`}
-            >
-              starships.ai
-            </motion.span>
-          )}
         </div>
 
         {/* Navigation Content - Moved to top */}

@@ -113,7 +113,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               <div
                 key={conversation.id}
                 className={cn(
-                  'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-xs',
+                  'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-xs text-muted-foreground hover:text-foreground',
                   'hover:bg-muted/50',
                   isActive && 'bg-[#DD961C]/20 text-foreground'
                 )}

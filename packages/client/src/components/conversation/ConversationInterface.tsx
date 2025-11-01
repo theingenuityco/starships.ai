@@ -579,9 +579,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       starshipSlug,
       conversationId: currentConversationId || externalConversationId || null,
       agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
-      setLeadingMentionAgent: (agent: any) => {
+      setLeadingMentionAgent: (agent: any, afterText?: string) => {
         try {
-          messageInputRef.current?.setLeadingMentionAgent?.(agent)
+          console.debug('[ConversationInterface] forwarding setLeadingMentionAgent', {
+            agent: { id: agent?.id, name: agent?.name, slug: agent?.slug },
+            afterText,
+          })
+        } catch {}
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
         } catch {}
       },
       focusInput: () => {

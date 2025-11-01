@@ -200,7 +200,13 @@ export function useDeferredAgentCreationModal(options: {
           ) ||
           null
         if (daedalus && setLeadingMentionAgent) {
-          setLeadingMentionAgent(daedalus as any, 'create a tool for this agent')
+          try {
+            console.debug('[AgentCreatedModal] askDaedalusCreateTools → setting mention', {
+              agent: { id: (daedalus as any)?.id, name: (daedalus as any)?.name, slug: (daedalus as any)?.slug },
+              afterText: 'create a tool for the agent please',
+            })
+          } catch {}
+          setLeadingMentionAgent(daedalus as any, 'create a tool for the agent please')
         }
         if (focusInput) {
           setTimeout(() => {

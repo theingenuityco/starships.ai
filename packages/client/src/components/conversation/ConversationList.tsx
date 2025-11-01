@@ -19,9 +19,10 @@ interface ConversationListProps {
   onConversationDelete?: (conversationId: string) => void
   onConversationArchive?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
+  compact?: boolean
 }
 
-export function ConversationList({ starshipId, onConversationDelete, onConversationArchive, onConversationSelect }: ConversationListProps) {
+export function ConversationList({ starshipId, onConversationDelete, onConversationArchive, onConversationSelect, compact = false }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
@@ -75,25 +76,56 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     onConversationSelect?.(conversationId)
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold mb-3">Conversations</h2>
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
+  // Compact mode - inline display without header/search
+  if (compact) {
+    if (isLoading) {
+      return (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-10 w-full rounded-lg" />
+          ))}
         </div>
-      </div>
-    )
-  }
+      )
+    }
 
-  if (error) {
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 px-2">
+          <p className="text-muted-foreground text-xs text-center">Failed to load conversations</p>
+        </div>
+      )
+    }
+    
+    // Flat list without date grouping for compact mode
     return (
-      <div className="flex flex-col h-full items-center justify-center p-4">
-        <p className="text-muted-foreground text-sm">Failed to load conversations</p>
+      <div className="space-y-0.5">
+        {filteredConversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 px-2">
+            <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+            <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
+          </div>
+        ) : (
+          filteredConversations.map((conversation: ConversationModel) => {
+            const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
+            const isActive = conversation.id === currentConversationId
+
+            return (
+              <div
+                key={conversation.id}
+                className={cn(
+                  'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-xs',
+                  'hover:bg-muted/50',
+                  isActive && 'bg-[#DD961C]/20 text-foreground'
+                )}
+                onClick={() => handleConversationClick(conversation.id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-xs font-medium truncate', isActive && 'text-[#DD961C]')}>{title}</p>
+                </div>
+              </div>
+            )
+          })
+        )}
       </div>
     )
   }

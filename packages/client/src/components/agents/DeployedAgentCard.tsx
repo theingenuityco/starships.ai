@@ -96,8 +96,9 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
       </CardHeader>
       <CardContent className="relative z-10 pt-0">
         <div className="flex items-center justify-between">
-          <Badge variant="secondary" className="text-xs">
-            {agent.model || 'N/A'}
+          <Badge variant="secondary" className="text-xs flex items-center gap-1.5">
+            <Icon name="brain" className="w-3 h-3" />
+            <span className="font-mono">{agent.model || 'N/A'}</span>
           </Badge>
           {onChat ? (
             <Button

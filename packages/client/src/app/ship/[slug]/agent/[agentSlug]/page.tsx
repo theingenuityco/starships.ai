@@ -606,8 +606,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         }
         if (agentSlug === 'new' && !routeUpdatedRef.current) {
           if (typeof slugArg === 'string' && slugArg) {
-            // Success: navigate to agents list for this starship
-            router.replace(`/ship/${slug}/agents`)
+            // Success: navigate to the created agent's page
+            const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+            router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)
             routeUpdatedRef.current = true
             setAgentOpenError(null)
             break

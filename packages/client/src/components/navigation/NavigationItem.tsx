@@ -39,7 +39,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
   const motionDiv = (
     <motion.div
       onClick={handleClick}
-      className={`group relative transition-all duration-300 rounded-xl flex items-center border w-full h-10 py-2 cursor-pointer ${
+      className={`group relative transition-all duration-300 rounded-xl flex items-center border w-full h-10 cursor-pointer ${
         isActive
           ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border-primary/30'
           : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
@@ -47,13 +47,15 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       style={{ 
         paddingLeft: '0.75rem',
         paddingRight: '0.75rem',
+        paddingTop: '0.5rem',
+        paddingBottom: '0.5rem',
         justifyContent: 'flex-start'
       }}
       whileHover={{ scale: expanded ? 1.02 : 1.05 }}
       whileTap={{ scale: expanded ? 0.98 : 0.95 }}
     >
       {special ? (
-        <div className="rounded-full flex items-center justify-center w-6 h-6 bg-[#DD961C] hover:bg-[#CC860C] transition-all duration-300 flex-shrink-0">
+        <div className="rounded-full flex items-center justify-center w-6 h-6 bg-[#DD961C] hover:bg-[#CC860C] transition-all duration-300 flex-shrink-0" style={{ margin: 0 }}>
           <LordIcon 
             src={getLordiconUrl(icon)} 
             width={16} 
@@ -63,13 +65,15 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
           />
         </div>
       ) : (
-        <LordIcon 
-          src={getLordiconUrl(icon)} 
-          width={24} 
-          height={24} 
-          className="w-6 h-6 flex-shrink-0" 
-          trigger="click" 
-        />
+        <div className="flex-shrink-0" style={{ width: '1.5rem', height: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
+          <LordIcon 
+            src={getLordiconUrl(icon)} 
+            width={24} 
+            height={24} 
+            className="w-6 h-6" 
+            trigger="click" 
+          />
+        </div>
       )}
       <AnimatePresence mode="wait">
         {expanded && (
@@ -79,6 +83,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
             className="ml-3 text-sm font-medium whitespace-nowrap"
+            style={{ marginLeft: '0.75rem' }}
           >
             {label}
           </motion.span>

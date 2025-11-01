@@ -29,9 +29,11 @@ export function NavigationSection({ title, items, pathname, renderAfter, showLab
       {items.map((item, index) => {
         const { isActive: itemOverrideActive, ...rest } = item
         const isActive = itemOverrideActive ?? pathname === item.href
+        // Use composite key to ensure uniqueness (href + label + index to handle duplicate hrefs)
+        const uniqueKey = `${item.href}-${item.label}-${index}`
 
         return (
-          <div key={item.href} className="w-full">
+          <div key={uniqueKey} className="w-full">
             <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} />
             {renderAfter ? renderAfter(item, index) : null}
           </div>

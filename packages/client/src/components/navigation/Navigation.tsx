@@ -89,34 +89,57 @@ export function Navigation(props: NavigationProps) {
 
   const starshipSlug = navigationStarshipSlug
 
-  // Check if we're on a conversation route
-  const isConversationRoute = pathname.includes('/conversations')
-  const isOverviewRoute = starshipSlug ? pathname === `/ship/${starshipSlug}` : false
-  const isSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings`) : false
-  const isUsageSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/usage`) : false
-  const isEnvironmentSettingsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/settings/environment`) : false
-  const isAgentsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agents`) : false
-  const isAgentBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/agent/`) : false
-  const isToolsRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tools`) : false
-  const isToolBuilderRoute = starshipSlug ? pathname.startsWith(`/ship/${starshipSlug}/tool/`) : false
+  // Memoize route checks to prevent unnecessary recalculations
+  const routeChecks = useMemo(() => {
+    if (!starshipSlug) {
+      return {
+        isOverviewRoute: false,
+        isSettingsRoute: false,
+        isEnvironmentSettingsRoute: false,
+        isAgentsRoute: false,
+        isAgentBuilderRoute: false,
+        isToolsRoute: false,
+        isToolBuilderRoute: false,
+      }
+    }
+    return {
+      isOverviewRoute: pathname === `/ship/${starshipSlug}`,
+      isSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings`),
+      isEnvironmentSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings/environment`),
+      isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
+      isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
+      isToolsRoute: pathname.startsWith(`/ship/${starshipSlug}/tools`),
+      isToolBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/tool/`),
+    }
+  }, [pathname, starshipSlug])
 
-  // Get starship data to access starship ID
-  const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug)
+  const {
+    isOverviewRoute,
+    isSettingsRoute,
+    isEnvironmentSettingsRoute,
+    isAgentsRoute,
+    isAgentBuilderRoute,
+    isToolsRoute,
+    isToolBuilderRoute,
+  } = routeChecks
+
+  // Get starship data to access starship ID - only fetch when needed
+  const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
 
 
-  // Conversation action handlers
+  // Conversation action handlers - memoized to prevent unnecessary re-renders
   const deleteConversationMutation = useDeleteConversation()
   const updateConversationStatusMutation = useUpdateConversationStatus()
 
-  const handleConversationDelete = async (conversationId: string) => {
+  const handleConversationDelete = useCallback(async (conversationId: string) => {
     try {
       await deleteConversationMutation.mutateAsync(conversationId)
     } catch (error) {
       // Error handling is done in the mutation hook
     }
-  }
+  }, [deleteConversationMutation])
 
-  const handleConversationArchive = async (conversationId: string) => {
+  const handleConversationArchive = useCallback(async (conversationId: string) => {
     try {
       await updateConversationStatusMutation.mutateAsync({
         conversationId,
@@ -125,39 +148,45 @@ export function Navigation(props: NavigationProps) {
     } catch (error) {
       // Error handling is done in the mutation hook
     }
-  }
+  }, [updateConversationStatusMutation])
 
-  // Handle new conversation
-  const handleNewConversation = () => {
+  // Handle new conversation - memoized
+  const handleNewConversation = useCallback(() => {
+    if (!starshipSlug) return
     router.push(`/ship/${starshipSlug}/conversations`)
-  }
+  }, [router, starshipSlug])
 
-  // Handle conversation selection - navigate to conversation
-  const handleConversationSelect = (conversationId: string) => {
+  // Handle conversation selection - memoized
+  const handleConversationSelect = useCallback((conversationId: string) => {
+    if (!starshipSlug) return
     router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)
-  }
+  }, [router, starshipSlug])
 
-  // Handle user profile click - navigate to settings
-  const handleUserProfileClick = () => {
+  // Handle user profile click - memoized
+  const handleUserProfileClick = useCallback(() => {
     if (!starshipSlug) return
     router.push(`/ship/${starshipSlug}/settings`)
-  }
+  }, [router, starshipSlug])
 
-
-  // Handle logo click - navigate to landing screen
-  const handleLogoClick = () => {
+  // Handle logo click - memoized
+  const handleLogoClick = useCallback(() => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
-    
     // Always go to landing screen
     router.push('/')
-  }
+  }, [router])
 
   // Memoize hover handlers to prevent unnecessary re-renders
   const handleMouseEnter = useCallback(() => setIsHovered(true), [])
   const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
-  // Memoize main navigation items
+  // Handle recents click - show tooltip only, navigation handled by expansion
+  const handleRecentsClick = useCallback(() => {
+    // No action needed - just shows tooltip in collapsed state
+  }, [])
+
+  // Memoize main navigation items - only recalculate when dependencies change
+  // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(() => [
     ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
@@ -165,7 +194,9 @@ export function Navigation(props: NavigationProps) {
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'tools', isActive: isToolsRoute || isToolBuilderRoute }] : []),
     { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
     ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
-  ], [isAuthenticated, starshipSlug, isOverviewRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, pathname, isEnvironmentSettingsRoute, handleNewConversation])
+    // Add Recents to same hierarchy when collapsed - it will be hidden when expanded via conditional rendering
+    ...(isAuthenticated && starshipSlug && starshipData?.id && !isHovered ? [{ href: '#', label: 'Recents', icon: 'history', isActive: false, onClick: handleRecentsClick }] : []),
+  ], [isAuthenticated, starshipSlug, isOverviewRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, pathname, isEnvironmentSettingsRoute, handleNewConversation, handleRecentsClick, isHovered, starshipData?.id])
 
   // Floating mode - expandable layout
   return (
@@ -185,7 +216,7 @@ export function Navigation(props: NavigationProps) {
         }}
       >
         {/* Compact Header with Theme Toggle */}
-        <div className="px-3 py-5 border-b border-border/20 flex-shrink-0 flex items-center justify-start gap-3 bg-muted/30">
+        <div className="px-3 py-3 border-b border-border/20 flex-shrink-0 flex items-center justify-start gap-3 bg-muted/60">
           <div className="cursor-pointer hover:scale-105 transform transition-transform text-muted-foreground hover:text-foreground flex-shrink-0 w-9 h-9 flex items-center justify-center" onClick={handleLogoClick} title="Go to Landing Screen">
             <StarshipsLogo
               width={36}
@@ -213,7 +244,7 @@ export function Navigation(props: NavigationProps) {
         </div>
 
         {/* Navigation Content - Moved to top */}
-        <div className="flex-shrink-0 py-3">
+        <div className="flex-shrink-0" style={{ paddingTop: '0.75rem', paddingBottom: (isAuthenticated && starshipSlug && starshipData?.id && isHovered) ? '0' : '0.75rem' }}>
           <div className="flex flex-col space-y-1 w-full">
             <NavigationSection
               title="Navigation"
@@ -224,32 +255,19 @@ export function Navigation(props: NavigationProps) {
           </div>
         </div>
 
-        {/* Recents Icon - Always visible in collapsed state */}
-        {isAuthenticated && starshipSlug && starshipData?.id && !isHovered && (
-          <div className="flex-shrink-0 py-2 flex items-center" style={{ paddingLeft: '0.75rem', paddingRight: '0.75rem', justifyContent: 'flex-start' }}>
-            <Tooltip delayDuration={300}>
-              <TooltipTrigger asChild>
-                <div className="w-full h-10 flex items-center cursor-pointer rounded-xl border border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md transition-all duration-300">
-                  <LordIcon src={getLordiconUrl('history')} width={24} height={24} className="w-6 h-6 text-muted-foreground flex-shrink-0" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                Recents
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        )}
-
         {/* Conversation History List - Recents - Show when navbar is expanded */}
         {isAuthenticated && starshipSlug && isHovered && starshipData?.id && (
           <div 
             ref={conversationHistoryRef}
             className="flex-1 min-h-0 flex flex-col overflow-hidden"
           >
-            <div className="px-3 py-2 flex-shrink-0">
-              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4 flex-shrink-0" />
-                <span>Recents</span>
+            {/* Recents header - matches NavigationItem exactly with space-y-1 gap (0.25rem) */}
+            <div className="w-full" style={{ paddingTop: '0.25rem' }}>
+              <div className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', paddingLeft: '0.75rem', paddingRight: '0.75rem', justifyContent: 'flex-start' }}>
+                <div className="flex-shrink-0" style={{ width: '1.5rem', height: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
+                  <LordIcon src={getLordiconUrl('history')} width={24} height={24} className="w-6 h-6 flex-shrink-0" />
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ marginLeft: '0.75rem' }}>Recents</span>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
@@ -270,16 +288,16 @@ export function Navigation(props: NavigationProps) {
         {(!isHovered || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
 
         {/* User Profile Section */}
-        <div ref={userSectionRef} className="flex-shrink-0 py-2 flex flex-col items-center justify-center relative">
+        <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
           {/* Profile section */}
           <div className="w-full" style={{ paddingLeft: '0.75rem', paddingRight: '0.75rem' }}>
             {isHovered ? (
               <div 
-                className="flex items-center gap-3 py-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full" 
+                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full" 
                 onClick={handleUserProfileClick}
-                style={{ justifyContent: 'flex-start' }}
+                style={{ justifyContent: 'flex-start', paddingTop: '0.5rem', paddingBottom: '0.5rem', minHeight: '2.5rem' }}
               >
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
                   <UserProfile
                     mode="collapsed"
                     active={isSettingsRoute}
@@ -317,12 +335,14 @@ export function Navigation(props: NavigationProps) {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center w-full" style={{ justifyContent: 'flex-start' }}>
-                <UserProfile
-                  mode="collapsed"
-                  active={isSettingsRoute}
-                  onClick={handleUserProfileClick}
-                />
+              <div className="flex items-center w-full" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+                <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
+                  <UserProfile
+                    mode="collapsed"
+                    active={isSettingsRoute}
+                    onClick={handleUserProfileClick}
+                  />
+                </div>
               </div>
             )}
           </div>

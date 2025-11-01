@@ -59,78 +59,85 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] p-0 gap-0 border-0 shadow-none bg-transparent overflow-visible outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 rounded-3xl sm:rounded-3xl">
-        <div className="relative bg-background rounded-3xl overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <motion.div
-              ref={scope}
-              animate={{
-                background: [
-                  'radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%)',
-                  'radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%)',
-                  'radial-gradient(circle at 40% 60%, rgba(236, 72, 153, 0.08) 0%, transparent 50%)',
-                  'radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%)',
-                ],
-              }}
-              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-              className="absolute inset-0"
-            />
-          </div>
+        <div className="relative rounded-3xl">
+          {/* Hero-style glow and blur border OUTSIDE the card */}
+          <div className="absolute inset-0 rounded-3xl video-glow pointer-events-none" aria-hidden />
+          <div className="absolute inset-0 rounded-3xl video-blur-border pointer-events-none" aria-hidden />
 
-          <div className="relative p-8">
-            <div className="text-center mb-6">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-bold">
-                  <span className="mr-2 align-[-2px]" aria-hidden>
-                    🎉
-                  </span>
-                  <span className="bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">{baseTitle}</span>
-                </DialogTitle>
-              </DialogHeader>
+          {/* Actual card container */}
+          <div className="relative bg-background rounded-3xl overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <motion.div
+                ref={scope}
+                animate={{
+                  background: [
+                    'radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%)',
+                    'radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%)',
+                    'radial-gradient(circle at 40% 60%, rgba(236, 72, 153, 0.08) 0%, transparent 50%)',
+                    'radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%)',
+                  ],
+                }}
+                transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-0"
+              />
             </div>
 
-            {/* Agents Cards (preferred) or fallback list */}
-            {Array.isArray(agents) && agents.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3 mb-6">
-                {agents.map((a, idx) => (
-                  <motion.div key={a.id || a.slug || a.name || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
-                    <DeployedAgentCard agent={a as AgentModel} onClick={() => onChatWithAgent?.(a.name)} onChat={() => onChatWithAgent?.(a.name)} showActions={false} hideChatControl={true} />
-                  </motion.div>
-                ))}
+            <div className="relative p-8">
+              <div className="text-center mb-6">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold">
+                    <span className="mr-2 align-[-2px]" aria-hidden>
+                      🎉
+                    </span>
+                    <span className="bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">{baseTitle}</span>
+                  </DialogTitle>
+                </DialogHeader>
               </div>
-            ) : (
-              uniqueNames.length > 0 && (
+
+              {/* Agents Cards (preferred) or fallback list */}
+              {Array.isArray(agents) && agents.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3 mb-6">
-                  {uniqueNames.map((name, idx) => (
-                    <motion.div key={name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
-                      <DeployedAgentCard
-                        agent={{ id: `temp-${name}-${idx}`, name, description: 'Draft agent is ready', model: 'N/A', slug: undefined } as unknown as AgentModel}
-                        onClick={() => onChatWithAgent?.(name)}
-                        onChat={() => onChatWithAgent?.(name)}
-                        showActions={false}
-                        hideChatControl={true}
-                      />
+                  {agents.map((a, idx) => (
+                    <motion.div key={a.id || a.slug || a.name || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
+                      <DeployedAgentCard agent={a as AgentModel} onClick={() => onChatWithAgent?.(a.name)} onChat={() => onChatWithAgent?.(a.name)} showActions={false} hideChatControl={true} />
                     </motion.div>
                   ))}
                 </div>
-              )
-            )}
+              ) : (
+                uniqueNames.length > 0 && (
+                  <div className="grid grid-cols-1 gap-3 mb-6">
+                    {uniqueNames.map((name, idx) => (
+                      <motion.div key={name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
+                        <DeployedAgentCard
+                          agent={{ id: `temp-${name}-${idx}`, name, description: 'Draft agent is ready', model: 'N/A', slug: undefined } as unknown as AgentModel}
+                          onClick={() => onChatWithAgent?.(name)}
+                          onChat={() => onChatWithAgent?.(name)}
+                          showActions={false}
+                          hideChatControl={true}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )
+              )}
 
-            {/* Bottom CTA */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <div className="grid grid-cols-1 gap-3">
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={() => onAskDaedalusCreateTools?.(primaryName)}
-                  className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground gap-1.5"
-                >
-                  <Icon name="wrench" className="w-8 h-8" />
-                  <span className="truncate">Create tools{primaryName ? ` for ${primaryName}` : ''}</span>
-                </Button>
-              </div>
-            </motion.div>
+              {/* Bottom CTA */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                <div className="grid grid-cols-1 gap-3">
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={() => onAskDaedalusCreateTools?.(primaryName)}
+                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground gap-1.5"
+                  >
+                    <Icon name="wrench" className="w-8 h-8" />
+                    <span className="truncate">Create tools{primaryName ? ` for ${primaryName}` : ''}</span>
+                  </Button>
+                </div>
+              </motion.div>
 
-            {/* Footer removed per design */}
+              {/* Footer removed per design */}
+            </div>
           </div>
         </div>
       </DialogContent>

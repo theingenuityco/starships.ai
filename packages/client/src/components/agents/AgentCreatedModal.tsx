@@ -93,7 +93,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
               <div className="grid grid-cols-1 gap-3 mb-6">
                 {agents.map((a, idx) => (
                   <motion.div key={a.id || a.slug || a.name || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
-                    <DeployedAgentCard agent={a as AgentModel} onClick={() => onChatWithAgent?.(a.name)} showActions={false} hideChatControl={true} />
+                    <DeployedAgentCard agent={a as AgentModel} onClick={() => onChatWithAgent?.(a.name)} onChat={() => onChatWithAgent?.(a.name)} showActions={false} hideChatControl={true} />
                   </motion.div>
                 ))}
               </div>
@@ -105,6 +105,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
                       <DeployedAgentCard
                         agent={{ id: `temp-${name}-${idx}`, name, description: 'Draft agent is ready', model: 'N/A', slug: undefined } as unknown as AgentModel}
                         onClick={() => onChatWithAgent?.(name)}
+                        onChat={() => onChatWithAgent?.(name)}
                         showActions={false}
                         hideChatControl={true}
                       />
@@ -114,24 +115,16 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
               )
             )}
 
-            {/* Bottom CTAs */}
+            {/* Bottom CTA */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
               <div className="grid grid-cols-1 gap-3">
-                <button
-                  type="button"
-                  onClick={() => onChatWithAgent?.(primaryName)}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/50 px-4 py-2.5 text-sm font-medium hover:bg-primary/10 w-full"
-                >
-                  <Icon name="message-square" className="w-4 h-4" />
-                  Chat now
-                </button>
                 <Button
                   type="button"
                   size="lg"
                   onClick={() => onAskDaedalusCreateTools?.(primaryName)}
-                  className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground"
+                  className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground gap-1.5"
                 >
-                  <Icon name="hammer" className="w-5 h-5 mr-2" />
+                  <Icon name="wrench" className="w-8 h-8" />
                   <span className="truncate">Create tools{primaryName ? ` for ${primaryName}` : ''}</span>
                 </Button>
               </div>

@@ -95,7 +95,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         </div>
       )
     }
-    
+
     // Flat list without date grouping for compact mode
     return (
       <div className="space-y-0.5">
@@ -113,15 +113,67 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               <div
                 key={conversation.id}
                 className={cn(
-                  'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-xs text-muted-foreground hover:text-foreground',
+                  'group flex items-center gap-2 p-2 rounded-lg transition-all text-xs text-muted-foreground hover:text-foreground relative',
                   'hover:bg-muted/50',
                   isActive && 'bg-[#DD961C]/20 text-foreground'
                 )}
-                onClick={() => handleConversationClick(conversation.id)}
               >
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
                   <p className={cn('text-xs font-medium truncate', isActive && 'text-[#DD961C]')}>{title}</p>
                 </div>
+                {/* Delete button - appears on hover */}
+                {(onConversationDelete || onConversationArchive) && (
+                  <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          onMouseDown={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          type="button"
+                        >
+                          <Icon name="dots-vertical" className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
+                        {onConversationArchive && (
+                          <DropdownMenuItem
+                            onClick={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onConversationArchive(conversation.id)
+                            }}
+                          >
+                            <Icon name="archive" className="mr-2 h-3 w-3" />
+                            <span className="text-xs">Archive</span>
+                          </DropdownMenuItem>
+                        )}
+                        {onConversationArchive && onConversationDelete && <DropdownMenuSeparator />}
+                        {onConversationDelete && (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onConversationDelete(conversation.id)
+                            }}
+                          >
+                            <Icon name="trash" className="mr-2 h-3 w-3" />
+                            <span className="text-xs">Delete</span>
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
               </div>
             )
           })

@@ -301,7 +301,7 @@ export abstract class BaseRepository {
     const pool = conn.getPool();
 
     const query = `DELETE FROM ${tableName} WHERE id = $1`;
-    
+
     // Use pool.query directly to get access to rowCount (PostgresConnection.query only returns rows array)
     const result = await pool.query(query, [id]);
     return (result.rowCount ?? 0) > 0;

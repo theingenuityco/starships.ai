@@ -287,7 +287,7 @@ export function useDeleteAgent() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       toast.error('Failed to delete agent', {
         description: errorMessage,
       })
@@ -336,7 +336,7 @@ export function useDeployAgent() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })
@@ -373,7 +373,7 @@ export function useRateAgent() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       toast.error('Failed to rate agent', {
         description: errorMessage,
       })

@@ -465,7 +465,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           }
         }
         if (!slugArg || typeof slugArg !== 'string') {
-          if (funcName === 'open-agent' && agentSlug === 'new' && !routeUpdatedRef.current && errorText) {
+          const fn = (funcName || '').toLowerCase()
+          if (fn.includes('open-agent') && agentSlug === 'new' && !routeUpdatedRef.current && errorText) {
             setAgentOpenError(errorText || 'Failed to open agent')
           }
           processedToolResultIdsRef.current.add(id)

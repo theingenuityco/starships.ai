@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+'use client'
+
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 
 /**
  * Detects agent creations during an active streaming turn and exposes a modal state
@@ -6,9 +9,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
  *
  * Detection heuristic: assistant tool call named like 'open-agent*' with a provided name and no slug.
  */
-export function useDeferredAgentCreationModal(options: { liveMessages: any[] | undefined; isStreaming: boolean | undefined }) {
+export function useDeferredAgentCreationModal(options: {
+  liveMessages: any[] | undefined
+  isStreaming: boolean | undefined
+  starshipSlug?: string | null
+  conversationId?: string | null
+  agents?: Array<{ name?: string; slug?: string }>
+}) {
   const isStreaming = Boolean(options?.isStreaming)
   const liveMessages = Array.isArray(options?.liveMessages) ? (options!.liveMessages as any[]) : []
+  const starshipSlug = typeof options?.starshipSlug === 'string' ? options!.starshipSlug : undefined
+  const conversationId = typeof options?.conversationId === 'string' ? options!.conversationId : undefined
+  const agents = Array.isArray(options?.agents) ? options!.agents : undefined
+  const router = useRouter()
 
   const prevStreamingRef = useRef<boolean>(false)
   const createdNamesRef = useRef<Set<string>>(new Set())
@@ -58,15 +71,50 @@ export function useDeferredAgentCreationModal(options: { liveMessages: any[] | u
     prevStreamingRef.current = Boolean(isStreaming)
   }, [isStreaming])
 
-  const close = useMemo(() => ({
-    close: () => setIsOpen(false),
-  }), [])
+  const findAgentSlugByName = useCallback(
+    (name: string | undefined): string | undefined => {
+      if (!name || !agents) return undefined
+      const n = String(name).toLowerCase()
+      const match = agents.find(a => String(a?.name || '').toLowerCase() === n)
+      return match?.slug
+    },
+    [agents]
+  )
+
+  const navigateToAgent = useCallback(
+    (name: string | undefined) => {
+      try {
+        if (!name || !starshipSlug) return
+        const slug = findAgentSlugByName(name) || 'new'
+        const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+        router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(slug)}${q}`)
+      } catch {}
+    },
+    [router, starshipSlug, conversationId, findAgentSlugByName]
+  )
+
+  const chatWithAgent = useCallback(
+    (name: string) => {
+      navigateToAgent(name)
+      setIsOpen(false)
+    },
+    [navigateToAgent]
+  )
+
+  const askDaedalusCreateTools = useCallback(
+    (name: string) => {
+      navigateToAgent(name)
+      setIsOpen(false)
+    },
+    [navigateToAgent]
+  )
 
   return {
     isOpen,
     createdNames,
     setIsOpen,
-    ...close,
+    chatWithAgent,
+    askDaedalusCreateTools,
   }
 }
 

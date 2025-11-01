@@ -77,7 +77,11 @@ jobs:
     environment: ci
     env:
       # Node.js Memory Configuration - Applied to all child processes
-      NODE_OPTIONS: --max-old-space-size=4096
+      # Increased from 4096 to 8192 (8GB) to prevent OOM kills during build
+      NODE_OPTIONS: --max-old-space-size=8192
+      
+      # Enable Next.js build cache for faster, more memory-efficient builds
+      NEXT_CACHE_ENABLED: true
 
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
@@ -132,4 +136,6 @@ jobs:
 
       - name: Build all packages
         run: |
+          # Enable Next.js build cache and set cache directory
+          export NEXT_BUILD_CACHE_DIR=.next/cache
           pnpm run build --concurrency=1

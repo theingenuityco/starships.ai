@@ -16,16 +16,15 @@ export function AgentCreatedModal({ open, names, onOpenChange }: AgentCreatedMod
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            {uniqueNames.length === 0 ? null : (
-              <div className="space-y-1 pt-1">
-                {uniqueNames.map(name => (
-                  <div key={name} className="text-foreground">{name} Agent created.</div>
-                ))}
-              </div>
-            )}
-          </DialogDescription>
+          <DialogDescription>{uniqueNames.length > 1 ? 'The following agents were created:' : 'Agent has been created:'}</DialogDescription>
         </DialogHeader>
+        {uniqueNames.length > 0 && (
+          <div className="space-y-1 pt-2">
+            {uniqueNames.map(name => (
+              <div key={name} className="text-foreground">{name} Agent created.</div>
+            ))}
+          </div>
+        )}
         <DialogFooter>
           <button
             type="button"

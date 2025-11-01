@@ -12,6 +12,8 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
+import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
+import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -32,6 +34,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   // Keep conversation streaming active and capture live messages/UI actions
   const { messages: liveMessages = [], lastUIAction, isResponding } = useConversationStreamed(conversationId, starship?.id || '', { enabled: true })
+  const deferredAgentCreate = useDeferredAgentCreationModal({ liveMessages, isStreaming: isResponding })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
@@ -431,6 +434,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
+      <AgentCreatedModal open={deferredAgentCreate.isOpen} names={deferredAgentCreate.createdNames} onOpenChange={deferredAgentCreate.setIsOpen} />
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (
         <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>

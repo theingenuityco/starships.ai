@@ -13,6 +13,8 @@ import { useConversationAgents, useConversationStreamed } from '@/hooks/useConve
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
+import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
+import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -34,6 +36,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Keep conversation streaming active and capture live messages/UI actions
   const { messages: liveMessages = [], isResponding } = useConversationStreamed(conversationId, starship?.id || '')
+  const deferredAgentCreate = useDeferredAgentCreationModal({ liveMessages, isStreaming: isResponding })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
@@ -682,6 +685,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
+      <AgentCreatedModal open={deferredAgentCreate.isOpen} names={deferredAgentCreate.createdNames} onOpenChange={deferredAgentCreate.setIsOpen} />
       <AgentBuilderView
         ref={agentBuilderRef}
         starshipId={starship.id}

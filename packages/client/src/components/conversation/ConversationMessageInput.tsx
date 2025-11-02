@@ -56,6 +56,7 @@ interface ConversationMessageInputProps {
 export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
   focusInput: () => void
+  setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -1404,10 +1405,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        try {
+          const summary = blockContent.slice(0, 4).map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs })).flat()
+          console.debug('[MessageInput.ensureLeadingAgentMention] current first paragraph', summary)
+        } catch {}
 
         // Collect all mention nodes in the first paragraph
         const mentionNodes = blockContent.filter((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
         if (mentionNodes.length > 0) {
+          // If there is already any non-whitespace text after the mention, do not rebuild
+          try {
+            const idxOfFirstMention = blockContent.findIndex((n: any) => n && n.type === 'mention')
+            const tail = idxOfFirstMention >= 0 ? blockContent.slice(idxOfFirstMention + 1) : []
+            const textAfter = tail.filter((n: any) => n && n.type === 'text').map((n: any) => n.text || '').join('')
+            if ((textAfter || '').trim().length > 0) {
+              if (process.env.NODE_ENV !== 'production') {
+                try { console.debug('[MessageInput.ensureLeadingAgentMention] detected existing text after mention, skipping rebuild') } catch {}
+              }
+              return
+            }
+          } catch {}
           // Always prefer the most recently inserted mention (last in content order)
           const desiredMention = mentionNodes[mentionNodes.length - 1]
           // Build remaining content excluding all mention nodes
@@ -1457,6 +1474,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             content: [desiredMention, ...contentAfterMention],
           }
           const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+          try {
+            const preview = newParagraph.content.slice(0, 3).map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
+            console.debug('[MessageInput.ensureLeadingAgentMention] rebuilding paragraph', preview)
+          } catch {}
           scheduleSetContent(newDoc)
 
           // Mark this agent as enforced to prevent re-enforcement
@@ -1570,6 +1591,60 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         focusInput: () => {
           try {
             tiptap?.commands.focus('end')
+          } catch {}
+        },
+        setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => {
+          try {
+            if (!tiptap || !agent) return
+            // Update local current agent immediately; defer external change to avoid race with enforcement
+            currentAgentRef.current = agent
+            const json: any = tiptap.getJSON()
+            const docContent = Array.isArray(json?.content) ? json.content : []
+            const firstBlock = docContent[0]
+            const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+            // Remove any existing mentions from first paragraph
+            let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+            // Drop leading whitespace-only text nodes to avoid double space after the mention
+            while (rest.length > 0 && rest[0]?.type === 'text' && typeof rest[0].text === 'string' && rest[0].text.trim() === '') {
+              rest = rest.slice(1)
+            }
+            const desiredMention = buildMentionNodeForAgent(agent)
+            if (!desiredMention) return
+            // Build paragraph: mention + (NBSP + prefill when provided) or NBSP
+            // NBSP ensures the gap after the chip is visibly preserved across renders
+            const nbsp = '\u00A0'
+            const prefill =
+              typeof afterText === 'string' && afterText.trim().length > 0
+                ? { type: 'text', text: `${nbsp}${afterText.trim()} ` }
+                : { type: 'text', text: `${nbsp}` }
+            try {
+              console.debug('[MessageInput.setLeadingMentionAgent] building content', {
+                agent: { id: agent?.id, name: agent?.name, slug: (agent as any)?.slug },
+                afterText,
+                prefillText: (prefill as any)?.text,
+                restPreview: rest.slice(0, 3).map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type })).flat(),
+              })
+            } catch {}
+            const newParagraph = { type: 'paragraph', content: [desiredMention, prefill, ...rest] }
+            const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+            scheduleSetContent(newDoc)
+            lastEnforcedAgentIdRef.current = agent.id
+            // Focus and place caret at end to continue typing naturally
+            setTimeout(() => {
+              try {
+                tiptap?.commands.focus('end')
+                try {
+                  const first = (tiptap as any)?.getJSON?.()?.content?.[0]
+                  console.debug('[MessageInput.setLeadingMentionAgent] post-setContent first paragraph', first)
+                } catch {}
+                // Now sync selectedAgent externally after our edits settle, to avoid enforcement racing our insert
+                setTimeout(() => {
+                  try {
+                    if (onAgentChange) onAgentChange(agent)
+                  } catch {}
+                }, 60)
+              } catch {}
+            }, 10)
           } catch {}
         },
       }),

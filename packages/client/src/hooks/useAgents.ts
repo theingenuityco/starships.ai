@@ -26,6 +26,7 @@ export const AGENT_QUERY_KEYS = {
   list: (filters?: AgentFilters) => [...AGENT_QUERY_KEYS.lists(), { filters }] as const,
   details: () => [...AGENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...AGENT_QUERY_KEYS.details(), id] as const,
+  bySlugOrId: (slugOrId: string) => [...AGENT_QUERY_KEYS.all, 'slugOrId', slugOrId] as const,
   byStarship: (starshipId: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId] as const,
   byAuthor: (authorId: string) => [...AGENT_QUERY_KEYS.all, 'author', authorId] as const,
   byUser: (userId: string) => [...AGENT_QUERY_KEYS.all, 'user', userId] as const,
@@ -47,6 +48,24 @@ export function useAgent(agentId: string, enabled: boolean = true) {
     enabled: !!agentId && enabled,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+/**
+ * Fetcher and hook for agent by slug or ID (single endpoint).
+ */
+export async function fetchAgentBySlugOrId(slugOrId: string): Promise<AgentModel> {
+  const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugOrId)}`)
+  return response.data.data
+}
+
+export function useAgentBySlugOrId(slugOrId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugOrId),
+    queryFn: () => fetchAgentBySlugOrId(slugOrId),
+    enabled: !!slugOrId && enabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
   })
 }
 

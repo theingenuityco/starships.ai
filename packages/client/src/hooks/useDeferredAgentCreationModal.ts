@@ -384,15 +384,38 @@ export function useDeferredAgentCreationModal(options: {
 
   // Navigate to conversations with the agent preselected via query param
   const navigateToConversationWithAgent = useCallback(
-    (name: string | undefined) => {
+    (identifier: string | undefined) => {
       try {
         if (!starshipSlug) return
-        const slug = name ? findAgentSlugByName(name) : undefined
+        let slug: string | undefined
+        const idLc = (identifier || '').toLowerCase()
+        // Prefer direct slug match from known lists
+        if (identifier) {
+          // Check created slugs first
+          if (createdSlugsRef.current.has(identifier) || createdSlugsRef.current.has(idLc)) slug = identifier
+          // Check agents list for exact slug match
+          if (!slug && Array.isArray(agents)) {
+            const bySlug = agents.find(a => String((a as any)?.slug || '').toLowerCase() === idLc)
+            if (bySlug) slug = String((bySlug as any).slug)
+          }
+        }
+        // Fallback to find by name from provided agents
+        if (!slug && identifier) slug = findAgentSlugByName(identifier)
+        // Fallback to createdAgents by name
+        if (!slug && createdAgents && createdAgents.length > 0 && identifier) {
+          const byName = createdAgents.find(a => String((a as any)?.name || '').toLowerCase() === idLc)
+          if (byName) slug = String((byName as any)?.slug || '') || undefined
+        }
+        // Last resort: use the first slug captured in state from the creation flow
+        if (!slug && Array.isArray(createdSlugs) && createdSlugs.length > 0) {
+          const first = createdSlugs[0]
+          if (first) slug = first
+        }
         const q = slug ? `?agent=${encodeURIComponent(slug)}` : ''
         router.push(`/ship/${starshipSlug}/conversations${q}`)
       } catch {}
     },
-    [router, starshipSlug, findAgentSlugByName]
+    [router, starshipSlug, findAgentSlugByName, agents, createdAgents, createdSlugs]
   )
 
   const chatWithAgent = useCallback(

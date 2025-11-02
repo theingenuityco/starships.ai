@@ -131,24 +131,31 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
                 )
               )}
 
-              {/* Bottom CTA */}
-              {primaryName && (
-                <div className="mb-2 -mt-1 text-sm text-muted-foreground flex items-center justify-center gap-2">
-                  <Icon name="bot" className="w-4 h-4" />
-                  <span>Daedalus — create a tool for this agent</span>
-                </div>
-              )}
+              {/* Bottom CTAs */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                 <div className="grid grid-cols-1 gap-3">
+                  {primaryName && (
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={() => onChatWithAgent?.(primaryName)}
+                      className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground gap-1.5"
+                      ref={primaryCtaRef}
+                    >
+                      <Icon name="message-square" className="w-8 h-8" />
+                      <span className="truncate">Chat with {primaryName}</span>
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
                     size="lg"
+                    variant="ghost"
                     onClick={() => onAskDaedalusCreateTools?.(primaryName)}
-                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all bg-primary text-primary-foreground gap-1.5"
-                    ref={primaryCtaRef}
+                    className="w-full gap-1.5"
                   >
-                    <Icon name="wrench" className="w-8 h-8" />
-                    <span className="truncate">Create tools{primaryName ? ` for ${primaryName}` : ''}</span>
+                    <Icon name="wrench" className="w-5 h-5" />
+                    <span className="truncate">@Daedalus create a tool{primaryName ? ` for ${primaryName}` : ''}</span>
                   </Button>
                 </div>
               </motion.div>

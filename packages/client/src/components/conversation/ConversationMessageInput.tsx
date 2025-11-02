@@ -391,11 +391,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Notify parent about message activity immediately (for UI state updates)
           onMessageSent?.()
 
+          // Build content with a leading @mention using the agent's display name
+          const displayName = String((selectedAgent as any)?.name || '').trim()
+          const mentionPrefix = displayName ? `@${displayName} ` : ''
+          const contentWithMention = `${mentionPrefix}${suggestionText}`
+
           // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
           void sendMessageFn({
             conversationId: currentConversationId!,
             agentId: selectedAgent!.id,
-            content: suggestionText,
+            content: contentWithMention,
             role: 'user',
             starshipId: starshipId!,
             messageType: 'user_input',

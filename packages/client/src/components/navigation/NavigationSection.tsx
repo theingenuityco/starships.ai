@@ -25,7 +25,7 @@ interface NavigationSectionProps {
 
 export function NavigationSection({ title, items, pathname, renderAfter, showLabels = false, expanded = false }: NavigationSectionProps) {
   return (
-    <div className="space-y-1.5 w-full">
+    <div className="space-y-1 w-full">
       {items.map((item, index) => {
         const { isActive: itemOverrideActive, ...rest } = item
         const isActive = itemOverrideActive ?? pathname === item.href

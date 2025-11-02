@@ -14,8 +14,8 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
+import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -56,6 +56,7 @@ interface ConversationMessageInputProps {
 export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
   focusInput: () => void
+  setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -92,6 +93,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const enforcingMentionRef = useRef(false)
     // Track any pending enforcement to avoid racing against user input
     const enforceTimeoutRef = useRef<number | null>(null)
+    // Debounce enforcement triggered from editor updates
+    const enforceOnUpdateTimeoutRef = useRef<number | null>(null)
     // When true, user is editing the mention text inline (avoid auto-enforcement)
     const isEditingMentionRef = useRef(false)
     // Track when mention enforcement is happening for visual feedback
@@ -277,7 +280,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 content: [
                   {
                     type: 'paragraph',
-                    content: [firstMention, { type: 'text', text: ' ' }],
+                    content: [firstMention, { type: 'text', text: '\u00A0' }],
                   },
                 ],
               })
@@ -388,11 +391,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Notify parent about message activity immediately (for UI state updates)
           onMessageSent?.()
 
+          // Build content with a leading @mention using the agent's display name
+          const displayName = String((selectedAgent as any)?.name || '').trim()
+          const mentionPrefix = displayName ? `@${displayName} ` : ''
+          const contentWithMention = `${mentionPrefix}${suggestionText}`
+
           // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
           void sendMessageFn({
             conversationId: currentConversationId!,
             agentId: selectedAgent!.id,
-            content: suggestionText,
+            content: contentWithMention,
             role: 'user',
             starshipId: starshipId!,
             messageType: 'user_input',
@@ -424,7 +432,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to choose an agent, then ask your question'
+      // In expanded form, guide user to choose an agent explicitly until a leading mention exists
+      if (!minimal && !leadingMentionAgent) {
+        return 'Type @ to select an agent, then give instructions'
+      }
+      return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to select an agent, then give instructions'
     }
 
     // Track if there's actual content beyond just the mention and space
@@ -648,6 +660,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     onAgentChange?.(agent)
                   }
                 } catch {}
+                // Enforce single leading mention after keyboard selection
+                try {
+                  setTimeout(() => {
+                    try {
+                      ensureLeadingAgentMention()
+                    } catch {}
+                  }, 0)
+                } catch {}
               } catch {}
             }
             return
@@ -690,6 +710,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       onAgentChange(selected)
                     }
                   } catch {}
+                  // Enforce single leading mention after insertion
+                  try {
+                    setTimeout(() => {
+                      try {
+                        ensureLeadingAgentMention()
+                      } catch {}
+                    }, 0)
+                  } catch {}
                 },
                 anchorRect: null,
               },
@@ -715,11 +743,22 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             } catch {}
           },
           onUpdate(props: any) {
+            // Preserve previous query to detect filter changes
+            const prevQuery = String(lastQuery || '')
             lastProps = props
             lastQuery = String(props?.query || '')
+
+            const newItems = (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean)
+
+            // Reset active to the first filtered item when query changes or when active is out of bounds
+            if (lastQuery !== prevQuery || active < 0 || active >= newItems.length) {
+              active = newItems.length > 0 ? 0 : 0
+            }
+
             component?.updateProps({
               ...component.props,
-              items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
+              items: newItems,
+              active,
             })
             popup?.[0]?.setProps({ getReferenceClientRect: props.clientRect })
           },
@@ -789,6 +828,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       onAgentChange?.(agent)
                     }
                   } catch {}
+                  // Enforce single leading mention after keyboard selection
+                  try {
+                    setTimeout(() => {
+                      try {
+                        ensureLeadingAgentMention()
+                      } catch {}
+                    }, 0)
+                  } catch {}
                 } catch (err) {
                   try {
                     const label = (choice as any)?.label || ''
@@ -810,6 +857,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                         currentAgentRef.current = agent
                         onAgentChange(agent)
                       }
+                    } catch {}
+                    // Enforce after fallback insertion as well
+                    try {
+                      setTimeout(() => {
+                        try {
+                          ensureLeadingAgentMention()
+                        } catch {}
+                      }, 0)
                     } catch {}
                   } catch {}
                 }
@@ -999,6 +1054,58 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       promptsRef.current = inlinePrompts
     }, [inlinePrompts])
 
+    // Compute the absolute document position immediately after the leading mention in the first paragraph
+    const getAnchorPosAfterLeadingMention = useCallback((editorInstance: any): number | null => {
+      try {
+        const ed: any = editorInstance
+        if (!ed) return null
+        const json: any = ed.getJSON()
+        const docContent = Array.isArray(json?.content) ? json.content : []
+        const firstBlock = docContent[0]
+        const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        let firstMentionLocalPos = -1
+        let firstMentionSize = 0
+        let offset = 0
+        for (let i = 0; i < blockContent.length; i++) {
+          const node = blockContent[i]
+          if (node && node.type === 'mention') {
+            firstMentionLocalPos = offset
+            firstMentionSize = typeof node.nodeSize === 'number' ? node.nodeSize : 1
+            break
+          }
+          // For JSON content, approximate local pos by accumulating text length or 1 for nodes
+          if (node && node.type === 'text' && typeof node.text === 'string') {
+            offset += node.text.length
+          } else {
+            offset += 1
+          }
+        }
+        if (firstMentionLocalPos < 0) return null
+        let anchorPos = 1 + firstMentionLocalPos + firstMentionSize
+        // Anchor is before the enforced space; keep it there so we can snap to after
+        return anchorPos
+      } catch {
+        return null
+      }
+    }, [])
+
+    // Ensure a single space exists immediately after the leading mention
+    const ensureSpaceAfterLeadingMention = useCallback(
+      (editorInstance: any) => {
+        try {
+          const ed: any = editorInstance
+          if (!ed) return
+          const anchorPos = getAnchorPosAfterLeadingMention(ed)
+          if (!anchorPos) return
+          const nextChar = ed.state.doc.textBetween(anchorPos, anchorPos + 1, '\n', '\n') || ''
+          if (nextChar !== ' ' && nextChar !== '\u00A0') {
+            ed.chain()?.setTextSelection(anchorPos)?.insertContent({ type: 'text', text: '\u00A0' })?.run()
+          }
+        } catch {}
+      },
+      [getAnchorPosAfterLeadingMention]
+    )
+
     // Helper: resolve the agent referenced by the leading @mention in the editor JSON (if any)
     const getLeadingMentionAgentFromEditor = useCallback((editorInstance: typeof tiptap | null): AgentModel | null => {
       const editor = editorInstance as any
@@ -1160,11 +1267,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           suggestion: mentionSuggestion,
         }),
         InlineHintExtension.configure({
-          getPrompts: () => promptsRef.current,
+          getPrompts: () => ['Type @ to select an agent, then give instructions'],
           getEnabled: () => !minimalRef.current && !disabledRef.current && !streamingRef.current && !sendingRef.current,
-          typingSpeedMs: 35,
-          pauseMs: 900,
-          debug: true,
+          staticMode: true,
+          debug: false,
         }),
       ],
       content: message,
@@ -1183,6 +1289,37 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
           }
+          // If user types '@' immediately after NBSP gap, convert NBSP to normal space first so Suggestion can match
+          try {
+            if (event.key === '@') {
+              const ed: any = tiptap
+              const anchorPos = getAnchorPosAfterLeadingMention(ed)
+              if (anchorPos) {
+                const selFrom = ed?.state?.selection?.from || 0
+                if (selFrom === anchorPos + 1) {
+                  const prevChar = ed.state.doc.textBetween(anchorPos, anchorPos + 1, '\n', '\n') || ''
+                  if (prevChar === '\u00A0') {
+                    ed.chain()
+                      .setTextSelection({ from: anchorPos, to: anchorPos + 1 })
+                      .insertContent(' ')
+                      .setTextSelection(anchorPos + 1)
+                      .run()
+                  }
+                }
+              }
+            }
+          } catch {}
+          // Prevent caret from sitting between mention and enforced space
+          try {
+            const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+            if (anchorPos) {
+              ensureSpaceAfterLeadingMention(tiptap as any)
+              const selFrom = (tiptap as any)?.state?.selection?.from || 0
+              if (selFrom === anchorPos) {
+                tiptap?.commands.setTextSelection(anchorPos + 1)
+              }
+            }
+          } catch {}
           // Cmd/Ctrl+K to clear input
           if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
@@ -1227,6 +1364,40 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
           return false
         },
+        handleClick: () => {
+          // Snap caret if user clicks between mention and space
+          try {
+            setTimeout(() => {
+              try {
+                const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+                if (anchorPos) {
+                  ensureSpaceAfterLeadingMention(tiptap as any)
+                  const selFrom = (tiptap as any)?.state?.selection?.from || 0
+                  if (selFrom === anchorPos) {
+                    tiptap?.commands.setTextSelection(anchorPos + 1)
+                  }
+                }
+              } catch {}
+            }, 0)
+          } catch {}
+          return false
+        },
+        handleTextInput: (_view, from, to, text) => {
+          // If typing at the boundary after mention, insert after enforced space instead
+          try {
+            const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+            if (anchorPos && from === anchorPos && typeof text === 'string' && text.length > 0) {
+              ensureSpaceAfterLeadingMention(tiptap as any)
+              tiptap
+                ?.chain()
+                ?.setTextSelection(anchorPos + 1)
+                ?.insertContent(text)
+                ?.run()
+              return true
+            }
+          } catch {}
+          return false
+        },
       },
       onUpdate: ({ editor }) => {
         // Don't enforce on every update - this causes cursor jumps and text to appear backward
@@ -1264,11 +1435,44 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             isEditingMentionRef.current = false
           }
         } catch {}
-        // Update hint visibility and position on editor update
+        // Update inline guide visibility and position on editor update
         try {
-          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(editor as any))
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && isOnlyAgentMentionWithSpace(editor as any))
           setShouldShowInlineHint(next)
           updateHintPosition()
+        } catch {}
+
+        // Enforce single leading mention even on paste/typing paths that bypass selection handlers
+        try {
+          if (!enforcingMentionRef.current && !isEditingMentionRef.current && !isSuggestionActiveRef.current) {
+            const json: any = (editor as any).getJSON?.()
+            const content = Array.isArray(json?.content) ? json.content : []
+            let mentionCount = 0
+            for (let bi = 0; bi < content.length; bi++) {
+              const blk = content[bi]
+              const cont = Array.isArray(blk?.content) ? blk.content : []
+              for (let ci = 0; ci < cont.length; ci++) {
+                const node = cont[ci]
+                if (node && node.type === 'mention' && node.attrs && node.attrs.id) mentionCount++
+              }
+            }
+            // If there are multiple mentions anywhere, or the very first inline node is not a mention when one exists, trigger enforcement
+            const firstBlock = content[0]
+            const firstContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+            const firstIsMention = firstContent[0] && firstContent[0].type === 'mention'
+            if (mentionCount > 1 || (mentionCount === 1 && !firstIsMention)) {
+              if (enforceOnUpdateTimeoutRef.current) {
+                clearTimeout(enforceOnUpdateTimeoutRef.current)
+                enforceOnUpdateTimeoutRef.current = null
+              }
+              enforceOnUpdateTimeoutRef.current = window.setTimeout(() => {
+                try {
+                  ensureLeadingAgentMention()
+                } catch {}
+                enforceOnUpdateTimeoutRef.current = null
+              }, 0)
+            }
+          }
         } catch {}
       },
     })
@@ -1310,7 +1514,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (!tiptap) return
       const compute = () => {
         try {
-          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(tiptap as any))
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && isOnlyAgentMentionWithSpace(tiptap as any))
           setShouldShowInlineHint(next)
           updateHintPosition()
         } catch {}
@@ -1321,7 +1525,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const t2 = setTimeout(compute, 150)
       const t3 = setTimeout(compute, 300)
 
-      const onSelectionUpdate = () => updateHintPosition()
+      const onSelectionUpdate = () => {
+        // Snap caret out of the protected gap between mention and enforced space
+        try {
+          const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+          if (anchorPos) {
+            ensureSpaceAfterLeadingMention(tiptap as any)
+            const selFrom = (tiptap as any)?.state?.selection?.from || 0
+            if (selFrom === anchorPos) {
+              tiptap?.commands.setTextSelection(anchorPos + 1)
+            }
+          }
+        } catch {}
+        updateHintPosition()
+      }
       try {
         ;(tiptap as any).on?.('selectionUpdate', onSelectionUpdate)
       } catch {}
@@ -1336,7 +1553,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch {}
         window.removeEventListener('resize', onSelectionUpdate)
       }
-    }, [tiptap, minimal, disabled, isStreamingEffective, sending, inlinePrompts.length, isOnlyAgentMentionWithSpace, updateHintPosition])
+    }, [tiptap, minimal, disabled, isStreamingEffective, sending, isOnlyAgentMentionWithSpace, updateHintPosition])
     // Wire editor-dependent helpers
     useEffect(() => {
       clearEditorRef.current = () => {
@@ -1404,21 +1621,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        try {
+          const summary = blockContent
+            .slice(0, 4)
+            .map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
+            .flat()
+          console.debug('[MessageInput.ensureLeadingAgentMention] current first paragraph', summary)
+        } catch {}
 
-        // Collect all mention nodes in the first paragraph
-        const mentionNodes = blockContent.filter((n: any) => n && n.type === 'mention' && n.attrs && n.attrs.id)
-        if (mentionNodes.length > 0) {
-          // Always prefer the most recently inserted mention (last in content order)
-          const desiredMention = mentionNodes[mentionNodes.length - 1]
-          // Build remaining content excluding all mention nodes
+        // Collect all mention nodes across the entire document
+        const allMentions: any[] = []
+        for (let bi = 0; bi < docContent.length; bi++) {
+          const b = docContent[bi]
+          const cont = Array.isArray(b?.content) ? b.content : []
+          for (let ci = 0; ci < cont.length; ci++) {
+            const node = cont[ci]
+            if (node && node.type === 'mention' && node.attrs && node.attrs.id) {
+              allMentions.push(node)
+            }
+          }
+        }
+
+        if (allMentions.length > 0) {
+          // Always prefer the most recently inserted mention anywhere in the doc
+          const desiredMention = allMentions[allMentions.length - 1]
+          // Build remaining content for the first paragraph excluding all mention nodes
           let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
 
           // Normalize whitespace: ensure exactly one space after mention, preserve content structure
           let contentAfterMention: any[] = []
 
           if (rest.length === 0) {
-            // No content - just one space
-            contentAfterMention = [{ type: 'text', text: ' ' }]
+            // No content - just one NBSP space
+            contentAfterMention = [{ type: 'text', text: '\u00A0' }]
           } else {
             // Find first node with actual content
             let firstContentIdx = -1
@@ -1435,28 +1670,40 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             if (firstContentIdx === -1) {
               // Only whitespace
-              contentAfterMention = [{ type: 'text', text: ' ' }]
+              contentAfterMention = [{ type: 'text', text: '\u00A0' }]
             } else {
               // Get content from first real content onwards
               const contentNodes = rest.slice(firstContentIdx)
               const firstNode = contentNodes[0]
 
               if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
-                // Trim start of first text node, add exactly one space
-                const updatedFirst = { ...firstNode, text: ' ' + firstNode.text.trimStart() }
+                // Trim start of first text node, add exactly one NBSP space
+                const updatedFirst = { ...firstNode, text: '\u00A0' + firstNode.text.trimStart() }
                 contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
               } else {
-                // Non-text first node - add space before it
-                contentAfterMention = [{ type: 'text', text: ' ' }, ...contentNodes]
+                // Non-text first node - add NBSP before it
+                contentAfterMention = [{ type: 'text', text: '\u00A0' }, ...contentNodes]
               }
             }
           }
 
-          const newParagraph = {
+          const newFirstParagraph = {
             type: 'paragraph',
             content: [desiredMention, ...contentAfterMention],
           }
-          const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+
+          // Remove all other mention nodes from the rest of the document
+          const cleanedOtherBlocks = docContent.slice(1).map((blk: any) => {
+            const origContent = Array.isArray(blk?.content) ? blk.content : []
+            const filtered = origContent.filter((n: any) => !(n && n.type === 'mention'))
+            return { ...blk, content: filtered }
+          })
+
+          const newDoc = { type: 'doc', content: [newFirstParagraph, ...cleanedOtherBlocks] }
+          try {
+            const preview = newFirstParagraph.content.slice(0, 3).map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
+            console.debug('[MessageInput.ensureLeadingAgentMention] rebuilding paragraph', preview)
+          } catch {}
           scheduleSetContent(newDoc)
 
           // Mark this agent as enforced to prevent re-enforcement
@@ -1474,19 +1721,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           return
         }
 
-        // Otherwise, insert the current agent mention if available (still skip if editing)
+        // Otherwise, insert the current agent mention at the very start and ensure no other mentions exist anywhere
         if (isEditingMentionRef.current) return
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return
 
         // Always add space after mention
-        const spaceNode = [{ type: 'text', text: ' ' }]
-        const newParagraph = {
+        const spaceNode = [{ type: 'text', text: '\u00A0' }]
+        const newFirstParagraph = {
           type: 'paragraph',
-          content: [desiredMention, ...spaceNode, ...blockContent],
+          content: [desiredMention, ...spaceNode, ...blockContent.filter((n: any) => !(n && n.type === 'mention'))],
         }
-        const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+        const cleanedOtherBlocks = docContent.slice(1).map((blk: any) => {
+          const origContent = Array.isArray(blk?.content) ? blk.content : []
+          const filtered = origContent.filter((n: any) => !(n && n.type === 'mention'))
+          return { ...blk, content: filtered }
+        })
+        const newDoc = { type: 'doc', content: [newFirstParagraph, ...cleanedOtherBlocks] }
         scheduleSetContent(newDoc)
 
         // Mark this agent as enforced
@@ -1570,6 +1822,60 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         focusInput: () => {
           try {
             tiptap?.commands.focus('end')
+          } catch {}
+        },
+        setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => {
+          try {
+            if (!tiptap || !agent) return
+            // Update local current agent immediately; defer external change to avoid race with enforcement
+            currentAgentRef.current = agent
+            const json: any = tiptap.getJSON()
+            const docContent = Array.isArray(json?.content) ? json.content : []
+            const firstBlock = docContent[0]
+            const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+            // Remove any existing mentions from first paragraph
+            let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+            // Drop leading whitespace-only text nodes to avoid double space after the mention
+            while (rest.length > 0 && rest[0]?.type === 'text' && typeof rest[0].text === 'string' && rest[0].text.trim() === '') {
+              rest = rest.slice(1)
+            }
+            const desiredMention = buildMentionNodeForAgent(agent)
+            if (!desiredMention) return
+            // Build paragraph: mention + (NBSP + prefill when provided) or NBSP
+            // NBSP ensures the gap after the chip is visibly preserved across renders
+            const nbsp = '\u00A0'
+            const prefill = typeof afterText === 'string' && afterText.trim().length > 0 ? { type: 'text', text: `${nbsp}${afterText.trim()} ` } : { type: 'text', text: `${nbsp}` }
+            try {
+              console.debug('[MessageInput.setLeadingMentionAgent] building content', {
+                agent: { id: agent?.id, name: agent?.name, slug: (agent as any)?.slug },
+                afterText,
+                prefillText: (prefill as any)?.text,
+                restPreview: rest
+                  .slice(0, 3)
+                  .map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type }))
+                  .flat(),
+              })
+            } catch {}
+            const newParagraph = { type: 'paragraph', content: [desiredMention, prefill, ...rest] }
+            const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+            scheduleSetContent(newDoc)
+            lastEnforcedAgentIdRef.current = agent.id
+            // Focus and place caret at end to continue typing naturally
+            setTimeout(() => {
+              try {
+                tiptap?.commands.focus('end')
+                try {
+                  const first = (tiptap as any)?.getJSON?.()?.content?.[0]
+                  console.debug('[MessageInput.setLeadingMentionAgent] post-setContent first paragraph', first)
+                } catch {}
+                // Now sync selectedAgent externally after our edits settle, to avoid enforcement racing our insert
+                setTimeout(() => {
+                  try {
+                    if (onAgentChange) onAgentChange(agent)
+                  } catch {}
+                }, 60)
+              } catch {}
+            }, 10)
           } catch {}
         },
       }),

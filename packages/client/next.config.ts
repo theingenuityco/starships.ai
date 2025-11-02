@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
+  // Enable experimental build optimizations for CI builds
+  experimental: {
+    // Enable optimizations for CI builds to reduce memory usage
+    ...(process.env.CI ? { optimizePackageImports: ['@radix-ui/react-icons', '@iconify/react'] } : {}),
+  },
   webpack: (config, { isServer }) => {
     // Prevent Node.js modules from being bundled in the browser
     if (!isServer) {

@@ -153,6 +153,27 @@ export class PostgresConnection {
   }
 
   /**
+   * Execute a query and return the full QueryResult (including rowCount)
+   * Useful for DELETE, UPDATE, and INSERT operations that need rowCount
+   */
+  async queryWithResult(text: string, params: unknown[] = []): Promise<{ rows: unknown[]; rowCount: number }> {
+    const pool = this.getPool();
+
+    try {
+      const result = await pool.query(text, params);
+      return {
+        rows: result.rows,
+        rowCount: result.rowCount ?? 0,
+      };
+    } catch (error) {
+      console.error('PostgreSQL query error:', error);
+      console.error('Query:', text);
+      console.error('Params:', params);
+      throw error;
+    }
+  }
+
+  /**
    * Check if the database connection is healthy
    */
   async healthCheck(): Promise<boolean> {

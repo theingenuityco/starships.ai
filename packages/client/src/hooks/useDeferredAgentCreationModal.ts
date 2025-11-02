@@ -34,13 +34,51 @@ export function useDeferredAgentCreationModal(options: {
   const createdSlugsRef = useRef<Set<string>>(new Set())
   const createdNamesRef = useRef<Set<string>>(new Set())
   const turnStartIndexRef = useRef<number>(0)
+  const agentCreationCallIdsRef = useRef<Set<string>>(new Set())
+  // Track all agent-related tool call ids (open/edit) regardless of whether slug was present initially
+  const agentRelatedCallIdsRef = useRef<Set<string>>(new Set())
 
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [createdNames, setCreatedNames] = useState<string[]>([])
   const [createdAgents, setCreatedAgents] = useState<any[]>([])
   const [createdSlugs, setCreatedSlugs] = useState<string[]>([])
 
-  // While streaming, collect created agent slugs from assistant args ONLY (agent-related calls)
+  // Persist modal payload across route replaces within the same conversation turn
+  const persistModalPayload = useCallback(
+    (payload: { slugs: string[]; names: string[] }) => {
+      try {
+        if (!conversationId) return
+        const key = `agentCreatedModal:${conversationId}`
+        const data = { ...payload, ts: Date.now() }
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          window.sessionStorage.setItem(key, JSON.stringify(data))
+        }
+      } catch {}
+    },
+    [conversationId]
+  )
+
+  const consumePersistedPayloadIfAny = useCallback(() => {
+    try {
+      if (!conversationId) return null
+      const key = `agentCreatedModal:${conversationId}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return null
+      const raw = window.sessionStorage.getItem(key)
+      if (!raw) return null
+      const parsed = JSON.parse(raw) as { slugs?: string[]; names?: string[]; ts?: number }
+      // Only accept very recent payloads (within 20 seconds)
+      if (typeof parsed?.ts === 'number' && Date.now() - parsed.ts > 20_000) {
+        window.sessionStorage.removeItem(key)
+        return null
+      }
+      window.sessionStorage.removeItem(key)
+      return { slugs: Array.isArray(parsed?.slugs) ? parsed!.slugs : [], names: Array.isArray(parsed?.names) ? parsed!.names : [] }
+    } catch {
+      return null
+    }
+  }, [conversationId])
+
+  // While streaming, track agent-creation candidate call ids (assistant calls without slug)
   useEffect(() => {
     if (!isStreaming || !liveMessages.length) return
 
@@ -51,7 +89,7 @@ export function useDeferredAgentCreationModal(options: {
     for (let i = recent.length - 1; i >= 0; i--) {
       const msg = recent[i] as any
       if (!msg) continue
-      // Assistant tool call arguments may include slug for open existing
+      // Assistant tool call arguments may indicate creation when slug missing
       if (msg.role === 'assistant' && Array.isArray((msg as any).toolCalls)) {
         for (const tc of (msg as any).toolCalls as any[]) {
           const rawName = tc?.function?.name as string | undefined
@@ -64,11 +102,20 @@ export function useDeferredAgentCreationModal(options: {
               args = JSON.parse(args)
             } catch {}
           }
-          const slug = args && typeof args.slug === 'string' && args.slug.trim().length > 0 ? String(args.slug) : null
-          const name = args && typeof args.name === 'string' && args.name.trim().length > 0 ? String(args.name) : null
-          if (slug) createdSlugsRef.current.add(slug)
-          // New agent creation path typically lacks slug but includes name; capture it
-          if (!slug && name) createdNamesRef.current.add(name)
+          // Normalize common nested shapes
+          const src = args && typeof args === 'object' ? (args as any) : undefined
+          const nested = src?.agent || src?.data || src?.payload || src
+          const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+          const altAgentSlug = typeof src?.agentSlug === 'string' && src.agentSlug.trim() ? String(src.agentSlug) : undefined
+          const slug = nestedSlug || altAgentSlug || null
+          const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
+          const callId = typeof (tc as any)?.id === 'string' ? String((tc as any).id) : undefined
+          if (callId) agentRelatedCallIdsRef.current.add(callId)
+          if (!slug && callId) agentCreationCallIdsRef.current.add(callId)
+          // While streaming, if we have a name but no slug yet, memoize the name (creation mode hint)
+          if (!slug && maybeName) {
+            createdNamesRef.current.add(maybeName)
+          }
         }
       }
     }
@@ -81,9 +128,12 @@ export function useDeferredAgentCreationModal(options: {
     if (!was && isStreaming) {
       createdSlugsRef.current.clear()
       createdNamesRef.current.clear()
+      agentCreationCallIdsRef.current.clear()
+      agentRelatedCallIdsRef.current.clear()
       setCreatedSlugs([])
       setCreatedAgents([])
       setCreatedNames([])
+      // Include the last existing message since it may receive in-place updates (toolCalls)
       // Include the last existing message since it may receive in-place updates (toolCalls)
       turnStartIndexRef.current = Math.max(0, liveMessages.length - 1)
     }
@@ -107,46 +157,142 @@ export function useDeferredAgentCreationModal(options: {
                   args = JSON.parse(args)
                 } catch {}
               }
-              const slug = args && typeof args.slug === 'string' && args.slug.trim().length > 0 ? String(args.slug) : null
-              const name = args && typeof args.name === 'string' && args.name.trim().length > 0 ? String(args.name) : null
-              if (slug) createdSlugsRef.current.add(slug)
-              if (!slug && name) createdNamesRef.current.add(name)
+              // Normalize common nested shapes
+              const src = args && typeof args === 'object' ? (args as any) : undefined
+              const nested = src?.agent || src?.data || src?.payload || src
+              const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+              const altAgentSlug = typeof src?.agentSlug === 'string' && src.agentSlug.trim() ? String(src.agentSlug) : undefined
+              const slug = nestedSlug || altAgentSlug || null
+              const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
+              const callId = typeof (tc as any)?.id === 'string' ? String((tc as any).id) : undefined
+              if (!slug && callId) {
+                // Mark as creation candidate when slug is not provided yet
+                agentCreationCallIdsRef.current.add(callId)
+              } else if (slug && callId && (agentCreationCallIdsRef.current.has(callId) || agentRelatedCallIdsRef.current.has(callId))) {
+                // If slug is present (either now or from start) and call is agent-related, capture it
+                createdSlugsRef.current.add(slug)
+              } else if (!slug && callId && agentCreationCallIdsRef.current.has(callId)) {
+                // Fallback: derive slug from function name suffix: open-agent-<slug> / edit-agent-<slug>
+                if (fnName.startsWith('open-agent-')) {
+                  const suffix = fnName.slice('open-agent-'.length)
+                  if (suffix) createdSlugsRef.current.add(suffix)
+                } else if (fnName.startsWith('edit-agent-')) {
+                  const suffix = fnName.slice('edit-agent-'.length)
+                  if (suffix) createdSlugsRef.current.add(suffix)
+                }
+              }
+              // Record name hints when present and slug still unknown (creation mode)
+              if (!slug && maybeName) {
+                createdNamesRef.current.add(maybeName)
+              }
+            }
+          }
+          if (msg.role === 'tool' && msg.toolCallId) {
+            const idStr = String(msg.toolCallId)
+            const inTrackedSets = agentCreationCallIdsRef.current.has(idStr) || agentRelatedCallIdsRef.current.has(idStr)
+            // Fallback: if not tracked (e.g., assistant call occurred before mount), verify by resolving assistant call anywhere in the message list
+            let isAgentRelatedTool = inTrackedSets
+            if (!isAgentRelatedTool) {
+              try {
+                for (let j = liveMessages.length - 1; j >= 0; j--) {
+                  const am = liveMessages[j] as any
+                  if (am?.role !== 'assistant' || !Array.isArray(am?.toolCalls)) continue
+                  const match = (am.toolCalls as any[]).find(tc => String(tc?.id || '') === idStr)
+                  if (match) {
+                    const rawName = match?.function?.name as string | undefined
+                    const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
+                    if (fnName && (fnName.includes('open-agent') || fnName.includes('open agent') || fnName.includes('edit-agent') || fnName.includes('edit agent'))) {
+                      isAgentRelatedTool = true
+                    }
+                    break
+                  }
+                }
+              } catch {}
+            }
+            if (!isAgentRelatedTool) continue
+            const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
+            if (content) {
+              try {
+                const parsed = JSON.parse(content) as any
+                // Robust slug extraction across shapes
+                const candidates: Array<string | undefined> = [
+                  typeof parsed?.slug === 'string' ? parsed.slug : undefined,
+                  typeof parsed?.data?.slug === 'string' ? parsed.data.slug : undefined,
+                  typeof parsed?.body?.slug === 'string' ? parsed.body.slug : undefined,
+                  typeof parsed?.body?.data?.slug === 'string' ? parsed.body.data.slug : undefined,
+                  typeof parsed?.body?.data?.agent?.slug === 'string' ? parsed.body.data.agent.slug : undefined,
+                  typeof parsed?.agent?.slug === 'string' ? parsed.agent.slug : undefined,
+                ]
+                const foundSlug = candidates.find(s => typeof s === 'string' && s.trim()) as string | undefined
+                if (foundSlug && foundSlug.trim()) createdSlugsRef.current.add(foundSlug.trim())
+                // Also capture name hint if available
+                const nameCandidates: Array<string | undefined> = [
+                  typeof parsed?.name === 'string' ? parsed.name : undefined,
+                  typeof parsed?.data?.name === 'string' ? parsed.data.name : undefined,
+                  typeof parsed?.body?.data?.name === 'string' ? parsed.body.data.name : undefined,
+                  typeof parsed?.body?.data?.agent?.name === 'string' ? parsed.body.data.agent.name : undefined,
+                  typeof parsed?.agent?.name === 'string' ? parsed.agent.name : undefined,
+                ]
+                const foundName = nameCandidates.find(n => typeof n === 'string' && n.trim()) as string | undefined
+                if (!foundSlug && foundName) createdNamesRef.current.add(foundName)
+              } catch {}
             }
           }
         }
       } catch {}
 
       const slugs = Array.from(createdSlugsRef.current)
-      const namesOnly = Array.from(createdNamesRef.current)
-      if (slugs.length > 0 || namesOnly.length > 0) {
+      const namesHints = Array.from(createdNamesRef.current)
+      if (slugs.length > 0 || namesHints.length > 0) {
         setCreatedSlugs(slugs)
-        // Resolve from provided agents cache if available
+        // Resolve from provided agents cache if available (by slug only)
         if (agents && Array.isArray(agents)) {
           const resolved: any[] = []
           const slugsSet = new Set(slugs)
-          const namesSet = new Set(namesOnly.map(n => String(n).toLowerCase()))
           for (const a of agents) {
             const aSlug = (a as any)?.slug
-            const aName = String((a as any)?.name || '')
-            if ((aSlug && slugsSet.has(aSlug)) || (aName && namesSet.has(aName.toLowerCase()))) {
+            if (aSlug && slugsSet.has(aSlug)) {
               resolved.push(a)
             }
           }
           setCreatedAgents(resolved)
-          const namesFromResolved = resolved.map(a => (a as any)?.name).filter(Boolean)
-          const mergedNames = Array.from(new Set([...(namesOnly || []), ...namesFromResolved]))
+          const namesFromResolved = resolved.map(a => (a as any)?.name).filter(Boolean) as string[]
+          // Merge any name hints captured during streaming
+          const mergedNames = Array.from(new Set<string>([...namesFromResolved, ...namesHints].filter(Boolean)))
           setCreatedNames(mergedNames)
         } else {
           setCreatedAgents([])
-          setCreatedNames(namesOnly)
+          // If we don't have agents cache, still surface names from hints
+          setCreatedNames(namesHints)
         }
+        // Persist payload to survive route replaces (e.g., /agent/new -> /agent/{slug})
+        try {
+          persistModalPayload({ slugs, names: Array.isArray(namesHints) && namesHints.length > 0 ? namesHints : createdNamesRef.current ? Array.from(createdNamesRef.current) : [] })
+        } catch {}
         setIsOpen(true)
         createdSlugsRef.current.clear()
         createdNamesRef.current.clear()
+        agentCreationCallIdsRef.current.clear()
+        agentRelatedCallIdsRef.current.clear()
       }
     }
     prevStreamingRef.current = Boolean(isStreaming)
   }, [isStreaming, liveMessages.length, agents])
+
+  // Cross-mount recovery: if we mount after turn completion (isStreaming=false) and have a recent persisted payload, open modal
+  useEffect(() => {
+    try {
+      if (isStreaming) return
+      if (!isOpen) {
+        const persisted = consumePersistedPayloadIfAny()
+        if (persisted && (persisted.slugs.length > 0 || persisted.names.length > 0)) {
+          setCreatedSlugs(persisted.slugs)
+          setCreatedNames(persisted.names)
+          setIsOpen(true)
+        }
+      }
+    } catch {}
+  }, [isStreaming, isOpen, consumePersistedPayloadIfAny])
 
   // When backing agents list updates after refetch, recompute createdAgents while modal is open (match by slug)
   useEffect(() => {
@@ -154,11 +300,9 @@ export function useDeferredAgentCreationModal(options: {
     // Resolve by slug first, and by name as a fallback
     const resolvedNext: any[] = []
     const slugsSet = new Set(createdSlugs)
-    const namesSet = new Set((createdNames || []).map(n => String(n).toLowerCase()))
     for (const a of agents) {
       const aSlug = (a as any)?.slug
-      const aName = String((a as any)?.name || '')
-      if ((aSlug && slugsSet.has(aSlug)) || (aName && namesSet.has(aName.toLowerCase()))) {
+      if (aSlug && slugsSet.has(aSlug)) {
         resolvedNext.push(a)
       }
     }
@@ -181,15 +325,13 @@ export function useDeferredAgentCreationModal(options: {
 
     // Merge names but avoid setting state if unchanged
     const namesFromResolved = resolvedNext.map(a => (a as any)?.name).filter(Boolean)
-    if (namesFromResolved.length > 0) {
-      setCreatedNames(prev => {
-        const mergedSet = new Set<string>(prev || [])
-        for (const n of namesFromResolved) mergedSet.add(String(n))
-        const merged = Array.from(mergedSet)
-        if ((prev || []).length === merged.length) return prev as string[]
-        return merged
-      })
-    }
+    setCreatedNames(prev => {
+      const mergedSet = new Set<string>(prev || [])
+      for (const n of namesFromResolved) mergedSet.add(String(n))
+      const merged = Array.from(mergedSet)
+      if ((prev || []).length === merged.length) return prev as string[]
+      return merged
+    })
   }, [agents, isOpen, createdSlugs, createdNames])
 
   // While modal open, hydrate missing agents by slug via TanStack Query

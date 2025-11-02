@@ -8,6 +8,7 @@ export interface InlineHintOptions {
   getEnabled: () => boolean
   typingSpeedMs?: number
   pauseMs?: number
+  staticMode?: boolean
   debug?: boolean
 }
 
@@ -20,13 +21,14 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
       getEnabled: () => true,
       typingSpeedMs: 55,
       pauseMs: 1100,
+      staticMode: false,
       debug: false,
     }
   },
 
   addProseMirrorPlugins() {
     const key = new PluginKey('inlineHint')
-    const { getPrompts, getEnabled, typingSpeedMs, pauseMs, debug } = this.options
+    const { getPrompts, getEnabled, typingSpeedMs, pauseMs, staticMode, debug } = this.options
 
     return [
       new Plugin<{
@@ -95,7 +97,7 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
                   // If there is a single space text node immediately after mention, advance one char
                   try {
                     const nextChar = state.doc.textBetween(anchorPos, anchorPos + 1, undefined, '\uFFFC')
-                    if (nextChar === ' ') {
+                    if (nextChar === ' ' || nextChar === '\u00A0') {
                       anchorPos = anchorPos + 1
                     }
                   } catch {}
@@ -110,21 +112,26 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
               return { decorations: DecorationSet.empty, idx: 0, char: 0, lastTick: 0, lastReason: reason }
             }
 
-            // Typing animation state advance (time-based)
             const now = Date.now()
             const current = String(prompts[idx % prompts.length] || '')
-            const advance = now - (lastTick || 0) >= (char < current.length ? typingSpeedMs! : pauseMs!)
-            if (advance) {
-              if (char < current.length) {
-                char += 1
-              } else {
-                char = 0
-                idx = (idx + 1) % prompts.length
+            if (!staticMode) {
+              // Typing animation state advance (time-based)
+              const advance = now - (lastTick || 0) >= (char < current.length ? typingSpeedMs! : pauseMs!)
+              if (advance) {
+                if (char < current.length) {
+                  char += 1
+                } else {
+                  char = 0
+                  idx = (idx + 1) % prompts.length
+                }
+                lastTick = now
               }
-              lastTick = now
+            } else {
+              // Show full prompt in static mode
+              char = current.length
             }
 
-            const shown = current.slice(0, char)
+            const shown = current.slice(0, Math.max(0, Math.min(char, current.length)))
             const span = document.createElement('span')
             span.className = 'inline-hint text-muted-foreground/80'
             // Allow wrapping within the editor flow
@@ -146,12 +153,14 @@ export const InlineHintExtension = Extension.create<InlineHintOptions>({
         },
         view: (editorView: EditorView) => {
           let raf: number | null = null
-          const tick = () => {
-            // Trigger re-apply to advance animation
-            editorView.dispatch(editorView.state.tr)
+          if (!staticMode) {
+            const tick = () => {
+              // Trigger re-apply to advance animation
+              editorView.dispatch(editorView.state.tr)
+              raf = window.setTimeout(tick, 65)
+            }
             raf = window.setTimeout(tick, 65)
           }
-          raf = window.setTimeout(tick, 65)
           return {
             destroy() {
               if (raf) {

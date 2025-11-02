@@ -25,9 +25,10 @@ interface DeployedAgentCardProps {
   onEdit?: (agent: AgentModel) => void
   onDelete?: (agent: AgentModel) => void
   showActions?: boolean
+  hideChatControl?: boolean
 }
 
-export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false }: DeployedAgentCardProps) {
+export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
   // Check if this is a system agent (Gaia or Daedalus)
   const isSystemAgent = agent.name === 'Gaia' || agent.name === 'Daedalus'
   
@@ -95,8 +96,9 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
       </CardHeader>
       <CardContent className="relative z-10 pt-0">
         <div className="flex items-center justify-between">
-          <Badge variant="secondary" className="text-xs">
-            {agent.model || 'N/A'}
+          <Badge variant="secondary" className="text-xs flex items-center gap-1.5">
+            <Icon name="brain" className="w-3 h-3" />
+            <span className="font-mono">{agent.model || 'N/A'}</span>
           </Badge>
           {onChat ? (
             <Button
@@ -111,7 +113,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
               <Icon name="message-square" className="mr-1 h-3.5 w-3.5" />
               Chat
             </Button>
-          ) : (
+          ) : hideChatControl ? null : (
             <div className="flex items-center gap-1 text-muted-foreground">
               <Icon name="fingerprint" className="h-3.5 w-3.5" />
               <span className="text-[10px]">{agent.id.slice(0, 6)}</span>

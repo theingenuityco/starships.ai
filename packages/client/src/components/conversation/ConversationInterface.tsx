@@ -14,12 +14,13 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import api, { agentAPI, toolAPI } from '@/lib/api'
 import { Avatar } from '@/components/ui/avatar'
+import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
+import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
-import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 
@@ -572,6 +573,29 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const liveMessages = (ctx?.messages as any[]) || []
     const lastUIAction = (ctx as any)?.lastUIAction
     const prevStreamingRef = useRef(false)
+    const deferredAgentCreate = useDeferredAgentCreationModal({
+      liveMessages,
+      isStreaming: uiStreaming,
+      starshipSlug,
+      conversationId: currentConversationId || externalConversationId || null,
+      agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
+      setLeadingMentionAgent: (agent: any, afterText?: string) => {
+        try {
+          console.debug('[ConversationInterface] forwarding setLeadingMentionAgent', {
+            agent: { id: agent?.id, name: agent?.name, slug: agent?.slug },
+            afterText,
+          })
+        } catch {}
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
+        } catch {}
+      },
+      focusInput: () => {
+        try {
+          messageInputRef.current?.focusInput?.()
+        } catch {}
+      },
+    })
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)
@@ -726,7 +750,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       } catch {}
     }, [uiStreaming, currentConversationId, lastUIAction])
 
-    return null
+    return (
+      <AgentCreatedModal
+        open={deferredAgentCreate.isOpen}
+        names={deferredAgentCreate.createdNames}
+        onOpenChange={deferredAgentCreate.setIsOpen}
+        onChatWithAgent={deferredAgentCreate.chatWithAgent}
+        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+      />
+    )
   }
 
   // Removed overlay UI effects

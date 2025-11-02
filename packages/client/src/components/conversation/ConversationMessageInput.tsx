@@ -14,7 +14,6 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
@@ -280,7 +279,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 content: [
                   {
                     type: 'paragraph',
-                    content: [firstMention, { type: 'text', text: ' ' }],
+                    content: [firstMention, { type: 'text', text: '\u00A0' }],
                   },
                 ],
               })
@@ -1078,8 +1077,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const anchorPos = getAnchorPosAfterLeadingMention(ed)
           if (!anchorPos) return
           const nextChar = ed.state.doc.textBetween(anchorPos, anchorPos + 1, '\n', '\n') || ''
-          if (nextChar !== ' ') {
-            ed.chain()?.setTextSelection(anchorPos)?.insertContent({ type: 'text', text: ' ' })?.run()
+          if (nextChar !== ' ' && nextChar !== '\u00A0') {
+            ed.chain()?.setTextSelection(anchorPos)?.insertContent({ type: 'text', text: '\u00A0' })?.run()
           }
         } catch {}
       },
@@ -1245,13 +1244,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             return `${options.suggestion.char}${display}`
           },
           suggestion: mentionSuggestion,
-        }),
-        InlineHintExtension.configure({
-          getPrompts: () => promptsRef.current,
-          getEnabled: () => !minimalRef.current && !disabledRef.current && !streamingRef.current && !sendingRef.current,
-          typingSpeedMs: 35,
-          pauseMs: 900,
-          debug: true,
         }),
       ],
       content: message,
@@ -1613,8 +1605,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           let contentAfterMention: any[] = []
 
           if (rest.length === 0) {
-            // No content - just one space
-            contentAfterMention = [{ type: 'text', text: ' ' }]
+            // No content - just one NBSP space
+            contentAfterMention = [{ type: 'text', text: '\u00A0' }]
           } else {
             // Find first node with actual content
             let firstContentIdx = -1
@@ -1631,19 +1623,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             if (firstContentIdx === -1) {
               // Only whitespace
-              contentAfterMention = [{ type: 'text', text: ' ' }]
+              contentAfterMention = [{ type: 'text', text: '\u00A0' }]
             } else {
               // Get content from first real content onwards
               const contentNodes = rest.slice(firstContentIdx)
               const firstNode = contentNodes[0]
 
               if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
-                // Trim start of first text node, add exactly one space
-                const updatedFirst = { ...firstNode, text: ' ' + firstNode.text.trimStart() }
+                // Trim start of first text node, add exactly one NBSP space
+                const updatedFirst = { ...firstNode, text: '\u00A0' + firstNode.text.trimStart() }
                 contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
               } else {
-                // Non-text first node - add space before it
-                contentAfterMention = [{ type: 'text', text: ' ' }, ...contentNodes]
+                // Non-text first node - add NBSP before it
+                contentAfterMention = [{ type: 'text', text: '\u00A0' }, ...contentNodes]
               }
             }
           }
@@ -1689,7 +1681,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!desiredMention) return
 
         // Always add space after mention
-        const spaceNode = [{ type: 'text', text: ' ' }]
+        const spaceNode = [{ type: 'text', text: '\u00A0' }]
         const newFirstParagraph = {
           type: 'paragraph',
           content: [desiredMention, ...spaceNode, ...blockContent.filter((n: any) => !(n && n.type === 'mention'))],

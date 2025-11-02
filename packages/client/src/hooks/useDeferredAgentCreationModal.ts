@@ -107,10 +107,11 @@ export function useDeferredAgentCreationModal(options: {
         for (let i = startIndex; i < liveMessages.length; i++) {
           const msg: any = liveMessages[i]
           if (!msg) continue
-          if (msg.role === 'tool' && msg.content && typeof msg.content === 'string') {
+          const isToolResult = String(msg?.messageType || '').toLowerCase() === 'tool_result'
+          if (isToolResult && (msg?.content || msg?.body || msg?.data)) {
             try {
-              const parsed = JSON.parse(msg.content)
-              const body = parsed && typeof parsed === 'object' ? (parsed as any).body : undefined
+              const parsed = typeof msg.content === 'string' ? JSON.parse(msg.content) : typeof msg.content === 'object' ? msg.content : null
+              const body = (parsed && typeof parsed === 'object' && (parsed as any).body) || msg.body || undefined
               const data = body && typeof body === 'object' ? (body as any).data : undefined
               const slug: string | undefined = data && typeof (data as any).slug === 'string' ? (data as any).slug : undefined
               const name: string | undefined = data && typeof (data as any).name === 'string' ? (data as any).name : undefined
@@ -174,20 +175,43 @@ export function useDeferredAgentCreationModal(options: {
   useEffect(() => {
     if (!isOpen || !Array.isArray(agents)) return
     // Resolve by slug first, and by name as a fallback
-    const resolved: any[] = []
+    const resolvedNext: any[] = []
     const slugsSet = new Set(createdSlugs)
     const namesSet = new Set((createdNames || []).map(n => String(n).toLowerCase()))
     for (const a of agents) {
       const aSlug = (a as any)?.slug
       const aName = String((a as any)?.name || '')
       if ((aSlug && slugsSet.has(aSlug)) || (aName && namesSet.has(aName.toLowerCase()))) {
-        resolved.push(a)
+        resolvedNext.push(a)
       }
     }
-    setCreatedAgents(resolved)
-    const namesFromResolved = resolved.map(a => (a as any)?.name).filter(Boolean)
+
+    // Update createdAgents only if it has actually changed (by slug or id)
+    setCreatedAgents(prev => {
+      const prevKeys = new Set(prev.map(x => String((x as any)?.slug || (x as any)?.id || '')))
+      const nextKeys = new Set(resolvedNext.map(x => String((x as any)?.slug || (x as any)?.id || '')))
+      if (prevKeys.size === nextKeys.size) {
+        let same = true
+        for (const k of prevKeys)
+          if (!nextKeys.has(k)) {
+            same = false
+            break
+          }
+        if (same) return prev
+      }
+      return resolvedNext
+    })
+
+    // Merge names but avoid setting state if unchanged
+    const namesFromResolved = resolvedNext.map(a => (a as any)?.name).filter(Boolean)
     if (namesFromResolved.length > 0) {
-      setCreatedNames(prev => Array.from(new Set([...(prev || []), ...namesFromResolved])))
+      setCreatedNames(prev => {
+        const mergedSet = new Set<string>(prev || [])
+        for (const n of namesFromResolved) mergedSet.add(String(n))
+        const merged = Array.from(mergedSet)
+        if ((prev || []).length === merged.length) return prev as string[]
+        return merged
+      })
     }
   }, [agents, isOpen, createdSlugs, createdNames])
 
@@ -221,7 +245,9 @@ export function useDeferredAgentCreationModal(options: {
             const n = String((a as any)?.name || '')
             if (n) names.add(n)
           }
-          return Array.from(names)
+          const next = Array.from(names)
+          if ((prev || []).length === next.length) return prev as string[]
+          return next
         })
       }
     })()

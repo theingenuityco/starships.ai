@@ -1262,6 +1262,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
           }
+          // If user types '@' immediately after NBSP gap, convert NBSP to normal space first so Suggestion can match
+          try {
+            if (event.key === '@') {
+              const ed: any = tiptap
+              const anchorPos = getAnchorPosAfterLeadingMention(ed)
+              if (anchorPos) {
+                const selFrom = ed?.state?.selection?.from || 0
+                if (selFrom === anchorPos + 1) {
+                  const prevChar = ed.state.doc.textBetween(anchorPos, anchorPos + 1, '\n', '\n') || ''
+                  if (prevChar === '\u00A0') {
+                    ed.chain()
+                      .setTextSelection({ from: anchorPos, to: anchorPos + 1 })
+                      .insertContent(' ')
+                      .setTextSelection(anchorPos + 1)
+                      .run()
+                  }
+                }
+              }
+            }
+          } catch {}
           // Prevent caret from sitting between mention and enforced space
           try {
             const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)

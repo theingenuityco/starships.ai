@@ -1034,6 +1034,58 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       promptsRef.current = inlinePrompts
     }, [inlinePrompts])
 
+    // Compute the absolute document position immediately after the leading mention in the first paragraph
+    const getAnchorPosAfterLeadingMention = useCallback((editorInstance: any): number | null => {
+      try {
+        const ed: any = editorInstance
+        if (!ed) return null
+        const json: any = ed.getJSON()
+        const docContent = Array.isArray(json?.content) ? json.content : []
+        const firstBlock = docContent[0]
+        const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
+        let firstMentionLocalPos = -1
+        let firstMentionSize = 0
+        let offset = 0
+        for (let i = 0; i < blockContent.length; i++) {
+          const node = blockContent[i]
+          if (node && node.type === 'mention') {
+            firstMentionLocalPos = offset
+            firstMentionSize = typeof node.nodeSize === 'number' ? node.nodeSize : 1
+            break
+          }
+          // For JSON content, approximate local pos by accumulating text length or 1 for nodes
+          if (node && node.type === 'text' && typeof node.text === 'string') {
+            offset += node.text.length
+          } else {
+            offset += 1
+          }
+        }
+        if (firstMentionLocalPos < 0) return null
+        let anchorPos = 1 + firstMentionLocalPos + firstMentionSize
+        // Anchor is before the enforced space; keep it there so we can snap to after
+        return anchorPos
+      } catch {
+        return null
+      }
+    }, [])
+
+    // Ensure a single space exists immediately after the leading mention
+    const ensureSpaceAfterLeadingMention = useCallback(
+      (editorInstance: any) => {
+        try {
+          const ed: any = editorInstance
+          if (!ed) return
+          const anchorPos = getAnchorPosAfterLeadingMention(ed)
+          if (!anchorPos) return
+          const nextChar = ed.state.doc.textBetween(anchorPos, anchorPos + 1, '\n', '\n') || ''
+          if (nextChar !== ' ') {
+            ed.chain()?.setTextSelection(anchorPos)?.insertContent({ type: 'text', text: ' ' })?.run()
+          }
+        } catch {}
+      },
+      [getAnchorPosAfterLeadingMention]
+    )
+
     // Helper: resolve the agent referenced by the leading @mention in the editor JSON (if any)
     const getLeadingMentionAgentFromEditor = useCallback((editorInstance: typeof tiptap | null): AgentModel | null => {
       const editor = editorInstance as any
@@ -1218,6 +1270,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Let the Suggestion plugin own all keys, including Enter/Tab, to avoid ordering issues
             return false
           }
+          // Prevent caret from sitting between mention and enforced space
+          try {
+            const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+            if (anchorPos) {
+              ensureSpaceAfterLeadingMention(tiptap as any)
+              const selFrom = (tiptap as any)?.state?.selection?.from || 0
+              if (selFrom === anchorPos) {
+                tiptap?.commands.setTextSelection(anchorPos + 1)
+              }
+            }
+          } catch {}
           // Cmd/Ctrl+K to clear input
           if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
@@ -1260,6 +1323,40 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             handleSubmit()
             return true
           }
+          return false
+        },
+        handleClick: () => {
+          // Snap caret if user clicks between mention and space
+          try {
+            setTimeout(() => {
+              try {
+                const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+                if (anchorPos) {
+                  ensureSpaceAfterLeadingMention(tiptap as any)
+                  const selFrom = (tiptap as any)?.state?.selection?.from || 0
+                  if (selFrom === anchorPos) {
+                    tiptap?.commands.setTextSelection(anchorPos + 1)
+                  }
+                }
+              } catch {}
+            }, 0)
+          } catch {}
+          return false
+        },
+        handleTextInput: (_view, from, to, text) => {
+          // If typing at the boundary after mention, insert after enforced space instead
+          try {
+            const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+            if (anchorPos && from === anchorPos && typeof text === 'string' && text.length > 0) {
+              ensureSpaceAfterLeadingMention(tiptap as any)
+              tiptap
+                ?.chain()
+                ?.setTextSelection(anchorPos + 1)
+                ?.insertContent(text)
+                ?.run()
+              return true
+            }
+          } catch {}
           return false
         },
       },
@@ -1389,7 +1486,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const t2 = setTimeout(compute, 150)
       const t3 = setTimeout(compute, 300)
 
-      const onSelectionUpdate = () => updateHintPosition()
+      const onSelectionUpdate = () => {
+        // Snap caret out of the protected gap between mention and enforced space
+        try {
+          const anchorPos = getAnchorPosAfterLeadingMention(tiptap as any)
+          if (anchorPos) {
+            ensureSpaceAfterLeadingMention(tiptap as any)
+            const selFrom = (tiptap as any)?.state?.selection?.from || 0
+            if (selFrom === anchorPos) {
+              tiptap?.commands.setTextSelection(anchorPos + 1)
+            }
+          }
+        } catch {}
+        updateHintPosition()
+      }
       try {
         ;(tiptap as any).on?.('selectionUpdate', onSelectionUpdate)
       } catch {}

@@ -9,6 +9,7 @@ interface NavigationSectionItem {
   icon: string
   isActive?: boolean
   onClick?: () => void
+  special?: boolean
 }
 
 type RenderAfterFn = (item: NavigationSectionItem, index: number) => React.ReactNode
@@ -24,18 +25,20 @@ interface NavigationSectionProps {
 
 export function NavigationSection({ title, items, pathname, renderAfter, showLabels = false, expanded = false }: NavigationSectionProps) {
   return (
-    <motion.div className="space-y-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+    <div className="space-y-1 w-full">
       {items.map((item, index) => {
         const { isActive: itemOverrideActive, ...rest } = item
         const isActive = itemOverrideActive ?? pathname === item.href
+        // Use composite key to ensure uniqueness (href + label + index to handle duplicate hrefs)
+        const uniqueKey = `${item.href}-${item.label}-${index}`
 
         return (
-          <motion.div key={item.href} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, delay: index * 0.05 }}>
-            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} />
+          <div key={uniqueKey} className="w-full">
+            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} />
             {renderAfter ? renderAfter(item, index) : null}
-          </motion.div>
+          </div>
         )
       })}
-    </motion.div>
+    </div>
   )
 }

@@ -434,6 +434,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     return []
   }, [examplePrompts, templatePrompts])
 
+  const getSuggestionIcon = useCallback((text: string): string => {
+    const t = String(text || '').toLowerCase()
+    if (/(fix|bug|debug|error|issue)/.test(t)) return 'bug'
+    if (/(optimi(s|z)e|improve|refactor|performance|speed)/.test(t)) return 'trending-up'
+    if (/(plan|roadmap|strategy|timeline|schedule)/.test(t)) return 'calendar'
+    if (/(research|analy(s|z)e|compare|investigate|explore|search)/.test(t)) return 'search'
+    if (/(write|document|doc|explain|summari(s|z)e)/.test(t)) return 'file-text'
+    if (/(test|qa|verify|validate)/.test(t)) return 'test-tube'
+    if (/(deploy|ship|release|launch)/.test(t)) return 'rocket'
+    if (/(code|implement|build)/.test(t)) return 'code'
+    if (/(design|idea|brainstorm|concept|creative|generate|create|draft)/.test(t)) return 'lightbulb'
+    return 'sparkles'
+  }, [])
+
   // Removed manual agent builder toggle (route-based only)
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
@@ -865,14 +879,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               {!showMessagesArea && suggestionPrompts.length > 0 && (
                 <motion.div key="suggestions" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Suggestions</div>
-                  <div className="flex flex-wrap gap-2 px-2">
+                  <div className="space-y-2 px-4">
                     {suggestionPrompts.slice(0, 8).map((text, idx) => (
                       <button
                         key={idx}
-                        className="px-3 py-2 text-sm rounded-xl border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                        className="group w-full text-left px-4 py-3 text-sm rounded-xl border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
                         onClick={() => messageInputRef.current?.handleSuggestionSubmit?.(text)}
                       >
-                        {text}
+                        <div className="flex items-start gap-3">
+                          <Icon name={getSuggestionIcon(text)} className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-muted-foreground group-hover:text-foreground transition-colors">{text}</p>
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>

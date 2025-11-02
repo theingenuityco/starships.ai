@@ -733,11 +733,22 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             } catch {}
           },
           onUpdate(props: any) {
+            // Preserve previous query to detect filter changes
+            const prevQuery = String(lastQuery || '')
             lastProps = props
             lastQuery = String(props?.query || '')
+
+            const newItems = (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean)
+
+            // Reset active to the first filtered item when query changes or when active is out of bounds
+            if (lastQuery !== prevQuery || active < 0 || active >= newItems.length) {
+              active = newItems.length > 0 ? 0 : 0
+            }
+
             component?.updateProps({
               ...component.props,
-              items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
+              items: newItems,
+              active,
             })
             popup?.[0]?.setProps({ getReferenceClientRect: props.clientRect })
           },

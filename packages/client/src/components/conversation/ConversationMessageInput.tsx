@@ -429,9 +429,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
       // In expanded form, guide user to choose an agent explicitly until a leading mention exists
       if (!minimal && !leadingMentionAgent) {
-        return 'Type @ to choose an agent, then ask your question'
+        return 'Type @ to select an agent, then give instructions'
       }
-      return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to choose an agent, then ask your question'
+      return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to select an agent, then give instructions'
     }
 
     // Track if there's actual content beyond just the mention and space
@@ -1262,7 +1262,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           suggestion: mentionSuggestion,
         }),
         InlineHintExtension.configure({
-          getPrompts: () => ['Type @ to choose an agent, then ask your question'],
+          getPrompts: () => ['Type @ to select an agent, then give instructions'],
           getEnabled: () => !minimalRef.current && !disabledRef.current && !streamingRef.current && !sendingRef.current,
           staticMode: true,
           debug: false,

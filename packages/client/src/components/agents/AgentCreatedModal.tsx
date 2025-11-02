@@ -19,9 +19,9 @@ interface AgentCreatedModalProps {
 export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, onAskDaedalusCreateTools, agents }: AgentCreatedModalProps) {
   const uniqueNames = Array.isArray(names) ? Array.from(new Set(names.filter(n => typeof n === 'string' && n.trim()))).slice(0, 10) : []
   const baseTitle = useMemo(() => {
-    if (uniqueNames.length > 1) return `You created ${uniqueNames.length} agents`
+    if (uniqueNames.length > 1) return `${uniqueNames.length} agents are ready`
     const single = (uniqueNames[0] || '').trim()
-    return single ? `You created ${single}` : 'You created an agent'
+    return single ? `${single} is ready` : 'Your agent is ready'
   }, [uniqueNames])
   const primaryName = useMemo(() => (Array.isArray(agents) && agents[0]?.name) || uniqueNames[0] || '', [agents, uniqueNames])
   const primarySlug = useMemo(() => (Array.isArray(agents) && (agents[0] as any)?.slug) || '', [agents])
@@ -110,13 +110,7 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
                 <div className="grid grid-cols-1 gap-3 mb-6">
                   {agents.map((a, idx) => (
                     <motion.div key={a.id || a.slug || a.name || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + idx * 0.04 }}>
-                      <DeployedAgentCard
-                        agent={a as AgentModel}
-                        onClick={() => onChatWithAgent?.((a as any)?.slug || a.name)}
-                        onChat={() => onChatWithAgent?.((a as any)?.slug || a.name)}
-                        showActions={false}
-                        hideChatControl={true}
-                      />
+                      <DeployedAgentCard agent={a as AgentModel} onClick={() => onChatWithAgent?.((a as any)?.slug || a.name)} showActions={false} hideChatControl={true} />
                     </motion.div>
                   ))}
                 </div>
@@ -128,7 +122,6 @@ export function AgentCreatedModal({ open, names, onOpenChange, onChatWithAgent, 
                         <DeployedAgentCard
                           agent={{ id: `temp-${name}-${idx}`, name, description: 'Draft agent is ready', model: 'N/A', slug: undefined } as unknown as AgentModel}
                           onClick={() => onChatWithAgent?.(name)}
-                          onChat={() => onChatWithAgent?.(name)}
                           showActions={false}
                           hideChatControl={true}
                         />

@@ -15,6 +15,7 @@ import type { AgentModel } from '@starships/protocol'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
+import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -426,6 +427,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
+      // In expanded form, guide user to choose an agent explicitly until a leading mention exists
+      if (!minimal && !leadingMentionAgent) {
+        return 'Type @ to choose an agent, then ask your question'
+      }
       return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to choose an agent, then ask your question'
     }
 
@@ -1256,6 +1261,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           },
           suggestion: mentionSuggestion,
         }),
+        InlineHintExtension.configure({
+          getPrompts: () => ['Type @ to choose an agent, then ask your question'],
+          getEnabled: () => !minimalRef.current && !disabledRef.current && !streamingRef.current && !sendingRef.current,
+          staticMode: true,
+          debug: false,
+        }),
       ],
       content: message,
       immediatelyRender: false,
@@ -1419,9 +1430,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             isEditingMentionRef.current = false
           }
         } catch {}
-        // Update hint visibility and position on editor update
+        // Update inline guide visibility and position on editor update
         try {
-          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(editor as any))
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && isOnlyAgentMentionWithSpace(editor as any))
           setShouldShowInlineHint(next)
           updateHintPosition()
         } catch {}
@@ -1498,7 +1509,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (!tiptap) return
       const compute = () => {
         try {
-          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && inlinePrompts.length > 0 && isOnlyAgentMentionWithSpace(tiptap as any))
+          const next = Boolean(!minimal && !disabled && !isStreamingEffective && !sending && isOnlyAgentMentionWithSpace(tiptap as any))
           setShouldShowInlineHint(next)
           updateHintPosition()
         } catch {}
@@ -1537,7 +1548,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch {}
         window.removeEventListener('resize', onSelectionUpdate)
       }
-    }, [tiptap, minimal, disabled, isStreamingEffective, sending, inlinePrompts.length, isOnlyAgentMentionWithSpace, updateHintPosition])
+    }, [tiptap, minimal, disabled, isStreamingEffective, sending, isOnlyAgentMentionWithSpace, updateHintPosition])
     // Wire editor-dependent helpers
     useEffect(() => {
       clearEditorRef.current = () => {

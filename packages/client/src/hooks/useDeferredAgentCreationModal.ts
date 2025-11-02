@@ -403,7 +403,7 @@ export function useDeferredAgentCreationModal(options: {
   )
 
   const askDaedalusCreateTools = useCallback(
-    (_: string) => {
+    (agentName: string) => {
       try {
         setIsOpen(false)
         const list = Array.isArray(agents) ? agents : []
@@ -421,13 +421,14 @@ export function useDeferredAgentCreationModal(options: {
           ) ||
           null
         if (daedalus && setLeadingMentionAgent) {
+          const afterText = typeof agentName === 'string' && agentName.trim().length > 0 ? `create a tool for ${agentName.trim()}` : 'create a tool'
           try {
             console.debug('[AgentCreatedModal] askDaedalusCreateTools → setting mention', {
               agent: { id: (daedalus as any)?.id, name: (daedalus as any)?.name, slug: (daedalus as any)?.slug },
-              afterText: 'create a tool for the agent please',
+              afterText,
             })
           } catch {}
-          setLeadingMentionAgent(daedalus as any, 'create a tool for the agent please')
+          setLeadingMentionAgent(daedalus as any, afterText)
         }
         if (focusInput) {
           setTimeout(() => {

@@ -878,8 +878,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             <AnimatePresence initial={false} mode="wait">
               {!showMessagesArea && suggestionPrompts.length > 0 && (
                 <motion.div key="suggestions" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Suggestions</div>
-                  <div className="space-y-2 px-4">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Suggestions</div>
+                  <div className="space-y-2">
                     {suggestionPrompts.slice(0, 8).map((text, idx) => (
                       <button
                         key={idx}

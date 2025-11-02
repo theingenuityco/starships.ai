@@ -19,6 +19,7 @@ import { BlueprintVisualization } from './BlueprintVisualization'
 
 import { motion } from 'motion/react'
 import { useState } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -35,7 +36,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
   const [isDeploying, setIsDeploying] = useState(false)
 
   // Get current user and their starships for deployment
-  const { userId } = useAuth()
+  const { userId, isAuthenticated } = useAuth()
   const { data: starships = [] } = useUserStarships(userId || '', !!userId)
   const primaryStarship = starships[0] // Use first starship by default
 
@@ -45,6 +46,10 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
 
   // Deployment mutation
   const createAgentMutation = useCreateAgentFromTemplate()
+
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   if (!template) return null
 
@@ -95,6 +100,28 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
     } finally {
       setIsDeploying(false)
     }
+  }
+
+  const handleChatClick = () => {
+    if (!template) return
+    // If not authenticated, redirect to login preserving return URL
+    if (!isAuthenticated) {
+      try {
+        const current = `${pathname}${searchParams && searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+        const params = new URLSearchParams({ returnUrl: current })
+        router.push(`/login?${params.toString()}`)
+      } catch {}
+      return
+    }
+
+    // Require a primary starship to start a conversation
+    const starshipSlug = (primaryStarship as any)?.slug
+    if (!starshipSlug) return
+
+    try {
+      const agentSlug = template.slug
+      router.push(`/ship/${encodeURIComponent(starshipSlug)}/conversations${agentSlug ? `?agent=${encodeURIComponent(agentSlug)}` : ''}`)
+    } catch {}
   }
 
   return (
@@ -222,6 +249,14 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                     <Icon name="sparkles" className="w-5 h-5 text-primary" />
                     Deployment
                   </h3>
+
+                  {/* Chat CTA */}
+                  <div className="mb-4">
+                    <Button size="lg" variant="outline" className="w-full" onClick={handleChatClick} disabled={!primaryStarship}>
+                      <Icon name="message-square" className="w-4 h-4 mr-2" />
+                      Chat with {template.name}
+                    </Button>
+                  </div>
 
                   {primaryStarship ? (
                     <div className="space-y-4">

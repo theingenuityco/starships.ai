@@ -12,14 +12,13 @@ import { ConversationStreamProvider, useConversationStreamContextOptional } from
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
-import api, { agentAPI, toolAPI } from '@/lib/api'
-import { Avatar } from '@/components/ui/avatar'
-import AgentAvatar from '@/components/animated/AgentAvatar'
+import { agentAPI, templateAPI, toolAPI } from '@/lib/api'
+import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
+import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
-import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 
@@ -139,35 +138,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
 
-  // Cache of participants by conversation id (agents involved)
-  const [conversationParticipants, setConversationParticipants] = useState<Record<string, any[]>>({})
-
-  // Prefetch participants for top 5 recent conversations when on starter state
-  const prefetchRecentParticipants = useCallback(async () => {
-    try {
-      const list = (starshipConversationsData?.conversations || []).filter((c: any) => c.status !== 'archived')
-      if (!Array.isArray(list) || list.length === 0) return
-      const recent = list
-        .slice()
-        .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
-        .slice(0, 3)
-      for (const conv of recent) {
-        const cid = conv?.id
-        if (!cid || conversationParticipants[cid]) continue
-        try {
-          const res = await api.get(`/api/v1/conversations/${cid}/messages`, { params: { limit: 1, page: 1 } })
-          const agents = (res as any)?.data?.data?.agents || []
-          if (Array.isArray(agents)) {
-            setConversationParticipants(prev => ({ ...prev, [cid]: agents }))
-          }
-        } catch {}
-      }
-    } catch {}
-  }, [starshipConversationsData, conversationParticipants])
-
-  // Kick off prefetch after showMessagesArea is computed
-  const shouldPrefetchParticipantsRef = useRef<boolean | null>(null)
-
   // Gate UI by presence of a conversation id; streaming details are handled in context consumers
   const showMessagesArea = Boolean(currentConversationId)
 
@@ -194,12 +164,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const isInputDocked = showMessagesArea
 
   useEffect(() => {
-    // Initialize ref after showMessagesArea is available
-    shouldPrefetchParticipantsRef.current = !showMessagesArea
-    if (shouldPrefetchParticipantsRef.current) {
-      void prefetchRecentParticipants()
-    }
-  }, [showMessagesArea, prefetchRecentParticipants])
+    return
+  }, [showMessagesArea])
 
   // Measure input container after showMessagesArea is known (prevents TS error and ensures correct layout)
   useEffect(() => {
@@ -343,6 +309,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Try to find by slug first (preferred), then fall back to ID for backward compatibility
       const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || starshipAgentsData.find(a => a.id === initialAgentId)
       if (agent) {
+        // Mark default as set so fallback effect does not override URL-selected agent
+        hasSetInitialDefaultAgentRef.current = true
         setSelectedAgentWithLogging(agent)
         hasEverSetAnyAgentRef.current = true
         lastAutoSelectedAgentIdRef.current = agent.id
@@ -358,6 +326,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     // Don't run if already set
     if (hasSetInitialDefaultAgentRef.current) {
+      return
+    }
+
+    // If URL provided an initial agent, don't apply fallback
+    if (initialAgentId) {
+      return
+    }
+
+    // If an agent is already selected, do not override
+    if (selectedAgent) {
       return
     }
 
@@ -378,7 +356,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-  }, [starshipAgentsData, setSelectedAgentWithLogging])
+  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
 
   // Keep guard ref in sync with agent changes
   useEffect(() => {
@@ -420,19 +398,67 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     router.push(`/ship/${starshipSlug}/tool/new${q}`)
   }, [router, starshipSlug, externalConversationId])
 
-  // Navigate/select recent conversation from starter state
-  const handleRecentConversationSelect = useCallback(
-    (conversationId: string) => {
+  // Suggestions: derive example prompts from selected agent (with template fallbacks)
+  const examplePrompts = useMemo(() => {
+    const a: any = selectedAgent as any
+    const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
+    return Array.isArray(list) ? (list as string[]).filter(Boolean) : []
+  }, [selectedAgent])
+
+  const [templatePrompts, setTemplatePrompts] = useState<string[]>([])
+  useEffect(() => {
+    let aborted = false
+    setTemplatePrompts([])
+    const a: any = selectedAgent as any
+    if (!a) return
+    if (examplePrompts.length > 0) return
+    ;(async () => {
       try {
-        if (starshipSlug) {
-          router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(conversationId)}`)
+        if (a?.id) {
+          const fresh = await agentAPI.getById(a.id)
+          const freshPrompts: string[] = (fresh as any)?.previewPrompts || []
+          if (!aborted && Array.isArray(freshPrompts) && freshPrompts.length > 0) {
+            setTemplatePrompts(freshPrompts.filter(Boolean))
+            return
+          }
         }
       } catch {}
-      setCurrentConversationId(conversationId)
-      onConversationChange?.(conversationId)
-    },
-    [router, starshipSlug, onConversationChange]
-  )
+      try {
+        const templateId = a?.templateId
+        if (templateId) {
+          const tpl = await templateAPI.getById(templateId)
+          const previews = (tpl as any)?.previewPrompts || []
+          if (!aborted && Array.isArray(previews) && previews.length > 0) {
+            setTemplatePrompts(previews.filter(Boolean))
+            return
+          }
+        }
+      } catch {}
+    })()
+    return () => {
+      aborted = true
+    }
+  }, [selectedAgent, examplePrompts])
+
+  const suggestionPrompts = useMemo(() => {
+    if (examplePrompts.length > 0) return examplePrompts
+    if (templatePrompts.length > 0) return templatePrompts
+    return []
+  }, [examplePrompts, templatePrompts])
+
+  const getSuggestionIcon = useCallback((text: string): string => {
+    const t = String(text || '').toLowerCase()
+    if (/(fix|bug|debug|error|issue)/.test(t)) return 'bug'
+    if (/(optimi(s|z)e|improve|refactor|performance|speed)/.test(t)) return 'trending-up'
+    if (/(plan|roadmap|strategy|timeline|schedule)/.test(t)) return 'calendar'
+    if (/(research|analy(s|z)e|compare|investigate|explore|search)/.test(t)) return 'search'
+    if (/(write|document|doc|explain|summari(s|z)e)/.test(t)) return 'file-text'
+    if (/(test|qa|verify|validate)/.test(t)) return 'test-tube'
+    if (/(deploy|ship|release|launch)/.test(t)) return 'rocket'
+    if (/(code|implement|build)/.test(t)) return 'code'
+    if (/(design|idea|brainstorm|concept|creative|generate|create|draft)/.test(t)) return 'lightbulb'
+    return 'sparkles'
+  }, [])
 
   // Removed manual agent builder toggle (route-based only)
 
@@ -572,6 +598,29 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const liveMessages = (ctx?.messages as any[]) || []
     const lastUIAction = (ctx as any)?.lastUIAction
     const prevStreamingRef = useRef(false)
+    const deferredAgentCreate = useDeferredAgentCreationModal({
+      liveMessages,
+      isStreaming: uiStreaming,
+      starshipSlug,
+      conversationId: currentConversationId || externalConversationId || null,
+      agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
+      setLeadingMentionAgent: (agent: any, afterText?: string) => {
+        try {
+          console.debug('[ConversationInterface] forwarding setLeadingMentionAgent', {
+            agent: { id: agent?.id, name: agent?.name, slug: agent?.slug },
+            afterText,
+          })
+        } catch {}
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
+        } catch {}
+      },
+      focusInput: () => {
+        try {
+          messageInputRef.current?.focusInput?.()
+        } catch {}
+      },
+    })
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)
@@ -726,7 +775,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       } catch {}
     }, [uiStreaming, currentConversationId, lastUIAction])
 
-    return null
+    return (
+      <AgentCreatedModal
+        open={deferredAgentCreate.isOpen}
+        names={deferredAgentCreate.createdNames}
+        onOpenChange={deferredAgentCreate.setIsOpen}
+        onChatWithAgent={deferredAgentCreate.chatWithAgent}
+        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+      />
+    )
   }
 
   // Removed overlay UI effects
@@ -830,51 +888,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               )}
             </AnimatePresence>
             <AnimatePresence initial={false} mode="wait">
-              {!showMessagesArea && Array.isArray(starshipConversationsData?.conversations) && starshipConversationsData!.conversations.filter((c: any) => c.status !== 'archived').length > 0 && (
-                <motion.div key="recent-list" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-4">Recent conversations</div>
-                  <div className="space-y-1">
-                    {starshipConversationsData!.conversations
-                      .filter((c: any) => c.status !== 'archived')
-                      .slice()
-                      .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
-                      .slice(0, 3)
-                      .map((conv: any) => {
-                        const title = conv?.title || `Conversation ${String(conv?.id || '').slice(0, 8)}`
-                        const participants = conversationParticipants?.[conv?.id] || []
-                        return (
-                          <button
-                            key={conv.id}
-                            className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-all duration-200 border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm hover:shadow-md group"
-                            onClick={() => handleRecentConversationSelect(conv.id)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-primary/15 group-hover:bg-primary/25 flex items-center justify-center shrink-0 transition-colors">
-                              <Icon name="message-square" className="w-5 h-5 text-primary/80 group-hover:text-primary transition-colors" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="truncate text-muted-foreground group-hover:text-foreground">{title}</p>
-                              {participants.length > 0 && (
-                                <div className="flex items-center gap-2 mt-1 min-w-0">
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    {participants.slice(0, 3).map((agent: any) => (
-                                      <Avatar key={agent?.id} className="h-4 w-4 ring-1 ring-border/40 rounded-[3px] overflow-hidden">
-                                        <AgentAvatar seed={agent?.name || agent?.slug || undefined} size={16} />
-                                      </Avatar>
-                                    ))}
-                                  </div>
-                                  <span className="text-[12px] text-muted-foreground truncate">
-                                    {participants
-                                      .slice(0, 3)
-                                      .map((a: any) => a?.name || a?.slug || 'Agent')
-                                      .join(', ')}
-                                  </span>
-                                  {participants.length > 3 && <span className="text-[10px] text-muted-foreground pl-1 shrink-0">+{participants.length - 3}</span>}
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
+              {!showMessagesArea && suggestionPrompts.length > 0 && (
+                <motion.div key="suggestions" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 pl-2">Suggestions</div>
+                  <div className="space-y-2">
+                    {suggestionPrompts.slice(0, 8).map((text, idx) => (
+                      <button
+                        key={idx}
+                        className="group w-full text-left px-4 py-3 text-sm rounded-xl border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                        onClick={() => messageInputRef.current?.handleSuggestionSubmit?.(text)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Icon name={getSuggestionIcon(text)} className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-muted-foreground group-hover:text-foreground transition-colors">{text}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </motion.div>
               )}

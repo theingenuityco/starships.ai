@@ -26,6 +26,7 @@ export const AGENT_QUERY_KEYS = {
   list: (filters?: AgentFilters) => [...AGENT_QUERY_KEYS.lists(), { filters }] as const,
   details: () => [...AGENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...AGENT_QUERY_KEYS.details(), id] as const,
+  bySlugOrId: (slugOrId: string) => [...AGENT_QUERY_KEYS.all, 'slugOrId', slugOrId] as const,
   byStarship: (starshipId: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId] as const,
   byAuthor: (authorId: string) => [...AGENT_QUERY_KEYS.all, 'author', authorId] as const,
   byUser: (userId: string) => [...AGENT_QUERY_KEYS.all, 'user', userId] as const,
@@ -47,6 +48,24 @@ export function useAgent(agentId: string, enabled: boolean = true) {
     enabled: !!agentId && enabled,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+/**
+ * Fetcher and hook for agent by slug or ID (single endpoint).
+ */
+export async function fetchAgentBySlugOrId(slugOrId: string): Promise<AgentModel> {
+  const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugOrId)}`)
+  return response.data.data
+}
+
+export function useAgentBySlugOrId(slugOrId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugOrId),
+    queryFn: () => fetchAgentBySlugOrId(slugOrId),
+    enabled: !!slugOrId && enabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
   })
 }
 
@@ -279,11 +298,15 @@ export function useDeleteAgent() {
       }
     },
     onError: (error: any, agentId, context) => {
-      // Rollback optimistic deletions
-      if (context?.agent) {
+      // Extract error message - handle both object and string formats
+      let errorMessage = 'Failed to delete agent'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to delete agent'
+      } else if (error?.message) {
+        errorMessage = error.message
       }
 
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete agent'
       toast.error('Failed to delete agent', {
         description: errorMessage,
       })
@@ -324,7 +347,15 @@ export function useDeployAgent() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to deploy agent'
+      // Extract error message - handle both object and string formats
+      let errorMessage = 'Failed to deploy agent'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to deploy agent'
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })
@@ -353,7 +384,15 @@ export function useRateAgent() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to rate agent'
+      // Extract error message - handle both object and string formats
+      let errorMessage = 'Failed to rate agent'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to rate agent'
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+
       toast.error('Failed to rate agent', {
         description: errorMessage,
       })

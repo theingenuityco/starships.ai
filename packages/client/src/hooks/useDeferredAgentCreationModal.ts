@@ -40,7 +40,7 @@ export function useDeferredAgentCreationModal(options: {
   const [createdAgents, setCreatedAgents] = useState<any[]>([])
   const [createdSlugs, setCreatedSlugs] = useState<string[]>([])
 
-  // While streaming, collect created agent slugs from tool results and assistant args
+  // While streaming, collect created agent slugs from assistant args ONLY (agent-related calls)
   useEffect(() => {
     if (!isStreaming || !liveMessages.length) return
 
@@ -51,25 +51,13 @@ export function useDeferredAgentCreationModal(options: {
     for (let i = recent.length - 1; i >= 0; i--) {
       const msg = recent[i] as any
       if (!msg) continue
-      // 1) Tool result messages often contain body.data.slug
-      const isToolResult = String(msg?.messageType || '').toLowerCase() === 'tool_result'
-      if (isToolResult && (msg?.content || msg?.body || msg?.data)) {
-        try {
-          const parsed = typeof msg.content === 'string' ? JSON.parse(msg.content) : typeof msg.content === 'object' ? msg.content : null
-          const body = (parsed && typeof parsed === 'object' && (parsed as any).body) || msg.body || undefined
-          const data = body && typeof body === 'object' ? (body as any).data : undefined
-          const slug: string | undefined = data && typeof (data as any).slug === 'string' ? (data as any).slug : undefined
-          const name: string | undefined = data && typeof (data as any).name === 'string' ? (data as any).name : undefined
-          if (slug) createdSlugsRef.current.add(slug)
-          if (!slug && name) createdNamesRef.current.add(name)
-        } catch {}
-      }
-      // 2) Assistant tool call arguments may include slug for open existing
+      // Assistant tool call arguments may include slug for open existing
       if (msg.role === 'assistant' && Array.isArray((msg as any).toolCalls)) {
         for (const tc of (msg as any).toolCalls as any[]) {
           const rawName = tc?.function?.name as string | undefined
           const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-          if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent'))) continue
+          // Only consider AGENT-related calls
+          if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent') && !fnName.includes('edit-agent') && !fnName.includes('edit agent'))) continue
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
             try {
@@ -99,7 +87,7 @@ export function useDeferredAgentCreationModal(options: {
       // Include the last existing message since it may receive in-place updates (toolCalls)
       turnStartIndexRef.current = Math.max(0, liveMessages.length - 1)
     }
-    // Turn ended: finalize and open modal if anything was created
+    // Turn ended: finalize and open modal if anything was created (agent-related only)
     if (was && !isStreaming) {
       // Fallback: some toolCalls may land right at the end; scan messages since turn start
       try {
@@ -107,23 +95,12 @@ export function useDeferredAgentCreationModal(options: {
         for (let i = startIndex; i < liveMessages.length; i++) {
           const msg: any = liveMessages[i]
           if (!msg) continue
-          const isToolResult = String(msg?.messageType || '').toLowerCase() === 'tool_result'
-          if (isToolResult && (msg?.content || msg?.body || msg?.data)) {
-            try {
-              const parsed = typeof msg.content === 'string' ? JSON.parse(msg.content) : typeof msg.content === 'object' ? msg.content : null
-              const body = (parsed && typeof parsed === 'object' && (parsed as any).body) || msg.body || undefined
-              const data = body && typeof body === 'object' ? (body as any).data : undefined
-              const slug: string | undefined = data && typeof (data as any).slug === 'string' ? (data as any).slug : undefined
-              const name: string | undefined = data && typeof (data as any).name === 'string' ? (data as any).name : undefined
-              if (slug) createdSlugsRef.current.add(slug)
-              if (!slug && name) createdNamesRef.current.add(name)
-            } catch {}
-          }
           if (msg.role === 'assistant' && Array.isArray((msg as any).toolCalls)) {
             for (const tc of (msg as any).toolCalls as any[]) {
               const rawName = tc?.function?.name as string | undefined
               const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-              if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent'))) continue
+              // Only consider AGENT-related calls
+              if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent') && !fnName.includes('edit-agent') && !fnName.includes('edit agent'))) continue
               let args: any = tc?.function?.arguments
               if (typeof args === 'string') {
                 try {

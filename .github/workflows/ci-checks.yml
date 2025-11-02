@@ -31,7 +31,7 @@ jobs:
 
   type-check:
     name: Type Check
-    runs-on: [self-hosted, linux, x64, t3.small]
+    runs-on: [self-hosted, linux, x64, t3.large]
     timeout-minutes: 10
 
     steps:
@@ -51,7 +51,7 @@ jobs:
 
   test:
     name: Test Check
-    runs-on: [self-hosted, linux, x64, t3.small]
+    runs-on: [self-hosted, linux, x64, t3.large]
     timeout-minutes: 10
 
     steps:

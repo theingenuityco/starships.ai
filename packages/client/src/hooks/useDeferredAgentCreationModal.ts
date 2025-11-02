@@ -32,6 +32,8 @@ export function useDeferredAgentCreationModal(options: {
 
   const prevStreamingRef = useRef<boolean>(false)
   const createdSlugsRef = useRef<Set<string>>(new Set())
+  const createdNamesRef = useRef<Set<string>>(new Set())
+  const turnStartIndexRef = useRef<number>(0)
 
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [createdNames, setCreatedNames] = useState<string[]>([])
@@ -42,18 +44,24 @@ export function useDeferredAgentCreationModal(options: {
   useEffect(() => {
     if (!isStreaming || !liveMessages.length) return
 
-    const recent = liveMessages.slice(-20)
+    // Only process messages that arrived during this streaming turn
+    // Include the last message that may receive in-place updates (e.g., toolCalls replacement)
+    const startIndex = Math.max(0, Math.min(turnStartIndexRef.current, liveMessages.length - 1))
+    const recent = liveMessages.slice(startIndex)
     for (let i = recent.length - 1; i >= 0; i--) {
       const msg = recent[i] as any
       if (!msg) continue
       // 1) Tool result messages often contain body.data.slug
-      if (msg.role === 'tool' && msg.content && typeof msg.content === 'string') {
+      const isToolResult = String(msg?.messageType || '').toLowerCase() === 'tool_result'
+      if (isToolResult && (msg?.content || msg?.body || msg?.data)) {
         try {
-          const parsed = JSON.parse(msg.content)
-          const body = parsed && typeof parsed === 'object' ? (parsed as any).body : undefined
+          const parsed = typeof msg.content === 'string' ? JSON.parse(msg.content) : typeof msg.content === 'object' ? msg.content : null
+          const body = (parsed && typeof parsed === 'object' && (parsed as any).body) || msg.body || undefined
           const data = body && typeof body === 'object' ? (body as any).data : undefined
           const slug: string | undefined = data && typeof (data as any).slug === 'string' ? (data as any).slug : undefined
+          const name: string | undefined = data && typeof (data as any).name === 'string' ? (data as any).name : undefined
           if (slug) createdSlugsRef.current.add(slug)
+          if (!slug && name) createdNamesRef.current.add(name)
         } catch {}
       }
       // 2) Assistant tool call arguments may include slug for open existing
@@ -61,7 +69,7 @@ export function useDeferredAgentCreationModal(options: {
         for (const tc of (msg as any).toolCalls as any[]) {
           const rawName = tc?.function?.name as string | undefined
           const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-          if (!fnName || !fnName.includes('open-agent')) continue
+          if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent'))) continue
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
             try {
@@ -69,51 +77,119 @@ export function useDeferredAgentCreationModal(options: {
             } catch {}
           }
           const slug = args && typeof args.slug === 'string' && args.slug.trim().length > 0 ? String(args.slug) : null
+          const name = args && typeof args.name === 'string' && args.name.trim().length > 0 ? String(args.name) : null
           if (slug) createdSlugsRef.current.add(slug)
+          // New agent creation path typically lacks slug but includes name; capture it
+          if (!slug && name) createdNamesRef.current.add(name)
         }
       }
     }
   }, [isStreaming, liveMessages])
 
-  // When streaming ends, open the modal if any creations were detected
+  // When streaming starts/ends, manage per-turn state and open the modal on end
   useEffect(() => {
     const was = prevStreamingRef.current
+    // Turn started: reset per-turn tracking and mark the current message index
+    if (!was && isStreaming) {
+      createdSlugsRef.current.clear()
+      createdNamesRef.current.clear()
+      setCreatedSlugs([])
+      setCreatedAgents([])
+      setCreatedNames([])
+      // Include the last existing message since it may receive in-place updates (toolCalls)
+      turnStartIndexRef.current = Math.max(0, liveMessages.length - 1)
+    }
+    // Turn ended: finalize and open modal if anything was created
     if (was && !isStreaming) {
+      // Fallback: some toolCalls may land right at the end; scan messages since turn start
+      try {
+        const startIndex = Math.max(0, Math.min(turnStartIndexRef.current, liveMessages.length))
+        for (let i = startIndex; i < liveMessages.length; i++) {
+          const msg: any = liveMessages[i]
+          if (!msg) continue
+          if (msg.role === 'tool' && msg.content && typeof msg.content === 'string') {
+            try {
+              const parsed = JSON.parse(msg.content)
+              const body = parsed && typeof parsed === 'object' ? (parsed as any).body : undefined
+              const data = body && typeof body === 'object' ? (body as any).data : undefined
+              const slug: string | undefined = data && typeof (data as any).slug === 'string' ? (data as any).slug : undefined
+              const name: string | undefined = data && typeof (data as any).name === 'string' ? (data as any).name : undefined
+              if (slug) createdSlugsRef.current.add(slug)
+              if (!slug && name) createdNamesRef.current.add(name)
+            } catch {}
+          }
+          if (msg.role === 'assistant' && Array.isArray((msg as any).toolCalls)) {
+            for (const tc of (msg as any).toolCalls as any[]) {
+              const rawName = tc?.function?.name as string | undefined
+              const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
+              if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent'))) continue
+              let args: any = tc?.function?.arguments
+              if (typeof args === 'string') {
+                try {
+                  args = JSON.parse(args)
+                } catch {}
+              }
+              const slug = args && typeof args.slug === 'string' && args.slug.trim().length > 0 ? String(args.slug) : null
+              const name = args && typeof args.name === 'string' && args.name.trim().length > 0 ? String(args.name) : null
+              if (slug) createdSlugsRef.current.add(slug)
+              if (!slug && name) createdNamesRef.current.add(name)
+            }
+          }
+        }
+      } catch {}
+
       const slugs = Array.from(createdSlugsRef.current)
-      if (slugs.length > 0) {
+      const namesOnly = Array.from(createdNamesRef.current)
+      if (slugs.length > 0 || namesOnly.length > 0) {
         setCreatedSlugs(slugs)
         // Resolve from provided agents cache if available
         if (agents && Array.isArray(agents)) {
           const resolved: any[] = []
+          const slugsSet = new Set(slugs)
+          const namesSet = new Set(namesOnly.map(n => String(n).toLowerCase()))
           for (const a of agents) {
-            const slug = (a as any)?.slug
-            if (slug && slugs.includes(slug)) resolved.push(a)
+            const aSlug = (a as any)?.slug
+            const aName = String((a as any)?.name || '')
+            if ((aSlug && slugsSet.has(aSlug)) || (aName && namesSet.has(aName.toLowerCase()))) {
+              resolved.push(a)
+            }
           }
           setCreatedAgents(resolved)
-          setCreatedNames(resolved.map(a => (a as any)?.name).filter(Boolean))
+          const namesFromResolved = resolved.map(a => (a as any)?.name).filter(Boolean)
+          const mergedNames = Array.from(new Set([...(namesOnly || []), ...namesFromResolved]))
+          setCreatedNames(mergedNames)
         } else {
           setCreatedAgents([])
-          setCreatedNames([])
+          setCreatedNames(namesOnly)
         }
         setIsOpen(true)
         createdSlugsRef.current.clear()
+        createdNamesRef.current.clear()
       }
     }
     prevStreamingRef.current = Boolean(isStreaming)
-  }, [isStreaming])
+  }, [isStreaming, liveMessages.length, agents])
 
   // When backing agents list updates after refetch, recompute createdAgents while modal is open (match by slug)
   useEffect(() => {
-    if (!isOpen || !Array.isArray(agents) || createdSlugs.length === 0) return
+    if (!isOpen || !Array.isArray(agents)) return
+    // Resolve by slug first, and by name as a fallback
     const resolved: any[] = []
-    const slugs = new Set(createdSlugs)
+    const slugsSet = new Set(createdSlugs)
+    const namesSet = new Set((createdNames || []).map(n => String(n).toLowerCase()))
     for (const a of agents) {
-      const slug = (a as any)?.slug
-      if (slug && slugs.has(slug)) resolved.push(a)
+      const aSlug = (a as any)?.slug
+      const aName = String((a as any)?.name || '')
+      if ((aSlug && slugsSet.has(aSlug)) || (aName && namesSet.has(aName.toLowerCase()))) {
+        resolved.push(a)
+      }
     }
     setCreatedAgents(resolved)
-    setCreatedNames(resolved.map(a => (a as any)?.name).filter(Boolean))
-  }, [agents, isOpen, createdSlugs])
+    const namesFromResolved = resolved.map(a => (a as any)?.name).filter(Boolean)
+    if (namesFromResolved.length > 0) {
+      setCreatedNames(prev => Array.from(new Set([...(prev || []), ...namesFromResolved])))
+    }
+  }, [agents, isOpen, createdSlugs, createdNames])
 
   // While modal open, hydrate missing agents by slug via TanStack Query
   useEffect(() => {

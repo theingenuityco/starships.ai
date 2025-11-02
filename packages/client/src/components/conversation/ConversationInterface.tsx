@@ -309,6 +309,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Try to find by slug first (preferred), then fall back to ID for backward compatibility
       const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || starshipAgentsData.find(a => a.id === initialAgentId)
       if (agent) {
+        // Mark default as set so fallback effect does not override URL-selected agent
+        hasSetInitialDefaultAgentRef.current = true
         setSelectedAgentWithLogging(agent)
         hasEverSetAnyAgentRef.current = true
         lastAutoSelectedAgentIdRef.current = agent.id
@@ -324,6 +326,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     // Don't run if already set
     if (hasSetInitialDefaultAgentRef.current) {
+      return
+    }
+
+    // If URL provided an initial agent, don't apply fallback
+    if (initialAgentId) {
+      return
+    }
+
+    // If an agent is already selected, do not override
+    if (selectedAgent) {
       return
     }
 
@@ -344,7 +356,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-  }, [starshipAgentsData, setSelectedAgentWithLogging])
+  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
 
   // Keep guard ref in sync with agent changes
   useEffect(() => {

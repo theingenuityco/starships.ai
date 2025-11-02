@@ -11,7 +11,7 @@ concurrency:
 jobs:
   security-audit:
     name: Dependency Security Audit
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, t3.small]
     timeout-minutes: 10
 
     steps:
@@ -34,7 +34,7 @@ jobs:
 
   gitleaks:
     name: Secret Scanning
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, t3.small]
     timeout-minutes: 10
     permissions:
       contents: read

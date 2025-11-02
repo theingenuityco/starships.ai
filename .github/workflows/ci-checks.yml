@@ -11,7 +11,7 @@ concurrency:
 jobs:
   lint:
     name: Lint Check
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, t3.small]
     timeout-minutes: 10
 
     steps:
@@ -31,7 +31,7 @@ jobs:
 
   type-check:
     name: Type Check
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, t3.small]
     timeout-minutes: 10
 
     steps:
@@ -51,7 +51,7 @@ jobs:
 
   test:
     name: Test Check
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, t3.small]
     timeout-minutes: 10
 
     steps:
@@ -71,14 +71,11 @@ jobs:
 
   build:
     name: Build Check
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, t3.large]
     timeout-minutes: 20
     needs: [lint, type-check, test]
     environment: ci
     env:
-      # Node.js Memory Configuration - Applied to all child processes
-      NODE_OPTIONS: --max-old-space-size=4096
-
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
       SERVER_PORT: ${{ vars.SERVER_PORT }}
@@ -131,5 +128,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        run: |
-          pnpm run build --concurrency=1
+        run: pnpm run build

@@ -382,24 +382,25 @@ export function useDeferredAgentCreationModal(options: {
     [agents]
   )
 
-  const navigateToAgent = useCallback(
+  // Navigate to conversations with the agent preselected via query param
+  const navigateToConversationWithAgent = useCallback(
     (name: string | undefined) => {
       try {
-        if (!name || !starshipSlug) return
-        const slug = findAgentSlugByName(name) || 'new'
-        const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(slug)}${q}`)
+        if (!starshipSlug) return
+        const slug = name ? findAgentSlugByName(name) : undefined
+        const q = slug ? `?agent=${encodeURIComponent(slug)}` : ''
+        router.push(`/ship/${starshipSlug}/conversations${q}`)
       } catch {}
     },
-    [router, starshipSlug, conversationId, findAgentSlugByName]
+    [router, starshipSlug, findAgentSlugByName]
   )
 
   const chatWithAgent = useCallback(
     (name: string) => {
-      navigateToAgent(name)
+      navigateToConversationWithAgent(name)
       setIsOpen(false)
     },
-    [navigateToAgent]
+    [navigateToConversationWithAgent]
   )
 
   const askDaedalusCreateTools = useCallback(

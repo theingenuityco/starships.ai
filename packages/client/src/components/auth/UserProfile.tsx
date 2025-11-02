@@ -53,9 +53,9 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
 
   if (mode === 'collapsed') {
     return (
-      <div className="flex justify-center group">
+      <div className="flex justify-start group">
         <div
-          className={`group relative transition-all duration-300 mx-auto rounded-xl w-10 h-10 flex items-center justify-center border cursor-pointer ${
+          className={`group relative transition-all duration-300 rounded-xl w-10 h-10 flex items-center justify-center border cursor-pointer ${
             active
               ? 'text-foreground bg-gradient-to-r from-muted/40 to-muted/30 shadow-md border-transparent'
               : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'

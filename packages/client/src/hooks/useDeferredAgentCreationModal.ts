@@ -243,7 +243,8 @@ export function useDeferredAgentCreationModal(options: {
 
       const slugs = Array.from(createdSlugsRef.current)
       const namesHints = Array.from(createdNamesRef.current)
-      if (slugs.length > 0 || namesHints.length > 0) {
+      // Only open the modal when we have at least one confirmed slug, indicating success
+      if (slugs.length > 0) {
         setCreatedSlugs(slugs)
         // Resolve from provided agents cache if available (by slug only)
         if (agents && Array.isArray(agents)) {
@@ -285,7 +286,8 @@ export function useDeferredAgentCreationModal(options: {
       if (isStreaming) return
       if (!isOpen) {
         const persisted = consumePersistedPayloadIfAny()
-        if (persisted && (persisted.slugs.length > 0 || persisted.names.length > 0)) {
+        // Only restore/open if we have at least one slug (successful creation)
+        if (persisted && persisted.slugs.length > 0) {
           setCreatedSlugs(persisted.slugs)
           setCreatedNames(persisted.names)
           setIsOpen(true)

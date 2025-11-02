@@ -7,9 +7,6 @@ import hashlib
 import time
 import jwt
 import requests
-import random
-from datetime import datetime, timedelta
-from botocore.exceptions import ClientError
 
 # AWS clients
 ec2 = boto3.client('ec2', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
@@ -27,32 +24,32 @@ RUNNER_SUBNET_ID = os.environ.get('RUNNER_SUBNET_ID')  # Optional, uses default 
 
 def lambda_handler(event, context):
     """Main Lambda handler for GitHub webhook events"""
-    
+
     # Verify webhook signature
     if not verify_webhook_signature(event):
         return {'statusCode': 401, 'body': json.dumps('Unauthorized')}
-    
+
     # Parse webhook payload
     try:
         body = json.loads(event['body'])
     except json.JSONDecodeError:
         return {'statusCode': 400, 'body': json.dumps('Invalid JSON')}
-    
+
     # Process workflow_job events
     # Get headers (case-insensitive)
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
     github_event = headers.get('x-github-event', '')
-    
+
     if github_event != 'workflow_job':
         return {'statusCode': 200, 'body': json.dumps('Not a workflow_job event')}
-    
+
     action = body.get('action')
-    
+
     if action == 'queued':
         return handle_job_queued(body)
     elif action == 'completed':
         return handle_job_completed(body)
-    
+
     return {'statusCode': 200, 'body': json.dumps(f'Action {action} not handled')}
 
 def verify_webhook_signature(event):
@@ -60,20 +57,19 @@ def verify_webhook_signature(event):
     # Get headers (case-insensitive)
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
     signature = headers.get('x-hub-signature-256', '')
-    
-    
+
     if not signature:
         return False
-    
+
     body = event.get('body', '')
     expected_signature = 'sha256=' + hmac.new(
         GITHUB_WEBHOOK_SECRET.encode(),
         body.encode(),
         hashlib.sha256
     ).hexdigest()
-    
+
     result = hmac.compare_digest(signature, expected_signature)
-    
+
     return result
 
 def get_github_app_token():
@@ -84,78 +80,77 @@ def get_github_app_token():
         'exp': now + 600,  # 10 minutes
         'iss': GITHUB_APP_ID
     }
-    
+
     return jwt.encode(payload, GITHUB_APP_PRIVATE_KEY, algorithm='RS256')
 
 def get_installation_token():
     """Get installation access token for GitHub App"""
     jwt_token = get_github_app_token()
-    
+
     headers = {
         'Authorization': f'Bearer {jwt_token}',
         'Accept': 'application/vnd.github.v3+json'
     }
-    
+
     response = requests.post(
         f'https://api.github.com/app/installations/{GITHUB_INSTALLATION_ID}/access_tokens',
         headers=headers
     )
-    
+
     if response.status_code != 201:
         raise Exception(f"Failed to get installation token: {response.text}")
-    
+
     return response.json()['token']
 
 def get_runner_registration_token(repo_url):
     """Get registration token for self-hosted runner"""
     installation_token = get_installation_token()
-    
+
     # Extract owner and repo from URL
     parts = repo_url.replace('https://github.com/', '').split('/')
     owner = parts[0]
     repo = parts[1]
-    
+
     headers = {
         'Authorization': f'token {installation_token}',
         'Accept': 'application/vnd.github.v3+json'
     }
-    
+
     response = requests.post(
         f'https://api.github.com/repos/{owner}/{repo}/actions/runners/registration-token',
         headers=headers
     )
-    
+
     if response.status_code != 201:
         raise Exception(f"Failed to get runner registration token: {response.text}")
-    
+
     return response.json()['token']
 
 def handle_job_queued(body):
     """Handle workflow_job queued event"""
     workflow_job = body.get('workflow_job', {})
     repository = body.get('repository', {})
-    
+
     # Check if job requires self-hosted runner
     labels = workflow_job.get('labels', [])
-    
+
     if 'self-hosted' not in labels:
         return {'statusCode': 200, 'body': json.dumps('Not a self-hosted job')}
-    
+
     repo_url = repository.get('html_url')
     job_id = workflow_job.get('id')
     run_id = workflow_job.get('run_id')
-    
+
     try:
         # Get runner registration token
         registration_token = get_runner_registration_token(repo_url)
-        
+
         # Create user data script
         user_data_script = create_user_data_script(repo_url, registration_token, labels, job_id)
-        
-        # Launch EC2 instance
-        instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url)
-        
-        
+
+        # Launch EC2 instance with labels for instance type selection
+        instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url, labels)
+
         return {
             'statusCode': 200,
             'body': json.dumps({
@@ -164,7 +159,7 @@ def handle_job_queued(body):
                 'job_id': job_id
             })
         }
-    
+
     except Exception as e:
         print(f"Error launching runner: {str(e)}")
         return {
@@ -178,15 +173,29 @@ def handle_job_completed(body):
     # This handler is for logging/monitoring purposes
     workflow_job = body.get('workflow_job', {})
     job_id = workflow_job.get('id')
-    
-    
+
     return {'statusCode': 200, 'body': json.dumps('Job completed')}
+
+def get_instance_type_from_labels(labels):
+    """
+    Extract instance type from workflow labels.
+    Looks for any label matching AWS instance type pattern (e.g., 't3.large', 'c5.xlarge').
+    Returns 't3.medium' as default if no instance type label found.
+    """
+    for label in labels:
+        # Check if label matches instance type pattern (contains a dot)
+        if '.' in label and not label.startswith('self-hosted'):
+            print(f"Found instance type label: {label}")
+            return label
+
+    print("No instance type label found, defaulting to t3.medium")
+    return 't3.medium'
 
 def create_user_data_script(repo_url, registration_token, labels, job_id):
     """Create user data script for EC2 instance"""
     runner_name = f"ephemeral-runner-{job_id}"
     labels_str = ','.join(labels)
-    
+
     script = f"""#!/bin/bash
 set -e  # Exit on error
 
@@ -218,12 +227,12 @@ echo "Installing runner dependencies..."
 
 # Configure runner
 echo "Configuring runner..."
-sudo -u runner ./config.sh --url {repo_url} \
-    --token {registration_token} \
-    --name {runner_name} \
-    --labels {labels_str} \
-    --ephemeral \
-    --unattended \
+sudo -u runner ./config.sh --url {repo_url} \\
+    --token {registration_token} \\
+    --name {runner_name} \\
+    --labels {labels_str} \\
+    --ephemeral \\
+    --unattended \\
     --replace 2>/dev/null
 
 # Install Node.js for workflows
@@ -241,17 +250,24 @@ sudo -u runner ./run.sh
 echo "Job completed, shutting down..."
 shutdown -h now
 """
-    
+
     # Encode to base64 for EC2 UserData
     return base64.b64encode(script.encode()).decode()
 
-def launch_ec2_instance(user_data, job_id, run_id, repo_url):
+def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels=None):
     """Launch EC2 Spot instance for runner"""
-    
+
+    # Determine instance type from labels
+    if labels is None:
+        labels = []
+    instance_type = get_instance_type_from_labels(labels)
+
+    print(f"Launching instance with type: {instance_type}")
+
     # Instance configuration
     instance_params = {
         'ImageId': RUNNER_AMI_ID,
-        'InstanceType': 't3.medium',
+        'InstanceType': instance_type,
         'MaxCount': 1,
         'MinCount': 1,
         'UserData': user_data,
@@ -285,41 +301,20 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url):
                     {'Key': 'JobId', 'Value': str(job_id)},
                     {'Key': 'RunId', 'Value': str(run_id)},
                     {'Key': 'Repository', 'Value': repo_url},
-                    {'Key': 'Ephemeral', 'Value': 'true'}
+                    {'Key': 'Ephemeral', 'Value': 'true'},
+                    {'Key': 'InstanceType', 'Value': instance_type}
                 ]
             }
         ],
         'InstanceInitiatedShutdownBehavior': 'terminate'
     }
-    
+
     # Add subnet if specified
     if RUNNER_SUBNET_ID:
         instance_params['SubnetId'] = RUNNER_SUBNET_ID
 
-    # Launch instance with retry logic for rate limiting
-    max_retries = 5
-    base_delay = 2  # Start with 2 seconds
-
-    for attempt in range(max_retries):
-        try:
-            response = ec2.run_instances(**instance_params)
-            instance_id = response['Instances'][0]['InstanceId']
-            print(f"Successfully launched instance {instance_id} for job {job_id}")
-            return instance_id
-
-        except ClientError as e:
-            error_code = e.response['Error']['Code']
-
-            # Retry on throttling errors
-            if error_code in ['RequestLimitExceeded', 'Throttling']:
-                if attempt < max_retries - 1:
-                    # Exponential backoff with jitter
-                    delay = min(base_delay * (2 ** attempt) + random.uniform(0, 1), 30)
-                    print(f"Rate limited on attempt {attempt + 1}/{max_retries}, retrying in {delay:.2f}s...")
-                    time.sleep(delay)
-                else:
-                    print(f"Failed after {max_retries} attempts due to rate limiting")
-                    raise
-            else:
-                # Don't retry on other errors
-                raise
+    # Launch instance
+    response = ec2.run_instances(**instance_params)
+    instance_id = response['Instances'][0]['InstanceId']
+    print(f"Successfully launched {instance_type} instance {instance_id} for job {job_id}")
+    return instance_id

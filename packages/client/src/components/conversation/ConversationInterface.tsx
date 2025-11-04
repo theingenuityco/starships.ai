@@ -105,7 +105,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   // Removed in-conversation builder overlays; now using dedicated routes
-  const lastUIActionKeyRef = useRef<string | null>(null)
+  // Removed UI action handling
 
   // View is always 'conversation' now; builders have dedicated routes
   const [viewMode] = useState<'conversation'>('conversation')
@@ -530,16 +530,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
           if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
             try {
+              const isOpenAgent = toolNameLc.includes('open-agent')
               let nextAgentSlug = (payload as any)?.slug || (payload as any)?.agentSlug
-              // Fallback to currently selected agent if not provided
-              if (!nextAgentSlug && selectedAgent?.slug) {
-                nextAgentSlug = selectedAgent.slug
+              // Do NOT fallback to selected agent; for open-agent without slug, go to 'new'
+              if (!nextAgentSlug && isOpenAgent) {
+                nextAgentSlug = 'new'
               }
               const slug = starshipSlug
               if (slug) {
                 const convId = currentConversationIdRef.current || externalConversationId || null
                 const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                router.push(`/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug || 'new')}${q}`)
+                if (nextAgentSlug) {
+                  router.push(`/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`)
+                }
               } else {
                 // If slug missing, do nothing special
               }
@@ -700,17 +703,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       prevStreamingRef.current = Boolean(uiStreaming)
     }, [uiStreaming])
 
-    // Back-compat UI actions parsed from assistant message JSON (only during active streaming)
-    useEffect(() => {
-      if (!uiStreaming || !currentConversationId || !liveMessages.length) return
-      const lastMessage = liveMessages[liveMessages.length - 1]
-      if (lastMessage?.role === 'assistant' && lastMessage?.content) {
-        try {
-          const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
-          handleUIPayload(payload)
-        } catch {}
-      }
-    }, [uiStreaming, currentConversationId, liveMessages])
+  // Removed UI action JSON parsing during streaming
 
     // Proactive navigation on tool calls (only during active streaming)
     useEffect(() => {
@@ -736,7 +729,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             'edit-tool-blueprint-edge',
             'remove-tool-blueprint-edge',
           ]
-          const agentFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+          const agentFragments = ['open-agent', 'edit-agent']
 
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
@@ -756,21 +749,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             return
           }
           if (agentFragments.some(f => name.includes(f))) {
+            const isOpen = name.includes('open-agent')
+            const isEdit = name.includes('edit-agent')
             let agentSlug = args?.slug || args?.agentSlug
-            // Fallbacks when args omit agent slug (common for assign/unassign)
-            if (!agentSlug && selectedAgent?.slug) {
-              agentSlug = selectedAgent.slug
-            }
-            if (!agentSlug) {
-              // Try deriving from recent messages
-              const recentAgentId = getMostRecentAgentIdFromMessages(liveMessages, currentConversationIdRef.current || undefined, starshipAgentsData)
-              const mapped = (Array.isArray(starshipAgentsData) ? starshipAgentsData : []).find(a => a.id === recentAgentId)
-              if (mapped?.slug) agentSlug = mapped.slug
-            }
+            if (isOpen && !agentSlug) agentSlug = 'new'
+            if (isEdit && !agentSlug) continue
+            if (!isOpen && !isEdit) continue
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
             try {
-              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug || 'new')}${q}`)
+              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
             } catch {}
             navigatedToolCallIdsRef.current.add(id)
             return
@@ -779,35 +767,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }, [uiStreaming, currentConversationId, externalConversationId, liveMessages, starshipSlug, router])
 
-    // Tool completion follow-ups
-    useEffect(() => {
-      if (!liveMessages || liveMessages.length === 0) return
-      const recentMessages = liveMessages.slice(-5)
-      for (const msg of recentMessages) {
-        if (msg.role === 'tool' && msg.toolCallId) {
-          const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
-          if (pendingCall && !pendingCall.completed) {
-            pendingCall.completed = true
-            const assistantMsg = liveMessages.find((m: any) => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === msg.toolCallId))
-            if (assistantMsg) {
-              const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === msg.toolCallId)
-              if (toolCall?.function?.arguments) {
-                pendingCall.args = toolCall.function.arguments
-                handleToolComplete(pendingCall.toolName, pendingCall.args)
-              }
-            }
-          }
-        }
-      }
-    }, [liveMessages])
+    // Removed Tool completion follow-ups (handled in builder routes)
 
-    // Consume clean ui_action channel (only during active streaming)
-    useEffect(() => {
-      if (!uiStreaming || !currentConversationId || !lastUIAction) return
-      try {
-        handleUIPayload(lastUIAction as any)
-      } catch {}
-    }, [uiStreaming, currentConversationId, lastUIAction])
+    // Removed UI action channel consumption
 
     return (
       <>

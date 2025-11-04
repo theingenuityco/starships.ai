@@ -4,7 +4,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { toolAPI } from '@/lib/api'
+import { useQueryClient } from '@tanstack/react-query'
+import { fetchStarshipTool, TOOL_QUERY_KEYS, useStarshipTool } from '@/hooks/useTools'
+import api from '@/lib/api'
+import type { FetchResponse } from '@/lib/types'
+import type { ApiResponse, ToolModel } from '@starships/protocol'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
@@ -26,6 +30,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   const toolBuilderRef = useRef<ToolBuilderViewRef>(null)
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
+  const queryClient = useQueryClient()
   const conversationId = useMemo(() => searchParams.get('conversationId') || null, [searchParams])
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
@@ -80,6 +85,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   // Track initial message count to only process NEW messages (prevents infinite loop on remount)
   const initialMessageCountRef = useRef<number | null>(null)
+  // Track baseline for tool-to-tool navigation to avoid duplicate pushes
+  const toolNavInitialCountRef = useRef<number | null>(null)
 
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
@@ -287,7 +294,99 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages])
 
-  // After tool execution completes, fetch and sync tool data once
+  // While streaming, navigate to a different tool when relevant tool calls target another slug
+  useEffect(() => {
+    if (!conversationId || !liveMessages.length || !isResponding) return
+
+    // On first render, record baseline and skip processing
+    if (toolNavInitialCountRef.current === null) {
+      toolNavInitialCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process newly arrived messages
+    if (liveMessages.length <= (toolNavInitialCountRef.current as number)) return
+
+    const toolBuilderSlugFragments = [
+      'open-tool',
+      'edit-tool',
+      'add-tool-blueprint-node',
+      'add-tool-blueprint-edge',
+      'edit-tool-blueprint-node',
+      'remove-tool-blueprint-node',
+      'edit-tool-blueprint-edge',
+      'remove-tool-blueprint-edge',
+    ]
+
+    const newMessages = (liveMessages as any[]).slice(toolNavInitialCountRef.current as number)
+    for (const msg of newMessages) {
+      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+      for (const toolCall of msg.toolCalls as any[]) {
+        const funcName = toolCall?.function?.name as string | undefined
+        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
+        if (!funcNameLc) continue
+        if (!(toolBuilderSlugFragments.some(s => funcNameLc.includes(s)) || funcNameLc.includes('tool-blueprint-'))) continue
+
+        // Parse arguments to extract next tool slug
+        let args: any = toolCall?.function?.arguments
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args)
+          } catch {}
+        }
+        const src = args && typeof args === 'object' ? (args as any) : undefined
+        const nested = src?.tool || src?.data || src?.payload || src
+        const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+        const altToolSlug = typeof src?.toolSlug === 'string' && src.toolSlug.trim() ? String(src.toolSlug) : undefined
+        const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
+        const nextToolSlug: string | undefined = nestedSlug || altToolSlug
+
+        // If we have a slug target and it's different, navigate to it
+        if (nextToolSlug && nextToolSlug !== toolSlug) {
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          toolNavInitialCountRef.current = liveMessages.length
+          router.push(`/ship/${slug}/tool/${encodeURIComponent(nextToolSlug)}${q}`)
+          return
+        }
+
+        // If this is an open-tool call with no slug, navigate to /new (creation flow)
+        if (!nextToolSlug && funcNameLc.includes('open-tool') && toolSlug !== 'new') {
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          toolNavInitialCountRef.current = liveMessages.length
+          router.push(`/ship/${slug}/tool/new${q}`)
+          return
+        }
+
+        // If this is an edit-tool call with a name but no slug, try to resolve by name using TanStack Query list
+        if (!nextToolSlug && funcNameLc.includes('edit-tool') && maybeName && starship?.id) {
+          ;(async () => {
+            try {
+              const list = await queryClient.fetchQuery({
+                queryKey: ['starship-tools', starship.id] as const,
+                queryFn: async (): Promise<ToolModel[]> => {
+                  const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starship.id}/tools`)
+                  return response.data.data || []
+                },
+                staleTime: 30 * 1000,
+              })
+              const match = (list || []).find(t => String(t?.name || '').toLowerCase() === maybeName.toLowerCase())
+              const slugFound = match && typeof match.slug === 'string' ? String(match.slug) : undefined
+              if (slugFound && slugFound !== toolSlug) {
+                const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+                toolNavInitialCountRef.current = liveMessages.length
+                router.push(`/ship/${slug}/tool/${encodeURIComponent(slugFound)}${q}`)
+              }
+            } catch {}
+          })()
+          return
+        }
+      }
+    }
+  }, [conversationId, isResponding, liveMessages, router, slug, toolSlug])
+
+  // Removed UI-action based navigation to avoid conflicts; rely on streaming toolCalls and tool result handling
+
+  // After tool execution completes, fetch and sync tool data once (via TanStack Query)
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !starship?.id || !toolBuilderRef.current) return
@@ -353,10 +452,17 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           continue
         }
 
-        // Fetch complete tool data by slug and sync form
+        // Fetch complete tool data by slug and sync form using TanStack Query
         ;(async () => {
           try {
-            const tool = await toolAPI.getBySlug(starship.id, slugArg as string)
+            const tool = await queryClient.fetchQuery({
+              queryKey: TOOL_QUERY_KEYS.detail(starship.id, slugArg as string),
+              queryFn: async (): Promise<ToolModel> => {
+                const res: FetchResponse<ApiResponse<ToolModel>> = await api.get(`/api/v1/starships/${starship.id}/tools/${slugArg}`)
+                return res.data.data
+              },
+              staleTime: 30 * 1000,
+            })
             if (tool && toolBuilderRef.current) {
               toolBuilderRef.current.updateField('name', tool.name || '')
               if (tool.description) toolBuilderRef.current.updateField('description', tool.description)
@@ -442,25 +548,14 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   }, [conversationId, liveMessages, slug, router, toolSlug, isResponding])
 
   // Prefill when editing an existing tool
+  const { data: existingTool } = useStarshipTool(starship?.id || '', toolSlug || '', !!starship?.id && !!toolSlug && toolSlug !== 'new')
   useEffect(() => {
-    const doPrefill = async () => {
-      const starshipId = starship?.id
-      if (!starshipId) return
-      if (!toolSlug || toolSlug === 'new') return
-      try {
-        const tool = await toolAPI.getBySlug(starshipId, toolSlug)
-        if (tool && toolBuilderRef.current) {
-          toolBuilderRef.current.updateField('name', tool.name || '')
-          if (tool.description) toolBuilderRef.current.updateField('description', tool.description)
-          if (tool.parameters) toolBuilderRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
-          if (tool.blueprint) toolBuilderRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
-        }
-      } catch {
-        // If fetch fails, keep an empty/new form
-      }
-    }
-    doPrefill()
-  }, [starship?.id, toolSlug])
+    if (!existingTool || !toolBuilderRef.current) return
+    toolBuilderRef.current.updateField('name', existingTool.name || '')
+    if (existingTool.description) toolBuilderRef.current.updateField('description', existingTool.description)
+    if (existingTool.parameters) toolBuilderRef.current.updateField('parameters', JSON.stringify(existingTool.parameters, null, 2))
+    if (existingTool.blueprint) toolBuilderRef.current.updateField('blueprint', JSON.stringify(existingTool.blueprint, null, 2))
+  }, [existingTool])
 
   const handleCancel = () => {
     if (conversationId) {

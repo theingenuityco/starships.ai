@@ -628,7 +628,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       return
     }
 
-    const agentToolSlugFragments = ['open-agent', 'edit-agent']
+    const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
 
     // Process only NEW messages (those after initial count)
     const consideration: any[] = (liveMessages as any[]).slice(initialMessageCountRef.current as number)
@@ -645,6 +645,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
         const isOpen = funcNameLc.includes('open-agent')
         const isEdit = funcNameLc.includes('edit-agent')
+        const isAssign = funcNameLc.includes('assign-agent-tool')
+        const isUnassign = funcNameLc.includes('unassign-agent-tool')
 
         // Parse arguments
         let args: any = call?.function?.arguments
@@ -654,9 +656,14 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           } catch {}
         }
 
-        let nextAgentSlug: string | undefined = args?.slug || args?.agentSlug
+        // Robust nested extraction for agent slug
+        const src = args && typeof args === 'object' ? (args as any) : undefined
+        const nested = src?.agent || src?.data || src?.payload || src
+        const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+        const altAgentSlug = typeof src?.agentSlug === 'string' && src.agentSlug.trim() ? String(src.agentSlug) : undefined
+        let nextAgentSlug: string | undefined = nestedSlug || altAgentSlug
         if (isOpen && !nextAgentSlug) nextAgentSlug = 'new'
-        if (isEdit && !nextAgentSlug) continue
+        if ((isEdit || isAssign || isUnassign) && !nextAgentSlug) continue
         if (!nextAgentSlug) continue
 
         const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''

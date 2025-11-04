@@ -79,7 +79,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     // Unauthenticated users: simple public view without nav
     if (!isAuthenticated) {
       return (
-        <StarTheme theme="dark">
+        <StarTheme>
           <div className="relative min-h-[100dvh] bg-background">
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
@@ -91,7 +91,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     const shouldHideNavigation = false
 
     return (
-      <StarTheme theme="dark">
+      <StarTheme>
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
@@ -133,7 +133,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <JwtAuthGate>
       <WelcomeModalProvider>
-        <StarTheme theme="dark">
+        <StarTheme>
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (

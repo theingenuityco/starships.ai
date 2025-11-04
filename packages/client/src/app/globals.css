@@ -648,39 +648,59 @@
  * Starships.ai themed components with space aesthetics
  */
 
-/* Star Dark Theme - For landing page */
+/* Star Dark Theme - Matches regular dark theme - Always dark regardless of global theme */
 .star-theme-dark {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 220 15% 5%;
-  --card-foreground: 0 0% 95%;
-  --primary: 38 92% 54%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 220 15% 10%;
-  --secondary-foreground: 0 0% 95%;
-  --muted: 220 15% 10%;
-  --muted-foreground: 0 0% 70%;
-  --accent: 220 15% 15%;
-  --accent-foreground: 0 0% 95%;
-  --border: 220 15% 20%;
-  --input: 220 15% 20%;
-  --ring: 38 92% 54%;
-  --primary-rgb: 245 158 11;
+  /* Use same values as .dark class for consistency */
+  --background: 220 15% 8% !important; /* Deep blue-black base - matches .dark */
+  --foreground: 0 0% 95% !important;
+  --card: 220 15% 10% !important;
+  --card-foreground: 0 0% 95% !important;
+  --primary: 38 92% 54% !important; /* Amber primary in dark */
+  --primary-foreground: 0 0% 100% !important;
+  --secondary: 220 15% 15% !important;
+  --secondary-foreground: 0 0% 95% !important;
+  --muted: 220 15% 15% !important;
+  --muted-foreground: 0 0% 65% !important;
+  --accent: 220 15% 15% !important;
+  --accent-foreground: 0 0% 95% !important;
+  --border: 220 15% 20% !important;
+  --input: 220 15% 20% !important;
+  --ring: 38 92% 54% !important;
+  --destructive: 0 62% 50% !important;
+  --destructive-foreground: 0 0% 98% !important;
+  --popover: 220 15% 12% !important;
+  --popover-foreground: 0 0% 95% !important;
+  --primary-rgb: 245 158 11 !important;
 
-  /* Ensure text color is applied */
-  color: hsl(var(--foreground));
+  /* Command Deck Dark - Deep space gradients */
+  --command-bg: linear-gradient(135deg, hsl(224 20% 12%), hsl(224 10% 8%)) !important;
+  --starship-accent: hsl(224 99% 58%) !important;
 
-  /* Match frosted border tone in StarTheme dark wrapper */
-  --frosted-border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Shadow colors for dark mode */
+  --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3) !important;
+  --frosted-border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  --frosted-overlay: hsl(0 0% 100% / 0.06) !important;
+
+  /* App gradient variables (dark) */
+  --app-tint: hsl(220 12% 20%) !important;
+  --app-wash: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 68%) !important;
+  --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 60%) !important;
+  --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%) !important;
+  --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 56%) !important;
+
+  /* Force dark background and text colors */
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
 }
 
-/* Star Light Theme - If needed */
+/* Star Light Theme - Matches regular light theme */
 .star-theme-light {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 0%;
+  /* Use same values as :root for consistency */
+  --background: 0 0% 98%; /* Enhanced Light Theme - Soothing Blue Foundation */
+  --foreground: 0 0% 8%;
   --card: 0 0% 100%;
   --card-foreground: 0 0% 8%;
-  --primary: 38 92% 50%;
+  --primary: 38 92% 50%; /* Amber primary in light */
   --primary-foreground: 0 0% 98%;
   --secondary: 220 14% 96%;
   --secondary-foreground: 0 0% 8%;
@@ -691,7 +711,28 @@
   --border: 220 13% 91%;
   --input: 220 13% 91%;
   --ring: 38 92% 50%;
+  --radius: 0.5rem;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 8%;
   --primary-rgb: 245 158 11;
+
+  /* Command Deck Light - Gradient backgrounds */
+  --command-bg: linear-gradient(135deg, hsl(224 30% 95%), hsl(224 20% 98%));
+  --starship-accent: hsl(224 99% 53%);
+
+  /* Shadow colors for light mode */
+  --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
+  --frosted-border: 1px solid rgba(255, 255, 255, 0.03);
+  --frosted-overlay: hsl(0 0% 0% / 0.04);
+
+  /* App gradient variables (light) */
+  --app-tint: hsl(220 10% 22%);
+  --app-wash: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 12%);
+  --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 16%);
+  --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 14%);
+  --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
 }
 
 /*

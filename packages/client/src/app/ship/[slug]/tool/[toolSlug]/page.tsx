@@ -393,14 +393,14 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       }
     } catch {}
 
-    // PRIORITY PASS: If any open-tool without slug exists in this turn, immediately route to /tool/new
+    // PRIORITY PASS: If any EXACT open-tool without slug exists in this turn, immediately route to /tool/new
     if (!creationFlowActiveRef.current) {
       for (const msg of newMessages) {
         if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
         for (const toolCall of msg.toolCalls as any[]) {
           const funcName = toolCall?.function?.name as string | undefined
           const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
-          if (!funcNameLc || !funcNameLc.includes('open-tool')) continue
+          if (funcNameLc !== 'open-tool') continue
           let args: any = toolCall?.function?.arguments
           if (typeof args === 'string') {
             try {
@@ -535,8 +535,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           continue
         }
 
-        const isOpenTool = funcNameLc.includes('open-tool')
-        const isEditTool = funcNameLc.includes('edit-tool')
+        const isOpenTool = funcNameLc === 'open-tool'
+        const isEditTool = funcNameLc === 'edit-tool'
 
         // Prefer slug from tool result body first (robust extraction across shapes)
         let slugArg: string | undefined
@@ -576,12 +576,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           continue
         }
 
-        // If we are currently at /tool/new but this result is not from an open-tool call, ignore to prevent bouncing to old tools
-        if (toolSlug === 'new' && !isOpenTool) {
-          processedToolResultIdsRef.current.add(id)
-          continue
-        }
-
         // Fetch complete tool data by slug and sync form using TanStack Query
         ;(async () => {
           try {
@@ -601,11 +595,12 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
               if (tool.parameters) toolBuilderRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
               if (tool.blueprint) toolBuilderRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
             }
-            // If we are currently at /tool/new and this was an open-tool completion, replace URL with real slug
-            if (!routeUpdatedRef.current && toolSlug === 'new' && isOpenTool && typeof slugArg === 'string' && slugArg) {
+            // If we are currently at /tool/new and creation flow is active, replace URL with the new slug
+            if (!routeUpdatedRef.current && toolSlug === 'new' && creationFlowActiveRef.current && typeof slugArg === 'string' && slugArg) {
               const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
               router.replace(`/ship/${slug}/tool/${encodeURIComponent(slugArg)}${q}`)
               routeUpdatedRef.current = true
+              creationFlowActiveRef.current = false
               setCreationFlowFlag(false)
             }
           } catch {
@@ -618,7 +613,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, starship?.id, toolSlug, router, slug])
 
-  // Navigate to agent page when agent-related tool calls are detected (only while streaming)
+  // Navigate to Agent Builder for agent-related tool calls (only while streaming, new messages only)
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !isResponding) return
 
@@ -633,7 +628,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       return
     }
 
-    const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+    const agentToolSlugFragments = ['open-agent', 'edit-agent']
 
     // Process only NEW messages (those after initial count)
     const consideration: any[] = (liveMessages as any[]).slice(initialMessageCountRef.current as number)
@@ -648,29 +643,24 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
         if (!agentToolSlugFragments.some(s => funcNameLc.includes(s))) continue
 
-        // Parse arguments to extract agent slug
+        const isOpen = funcNameLc.includes('open-agent')
+        const isEdit = funcNameLc.includes('edit-agent')
+
+        // Parse arguments
         let args: any = call?.function?.arguments
         if (typeof args === 'string') {
           try {
             args = JSON.parse(args)
-          } catch {
-            // ignore parse errors
-          }
+          } catch {}
         }
 
         let nextAgentSlug: string | undefined = args?.slug || args?.agentSlug
-        // Fallback to current selected agent when args omit agent slug (assign/unassign flows)
-        if (!nextAgentSlug && selectedAgent?.slug) {
-          nextAgentSlug = selectedAgent.slug
-        }
-
-        // Don't navigate if we're somehow trying to navigate to ourselves (unlikely but safe)
-        if (nextAgentSlug === toolSlug) {
-          continue
-        }
+        if (isOpen && !nextAgentSlug) nextAgentSlug = 'new'
+        if (isEdit && !nextAgentSlug) continue
+        if (!nextAgentSlug) continue
 
         const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug || 'new')}${q}`
+        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`
 
         // Prevent duplicate attempts before unmount by advancing the baseline
         initialMessageCountRef.current = liveMessages.length

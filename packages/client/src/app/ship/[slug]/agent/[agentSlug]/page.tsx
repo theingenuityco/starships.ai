@@ -4,16 +4,21 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { agentAPI } from '@/lib/api'
+import api, { agentAPI } from '@/lib/api'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, useAgentBySlugOrId, useStarshipAgents } from '@/hooks/useAgents'
+import { useQueryClient } from '@tanstack/react-query'
+import type { FetchResponse } from '@/lib/types'
+import type { ApiResponse, AgentModel } from '@starships/protocol'
 import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
+import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
+import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
@@ -25,6 +30,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const agentBuilderRef = useRef<AgentBuilderViewRef>(null)
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
+  const creationFlowActiveRef = useRef<boolean>(false)
+  const queryClient = useQueryClient()
   const conversationId = searchParams.get('conversationId') || null
   const [agentOpenError, setAgentOpenError] = useState<string | null>(null)
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
@@ -41,6 +48,24 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     isStreaming: isResponding,
     starshipSlug: String(slug),
     conversationId,
+    agents,
+    setLeadingMentionAgent: (agent: any, afterText?: string) => {
+      try {
+        messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
+      } catch {}
+    },
+    focusInput: () => {
+      try {
+        messageInputRef.current?.focusInput?.()
+      } catch {}
+    },
+  })
+  const deferredToolCreate = useDeferredToolCreationModal({
+    liveMessages,
+    isStreaming: isResponding,
+    starshipSlug: String(slug),
+    conversationId,
+    starshipId: starship?.id || null,
     agents,
     setLeadingMentionAgent: (agent: any, afterText?: string) => {
       try {
@@ -70,6 +95,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const initialMessageCountRef = useRef<number | null>(null)
   // Separate initial count for tool navigation to avoid cross-effect interference
   const toolNavInitialCountRef = useRef<number | null>(null)
+  const agentNavInitialCountRef = useRef<number | null>(null)
+
+  const setCreationFlowFlag = (on: boolean) => {
+    try {
+      if (!conversationId) return
+      const key = `agentCreationFlow:${conversationId}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return
+      if (on) window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now() }))
+      else window.sessionStorage.removeItem(key)
+    } catch {}
+  }
 
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
@@ -89,6 +125,29 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       agentBuilderRef.current.updateField('slug', String(agentSlug))
     }
   }, [agentSlug])
+
+  // Manage creation-flow guard across route transitions within the same turn
+  useEffect(() => {
+    try {
+      if (!conversationId) return
+      const key = `agentCreationFlow:${conversationId}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return
+      if (!isResponding) {
+        window.sessionStorage.removeItem(key)
+        creationFlowActiveRef.current = false
+      } else {
+        const raw = window.sessionStorage.getItem(key)
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as { ts?: number }
+            if (typeof parsed?.ts === 'number' && Date.now() - parsed.ts < 20000) {
+              creationFlowActiveRef.current = true
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }, [isResponding, conversationId])
 
   // Stream agent arguments into builder as they arrive (only while streaming)
   useEffect(() => {
@@ -464,13 +523,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (!assistantMsg) continue
         const toolCall = assistantMsg.toolCalls?.find((tc: LlmToolCall) => tc.id === id)
         const funcName = toolCall?.function?.name as string
-        const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+        const agentToolSlugFragments = ['open-agent', 'edit-agent']
         if (!agentToolSlugFragments.some(s => (funcName || '').toLowerCase().includes(s))) {
           processedToolResultIdsRef.current.add(id)
           continue
         }
 
-        // Extract slug strictly from tool result HTTP response shape: body.data.slug; collect error, if any
+        // Extract slug strictly from tool result HTTP response shape; collect error, if any
         let slugArg: string | undefined
         let errorText: string | undefined
         {
@@ -480,9 +539,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               const parsed = JSON.parse(content) as Record<string, unknown>
               const body = parsed.body as Record<string, unknown> | undefined
               const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
-              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
-              slugArg = slugVal
-              if (!slugVal) {
+              const candidates: Array<string | undefined> = [
+                typeof (parsed as any)?.slug === 'string' ? ((parsed as any).slug as string) : undefined,
+                typeof (parsed as any)?.agent?.slug === 'string' ? ((parsed as any).agent.slug as string) : undefined,
+                typeof data?.slug === 'string' ? (data.slug as string) : undefined,
+                typeof (data as any)?.agent?.slug === 'string' ? ((data as any).agent.slug as string) : undefined,
+                typeof (body as any)?.slug === 'string' ? ((body as any).slug as string) : undefined,
+                typeof (body as any)?.agent?.slug === 'string' ? ((body as any).agent.slug as string) : undefined,
+              ]
+              const found = candidates.find(s => typeof s === 'string' && s.trim())
+              if (found) slugArg = found as string
+              if (!slugArg) {
                 const pickFirstString = (arr: unknown[]): string | undefined => {
                   for (const item of arr) {
                     if (typeof item === 'string' && item) return item
@@ -530,42 +597,28 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             } catch {}
           }
         }
-        // Fallbacks when slug is not present in tool result body
+        // If slug not present in tool result body, do not guess from args; wait for proper result
         if (!slugArg || typeof slugArg !== 'string') {
           const fn = (funcName || '').toLowerCase()
           if (fn.includes('open-agent') && agentSlug === 'new' && !routeUpdatedRef.current && errorText) {
             setAgentOpenError(errorText || 'Failed to open agent')
           }
-          // Try to derive slug from the assistant tool call arguments (assign/unassign flows often omit body slug)
-          if (!slugArg) {
-            try {
-              let args: any = toolCall?.function?.arguments
-              if (typeof args === 'string') {
-                try {
-                  args = JSON.parse(args)
-                } catch {}
-              }
-              const fromArgs = args?.slug || args?.agentSlug
-              if (typeof fromArgs === 'string' && fromArgs) {
-                slugArg = fromArgs
-              }
-            } catch {}
-          }
-          // Final fallback to current route slug if editing an existing agent
-          if (!slugArg && agentSlug && agentSlug !== 'new') {
-            slugArg = String(agentSlug)
-          }
-          // If we still don't have a slug, mark processed and skip; otherwise proceed to fetch
-          if (!slugArg) {
-            processedToolResultIdsRef.current.add(id)
-            continue
-          }
+          processedToolResultIdsRef.current.add(id)
+          continue
         }
 
-        // Fetch complete agent data by slug and sync form
+        // Fetch complete agent data by slug and sync form via TanStack Query
         ;(async () => {
           try {
-            const agent = await agentAPI.getBySlug(slugArg)
+            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugArg as string), exact: true })
+            const agent = await queryClient.fetchQuery({
+              queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugArg as string),
+              queryFn: async (): Promise<AgentModel> => {
+                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugArg as string)}`)
+                return res.data.data
+              },
+              staleTime: 30 * 1000,
+            })
             if (agent && agentBuilderRef.current) {
               agentBuilderRef.current.updateField('name', agent.name || '')
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
@@ -585,6 +638,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               router.replace(`/ship/${slug}/agent/${encodeURIComponent(slugArg)}${q}`)
               routeUpdatedRef.current = true
               setAgentOpenError(null)
+              setCreationFlowFlag(false)
             }
           } catch {
             // ignore fetch errors
@@ -595,6 +649,89 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       }
     }
   }, [conversationId, liveMessages, agentSlug, slug, router])
+
+  // While streaming, navigate to a different agent when relevant agent calls target another slug
+  useEffect(() => {
+    if (!conversationId || !liveMessages.length || !isResponding) return
+
+    // On first render, record baseline and skip processing
+    if (agentNavInitialCountRef.current === null) {
+      agentNavInitialCountRef.current = liveMessages.length
+      return
+    }
+
+    // Only process newly arrived messages
+    if (liveMessages.length <= (agentNavInitialCountRef.current as number)) return
+
+    const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+
+    const newMessages = (liveMessages as any[]).slice(agentNavInitialCountRef.current as number)
+    for (const msg of newMessages) {
+      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+      for (const toolCall of msg.toolCalls as any[]) {
+        const funcName = toolCall?.function?.name as string | undefined
+        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
+        if (!funcNameLc) continue
+        if (!agentBuilderSlugFragments.some(s => funcNameLc.includes(s))) continue
+
+        // Parse arguments to extract next agent slug/name
+        let args: any = toolCall?.function?.arguments
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args)
+          } catch {}
+        }
+        const src = args && typeof args === 'object' ? (args as any) : undefined
+        const nested = src?.agent || src?.data || src?.payload || src
+        const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+        const altAgentSlug = typeof src?.agentSlug === 'string' && src.agentSlug.trim() ? String(src.agentSlug) : undefined
+        const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
+        const nextAgentSlug: string | undefined = nestedSlug || altAgentSlug
+
+        // Only navigate to explicit slug for edit-agent (avoid open-agent misrouting to caller)
+        if (funcNameLc.includes('edit-agent') && nextAgentSlug && nextAgentSlug !== agentSlug && !creationFlowActiveRef.current) {
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          agentNavInitialCountRef.current = liveMessages.length
+          router.push(`/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`)
+          return
+        }
+
+        // If open-agent without slug, go to /agent/new and set creation flag
+        if (!nextAgentSlug && funcNameLc.includes('open-agent') && agentSlug !== 'new') {
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          agentNavInitialCountRef.current = liveMessages.length
+          creationFlowActiveRef.current = true
+          setCreationFlowFlag(true)
+          router.push(`/ship/${slug}/agent/new${q}`)
+          return
+        }
+
+        // If edit-agent with name but no slug, resolve via starship agents list and navigate
+        if (!nextAgentSlug && funcNameLc.includes('edit-agent') && maybeName && starship?.id) {
+          ;(async () => {
+            try {
+              const list = await queryClient.fetchQuery({
+                queryKey: AGENT_QUERY_KEYS.byStarship(starship.id),
+                queryFn: async (): Promise<AgentModel[]> => {
+                  const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starship.id}/agents`)
+                  return response.data.data
+                },
+                staleTime: 30 * 1000,
+              })
+              const match = (list || []).find(a => String(a?.name || '').toLowerCase() === maybeName.toLowerCase())
+              const slugFound = match && typeof (match as any).slug === 'string' ? String((match as any).slug) : undefined
+              if (slugFound && slugFound !== agentSlug) {
+                const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+                agentNavInitialCountRef.current = liveMessages.length
+                router.push(`/ship/${slug}/agent/${encodeURIComponent(slugFound)}${q}`)
+              }
+            } catch {}
+          })()
+          return
+        }
+      }
+    }
+  }, [conversationId, isResponding, liveMessages, router, slug, agentSlug, starship?.id])
   // Detect tool-related calls while streaming and navigate to Tool Builder
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !isResponding) return
@@ -660,34 +797,25 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, slug, router, agentSlug, isResponding])
 
-  // Prefill when editing an existing agent
+  // Prefill when editing an existing agent via TanStack Query
+  const { data: existingAgent } = useAgentBySlugOrId(agentSlug || '', !!agentSlug && agentSlug !== 'new')
   useEffect(() => {
-    const doPrefill = async () => {
-      if (!agentSlug || agentSlug === 'new') return
-      try {
-        console.debug('[AgentBuilder] Prefill start', { agentSlug })
-        const agent = await agentAPI.getBySlug(agentSlug)
-        if (agent && agentBuilderRef.current) {
-          console.debug('[AgentBuilder] Prefill fetched agent', { id: agent.id, slug: agent.slug })
-          agentBuilderRef.current.updateField('name', agent.name || '')
-          if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
-          if (agent.description) agentBuilderRef.current.updateField('description', agent.description)
-          if (agent.model) agentBuilderRef.current.updateField('model', agent.model)
-          if (agent.systemPrompt) agentBuilderRef.current.updateField('systemPrompt', agent.systemPrompt)
-          if (agent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', agent.temperature as any)
-          if (agent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', agent.maxTokens as any)
-          if (agent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', agent.timeout as any)
-          if (Array.isArray((agent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (agent as any).assignedToolSlugs as any)
-          if (agent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
-          if ((agent as any).icon) agentBuilderRef.current.updateField('icon', (agent as any).icon)
-        }
-      } catch {
-        console.warn('[AgentBuilder] Prefill failed', { agentSlug })
-        // If fetch fails, keep an empty/new form
-      }
-    }
-    doPrefill()
-  }, [agentSlug])
+    if (!existingAgent || !agentBuilderRef.current) return
+    try {
+      console.debug('[AgentBuilder] Prefill fetched agent', { id: existingAgent.id, slug: existingAgent.slug })
+    } catch {}
+    agentBuilderRef.current.updateField('name', existingAgent.name || '')
+    if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
+    if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
+    if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)
+    if (existingAgent.systemPrompt) agentBuilderRef.current.updateField('systemPrompt', existingAgent.systemPrompt)
+    if (existingAgent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', existingAgent.temperature as any)
+    if (existingAgent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', existingAgent.maxTokens as any)
+    if (existingAgent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', existingAgent.timeout as any)
+    if (Array.isArray((existingAgent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (existingAgent as any).assignedToolSlugs as any)
+    if (existingAgent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(existingAgent.blueprint, null, 2))
+    if ((existingAgent as any).icon) agentBuilderRef.current.updateField('icon', (existingAgent as any).icon)
+  }, [existingAgent])
 
   const handleCancel = () => {
     if (conversationId) {
@@ -708,6 +836,15 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         onChatWithAgent={deferredAgentCreate.chatWithAgent}
         onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
         agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+      />
+      <ToolCreatedModal
+        open={deferredToolCreate.isOpen}
+        names={deferredToolCreate.createdNames}
+        onOpenChange={deferredToolCreate.setIsOpen}
+        onOpenTool={deferredToolCreate.openToolInBuilder}
+        slugs={deferredToolCreate.createdSlugs}
+        tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
+        onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
       />
       <AgentBuilderView
         ref={agentBuilderRef}

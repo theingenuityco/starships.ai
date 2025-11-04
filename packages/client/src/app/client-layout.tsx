@@ -117,9 +117,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           )}
 
           {/* Main Content Area - takes remaining space */}
-          <main className="relative flex-1 min-h-full w-full overflow-auto">
-            {children}
-          </main>
+          <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
         </div>
       </StarTheme>
     )
@@ -159,9 +157,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             )}
 
             {/* Main Content Area - takes remaining space */}
-            <main className="relative flex-1 min-h-full w-full overflow-auto">
-              {children}
-            </main>
+            <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>
       </WelcomeModalProvider>

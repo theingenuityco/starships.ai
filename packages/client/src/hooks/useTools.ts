@@ -13,7 +13,7 @@ export const TOOL_QUERY_KEYS = {
 
 export function getStarshipToolQuery(starshipId: string, slug: string) {
   return {
-    queryKey: TOOL_QUERY_KEYS.detail(starshipId, slug) as const,
+    queryKey: TOOL_QUERY_KEYS.detail(starshipId, slug),
     queryFn: async (): Promise<ToolModel> => {
       const res: FetchResponse<ApiResponse<ToolModel>> = await api.get(`/api/v1/starships/${starshipId}/tools/${slug}`)
       return res.data.data

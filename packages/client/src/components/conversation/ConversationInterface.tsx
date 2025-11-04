@@ -15,6 +15,8 @@ import type { Agent } from '@/lib/api'
 import { agentAPI, templateAPI, toolAPI } from '@/lib/api'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
+import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
+import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -103,7 +105,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   // Removed in-conversation builder overlays; now using dedicated routes
-  const lastUIActionKeyRef = useRef<string | null>(null)
+  // Removed UI action handling
 
   // View is always 'conversation' now; builders have dedicated routes
   const [viewMode] = useState<'conversation'>('conversation')
@@ -112,6 +114,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
   // Track last conversation id to reset applied set
   const lastAppliedConversationRef = useRef<string | null>(null)
+  // Deduplicate UI action payloads across sources
+  const lastUIActionKeyRef = useRef<string | null>(null)
 
   // Removed overlay state; no longer used without in-page builders
   const [isMessageOverlayExpanded] = useState(false)
@@ -121,6 +125,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
   // Track toolCallIds we've already navigated for to avoid duplicate route pushes
   const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
+  // Navigation baseline for current streaming turn to avoid acting on old messages
+  const navPrevStreamingRef = useRef<boolean>(false)
+  const navTurnStartIdxRef = useRef<number | null>(null)
+  // Creation flow guard for tool builder routing during current turn
+  const toolCreationFlowActiveRef = useRef<boolean>(false)
+  const setToolCreationFlowFlag = (on: boolean) => {
+    try {
+      if (!currentConversationIdRef.current) return
+      const key = `toolCreationFlow:${currentConversationIdRef.current}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return
+      if (on) window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now() }))
+      else window.sessionStorage.removeItem(key)
+    } catch {}
+  }
 
   const queryClient = useQueryClient()
 
@@ -528,12 +546,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
           if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
             try {
-              const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
+              const isOpenAgent = toolNameLc.includes('open-agent')
+              let nextAgentSlug = (payload as any)?.slug || (payload as any)?.agentSlug
+              // Do NOT fallback to selected agent; for open-agent without slug, go to 'new'
+              if (!nextAgentSlug && isOpenAgent) {
+                nextAgentSlug = 'new'
+              }
               const slug = starshipSlug
               if (slug) {
                 const convId = currentConversationIdRef.current || externalConversationId || null
                 const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+                if (nextAgentSlug) {
+                  router.push(`/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`)
+                }
               } else {
                 // If slug missing, do nothing special
               }
@@ -621,6 +646,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         } catch {}
       },
     })
+    const deferredToolCreate = useDeferredToolCreationModal({
+      liveMessages,
+      isStreaming: uiStreaming,
+      starshipSlug,
+      conversationId: currentConversationId || externalConversationId || null,
+      starshipId,
+      agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
+      setLeadingMentionAgent: (agent: any, afterText?: string) => {
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
+        } catch {}
+      },
+      focusInput: () => {
+        try {
+          messageInputRef.current?.focusInput?.()
+        } catch {}
+      },
+    })
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)
@@ -668,32 +711,81 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // Focus input when streaming transitions from true -> false
     useEffect(() => {
       const was = prevStreamingRef.current
+      let t: number | null = null
       if (was && !uiStreaming) {
-        setTimeout(() => {
-          messageInputRef.current?.focusInput?.()
+        t = window.setTimeout(() => {
+          try {
+            messageInputRef.current?.focusInput?.()
+          } catch {}
         }, 50)
       }
       prevStreamingRef.current = Boolean(uiStreaming)
+      return () => {
+        if (t) clearTimeout(t)
+      }
     }, [uiStreaming])
 
-    // Back-compat UI actions parsed from assistant message JSON (only during active streaming)
-    useEffect(() => {
-      if (!uiStreaming || !currentConversationId || !liveMessages.length) return
-      const lastMessage = liveMessages[liveMessages.length - 1]
-      if (lastMessage?.role === 'assistant' && lastMessage?.content) {
-        try {
-          const payload = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
-          handleUIPayload(payload)
-        } catch {}
-      }
-    }, [uiStreaming, currentConversationId, liveMessages])
+    // Removed UI action JSON parsing during streaming
 
-    // Proactive navigation on tool calls (only during active streaming)
+    // Track turn boundaries for navigation baseline
+    useEffect(() => {
+      const was = navPrevStreamingRef.current
+      if (!was && uiStreaming) {
+        // Turn just started: record baseline so we only act on new messages
+        navTurnStartIdxRef.current = liveMessages.length
+        toolCreationFlowActiveRef.current = false
+        setToolCreationFlowFlag(false)
+      }
+      if (was && !uiStreaming) {
+        // Turn ended: clear baseline and navigated ids
+        navTurnStartIdxRef.current = null
+        navigatedToolCallIdsRef.current.clear()
+        toolCreationFlowActiveRef.current = false
+        setToolCreationFlowFlag(false)
+      }
+      navPrevStreamingRef.current = Boolean(uiStreaming)
+    }, [uiStreaming, liveMessages.length])
+
+    // Proactive navigation on tool calls (only during active streaming; only new messages after turn start)
     useEffect(() => {
       if (!uiStreaming || !currentConversationId || !liveMessages.length || !starshipSlug) return
-      const recent = (liveMessages as any[]).slice(-10)
-      for (let i = recent.length - 1; i >= 0; i--) {
-        const msg = recent[i] as any
+      if (navTurnStartIdxRef.current === null) return
+      const newMessages = (liveMessages as any[]).slice(navTurnStartIdxRef.current as number)
+
+      // PRIORITY PASS: If any open-tool without slug exists in this turn, immediately route to /tool/new
+      if (!toolCreationFlowActiveRef.current) {
+        for (let i = 0; i < newMessages.length; i++) {
+          const msg = newMessages[i] as any
+          if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+          for (const tc of msg.toolCalls as any[]) {
+            const rawName = tc?.function?.name as string | undefined
+            const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
+            if (!name) continue
+            let args: any = tc?.function?.arguments
+            if (typeof args === 'string') {
+              try {
+                args = JSON.parse(args)
+              } catch {}
+            }
+            if (name.includes('open-tool')) {
+              const toolSlug = args?.slug || args?.toolSlug
+              if (!toolSlug) {
+                const convId = currentConversationIdRef.current || externalConversationId || null
+                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+                try {
+                  toolCreationFlowActiveRef.current = true
+                  setToolCreationFlowFlag(true)
+                  router.push(`/ship/${starshipSlug}/tool/new${q}`)
+                } catch {}
+                return
+              }
+            }
+          }
+        }
+      }
+
+      for (let i = 0; i < newMessages.length; i++) {
+        const msg = newMessages[i] as any
         if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
         for (const tc of msg.toolCalls as any[]) {
           const id = tc?.id as string | undefined
@@ -712,7 +804,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             'edit-tool-blueprint-edge',
             'remove-tool-blueprint-edge',
           ]
-          const agentFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
+          const agentFragments = ['open-agent', 'edit-agent']
 
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
@@ -722,17 +814,39 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           if (toolFragments.some(f => name.includes(f)) || name.includes('tool-blueprint-')) {
-            const toolSlug = args?.slug || args?.toolSlug || 'new'
+            const isOpen = name.includes('open-tool')
+            const isEdit = name.includes('edit-tool')
+            let toolSlug = args?.slug || args?.toolSlug
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
             try {
-              router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+              if (isOpen && !toolSlug) {
+                // Creation flow: go to /tool/new and mark creation flag for this turn
+                toolCreationFlowActiveRef.current = true
+                setToolCreationFlowFlag(true)
+                router.push(`/ship/${starshipSlug}/tool/new${q}`)
+                navigatedToolCallIdsRef.current.add(id)
+                return
+              }
+              if ((isOpen || isEdit) && toolSlug) {
+                // Respect creation-flow guard to avoid slug jumps within same turn
+                if (toolCreationFlowActiveRef.current) {
+                  navigatedToolCallIdsRef.current.add(id)
+                  return
+                }
+                router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+                navigatedToolCallIdsRef.current.add(id)
+                return
+              }
             } catch {}
-            navigatedToolCallIdsRef.current.add(id)
-            return
           }
           if (agentFragments.some(f => name.includes(f))) {
-            const agentSlug = args?.slug || args?.agentSlug || 'new'
+            const isOpen = name.includes('open-agent')
+            const isEdit = name.includes('edit-agent')
+            let agentSlug = args?.slug || args?.agentSlug
+            if (isOpen && !agentSlug) agentSlug = 'new'
+            if (isEdit && !agentSlug) continue
+            if (!isOpen && !isEdit) continue
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
             try {
@@ -745,45 +859,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
     }, [uiStreaming, currentConversationId, externalConversationId, liveMessages, starshipSlug, router])
 
-    // Tool completion follow-ups
-    useEffect(() => {
-      if (!liveMessages || liveMessages.length === 0) return
-      const recentMessages = liveMessages.slice(-5)
-      for (const msg of recentMessages) {
-        if (msg.role === 'tool' && msg.toolCallId) {
-          const pendingCall = pendingToolCallsRef.current.get(msg.toolCallId)
-          if (pendingCall && !pendingCall.completed) {
-            pendingCall.completed = true
-            const assistantMsg = liveMessages.find((m: any) => m.role === 'assistant' && m.toolCalls?.some((tc: any) => tc.id === msg.toolCallId))
-            if (assistantMsg) {
-              const toolCall = assistantMsg.toolCalls?.find((tc: any) => tc.id === msg.toolCallId)
-              if (toolCall?.function?.arguments) {
-                pendingCall.args = toolCall.function.arguments
-                handleToolComplete(pendingCall.toolName, pendingCall.args)
-              }
-            }
-          }
-        }
-      }
-    }, [liveMessages])
+    // Removed Tool completion follow-ups (handled in builder routes)
 
-    // Consume clean ui_action channel (only during active streaming)
-    useEffect(() => {
-      if (!uiStreaming || !currentConversationId || !lastUIAction) return
-      try {
-        handleUIPayload(lastUIAction as any)
-      } catch {}
-    }, [uiStreaming, currentConversationId, lastUIAction])
+    // Removed UI action channel consumption
 
     return (
-      <AgentCreatedModal
-        open={deferredAgentCreate.isOpen}
-        names={deferredAgentCreate.createdNames}
-        onOpenChange={deferredAgentCreate.setIsOpen}
-        onChatWithAgent={deferredAgentCreate.chatWithAgent}
-        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
-        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
-      />
+      <>
+        <AgentCreatedModal
+          open={deferredAgentCreate.isOpen}
+          names={deferredAgentCreate.createdNames}
+          onOpenChange={deferredAgentCreate.setIsOpen}
+          onChatWithAgent={deferredAgentCreate.chatWithAgent}
+          onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+          agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+        />
+        <ToolCreatedModal
+          open={deferredToolCreate.isOpen}
+          names={deferredToolCreate.createdNames}
+          onOpenChange={deferredToolCreate.setIsOpen}
+          onOpenTool={deferredToolCreate.openToolInBuilder}
+          slugs={deferredToolCreate.createdSlugs}
+          tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
+          onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
+        />
+      </>
     )
   }
 

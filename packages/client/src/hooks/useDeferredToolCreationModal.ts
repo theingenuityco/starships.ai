@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import api from '@/lib/api'
+import type { FetchResponse } from '@/lib/types'
+import type { ApiResponse, ToolModel } from '@starships/protocol'
 
 /**
  * Detects tool creations during an active streaming turn and exposes a modal state
@@ -10,12 +14,14 @@ import { useRouter } from 'next/navigation'
  * Detection heuristic: assistant tool call named like 'open-tool*' with a provided name and no slug,
  * then a tool role message or follow-up args that include the created tool slug.
  */
-export function useDeferredToolCreationModal(options: { liveMessages: any[] | undefined; isStreaming: boolean | undefined; starshipSlug?: string | null; conversationId?: string | null }) {
+export function useDeferredToolCreationModal(options: { liveMessages: any[] | undefined; isStreaming: boolean | undefined; starshipSlug?: string | null; conversationId?: string | null; starshipId?: string | null }) {
   const isStreaming = Boolean(options?.isStreaming)
   const liveMessages = Array.isArray(options?.liveMessages) ? (options!.liveMessages as any[]) : []
   const starshipSlug = typeof options?.starshipSlug === 'string' ? options!.starshipSlug : undefined
   const conversationId = typeof options?.conversationId === 'string' ? options!.conversationId : undefined
   const router = useRouter()
+  const starshipId = typeof options?.starshipId === 'string' ? options!.starshipId : undefined
+  const queryClient = useQueryClient()
 
   const prevStreamingRef = useRef<boolean>(false)
   const createdSlugsRef = useRef<Set<string>>(new Set())
@@ -27,6 +33,7 @@ export function useDeferredToolCreationModal(options: { liveMessages: any[] | un
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [createdNames, setCreatedNames] = useState<string[]>([])
   const [createdSlugs, setCreatedSlugs] = useState<string[]>([])
+  const [createdTools, setCreatedTools] = useState<any[]>([])
 
   const persistModalPayload = useCallback(
     (payload: { slugs: string[]; names: string[] }) => {
@@ -233,6 +240,38 @@ export function useDeferredToolCreationModal(options: { liveMessages: any[] | un
     } catch {}
   }, [isStreaming, isOpen, consumePersistedPayloadIfAny])
 
+  // While modal open, hydrate tools by slug
+  useEffect(() => {
+    if (!isOpen || createdSlugs.length === 0 || !starshipId) return
+    let cancelled = false
+    ;(async () => {
+      const fetched: ToolModel[] = []
+      for (const slug of createdSlugs) {
+        try {
+          const tool = await queryClient.fetchQuery({
+            queryKey: ['starship-tool', starshipId, slug] as const,
+            queryFn: async (): Promise<ToolModel> => {
+              const res: FetchResponse<ApiResponse<ToolModel>> = await api.get(`/api/v1/starships/${starshipId}/tools/${slug}`)
+              return res.data.data
+            },
+            staleTime: 30 * 1000,
+          })
+          if (tool) fetched.push(tool)
+        } catch {}
+      }
+      if (!cancelled && fetched.length > 0) {
+        setCreatedTools(prev => {
+          const bySlug = new Map<string, any>(prev.map(t => [String((t as any)?.slug || ''), t]))
+          for (const t of fetched) bySlug.set(String((t as any)?.slug || ''), t)
+          return Array.from(bySlug.values())
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, createdSlugs, starshipId, queryClient])
+
   const openToolInBuilder = useCallback(
     (identifier?: string) => {
       try {
@@ -255,5 +294,6 @@ export function useDeferredToolCreationModal(options: { liveMessages: any[] | un
     createdSlugs,
     setIsOpen,
     openToolInBuilder,
+    createdTools,
   }
 }

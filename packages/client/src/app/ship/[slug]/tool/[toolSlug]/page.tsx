@@ -455,6 +455,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         // Fetch complete tool data by slug and sync form using TanStack Query
         ;(async () => {
           try {
+            // Force refetch to get freshest server data after edits/creates
+            await queryClient.invalidateQueries({ queryKey: TOOL_QUERY_KEYS.detail(starship.id, slugArg as string), exact: true })
             const tool = await queryClient.fetchQuery({
               queryKey: TOOL_QUERY_KEYS.detail(starship.id, slugArg as string),
               queryFn: async (): Promise<ToolModel> => {

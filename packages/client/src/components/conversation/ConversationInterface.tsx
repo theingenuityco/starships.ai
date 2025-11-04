@@ -15,6 +15,8 @@ import type { Agent } from '@/lib/api'
 import { agentAPI, templateAPI, toolAPI } from '@/lib/api'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
+import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
+import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -621,6 +623,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         } catch {}
       },
     })
+    const deferredToolCreate = useDeferredToolCreationModal({
+      liveMessages,
+      isStreaming: uiStreaming,
+      starshipSlug,
+      conversationId: currentConversationId || externalConversationId || null,
+    })
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)
@@ -776,14 +784,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }, [uiStreaming, currentConversationId, lastUIAction])
 
     return (
-      <AgentCreatedModal
-        open={deferredAgentCreate.isOpen}
-        names={deferredAgentCreate.createdNames}
-        onOpenChange={deferredAgentCreate.setIsOpen}
-        onChatWithAgent={deferredAgentCreate.chatWithAgent}
-        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
-        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
-      />
+      <>
+        <AgentCreatedModal
+          open={deferredAgentCreate.isOpen}
+          names={deferredAgentCreate.createdNames}
+          onOpenChange={deferredAgentCreate.setIsOpen}
+          onChatWithAgent={deferredAgentCreate.chatWithAgent}
+          onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+          agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+        />
+        <ToolCreatedModal
+          open={deferredToolCreate.isOpen}
+          names={deferredToolCreate.createdNames}
+          onOpenChange={deferredToolCreate.setIsOpen}
+          onOpenTool={deferredToolCreate.openToolInBuilder}
+          slugs={deferredToolCreate.createdSlugs}
+        />
+      </>
     )
   }
 

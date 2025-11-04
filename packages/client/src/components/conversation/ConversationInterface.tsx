@@ -711,12 +711,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // Focus input when streaming transitions from true -> false
     useEffect(() => {
       const was = prevStreamingRef.current
+      let t: number | null = null
       if (was && !uiStreaming) {
-        setTimeout(() => {
-          messageInputRef.current?.focusInput?.()
+        t = window.setTimeout(() => {
+          try {
+            messageInputRef.current?.focusInput?.()
+          } catch {}
         }, 50)
       }
       prevStreamingRef.current = Boolean(uiStreaming)
+      return () => {
+        if (t) clearTimeout(t)
+      }
     }, [uiStreaming])
 
     // Removed UI action JSON parsing during streaming

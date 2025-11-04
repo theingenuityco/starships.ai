@@ -114,6 +114,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
   // Track last conversation id to reset applied set
   const lastAppliedConversationRef = useRef<string | null>(null)
+  // Deduplicate UI action payloads across sources
+  const lastUIActionKeyRef = useRef<string | null>(null)
 
   // Removed overlay state; no longer used without in-page builders
   const [isMessageOverlayExpanded] = useState(false)
@@ -717,7 +719,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       prevStreamingRef.current = Boolean(uiStreaming)
     }, [uiStreaming])
 
-  // Removed UI action JSON parsing during streaming
+    // Removed UI action JSON parsing during streaming
 
     // Track turn boundaries for navigation baseline
     useEffect(() => {
@@ -755,7 +757,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             if (!name) continue
             let args: any = tc?.function?.arguments
             if (typeof args === 'string') {
-              try { args = JSON.parse(args) } catch {}
+              try {
+                args = JSON.parse(args)
+              } catch {}
             }
             if (name.includes('open-tool')) {
               const toolSlug = args?.slug || args?.toolSlug

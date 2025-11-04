@@ -31,6 +31,16 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
   const queryClient = useQueryClient()
+  const creationFlowActiveRef = useRef<boolean>(false)
+  const setCreationFlowFlag = (on: boolean) => {
+    try {
+      if (!conversationId) return
+      const key = `toolCreationFlow:${conversationId}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return
+      if (on) window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now() }))
+      else window.sessionStorage.removeItem(key)
+    } catch {}
+  }
   const conversationId = useMemo(() => searchParams.get('conversationId') || null, [searchParams])
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
@@ -294,6 +304,31 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages])
 
+  // Manage creation-flow guard across route transitions within the same turn
+  useEffect(() => {
+    try {
+      if (!conversationId) return
+      const key = `toolCreationFlow:${conversationId}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return
+      if (!isResponding) {
+        // End of turn: clear persisted flag
+        window.sessionStorage.removeItem(key)
+        creationFlowActiveRef.current = false
+      } else {
+        // While streaming: restore flag if set recently (20s)
+        const raw = window.sessionStorage.getItem(key)
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as { ts?: number }
+            if (typeof parsed?.ts === 'number' && Date.now() - parsed.ts < 20000) {
+              creationFlowActiveRef.current = true
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }, [isResponding, conversationId])
+
   // While streaming, navigate to a different tool when relevant tool calls target another slug
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !isResponding) return
@@ -341,8 +376,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
         const nextToolSlug: string | undefined = nestedSlug || altToolSlug
 
-        // If we have a slug target and it's different, navigate to it
-        if (nextToolSlug && nextToolSlug !== toolSlug) {
+        // If we have a slug target and it's different, navigate to it (unless creation flow is active this turn)
+        if (nextToolSlug && nextToolSlug !== toolSlug && !creationFlowActiveRef.current) {
           const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
           toolNavInitialCountRef.current = liveMessages.length
           router.push(`/ship/${slug}/tool/${encodeURIComponent(nextToolSlug)}${q}`)
@@ -353,6 +388,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         if (!nextToolSlug && funcNameLc.includes('open-tool') && toolSlug !== 'new') {
           const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
           toolNavInitialCountRef.current = liveMessages.length
+          creationFlowActiveRef.current = true
+          setCreationFlowFlag(true)
           router.push(`/ship/${slug}/tool/new${q}`)
           return
         }
@@ -476,6 +513,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
               const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
               router.replace(`/ship/${slug}/tool/${encodeURIComponent(slugArg)}${q}`)
               routeUpdatedRef.current = true
+              setCreationFlowFlag(false)
             }
           } catch {
             // ignore fetch errors

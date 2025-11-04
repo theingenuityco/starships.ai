@@ -530,12 +530,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
           if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
             try {
-              const agentSlug = (payload as any)?.slug || (payload as any)?.agentSlug || 'new'
+              let nextAgentSlug = (payload as any)?.slug || (payload as any)?.agentSlug
+              // Fallback to currently selected agent if not provided
+              if (!nextAgentSlug && selectedAgent?.slug) {
+                nextAgentSlug = selectedAgent.slug
+              }
               const slug = starshipSlug
               if (slug) {
                 const convId = currentConversationIdRef.current || externalConversationId || null
                 const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+                router.push(`/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug || 'new')}${q}`)
               } else {
                 // If slug missing, do nothing special
               }
@@ -752,11 +756,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             return
           }
           if (agentFragments.some(f => name.includes(f))) {
-            const agentSlug = args?.slug || args?.agentSlug || 'new'
+            let agentSlug = args?.slug || args?.agentSlug
+            // Fallbacks when args omit agent slug (common for assign/unassign)
+            if (!agentSlug && selectedAgent?.slug) {
+              agentSlug = selectedAgent.slug
+            }
+            if (!agentSlug) {
+              // Try deriving from recent messages
+              const recentAgentId = getMostRecentAgentIdFromMessages(liveMessages, currentConversationIdRef.current || undefined, starshipAgentsData)
+              const mapped = (Array.isArray(starshipAgentsData) ? starshipAgentsData : []).find(a => a.id === recentAgentId)
+              if (mapped?.slug) agentSlug = mapped.slug
+            }
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
             try {
-              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
+              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug || 'new')}${q}`)
             } catch {}
             navigatedToolCallIdsRef.current.add(id)
             return

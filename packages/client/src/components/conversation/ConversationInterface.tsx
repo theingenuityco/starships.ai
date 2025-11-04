@@ -126,6 +126,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Navigation baseline for current streaming turn to avoid acting on old messages
   const navPrevStreamingRef = useRef<boolean>(false)
   const navTurnStartIdxRef = useRef<number | null>(null)
+  // Creation flow guard for tool builder routing during current turn
+  const toolCreationFlowActiveRef = useRef<boolean>(false)
+  const setToolCreationFlowFlag = (on: boolean) => {
+    try {
+      if (!currentConversationIdRef.current) return
+      const key = `toolCreationFlow:${currentConversationIdRef.current}`
+      if (typeof window === 'undefined' || !window.sessionStorage) return
+      if (on) window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now() }))
+      else window.sessionStorage.removeItem(key)
+    } catch {}
+  }
 
   const queryClient = useQueryClient()
 
@@ -714,11 +725,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (!was && uiStreaming) {
         // Turn just started: record baseline so we only act on new messages
         navTurnStartIdxRef.current = liveMessages.length
+        toolCreationFlowActiveRef.current = false
+        setToolCreationFlowFlag(false)
       }
       if (was && !uiStreaming) {
         // Turn ended: clear baseline and navigated ids
         navTurnStartIdxRef.current = null
         navigatedToolCallIdsRef.current.clear()
+        toolCreationFlowActiveRef.current = false
+        setToolCreationFlowFlag(false)
       }
       navPrevStreamingRef.current = Boolean(uiStreaming)
     }, [uiStreaming, liveMessages.length])
@@ -728,6 +743,37 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (!uiStreaming || !currentConversationId || !liveMessages.length || !starshipSlug) return
       if (navTurnStartIdxRef.current === null) return
       const newMessages = (liveMessages as any[]).slice(navTurnStartIdxRef.current as number)
+
+      // PRIORITY PASS: If any open-tool without slug exists in this turn, immediately route to /tool/new
+      if (!toolCreationFlowActiveRef.current) {
+        for (let i = 0; i < newMessages.length; i++) {
+          const msg = newMessages[i] as any
+          if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+          for (const tc of msg.toolCalls as any[]) {
+            const rawName = tc?.function?.name as string | undefined
+            const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
+            if (!name) continue
+            let args: any = tc?.function?.arguments
+            if (typeof args === 'string') {
+              try { args = JSON.parse(args) } catch {}
+            }
+            if (name.includes('open-tool')) {
+              const toolSlug = args?.slug || args?.toolSlug
+              if (!toolSlug) {
+                const convId = currentConversationIdRef.current || externalConversationId || null
+                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
+                try {
+                  toolCreationFlowActiveRef.current = true
+                  setToolCreationFlowFlag(true)
+                  router.push(`/ship/${starshipSlug}/tool/new${q}`)
+                } catch {}
+                return
+              }
+            }
+          }
+        }
+      }
+
       for (let i = 0; i < newMessages.length; i++) {
         const msg = newMessages[i] as any
         if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
@@ -758,14 +804,31 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           if (toolFragments.some(f => name.includes(f)) || name.includes('tool-blueprint-')) {
-            const toolSlug = args?.slug || args?.toolSlug || 'new'
+            const isOpen = name.includes('open-tool')
+            const isEdit = name.includes('edit-tool')
+            let toolSlug = args?.slug || args?.toolSlug
             const convId = currentConversationIdRef.current || externalConversationId || null
             const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
             try {
-              router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+              if (isOpen && !toolSlug) {
+                // Creation flow: go to /tool/new and mark creation flag for this turn
+                toolCreationFlowActiveRef.current = true
+                setToolCreationFlowFlag(true)
+                router.push(`/ship/${starshipSlug}/tool/new${q}`)
+                navigatedToolCallIdsRef.current.add(id)
+                return
+              }
+              if ((isOpen || isEdit) && toolSlug) {
+                // Respect creation-flow guard to avoid slug jumps within same turn
+                if (toolCreationFlowActiveRef.current) {
+                  navigatedToolCallIdsRef.current.add(id)
+                  return
+                }
+                router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
+                navigatedToolCallIdsRef.current.add(id)
+                return
+              }
             } catch {}
-            navigatedToolCallIdsRef.current.add(id)
-            return
           }
           if (agentFragments.some(f => name.includes(f))) {
             const isOpen = name.includes('open-agent')

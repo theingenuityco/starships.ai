@@ -419,7 +419,11 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           }
         }
 
-        const nextAgentSlug = args?.slug || args?.agentSlug || 'new'
+        let nextAgentSlug: string | undefined = args?.slug || args?.agentSlug
+        // Fallback to current selected agent when args omit agent slug (assign/unassign flows)
+        if (!nextAgentSlug && selectedAgent?.slug) {
+          nextAgentSlug = selectedAgent.slug
+        }
 
         // Don't navigate if we're somehow trying to navigate to ourselves (unlikely but safe)
         if (nextAgentSlug === toolSlug) {
@@ -427,7 +431,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         }
 
         const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`
+        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug || 'new')}${q}`
 
         // Prevent duplicate attempts before unmount by advancing the baseline
         initialMessageCountRef.current = liveMessages.length

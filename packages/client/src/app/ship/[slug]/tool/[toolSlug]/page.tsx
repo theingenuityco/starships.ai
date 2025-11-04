@@ -32,6 +32,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   const routeUpdatedRef = useRef<boolean>(false)
   const queryClient = useQueryClient()
   const creationFlowActiveRef = useRef<boolean>(false)
+  // Baseline index for processing tool result messages for the current streaming turn
+  const toolResultTurnStartIdxRef = useRef<number | null>(null)
   const setCreationFlowFlag = (on: boolean) => {
     try {
       if (!conversationId) return
@@ -108,6 +110,27 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }, 150)
     return () => clearTimeout(t)
   }, [conversationId])
+
+  // If we are on /tool/new while streaming, ensure creation flow is active immediately
+  useEffect(() => {
+    try {
+      if (toolSlug === 'new' && isResponding) {
+        creationFlowActiveRef.current = true
+        setCreationFlowFlag(true)
+      }
+    } catch {}
+  }, [toolSlug, isResponding, conversationId])
+
+  // Reset one-shot route replacement flag at start of streaming turn
+  const prevRespondingRef = useRef<boolean>(false)
+  useEffect(() => {
+    const was = prevRespondingRef.current
+    if (!was && isResponding) {
+      routeUpdatedRef.current = false
+      toolResultTurnStartIdxRef.current = liveMessages.length
+    }
+    prevRespondingRef.current = Boolean(isResponding)
+  }, [isResponding])
 
   // Stream tool arguments into builder as they arrive
   useEffect(() => {
@@ -354,6 +377,57 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     ]
 
     const newMessages = (liveMessages as any[]).slice(toolNavInitialCountRef.current as number)
+
+    // Refresh creation flow from session synchronously to avoid race with restore effect
+    try {
+      if (conversationId && typeof window !== 'undefined' && window.sessionStorage) {
+        const raw = window.sessionStorage.getItem(`toolCreationFlow:${conversationId}`)
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as { ts?: number }
+            if (typeof parsed?.ts === 'number' && Date.now() - parsed.ts < 20000) {
+              creationFlowActiveRef.current = true
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    // PRIORITY PASS: If any open-tool without slug exists in this turn, immediately route to /tool/new
+    if (!creationFlowActiveRef.current) {
+      for (const msg of newMessages) {
+        if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
+        for (const toolCall of msg.toolCalls as any[]) {
+          const funcName = toolCall?.function?.name as string | undefined
+          const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
+          if (!funcNameLc || !funcNameLc.includes('open-tool')) continue
+          let args: any = toolCall?.function?.arguments
+          if (typeof args === 'string') {
+            try {
+              args = JSON.parse(args)
+            } catch {}
+          }
+          const src = args && typeof args === 'object' ? (args as any) : undefined
+          const nested = src?.tool || src?.data || src?.payload || src
+          const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+          const altToolSlug = typeof src?.toolSlug === 'string' && src.toolSlug.trim() ? String(src.toolSlug) : undefined
+          const hasSlug = Boolean(nestedSlug || altToolSlug)
+          if (!hasSlug && toolSlug !== 'new') {
+            const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+            toolNavInitialCountRef.current = liveMessages.length
+            creationFlowActiveRef.current = true
+            setCreationFlowFlag(true)
+            router.push(`/ship/${slug}/tool/new${q}`)
+            return
+          }
+        }
+      }
+    }
+
+    // If we are already on /tool/new, do not process any slug-based navigations in this turn
+    if (toolSlug === 'new') {
+      return
+    }
     for (const msg of newMessages) {
       if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
       for (const toolCall of msg.toolCalls as any[]) {
@@ -423,13 +497,15 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   // Removed UI-action based navigation to avoid conflicts; rely on streaming toolCalls and tool result handling
 
-  // After tool execution completes, fetch and sync tool data once (via TanStack Query)
+  // After tool execution completes (this turn only), fetch and sync tool data (via TanStack Query)
   const processedToolResultIdsRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (!conversationId || !liveMessages.length || !starship?.id || !toolBuilderRef.current) return
 
-    // Check last few messages for tool results
-    const recentMessages = liveMessages.slice(-10)
+    // Only process tool results that arrived after the start of this streaming turn
+    if (toolResultTurnStartIdxRef.current === null) return
+
+    const recentMessages = liveMessages.slice(toolResultTurnStartIdxRef.current as number)
 
     for (const msg of recentMessages as any[]) {
       if (msg.role === 'tool' && msg.toolCallId) {
@@ -459,32 +535,49 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           continue
         }
 
-        // Attempt to extract slug from tool call arguments
-        let args: any = toolCall?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // ignore
-          }
-        }
-        let slugArg: string | undefined = typeof args?.slug === 'string' ? args.slug : undefined
+        const isOpenTool = funcNameLc.includes('open-tool')
+        const isEditTool = funcNameLc.includes('edit-tool')
 
-        // Fallback: extract slug from tool result HTTP response shape: body.data.slug
-        if (!slugArg) {
+        // Prefer slug from tool result body first (robust extraction across shapes)
+        let slugArg: string | undefined
+        {
           const content = typeof msg.content === 'string' ? String(msg.content).trim() : ''
           if (content) {
             try {
-              const parsed = JSON.parse(content) as Record<string, unknown>
-              const body = parsed.body as Record<string, unknown> | undefined
-              const data = body && typeof body === 'object' ? (body.data as Record<string, unknown> | undefined) : undefined
-              const slugVal = data && typeof data.slug === 'string' ? (data.slug as string) : undefined
-              slugArg = slugVal
+              const parsed = JSON.parse(content) as any
+              const candidates: Array<string | undefined> = [
+                typeof parsed?.slug === 'string' ? parsed.slug : undefined,
+                typeof parsed?.data?.slug === 'string' ? parsed.data.slug : undefined,
+                typeof parsed?.body?.slug === 'string' ? parsed.body.slug : undefined,
+                typeof parsed?.body?.data?.slug === 'string' ? parsed.body.data.slug : undefined,
+                typeof parsed?.tool?.slug === 'string' ? parsed.tool.slug : undefined,
+                typeof parsed?.body?.data?.tool?.slug === 'string' ? parsed.body.data.tool.slug : undefined,
+              ]
+              const found = candidates.find(s => typeof s === 'string' && s.trim())
+              if (found) slugArg = String(found)
             } catch {}
           }
         }
 
+        // Only if still missing AND this was an edit-tool, fall back to arguments
+        if (!slugArg && isEditTool) {
+          let args: any = toolCall?.function?.arguments
+          if (typeof args === 'string') {
+            try {
+              args = JSON.parse(args)
+            } catch {}
+          }
+          const argSlug = typeof args?.slug === 'string' ? (args.slug as string) : undefined
+          if (argSlug) slugArg = argSlug
+        }
+
         if (!slugArg || typeof slugArg !== 'string') {
+          processedToolResultIdsRef.current.add(id)
+          continue
+        }
+
+        // If we are currently at /tool/new but this result is not from an open-tool call, ignore to prevent bouncing to old tools
+        if (toolSlug === 'new' && !isOpenTool) {
           processedToolResultIdsRef.current.add(id)
           continue
         }
@@ -508,8 +601,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
               if (tool.parameters) toolBuilderRef.current.updateField('parameters', JSON.stringify(tool.parameters, null, 2))
               if (tool.blueprint) toolBuilderRef.current.updateField('blueprint', JSON.stringify(tool.blueprint, null, 2))
             }
-            // If we are currently at /tool/new, replace URL with real slug
-            if (!routeUpdatedRef.current && toolSlug === 'new' && typeof slugArg === 'string' && slugArg) {
+            // If we are currently at /tool/new and this was an open-tool completion, replace URL with real slug
+            if (!routeUpdatedRef.current && toolSlug === 'new' && isOpenTool && typeof slugArg === 'string' && slugArg) {
               const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
               router.replace(`/ship/${slug}/tool/${encodeURIComponent(slugArg)}${q}`)
               routeUpdatedRef.current = true

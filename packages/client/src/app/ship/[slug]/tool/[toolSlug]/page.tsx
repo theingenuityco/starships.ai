@@ -14,6 +14,8 @@ import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
+import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
+import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -50,6 +52,12 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         messageInputRef.current?.focusInput?.()
       } catch {}
     },
+  })
+  const deferredToolCreate = useDeferredToolCreationModal({
+    liveMessages,
+    isStreaming: isResponding,
+    starshipSlug: String(slug),
+    conversationId,
   })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
@@ -457,6 +465,13 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         onChatWithAgent={deferredAgentCreate.chatWithAgent}
         onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
         agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+      />
+      <ToolCreatedModal
+        open={deferredToolCreate.isOpen}
+        names={deferredToolCreate.createdNames}
+        onOpenChange={deferredToolCreate.setIsOpen}
+        onOpenTool={deferredToolCreate.openToolInBuilder}
+        slugs={deferredToolCreate.createdSlugs}
       />
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (

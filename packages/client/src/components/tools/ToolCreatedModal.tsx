@@ -12,13 +12,12 @@ interface ToolCreatedModalProps {
   names: string[]
   onOpenChange: (open: boolean) => void
   onOpenTool?: (slugOrName?: string) => void
+  onAskGaiaAssignTool?: (slugOrName?: string) => void
   slugs?: string[]
   tools?: ToolModel[]
 }
 
-export function ToolCreatedModal({ open, names, onOpenChange, onOpenTool, slgs, slugs, tools }: any) {
-  // Back-compat props support (slgs typo guard)
-  if (!Array.isArray(slugs) && Array.isArray(slgs)) slugs = slgs
+export function ToolCreatedModal({ open, names, onOpenChange, onOpenTool, onAskGaiaAssignTool, slugs, tools }: ToolCreatedModalProps) {
   const uniqueNames = Array.isArray(names) ? Array.from(new Set(names.filter(n => typeof n === 'string' && n.trim()))).slice(0, 10) : []
   const baseTitle = useMemo(() => {
     if (uniqueNames.length > 1) return `${uniqueNames.length} tools are ready`
@@ -166,9 +165,15 @@ export function ToolCreatedModal({ open, names, onOpenChange, onOpenTool, slgs, 
                     </Button>
                   )}
 
-                  <Button type="button" size="lg" variant="ghost" onClick={() => onOpenChange(false)} className="w-full gap-1.5">
-                    <Icon name="x" className="w-5 h-5" />
-                    <span className="truncate">Close</span>
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="ghost"
+                    onClick={() => onAskGaiaAssignTool?.(primarySlug || primaryName)}
+                    className="w-full gap-1.5"
+                  >
+                    <Icon name="wand-sparkles" className="w-5 h-5" />
+                    <span className="truncate">@Gaia assign this tool to …</span>
                   </Button>
                 </div>
               </motion.div>

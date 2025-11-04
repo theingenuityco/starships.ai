@@ -59,6 +59,17 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     starshipSlug: String(slug),
     conversationId,
     starshipId: starship?.id || null,
+    agents,
+    setLeadingMentionAgent: (agent: any, afterText?: string) => {
+      try {
+        messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
+      } catch {}
+    },
+    focusInput: () => {
+      try {
+        messageInputRef.current?.focusInput?.()
+      } catch {}
+    },
   })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
@@ -474,6 +485,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         onOpenTool={deferredToolCreate.openToolInBuilder}
         slugs={deferredToolCreate.createdSlugs}
         tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
+        onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
       />
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
       {conversationId && (

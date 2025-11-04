@@ -14,7 +14,16 @@ import type { ApiResponse, ToolModel } from '@starships/protocol'
  * Detection heuristic: assistant tool call named like 'open-tool*' with a provided name and no slug,
  * then a tool role message or follow-up args that include the created tool slug.
  */
-export function useDeferredToolCreationModal(options: { liveMessages: any[] | undefined; isStreaming: boolean | undefined; starshipSlug?: string | null; conversationId?: string | null; starshipId?: string | null }) {
+export function useDeferredToolCreationModal(options: {
+  liveMessages: any[] | undefined
+  isStreaming: boolean | undefined
+  starshipSlug?: string | null
+  conversationId?: string | null
+  starshipId?: string | null
+  agents?: Array<{ id?: string; name?: string; slug?: string }>
+  setLeadingMentionAgent?: (agent: { id?: string; name?: string; slug?: string }, afterText?: string) => void
+  focusInput?: () => void
+}) {
   const isStreaming = Boolean(options?.isStreaming)
   const liveMessages = Array.isArray(options?.liveMessages) ? (options!.liveMessages as any[]) : []
   const starshipSlug = typeof options?.starshipSlug === 'string' ? options!.starshipSlug : undefined
@@ -22,6 +31,9 @@ export function useDeferredToolCreationModal(options: { liveMessages: any[] | un
   const router = useRouter()
   const starshipId = typeof options?.starshipId === 'string' ? options!.starshipId : undefined
   const queryClient = useQueryClient()
+  const agents = Array.isArray(options?.agents) ? options!.agents : undefined
+  const setLeadingMentionAgent = typeof options?.setLeadingMentionAgent === 'function' ? options!.setLeadingMentionAgent : undefined
+  const focusInput = typeof options?.focusInput === 'function' ? options!.focusInput : undefined
 
   const prevStreamingRef = useRef<boolean>(false)
   const createdSlugsRef = useRef<Set<string>>(new Set())
@@ -295,5 +307,35 @@ export function useDeferredToolCreationModal(options: { liveMessages: any[] | un
     setIsOpen,
     openToolInBuilder,
     createdTools,
+    askGaiaAssignTool: (toolIdentifier?: string) => {
+      try {
+        setIsOpen(false)
+        const list = Array.isArray(agents) ? agents : []
+        const gaia =
+          list.find(a => String(a?.name || '').toLowerCase() === 'gaia') ||
+          list.find(a =>
+            String(a?.slug || '')
+              .toLowerCase()
+              .startsWith('gaia')
+          ) ||
+          list.find(a =>
+            String(a?.name || '')
+              .toLowerCase()
+              .includes('gaia')
+          ) ||
+          null
+        if (gaia && setLeadingMentionAgent) {
+          const afterText = 'assign this tool to '
+          setLeadingMentionAgent(gaia as any, afterText)
+        }
+        if (focusInput) {
+          setTimeout(() => {
+            try {
+              focusInput()
+            } catch {}
+          }, 50)
+        }
+      } catch {}
+    },
   }
 }

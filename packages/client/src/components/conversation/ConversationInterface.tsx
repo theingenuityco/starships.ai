@@ -629,6 +629,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       starshipSlug,
       conversationId: currentConversationId || externalConversationId || null,
       starshipId,
+      agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
+      setLeadingMentionAgent: (agent: any, afterText?: string) => {
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
+        } catch {}
+      },
+      focusInput: () => {
+        try {
+          messageInputRef.current?.focusInput?.()
+        } catch {}
+      },
     })
 
     // Track last processed state to avoid redundant updates
@@ -801,6 +812,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           onOpenTool={deferredToolCreate.openToolInBuilder}
           slugs={deferredToolCreate.createdSlugs}
           tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
+          onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
         />
       </>
     )

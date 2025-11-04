@@ -123,6 +123,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
   // Track toolCallIds we've already navigated for to avoid duplicate route pushes
   const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
+  // Navigation baseline for current streaming turn to avoid acting on old messages
+  const navPrevStreamingRef = useRef<boolean>(false)
+  const navTurnStartIdxRef = useRef<number | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -705,12 +708,28 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Removed UI action JSON parsing during streaming
 
-    // Proactive navigation on tool calls (only during active streaming)
+    // Track turn boundaries for navigation baseline
+    useEffect(() => {
+      const was = navPrevStreamingRef.current
+      if (!was && uiStreaming) {
+        // Turn just started: record baseline so we only act on new messages
+        navTurnStartIdxRef.current = liveMessages.length
+      }
+      if (was && !uiStreaming) {
+        // Turn ended: clear baseline and navigated ids
+        navTurnStartIdxRef.current = null
+        navigatedToolCallIdsRef.current.clear()
+      }
+      navPrevStreamingRef.current = Boolean(uiStreaming)
+    }, [uiStreaming, liveMessages.length])
+
+    // Proactive navigation on tool calls (only during active streaming; only new messages after turn start)
     useEffect(() => {
       if (!uiStreaming || !currentConversationId || !liveMessages.length || !starshipSlug) return
-      const recent = (liveMessages as any[]).slice(-10)
-      for (let i = recent.length - 1; i >= 0; i--) {
-        const msg = recent[i] as any
+      if (navTurnStartIdxRef.current === null) return
+      const newMessages = (liveMessages as any[]).slice(navTurnStartIdxRef.current as number)
+      for (let i = 0; i < newMessages.length; i++) {
+        const msg = newMessages[i] as any
         if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
         for (const tc of msg.toolCalls as any[]) {
           const id = tc?.id as string | undefined

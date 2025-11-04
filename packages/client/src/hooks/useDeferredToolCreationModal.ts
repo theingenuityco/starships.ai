@@ -41,6 +41,7 @@ export function useDeferredToolCreationModal(options: {
   const turnStartIndexRef = useRef<number>(0)
   const toolCreationCallIdsRef = useRef<Set<string>>(new Set())
   const toolRelatedCallIdsRef = useRef<Set<string>>(new Set())
+  const focusTimeoutRef = useRef<number | null>(null)
 
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [createdNames, setCreatedNames] = useState<string[]>([])
@@ -252,6 +253,16 @@ export function useDeferredToolCreationModal(options: {
     } catch {}
   }, [isStreaming, isOpen, consumePersistedPayloadIfAny])
 
+  // Cleanup any pending focus timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current)
+        focusTimeoutRef.current = null
+      }
+    }
+  }, [])
+
   // While modal open, hydrate tools by slug
   useEffect(() => {
     if (!isOpen || createdSlugs.length === 0 || !starshipId) return
@@ -329,10 +340,15 @@ export function useDeferredToolCreationModal(options: {
           setLeadingMentionAgent(gaia as any, afterText)
         }
         if (focusInput) {
-          setTimeout(() => {
+          if (focusTimeoutRef.current) {
+            clearTimeout(focusTimeoutRef.current)
+            focusTimeoutRef.current = null
+          }
+          focusTimeoutRef.current = window.setTimeout(() => {
             try {
               focusInput()
             } catch {}
+            focusTimeoutRef.current = null
           }, 50)
         }
       } catch {}

@@ -628,6 +628,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       isStreaming: uiStreaming,
       starshipSlug,
       conversationId: currentConversationId || externalConversationId || null,
+      starshipId,
     })
 
     // Track last processed state to avoid redundant updates
@@ -799,6 +800,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           onOpenChange={deferredToolCreate.setIsOpen}
           onOpenTool={deferredToolCreate.openToolInBuilder}
           slugs={deferredToolCreate.createdSlugs}
+          tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
         />
       </>
     )

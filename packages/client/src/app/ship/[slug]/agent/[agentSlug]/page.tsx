@@ -60,6 +60,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     isStreaming: isResponding,
     starshipSlug: String(slug),
     conversationId,
+    starshipId: starship?.id || null,
   })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
@@ -723,6 +724,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         onOpenChange={deferredToolCreate.setIsOpen}
         onOpenTool={deferredToolCreate.openToolInBuilder}
         slugs={deferredToolCreate.createdSlugs}
+        tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
       />
       <AgentBuilderView
         ref={agentBuilderRef}

@@ -565,7 +565,19 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           userId,
           provider,
           errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
         });
+
+        // Extract user-friendly error message
+        let errorMessage = 'linking_failed';
+        if (error instanceof Error) {
+          // Check if it's a ValidationError with a specific message
+          if (error.message.includes('already registered') || error.message.includes('already linked')) {
+            errorMessage = encodeURIComponent(error.message);
+          } else if (error.message) {
+            errorMessage = encodeURIComponent(error.message);
+          }
+        }
 
         // Get user's first starship for error redirect too
         let errorRedirectPath = '/profile';
@@ -577,13 +589,13 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           if (firstStarship) {
             errorRedirectPath = `/ship/${firstStarship.slug}/settings/profile`;
           }
-        } catch (error) {
+        } catch (starshipError) {
           logger.warn('[OAUTH-LINKING] Failed to get starship for error redirect, using default profile page', {
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: starshipError instanceof Error ? starshipError.message : 'Unknown error',
           });
         }
 
-        return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=linking_failed`);
+        return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=${errorMessage}`);
       }
     }
 

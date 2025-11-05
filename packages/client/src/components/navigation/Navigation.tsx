@@ -220,13 +220,13 @@ export function Navigation(props: NavigationProps) {
   return (
     <div
       ref={sidebarRef}
-      className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+      className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{ willChange: 'width' }}
     >
       <div
-        className="flex flex-col transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        className="flex flex-col transition-all duration-300 ease-in-out"
         style={{
           width: isHovered ? '16rem' : '3.5rem',
           height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding from layout

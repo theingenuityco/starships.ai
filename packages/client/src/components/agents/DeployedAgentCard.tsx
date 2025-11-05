@@ -68,7 +68,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
         {/* Shimmer effect on hover with purple tint */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
-            className="absolute inset-y-0 w-1/2 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-[800ms] ease-in-out"
+            className="absolute inset-y-0 w-1/2 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-700 ease-in-out"
             style={{
               background: 'linear-gradient(to right, transparent, rgba(168,85,247,0.15), rgba(139,92,246,0.1), transparent)',
             }}

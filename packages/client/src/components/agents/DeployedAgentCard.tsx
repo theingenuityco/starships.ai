@@ -165,7 +165,10 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
             {/* Agent name and badge */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-violet-400 group-hover:via-purple-400 group-hover:to-indigo-400">
+                <CardTitle 
+                  className="truncate text-lg font-bold transition-all duration-300"
+                  style={{ color: 'rgba(168,85,247,1)' }}
+                >
                   {agent.name}
                 </CardTitle>
                 {isSystemAgent && (

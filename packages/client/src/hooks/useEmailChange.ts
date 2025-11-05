@@ -10,6 +10,7 @@ import type { ApiResponse, EmailChangeStatusResponse } from '@starships/protocol
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 // Centralized query keys for email change operations
 export const EMAIL_CHANGE_QUERY_KEYS = {
@@ -45,11 +46,10 @@ export function useInitiateEmailChange() {
 
   return useMutation({
     mutationFn: async ({ userId, newEmail }: { userId: string; newEmail: string }): Promise<void> => {
-      const response: FetchResponse<ApiResponse<{ message: string }>> = await api.post(
+      await api.post(
         `/api/v1/users/${userId}/email/change`,
         { newEmail }
       )
-      return response.data.data
     },
     onSuccess: (_, variables) => {
       // Invalidate email change status query
@@ -62,7 +62,7 @@ export function useInitiateEmailChange() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to initiate email change'
+      const errorMessage = getSafeErrorMessage(error) || 'Failed to initiate email change'
       toast.error('Failed to initiate email change', {
         description: errorMessage,
       })
@@ -78,10 +78,9 @@ export function useResendEmailChangeVerification() {
 
   return useMutation({
     mutationFn: async (userId: string): Promise<void> => {
-      const response: FetchResponse<ApiResponse<{ message: string }>> = await api.post(
+      await api.post(
         `/api/v1/users/${userId}/email/change/resend`
       )
-      return response.data.data
     },
     onSuccess: (_, userId) => {
       // Invalidate email change status query
@@ -94,7 +93,7 @@ export function useResendEmailChangeVerification() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to resend verification email'
+      const errorMessage = getSafeErrorMessage(error) || 'Failed to resend verification email'
       toast.error('Failed to resend verification email', {
         description: errorMessage,
       })
@@ -110,10 +109,9 @@ export function useCancelEmailChange() {
 
   return useMutation({
     mutationFn: async (userId: string): Promise<void> => {
-      const response: FetchResponse<ApiResponse<{ message: string }>> = await api.post(
+      await api.post(
         `/api/v1/users/${userId}/email/change/cancel`
       )
-      return response.data.data
     },
     onSuccess: (_, userId) => {
       // Invalidate email change status query
@@ -126,7 +124,7 @@ export function useCancelEmailChange() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to cancel email change'
+      const errorMessage = getSafeErrorMessage(error) || 'Failed to cancel email change'
       toast.error('Failed to cancel email change', {
         description: errorMessage,
       })

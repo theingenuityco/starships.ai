@@ -3,6 +3,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentUser, useDeleteUser, useUpdateUserProfile } from '@/hooks/useUsers'
+import {
+  useEmailChangeStatus,
+  useInitiateEmailChange,
+  useResendEmailChangeVerification,
+  useCancelEmailChange,
+} from '@/hooks/useEmailChange'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { validatePassword } from '@/utils/passwordStrength'
@@ -32,6 +38,18 @@ export function useAccountForm() {
   const { data: currentUser, isLoading: loadingUser } = useCurrentUser(userId || null, !!userId)
   const updateProfile = useUpdateUserProfile()
   const deleteUser = useDeleteUser()
+
+  // Email change hooks
+  const { data: emailChangeStatus } = useEmailChangeStatus(userId || '', !!userId)
+  const initiateEmailChange = useInitiateEmailChange()
+  const resendEmailChangeVerification = useResendEmailChangeVerification()
+  const cancelEmailChange = useCancelEmailChange()
+
+  // Pending email change state
+  const [pendingEmailChange, setPendingEmailChange] = useState<{
+    newEmail: string
+    expiresAt: string
+  } | null>(null)
 
   // Refs
   const currentPasswordRef = useRef<HTMLInputElement>(null)
@@ -76,6 +94,18 @@ export function useAccountForm() {
   // Track if user has made changes to prevent overwriting during typing
   const [hasUserChanges, setHasUserChanges] = useState(false)
 
+  // Sync pending email change status from API
+  useEffect(() => {
+    if (emailChangeStatus?.pending && emailChangeStatus.newEmail && emailChangeStatus.expiresAt) {
+      setPendingEmailChange({
+        newEmail: emailChangeStatus.newEmail,
+        expiresAt: emailChangeStatus.expiresAt,
+      })
+    } else {
+      setPendingEmailChange(null)
+    }
+  }, [emailChangeStatus])
+
   // Sync when user data arrives, but only if user hasn't made changes
   useEffect(() => {
     if (!hasUserChanges) {
@@ -101,8 +131,17 @@ export function useAccountForm() {
   const deleting = deleteUser.isPending
 
   const dirty = useMemo(() => {
-    return form.displayName !== initial.displayName || form.avatar !== initial.avatar || form.email !== initial.email || !!form.newPassword || !!form.currentPassword || !!form.confirmNewPassword
-  }, [form, initial])
+    // Exclude email from dirty calculation if pending email change exists
+    const emailDirty = pendingEmailChange ? false : form.email !== initial.email
+    return (
+      form.displayName !== initial.displayName ||
+      form.avatar !== initial.avatar ||
+      emailDirty ||
+      !!form.newPassword ||
+      !!form.currentPassword ||
+      !!form.confirmNewPassword
+    )
+  }, [form, initial, pendingEmailChange])
 
   // Validation helpers (logic only)
   const computePasswordErrors = (f: FormState): PasswordErrors => {
@@ -183,10 +222,30 @@ export function useAccountForm() {
       return
     }
 
+    // Detect if email is being changed
+    const isEmailChanging = form.email !== initial.email && !pendingEmailChange
+
+    // If email is being changed, initiate email change flow instead of direct update
+    if (isEmailChanging && userId) {
+      try {
+        await initiateEmailChange.mutateAsync({ userId, newEmail: form.email.trim() })
+        // Update pending state after successful initiation
+        // Note: The actual pending state will be updated via useEffect when emailChangeStatus updates
+        setHasUserChanges(false) // Reset user changes flag after successful initiation
+        return
+      } catch (err: any) {
+        const apiError = err?.response?.data?.error
+        const apiMsg: string = (typeof apiError === 'string' ? apiError : apiError?.message) || err?.message || 'Failed to initiate email change'
+        toast.error('Failed to initiate email change', { description: apiMsg })
+        return
+      }
+    }
+
     const updates: Record<string, unknown> = {}
     if (form.displayName !== initial.displayName) updates.displayName = form.displayName.trim()
     if (form.avatar !== initial.avatar) updates.avatar = form.avatar.trim()
-    if (form.email !== initial.email) updates.email = form.email.trim()
+    // Don't include email in updates if there's a pending email change
+    if (form.email !== initial.email && !pendingEmailChange) updates.email = form.email.trim()
     if (form.newPassword) {
       updates.currentPassword = form.currentPassword
       updates.newPassword = form.newPassword
@@ -195,7 +254,7 @@ export function useAccountForm() {
     if (Object.keys(updates).length === 0) return
 
     // Confirm sensitive updates
-    if (updates.email || updates.newPassword) {
+    if (updates.newPassword) {
       setPendingUpdates(updates)
       setShowConfirmUpdate(true)
       return
@@ -285,6 +344,29 @@ export function useAccountForm() {
     setPasswordErrors({})
   }
 
+  const handleResendEmailChangeVerification = async () => {
+    if (!userId) return
+    try {
+      await resendEmailChangeVerification.mutateAsync(userId)
+    } catch {
+      // Error handled by hook toast
+    }
+  }
+
+  const handleCancelEmailChange = async () => {
+    if (!userId) return
+    try {
+      await cancelEmailChange.mutateAsync(userId)
+      // Clear pending state
+      setPendingEmailChange(null)
+      // Reset email field to current email
+      setForm(f => ({ ...f, email: initial.email }))
+      setHasUserChanges(false)
+    } catch {
+      // Error handled by hook toast
+    }
+  }
+
   const changeList: ChangeSummaryItem[] = useMemo(() => {
     const list: ChangeSummaryItem[] = []
     if (form.displayName !== initial.displayName) list.push({ type: 'displayName', from: initial.displayName || '—', to: form.displayName })
@@ -341,6 +423,11 @@ export function useAccountForm() {
     onSave,
     onRevertAll,
     cancelPasswordEdit,
+
+    // Email change
+    pendingEmailChange,
+    resendEmailChangeVerification: handleResendEmailChangeVerification,
+    cancelEmailChange: handleCancelEmailChange,
 
     // Refs
     currentPasswordRef,

@@ -14,6 +14,7 @@ import { EmailSchema, PasswordSchema, OAuthProviderSchema } from '@/schemas/comm
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
+import type { UserModel } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -284,6 +285,33 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
 // ============================================================================
 
 /**
+ * Helper function to get authenticated user from request (optional auth)
+ * Returns user if authenticated, null if not (doesn't throw errors)
+ * Follows optionalJwtAuth middleware pattern but as a helper function
+ */
+async function getAuthenticatedUserFromRequest(req: Request): Promise<UserModel | null> {
+  try {
+    // Try Authorization header (frontend sends JWT via Authorization header)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      if (token && token.length >= 10) {
+        const { payload } = await verifyJWT(token);
+        const user = await UserService.getUserById(payload.sub as string);
+        if (user) return user;
+      }
+    }
+
+    // Email links clicked directly won't have Authorization header (browser redirects)
+    // This is expected - return null for unauthenticated users
+    return null;
+  } catch (error) {
+    // Silently fail - user is not authenticated
+    return null;
+  }
+}
+
+/**
  * Verify email address using verification token
  * GET /auth/verify-email?token=xxx
  * Follows established route patterns with Zod validation
@@ -353,6 +381,56 @@ router.post('/auth/resend-verification', rateLimiters.sensitive, async (req: Req
     });
   } catch (error) {
     handleError(error, res, 'resend verification email');
+  }
+});
+
+/**
+ * Verify email change using verification token
+ * GET /auth/email/change/verify?token=xxx
+ * Follows established route patterns with Zod validation
+ */
+router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
+  try {
+    // Validate query parameters using Zod
+    const queryValidation = validateData(
+      z.object({
+        token: z
+          .string()
+          .length(64, 'Invalid token format')
+          .regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+      }),
+      req.query,
+      res,
+      'email change verification token'
+    );
+    if (!queryValidation) return;
+
+    const { token } = queryValidation;
+    const env = getEnvConfig();
+
+    // Use UserService for business logic
+    const userService = ServiceFactory.createUserService();
+    const result = await userService.completeEmailChange(token);
+
+    // Check if user is authenticated using helper function
+    const authenticatedUser = await getAuthenticatedUserFromRequest(req);
+
+    // Determine redirect based on authentication status
+    let redirectPath: string;
+    if (authenticatedUser && authenticatedUser.id === result.userId) {
+      // User is authenticated AND userId matches - redirect to profile page
+      redirectPath = await userService.getProfileRedirectPath(result.userId);
+      redirectPath = `${env.PUBLIC_URL}${redirectPath}?emailChange=success`;
+    } else {
+      // User is not authenticated OR userId mismatch - redirect to login page
+      redirectPath = `${env.PUBLIC_URL}/login?emailChange=success`;
+    }
+
+    return res.redirect(redirectPath);
+  } catch (error) {
+    logger.error('[EMAIL-CHANGE-VERIFY] Error:', { error });
+    const env = getEnvConfig();
+    return res.redirect(`${env.PUBLIC_URL}/login?emailChange=error`);
   }
 });
 

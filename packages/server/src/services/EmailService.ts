@@ -83,6 +83,38 @@ export class EmailService {
     }
   }
 
+  /**
+   * Send email change verification email following established service patterns
+   * Business logic: Email change verification template generation and delivery
+   */
+  async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string): Promise<void> {
+    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
+    
+    const command = new SendEmailCommand({
+      Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
+      Destination: { ToAddresses: [newEmail] },
+      Message: {
+        Subject: { Data: 'Confirm your new email address' },
+        Body: {
+          Html: { Data: this.generateEmailChangeVerificationTemplate(verificationUrl, oldEmail, newEmail) },
+          Text: { Data: this.generateEmailChangeVerificationTextTemplate(verificationUrl, oldEmail, newEmail) },
+        },
+      },
+    });
+
+    try {
+      await this.sesClient.send(command);
+      logger.info('[EmailService] Email change verification email sent', { newEmail, oldEmail });
+    } catch (error) {
+      logger.error('[EmailService] Failed to send email change verification email', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        newEmail,
+        oldEmail
+      });
+      throw new Error(`Failed to send email change verification email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   private generateEmailTemplate(verificationUrl: string): string {
     return `
       <!DOCTYPE html>
@@ -170,6 +202,53 @@ export class EmailService {
       This link expires in 1 hour.
       
       If you didn't request a password reset, please ignore this email or contact support if you have concerns.
+    `;
+  }
+
+  private generateEmailChangeVerificationTemplate(verificationUrl: string, oldEmail: string, newEmail: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"><title>Confirm Your New Email Address</title></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1a202c;">✉️ Confirm Your New Email Address</h1>
+          </div>
+          <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="margin-top: 0; color: #2d3748;">Confirm Your Email Change</h2>
+            <p>You requested to change your email address from <strong>${oldEmail}</strong> to <strong>${newEmail}</strong>.</p>
+            <p>Click the button below to confirm this change:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" 
+                 style="background: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                Confirm Email Change
+              </a>
+            </div>
+            <p style="font-size: 14px; color: #718096;">
+              If the button doesn't work, copy and paste this link: <br>
+              <a href="${verificationUrl}">${verificationUrl}</a>
+            </p>
+          </div>
+          <div style="font-size: 12px; color: #a0aec0; text-align: center;">
+            <p style="color: #e53e3e; font-weight: bold;">This link expires in 1 hour.</p>
+            <p>If you didn't request this email change, please ignore this email or contact support if you have concerns.</p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private generateEmailChangeVerificationTextTemplate(verificationUrl: string, oldEmail: string, newEmail: string): string {
+    return `
+      Confirm Your New Email Address
+      
+      You requested to change your email address from ${oldEmail} to ${newEmail}.
+      Click this link to confirm the change:
+      ${verificationUrl}
+      
+      This link expires in 1 hour.
+      
+      If you didn't request this email change, please ignore this email or contact support if you have concerns.
     `;
   }
 }

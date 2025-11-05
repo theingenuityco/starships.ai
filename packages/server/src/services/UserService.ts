@@ -11,6 +11,7 @@ import {
   UserRepository,
   EmailVerificationTokenRepository,
   PasswordResetTokenRepository,
+  EmailChangeTokenRepository,
   StarshipRepository,
 } from '@starships/models';
 import type {
@@ -58,11 +59,13 @@ export class UserService {
   private userRepository: UserRepository;
   private oauthRepository: OAuthAccountRepository;
   private passwordResetTokenRepository: PasswordResetTokenRepository;
+  private emailChangeTokenRepository: EmailChangeTokenRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
     this.oauthRepository = new OAuthAccountRepository();
     this.passwordResetTokenRepository = new PasswordResetTokenRepository();
+    this.emailChangeTokenRepository = new EmailChangeTokenRepository();
   }
 
   // ============================================================================
@@ -175,12 +178,9 @@ export class UserService {
       throw new NotFoundError('User', userId);
     }
 
-    // Business validation: Email uniqueness (if changing)
+    // Business validation: Email changes require verification (prevent direct email update)
     if (updates.email && updates.email !== existingUser.email) {
-      const existingUserByEmail = await this.userRepository.findByEmail(updates.email);
-      if (existingUserByEmail) {
-        throw new ValidationError(`Email "${updates.email}" is already registered`, 'email');
-      }
+      throw new ValidationError('Email changes require verification. Please use the email change flow.', 'email');
     }
 
     // Business logic: Password change
@@ -981,5 +981,162 @@ export class UserService {
       userId: verification.userId,
       email: verification.email,
     });
+  }
+
+  // ============================================================================
+  // EMAIL CHANGE METHODS
+  // ============================================================================
+
+  /**
+   * Initiate email change (business logic layer)
+   * Orchestrates repository and email service calls with security validations
+   */
+  async initiateEmailChange(userId: string, newEmail: string): Promise<void> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Business validation: New email format
+    if (!newEmail || !newEmail.includes('@')) {
+      throw new ValidationError('Invalid email format', 'newEmail');
+    }
+
+    // Business validation: New email must be different from current
+    if (newEmail.toLowerCase() === user.email?.toLowerCase()) {
+      logger.info('[UserService] Email change requested for same email', { userId, newEmail });
+      return; // No-op - same email
+    }
+
+    // Business validation: Check if new email already exists
+    const existingUserByEmail = await this.userRepository.findByEmail(newEmail);
+    if (existingUserByEmail) {
+      throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Business rule: Cancel any existing pending email change tokens for user
+    await this.emailChangeTokenRepository.cancelTokenForUser(userId);
+
+    // Generate token using repository
+    const oldEmail = user.email!;
+    const token = await this.emailChangeTokenRepository.generateToken(userId, oldEmail, newEmail);
+
+    // Send verification email using email service
+    const { ServiceFactory } = await import('./ServiceFactory');
+    const emailService = ServiceFactory.createEmailService();
+    await emailService.sendEmailChangeVerificationEmail(newEmail, token, oldEmail);
+
+    logger.info('[UserService] Email change initiated', { userId, oldEmail, newEmail });
+  }
+
+  /**
+   * Complete email change using token (business logic layer)
+   * Validates token, confirms user's current email matches token's old email, and updates user email
+   */
+  async completeEmailChange(token: string): Promise<{ userId: string; oldEmail: string; newEmail: string }> {
+    // Validate and consume token atomically
+    const verification = await this.emailChangeTokenRepository.validateAndConsumeToken(token);
+
+    if (!verification) {
+      throw new ValidationError('Invalid or expired verification token', 'token');
+    }
+
+    // Get user from database
+    const user = await this.userRepository.findById(verification.userId);
+    if (!user) {
+      throw new NotFoundError('User', verification.userId);
+    }
+
+    // SECURITY CHECK: Verify user's current email matches token's old email
+    // This prevents race conditions where user changes email twice before verifying first change
+    if (user.email?.toLowerCase() !== verification.oldEmail.toLowerCase()) {
+      throw new ValidationError('Invalid or expired verification token', 'token');
+    }
+
+    // Business validation: Check if new email still available (race condition check)
+    const existingUserByEmail = await this.userRepository.findByEmail(verification.newEmail);
+    if (existingUserByEmail) {
+      throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Update user email in database
+    await this.userRepository.update(verification.userId, {
+      email: verification.newEmail,
+      emailVerified: true, // Set emailVerified to true if not already
+    });
+
+    // Cancel all other pending email change tokens for user
+    await this.emailChangeTokenRepository.cancelTokenForUser(verification.userId);
+
+    logger.info('[UserService] Email change completed', {
+      userId: verification.userId,
+      oldEmail: verification.oldEmail,
+      newEmail: verification.newEmail,
+    });
+
+    return {
+      userId: verification.userId,
+      oldEmail: verification.oldEmail,
+      newEmail: verification.newEmail,
+    };
+  }
+
+  /**
+   * Cancel email change (business logic layer)
+   * Cancels pending email change token for user
+   */
+  async cancelEmailChange(userId: string): Promise<void> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Cancel pending token for user
+    const cancelledCount = await this.emailChangeTokenRepository.cancelTokenForUser(userId);
+
+    logger.info('[UserService] Email change cancelled', { userId, cancelledCount });
+  }
+
+  /**
+   * Get pending email change status (business logic layer)
+   * Returns pending email change info for user
+   */
+  async getPendingEmailChange(userId: string): Promise<{ newEmail: string; expiresAt: string } | null> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Get pending token info for user
+    const pendingToken = await this.emailChangeTokenRepository.getPendingTokenForUser(userId);
+
+    if (!pendingToken) {
+      return null;
+    }
+
+    return {
+      newEmail: pendingToken.newEmail,
+      expiresAt: pendingToken.expiresAt,
+    };
+  }
+
+  /**
+   * Get profile redirect path helper (business logic layer)
+   * Encapsulates starship lookup logic for profile redirects
+   * Used by email change verification and OAuth handlers
+   */
+  async getProfileRedirectPath(userId: string): Promise<string> {
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(userId);
+      const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
+      return firstStarship ? `/ship/${firstStarship.slug}/settings/profile` : '/profile';
+    } catch (error) {
+      logger.warn('[UserService] Failed to get starship for redirect', { userId, error });
+      return '/profile';
+    }
   }
 }

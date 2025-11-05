@@ -2,8 +2,8 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import React, { useEffect, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -98,23 +98,54 @@ export function OAuthAccountsSettings() {
   const { data: accountsData, isLoading, error, refetch } = useOAuthAccounts()
   const unlinkMutation = useUnlinkOAuthAccount()
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const oauthLinkToastShownRef = useRef(false)
 
   const accounts = accountsData?.accounts || []
 
   // Handle OAuth linking success/error
   useEffect(() => {
-    const oauthLink = searchParams?.get('oauth_link')
-    const provider = searchParams?.get('provider')
-    
-    if (oauthLink === 'success' && provider) {
-      toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account linked successfully!`)
-      // Refetch accounts data to show the newly linked account
-      refetch()
-    } else if (oauthLink === 'error') {
-      const message = searchParams?.get('message')
-      toast.error(`Failed to link account: ${message || 'Unknown error'}`)
-    }
-  }, [searchParams, refetch])
+    // Small delay to ensure page is loaded
+    const timer = setTimeout(() => {
+      const oauthLink = searchParams?.get('oauth_link')
+      const provider = searchParams?.get('provider')
+      
+      if (oauthLink === 'success' && provider && !oauthLinkToastShownRef.current) {
+        oauthLinkToastShownRef.current = true
+        toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account linked successfully!`)
+        // Refetch accounts data to show the newly linked account
+        refetch()
+        
+        // Clear query params after showing toast
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('oauth_link')
+        params.delete('provider')
+        router.replace(`?${params.toString()}`, { scroll: false })
+        
+        // Reset ref after navigation
+        setTimeout(() => {
+          oauthLinkToastShownRef.current = false
+        }, 100)
+      } else if (oauthLink === 'error' && !oauthLinkToastShownRef.current) {
+        oauthLinkToastShownRef.current = true
+        const message = searchParams?.get('message')
+        toast.error(`Failed to link account: ${message || 'Unknown error'}`)
+        
+        // Clear query params after showing toast
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('oauth_link')
+        params.delete('message')
+        router.replace(`?${params.toString()}`, { scroll: false })
+        
+        // Reset ref after navigation
+        setTimeout(() => {
+          oauthLinkToastShownRef.current = false
+        }, 100)
+      }
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [searchParams, refetch, router])
 
   // OAuth initiation function - uses secure authenticated endpoint
   const handleLinkAccount = async (provider: 'google' | 'github') => {

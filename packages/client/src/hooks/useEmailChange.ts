@@ -25,9 +25,7 @@ export function useEmailChangeStatus(userId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: EMAIL_CHANGE_QUERY_KEYS.status(userId),
     queryFn: async (): Promise<EmailChangeStatusResponse> => {
-      const response: FetchResponse<ApiResponse<EmailChangeStatusResponse>> = await api.get(
-        `/api/v1/users/${userId}/email/change/status`
-      )
+      const response: FetchResponse<ApiResponse<EmailChangeStatusResponse>> = await api.get(`/api/v1/users/${userId}/email/change/status`)
       return response.data.data
     },
     enabled: !!userId && enabled,
@@ -46,10 +44,7 @@ export function useInitiateEmailChange() {
 
   return useMutation({
     mutationFn: async ({ userId, newEmail }: { userId: string; newEmail: string }): Promise<void> => {
-      await api.post(
-        `/api/v1/users/${userId}/email/change`,
-        { newEmail }
-      )
+      await api.post(`/api/v1/users/${userId}/email/change`, { newEmail })
     },
     onSuccess: (_, variables) => {
       // Invalidate email change status query
@@ -78,9 +73,7 @@ export function useResendEmailChangeVerification() {
 
   return useMutation({
     mutationFn: async (userId: string): Promise<void> => {
-      await api.post(
-        `/api/v1/users/${userId}/email/change/resend`
-      )
+      await api.post(`/api/v1/users/${userId}/email/change/resend`)
     },
     onSuccess: (_, userId) => {
       // Invalidate email change status query
@@ -109,9 +102,7 @@ export function useCancelEmailChange() {
 
   return useMutation({
     mutationFn: async (userId: string): Promise<void> => {
-      await api.post(
-        `/api/v1/users/${userId}/email/change/cancel`
-      )
+      await api.post(`/api/v1/users/${userId}/email/change/cancel`)
     },
     onSuccess: (_, userId) => {
       // Invalidate email change status query
@@ -131,4 +122,3 @@ export function useCancelEmailChange() {
     },
   })
 }
-

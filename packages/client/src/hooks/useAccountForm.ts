@@ -234,9 +234,7 @@ export function useAccountForm() {
         setHasUserChanges(false) // Reset user changes flag after successful initiation
         return
       } catch (err: any) {
-        const apiError = err?.response?.data?.error
-        const apiMsg: string = (typeof apiError === 'string' ? apiError : apiError?.message) || err?.message || 'Failed to initiate email change'
-        toast.error('Failed to initiate email change', { description: apiMsg })
+        // Error is already handled by mutation's onError handler - don't show duplicate toast
         return
       }
     }

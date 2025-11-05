@@ -30,25 +30,21 @@ export default function AccountDetailsCard({
   onCancelEmailChange,
 }: AccountDetailsCardProps) {
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
       <CardHeader className="pb-4">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Icon name="shield" className="h-4 w-4 text-primary" />
-          Account details
-        </CardTitle>
+        <CardTitle className="text-base">Account details</CardTitle>
         <CardDescription className="text-sm">Keep your personal information accurate.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="displayName">Display name</Label>
-            <div className="relative">
-              <Input id="displayName" placeholder="Your name" value={form.displayName} onChange={e => setForm(prev => ({ ...prev, displayName: e.target.value }))} disabled={saving} className="pr-9" />
-              <Icon name="user" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            </div>
+      <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="displayName">Display name</Label>
+          <div className="relative">
+            <Input id="displayName" placeholder="Your name" value={form.displayName} onChange={e => setForm(prev => ({ ...prev, displayName: e.target.value }))} disabled={saving} className="pr-9" />
+            <Icon name="user" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           </div>
+        </div>
 
-          <div className="space-y-2">
+        <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <div className="relative">
             <Input
@@ -71,9 +67,8 @@ export default function AccountDetailsCard({
               loading={saving}
             />
           ) : (
-            <p className="text-xs text-muted-foreground">Changing email will send a verification email to the new address.</p>
+            <p className="text-[11px] text-muted-foreground">Changing email will send a verification email to the new address.</p>
           )}
-          </div>
         </div>
       </CardContent>
     </Card>

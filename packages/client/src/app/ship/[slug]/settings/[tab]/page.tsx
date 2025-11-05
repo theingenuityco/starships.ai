@@ -66,9 +66,15 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               </div>
 
               <TabsContent value="profile">
-                <section aria-labelledby="profile-section" className="space-y-6">
-                  <AccountForm />
-                  <SignOutSection onSignOut={logout} onNavigateHome={() => router.push('/')} />
+                <section aria-labelledby="profile-section" className="rounded-xl border border-border/80 bg-background p-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
+                      <AccountForm />
+                    </div>
+
+                    <SignOutSection onSignOut={logout} onNavigateHome={() => router.push('/')} />
+                  </div>
                 </section>
               </TabsContent>
 

@@ -424,8 +424,9 @@ export class UserService {
       }
     }
 
-    // SECURITY: Check if OAuth email is already used as primary email for another user
+    // SECURITY: Check if OAuth email conflicts with existing accounts
     if (profile.email) {
+      // Allow if email matches user's primary email (user wants to link OAuth account with same email)
       const existingUserByEmail = await this.userRepository.findByEmail(profile.email);
       if (existingUserByEmail && existingUserByEmail.id !== userId) {
         throw new ValidationError(
@@ -434,14 +435,20 @@ export class UserService {
         );
       }
 
-      // SECURITY: Check if OAuth email is already used in OAuth accounts for another user
+      // Check if this OAuth email is already linked to another OAuth account for another user
+      // Allow if email matches user's primary email (user linking OAuth with same email)
+      // Allow if email is already linked to this user's OAuth account with different provider
+      // Block if email is already linked to another user's OAuth account
       const existingOAuthAccount = await oauthRepo.findByEmail(profile.email);
       if (existingOAuthAccount && existingOAuthAccount.userId !== userId) {
+        // Email is linked to another user's OAuth account - block it
         throw new ValidationError(
           `Email "${profile.email}" is already linked to another account. Please use a different account or contact support.`,
           'email'
         );
       }
+      // If existingOAuthAccount.userId === userId, allow it (user can link multiple OAuth accounts with same email)
+      // Same provider check is already handled above via findByProviderAndUser
     }
 
     // Business logic: Create OAuth account link using Entity pattern
@@ -1063,15 +1070,16 @@ export class UserService {
       return; // No-op - same email
     }
 
-    // Business validation: Check if new email already exists (as primary email or OAuth email)
+    // Business validation: Check if new email already exists as primary email for another user
     const existingUserByEmail = await this.userRepository.findByEmail(newEmail);
-    if (existingUserByEmail) {
+    if (existingUserByEmail && existingUserByEmail.id !== userId) {
       throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
     }
 
-    // Business validation: Check if new email is already used in OAuth accounts (case-insensitive)
+    // Business validation: Check if new email is already used in OAuth accounts for another user
+    // Allow if it's the same user's OAuth email (user wants to change primary to their OAuth email)
     const existingOAuthAccount = await this.oauthRepository.findByEmail(newEmail);
-    if (existingOAuthAccount) {
+    if (existingOAuthAccount && existingOAuthAccount.userId !== userId) {
       throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
     }
 
@@ -1116,14 +1124,16 @@ export class UserService {
 
     // Business validation: Check if new email still available (race condition check)
     // Check both primary email and OAuth accounts
+    // Allow if it's the same user's OAuth email (user wants to change primary to their OAuth email)
     const existingUserByEmail = await this.userRepository.findByEmail(verification.newEmail);
-    if (existingUserByEmail) {
+    if (existingUserByEmail && existingUserByEmail.id !== verification.userId) {
       throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
     }
 
-    // Business validation: Check if new email is already used in OAuth accounts (case-insensitive)
+    // Business validation: Check if new email is already used in OAuth accounts for another user
+    // Allow if it's the same user's OAuth email (user wants to change primary to their OAuth email)
     const existingOAuthAccount = await this.oauthRepository.findByEmail(verification.newEmail);
-    if (existingOAuthAccount) {
+    if (existingOAuthAccount && existingOAuthAccount.userId !== verification.userId) {
       throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
     }
 

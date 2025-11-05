@@ -31,36 +31,48 @@ export function EmailChangeToastHandler() {
       return
     }
 
-    try {
-      const emailChange = searchParams.get('emailChange')
+    // Use a small delay to ensure the page has fully loaded
+    const timeoutId = setTimeout(() => {
+      try {
+        const emailChange = searchParams.get('emailChange')
 
-      // Handle email change success message
-      if (emailChange === 'success' && !emailChangeToastShownRef.current) {
-        emailChangeToastShownRef.current = true
-        toast.success('Email changed successfully!')
+        // Handle email change success message
+        if (emailChange === 'success' && !emailChangeToastShownRef.current) {
+          emailChangeToastShownRef.current = true
+          toast.success('Email changed successfully!')
 
-        // Refresh user data if user is authenticated
-        if (userId) {
-          queryClient.invalidateQueries({ queryKey: USER_QUERY_KEYS.detail(userId) })
-          queryClient.invalidateQueries({ queryKey: EMAIL_CHANGE_QUERY_KEYS.status(userId) })
+          // Refresh user data if user is authenticated
+          if (userId) {
+            queryClient.invalidateQueries({ queryKey: USER_QUERY_KEYS.detail(userId) })
+            queryClient.invalidateQueries({ queryKey: EMAIL_CHANGE_QUERY_KEYS.status(userId) })
+          }
+
+          // Clear query param after handling (with a delay to ensure toast is visible)
+          setTimeout(() => {
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete('emailChange')
+            const newPath = newUrl.pathname + (newUrl.search ? newUrl.search : '')
+            router.replace(newPath, { scroll: false })
+          }, 100)
+        } else if (emailChange === 'error' && !emailChangeToastShownRef.current) {
+          emailChangeToastShownRef.current = true
+          toast.error('Email change failed. Please try again.')
+
+          // Clear query param after handling
+          setTimeout(() => {
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete('emailChange')
+            const newPath = newUrl.pathname + (newUrl.search ? newUrl.search : '')
+            router.replace(newPath, { scroll: false })
+          }, 100)
         }
-
-        // Clear query param after handling
-        const newUrl = new URL(window.location.href)
-        newUrl.searchParams.delete('emailChange')
-        router.replace(newUrl.pathname + newUrl.search, { scroll: false })
-      } else if (emailChange === 'error' && !emailChangeToastShownRef.current) {
-        emailChangeToastShownRef.current = true
-        toast.error('Email change failed. Please try again.')
-
-        // Clear query param after handling
-        const newUrl = new URL(window.location.href)
-        newUrl.searchParams.delete('emailChange')
-        router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+      } catch (error) {
+        // Silently handle URL parameter errors
+        console.error('[EmailChangeToastHandler] Error handling email change query param:', error)
       }
-    } catch (error) {
-      // Silently handle URL parameter errors
-    }
+    }, 100)
+
+    return () => clearTimeout(timeoutId)
   }, [searchParams, router, queryClient, userId])
 
   return null

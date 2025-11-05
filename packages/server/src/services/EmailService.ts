@@ -216,7 +216,10 @@ export class EmailService {
           </div>
           <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <h2 style="margin-top: 0; color: #2d3748;">Confirm Your Email Change</h2>
-            <p>You requested to change your email address from <strong>${oldEmail}</strong> to <strong>${newEmail}</strong>.</p>
+            <p style="line-height: 1.6;">You requested to change your email address from:</p>
+            <p style="margin: 8px 0; padding: 8px 12px; background: #ffffff; border-left: 3px solid #4299e1; font-family: monospace; color: #2d3748; word-break: break-all;">${oldEmail}</p>
+            <p style="line-height: 1.6;">to:</p>
+            <p style="margin: 8px 0 16px 0; padding: 8px 12px; background: #ffffff; border-left: 3px solid #10b981; font-family: monospace; color: #2d3748; word-break: break-all;">${newEmail}</p>
             <p>Click the button below to confirm this change:</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${verificationUrl}" 

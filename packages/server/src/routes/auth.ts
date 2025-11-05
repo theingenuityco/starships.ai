@@ -422,11 +422,11 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
       redirectPath = await userService.getProfileRedirectPath(result.userId);
       redirectPath = `${env.PUBLIC_URL}${redirectPath}?emailChange=success`;
     } else {
-      // User is not authenticated OR userId mismatch - redirect to login page with returnUrl
-      // This ensures they get redirected to profile after login, preserving the emailChange param
+      // User is not authenticated OR userId mismatch - redirect to login page with returnUrl and emailChange param
+      // This ensures they get redirected to profile after login, and toast shows on login page
       const profilePath = await userService.getProfileRedirectPath(result.userId);
       const returnUrl = encodeURIComponent(`${profilePath}?emailChange=success`);
-      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}`;
+      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}&emailChange=success`;
     }
 
     return res.redirect(redirectPath);

@@ -845,7 +845,7 @@ export class UserService {
     // Send email using email service - use ServiceFactory for consistent instantiation
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
-    await emailService.sendVerificationEmail(email, token);
+    await emailService.sendVerificationEmail(email, token, user.displayName);
 
     logger.info('[UserService] Email verification sent', { userId, email });
   }
@@ -941,7 +941,7 @@ export class UserService {
     const token = await this.passwordResetTokenRepository.generateToken(user.id, email);
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
-    await emailService.sendPasswordResetEmail(email, token);
+    await emailService.sendPasswordResetEmail(email, token, user.displayName);
 
     logger.info('[UserService] Password reset email sent', { userId: user.id, email });
   }

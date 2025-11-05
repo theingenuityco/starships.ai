@@ -47,13 +47,16 @@ This document provides a systematic implementation plan for adding email change 
 
 #### ✅ **GAP 3: Redirect URL Problem - MAJOR**
 
-**Issue**: Plan redirects to `${PUBLIC_URL}/ship/{slug}/settings/profile?emailChange=success`, but we don't have the `slug` in the backend route handler.
+**Issue**: Plan redirects to `${PUBLIC_URL}/ship/{slug}/settings/profile?emailChange=success`, but we don't have the `slug` in the backend route handler. Also, email change verification can be clicked by either logged-in or logged-out users.
 
 **Analysis**:
 
 - OAuth linking uses duplicate code pattern (lines 465-505 in `auth.ts` - same logic twice!)
 - Pattern: Get user's starships → find first active → build redirect path → fallback to `/profile`
 - This pattern is duplicated in OAuth success and error handlers
+- Email verification always redirects to `/login` (user not logged in yet)
+- OAuth linking redirects to profile page (user IS logged in)
+- Email change verification could be clicked by either logged-in or logged-out user
 
 **Elegant Resolution**:
 
@@ -72,9 +75,48 @@ This document provides a systematic implementation plan for adding email change 
     }
   }
   ```
-- Use in email change verification route
-- **Bonus**: Refactor OAuth handlers to use same method (removes duplication!)
-- Fallback: `/login?emailChange=success` (consistent with email verification fallback to `/login?verification=success`)
+- **Create helper function** in `auth.ts` route: `getAuthenticatedUserFromRequest(req: Request): Promise<UserModel | null>`
+  - This helper tries to extract and verify JWT from Authorization header
+  - Returns user if authenticated, null if not (doesn't throw errors)
+  - Follows the `optionalJwtAuth` middleware pattern but as a helper function
+  - **Note**: Email links clicked directly won't have Authorization header (browser redirects don't include it), so this will return `null` for direct link clicks, which is correct behavior
+
+  ```typescript
+  async function getAuthenticatedUserFromRequest(req: Request): Promise<UserModel | null> {
+    try {
+      // Try Authorization header (frontend sends JWT via Authorization header)
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        if (token && token.length >= 10) {
+          const { payload } = await verifyJWT(token);
+          const user = await UserService.getUserById(payload.sub as string);
+          if (user) return user;
+        }
+      }
+
+      // Email links clicked directly won't have Authorization header (browser redirects)
+      // This is expected - return null for unauthenticated users
+      return null;
+    } catch (error) {
+      // Silently fail - user is not authenticated
+      return null;
+    }
+  }
+  ```
+
+- **In email change verification route**:
+  - After validating email change token and completing change, get `userId` from token
+  - Check if user is authenticated: `const authenticatedUser = await getAuthenticatedUserFromRequest(req)`
+  - If authenticated AND userId matches: Use `getProfileRedirectPath(userId)` → redirect to profile page
+  - If not authenticated OR userId mismatch: Redirect to `/login?emailChange=success`
+  - This handles both logged-in and logged-out scenarios elegantly
+- **Bonus**: Refactor OAuth handlers to use `getProfileRedirectPath()` method (removes duplication!)
+- This approach is elegant because:
+  - ✅ Reuses existing JWT verification logic
+  - ✅ Doesn't require new middleware
+  - ✅ Handles both authenticated and unauthenticated users
+  - ✅ Matches OAuth pattern (logged in → profile) and email verification pattern (logged out → login)
 
 #### ✅ **GAP 4: Rate Limiting**
 
@@ -360,6 +402,10 @@ CREATE INDEX idx_email_change_tokens_new_email ON email_change_tokens(new_email)
   - [ ] Log operation
 - [ ] Add `completeEmailChange(token)`:
   - [ ] Validate and consume token (atomic)
+  - [ ] Get user from database using `userId` from token
+  - [ ] **SECURITY CHECK**: Verify user's current email matches token's `oldEmail`:
+    - [ ] If user's current email !== token's `oldEmail`, throw `InvalidTokenError` (token is stale - user may have changed email already)
+    - [ ] This prevents race conditions where user changes email twice before verifying first change
   - [ ] Check if new email still available (race condition check)
   - [ ] Update user email in database
   - [ ] Set `emailVerified = true` if not already
@@ -512,15 +558,18 @@ CREATE INDEX idx_email_change_tokens_new_email ON email_change_tokens(new_email)
   - [ ] Add rate limiting (use `rateLimiters.sensitive` - 20/hour)
 - [ ] Add route in `auth.ts`: `GET /auth/email/change/verify?token=xxx`
   - [ ] **Extend EMAIL VERIFICATION ROUTES section** (after email verification route)
-  - [ ] No authentication required (token-based)
+  - [ ] No authentication required (token-based, like email verification)
   - [ ] Validate token format (64-char hex) using same Zod schema pattern
   - [ ] Call `UserService.completeEmailChange()` to get `{ userId, oldEmail, newEmail }`
-  - [ ] **ELEGANT**: Use `UserService.getProfileRedirectPath(userId)` helper method:
-    - [ ] Get redirect path from helper (handles starship lookup internally)
-    - [ ] Check if redirect path is `/profile` (no starship found):
-      - [ ] If `/profile`: Redirect to `${PUBLIC_URL}/login?emailChange=success` (user might not be logged in)
-      - [ ] If starship path: Redirect to `${PUBLIC_URL}${redirectPath}?emailChange=success`
-    - [ ] This handles both logged-in and logged-out users gracefully
+  - [ ] **ELEGANT**: Check if user is authenticated using `getAuthenticatedUserFromRequest(req)` helper:
+    - [ ] Helper function tries to extract and verify JWT from Authorization header
+    - [ ] Returns `UserModel | null` (doesn't throw errors if not authenticated)
+    - [ ] Follows `optionalJwtAuth` middleware pattern but as a helper function
+  - [ ] **ELEGANT**: Determine redirect based on authentication status:
+    - [ ] If authenticated AND userId matches: Use `UserService.getProfileRedirectPath(userId)` → redirect to `${PUBLIC_URL}${redirectPath}?emailChange=success`
+      - [ ] This handles starship lookup internally (returns `/ship/{slug}/settings/profile` or `/profile`)
+    - [ ] If not authenticated OR userId mismatch: Redirect to `${PUBLIC_URL}/login?emailChange=success`
+      - [ ] Matches email verification pattern (user not logged in → login page)
   - [ ] Handle errors (redirect to `${PUBLIC_URL}/login?emailChange=error`)
   - [ ] Follow exact same pattern as `GET /auth/verify-email` route
 - [ ] Add route in `users.ts`: `POST /users/:id/email/change/resend`
@@ -732,8 +781,8 @@ CREATE INDEX idx_email_change_tokens_new_email ON email_change_tokens(new_email)
 - [ ] When no pending state:
   - [ ] Enable email input
   - [ ] Show current email
-  - [ ] Show note: "Changing email will require confirmation"
-- [ ] Handle email input changes (only when not pending)
+  - [ ] Show note: "Changing email will send a verification email to the new address"
+  - [ ] Handle email input changes (only when not pending)
 
 **Testing**:
 

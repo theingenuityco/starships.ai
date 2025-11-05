@@ -112,7 +112,7 @@ describe('UserRepository', () => {
 
       const result = await repository.findByEmail('test@example.com');
 
-      expect(testHelper.mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM users WHERE email = $1', ['test@example.com']);
+      expect(testHelper.mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', ['test@example.com']);
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).not.toBeNull();
       expect(result!.id).toBe(mockUser.id);

@@ -87,7 +87,7 @@ export class EmailService {
    * Send email change verification email following established service patterns
    * Business logic: Email change verification template generation and delivery
    */
-  async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string): Promise<void> {
+  async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string, displayName?: string): Promise<void> {
     const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
     
     const command = new SendEmailCommand({
@@ -96,8 +96,8 @@ export class EmailService {
       Message: {
         Subject: { Data: 'Confirm your new email address' },
         Body: {
-          Html: { Data: this.generateEmailChangeVerificationTemplate(verificationUrl, oldEmail, newEmail) },
-          Text: { Data: this.generateEmailChangeVerificationTextTemplate(verificationUrl, oldEmail, newEmail) },
+          Html: { Data: this.generateEmailChangeVerificationTemplate(verificationUrl, oldEmail, newEmail, displayName) },
+          Text: { Data: this.generateEmailChangeVerificationTextTemplate(verificationUrl, oldEmail, newEmail, displayName) },
         },
       },
     });
@@ -205,53 +205,66 @@ export class EmailService {
     `;
   }
 
-  private generateEmailChangeVerificationTemplate(verificationUrl: string, oldEmail: string, newEmail: string): string {
+  private generateEmailChangeVerificationTemplate(verificationUrl: string, oldEmail: string, newEmail: string, displayName?: string): string {
+    const greeting = displayName ? `Hi ${displayName.split(' ')[0]},` : 'Hi there,';
+    
     return `
       <!DOCTYPE html>
       <html>
         <head><meta charset="utf-8"><title>Confirm Your New Email Address</title></head>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #1a202c;">🔐 Email Change Request</h1>
-          </div>
-          <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="margin-top: 0; color: #2d3748;">Confirm Your Email Change</h2>
-            <p style="line-height: 1.6;">You requested to change your email address from:</p>
-            <p style="margin: 8px 0; padding: 8px 12px; background: #ffffff; border-left: 3px solid #4299e1; font-family: monospace; color: #2d3748; word-break: break-all;">${oldEmail}</p>
-            <p style="line-height: 1.6;">to:</p>
-            <p style="margin: 8px 0 16px 0; padding: 8px 12px; background: #ffffff; border-left: 3px solid #10b981; font-family: monospace; color: #2d3748; word-break: break-all;">${newEmail}</p>
-            <p>Click the button below to confirm this change:</p>
-            <div style="text-align: center; margin: 30px 0;">
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+          <div style="background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h1 style="color: #1a202c; font-size: 24px; margin: 0 0 24px 0; font-weight: 600;">${greeting}</h1>
+            
+            <p style="color: #2d3748; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+              We would like to confirm that you prefer using <strong style="color: #1a202c;">${newEmail}</strong> as your email for Starships.ai.
+            </p>
+            
+            <p style="color: #2d3748; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+              If you do not wish to change your email address and continue using your current email address <strong style="color: #1a202c;">${oldEmail}</strong>, simply disregard this email.
+            </p>
+            
+            <p style="color: #2d3748; font-size: 16px; line-height: 1.6; margin: 0 0 32px 0;">
+              Until you confirm this change, you will need to use your current email address to login to Starships.ai.
+            </p>
+            
+            <div style="text-align: center; margin: 32px 0;">
               <a href="${verificationUrl}" 
-                 style="background: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-                Confirm Email Change
+                 style="background-color: #4299e1; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600; font-size: 16px;">
+                Change email
               </a>
             </div>
-            <p style="font-size: 14px; color: #718096;">
-              If the button doesn't work, copy and paste this link: <br>
-              <a href="${verificationUrl}">${verificationUrl}</a>
-            </p>
-          </div>
-          <div style="font-size: 12px; color: #a0aec0; text-align: center;">
-            <p style="color: #e53e3e; font-weight: bold;">This link expires in 1 hour.</p>
-            <p>If you didn't request this email change, please ignore this email or contact support if you have concerns.</p>
+            
+            <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+              <p style="color: #718096; font-size: 14px; line-height: 1.5; margin: 0 0 8px 0;">
+                This link will be valid for the next 1 hour.
+              </p>
+              <p style="color: #718096; font-size: 14px; line-height: 1.5; margin: 0;">
+                This is an automatically generated email—please do not reply to this email.
+              </p>
+            </div>
           </div>
         </body>
       </html>
     `;
   }
 
-  private generateEmailChangeVerificationTextTemplate(verificationUrl: string, oldEmail: string, newEmail: string): string {
+  private generateEmailChangeVerificationTextTemplate(verificationUrl: string, oldEmail: string, newEmail: string, displayName?: string): string {
+    const greeting = displayName ? `Hi ${displayName.split(' ')[0]},` : 'Hi there,';
+    
     return `
-      Confirm Your New Email Address
-      
-      You requested to change your email address from ${oldEmail} to ${newEmail}.
-      Click this link to confirm the change:
-      ${verificationUrl}
-      
-      This link expires in 1 hour.
-      
-      If you didn't request this email change, please ignore this email or contact support if you have concerns.
+      ${greeting}
+
+      We would like to confirm that you prefer using ${newEmail} as your email for Starships.ai.
+
+      If you do not wish to change your email address and continue using your current email address ${oldEmail}, simply disregard this email.
+
+      Until you confirm this change, you will need to use your current email address to login to Starships.ai.
+
+      Change email: ${verificationUrl}
+
+      This link will be valid for the next 1 hour.
+      This is an automatically generated email—please do not reply to this email.
     `;
   }
 }

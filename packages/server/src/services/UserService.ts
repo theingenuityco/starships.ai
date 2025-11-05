@@ -1025,7 +1025,7 @@ export class UserService {
     // Send verification email using email service
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
-    await emailService.sendEmailChangeVerificationEmail(newEmail, token, oldEmail);
+    await emailService.sendEmailChangeVerificationEmail(newEmail, token, oldEmail, user.displayName);
 
     logger.info('[UserService] Email change initiated', { userId, oldEmail, newEmail });
   }

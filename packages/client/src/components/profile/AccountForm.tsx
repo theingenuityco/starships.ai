@@ -66,7 +66,7 @@ export default function AccountForm() {
     <>
       <AccountTopBar dirty={dirty} saving={saving} onReset={onRevertAll} formId="account-form" />
 
-      <form id="account-form" onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 xl:gap-8">
+      <form id="account-form" onSubmit={onSave} className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <ProfileOverviewCard
             initials={initials}

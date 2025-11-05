@@ -22,7 +22,7 @@ const OAUTH_QUERY_KEYS = {
 } as const
 
 // Response data extraction helper
-const extractResponseData = <T = any>(response: any): T => response.data.data
+const extractResponseData = <T = any,>(response: any): T => response.data.data
 
 // OAuth accounts hook
 function useOAuthAccounts(enabled: boolean = true) {
@@ -48,7 +48,7 @@ function useUnlinkOAuthAccount() {
       const response = await api.delete(`/api/v1/auth/oauth/unlink/${provider}`)
       return response.data
     },
-    onMutate: async (provider) => {
+    onMutate: async provider => {
       // Cancel competing queries
       await queryClient.cancelQueries({ queryKey: OAUTH_QUERY_KEYS.accounts() })
 
@@ -105,7 +105,7 @@ export function OAuthAccountsSettings() {
   useEffect(() => {
     const oauthLink = searchParams?.get('oauth_link')
     const provider = searchParams?.get('provider')
-    
+
     if (oauthLink === 'success' && provider) {
       toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account linked successfully!`)
       // Refetch accounts data to show the newly linked account
@@ -121,7 +121,7 @@ export function OAuthAccountsSettings() {
     try {
       const response = await api.post(`/api/v1/auth/oauth/link/${provider}`)
       const { authUrl } = extractResponseData<{ authUrl: string }>(response)
-      
+
       // Redirect to OAuth provider with secure state
       window.location.href = authUrl
     } catch (error: any) {
@@ -180,9 +180,7 @@ export function OAuthAccountsSettings() {
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
-            <AlertDescription>
-              Failed to load your connected accounts. Please try refreshing the page.
-            </AlertDescription>
+            <AlertDescription>Failed to load your connected accounts. Please try refreshing the page.</AlertDescription>
           </Alert>
         </CardContent>
       </Card>
@@ -190,22 +188,20 @@ export function OAuthAccountsSettings() {
   }
 
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Connected Accounts
         </CardTitle>
-        <CardDescription className="text-sm">
-          Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf
-        </CardDescription>
+        <CardDescription className="text-sm">Link accounts for authentication only - we don't access your account data or perform actions on your behalf.</CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {(['google', 'github'] as const).map(provider => {
           const isLinked = getProviderStatus(provider)
           const account = getProviderAccount(provider)
-          
+
           return (
             <motion.div
               key={provider}
@@ -235,31 +231,19 @@ export function OAuthAccountsSettings() {
                       {account.profileData?.name && ` • ${account.profileData.name}`}
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Not connected
-                    </p>
+                    <p className="text-xs text-muted-foreground">Not connected</p>
                   )}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 {isLinked ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleUnlinkAccount(provider)}
-                    disabled={unlinkMutation.isPending}
-                    className="text-destructive hover:text-destructive"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(provider)} disabled={unlinkMutation.isPending} className="text-destructive hover:text-destructive">
                     <Icon name="unlink" className="h-3 w-3 mr-1" />
                     Unlink
                   </Button>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleLinkAccount(provider)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleLinkAccount(provider)}>
                     <Icon name="external-link" className="h-3 w-3 mr-1" />
                     Connect
                   </Button>
@@ -268,13 +252,11 @@ export function OAuthAccountsSettings() {
             </motion.div>
           )
         })}
-        
+
         {accounts.length > 0 && (
           <Alert>
             <Icon name="shield" className="h-4 w-4" />
-            <AlertDescription>
-              You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.
-            </AlertDescription>
+            <AlertDescription>You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.</AlertDescription>
           </Alert>
         )}
       </CardContent>

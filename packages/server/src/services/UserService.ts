@@ -424,6 +424,26 @@ export class UserService {
       }
     }
 
+    // SECURITY: Check if OAuth email is already used as primary email for another user
+    if (profile.email) {
+      const existingUserByEmail = await this.userRepository.findByEmail(profile.email);
+      if (existingUserByEmail && existingUserByEmail.id !== userId) {
+        throw new ValidationError(
+          `Email "${profile.email}" is already registered as a primary account. Please use a different account or contact support.`,
+          'email'
+        );
+      }
+
+      // SECURITY: Check if OAuth email is already used in OAuth accounts for another user
+      const existingOAuthAccount = await oauthRepo.findByEmail(profile.email);
+      if (existingOAuthAccount && existingOAuthAccount.userId !== userId) {
+        throw new ValidationError(
+          `Email "${profile.email}" is already linked to another account. Please use a different account or contact support.`,
+          'email'
+        );
+      }
+    }
+
     // Business logic: Create OAuth account link using Entity pattern
     const oauthAccountData = {
       userId,
@@ -477,23 +497,23 @@ export class UserService {
     // Update auth methods after unlinking to reflect the removed OAuth account
     // Get remaining OAuth accounts after deletion
     const remainingOAuthAccounts = await this.getUserOAuthAccounts(userId);
-    
+
     // Rebuild auth methods array based on current state
     const authMethods: AuthMethod[] = [];
-    
+
     if (user.hasPassword) {
       authMethods.push('password');
     }
-    
+
     remainingOAuthAccounts.forEach((account) => {
       if (!authMethods.includes(account.provider as AuthMethod)) {
         authMethods.push(account.provider as AuthMethod);
       }
     });
-    
+
     // Update primary auth method
     const primaryAuthMethod = user.hasPassword ? 'password' : 'oauth';
-    
+
     await this.userRepository.update(userId, {
       authMethods,
       primaryAuthMethod,

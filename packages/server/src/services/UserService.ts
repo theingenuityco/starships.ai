@@ -1009,9 +1009,15 @@ export class UserService {
       return; // No-op - same email
     }
 
-    // Business validation: Check if new email already exists
+    // Business validation: Check if new email already exists (as primary email or OAuth email)
     const existingUserByEmail = await this.userRepository.findByEmail(newEmail);
     if (existingUserByEmail) {
+      throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Business validation: Check if new email is already used in OAuth accounts (case-insensitive)
+    const existingOAuthAccount = await this.oauthRepository.findByEmail(newEmail);
+    if (existingOAuthAccount) {
       throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
     }
 
@@ -1055,8 +1061,15 @@ export class UserService {
     }
 
     // Business validation: Check if new email still available (race condition check)
+    // Check both primary email and OAuth accounts
     const existingUserByEmail = await this.userRepository.findByEmail(verification.newEmail);
     if (existingUserByEmail) {
+      throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Business validation: Check if new email is already used in OAuth accounts (case-insensitive)
+    const existingOAuthAccount = await this.oauthRepository.findByEmail(verification.newEmail);
+    if (existingOAuthAccount) {
       throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
     }
 

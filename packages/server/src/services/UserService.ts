@@ -456,14 +456,48 @@ export class UserService {
   async unlinkOAuthAccount(userId: string, provider: string): Promise<void> {
     // Business rule: Check if user has password or other OAuth accounts
     const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
     const oauthAccounts = await this.getUserOAuthAccounts(userId);
 
-    if (!user?.password && oauthAccounts.length <= 1) {
+    // Check if this would be the last authentication method
+    // User needs either a password OR multiple OAuth accounts
+    const willHaveOtherOAuthAccounts = oauthAccounts.length > 1;
+    const hasPassword = user.hasPassword;
+
+    if (!hasPassword && !willHaveOtherOAuthAccounts) {
       throw new ValidationError('Cannot unlink last authentication method. Set a password first.', 'provider');
     }
 
     // Business operation: Remove OAuth account
     await this.oauthRepository.deleteByProviderAndUser(provider, userId);
+
+    // Update auth methods after unlinking to reflect the removed OAuth account
+    // Get remaining OAuth accounts after deletion
+    const remainingOAuthAccounts = await this.getUserOAuthAccounts(userId);
+    
+    // Rebuild auth methods array based on current state
+    const authMethods: AuthMethod[] = [];
+    
+    if (user.hasPassword) {
+      authMethods.push('password');
+    }
+    
+    remainingOAuthAccounts.forEach((account) => {
+      if (!authMethods.includes(account.provider as AuthMethod)) {
+        authMethods.push(account.provider as AuthMethod);
+      }
+    });
+    
+    // Update primary auth method
+    const primaryAuthMethod = user.hasPassword ? 'password' : 'oauth';
+    
+    await this.userRepository.update(userId, {
+      authMethods,
+      primaryAuthMethod,
+    });
   }
 
   /**

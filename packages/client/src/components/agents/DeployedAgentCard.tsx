@@ -30,7 +30,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
       <Card
-        className="frosted-glass-card shadow-frosted-lg group relative overflow-hidden transition-all duration-300 cursor-pointer border-2 border-border/30 hover:border-violet-500/50 backdrop-blur-xl h-full flex flex-col"
+        className="frosted-glass-card shadow-frosted-lg group relative overflow-hidden transition-all duration-300 cursor-pointer border border-border/50 hover:border-violet-500/50 backdrop-blur-xl h-full flex flex-col"
         onClick={onClick}
       >
         {/* Space-themed radial gradient overlay - matching landing screen */}
@@ -116,33 +116,39 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
 
         <CardHeader className="pb-4 relative z-10 pt-5">
           <div className="flex items-start gap-3 mb-3">
-            {/* Enhanced Avatar with purple/violet glow effect */}
+            {/* Enhanced Avatar */}
             <div className="relative flex-shrink-0">
-              {/* Purple/violet glow ring on hover */}
+              {/* Animated purple glow ring - only on hover */}
               <motion.div
-                className="absolute inset-0 rounded-full blur-xl opacity-0 group-hover:opacity-100"
+                className="absolute inset-0 rounded-full blur-xl pointer-events-none hidden group-hover:block"
                 style={{
                   background: 'radial-gradient(circle, rgba(168,85,247,0.4), rgba(139,92,246,0.2), transparent 70%)',
                 }}
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                animate={{
+                  scale: [1, 1.15, 1],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
               />
               <Avatar
                 className="h-12 w-12 transition-all duration-300 relative z-10 shadow-lg"
                 style={{
-                  boxShadow: '0 0 0 2px rgba(168,85,247,0.2), 0 4px 12px rgba(168,85,247,0.15)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 }}
               >
                 <AgentAvatar seed={agent.name} size={48} />
               </Avatar>
+              {/* Animated purple border ring - only on hover */}
               <motion.div
-                className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100"
+                className="absolute inset-0 rounded-full pointer-events-none hidden group-hover:block"
                 style={{
                   boxShadow: '0 0 0 3px rgba(168,85,247,0.4)',
                 }}
                 animate={{
                   scale: [1, 1.15, 1],
-                  opacity: [0.6, 0.8, 0.6],
                 }}
                 transition={{
                   duration: 2,
@@ -186,41 +192,31 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
 
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
           <div className="flex items-center justify-between">
-            {/* Model badge with purple/violet styling */}
-            <Badge
-              variant="secondary"
-              className="text-xs flex items-center gap-1.5 px-2.5 py-1 transition-all duration-200"
-              style={{
-                backgroundColor: 'rgba(139,92,246,0.15)',
-                borderColor: 'rgba(168,85,247,0.3)',
-                borderWidth: '1px',
-                borderStyle: 'solid',
-              }}
-            >
-              <Icon name="brain" className="w-3.5 h-3.5" style={{ color: 'rgba(168,85,247,0.9)' }} />
+            {/* Model badge */}
+            <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1 transition-all duration-200">
+              <Icon name="brain" className="w-3.5 h-3.5" />
               <span className="font-mono text-xs">{agent.model || 'N/A'}</span>
             </Badge>
 
-            {/* Chat button with purple/violet gradient styling */}
+            {/* Chat button */}
             {onChat ? (
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-9 px-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md group-hover:scale-105"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(168,85,247,0.15), rgba(139,92,246,0.1))',
-                  border: '1px solid rgba(168,85,247,0.3)',
-                  color: 'rgba(168,85,247,1)',
-                }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(139,92,246,0.2))'
-                  e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)'
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(168,85,247,0.3)'
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(139,92,246,0.12))'
+                  e.currentTarget.style.borderColor = 'rgba(168,85,247,0.4)'
+                  e.currentTarget.style.boxShadow = '0 0 8px rgba(168,85,247,0.2)'
+                  e.currentTarget.style.color = 'rgba(168,85,247,0.9)'
+                  e.currentTarget.style.border = '1px solid rgba(168,85,247,0.4)'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.15), rgba(139,92,246,0.1))'
-                  e.currentTarget.style.borderColor = 'rgba(168,85,247,0.3)'
-                  e.currentTarget.style.boxShadow = '0 0 0 rgba(168,85,247,0)'
+                  e.currentTarget.style.background = ''
+                  e.currentTarget.style.borderColor = ''
+                  e.currentTarget.style.boxShadow = ''
+                  e.currentTarget.style.color = ''
+                  e.currentTarget.style.border = ''
                 }}
                 onClick={e => {
                   e.stopPropagation()

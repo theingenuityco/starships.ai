@@ -44,10 +44,29 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
     if (special) {
       return (
         <div
-          className="rounded-full flex items-center justify-center bg-[#DD961C] hover:bg-[#CC860C] transition-colors duration-200 flex-shrink-0"
-          style={{ width: '1.625rem', height: '1.625rem', margin: 0, pointerEvents: 'none' }}
+          className="rounded-full bg-[#DD961C] hover:bg-[#CC860C] transition-colors duration-200 flex-shrink-0"
+          style={{
+            width: '1.625rem',
+            height: '1.625rem',
+            margin: 0,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <span className="text-black font-normal text-2xl leading-none font-mono">+</span>
+          <span
+            className="text-black font-light text-lg"
+            style={{
+              lineHeight: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '-2px',
+            }}
+          >
+            +
+          </span>
         </div>
       )
     }

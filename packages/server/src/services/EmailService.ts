@@ -212,7 +212,7 @@ export class EmailService {
         <head><meta charset="utf-8"><title>Confirm Your New Email Address</title></head>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #1a202c;">✉️ Confirm Your New Email Address</h1>
+            <h1 style="color: #1a202c;">🔐 Email Change Request</h1>
           </div>
           <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <h2 style="margin-top: 0; color: #2d3748;">Confirm Your Email Change</h2>

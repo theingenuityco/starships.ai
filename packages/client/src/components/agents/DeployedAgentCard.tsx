@@ -165,12 +165,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
             {/* Agent name and badge */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <CardTitle 
-                  className="truncate text-lg font-bold transition-all duration-300"
-                  style={{ color: 'rgba(168,85,247,1)' }}
-                >
-                  {agent.name}
-                </CardTitle>
+                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(168,85,247,1)]">{agent.name}</CardTitle>
                 {isSystemAgent && (
                   <Badge
                     variant="outline"
@@ -206,13 +201,13 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-9 px-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md group-hover:scale-105"
+                className="h-9 px-3 font-medium transition-all duration-200"
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(139,92,246,0.12))'
-                  e.currentTarget.style.borderColor = 'rgba(168,85,247,0.4)'
-                  e.currentTarget.style.boxShadow = '0 0 8px rgba(168,85,247,0.2)'
-                  e.currentTarget.style.color = 'rgba(168,85,247,0.9)'
-                  e.currentTarget.style.border = '1px solid rgba(168,85,247,0.4)'
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.1), rgba(139,92,246,0.06))'
+                  e.currentTarget.style.borderColor = 'rgba(168,85,247,0.25)'
+                  e.currentTarget.style.boxShadow = '0 0 4px rgba(168,85,247,0.1)'
+                  e.currentTarget.style.color = 'rgba(168,85,247,0.8)'
+                  e.currentTarget.style.border = '1px solid rgba(168,85,247,0.25)'
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.background = ''

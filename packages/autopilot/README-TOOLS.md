@@ -218,6 +218,23 @@ Notes:
 - **Dynamic Execution**: Creates tool calling loops automatically
 - **Memory Integration**: Works with agent memory system
 
+## Using Code node inside tools (module-style)
+
+When authoring tool blueprints that include a `code` node, write code as a module with an entrypoint:
+
+```javascript
+async function main(ctx) {
+  // Access tool arguments via ctx.$input
+  // Access workflow state via ctx.$state
+  // Access secure env via ctx.$env('KEY')
+  // Read prior node output via ctx.$lastOutputOf('node_ref')
+  return { ok: true };
+}
+```
+
+- Globals: standard JS built-ins and `console` are available. Timers (`setTimeout`, `setInterval`), `require`, `import`, `eval`, `Function`, `process`, `global`, and `globalThis` are blocked.
+- The old top-level `return` style is no longer supported.
+
 ## Error handling and loop prevention
 
 - Tools execute their own blueprint with failOnNodeError enabled. On failure, the Tool node returns an ExecutionItem that sets `error` and also provides `json` with a structured payload:

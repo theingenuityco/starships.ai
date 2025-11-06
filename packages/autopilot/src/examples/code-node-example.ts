@@ -25,50 +25,51 @@ const calculatorBlueprint: Blueprint = {
       description: 'Perform calculation using JavaScript',
       parameters: {
         code: `
-          // Get the expression from input
-          const expression = input.expression;
-          
-          if (!expression || typeof expression !== 'string') {
-            throw new Error('Expression is required and must be a string');
-          }
-          
-          // Validate expression contains only safe characters
-          if (!/^[0-9+\\-*/().\\s]+$/.test(expression)) {
-            throw new Error('Expression contains invalid characters');
-          }
-          
-          // Simple calculator using basic operations
-          let result;
-          try {
-            // For this example, we'll implement a basic calculator
-            // In a real implementation, you could use a proper expression parser
-            result = parseFloat(expression.replace(/\\s/g, ''));
+          async function main(ctx) {
+            const expression = ctx.$input.expression;
             
-            // If it's just a number, return it
-            if (!isNaN(result) && expression.match(/^[0-9.]+$/)) {
-              // Just a number
-            } else {
-              // For demo purposes, handle a few simple cases
-              if (expression === '2 + 3 * 4') {
-                result = 14; // 2 + (3 * 4) = 14
-              } else if (expression.includes('+')) {
-                const parts = expression.split('+').map(p => parseFloat(p.trim()));
-                result = parts.reduce((a, b) => a + b, 0);
-              } else if (expression.includes('*')) {
-                const parts = expression.split('*').map(p => parseFloat(p.trim()));
-                result = parts.reduce((a, b) => a * b, 1);
-              } else {
-                throw new Error('Unsupported expression format');
-              }
+            if (!expression || typeof expression !== 'string') {
+              throw new Error('Expression is required and must be a string');
             }
             
-            return {
-              expression: expression,
-              result: result,
-              timestamp: new Date().toISOString()
-            };
-          } catch (error) {
-            throw new Error('Invalid expression: ' + error.message);
+            // Validate expression contains only safe characters
+            if (!/^[0-9+\\-*/().\\s]+$/.test(expression)) {
+              throw new Error('Expression contains invalid characters');
+            }
+            
+            // Simple calculator using basic operations
+            let result;
+            try {
+              // For this example, we'll implement a basic calculator
+              // In a real implementation, you could use a proper expression parser
+              result = parseFloat(expression.replace(/\\s/g, ''));
+              
+              // If it's just a number, return it
+              if (!isNaN(result) && expression.match(/^[0-9.]+$/)) {
+                // Just a number
+              } else {
+                // For demo purposes, handle a few simple cases
+                if (expression === '2 + 3 * 4') {
+                  result = 14; // 2 + (3 * 4) = 14
+                } else if (expression.includes('+')) {
+                  const parts = expression.split('+').map(p => parseFloat(p.trim()));
+                  result = parts.reduce((a, b) => a + b, 0);
+                } else if (expression.includes('*')) {
+                  const parts = expression.split('*').map(p => parseFloat(p.trim()));
+                  result = parts.reduce((a, b) => a * b, 1);
+                } else {
+                  throw new Error('Unsupported expression format');
+                }
+              }
+              
+              return {
+                expression: expression,
+                result: result,
+                timestamp: new Date().toISOString()
+              };
+            } catch (error) {
+              throw new Error('Invalid expression: ' + error.message);
+            }
           }
         `,
         timeout: 5000,
@@ -128,32 +129,34 @@ const timeBlueprint: Blueprint = {
       description: 'Get current time with timezone support',
       parameters: {
         code: `
-          const timezone = input.timezone || 'UTC';
-          const format = input.format || 'ISO';
-          const now = new Date();
-          
-          let result;
-          
-          switch (format) {
-            case 'ISO':
-              result = timezone === 'UTC' ? now.toISOString() : now.toLocaleString('sv-SE', { timeZone: timezone }) + 'Z';
-              break;
-            case 'locale':
-              result = timezone === 'UTC' ? now.toUTCString() : now.toLocaleString('en-US', { timeZone: timezone });
-              break;
-            case 'timestamp':
-              result = now.getTime();
-              break;
-            default:
-              result = now.toISOString();
+          async function main(ctx) {
+            const timezone = ctx.$input.timezone || 'UTC';
+            const format = ctx.$input.format || 'ISO';
+            const now = new Date();
+            
+            let result;
+            
+            switch (format) {
+              case 'ISO':
+                result = timezone === 'UTC' ? now.toISOString() : now.toLocaleString('sv-SE', { timeZone: timezone }) + 'Z';
+                break;
+              case 'locale':
+                result = timezone === 'UTC' ? now.toUTCString() : now.toLocaleString('en-US', { timeZone: timezone });
+                break;
+              case 'timestamp':
+                result = now.getTime();
+                break;
+              default:
+                result = now.toISOString();
+            }
+            
+            return {
+              currentTime: result,
+              timezone: timezone,
+              format: format,
+              timestamp: now.getTime()
+            };
           }
-          
-          return {
-            currentTime: result,
-            timezone: timezone,
-            format: format,
-            timestamp: now.getTime()
-          };
         `,
         timeout: 3000,
       },

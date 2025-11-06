@@ -81,7 +81,7 @@ export function useDeferredToolCreationModal(options: {
     }
   }, [conversationId])
 
-  // While streaming, track tool-creation candidate call ids (assistant calls without slug)
+  // While streaming, track tool-creation candidate call ids (assistant open-tool calls without slug)
   useEffect(() => {
     if (!isStreaming || !liveMessages.length) return
 
@@ -94,7 +94,8 @@ export function useDeferredToolCreationModal(options: {
         for (const tc of (msg as any).toolCalls as any[]) {
           const rawName = tc?.function?.name as string | undefined
           const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-          if (!fnName || (!fnName.includes('open-tool') && !fnName.includes('edit-tool') && !fnName.includes('tool-blueprint-'))) continue
+          // Only consider open-tool calls for creation detection (ignore edits/blueprint changes)
+          if (!fnName || (!fnName.includes('open-tool'))) continue
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
             try {
@@ -108,7 +109,6 @@ export function useDeferredToolCreationModal(options: {
           const slug = nestedSlug || altToolSlug || null
           const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
           const callId = typeof (tc as any)?.id === 'string' ? String((tc as any).id) : undefined
-          if (callId) toolRelatedCallIdsRef.current.add(callId)
           if (!slug && callId) toolCreationCallIdsRef.current.add(callId)
           if (!slug && maybeName) {
             createdNamesRef.current.add(maybeName)
@@ -140,7 +140,8 @@ export function useDeferredToolCreationModal(options: {
             for (const tc of (msg as any).toolCalls as any[]) {
               const rawName = tc?.function?.name as string | undefined
               const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-              if (!fnName || (!fnName.includes('open-tool') && !fnName.includes('edit-tool') && !fnName.includes('tool-blueprint-'))) continue
+              // Only consider open-tool calls (ignore edits/blueprint)
+              if (!fnName || (!fnName.includes('open-tool'))) continue
               let args: any = tc?.function?.arguments
               if (typeof args === 'string') {
                 try {
@@ -156,14 +157,12 @@ export function useDeferredToolCreationModal(options: {
               const callId = typeof (tc as any)?.id === 'string' ? String((tc as any).id) : undefined
               if (!slug && callId) {
                 toolCreationCallIdsRef.current.add(callId)
-              } else if (slug && callId && (toolCreationCallIdsRef.current.has(callId) || toolRelatedCallIdsRef.current.has(callId))) {
+              } else if (slug && callId && toolCreationCallIdsRef.current.has(callId)) {
+                // Only capture slugs that originated from an open-tool call without slug
                 createdSlugsRef.current.add(slug)
               } else if (!slug && callId && toolCreationCallIdsRef.current.has(callId)) {
                 if (fnName.startsWith('open-tool-')) {
                   const suffix = fnName.slice('open-tool-'.length)
-                  if (suffix) createdSlugsRef.current.add(suffix)
-                } else if (fnName.startsWith('edit-tool-')) {
-                  const suffix = fnName.slice('edit-tool-'.length)
                   if (suffix) createdSlugsRef.current.add(suffix)
                 }
               }
@@ -174,7 +173,7 @@ export function useDeferredToolCreationModal(options: {
           }
           if (msg.role === 'tool' && msg.toolCallId) {
             const idStr = String(msg.toolCallId)
-            let isToolRelated = toolCreationCallIdsRef.current.has(idStr) || toolRelatedCallIdsRef.current.has(idStr)
+            let isToolRelated = toolCreationCallIdsRef.current.has(idStr)
             if (!isToolRelated) {
               try {
                 for (let j = liveMessages.length - 1; j >= 0; j--) {
@@ -184,8 +183,20 @@ export function useDeferredToolCreationModal(options: {
                   if (match) {
                     const rawName = match?.function?.name as string | undefined
                     const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-                    if (fnName && (fnName.includes('open-tool') || fnName.includes('edit-tool') || fnName.includes('tool-blueprint-'))) {
-                      isToolRelated = true
+                    if (fnName && fnName.includes('open-tool')) {
+                      // Ensure initial args lacked slug to qualify as creation flow
+                      let args: any = match?.function?.arguments
+                      if (typeof args === 'string') {
+                        try {
+                          args = JSON.parse(args)
+                        } catch {}
+                      }
+                      const src = args && typeof args === 'object' ? (args as any) : undefined
+                      const nested = src?.tool || src?.data || src?.payload || src
+                      const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+                      const altToolSlug = typeof src?.toolSlug === 'string' && src.toolSlug.trim() ? String(src.toolSlug) : undefined
+                      const hadSlugInitially = Boolean(nestedSlug || altToolSlug)
+                      if (!hadSlugInitially) isToolRelated = true
                     }
                     break
                   }

@@ -42,24 +42,26 @@ Behavior and limits:
         description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('baseUrl is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('authToken is required');
+              if (!starshipId) throw new Error('starshipId is required');
 
-            const slug = input && input.slug;
-            if (!slug || typeof slug !== 'string') throw new Error('slug is required');
+              const slug = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input.slug : undefined;
+              if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
-            return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
-              method: 'GET',
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
-              }
-            };
+              return {
+                url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
+                method: 'GET',
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -83,13 +85,15 @@ Behavior and limits:
         description: 'Return the tool model (prefer body.data when present)',
         parameters: {
           code: `
-            const http = input;
-            const body = http && typeof http === 'object' ? http.body : http;
-            // Server sendSuccess returns { data: T }, prefer data when present
-            if (body && typeof body === 'object' && body.data !== undefined) {
-              return body.data;
+            async function main(ctx) {
+              const http = ctx.$input;
+              const body = http && typeof http === 'object' ? http.body : http;
+              // Server sendSuccess returns { data: T }, prefer data when present
+              if (body && typeof body === 'object' && body.data !== undefined) {
+                return body.data;
+              }
+              return body;
             }
-            return body;
           `,
           timeout: 2000,
         },

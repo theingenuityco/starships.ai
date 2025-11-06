@@ -35,7 +35,7 @@ export function useDeferredAgentCreationModal(options: {
   const createdNamesRef = useRef<Set<string>>(new Set())
   const turnStartIndexRef = useRef<number>(0)
   const agentCreationCallIdsRef = useRef<Set<string>>(new Set())
-  // Track all agent-related tool call ids (open/edit) regardless of whether slug was present initially
+  // Track agent-creation candidate call ids (open-agent without slug initially)
   const agentRelatedCallIdsRef = useRef<Set<string>>(new Set())
 
   const [isOpen, setIsOpen] = useState<boolean>(false)
@@ -78,7 +78,7 @@ export function useDeferredAgentCreationModal(options: {
     }
   }, [conversationId])
 
-  // While streaming, track agent-creation candidate call ids (assistant calls without slug)
+  // While streaming, track agent-creation candidate call ids (assistant open-agent calls without slug)
   useEffect(() => {
     if (!isStreaming || !liveMessages.length) return
 
@@ -94,8 +94,8 @@ export function useDeferredAgentCreationModal(options: {
         for (const tc of (msg as any).toolCalls as any[]) {
           const rawName = tc?.function?.name as string | undefined
           const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-          // Only consider AGENT-related calls
-          if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent') && !fnName.includes('edit-agent') && !fnName.includes('edit agent'))) continue
+          // Only consider open-agent calls for creation detection (ignore edits)
+          if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent'))) continue
           let args: any = tc?.function?.arguments
           if (typeof args === 'string') {
             try {
@@ -110,7 +110,6 @@ export function useDeferredAgentCreationModal(options: {
           const slug = nestedSlug || altAgentSlug || null
           const maybeName = nested && typeof nested.name === 'string' && nested.name.trim() ? String(nested.name) : undefined
           const callId = typeof (tc as any)?.id === 'string' ? String((tc as any).id) : undefined
-          if (callId) agentRelatedCallIdsRef.current.add(callId)
           if (!slug && callId) agentCreationCallIdsRef.current.add(callId)
           // While streaming, if we have a name but no slug yet, memoize the name (creation mode hint)
           if (!slug && maybeName) {
@@ -137,7 +136,7 @@ export function useDeferredAgentCreationModal(options: {
       // Include the last existing message since it may receive in-place updates (toolCalls)
       turnStartIndexRef.current = Math.max(0, liveMessages.length - 1)
     }
-    // Turn ended: finalize and open modal if anything was created (agent-related only)
+    // Turn ended: finalize and open modal if anything was created (open-agent only)
     if (was && !isStreaming) {
       // Fallback: some toolCalls may land right at the end; scan messages since turn start
       try {
@@ -149,8 +148,8 @@ export function useDeferredAgentCreationModal(options: {
             for (const tc of (msg as any).toolCalls as any[]) {
               const rawName = tc?.function?.name as string | undefined
               const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-              // Only consider AGENT-related calls
-              if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent') && !fnName.includes('edit-agent') && !fnName.includes('edit agent'))) continue
+              // Only consider open-agent calls (ignore edits)
+              if (!fnName || (!fnName.includes('open-agent') && !fnName.includes('open agent'))) continue
               let args: any = tc?.function?.arguments
               if (typeof args === 'string') {
                 try {
@@ -168,16 +167,13 @@ export function useDeferredAgentCreationModal(options: {
               if (!slug && callId) {
                 // Mark as creation candidate when slug is not provided yet
                 agentCreationCallIdsRef.current.add(callId)
-              } else if (slug && callId && (agentCreationCallIdsRef.current.has(callId) || agentRelatedCallIdsRef.current.has(callId))) {
-                // If slug is present (either now or from start) and call is agent-related, capture it
+              } else if (slug && callId && agentCreationCallIdsRef.current.has(callId)) {
+                // Only capture slugs that originated from an open-agent call without slug
                 createdSlugsRef.current.add(slug)
               } else if (!slug && callId && agentCreationCallIdsRef.current.has(callId)) {
                 // Fallback: derive slug from function name suffix: open-agent-<slug> / edit-agent-<slug>
                 if (fnName.startsWith('open-agent-')) {
                   const suffix = fnName.slice('open-agent-'.length)
-                  if (suffix) createdSlugsRef.current.add(suffix)
-                } else if (fnName.startsWith('edit-agent-')) {
-                  const suffix = fnName.slice('edit-agent-'.length)
                   if (suffix) createdSlugsRef.current.add(suffix)
                 }
               }
@@ -189,8 +185,8 @@ export function useDeferredAgentCreationModal(options: {
           }
           if (msg.role === 'tool' && msg.toolCallId) {
             const idStr = String(msg.toolCallId)
-            const inTrackedSets = agentCreationCallIdsRef.current.has(idStr) || agentRelatedCallIdsRef.current.has(idStr)
-            // Fallback: if not tracked (e.g., assistant call occurred before mount), verify by resolving assistant call anywhere in the message list
+            const inTrackedSets = agentCreationCallIdsRef.current.has(idStr)
+            // Fallback: if not tracked (e.g., assistant call occurred before mount), verify by resolving assistant open-agent call without slug
             let isAgentRelatedTool = inTrackedSets
             if (!isAgentRelatedTool) {
               try {
@@ -201,8 +197,20 @@ export function useDeferredAgentCreationModal(options: {
                   if (match) {
                     const rawName = match?.function?.name as string | undefined
                     const fnName = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-                    if (fnName && (fnName.includes('open-agent') || fnName.includes('open agent') || fnName.includes('edit-agent') || fnName.includes('edit agent'))) {
-                      isAgentRelatedTool = true
+                    if (fnName && (fnName.includes('open-agent') || fnName.includes('open agent'))) {
+                      // Parse args and ensure no slug was provided initially
+                      let args: any = match?.function?.arguments
+                      if (typeof args === 'string') {
+                        try {
+                          args = JSON.parse(args)
+                        } catch {}
+                      }
+                      const src = args && typeof args === 'object' ? (args as any) : undefined
+                      const nested = src?.agent || src?.data || src?.payload || src
+                      const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
+                      const altAgentSlug = typeof src?.agentSlug === 'string' && src.agentSlug.trim() ? String(src.agentSlug) : undefined
+                      const hadSlugInitially = Boolean(nestedSlug || altAgentSlug)
+                      if (!hadSlugInitially) isAgentRelatedTool = true
                     }
                     break
                   }

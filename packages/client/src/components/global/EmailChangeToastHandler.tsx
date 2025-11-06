@@ -31,14 +31,16 @@ export function EmailChangeToastHandler() {
       return
     }
 
-    // Use a small delay to ensure the page has fully loaded
-    const timeoutId = setTimeout(() => {
-      try {
-        const emailChange = searchParams.get('emailChange')
+    try {
+      const emailChange = searchParams.get('emailChange')
 
-        // Handle email change success message
-        if (emailChange === 'success' && !emailChangeToastShownRef.current) {
-          emailChangeToastShownRef.current = true
+      // Handle email change success message
+      if (emailChange === 'success' && !emailChangeToastShownRef.current) {
+        // Set ref immediately to prevent duplicate toasts
+        emailChangeToastShownRef.current = true
+        
+        // Use a small delay to ensure the page has fully loaded
+        const timeoutId = setTimeout(() => {
           toast.success('Email changed successfully!')
 
           // Refresh user data if user is authenticated
@@ -54,8 +56,15 @@ export function EmailChangeToastHandler() {
             const newPath = newUrl.pathname + (newUrl.search ? newUrl.search : '')
             router.replace(newPath, { scroll: false })
           }, 100)
-        } else if (emailChange === 'error' && !emailChangeToastShownRef.current) {
-          emailChangeToastShownRef.current = true
+        }, 100)
+
+        return () => clearTimeout(timeoutId)
+      } else if (emailChange === 'error' && !emailChangeToastShownRef.current) {
+        // Set ref immediately to prevent duplicate toasts
+        emailChangeToastShownRef.current = true
+        
+        // Use a small delay to ensure the page has fully loaded
+        const timeoutId = setTimeout(() => {
           toast.error('Email change failed. Please try again.')
 
           // Clear query param after handling
@@ -65,14 +74,14 @@ export function EmailChangeToastHandler() {
             const newPath = newUrl.pathname + (newUrl.search ? newUrl.search : '')
             router.replace(newPath, { scroll: false })
           }, 100)
-        }
-      } catch (error) {
-        // Silently handle URL parameter errors
-        console.error('[EmailChangeToastHandler] Error handling email change query param:', error)
-      }
-    }, 100)
+        }, 100)
 
-    return () => clearTimeout(timeoutId)
+        return () => clearTimeout(timeoutId)
+      }
+    } catch (error) {
+      // Silently handle URL parameter errors
+      console.error('[EmailChangeToastHandler] Error handling email change query param:', error)
+    }
   }, [searchParams, router, queryClient, userId])
 
   return null

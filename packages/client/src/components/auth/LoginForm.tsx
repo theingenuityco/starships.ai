@@ -88,6 +88,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       const oauthError = searchParams.get('oauth_error')
       const verification = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
+      const emailChange = searchParams.get('emailChange')
 
       // Handle password reset success message
       if (resetSuccess === 'success' && !passwordResetToastShownRef.current) {
@@ -100,6 +101,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
         emailVerificationToastShownRef.current = true
         toast.success('Email verified successfully! You can now log in to your account.')
       }
+
 
       // Prevent duplicate handling (synchronous check with ref)
       if (oauthHandledRef.current) {

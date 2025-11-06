@@ -123,7 +123,7 @@ export default function Hero() {
             gradient-shift 8s ease-in-out 1.2s infinite,
             warp-blur 3.6s ease-in-out 1.3s infinite;
           will-change: transform, opacity, filter, background-position;
-          background: linear-gradient(120deg, rgba(255, 255, 255, 0.95) 0%, rgba(59, 130, 246, 0.9) 35%, rgba(168, 85, 247, 0.9) 70%, rgba(255, 255, 255, 0.95) 100%);
+          background: linear-gradient(120deg, rgba(168, 85, 247, 0.95) 0%, rgba(139, 92, 246, 0.9) 35%, rgba(124, 58, 237, 0.9) 70%, rgba(168, 85, 247, 0.95) 100%);
           background-size: 250% 250%;
           color: transparent;
           -webkit-text-fill-color: transparent;
@@ -150,9 +150,9 @@ export default function Hero() {
             transform: translateY(14px) scaleX(1.5) skewX(-14deg);
             filter: blur(8px);
             text-shadow:
-              10px 0 rgba(59, 130, 246, 0.28),
-              -10px 0 rgba(168, 85, 247, 0.22),
-              18px 0 rgba(59, 130, 246, 0.14),
+              10px 0 rgba(168, 85, 247, 0.28),
+              -10px 0 rgba(139, 92, 246, 0.22),
+              18px 0 rgba(124, 58, 237, 0.14),
               -18px 0 rgba(168, 85, 247, 0.12);
           }
           45% {
@@ -160,8 +160,8 @@ export default function Hero() {
             transform: translateY(0) scaleX(0.94) skewX(3deg);
             filter: blur(1px);
             text-shadow:
-              6px 0 rgba(59, 130, 246, 0.18),
-              -6px 0 rgba(168, 85, 247, 0.14);
+              6px 0 rgba(168, 85, 247, 0.18),
+              -6px 0 rgba(139, 92, 246, 0.14);
           }
           100% {
             opacity: 1;

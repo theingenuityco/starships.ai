@@ -138,6 +138,28 @@ export class EmailVerificationTokenRepository extends BaseRepository {
   }
 
   /**
+   * Cancel all pending tokens for a user
+   * Marks all non-consumed, non-expired tokens as consumed
+   * Returns number of tokens cancelled
+   */
+  async cancelTokenForUser(userId: string): Promise<number> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      
+      const result = await connection.query(
+        `UPDATE email_verification_tokens 
+         SET consumed = true
+         WHERE user_id = $1 
+           AND NOT consumed 
+           AND expires_at > NOW()`,
+        [userId]
+      );
+      
+      return (result as unknown as { rowCount: number }).rowCount || 0;
+    }, 'cancelTokenForUser', 'email_verification_tokens');
+  }
+
+  /**
    * Clean up expired email verification tokens
    * Returns number of tokens deleted
    */

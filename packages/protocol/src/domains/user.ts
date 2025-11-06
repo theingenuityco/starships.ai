@@ -74,6 +74,38 @@ export interface SetPasswordRequest {
 }
 
 /**
+ * Request to initiate email change
+ */
+export interface InitiateEmailChangeRequest {
+  newEmail: string;
+}
+
+/**
+ * Request to verify email change (token-based)
+ */
+export interface VerifyEmailChangeRequest {
+  token: string;
+}
+
+/**
+ * Response for email change status
+ */
+export interface EmailChangeStatusResponse {
+  pending: boolean;
+  newEmail?: string;
+  expiresAt?: string;
+}
+
+/**
+ * Response for email change completion
+ */
+export interface EmailChangeCompleteResponse {
+  userId: string;
+  oldEmail: string;
+  newEmail: string;
+}
+
+/**
  * User response structure
  */
 export interface UserResponse {

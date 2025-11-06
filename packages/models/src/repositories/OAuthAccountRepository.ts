@@ -85,12 +85,15 @@ export class OAuthAccountRepository extends BaseRepository {
   }
 
   /**
-   * Find OAuth account by email
+   * Find OAuth account by email (case-insensitive)
    */
   async findByEmail(email: string): Promise<OAuthAccountModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
-      const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM oauth_accounts WHERE email = $1', [email]);
+      const result = await connection.queryOne<Record<string, unknown>>(
+        'SELECT * FROM oauth_accounts WHERE LOWER(email) = LOWER($1)',
+        [email]
+      );
       return result ? fromDatabase(OAuthAccountEntity, result) : null;
     }, 'findByEmail');
   }

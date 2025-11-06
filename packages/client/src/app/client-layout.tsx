@@ -7,6 +7,7 @@ import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
 import { WelcomeModalProvider } from '@/components/auth/WelcomeModalProvider'
+import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
 
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
@@ -71,7 +72,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   if (isPublicSimplePage) {
     // Public pages - no authentication required
-    return <div className="h-full w-full">{children}</div>
+    return (
+      <div className="h-full w-full">
+        <EmailChangeToastHandler />
+        {children}
+      </div>
+    )
   }
 
   // Public page with optional navigation (shown only when authenticated)
@@ -79,7 +85,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     // Unauthenticated users: simple public view without nav
     if (!isAuthenticated) {
       return (
-        <StarTheme theme="dark">
+        <StarTheme>
+          <EmailChangeToastHandler />
           <div className="relative min-h-[100dvh] bg-background">
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
@@ -91,7 +98,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     const shouldHideNavigation = false
 
     return (
-      <StarTheme theme="dark">
+      <StarTheme>
+        <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
@@ -117,9 +125,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           )}
 
           {/* Main Content Area - takes remaining space */}
-          <main className="relative flex-1 min-h-full w-full overflow-auto">
-            {children}
-          </main>
+          <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
         </div>
       </StarTheme>
     )
@@ -133,7 +139,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <JwtAuthGate>
       <WelcomeModalProvider>
-        <StarTheme theme="dark">
+        <StarTheme>
+          <EmailChangeToastHandler />
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
@@ -159,9 +166,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             )}
 
             {/* Main Content Area - takes remaining space */}
-            <main className="relative flex-1 min-h-full w-full overflow-auto">
-              {children}
-            </main>
+            <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>
       </WelcomeModalProvider>

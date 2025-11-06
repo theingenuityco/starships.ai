@@ -22,10 +22,16 @@ export class UserRepository extends BaseRepository {
     }, 'findById');
   }
 
+  /**
+   * Find user by email (case-insensitive)
+   */
   async findByEmail(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
-      const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM users WHERE email = $1', [email]);
+      const result = await connection.queryOne<Record<string, unknown>>(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [email]
+      );
       return result ? fromDatabase(UserEntity, result) : null;
     }, 'findByEmail');
   }

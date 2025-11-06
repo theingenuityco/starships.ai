@@ -39,6 +39,18 @@ export function isSubscriptionCancellationError(error: unknown): boolean {
  * Super simple error sanitization - KISS approach
  */
 export function getSafeErrorMessage(error: any): string {
-  // SIMPLE: Just grab whatever error message exists, or use fallback
-  return error?.response?.data?.error || 'Something went wrong';
+  // Extract message from error response structure
+  // Server sends: { error: { message: string, code: string } }
+  // Or: { error: string }
+  const errorData = error?.response?.data?.error
+  if (typeof errorData === 'string') {
+    return errorData
+  }
+  if (errorData?.message && typeof errorData.message === 'string') {
+    return errorData.message
+  }
+  if (error?.message && typeof error.message === 'string') {
+    return error.message
+  }
+  return 'Something went wrong'
 }

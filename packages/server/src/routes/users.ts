@@ -9,11 +9,12 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
 import { StarshipService } from '@/services/StarshipService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import { PasswordSchema } from '@/schemas/common';
+import { PasswordSchema, EmailSchema } from '@/schemas/common';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
+import { rateLimiters } from '@/middleware/rateLimiter';
 
 const router: Router = Router();
 
@@ -84,6 +85,10 @@ const CreateUserWithPasswordSchema = z.object({
   password: PasswordSchema,
   displayName: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(100).optional(), // Legacy support
+});
+
+const InitiateEmailChangeSchema = z.object({
+  newEmail: EmailSchema,
 });
 
 // Helper function to validate request data with Zod
@@ -406,6 +411,126 @@ router.post('/users/authenticate', async (req: Request, res: Response): Promise<
     sendSuccess(res, user);
   } catch (error) {
     handleError(error, res, 'authenticating user');
+  }
+});
+
+// ============================================================================
+// EMAIL CHANGE ENDPOINTS
+// ============================================================================
+
+// POST /users/:id/email/change - Initiate email change
+router.post('/users/:id/email/change', jwtAuthMiddleware, rateLimiters.sensitive, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+
+    // Authorization: Users can only change their own email
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only change your own email', 403);
+      return;
+    }
+
+    const bodyValidation = validateData(InitiateEmailChangeSchema, req.body, res, 'email change data');
+    if (!bodyValidation) return;
+
+    const { newEmail } = bodyValidation;
+
+    const userService = new UserService();
+    await userService.initiateEmailChange(req.params.id, newEmail);
+
+    sendSuccess(res, { message: 'Email change verification email sent successfully.' });
+  } catch (error) {
+    handleError(error, res, 'initiating email change');
+  }
+});
+
+// POST /users/:id/email/change/resend - Resend email change verification email
+router.post('/users/:id/email/change/resend', jwtAuthMiddleware, rateLimiters.sensitive, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+
+    // Authorization: Users can only resend their own email change
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only resend your own email change', 403);
+      return;
+    }
+
+    const userService = new UserService();
+    const pendingChange = await userService.getPendingEmailChange(req.params.id);
+
+    if (!pendingChange) {
+      sendError(res, 'VALIDATION_ERROR', 'No pending email change found', 400);
+      return;
+    }
+
+    // Initiate email change - this atomically cancels old tokens and creates a new one
+    // Fix: Don't call cancelEmailChange separately to avoid race condition where
+    // cancel succeeds but initiate fails, leaving user without a pending change
+    await userService.initiateEmailChange(req.params.id, pendingChange.newEmail);
+
+    sendSuccess(res, { message: 'Email change verification email resent successfully.' });
+  } catch (error) {
+    handleError(error, res, 'resending email change verification email');
+  }
+});
+
+// POST /users/:id/email/change/cancel - Cancel email change
+router.post('/users/:id/email/change/cancel', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+
+    // Authorization: Users can only cancel their own email change
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only cancel your own email change', 403);
+      return;
+    }
+
+    const userService = new UserService();
+    await userService.cancelEmailChange(req.params.id);
+
+    sendSuccess(res, { message: 'Email change cancelled successfully.' });
+  } catch (error) {
+    handleError(error, res, 'cancelling email change');
+  }
+});
+
+// GET /users/:id/email/change/status - Get email change status
+router.get('/users/:id/email/change/status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+
+    // Authorization: Users can only check their own email change status
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only check your own email change status', 403);
+      return;
+    }
+
+    const userService = new UserService();
+    const pendingChange = await userService.getPendingEmailChange(req.params.id);
+
+    if (!pendingChange) {
+      sendSuccess(res, { pending: false });
+      return;
+    }
+
+    sendSuccess(res, {
+      pending: true,
+      newEmail: pendingChange.newEmail,
+      expiresAt: pendingChange.expiresAt,
+    });
+  } catch (error) {
+    handleError(error, res, 'fetching email change status');
   }
 });
 

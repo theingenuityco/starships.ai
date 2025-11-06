@@ -2,8 +2,8 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import React, { useEffect, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -22,7 +22,7 @@ const OAUTH_QUERY_KEYS = {
 } as const
 
 // Response data extraction helper
-const extractResponseData = <T = any>(response: any): T => response.data.data
+const extractResponseData = <T = any,>(response: any): T => response.data.data
 
 // OAuth accounts hook
 function useOAuthAccounts(enabled: boolean = true) {
@@ -48,7 +48,7 @@ function useUnlinkOAuthAccount() {
       const response = await api.delete(`/api/v1/auth/oauth/unlink/${provider}`)
       return response.data
     },
-    onMutate: async (provider) => {
+    onMutate: async provider => {
       // Cancel competing queries
       await queryClient.cancelQueries({ queryKey: OAUTH_QUERY_KEYS.accounts() })
 
@@ -98,30 +98,72 @@ export function OAuthAccountsSettings() {
   const { data: accountsData, isLoading, error, refetch } = useOAuthAccounts()
   const unlinkMutation = useUnlinkOAuthAccount()
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const oauthLinkToastShownRef = useRef(false)
+  const nestedTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const accounts = accountsData?.accounts || []
 
   // Handle OAuth linking success/error
   useEffect(() => {
-    const oauthLink = searchParams?.get('oauth_link')
-    const provider = searchParams?.get('provider')
-    
-    if (oauthLink === 'success' && provider) {
-      toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account linked successfully!`)
-      // Refetch accounts data to show the newly linked account
-      refetch()
-    } else if (oauthLink === 'error') {
-      const message = searchParams?.get('message')
-      toast.error(`Failed to link account: ${message || 'Unknown error'}`)
+    // Small delay to ensure page is loaded
+    const timer = setTimeout(() => {
+      const oauthLink = searchParams?.get('oauth_link')
+      const provider = searchParams?.get('provider')
+
+      if (oauthLink === 'success' && provider && !oauthLinkToastShownRef.current) {
+        oauthLinkToastShownRef.current = true
+        toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account linked successfully!`)
+        // Refetch accounts data to show the newly linked account
+        refetch()
+
+        // Clear query params after showing toast
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('oauth_link')
+        params.delete('provider')
+        router.replace(`?${params.toString()}`, { scroll: false })
+
+        // Reset ref after navigation - track this timeout for cleanup
+        nestedTimeoutRef.current = setTimeout(() => {
+          oauthLinkToastShownRef.current = false
+          nestedTimeoutRef.current = null
+        }, 100)
+      } else if (oauthLink === 'error' && !oauthLinkToastShownRef.current) {
+        oauthLinkToastShownRef.current = true
+        const message = searchParams?.get('message')
+        toast.error(`Failed to link account: ${message || 'Unknown error'}`)
+
+        // Clear query params after showing toast - fix: also delete provider param for consistency
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('oauth_link')
+        params.delete('message')
+        params.delete('provider') // Fix: Delete provider param in error path too
+        router.replace(`?${params.toString()}`, { scroll: false })
+
+        // Reset ref after navigation - track this timeout for cleanup
+        nestedTimeoutRef.current = setTimeout(() => {
+          oauthLinkToastShownRef.current = false
+          nestedTimeoutRef.current = null
+        }, 100)
+      }
+    }, 100)
+
+    // Cleanup all timeouts to prevent memory leaks
+    return () => {
+      clearTimeout(timer)
+      if (nestedTimeoutRef.current) {
+        clearTimeout(nestedTimeoutRef.current)
+        nestedTimeoutRef.current = null
+      }
     }
-  }, [searchParams, refetch])
+  }, [searchParams, refetch, router])
 
   // OAuth initiation function - uses secure authenticated endpoint
   const handleLinkAccount = async (provider: 'google' | 'github') => {
     try {
       const response = await api.post(`/api/v1/auth/oauth/link/${provider}`)
       const { authUrl } = extractResponseData<{ authUrl: string }>(response)
-      
+
       // Redirect to OAuth provider with secure state
       window.location.href = authUrl
     } catch (error: any) {
@@ -180,9 +222,7 @@ export function OAuthAccountsSettings() {
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
-            <AlertDescription>
-              Failed to load your connected accounts. Please try refreshing the page.
-            </AlertDescription>
+            <AlertDescription>Failed to load your connected accounts. Please try refreshing the page.</AlertDescription>
           </Alert>
         </CardContent>
       </Card>
@@ -196,16 +236,14 @@ export function OAuthAccountsSettings() {
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Connected Accounts
         </CardTitle>
-        <CardDescription className="text-sm">
-          Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf
-        </CardDescription>
+        <CardDescription className="text-sm">Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf</CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {(['google', 'github'] as const).map(provider => {
           const isLinked = getProviderStatus(provider)
           const account = getProviderAccount(provider)
-          
+
           return (
             <motion.div
               key={provider}
@@ -235,31 +273,19 @@ export function OAuthAccountsSettings() {
                       {account.profileData?.name && ` • ${account.profileData.name}`}
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Not connected
-                    </p>
+                    <p className="text-xs text-muted-foreground">Not connected</p>
                   )}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 {isLinked ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleUnlinkAccount(provider)}
-                    disabled={unlinkMutation.isPending}
-                    className="text-destructive hover:text-destructive"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(provider)} disabled={unlinkMutation.isPending} className="text-destructive hover:text-destructive">
                     <Icon name="unlink" className="h-3 w-3 mr-1" />
                     Unlink
                   </Button>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleLinkAccount(provider)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleLinkAccount(provider)}>
                     <Icon name="external-link" className="h-3 w-3 mr-1" />
                     Connect
                   </Button>
@@ -268,13 +294,11 @@ export function OAuthAccountsSettings() {
             </motion.div>
           )
         })}
-        
+
         {accounts.length > 0 && (
           <Alert>
             <Icon name="shield" className="h-4 w-4" />
-            <AlertDescription>
-              You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.
-            </AlertDescription>
+            <AlertDescription>You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.</AlertDescription>
           </Alert>
         )}
       </CardContent>

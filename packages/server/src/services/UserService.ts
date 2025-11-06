@@ -11,6 +11,7 @@ import {
   UserRepository,
   EmailVerificationTokenRepository,
   PasswordResetTokenRepository,
+  EmailChangeTokenRepository,
   StarshipRepository,
 } from '@starships/models';
 import type {
@@ -58,11 +59,13 @@ export class UserService {
   private userRepository: UserRepository;
   private oauthRepository: OAuthAccountRepository;
   private passwordResetTokenRepository: PasswordResetTokenRepository;
+  private emailChangeTokenRepository: EmailChangeTokenRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
     this.oauthRepository = new OAuthAccountRepository();
     this.passwordResetTokenRepository = new PasswordResetTokenRepository();
+    this.emailChangeTokenRepository = new EmailChangeTokenRepository();
   }
 
   // ============================================================================
@@ -175,12 +178,9 @@ export class UserService {
       throw new NotFoundError('User', userId);
     }
 
-    // Business validation: Email uniqueness (if changing)
+    // Business validation: Email changes require verification (prevent direct email update)
     if (updates.email && updates.email !== existingUser.email) {
-      const existingUserByEmail = await this.userRepository.findByEmail(updates.email);
-      if (existingUserByEmail) {
-        throw new ValidationError(`Email "${updates.email}" is already registered`, 'email');
-      }
+      throw new ValidationError('Email changes require verification. Please use the email change flow.', 'email');
     }
 
     // Business logic: Password change
@@ -424,6 +424,33 @@ export class UserService {
       }
     }
 
+    // SECURITY: Check if OAuth email conflicts with existing accounts
+    if (profile.email) {
+      // Allow if email matches user's primary email (user wants to link OAuth account with same email)
+      const existingUserByEmail = await this.userRepository.findByEmail(profile.email);
+      if (existingUserByEmail && existingUserByEmail.id !== userId) {
+        throw new ValidationError(
+          `Email "${profile.email}" is already registered as a primary account. Please use a different account or contact support.`,
+          'email'
+        );
+      }
+
+      // Check if this OAuth email is already linked to another OAuth account for another user
+      // Allow if email matches user's primary email (user linking OAuth with same email)
+      // Allow if email is already linked to this user's OAuth account with different provider
+      // Block if email is already linked to another user's OAuth account
+      const existingOAuthAccount = await oauthRepo.findByEmail(profile.email);
+      if (existingOAuthAccount && existingOAuthAccount.userId !== userId) {
+        // Email is linked to another user's OAuth account - block it
+        throw new ValidationError(
+          `Email "${profile.email}" is already linked to another account. Please use a different account or contact support.`,
+          'email'
+        );
+      }
+      // If existingOAuthAccount.userId === userId, allow it (user can link multiple OAuth accounts with same email)
+      // Same provider check is already handled above via findByProviderAndUser
+    }
+
     // Business logic: Create OAuth account link using Entity pattern
     const oauthAccountData = {
       userId,
@@ -456,14 +483,48 @@ export class UserService {
   async unlinkOAuthAccount(userId: string, provider: string): Promise<void> {
     // Business rule: Check if user has password or other OAuth accounts
     const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
     const oauthAccounts = await this.getUserOAuthAccounts(userId);
 
-    if (!user?.password && oauthAccounts.length <= 1) {
+    // Check if this would be the last authentication method
+    // User needs either a password OR multiple OAuth accounts
+    const willHaveOtherOAuthAccounts = oauthAccounts.length > 1;
+    const hasPassword = user.hasPassword;
+
+    if (!hasPassword && !willHaveOtherOAuthAccounts) {
       throw new ValidationError('Cannot unlink last authentication method. Set a password first.', 'provider');
     }
 
     // Business operation: Remove OAuth account
     await this.oauthRepository.deleteByProviderAndUser(provider, userId);
+
+    // Update auth methods after unlinking to reflect the removed OAuth account
+    // Get remaining OAuth accounts after deletion
+    const remainingOAuthAccounts = await this.getUserOAuthAccounts(userId);
+
+    // Rebuild auth methods array based on current state
+    const authMethods: AuthMethod[] = [];
+
+    if (user.hasPassword) {
+      authMethods.push('password');
+    }
+
+    remainingOAuthAccounts.forEach((account) => {
+      if (!authMethods.includes(account.provider as AuthMethod)) {
+        authMethods.push(account.provider as AuthMethod);
+      }
+    });
+
+    // Update primary auth method
+    const primaryAuthMethod = user.hasPassword ? 'password' : 'oauth';
+
+    await this.userRepository.update(userId, {
+      authMethods,
+      primaryAuthMethod,
+    });
   }
 
   /**
@@ -838,14 +899,18 @@ export class UserService {
       throw new ValidationError('User email is already verified', 'emailVerified');
     }
 
-    // Generate token using dedicated repository
+    // Business rule: Cancel any existing pending email verification tokens for user
+    // This ensures only the latest token is valid (consistent with email change flow)
     const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    await emailVerificationTokenRepo.cancelTokenForUser(userId);
+
+    // Generate token using dedicated repository
     const token = await emailVerificationTokenRepo.generateToken(userId, email);
 
     // Send email using email service - use ServiceFactory for consistent instantiation
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
-    await emailService.sendVerificationEmail(email, token);
+    await emailService.sendVerificationEmail(email, token, user.displayName);
 
     logger.info('[UserService] Email verification sent', { userId, email });
   }
@@ -937,11 +1002,15 @@ export class UserService {
       return; // Silent success (OAuth users use "Set Password" flow)
     }
 
+    // Business rule: Cancel any existing pending password reset tokens for user
+    // This ensures only the latest token is valid (consistent with email change flow)
+    await this.passwordResetTokenRepository.cancelTokenForUser(user.id);
+
     // Generate and send reset token using existing email service pattern
     const token = await this.passwordResetTokenRepository.generateToken(user.id, email);
     const { ServiceFactory } = await import('./ServiceFactory');
     const emailService = ServiceFactory.createEmailService();
-    await emailService.sendPasswordResetEmail(email, token);
+    await emailService.sendPasswordResetEmail(email, token, user.displayName);
 
     logger.info('[UserService] Password reset email sent', { userId: user.id, email });
   }
@@ -981,5 +1050,178 @@ export class UserService {
       userId: verification.userId,
       email: verification.email,
     });
+  }
+
+  // ============================================================================
+  // EMAIL CHANGE METHODS
+  // ============================================================================
+
+  /**
+   * Initiate email change (business logic layer)
+   * Orchestrates repository and email service calls with security validations
+   */
+  async initiateEmailChange(userId: string, newEmail: string): Promise<void> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Business validation: New email format
+    if (!newEmail || !newEmail.includes('@')) {
+      throw new ValidationError('Invalid email format', 'newEmail');
+    }
+
+    // Business validation: New email must be different from current
+    if (newEmail.toLowerCase() === user.email?.toLowerCase()) {
+      logger.info('[UserService] Email change requested for same email', { userId, newEmail });
+      return; // No-op - same email
+    }
+
+    // Business validation: Check if new email already exists as primary email for another user
+    const existingUserByEmail = await this.userRepository.findByEmail(newEmail);
+    if (existingUserByEmail && existingUserByEmail.id !== userId) {
+      throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Business validation: Check if new email is already used in OAuth accounts for another user
+    // Allow if it's the same user's OAuth email (user wants to change primary to their OAuth email)
+    const existingOAuthAccount = await this.oauthRepository.findByEmail(newEmail);
+    if (existingOAuthAccount && existingOAuthAccount.userId !== userId) {
+      throw new ValidationError(`Email "${newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Business rule: Cancel any existing pending email change tokens for user
+    await this.emailChangeTokenRepository.cancelTokenForUser(userId);
+
+    // Generate token using repository
+    const oldEmail = user.email!;
+    const token = await this.emailChangeTokenRepository.generateToken(userId, oldEmail, newEmail);
+
+    // Send verification email using email service
+    const { ServiceFactory } = await import('./ServiceFactory');
+    const emailService = ServiceFactory.createEmailService();
+    await emailService.sendEmailChangeVerificationEmail(newEmail, token, oldEmail, user.displayName);
+
+    logger.info('[UserService] Email change initiated', { userId, oldEmail, newEmail });
+  }
+
+  /**
+   * Complete email change using token (business logic layer)
+   * Validates token, confirms user's current email matches token's old email, and updates user email
+   */
+  async completeEmailChange(token: string): Promise<{ userId: string; oldEmail: string; newEmail: string }> {
+    // Validate and consume token atomically
+    const verification = await this.emailChangeTokenRepository.validateAndConsumeToken(token);
+
+    if (!verification) {
+      throw new ValidationError('Invalid or expired verification token', 'token');
+    }
+
+    // Get user from database
+    const user = await this.userRepository.findById(verification.userId);
+    if (!user) {
+      throw new NotFoundError('User', verification.userId);
+    }
+
+    // SECURITY CHECK: Verify user's current email matches token's old email
+    // This prevents race conditions where user changes email twice before verifying first change
+    if (user.email?.toLowerCase() !== verification.oldEmail.toLowerCase()) {
+      throw new ValidationError('Invalid or expired verification token', 'token');
+    }
+
+    // Business validation: Check if new email still available (race condition check)
+    // Check both primary email and OAuth accounts
+    // Allow if it's the same user's OAuth email (user wants to change primary to their OAuth email)
+    const existingUserByEmail = await this.userRepository.findByEmail(verification.newEmail);
+    if (existingUserByEmail && existingUserByEmail.id !== verification.userId) {
+      throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Business validation: Check if new email is already used in OAuth accounts for another user
+    // Allow if it's the same user's OAuth email (user wants to change primary to their OAuth email)
+    const existingOAuthAccount = await this.oauthRepository.findByEmail(verification.newEmail);
+    if (existingOAuthAccount && existingOAuthAccount.userId !== verification.userId) {
+      throw new ValidationError(`Email "${verification.newEmail}" is already registered`, 'newEmail');
+    }
+
+    // Update user email in database
+    await this.userRepository.update(verification.userId, {
+      email: verification.newEmail,
+      emailVerified: true, // Set emailVerified to true if not already
+    });
+
+    // Cancel all other pending email change tokens for user
+    await this.emailChangeTokenRepository.cancelTokenForUser(verification.userId);
+
+    logger.info('[UserService] Email change completed', {
+      userId: verification.userId,
+      oldEmail: verification.oldEmail,
+      newEmail: verification.newEmail,
+    });
+
+    return {
+      userId: verification.userId,
+      oldEmail: verification.oldEmail,
+      newEmail: verification.newEmail,
+    };
+  }
+
+  /**
+   * Cancel email change (business logic layer)
+   * Cancels pending email change token for user
+   */
+  async cancelEmailChange(userId: string): Promise<void> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Cancel pending token for user
+    const cancelledCount = await this.emailChangeTokenRepository.cancelTokenForUser(userId);
+
+    logger.info('[UserService] Email change cancelled', { userId, cancelledCount });
+  }
+
+  /**
+   * Get pending email change status (business logic layer)
+   * Returns pending email change info for user
+   */
+  async getPendingEmailChange(userId: string): Promise<{ newEmail: string; expiresAt: string } | null> {
+    // Business validation: User must exist
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Get pending token info for user
+    const pendingToken = await this.emailChangeTokenRepository.getPendingTokenForUser(userId);
+
+    if (!pendingToken) {
+      return null;
+    }
+
+    return {
+      newEmail: pendingToken.newEmail,
+      expiresAt: pendingToken.expiresAt,
+    };
+  }
+
+  /**
+   * Get profile redirect path helper (business logic layer)
+   * Encapsulates starship lookup logic for profile redirects
+   * Used by email change verification and OAuth handlers
+   */
+  async getProfileRedirectPath(userId: string): Promise<string> {
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(userId);
+      const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
+      return firstStarship ? `/ship/${firstStarship.slug}/settings/profile` : '/profile';
+    } catch (error) {
+      logger.warn('[UserService] Failed to get starship for redirect', { userId, error });
+      return '/profile';
+    }
   }
 }

@@ -158,7 +158,7 @@ export function useLogin() {
       const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
-        handleError(new Error('Login successful but missing user or token'), 'useLogin')
+        handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useLogin')
         return
       }
 
@@ -231,7 +231,7 @@ export function useRegister() {
       const { user, token, starship } = data
 
       if (!user || !token) {
-        handleError(new Error('Registration successful but missing user or token'), 'useRegister')
+        handleError(new Error('We encountered an issue setting up your account. Please try refreshing the page or contact support if this persists.'), 'useRegister')
         return
       }
 
@@ -284,7 +284,7 @@ export function useOAuthLogin() {
       const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
-        handleError(new Error('OAuth successful but missing user or token'), 'useOAuthLogin')
+        handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useOAuthLogin')
         return
       }
 

@@ -323,7 +323,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
           <p className="text-base text-muted-foreground mb-3">{filters.searchQuery || filters.category ? 'No agents match your filters' : AGENT_TEXT.NO_AGENTS_AVAILABLE}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
             <DeployedAgentCard 
               key={agent.id} 

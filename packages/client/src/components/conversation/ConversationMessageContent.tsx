@@ -230,8 +230,8 @@ export function ConversationMessageContent({
           {displayContent}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
-        {enableCopy && (
-          <Button variant="ghost" size="icon" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
+        {enableCopy && !isStreaming && (
+          <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
             <Icon name="copy" className="w-3 h-3" />
           </Button>
         )}
@@ -478,7 +478,7 @@ export function ConversationMessageContent({
 
       {/* Copy button for entire message */}
       {enableCopy && !isStreaming && (
-        <Button variant="ghost" size="icon" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
+        <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
           <Icon name="copy" className="w-3 h-3" />
         </Button>
       )}

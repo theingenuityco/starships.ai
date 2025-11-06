@@ -44,7 +44,11 @@ export default function AccountForm() {
     onRevertAll,
     cancelPasswordEdit,
     currentPasswordRef,
+    pendingEmailChange,
+    resendEmailChangeVerification,
+    cancelEmailChange,
   } = useAccountForm()
+
 
   const handleConnectOAuth = (provider: 'google' | 'github') => {
     window.location.href = `/api/v1/auth/${provider}`
@@ -75,7 +79,14 @@ export default function AccountForm() {
         </div>
 
         <div className="lg:col-span-8 space-y-6">
-          <AccountDetailsCard form={form} setForm={setForm} saving={saving} />
+          <AccountDetailsCard
+            form={form}
+            setForm={setForm}
+            saving={saving}
+            pendingEmailChange={pendingEmailChange}
+            onResendEmail={resendEmailChangeVerification}
+            onCancelEmailChange={cancelEmailChange}
+          />
 
           <SecurityCard
             hasPassword={hasPassword}

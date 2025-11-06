@@ -899,8 +899,12 @@ export class UserService {
       throw new ValidationError('User email is already verified', 'emailVerified');
     }
 
-    // Generate token using dedicated repository
+    // Business rule: Cancel any existing pending email verification tokens for user
+    // This ensures only the latest token is valid (consistent with email change flow)
     const emailVerificationTokenRepo = new EmailVerificationTokenRepository();
+    await emailVerificationTokenRepo.cancelTokenForUser(userId);
+
+    // Generate token using dedicated repository
     const token = await emailVerificationTokenRepo.generateToken(userId, email);
 
     // Send email using email service - use ServiceFactory for consistent instantiation
@@ -997,6 +1001,10 @@ export class UserService {
       });
       return; // Silent success (OAuth users use "Set Password" flow)
     }
+
+    // Business rule: Cancel any existing pending password reset tokens for user
+    // This ensures only the latest token is valid (consistent with email change flow)
+    await this.passwordResetTokenRepository.cancelTokenForUser(user.id);
 
     // Generate and send reset token using existing email service pattern
     const token = await this.passwordResetTokenRepository.generateToken(user.id, email);

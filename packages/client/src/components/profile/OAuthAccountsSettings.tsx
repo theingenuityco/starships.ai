@@ -100,6 +100,7 @@ export function OAuthAccountsSettings() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const oauthLinkToastShownRef = useRef(false)
+  const nestedTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const accounts = accountsData?.accounts || []
 
@@ -122,29 +123,39 @@ export function OAuthAccountsSettings() {
         params.delete('provider')
         router.replace(`?${params.toString()}`, { scroll: false })
 
-        // Reset ref after navigation
-        setTimeout(() => {
+        // Reset ref after navigation - track this timeout for cleanup
+        nestedTimeoutRef.current = setTimeout(() => {
           oauthLinkToastShownRef.current = false
+          nestedTimeoutRef.current = null
         }, 100)
       } else if (oauthLink === 'error' && !oauthLinkToastShownRef.current) {
         oauthLinkToastShownRef.current = true
         const message = searchParams?.get('message')
         toast.error(`Failed to link account: ${message || 'Unknown error'}`)
 
-        // Clear query params after showing toast
+        // Clear query params after showing toast - fix: also delete provider param for consistency
         const params = new URLSearchParams(searchParams.toString())
         params.delete('oauth_link')
         params.delete('message')
+        params.delete('provider') // Fix: Delete provider param in error path too
         router.replace(`?${params.toString()}`, { scroll: false })
 
-        // Reset ref after navigation
-        setTimeout(() => {
+        // Reset ref after navigation - track this timeout for cleanup
+        nestedTimeoutRef.current = setTimeout(() => {
           oauthLinkToastShownRef.current = false
+          nestedTimeoutRef.current = null
         }, 100)
       }
     }, 100)
 
-    return () => clearTimeout(timer)
+    // Cleanup all timeouts to prevent memory leaks
+    return () => {
+      clearTimeout(timer)
+      if (nestedTimeoutRef.current) {
+        clearTimeout(nestedTimeoutRef.current)
+        nestedTimeoutRef.current = null
+      }
+    }
   }, [searchParams, refetch, router])
 
   // OAuth initiation function - uses secure authenticated endpoint

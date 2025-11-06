@@ -468,8 +468,9 @@ router.post('/users/:id/email/change/resend', jwtAuthMiddleware, rateLimiters.se
       return;
     }
 
-    // Cancel old token and create new one
-    await userService.cancelEmailChange(req.params.id);
+    // Initiate email change - this atomically cancels old tokens and creates a new one
+    // Fix: Don't call cancelEmailChange separately to avoid race condition where
+    // cancel succeeds but initiate fails, leaving user without a pending change
     await userService.initiateEmailChange(req.params.id, pendingChange.newEmail);
 
     sendSuccess(res, { message: 'Email change verification email resent successfully.' });

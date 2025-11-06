@@ -22,6 +22,19 @@ export class EmailService {
   }
 
   /**
+   * Escape HTML special characters to prevent XSS attacks
+   * Security: Prevents HTML injection in email templates
+   */
+  private escapeHtml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  /**
    * Send verification email following established service patterns
    * Business logic: Email template generation and delivery
    */
@@ -116,7 +129,9 @@ export class EmailService {
   }
 
   private generateEmailTemplate(verificationUrl: string, displayName?: string): string {
-    const greeting = displayName ? `Hi ${displayName.split(' ')[0]},` : 'Hi there,';
+    // Security: Escape HTML to prevent XSS attacks
+    const safeDisplayName = displayName && displayName.trim() ? this.escapeHtml(displayName.trim().split(' ')[0]) : null;
+    const greeting = safeDisplayName ? `Hi ${safeDisplayName},` : 'Hi there,';
 
     return `
       <!DOCTYPE html>
@@ -175,7 +190,9 @@ export class EmailService {
   }
 
   private generatePasswordResetTemplate(resetUrl: string, displayName?: string): string {
-    const greeting = displayName ? `Hi ${displayName.split(' ')[0]},` : 'Hi there,';
+    // Security: Escape HTML to prevent XSS attacks
+    const safeDisplayName = displayName && displayName.trim() ? this.escapeHtml(displayName.trim().split(' ')[0]) : null;
+    const greeting = safeDisplayName ? `Hi ${safeDisplayName},` : 'Hi there,';
 
     return `
       <!DOCTYPE html>
@@ -239,7 +256,11 @@ export class EmailService {
     newEmail: string,
     displayName?: string
   ): string {
-    const greeting = displayName ? `Hi ${displayName.split(' ')[0]},` : 'Hi there,';
+    // Security: Escape HTML to prevent XSS attacks
+    const safeDisplayName = displayName && displayName.trim() ? this.escapeHtml(displayName.trim().split(' ')[0]) : null;
+    const greeting = safeDisplayName ? `Hi ${safeDisplayName},` : 'Hi there,';
+    const safeOldEmail = this.escapeHtml(oldEmail);
+    const safeNewEmail = this.escapeHtml(newEmail);
 
     return `
       <!DOCTYPE html>
@@ -252,8 +273,8 @@ export class EmailService {
           <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <h2 style="margin-top: 0; color: #2d3748;">${greeting}</h2>
             <h3 style="margin-top: 16px; margin-bottom: 16px; color: #2d3748;">Confirm Your Email Change</h3>
-            <p>We would like to confirm that you prefer using <strong>${newEmail}</strong> as your email for Starships.ai.</p>
-            <p>If you do not wish to change your email address and continue using your current email address <strong>${oldEmail}</strong>, simply disregard this email.</p>
+            <p>We would like to confirm that you prefer using <strong>${safeNewEmail}</strong> as your email for Starships.ai.</p>
+            <p>If you do not wish to change your email address and continue using your current email address <strong>${safeOldEmail}</strong>, simply disregard this email.</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${verificationUrl}" 
                  style="background: #4299e1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
@@ -287,7 +308,9 @@ export class EmailService {
     newEmail: string,
     displayName?: string
   ): string {
-    const greeting = displayName ? `Hi ${displayName.split(' ')[0]},` : 'Hi there,';
+    // Security: Escape HTML to prevent XSS attacks (text template, but still safe to escape)
+    const safeDisplayName = displayName && displayName.trim() ? displayName.trim().split(' ')[0] : null;
+    const greeting = safeDisplayName ? `Hi ${safeDisplayName},` : 'Hi there,';
 
     return `
       Confirm Your New Email Address

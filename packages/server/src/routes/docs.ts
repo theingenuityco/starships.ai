@@ -61,8 +61,8 @@ router.get('/docs', (req: Request, res: Response): void => {
 
   try {
     if (query.topic === 'node-schema') {
-      const data = getNodeSchemaResponse(query.nodeType as string, (query.detail as any) ?? 'full');
-      sendSuccess(res, data);
+      const md = buildNodeSchemaMarkdown(query.nodeType as string, (query.detail as any) ?? 'full');
+      sendSuccess(res, { content: md });
       return;
     }
 
@@ -82,6 +82,154 @@ router.get('/docs', (req: Request, res: Response): void => {
 // ----------------------------------------------------------------------------
 // Implementation (verbatim logic migrated from tool code nodes)
 // ----------------------------------------------------------------------------
+
+function buildNodeSchemaMarkdown(nodeType: string, detail: 'summary' | 'full' | 'examples'): string {
+  const value = getNodeSchemaResponse(nodeType, detail) as any;
+
+  if (nodeType === 'all') {
+    if (value?.error) return `# Node Types\n\nError: ${value.error}`;
+    const lines: string[] = [];
+    lines.push('# Node Types');
+    lines.push('');
+    lines.push(`Total: ${value.totalTypes}`);
+    lines.push('');
+    for (const item of value.nodeTypes ?? []) {
+      lines.push(
+        `- ${item.type}: ${item.description} ${item.hasRequiredParams ? '(has required params)' : ''} ${item.supportsInlineOps ? '— supports inline ops' : ''}`.trim()
+      );
+    }
+    lines.push('');
+    lines.push('## Inline Operations');
+    if (value.inlineOperations) {
+      lines.push('');
+      lines.push(`- Description: ${value.inlineOperations.description}`);
+      lines.push(`- Execution: ${value.inlineOperations.execution}`);
+    }
+    lines.push('');
+    lines.push('_All string parameters support {{ jsExpression }} templates._');
+    return lines.join('\n');
+  }
+
+  if (value?.error) {
+    return `# Node: ${nodeType}\n\nError: ${value.error}`;
+  }
+
+  // Examples-only response shape
+  if (detail === 'examples') {
+    const lines: string[] = [];
+    lines.push(`# Node: ${value.type}`);
+    lines.push('');
+    lines.push('## Examples');
+    const examples = value.examples || [];
+    if (!examples.length) {
+      lines.push('No examples.');
+    } else {
+      for (const [idx, ex] of examples.entries()) {
+        lines.push(`### Example ${idx + 1}`);
+        lines.push('');
+        lines.push('```json');
+        lines.push(JSON.stringify(ex, null, 2));
+        lines.push('```');
+        lines.push('');
+      }
+    }
+    if (value.validation?.length) {
+      lines.push('## Validation');
+      for (const rule of value.validation) lines.push(`- ${rule}`);
+    }
+    return lines.join('\n');
+  }
+
+  // Summary or full schema
+  const schema = value;
+  const lines: string[] = [];
+  lines.push(`# Node: ${schema.type}`);
+  if (schema.description) {
+    lines.push('');
+    lines.push(schema.description);
+  }
+
+  // Summary
+  if (detail === 'summary') {
+    if (schema.requiredParams) {
+      lines.push('');
+      lines.push('## Required Parameters');
+      if (schema.requiredParams.length) {
+        for (const p of schema.requiredParams) lines.push(`- ${p}`);
+      } else {
+        lines.push('- None');
+      }
+    }
+    lines.push('');
+    lines.push(`Supports Inline Operations: ${schema.supportsInlineOps ? 'Yes' : 'No'}`);
+    return lines.join('\n');
+  }
+
+  // Full details
+  if (schema.parameters && Object.keys(schema.parameters).length) {
+    lines.push('');
+    lines.push('## Parameters');
+    for (const [name, spec] of Object.entries<any>(schema.parameters)) {
+      const req = spec.required ? 'required' : 'optional';
+      const type = spec.type ? ` (${spec.type})` : '';
+      const desc = spec.description ? ` — ${spec.description}` : '';
+      lines.push(`- ${name}${type} — ${req}${desc}`);
+    }
+  }
+
+  if (schema.context) {
+    lines.push('');
+    lines.push('## Context');
+    if (schema.context.available?.length) {
+      lines.push('**Available**:');
+      for (const item of schema.context.available) lines.push(`- ${item}`);
+    }
+    if (schema.context.forbidden?.length) {
+      lines.push('');
+      lines.push('**Forbidden**:');
+      for (const item of schema.context.forbidden) lines.push(`- ${item}`);
+    }
+  }
+
+  if (schema.behavior) {
+    lines.push('');
+    lines.push('## Behavior');
+    for (const [k, v] of Object.entries<any>(schema.behavior)) {
+      lines.push(`- **${k}**: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
+    }
+  }
+
+  if (schema.inlineOperations) {
+    const inline = (getNodeSchemaResponse('all', 'full') as any).inlineOperations;
+    if (inline) {
+      lines.push('');
+      lines.push('## Inline Operations');
+      lines.push(`- Description: ${inline.description}`);
+      lines.push(`- Execution: ${inline.execution}`);
+    }
+  }
+
+  if (schema.validation?.length) {
+    lines.push('');
+    lines.push('## Validation');
+    for (const rule of schema.validation) lines.push(`- ${rule}`);
+  }
+
+  if (schema.examples?.length) {
+    lines.push('');
+    lines.push('## Examples');
+    for (const [idx, ex] of schema.examples.entries()) {
+      lines.push(`### Example ${idx + 1}`);
+      lines.push('');
+      lines.push('```json');
+      lines.push(JSON.stringify(ex, null, 2));
+      lines.push('```');
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
 
 function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'examples') {
   const schemas: Record<string, any> = {
@@ -110,8 +258,7 @@ function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'e
       },
       behavior: {
         input: 'Any ExecutionItem[] from previous node (ignored)',
-        output:
-          'If output parameter set, returns { result: resolvedValue }; otherwise returns empty object',
+        output: 'If output parameter set, returns { result: resolvedValue }; otherwise returns empty object',
         execution: 'Marks workflow completion',
       },
       validation: 'Output parameter can be any type or template expression',
@@ -132,15 +279,13 @@ function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'e
         model: {
           type: 'string',
           required: true,
-          description:
-            'Model identifier (e.g., anthropic/claude-3.5-sonnet, openai/gpt-4-turbo)',
+          description: 'Model identifier (e.g., anthropic/claude-3.5-sonnet, openai/gpt-4-turbo)',
           examples: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4-turbo', 'google/gemini-pro-1.5'],
         },
         messages: {
           type: 'array | string',
           required: true,
-          description:
-            'Chat messages array [{role, content}] or template string that resolves to messages',
+          description: 'Chat messages array [{role, content}] or template string that resolves to messages',
           schema: {
             role: { type: 'string', enum: ['system', 'user', 'assistant', 'tool'] },
             content: { type: 'string' },
@@ -245,11 +390,7 @@ function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'e
         messageOrdering: 'systemPrompt -> state.messages -> input messages',
         runner: 'ChildProcessRunner for depth=0, LocalRunner for depth>0',
       },
-      validation: [
-        'Name and model are required',
-        'Temperature 0-2, maxTokens >= 1',
-        'Blueprint must have start node if provided',
-      ],
+      validation: ['Name and model are required', 'Temperature 0-2, maxTokens >= 1', 'Blueprint must have start node if provided'],
       inlineOperations: true,
     },
     http_request: {
@@ -368,7 +509,11 @@ function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'e
           type: 'object',
           required: true,
           description: 'JSON Schema for tool input parameters',
-          properties: { type: { constant: 'object' }, properties: { type: 'object', description: 'Parameter definitions' }, required: { type: 'array', description: 'Required parameter names' } },
+          properties: {
+            type: { constant: 'object' },
+            properties: { type: 'object', description: 'Parameter definitions' },
+            required: { type: 'array', description: 'Required parameter names' },
+          },
         },
         blueprint: {
           type: 'Blueprint',
@@ -539,7 +684,12 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
                 maxTokens: 500,
               },
             },
-            { ref: 'end_1', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.content }}' } },
+            {
+              ref: 'end_1',
+              type: 'end',
+              name: 'End',
+              parameters: { output: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.content }}' },
+            },
           ],
           edges: [
             { ref: 'e1', from: 'start_1', to: 'llm_1' },
@@ -568,9 +718,7 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
               type: 'transform',
               name: 'Extract Fields',
               parameters: {
-                transforms: [
-                  { operation: 'add', path: '/result', value: '{{ $lastOutputOf("api_1")[0].json.body.data }}' },
-                ],
+                transforms: [{ operation: 'add', path: '/result', value: '{{ $lastOutputOf("api_1")[0].json.body.data }}' }],
               },
             },
             { ref: 'end_1', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("transform_1")[0].json.result }}' } },
@@ -590,16 +738,36 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
         blueprint: {
           nodes: [
             { ref: 'start_1', type: 'start', name: 'Start', parameters: {} },
-            { ref: 'init_state', type: 'mutate', name: 'Initialize Retry Count', parameters: { mutations: [{ operation: 'add', path: '/state/retryCount', value: 0 }] } },
+            {
+              ref: 'init_state',
+              type: 'mutate',
+              name: 'Initialize Retry Count',
+              parameters: { mutations: [{ operation: 'add', path: '/state/retryCount', value: 0 }] },
+            },
             {
               ref: 'api_call',
               type: 'http_request',
               name: 'Call API',
               parameters: { url: '{{ $input("url") }}', method: 'POST', body: '{{ $input("payload") }}', timeout: 5000 },
             },
-            { ref: 'check_status', type: 'conditional', name: 'Check Success', parameters: { condition: '{{ $lastOutputOf("api_call")[0].json?.status === 200 ? "success" : "retry" }}' } },
-            { ref: 'increment_retry', type: 'mutate', name: 'Increment Retry', parameters: { mutations: [{ operation: 'replace', path: '/state/retryCount', value: '{{ state.retryCount + 1 }}' }] } },
-            { ref: 'check_retry_limit', type: 'conditional', name: 'Check Retry Limit', parameters: { condition: '{{ state.retryCount < 3 ? "retry" : "fail" }}' } },
+            {
+              ref: 'check_status',
+              type: 'conditional',
+              name: 'Check Success',
+              parameters: { condition: '{{ $lastOutputOf("api_call")[0].json?.status === 200 ? "success" : "retry" }}' },
+            },
+            {
+              ref: 'increment_retry',
+              type: 'mutate',
+              name: 'Increment Retry',
+              parameters: { mutations: [{ operation: 'replace', path: '/state/retryCount', value: '{{ state.retryCount + 1 }}' }] },
+            },
+            {
+              ref: 'check_retry_limit',
+              type: 'conditional',
+              name: 'Check Retry Limit',
+              parameters: { condition: '{{ state.retryCount < 3 ? "retry" : "fail" }}' },
+            },
             { ref: 'success_end', type: 'end', name: 'Success', parameters: { output: '{{ $lastOutputOf("api_call")[0].json }}' } },
             { ref: 'fail_end', type: 'end', name: 'Failed', parameters: { output: { error: 'API call failed after 3 retries' } } },
           ],
@@ -637,7 +805,12 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
                 ],
               },
             },
-            { ref: 'check_tools', type: 'conditional', name: 'Check Tool Calls', parameters: { condition: "{{ $exists($lastOutputOf('llm_1')[0].json.choices[0].message.toolCalls) ? 'execute' : 'done' }}" } },
+            {
+              ref: 'check_tools',
+              type: 'conditional',
+              name: 'Check Tool Calls',
+              parameters: { condition: "{{ $exists($lastOutputOf('llm_1')[0].json.choices[0].message.toolCalls) ? 'execute' : 'done' }}" },
+            },
             {
               ref: 'prepare_args',
               type: 'code',
@@ -688,8 +861,24 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
         blueprint: {
           nodes: [
             { ref: 'start_1', type: 'start', name: 'Start', parameters: {} },
-            { ref: 'init', type: 'mutate', name: 'Initialize State', parameters: { mutations: [ { operation: 'add', path: '/state/items', value: [] }, { operation: 'add', path: '/state/total', value: 0 }, { operation: 'add', path: '/state/metadata', value: { timestamp: '{{ $now() }}' } } ] } },
-            { ref: 'fetch_data', type: 'http_request', name: 'Fetch Items', parameters: { url: '{{ $input("apiUrl") }}/items', method: 'GET' } },
+            {
+              ref: 'init',
+              type: 'mutate',
+              name: 'Initialize State',
+              parameters: {
+                mutations: [
+                  { operation: 'add', path: '/state/items', value: [] },
+                  { operation: 'add', path: '/state/total', value: 0 },
+                  { operation: 'add', path: '/state/metadata', value: { timestamp: '{{ $now() }}' } },
+                ],
+              },
+            },
+            {
+              ref: 'fetch_data',
+              type: 'http_request',
+              name: 'Fetch Items',
+              parameters: { url: '{{ $input("apiUrl") }}/items', method: 'GET' },
+            },
             {
               ref: 'process_items',
               type: 'code',
@@ -765,14 +954,30 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
                 blueprint: {
                   nodes: [
                     { ref: 'sub_start', type: 'start', name: 'Start Search', parameters: {} },
-                    { ref: 'sub_api', type: 'http_request', name: 'Search API', parameters: { url: 'https://api.search.com/query', method: 'POST', body: { q: '{{ $input("query") }}', limit: '{{ $input("maxResults") }}' } } },
+                    {
+                      ref: 'sub_api',
+                      type: 'http_request',
+                      name: 'Search API',
+                      parameters: {
+                        url: 'https://api.search.com/query',
+                        method: 'POST',
+                        body: { q: '{{ $input("query") }}', limit: '{{ $input("maxResults") }}' },
+                      },
+                    },
                     {
                       ref: 'sub_filter',
                       type: 'code',
                       name: 'Filter Results',
-                      parameters: { code: `\n                                    async function main(ctx) {\n                                      const results = ctx.$lastOutputOf("sub_api")[0].json.body.results;\n                                      return results.filter(r => r.score > 0.5);\n                                    }\n                                  ` },
+                      parameters: {
+                        code: `\n                                    async function main(ctx) {\n                                      const results = ctx.$lastOutputOf("sub_api")[0].json.body.results;\n                                      return results.filter(r => r.score > 0.5);\n                                    }\n                                  `,
+                      },
                     },
-                    { ref: 'sub_end', type: 'end', name: 'End Search', parameters: { output: '{{ $lastOutputOf("sub_filter")[0].json }}' } },
+                    {
+                      ref: 'sub_end',
+                      type: 'end',
+                      name: 'End Search',
+                      parameters: { output: '{{ $lastOutputOf("sub_filter")[0].json }}' },
+                    },
                   ],
                   edges: [
                     { ref: 'se1', from: 'sub_start', to: 'sub_api' },
@@ -819,9 +1024,24 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
         blueprint: {
           nodes: [
             { ref: 'start_1', type: 'start', name: 'Start', parameters: {} },
-            { ref: 'primary_api', type: 'http_request', name: 'Primary API', parameters: { url: '{{ $input("primaryUrl") }}', method: 'GET', timeout: 3000 } },
-            { ref: 'check_primary', type: 'conditional', name: 'Check Primary Success', parameters: { condition: "{{ $exists($lastOutputOf('primary_api')[0].error) ? 'fallback' : 'success' }}" } },
-            { ref: 'fallback_api', type: 'http_request', name: 'Fallback API', parameters: { url: '{{ $input("fallbackUrl") }}', method: 'GET', timeout: 5000 } },
+            {
+              ref: 'primary_api',
+              type: 'http_request',
+              name: 'Primary API',
+              parameters: { url: '{{ $input("primaryUrl") }}', method: 'GET', timeout: 3000 },
+            },
+            {
+              ref: 'check_primary',
+              type: 'conditional',
+              name: 'Check Primary Success',
+              parameters: { condition: "{{ $exists($lastOutputOf('primary_api')[0].error) ? 'fallback' : 'success' }}" },
+            },
+            {
+              ref: 'fallback_api',
+              type: 'http_request',
+              name: 'Fallback API',
+              parameters: { url: '{{ $input("fallbackUrl") }}', method: 'GET', timeout: 5000 },
+            },
             {
               ref: 'merge_results',
               type: 'code',
@@ -889,5 +1109,3 @@ function getBlueprintExamplesResponse(category: string, pattern?: string) {
 }
 
 export default router;
-
-

@@ -27,7 +27,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 </character>
 
 <instructions>
-- Before creating or editing, consult Docs Node Schema and Docs Blueprint Examples to confirm node parameters and patterns.
+- Before creating or editing any tool, consult Docs Node Schema and Docs Blueprint Examples to confirm node parameters and patterns.
 - Open Tool to create: provide name and concise description (slug auto-generated unless provided).
 - Open Tool to open: provide slug only.
 - Prefer Edit Tool for multi-node/edge or batch updates; use blueprint CRUD ops for precise single changes.
@@ -50,12 +50,20 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 </context>
 
 <examples>
-- Create webhook sender:
-  1) Open Tool (name, description)
-  2) Edit Tool (initial blueprint + params)
-  3) Test Tool Blueprint → fix if needed
-  4) Edit Tool (finalize)
-  5) Test Tool (deterministic args)
+- Create webhook sender (with docs consulted):
+  1) Docs Node Schema → verify node types and required params
+  2) Docs Blueprint Examples → find a closest example
+  3) Open Tool (name, description)
+  4) Edit Tool (initial blueprint + params)
+  5) Test Tool Blueprint → fix if needed
+  6) Edit Tool (finalize)
+  7) Test Tool (deterministic args)
+
+- Edit existing tool safely:
+  1) Docs Node Schema → check parameter names/types for impacted nodes
+  2) Get Tool → inspect current blueprint and parameters
+  3) Edit Tool (small, focused change)
+  4) Test Tool Blueprint → iterate until clean
 </examples>`,
     state: {
       messages: [],
@@ -97,7 +105,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
 
   icon: '🛠️',
   previewPrompts: [
-    'Design a tool that calls a REST API and returns selected fields',
+    'Before editing, consult docs; then design a REST API tool with strict params',
     'Propose parameters and blueprint for a CSV-to-JSON converter tool',
     'Create a webhook sender tool with configuration fields',
     'Help me scaffold a tool that validates and formats addresses',

@@ -27,6 +27,14 @@ export class MigrationRunner {
   private connection: ReturnType<typeof getConnection> | null = null;
   private migrationsPath = join(__dirname, '../../migrations');
 
+  private isDistBuild(): boolean {
+    return __dirname.includes('/dist/') || __dirname.includes('\\dist\\');
+  }
+
+  private getMigrationsPath(): string {
+    return this.isDistBuild() ? join(__dirname, '../migrations') : this.migrationsPath;
+  }
+
   private getConnection() {
     if (!this.connection) {
       this.connection = getConnection();
@@ -35,10 +43,10 @@ export class MigrationRunner {
   }
 
   private resolveMigrationModulePath(id: string): string | null {
-    // Single source of truth at runtime: compiled JS in dist/migrations relative to dist/scripts
-    const base = this.migrationsPath; // __dirname/../../migrations
-    const pNoExt = join(base, id);
-    if (existsSync(pNoExt + '.js')) return pNoExt + '.js';
+    const base = this.getMigrationsPath();
+    const ext = this.isDistBuild() ? '.js' : '.ts';
+    const p = join(base, id + ext);
+    if (existsSync(p)) return p;
     return null;
   }
 
@@ -80,7 +88,7 @@ export class MigrationRunner {
       // Execute schema initialization via JS migration
       const schemaModulePath = this.resolveMigrationModulePath('000_postgresql_schema');
       if (!schemaModulePath) {
-        result.errors?.push(`Schema module not found: ${join(this.migrationsPath, '000_postgresql_schema')}.(js|ts)`);
+        result.errors?.push(`Schema module not found: ${join(this.getMigrationsPath(), '000_postgresql_schema')}.(js|ts)`);
         return result;
       }
       console.log('🚀 Initializing database schema via migration...');
@@ -144,11 +152,10 @@ export class MigrationRunner {
       // Resolve JS/TS module
       const modulePath = this.resolveMigrationModulePath(migrationId);
       if (!modulePath) {
-        result.errors?.push(`Migration module not found: ${join(this.migrationsPath, migrationId)}.(js|ts)`);
+        result.errors?.push(`Migration module not found: ${join(this.getMigrationsPath(), migrationId)}.(js|ts)`);
         return result;
       }
       console.log(`🚀 Running migration ${migrationId}...`);
-      console.log(`[MigrationRunner] Loaded module path: ${modulePath}`);
       const mod = await import(modulePath);
       if (!mod || typeof mod.up !== 'function') {
         result.errors?.push(`Migration ${migrationId} does not export up(client)`);
@@ -235,43 +242,26 @@ export class MigrationRunner {
     }
   }
 
-  /** Get list of pending migrations (reads JS/TS modules from known locations) */
+  /** Get list of pending migrations (reads JS modules from dist/migrations; dev fallback if needed) */
   async getPendingMigrations(): Promise<string[]> {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map((m) => m.id));
 
-    // Collect migration ids across candidate bases (supports dev TS and built JS)
-    const bases = [
-      join(__dirname, '../../migrations'),
-      join(__dirname, '../migrations'),
-      join(process.cwd(), 'packages/models/dist/migrations'),
-      join(process.cwd(), 'packages/models/src/migrations'),
-      join(__dirname, '../../../dist/migrations'),
-      join(__dirname, '../../../src/migrations'),
-    ];
-
-    const foundIds = new Set<string>();
-    for (const base of bases) {
-      if (!existsSync(base)) continue;
-      const files = readdirSync(base).filter((file) => (file.endsWith('.js') || file.endsWith('.ts')) && !file.includes('rollback'));
-      for (const f of files) {
-        const id = f.replace(/\.(ts|js)$/i, '');
-        foundIds.add(id);
-      }
-    }
+    const base = this.getMigrationsPath();
+    if (!existsSync(base)) return [];
+    const ext = this.isDistBuild() ? '.js' : '.ts';
+    const files = readdirSync(base).filter((file) => file.endsWith(ext) && !file.endsWith('.d.ts'));
+    const ids = files.map((f) => f.slice(0, -ext.length));
 
     // Sort by numeric prefix, then lexicographically
-    const sortedIds = Array.from(foundIds).sort((a, b) => {
+    const sortedIds = ids.sort((a, b) => {
       const na = parseInt(a.match(/^(\d+)/)?.[1] ?? '999999', 10);
       const nb = parseInt(b.match(/^(\d+)/)?.[1] ?? '999999', 10);
       if (na !== nb) return na - nb;
       return a.localeCompare(b);
     });
 
-    const pending = sortedIds.filter((id) => !appliedIds.has(id));
-    console.log(`[MigrationRunner] Pending migrations detected: ${pending.length}`);
-    pending.forEach((id, idx) => console.log(`   ${idx + 1}. ${id}`));
-    return pending;
+    return sortedIds.filter((id) => !appliedIds.has(id));
   }
 
   /** Check if migration is already applied */

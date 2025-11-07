@@ -29,11 +29,12 @@ export const calculatorTool: ToolParams = {
         description: 'Evaluate mathematical expression',
         parameters: {
           code: `
-            // Safe mathematical expression evaluation with + - * / and parentheses
-            const expression = input.expression;
-            if (!expression || typeof expression !== 'string') {
-              throw new Error('Expression is required and must be a string');
-            }
+            async function main(ctx) {
+              // Safe mathematical expression evaluation with + - * / and parentheses
+              const expression = ctx.$input.expression;
+              if (!expression || typeof expression !== 'string') {
+                throw new Error('Expression is required and must be a string');
+              }
 
             // Reject complex expressions BEFORE character validation
             const lower = expression.toLowerCase();
@@ -143,22 +144,23 @@ export const calculatorTool: ToolParams = {
               return st[0];
             }
 
-            try {
-              const tokens = tokenize(expression);
-              const rpn = toRPN(tokens);
-              const result = evalRPN(rpn);
+              try {
+                const tokens = tokenize(expression);
+                const rpn = toRPN(tokens);
+                const result = evalRPN(rpn);
 
-              if (typeof result !== 'number' || !isFinite(result)) {
-                // Allow Infinity explicitly (division by zero)
-                if (result !== Infinity && result !== -Infinity) {
-                  throw new Error('Expression did not evaluate to a valid number');
+                if (typeof result !== 'number' || !isFinite(result)) {
+                  // Allow Infinity explicitly (division by zero)
+                  if (result !== Infinity && result !== -Infinity) {
+                    throw new Error('Expression did not evaluate to a valid number');
+                  }
                 }
-              }
 
-              return { expression, result, type: 'calculation' };
-            } catch (error) {
-              const msg = error && error.message ? error.message : String(error);
-              throw new Error('Invalid mathematical expression: ' + msg);
+                return { expression, result, type: 'calculation' };
+              } catch (error) {
+                const msg = error && (error).message ? (error).message : String(error);
+                throw new Error('Invalid mathematical expression: ' + msg);
+              }
             }
           `,
           timeout: 5000,

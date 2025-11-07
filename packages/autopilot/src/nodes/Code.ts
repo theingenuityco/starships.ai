@@ -29,10 +29,7 @@ export class Code extends BaseNode<CodeParams> {
       // Get execution context for state and other data
       const execution = this.getOptions()?.execution;
 
-      // Create the execution context for the code
-      const secureEnv = this.getOptions()?.secureEnv || {};
-
-      // Helper to access last output of a node within current execution
+      // Create helpers for ctx
       const $lastOutputOf = (ref: string): ExecutionItem[] => {
         try {
           if (!execution?.results || !ref) return [];
@@ -48,40 +45,27 @@ export class Code extends BaseNode<CodeParams> {
         }
       };
 
-      const context = {
-        // Inputs and state helpers
-        input: inputData,
-        $input: () => inputData,
+      // Secure env accessor only (no envAll)
+      const secureEnv = this.getOptions()?.secureEnv || {};
+      const $env = (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined);
+
+      // Build ctx surface (prefixed keys)
+      const ctx = {
+        $input: inputData,
+        $state: execution?.state || {},
+        $env,
         $lastOutputOf,
+      };
 
-        state: execution?.state || {},
-        env: (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined),
-        envAll: () => ({ ...secureEnv }),
-
-        // Console shims
-        console: {
-          log: (...args: unknown[]) => console.log('[Code Node]:', ...args),
-          error: (...args: unknown[]) => console.error('[Code Node]:', ...args),
-          warn: (...args: unknown[]) => console.warn('[Code Node]:', ...args),
-        },
-
-        // Common utilities
-        JSON: JSON,
-        Math: Math,
-        Date: Date,
-
-        // Hard disables for security
-        setTimeout: undefined,
-        setInterval: undefined,
-        require: undefined,
-        process: undefined,
-        global: undefined,
-        eval: undefined,
-        Function: undefined,
+      // Console shim for scoping
+      const consoleShim = {
+        log: (...args: unknown[]) => console.log('[Code Node]:', ...args),
+        error: (...args: unknown[]) => console.error('[Code Node]:', ...args),
+        warn: (...args: unknown[]) => console.warn('[Code Node]:', ...args),
       };
 
       // Execute the code with timeout
-      const result = await this.executeCodeWithTimeout(params.code, context, params.timeout || 5000);
+      const result = await this.executeCodeWithTimeout(params.code, ctx, consoleShim, params.timeout || 5000);
 
       // Sanitize non-finite numbers for JSON-safe transport (sentinel strings)
       const sanitizeNonFinite = (x: unknown): unknown => {
@@ -113,45 +97,58 @@ export class Code extends BaseNode<CodeParams> {
   /**
    * Execute code with timeout protection
    */
-  private async executeCodeWithTimeout(code: string, context: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
+  private async executeCodeWithTimeout(
+    code: string,
+    ctx: Record<string, unknown>,
+    consoleShim: Record<string, unknown>,
+    timeoutMs: number
+  ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error(`Code execution timeout after ${timeoutMs}ms`));
       }, timeoutMs);
 
       try {
-        // Create a function from the code with the context as parameters
-        const contextKeys = Object.keys(context);
-        const contextValues = Object.values(context);
-
-        // Wrap the code in a function that returns the result
-        const wrappedCode = `
+        // Wrap the user code and enforce async main(ctx) entrypoint
+        const wrapped = `
+          'use strict';
           try {
             ${code}
+            if (typeof main !== 'function') {
+              throw new Error("Missing async function main(ctx)");
+            }
+            // Return the result (may be a Promise)
+            return main(ctx);
           } catch (error) {
-            throw new Error('Code execution error: ' + error.message);
+            throw new Error('Code execution error: ' + (error && error.message ? error.message : String(error)));
           }
         `;
 
-        // Use Function constructor to create the function (safer than eval)
-        const func = new Function(...contextKeys, wrappedCode);
-        const result = func.apply(null, contextValues);
+        // Shadow/block sensitive globals by parameter shadowing
+        // Note: JSON/Math/Date remain available as normal JS built-ins
+        const func = new Function(
+          'ctx',
+          'console',
+          'setTimeout',
+          'setInterval',
+          'require',
+          'Function',
+          'process',
+          'global',
+          'globalThis',
+          wrapped
+        );
 
-        // Handle both sync and async results
-        if (result && typeof result.then === 'function') {
-          result
-            .then((asyncResult: unknown) => {
-              clearTimeout(timeoutId);
-              resolve(asyncResult);
-            })
-            .catch((error: Error) => {
-              clearTimeout(timeoutId);
-              reject(error);
-            });
-        } else {
-          clearTimeout(timeoutId);
-          resolve(result);
-        }
+        const maybePromise = func(ctx, consoleShim, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+        Promise.resolve(maybePromise)
+          .then((asyncResult: unknown) => {
+            clearTimeout(timeoutId);
+            resolve(asyncResult);
+          })
+          .catch((error: Error) => {
+            clearTimeout(timeoutId);
+            reject(error);
+          });
       } catch (error) {
         clearTimeout(timeoutId);
         reject(error);
@@ -173,12 +170,21 @@ export class Code extends BaseNode<CodeParams> {
     // Code syntax validation (basic check)
     if (params.code) {
       try {
-        // Try to parse as function to check basic syntax
-        new Function(params.code);
+        // Try to compile with expected parameters (no execution)
+        new Function('ctx', 'console', params.code);
       } catch (syntaxError) {
         errors.push({
           code: 'INVALID_PARAMETERS',
           message: `Code syntax error: ${syntaxError instanceof Error ? syntaxError.message : 'Unknown syntax error'}`,
+        });
+      }
+
+      // Require async function main(ctx) presence (strict API)
+      const requiresMain = /async\s+function\s+main\s*\(/;
+      if (!requiresMain.test(params.code)) {
+        errors.push({
+          code: 'INVALID_PARAMETERS',
+          message: `Missing required entrypoint: async function main(ctx)`,
         });
       }
     }
@@ -195,6 +201,7 @@ export class Code extends BaseNode<CodeParams> {
         /require\s*\(/,
         /process\s*\./,
         /global\s*\./,
+        /globalThis\s*\./,
         /import\s+/,
         /eval\s*\(/,
         /setTimeout\s*\(/,

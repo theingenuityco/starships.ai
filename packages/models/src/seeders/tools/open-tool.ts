@@ -54,49 +54,51 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Build URL, headers and body based on mode (create or open)',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('baseUrl is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('authToken is required');
+              if (!starshipId) throw new Error('starshipId is required');
 
-            const hasName = input && typeof input.name === 'string' && input.name.trim().length > 0;
-            const hasSlug = input && typeof input.slug === 'string' && input.slug.trim().length > 0;
+              const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
+              const hasSlug = ctx.$input && typeof ctx.$input.slug === 'string' && ctx.$input.slug.trim().length > 0;
 
-            if (hasName) {
-              // Create tool (active by default)
-              const name = input.name.trim();
-              const description = (input && typeof input.description === 'string' ? input.description.trim() : '');
-              if (!description) throw new Error('description is required when creating a new tool');
-              const body = {
-                name,
-                description,
-                status: 'active'
-              };
+              if (hasName) {
+                // Create tool (active by default)
+                const name = ctx.$input.name.trim();
+                const description = (ctx.$input && typeof ctx.$input.description === 'string' ? ctx.$input.description.trim() : '');
+                if (!description) throw new Error('description is required when creating a new tool');
+                const body = {
+                  name,
+                  description,
+                  status: 'active'
+                };
+                return {
+                  url: baseUrl + '/starships/' + starshipId + '/tools',
+                  method: 'POST',
+                  headers: {
+                    'Authorization': 'Bearer ' + authToken,
+                    'Content-Type': 'application/json'
+                  },
+                  body,
+                  timeout: 10000
+                };
+              }
+
+              // Open existing
+              if (!hasSlug) throw new Error('slug is required to open an existing tool');
               return {
-                url: baseUrl + '/starships/' + starshipId + '/tools',
-                method: 'POST',
+                url: baseUrl + '/starships/' + starshipId + '/tools/' + ctx.$input.slug,
+                method: 'GET',
                 headers: {
                   'Authorization': 'Bearer ' + authToken,
                   'Content-Type': 'application/json'
                 },
-                body,
-                timeout: 10000
+                timeout: 5000
               };
             }
-
-            // Open existing
-            if (!hasSlug) throw new Error('slug is required to open an existing tool');
-            return {
-              url: baseUrl + '/starships/' + starshipId + '/tools/' + input.slug,
-              method: 'GET',
-              headers: {
-                'Authorization': 'Bearer ' + authToken,
-                'Content-Type': 'application/json'
-              },
-              timeout: 5000
-            };
           `,
           timeout: 3000,
         },

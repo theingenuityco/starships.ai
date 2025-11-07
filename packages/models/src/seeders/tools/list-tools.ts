@@ -44,21 +44,23 @@ Behavior and limits:
         description: 'Build URL and headers',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('baseUrl is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('authToken is required');
+              if (!starshipId) throw new Error('starshipId is required');
 
-            return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
-              method: 'GET',
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
-              }
-            };
+              return {
+                url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
+                method: 'GET',
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -82,21 +84,23 @@ Behavior and limits:
         description: 'Strip heavy fields (e.g., blueprint) and return a lean list',
         parameters: {
           code: `
-            // Input is the HttpResponse from http_list (see HttpRequest node contract)
-            const http = input;
-            const body = http && typeof http === 'object' ? http.body : http;
-            // Server sendSuccess returns { data: T }, so prefer body.data when present
-            const data = (body && typeof body === 'object' && Array.isArray(body.data))
-              ? body.data
-              : (Array.isArray(body) ? body : []);
+            async function main(ctx) {
+              // Input is the HttpResponse from http_list (see HttpRequest node contract)
+              const http = ctx.$input;
+              const body = http && typeof http === 'object' ? http.body : http;
+              // Server sendSuccess returns { data: T }, so prefer body.data when present
+              const data = body && typeof body === 'object' && Array.isArray(body.data)
+                ? body.data
+                : (Array.isArray(body) ? body : []);
 
-            // Return a lean summary to avoid leaking large/templated blueprint contents
-            return data.map((t) => ({
-              slug: t && t.slug,
-              name: t && t.name,
-              description: t && t.description,
-              isEnabled: t && t.isEnabled,
-            }));
+              // Return a lean summary to avoid leaking large/templated blueprint contents
+              return data.map((t) => ({
+                slug: t && t.slug,
+                name: t && t.name,
+                description: t && t.description,
+                isEnabled: t && t.isEnabled,
+              }));
+            }
           `,
           timeout: 2000,
         },

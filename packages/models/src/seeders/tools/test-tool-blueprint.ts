@@ -82,113 +82,115 @@ Returns structured validation result:
         description: 'Run structural validations',
         parameters: {
           code: `
-            function isObject(v) { return v && typeof v === 'object' && !Array.isArray(v); }
+            async function main(ctx) {
+              function isObject(v) { return v && typeof v === 'object' && !Array.isArray(v); }
 
-            // Accept either { blueprint } wrapper or direct blueprint
-            const candidate = (input && typeof input === 'object' && 'blueprint' in input) ? input.blueprint : input;
-            const issues = [];
+              // Accept either { blueprint } wrapper or direct blueprint
+              const candidate = (ctx.$input && typeof ctx.$input === 'object' && 'blueprint' in ctx.$input) ? ctx.$input.blueprint : ctx.$input;
+              const issues = [];
 
-            // If it's not an object, do not throw - return a structured lint result
-            if (!isObject(candidate)) {
+              // If it's not an object, return a structured lint result
+              if (!isObject(candidate)) {
+                return {
+                  ok: false,
+                  issues: ['Invalid blueprint: must be an object with nodes[] and edges[]'],
+                  summary: { nodeCount: 0, edgeCount: 0, types: {} }
+                };
+              }
+
+              const bp = candidate;
+
+              // Normalize missing arrays to empty while recording issues
+              if (!Array.isArray(bp.nodes)) {
+                issues.push('Invalid blueprint: nodes must be an array');
+                bp.nodes = [];
+              }
+              if (!Array.isArray(bp.edges)) {
+                issues.push('Invalid blueprint: edges must be an array');
+                bp.edges = [];
+              }
+
+              const nodes = bp.nodes;
+              const edges = bp.edges;
+
+              // Validate node refs and types
+              const allowedTypes = [
+                'start','end','agent','workflow','http_request','llm','user_prompt',
+                'conditional','transform','mutate','tool','code'
+              ];
+              const seenRefs = new Set();
+              for (const n of nodes) {
+                if (!n || typeof n !== 'object') {
+                  issues.push('Node entry must be an object');
+                  continue;
+                }
+                if (!n.ref || typeof n.ref !== 'string') {
+                  issues.push('Node missing valid "ref"');
+                } else {
+                  if (seenRefs.has(n.ref)) issues.push('Duplicate node ref: ' + n.ref);
+                  seenRefs.add(n.ref);
+                }
+
+                if (!n.type || typeof n.type !== 'string') {
+                  issues.push((n.ref ?? '?') + ' missing "type"');
+                } else if (!allowedTypes.includes(n.type)) {
+                  issues.push('Unsupported node type "' + n.type + '" at ' + n.ref);
+                }
+              }
+
+              // Start/End presence
+              const hasStart = nodes.some((n) => n && n.type === 'start');
+              const hasEnd = nodes.some((n) => n && n.type === 'end');
+              if (!hasStart) issues.push('Missing start node');
+              if (!hasEnd) issues.push('Missing end node');
+
+              // Validate edges structure and references
+              const seenEdgeRefs = new Set();
+              for (const e of edges) {
+                if (!e || typeof e !== 'object') {
+                  issues.push('Edge entry must be an object');
+                  continue;
+                }
+                if (!e.ref || typeof e.ref !== 'string') {
+                  issues.push('Edge missing valid "ref"');
+                } else {
+                  if (seenEdgeRefs.has(e.ref)) issues.push('Duplicate edge ref: ' + e.ref);
+                  seenEdgeRefs.add(e.ref);
+                }
+                if (!e.from || typeof e.from !== 'string' || !e.to || typeof e.to !== 'string') {
+                  issues.push((e.ref ?? '?') + ' missing "from" or "to"');
+                  continue;
+                }
+                if (!seenRefs.has(e.from)) issues.push((e.ref ?? '?') + ' "from" references unknown node: ' + e.from);
+                if (!seenRefs.has(e.to)) issues.push((e.ref ?? '?') + ' "to" references unknown node: ' + e.to);
+                if (e.condition !== undefined && typeof e.condition !== 'string') {
+                  issues.push((e.ref ?? '?') + ' condition must be a string"');
+                }
+                if (e.label !== undefined && typeof e.label !== 'string') {
+                  issues.push((e.ref ?? '?') + ' label must be a string"');
+                }
+                if (e.metadata !== undefined && (typeof e.metadata !== 'object' || Array.isArray(e.metadata))) {
+                  issues.push((e.ref ?? '?') + ' metadata must be an object"');
+                }
+              }
+
+              // Basic summary
+              const typeCounts = nodes.reduce((acc, n) => {
+                const t = n && typeof n === 'object' && n.type ? n.type : 'unknown';
+                acc[t] = (acc[t] || 0) + 1;
+                return acc;
+              }, {});
+
               return {
-                ok: false,
-                issues: ['Invalid blueprint: must be an object with nodes[] and edges[]'],
-                summary: { nodeCount: 0, edgeCount: 0, types: {} }
+                ok: issues.length === 0,
+                issues,
+                summary: {
+                  nodeCount: nodes.length,
+                  edgeCount: edges.length,
+                  types: typeCounts
+                }
               };
             }
-
-            const bp = candidate;
-
-            // Normalize missing arrays to empty while recording issues
-            if (!Array.isArray(bp.nodes)) {
-              issues.push('Invalid blueprint: nodes must be an array');
-              bp.nodes = [];
-            }
-            if (!Array.isArray(bp.edges)) {
-              issues.push('Invalid blueprint: edges must be an array');
-              bp.edges = [];
-            }
-
-            const nodes = bp.nodes;
-            const edges = bp.edges;
-
-            // Validate node refs and types
-            const allowedTypes = [
-              'start','end','agent','workflow','http_request','llm','user_prompt',
-              'conditional','transform','mutate','tool','code'
-            ];
-            const seenRefs = new Set();
-            for (const n of nodes) {
-              if (!n || typeof n !== 'object') {
-                issues.push('Node entry must be an object');
-                continue;
-              }
-              if (!n.ref || typeof n.ref !== 'string') {
-                issues.push('Node missing valid "ref"');
-              } else {
-                if (seenRefs.has(n.ref)) issues.push('Duplicate node ref: ' + n.ref);
-                seenRefs.add(n.ref);
-              }
-
-              if (!n.type || typeof n.type !== 'string') {
-                issues.push((n.ref ?? '?') + ' missing "type"');
-              } else if (!allowedTypes.includes(n.type)) {
-                issues.push('Unsupported node type "' + n.type + '" at ' + n.ref);
-              }
-            }
-
-            // Start/End presence
-            const hasStart = nodes.some((n) => n && n.type === 'start');
-            const hasEnd = nodes.some((n) => n && n.type === 'end');
-            if (!hasStart) issues.push('Missing start node');
-            if (!hasEnd) issues.push('Missing end node');
-
-            // Validate edges structure and references
-            const seenEdgeRefs = new Set();
-            for (const e of edges) {
-              if (!e || typeof e !== 'object') {
-                issues.push('Edge entry must be an object');
-                continue;
-              }
-              if (!e.ref || typeof e.ref !== 'string') {
-                issues.push('Edge missing valid "ref"');
-              } else {
-                if (seenEdgeRefs.has(e.ref)) issues.push('Duplicate edge ref: ' + e.ref);
-                seenEdgeRefs.add(e.ref);
-              }
-              if (!e.from || typeof e.from !== 'string' || !e.to || typeof e.to !== 'string') {
-                issues.push((e.ref ?? '?') + ' missing "from" or "to"');
-                continue;
-              }
-              if (!seenRefs.has(e.from)) issues.push((e.ref ?? '?') + ' "from" references unknown node: ' + e.from);
-              if (!seenRefs.has(e.to)) issues.push((e.ref ?? '?') + ' "to" references unknown node: ' + e.to);
-              if (e.condition !== undefined && typeof e.condition !== 'string') {
-                issues.push((e.ref ?? '?') + ' condition must be a string"');
-              }
-              if (e.label !== undefined && typeof e.label !== 'string') {
-                issues.push((e.ref ?? '?') + ' label must be a string"');
-              }
-              if (e.metadata !== undefined && (typeof e.metadata !== 'object' || Array.isArray(e.metadata))) {
-                issues.push((e.ref ?? '?') + ' metadata must be an object"');
-              }
-            }
-
-            // Basic summary
-            const typeCounts = nodes.reduce((acc, n) => {
-              const t = n?.type ?? 'unknown';
-              acc[t] = (acc[t] || 0) + 1;
-              return acc;
-            }, {});
-
-            return {
-              ok: issues.length === 0,
-              issues,
-              summary: {
-                nodeCount: nodes.length,
-                edgeCount: edges.length,
-                types: typeCounts
-              }
-            };
           `,
           timeout: 4000,
         },

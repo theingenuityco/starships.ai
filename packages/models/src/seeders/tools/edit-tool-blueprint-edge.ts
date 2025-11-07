@@ -28,16 +28,18 @@ export const blueprintEditEdgeTool: ToolParams = {
         description: 'Build URL, headers and validate inputs',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
-            if (!input.toolSlug) throw new Error('toolSlug is required');
-            if (!input.edgeRef || typeof input.edgeRef !== 'string') throw new Error('edgeRef is required and must be a string');
-            if (!input.updates || typeof input.updates !== 'object') throw new Error('updates is required and must be an object');
-            return { baseUrl, starshipId, toolSlug: input.toolSlug, edgeRef: input.edgeRef, updates: input.updates, headers: { 'Authorization': \`Bearer \${authToken}\`, 'Content-Type': 'application/json' } };
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
+              if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
+              if (!ctx.$input.edgeRef || typeof ctx.$input.edgeRef !== 'string') throw new Error('edgeRef is required and must be a string');
+              if (!ctx.$input.updates || typeof ctx.$input.updates !== 'object') throw new Error('updates is required and must be an object');
+              return { baseUrl, starshipId, toolSlug: ctx.$input.toolSlug, edgeRef: ctx.$input.edgeRef, updates: ctx.$input.updates, headers: { 'Authorization': \`Bearer \${authToken}\`, 'Content-Type': 'application/json' } };
+            }
           `,
           timeout: 3000,
         },
@@ -61,34 +63,36 @@ export const blueprintEditEdgeTool: ToolParams = {
         description: 'Edit edge properties with validation',
         parameters: {
           code: `
-            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
-            const toolData = fetchResponse.body?.data || fetchResponse.body;
-            if (!toolData || !toolData.blueprint) throw new Error('Tool not found or missing blueprint');
-            const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
-            if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
-            if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
-            const edgeRef = $lastOutputOf('prepare')[0].json.edgeRef;
-            const updates = $lastOutputOf('prepare')[0].json.updates;
-            const edgeIndex = blueprint.edges.findIndex(e => e?.ref === edgeRef);
-            if (edgeIndex === -1) return { success: false, error: \`Edge not found: \${edgeRef}\`, toolData };
-            const currentEdge = blueprint.edges[edgeIndex];
-            const nodeRefs = new Set(blueprint.nodes.map(n => n?.ref).filter(Boolean));
-            const errors = [];
-            if (updates.from !== undefined) { if (typeof updates.from !== 'string') errors.push('Edge from must be a string'); else if (!nodeRefs.has(updates.from)) errors.push(\`Source node does not exist: \${updates.from}\`); }
-            if (updates.to !== undefined) { if (typeof updates.to !== 'string') errors.push('Edge to must be a string'); else if (!nodeRefs.has(updates.to)) errors.push(\`Target node does not exist: \${updates.to}\`); }
-            if (updates.condition !== undefined && typeof updates.condition !== 'string') errors.push('Edge condition must be a string expression');
-            if (updates.label !== undefined && typeof updates.label !== 'string') errors.push('Edge label must be a string');
-            if (updates.metadata !== undefined && (typeof updates.metadata !== 'object' || Array.isArray(updates.metadata))) errors.push('Edge metadata must be an object');
-            if (errors.length > 0) return { success: false, errors, toolData };
-            const updatedEdge = { ...currentEdge };
-            if (updates.from !== undefined) updatedEdge.from = updates.from;
-            if (updates.to !== undefined) updatedEdge.to = updates.to;
-            if (updates.condition !== undefined) updatedEdge.condition = updates.condition;
-            if (updates.label !== undefined) updatedEdge.label = updates.label;
-            if (updates.metadata !== undefined) updatedEdge.metadata = updates.metadata;
-            const sanitizedEdge = { ref: updatedEdge.ref, from: updatedEdge.from, to: updatedEdge.to, ...(updatedEdge.condition !== undefined ? { condition: updatedEdge.condition } : {}), ...(updatedEdge.label !== undefined ? { label: updatedEdge.label } : {}), ...(updatedEdge.metadata !== undefined ? { metadata: updatedEdge.metadata } : {}) };
-            blueprint.edges[edgeIndex] = sanitizedEdge;
-            return { success: true, toolData, updatedBlueprint: blueprint, editedEdge: sanitizedEdge, edgeRef };
+            async function main(ctx) {
+              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const toolData = fetchResponse.body?.data || fetchResponse.body;
+              if (!toolData || !toolData.blueprint) throw new Error('Tool not found or missing blueprint');
+              const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
+              if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
+              if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
+              const edgeRef = ctx.$lastOutputOf('prepare')[0].json.edgeRef;
+              const updates = ctx.$lastOutputOf('prepare')[0].json.updates;
+              const edgeIndex = blueprint.edges.findIndex((e: any) => e?.ref === edgeRef);
+              if (edgeIndex === -1) return { success: false, error: \`Edge not found: \${edgeRef}\`, toolData };
+              const currentEdge: any = blueprint.edges[edgeIndex];
+              const nodeRefs = new Set(blueprint.nodes.map((n: any) => n?.ref).filter(Boolean));
+              const errors: string[] = [];
+              if (updates.from !== undefined) { if (typeof updates.from !== 'string') errors.push('Edge from must be a string'); else if (!nodeRefs.has(updates.from)) errors.push(\`Source node does not exist: \${updates.from}\`); }
+              if (updates.to !== undefined) { if (typeof updates.to !== 'string') errors.push('Edge to must be a string'); else if (!nodeRefs.has(updates.to)) errors.push(\`Target node does not exist: \${updates.to}\`); }
+              if (updates.condition !== undefined && typeof updates.condition !== 'string') errors.push('Edge condition must be a string expression');
+              if (updates.label !== undefined && typeof updates.label !== 'string') errors.push('Edge label must be a string');
+              if (updates.metadata !== undefined && (typeof updates.metadata !== 'object' || Array.isArray(updates.metadata))) errors.push('Edge metadata must be an object');
+              if (errors.length > 0) return { success: false, errors, toolData };
+              const updatedEdge: any = { ...currentEdge };
+              if (updates.from !== undefined) updatedEdge.from = updates.from;
+              if (updates.to !== undefined) updatedEdge.to = updates.to;
+              if (updates.condition !== undefined) updatedEdge.condition = updates.condition;
+              if (updates.label !== undefined) updatedEdge.label = updates.label;
+              if (updates.metadata !== undefined) updatedEdge.metadata = updates.metadata;
+              const sanitizedEdge = { ref: updatedEdge.ref, from: updatedEdge.from, to: updatedEdge.to, ...(updatedEdge.condition !== undefined ? { condition: updatedEdge.condition } : {}), ...(updatedEdge.label !== undefined ? { label: updatedEdge.label } : {}), ...(updatedEdge.metadata !== undefined ? { metadata: updatedEdge.metadata } : {}) };
+              blueprint.edges[edgeIndex] = sanitizedEdge;
+              return { success: true, toolData, updatedBlueprint: blueprint, editedEdge: sanitizedEdge, edgeRef };
+            }
           `,
           timeout: 3000,
         },

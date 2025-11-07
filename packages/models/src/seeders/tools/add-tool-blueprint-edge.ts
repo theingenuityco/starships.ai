@@ -38,24 +38,26 @@ export const toolAddBlueprintEdgeTool: ToolParams = {
         description: 'Build URL, headers and validate inputs',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
-            if (!input.toolSlug) throw new Error('toolSlug is required');
-            if (!input.edge || typeof input.edge !== 'object') throw new Error('edge is required and must be an object');
-            return {
-              baseUrl,
-              starshipId,
-              toolSlug: input.toolSlug,
-              edge: input.edge,
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
-              }
-            };
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
+              if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
+              if (!ctx.$input.edge || typeof ctx.$input.edge !== 'object') throw new Error('edge is required and must be an object');
+              return {
+                baseUrl,
+                starshipId,
+                toolSlug: ctx.$input.toolSlug,
+                edge: ctx.$input.edge,
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -79,25 +81,27 @@ export const toolAddBlueprintEdgeTool: ToolParams = {
         description: 'Validate edge and add to blueprint',
         parameters: {
           code: `
-            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
-            const toolData = fetchResponse.body?.data || fetchResponse.body;
-            if (!toolData || !toolData.blueprint) throw new Error('Tool not found or missing blueprint');
-            const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
-            if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
-            if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
-            const edge = $lastOutputOf('prepare')[0].json.edge;
-            const errors = [];
-            if (!edge.ref || typeof edge.ref !== 'string') errors.push('Edge must have a valid ref (string)');
-            if (!edge.from || typeof edge.from !== 'string') errors.push('Edge must have a valid from (string)');
-            if (!edge.to || typeof edge.to !== 'string') errors.push('Edge must have a valid to (string)');
-            const nodeRefs = new Set(blueprint.nodes.map(n => n?.ref).filter(Boolean));
-            if (edge.from && !nodeRefs.has(edge.from)) errors.push(\`Unknown from node: \${edge.from}\`);
-            if (edge.to && !nodeRefs.has(edge.to)) errors.push(\`Unknown to node: \${edge.to}\`);
-            const existingRefs = new Set(blueprint.edges.map(e => e?.ref).filter(Boolean));
-            if (existingRefs.has(edge.ref)) errors.push(\`Edge ref already exists: \${edge.ref}\`);
-            if (errors.length > 0) return { success: false, errors, toolData };
-            blueprint.edges.push({ ref: edge.ref, from: edge.from, to: edge.to, ...(edge.condition ? { condition: edge.condition } : {}), ...(edge.label ? { label: edge.label } : {}), ...(edge.metadata ? { metadata: edge.metadata } : {}) });
-            return { success: true, toolData, updatedBlueprint: blueprint, addedEdge: edge, edgeCount: blueprint.edges.length };
+            async function main(ctx) {
+              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const toolData = fetchResponse.body?.data || fetchResponse.body;
+              if (!toolData || !toolData.blueprint) throw new Error('Tool not found or missing blueprint');
+              const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
+              if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
+              if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
+              const edge = ctx.$lastOutputOf('prepare')[0].json.edge;
+              const errors: string[] = [];
+              if (!edge.ref || typeof edge.ref !== 'string') errors.push('Edge must have a valid ref (string)');
+              if (!edge.from || typeof edge.from !== 'string') errors.push('Edge must have a valid from (string)');
+              if (!edge.to || typeof edge.to !== 'string') errors.push('Edge must have a valid to (string)');
+              const nodeRefs = new Set(blueprint.nodes.map((n: any) => n?.ref).filter(Boolean));
+              if (edge.from && !nodeRefs.has(edge.from)) errors.push(\`Unknown from node: \${edge.from}\`);
+              if (edge.to && !nodeRefs.has(edge.to)) errors.push(\`Unknown to node: \${edge.to}\`);
+              const existingRefs = new Set(blueprint.edges.map((e: any) => e?.ref).filter(Boolean));
+              if (existingRefs.has(edge.ref)) errors.push(\`Edge ref already exists: \${edge.ref}\`);
+              if (errors.length > 0) return { success: false, errors, toolData };
+              blueprint.edges.push({ ref: edge.ref, from: edge.from, to: edge.to, ...(edge.condition ? { condition: edge.condition } : {}), ...(edge.label ? { label: edge.label } : {}), ...(edge.metadata ? { metadata: edge.metadata } : {}) });
+              return { success: true, toolData, updatedBlueprint: blueprint, addedEdge: edge, edgeCount: blueprint.edges.length };
+            }
           `,
           timeout: 3000,
         },

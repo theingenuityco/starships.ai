@@ -73,31 +73,33 @@ Returns updated tool with new node in blueprint, or validation errors if additio
         description: 'Build URL, headers and validate inputs',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-            if (!input.toolSlug) {
-              throw new Error('toolSlug is required');
-            }
-
-            if (!input.node || typeof input.node !== 'object') {
-              throw new Error('node is required and must be an object');
-            }
-
-            return {
-              baseUrl,
-              starshipId,
-              toolSlug: input.toolSlug,
-              node: input.node,
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
+              if (!ctx.$input.toolSlug) {
+                throw new Error('toolSlug is required');
               }
-            };
+
+              if (!ctx.$input.node || typeof ctx.$input.node !== 'object') {
+                throw new Error('node is required and must be an object');
+              }
+
+              return {
+                baseUrl,
+                starshipId,
+                toolSlug: ctx.$input.toolSlug,
+                node: ctx.$input.node,
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -121,68 +123,70 @@ Returns updated tool with new node in blueprint, or validation errors if additio
         description: 'Validate node and add to blueprint',
         parameters: {
           code: `
-            const supportedTypes = [
-              'start', 'end', 'llm', 'code', 'http_request', 'conditional',
-              'transform', 'mutate', 'tool', 'workflow', 'user_prompt'
-            ];
+            async function main(ctx) {
+              const supportedTypes = [
+                'start', 'end', 'llm', 'code', 'http_request', 'conditional',
+                'transform', 'mutate', 'tool', 'workflow', 'user_prompt'
+              ];
 
-            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
-            const toolData = fetchResponse.body?.data || fetchResponse.body;
+              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const toolData = fetchResponse.body?.data || fetchResponse.body;
 
-            if (!toolData || !toolData.blueprint) {
-              throw new Error('Tool not found or missing blueprint');
-            }
+              if (!toolData || !toolData.blueprint) {
+                throw new Error('Tool not found or missing blueprint');
+              }
 
-            const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
-            if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
-            if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
+              const blueprint = JSON.parse(JSON.stringify(toolData.blueprint));
+              if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
+              if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
 
-            const newNode = $lastOutputOf('prepare')[0].json.node;
-            const errors = [];
+              const newNode = ctx.$lastOutputOf('prepare')[0].json.node;
+              const errors: string[] = [];
 
-            // Validate node structure
-            if (!newNode.ref || typeof newNode.ref !== 'string') {
-              errors.push('Node must have a valid ref (string)');
-            }
+              // Validate node structure
+              if (!newNode.ref || typeof newNode.ref !== 'string') {
+                errors.push('Node must have a valid ref (string)');
+              }
 
-            if (!newNode.type || typeof newNode.type !== 'string') {
-              errors.push('Node must have a valid type (string)');
-            } else if (!supportedTypes.includes(newNode.type)) {
-              errors.push(\`Unsupported node type: \${newNode.type}\`);
-            }
+              if (!newNode.type || typeof newNode.type !== 'string') {
+                errors.push('Node must have a valid type (string)');
+              } else if (!supportedTypes.includes(newNode.type)) {
+                errors.push(\`Unsupported node type: \${newNode.type}\`);
+              }
 
-            if (!newNode.name || typeof newNode.name !== 'string') {
-              errors.push('Node must have a valid name (string)');
-            }
+              if (!newNode.name || typeof newNode.name !== 'string') {
+                errors.push('Node must have a valid name (string)');
+              }
 
-            if (!newNode.parameters || typeof newNode.parameters !== 'object') {
-              newNode.parameters = {};
-            }
+              if (!newNode.parameters || typeof newNode.parameters !== 'object') {
+                newNode.parameters = {};
+              }
 
-            // Check for ref conflicts
-            const existingRefs = new Set(blueprint.nodes.map(n => n?.ref).filter(Boolean));
-            if (existingRefs.has(newNode.ref)) {
-              errors.push(\`Node ref already exists: \${newNode.ref}\`);
-            }
+              // Check for ref conflicts
+              const existingRefs = new Set(blueprint.nodes.map((n: any) => n?.ref).filter(Boolean));
+              if (existingRefs.has(newNode.ref)) {
+                errors.push(\`Node ref already exists: \${newNode.ref}\`);
+              }
 
-            if (errors.length > 0) {
+              if (errors.length > 0) {
+                return {
+                  success: false,
+                  errors,
+                  toolData
+                };
+              }
+
+              // Add the node
+              blueprint.nodes.push(newNode);
+
               return {
-                success: false,
-                errors,
-                toolData
+                success: true,
+                toolData,
+                updatedBlueprint: blueprint,
+                addedNode: newNode,
+                nodeCount: blueprint.nodes.length
               };
             }
-
-            // Add the node
-            blueprint.nodes.push(newNode);
-
-            return {
-              success: true,
-              toolData,
-              updatedBlueprint: blueprint,
-              addedNode: newNode,
-              nodeCount: blueprint.nodes.length
-            };
           `,
           timeout: 3000,
         },

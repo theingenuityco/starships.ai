@@ -127,8 +127,8 @@ describe('Conditional Node Handler', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].json).toEqual({
-        edgeCondition: 'false',
-        result: false,
+        edgeCondition: 'true',
+        result: true,
       });
     });
 

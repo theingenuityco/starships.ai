@@ -35,25 +35,10 @@ export class MigrationRunner {
   }
 
   private resolveMigrationModulePath(id: string): string | null {
-    const baseCandidates = [
-      // Typical when running compiled code from dist/scripts
-      join(__dirname, '../../migrations'),
-      // Fallback: sometimes transpiler preserves one fewer level
-      join(__dirname, '../migrations'),
-      // Dev: running from repo root with ts-node/tsx
-      join(process.cwd(), 'packages/models/src/migrations'),
-      join(process.cwd(), 'packages/models/dist/migrations'),
-      // Direct package path fallback (monorepo local)
-      join(__dirname, '../../../src/migrations'),
-      join(__dirname, '../../../dist/migrations'),
-    ];
-
-    for (const base of baseCandidates) {
-      const pNoExt = join(base, id);
-      if (existsSync(pNoExt + '.js')) return pNoExt + '.js';
-      if (existsSync(pNoExt + '.ts')) return pNoExt + '.ts';
-      if (existsSync(pNoExt)) return pNoExt; // in case extensionless resolvable
-    }
+    // Single source of truth at runtime: compiled JS in dist/migrations relative to dist/scripts
+    const base = this.migrationsPath; // __dirname/../../migrations
+    const pNoExt = join(base, id);
+    if (existsSync(pNoExt + '.js')) return pNoExt + '.js';
     return null;
   }
 
@@ -98,14 +83,14 @@ export class MigrationRunner {
         result.errors?.push(`Schema module not found: ${join(this.migrationsPath, '000_postgresql_schema')}.(js|ts)`);
         return result;
       }
-      console.log('🚀 Initializing database schema via JS migration...');
+      console.log('🚀 Initializing database schema via migration...');
       try {
         const mod = await import(schemaModulePath);
         if (!mod || typeof mod.up !== 'function') {
           throw new Error('Migration module must export an async function up(client)');
         }
         await mod.up(this.getConnection());
-        console.log('✅ Schema JS migration executed successfully, now verifying...');
+        console.log('✅ Schema migration executed successfully, now verifying...');
       } catch (executionError) {
         console.error('❌ Schema JS migration execution failed:', executionError);
         throw executionError;
@@ -146,11 +131,6 @@ export class MigrationRunner {
     };
 
     try {
-      // Legacy aliases: initialize schema
-      if (migrationId === '001_initialize_schema' || migrationId === '000_postgresql_schema') {
-        return this.initializeSchema();
-      }
-
       await this.ensureMigrationTable();
 
       // Skip if already applied
@@ -167,7 +147,8 @@ export class MigrationRunner {
         result.errors?.push(`Migration module not found: ${join(this.migrationsPath, migrationId)}.(js|ts)`);
         return result;
       }
-      console.log(`🚀 Running JS migration ${migrationId}...`);
+      console.log(`🚀 Running migration ${migrationId}...`);
+      console.log(`[MigrationRunner] Loaded module path: ${modulePath}`);
       const mod = await import(modulePath);
       if (!mod || typeof mod.up !== 'function') {
         result.errors?.push(`Migration ${migrationId} does not export up(client)`);
@@ -254,17 +235,43 @@ export class MigrationRunner {
     }
   }
 
-  /** Get list of pending migrations (reads JS/TS files in /migrations) */
+  /** Get list of pending migrations (reads JS/TS modules from known locations) */
   async getPendingMigrations(): Promise<string[]> {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map((m) => m.id));
 
-    // Scan for JS/TS migration modules
-    const files = readdirSync(this.migrationsPath).filter(
-      (file) => (file.endsWith('.js') || file.endsWith('.ts')) && !file.includes('rollback')
-    );
-    const ids = Array.from(new Set(files.map((f) => f.replace(/\.(ts|js)$/i, '')))).sort();
-    return ids.filter((id) => !appliedIds.has(id));
+    // Collect migration ids across candidate bases (supports dev TS and built JS)
+    const bases = [
+      join(__dirname, '../../migrations'),
+      join(__dirname, '../migrations'),
+      join(process.cwd(), 'packages/models/dist/migrations'),
+      join(process.cwd(), 'packages/models/src/migrations'),
+      join(__dirname, '../../../dist/migrations'),
+      join(__dirname, '../../../src/migrations'),
+    ];
+
+    const foundIds = new Set<string>();
+    for (const base of bases) {
+      if (!existsSync(base)) continue;
+      const files = readdirSync(base).filter((file) => (file.endsWith('.js') || file.endsWith('.ts')) && !file.includes('rollback'));
+      for (const f of files) {
+        const id = f.replace(/\.(ts|js)$/i, '');
+        foundIds.add(id);
+      }
+    }
+
+    // Sort by numeric prefix, then lexicographically
+    const sortedIds = Array.from(foundIds).sort((a, b) => {
+      const na = parseInt(a.match(/^(\d+)/)?.[1] ?? '999999', 10);
+      const nb = parseInt(b.match(/^(\d+)/)?.[1] ?? '999999', 10);
+      if (na !== nb) return na - nb;
+      return a.localeCompare(b);
+    });
+
+    const pending = sortedIds.filter((id) => !appliedIds.has(id));
+    console.log(`[MigrationRunner] Pending migrations detected: ${pending.length}`);
+    pending.forEach((id, idx) => console.log(`   ${idx + 1}. ${id}`));
+    return pending;
   }
 
   /** Check if migration is already applied */
@@ -395,40 +402,44 @@ export class MigrationRunner {
 
   /** Initialize database schema and then run any remaining pending migrations */
   async runAllPendingMigrations(): Promise<MigrationResult[]> {
-    console.log('🚀 Checking database schema...');
+    console.log('🚀 Checking database schema and pending migrations...');
 
     const results: MigrationResult[] = [];
 
-    // Always ensure base schema first
-    const initResult = await this.initializeSchema();
-    results.push(initResult);
-
-    if (!initResult.success) {
-      console.error('❌ Database schema initialization failed:', initResult.errors);
-      return results;
-    }
+    // Ensure history table exists before we check applied/pending
+    await this.ensureMigrationTable();
 
     console.log('🔍 Scanning for pending migrations...');
-    const pending = await this.getPendingMigrations();
-
-    // Filter out base initializer if present
-    const toRun = pending.filter((id) => id !== '000_postgresql_schema');
+    const toRun = await this.getPendingMigrations();
 
     if (toRun.length === 0) {
       console.log('✅ No pending migrations to apply');
       return results;
     }
 
-    console.log(`🧩 Applying ${toRun.length} pending migration(s): ${toRun.join(', ')}`);
+    console.log(`🧩 Applying ${toRun.length} pending migration(s):`);
+    toRun.forEach((id, idx) => console.log(`   ${idx + 1}. ${id}`));
 
+    const applied: string[] = [];
+    const failed: { id: string; errors?: string[] }[] = [];
     for (const id of toRun) {
+      console.log(`▶️  [${id}] starting...`);
+      const started = Date.now();
       const res = await this.runMigration(id);
       results.push(res);
+      const took = Date.now() - started;
       if (!res.success) {
-        console.error(`❌ Migration ${id} failed:`, res.errors);
-        // Continue applying others to surface all issues; caller can decide how to handle failures
+        console.error(`❌ [${id}] failed in ${took}ms:`, res.errors);
+        failed.push({ id, errors: res.errors });
+      } else {
+        console.log(`✅ [${id}] applied in ${took}ms`);
+        applied.push(id);
       }
     }
+
+    console.log('📦 Migration summary:');
+    console.log(`   Applied: ${applied.length} ${applied.length ? `(${applied.join(', ')})` : ''}`);
+    console.log(`   Failed: ${failed.length} ${failed.length ? `(${failed.map((f) => f.id).join(', ')})` : ''}`);
 
     return results;
   }

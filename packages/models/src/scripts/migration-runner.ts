@@ -1,5 +1,5 @@
 import { getConnection } from '@/helpers/database';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 /** Migration runner with error handling and rollback capabilities for PostgreSQL */
@@ -34,7 +34,7 @@ export class MigrationRunner {
     return this.connection;
   }
 
-  /** Initialize schema if not already done */
+  /** Initialize schema if not already done (JS-first migrations) */
   async initializeSchema(): Promise<MigrationResult> {
     const startTime = Date.now();
     const result: MigrationResult = {
@@ -69,22 +69,23 @@ export class MigrationRunner {
         }
       }
 
-      // Validate migration file exists
-      const migrationPath = join(this.migrationsPath, '000_postgresql_schema.sql');
-      if (!existsSync(migrationPath)) {
-        result.errors?.push(`Schema file not found: ${migrationPath}`);
+      // Execute schema initialization via JS migration
+      const migrationModulePath = join(this.migrationsPath, '000_postgresql_schema');
+      if (!existsSync(migrationModulePath + '.js') && !existsSync(migrationModulePath + '.ts')) {
+        result.errors?.push(`Schema module not found: ${migrationModulePath}.(js|ts)`);
         return result;
       }
-
-      // Execute schema initialization
-      const schemaContent = readFileSync(migrationPath, 'utf-8');
-      console.log('🚀 Initializing database schema...');
-
+      console.log('🚀 Initializing database schema via JS migration...');
       try {
-        await this.executeMigrationContent(schemaContent);
-        console.log('✅ Migration content executed successfully, now verifying...');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = require(migrationModulePath);
+        if (!mod || typeof mod.up !== 'function') {
+          throw new Error('Migration module must export an async function up(client)');
+        }
+        await mod.up(this.getConnection());
+        console.log('✅ Schema JS migration executed successfully, now verifying...');
       } catch (executionError) {
-        console.error('❌ Migration content execution failed:', executionError);
+        console.error('❌ Schema JS migration execution failed:', executionError);
         throw executionError;
       }
 
@@ -110,7 +111,7 @@ export class MigrationRunner {
     return result;
   }
 
-  /** Execute a specific migration file (supports arbitrary IDs in /migrations) */
+  /** Execute a specific migration (JS-first, resolves module by id in /migrations) */
   async runMigration(migrationId: string): Promise<MigrationResult> {
     const startTime = Date.now();
     const result: MigrationResult = {
@@ -138,17 +139,22 @@ export class MigrationRunner {
         return result;
       }
 
-      // Validate file exists
-      const migrationPath = join(this.migrationsPath, `${migrationId}.sql`);
-      if (!existsSync(migrationPath)) {
-        result.errors?.push(`Migration file not found: ${migrationPath}`);
+      // Resolve JS/TS module
+      const migrationModulePath = join(this.migrationsPath, migrationId);
+      const jsPath = migrationModulePath + '.js';
+      const tsPath = migrationModulePath + '.ts';
+      if (!existsSync(jsPath) && !existsSync(tsPath)) {
+        result.errors?.push(`Migration module not found: ${migrationModulePath}.(js|ts)`);
         return result;
       }
-
-      // Execute content
-      const content = readFileSync(migrationPath, 'utf-8');
-      console.log(`🚀 Running migration ${migrationId}...`);
-      await this.executeMigrationContent(content);
+      console.log(`🚀 Running JS migration ${migrationId}...`);
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require(migrationModulePath);
+      if (!mod || typeof mod.up !== 'function') {
+        result.errors?.push(`Migration ${migrationId} does not export up(client)`);
+        return result;
+      }
+      await mod.up(this.getConnection());
 
       // Record as applied
       await this.recordMigration(migrationId, migrationId, `Applied migration ${migrationId}`, '1.0.0');
@@ -165,7 +171,7 @@ export class MigrationRunner {
     }
   }
 
-  /** Rollback a migration */
+  /** Rollback a migration (not implemented for JS migrations) */
   async rollbackMigration(migrationId: string): Promise<MigrationResult> {
     const startTime = Date.now();
     const result: MigrationResult = {
@@ -187,16 +193,8 @@ export class MigrationRunner {
         return result;
       }
 
-      // Find rollback file
-      const rollbackPath = join(this.migrationsPath, `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.sql`);
-      if (!existsSync(rollbackPath)) {
-        result.errors?.push(`Rollback file not found: ${rollbackPath}`);
-        return result;
-      }
-
-      // Execute rollback
-      const rollbackContent = readFileSync(rollbackPath, 'utf-8');
-      await this.executeMigrationContent(rollbackContent);
+      result.errors?.push('Rollback not implemented for JS migrations');
+      return result;
 
       result.success = true;
       result.executionTime = Date.now() - startTime;
@@ -240,18 +238,17 @@ export class MigrationRunner {
     }
   }
 
-  /** Get list of pending migrations */
+  /** Get list of pending migrations (reads JS/TS files in /migrations) */
   async getPendingMigrations(): Promise<string[]> {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map((m) => m.id));
 
-    // Scan the migrations directory for .sql files (not rollback files)
-    const migrationFiles = readdirSync(this.migrationsPath)
-      .filter((file) => file.endsWith('.sql') && !file.includes('rollback'))
-      .map((file) => file.replace('.sql', ''))
-      .sort();
-
-    return migrationFiles.filter((id) => !appliedIds.has(id));
+    // Scan for JS/TS migration modules
+    const files = readdirSync(this.migrationsPath).filter((file) =>
+      (file.endsWith('.js') || file.endsWith('.ts')) && !file.includes('rollback')
+    );
+    const ids = Array.from(new Set(files.map((f) => f.replace(/\.(ts|js)$/i, '')))).sort();
+    return ids.filter((id) => !appliedIds.has(id));
   }
 
   /** Check if migration is already applied */
@@ -307,49 +304,7 @@ export class MigrationRunner {
     );
   }
 
-  /** Execute migration content with transaction handling */
-  private async executeMigrationContent(content: string): Promise<void> {
-    // Clean content: remove comment lines and empty lines, but preserve multi-line statements
-    const lines = content.split('\n');
-    const cleanedLines: string[] = [];
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      // Skip empty lines and comment-only lines
-      if (trimmedLine.length === 0 || trimmedLine.startsWith('--')) {
-        continue;
-      }
-      cleanedLines.push(line);
-    }
-
-    const cleanContent = cleanedLines.join('\n');
-
-    // Split content into individual statements by semicolons
-    const statements = cleanContent
-      .split(';')
-      .map((stmt) => stmt.trim())
-      .filter((stmt) => stmt.length > 0);
-
-    console.log(`📝 Executing ${statements.length} statements for schema initialization`);
-
-    // Execute each statement
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i].trim();
-      if (statement) {
-        try {
-          // Show friendly progress without revealing statement content
-          const statementType = this.getStatementType(statement);
-          console.log(`  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`);
-          await this.getConnection().query(statement);
-        } catch (error) {
-          console.error(`❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`);
-          throw new Error(`Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-    }
-
-    console.log(`✅ Successfully executed all ${statements.length} statements`);
-  }
+  // executeMigrationContent removed for JS-first migrations
 
   /** Get a friendly description of statement type without revealing content */
   private getStatementType(statement: string): string {

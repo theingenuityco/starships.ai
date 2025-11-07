@@ -62,10 +62,10 @@ Behavior and limits:
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
               return {
-                url: `${'${'}baseUrl}/starships/${'${'}starshipId}/agents/${'${'}slug}`,
+                url: baseUrl + '/starships/' + String(starshipId) + '/agents/' + String(slug),
                 method: 'GET',
                 headers: {
-                  'Authorization': `Bearer ${'${'}authToken}`,
+                  'Authorization': 'Bearer ' + String(authToken),
                   'Content-Type': 'application/json'
                 }
               };

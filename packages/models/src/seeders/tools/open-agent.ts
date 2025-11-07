@@ -127,10 +127,10 @@ Automatically inferred from agent state (do not pass manually):
                 }
                 
                 return {
-                  url: `${'${'}baseUrl}/agents`,
+                  url: baseUrl + '/agents',
                   method: 'POST',
                   headers: {
-                    'Authorization': `Bearer ${'${'}authToken}`,
+                    'Authorization': 'Bearer ' + String(authToken),
                     'Content-Type': 'application/json'
                   },
                   body: {
@@ -144,10 +144,10 @@ Automatically inferred from agent state (do not pass manually):
               // Open existing
               if (!slug || typeof slug !== 'string') throw new Error('slug is required to open an agent');
               return {
-                url: `${'${'}baseUrl}/agents/${'${'}slug}`,
+                url: baseUrl + '/agents/' + String(slug),
                 method: 'GET',
                 headers: {
-                  'Authorization': `Bearer ${'${'}authToken}`,
+                  'Authorization': 'Bearer ' + String(authToken),
                   'Content-Type': 'application/json'
                 },
                 timeout: 5000

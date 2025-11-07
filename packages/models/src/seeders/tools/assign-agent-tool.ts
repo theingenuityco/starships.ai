@@ -116,7 +116,7 @@ Returns server response indicating success.
               const toolSlug = prep.toolSlug;
 
               return {
-                url: `${'${'}prep.baseUrl}/agents/${'${'}agentData.id}/tools/${'${'}toolSlug}`,
+                url: String(prep.baseUrl) + '/agents/' + String(agentData.id) + '/tools/' + String(toolSlug),
                 method: 'POST',
                 headers: prep.headers,
                 body: {

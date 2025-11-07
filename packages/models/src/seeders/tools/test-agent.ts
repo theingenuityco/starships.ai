@@ -95,17 +95,17 @@ Automatically inferred from agent state (do not pass manually):
                 testInput = [{ role: 'user', content: testInput }];
               }
 
-              return {
-                url: `${'${'}baseUrl}/starships/${'${'}starshipId}/agents/${'${'}slug}/test`,
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${'${'}authToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: {
-                  input: testInput
-                }
-              };
+            return {
+              url: String(baseUrl) + '/starships/' + String(starshipId) + '/agents/' + String(slug) + '/test',
+              method: 'POST',
+              headers: {
+                'Authorization': 'Bearer ' + String(authToken),
+                'Content-Type': 'application/json'
+              },
+              body: {
+                input: testInput
+              }
+            };
             }
           `,
           timeout: 3000,

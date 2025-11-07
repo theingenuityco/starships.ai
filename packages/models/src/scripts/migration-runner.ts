@@ -77,8 +77,7 @@ export class MigrationRunner {
       }
       console.log('🚀 Initializing database schema via JS migration...');
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const mod = require(migrationModulePath);
+        const mod = await import(migrationModulePath);
         if (!mod || typeof mod.up !== 'function') {
           throw new Error('Migration module must export an async function up(client)');
         }
@@ -148,8 +147,7 @@ export class MigrationRunner {
         return result;
       }
       console.log(`🚀 Running JS migration ${migrationId}...`);
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require(migrationModulePath);
+      const mod = await import(migrationModulePath);
       if (!mod || typeof mod.up !== 'function') {
         result.errors?.push(`Migration ${migrationId} does not export up(client)`);
         return result;
@@ -195,9 +193,6 @@ export class MigrationRunner {
 
       result.errors?.push('Rollback not implemented for JS migrations');
       return result;
-
-      result.success = true;
-      result.executionTime = Date.now() - startTime;
     } catch (error) {
       result.errors?.push(`Rollback execution failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -244,8 +239,8 @@ export class MigrationRunner {
     const appliedIds = new Set(appliedMigrations.map((m) => m.id));
 
     // Scan for JS/TS migration modules
-    const files = readdirSync(this.migrationsPath).filter((file) =>
-      (file.endsWith('.js') || file.endsWith('.ts')) && !file.includes('rollback')
+    const files = readdirSync(this.migrationsPath).filter(
+      (file) => (file.endsWith('.js') || file.endsWith('.ts')) && !file.includes('rollback')
     );
     const ids = Array.from(new Set(files.map((f) => f.replace(/\.(ts|js)$/i, '')))).sort();
     return ids.filter((id) => !appliedIds.has(id));

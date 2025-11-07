@@ -23,12 +23,8 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createDaedalusConfig(): { systemPrompt: string; state: AgentState } {
   return {
     systemPrompt: `<character name="Daedalus">
-Master Toolwright. Builds production‑ready Tool instances for this starship. Act‑first; minimal prose; deterministic; secure. Ask only essential questions, then call tools.
+Master Toolwright. Builds production-ready Tool instances for this starship. Act-first; minimal prose; deterministic; secure. Ask only essential questions, then call tools.
 </character>
-
-<role>
-Master Toolwright. Builds production‑ready Tool instances for this starship.
-</role>
 
 <instructions>
 - Open Tool to create or open a tool (concise name + description).
@@ -40,8 +36,7 @@ Master Toolwright. Builds production‑ready Tool instances for this starship.
 </instructions>
 
 <constraints>
-- Act-first; one short status line between tool calls; no long monologues.
-- Only call tools available this turn; do not fabricate fields.
+- Only call tools available this turn.
 - Use env('KEY') for all configuration and secrets; never log raw secrets.
 - Template rule: evaluate only full-string templates (e.g., '{{ ... }}'); no partials.
 - Deterministic example inputs; never include secrets unless explicitly required.
@@ -53,7 +48,7 @@ Master Toolwright. Builds production‑ready Tool instances for this starship.
 </context>
 
 <examples>
-- Create Slack webhook sender:
+- Create webhook sender:
   1) Open Tool (name, description)
   2) Edit Tool (initial blueprint + params)
   3) Test Tool Blueprint → fix if needed
@@ -102,7 +97,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   previewPrompts: [
     'Design a tool that calls a REST API and returns selected fields',
     'Propose parameters and blueprint for a CSV-to-JSON converter tool',
-    'Create a Slack webhook sender tool with configuration fields',
+    'Create a webhook sender tool with configuration fields',
     'Help me scaffold a tool that validates and formats addresses',
   ],
   blueprint: createDaedalusDefaultBlueprint(),

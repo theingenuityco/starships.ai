@@ -54,9 +54,34 @@ Returns complete, executable blueprints with:
         description: 'Return blueprint examples for the requested category',
         parameters: {
           code: `
+            async function main(ctx) {
+            const input = ctx.$input || {};
             const category = input.category || 'all';
             const pattern = input.pattern;
-            
+
+            // Normalize legacy code node strings to async main(ctx) API
+            function wrapCode(codeStr) {
+              if (typeof codeStr !== 'string') return codeStr;
+              let s = codeStr;
+              s = s.replace(/\benv\(/g, 'ctx.$env(')
+                   .replace(/\$lastOutputOf\(/g, 'ctx.$lastOutputOf(')
+                   .replace(/\binput\b/g, 'ctx.$input');
+              if (/async\s+function\s+main\s*\(/.test(s)) return s;
+              return 'async function main(ctx) {\n' + s + '\n}';
+            }
+
+            function transformBlueprint(bp) {
+              if (!bp || !Array.isArray(bp.nodes)) return bp;
+              const clone = JSON.parse(JSON.stringify(bp));
+              clone.nodes = clone.nodes.map((n) => {
+                if (n && n.type === 'code' && n.parameters && typeof n.parameters.code === 'string') {
+                  n.parameters.code = wrapCode(n.parameters.code);
+                }
+                return n;
+              });
+              return clone;
+            }
+
             const examples = {
               basic: {
                 simple_llm: {
@@ -70,7 +95,7 @@ Returns complete, executable blueprints with:
                         type: 'llm',
                         name: 'Ask AI',
                         parameters: {
-                          model: 'anthropic/claude-3-haiku',
+                          model: '{{ state.model }}',
                           messages: [
                             { role: 'user', content: '{{ $input("question") }}' }
                           ],
@@ -556,6 +581,15 @@ Returns complete, executable blueprints with:
               }
             };
             
+            // Normalize all example blueprints to new Code node API
+            for (const [catKey, catObj] of Object.entries(examples)) {
+              for (const [patKey, patObj] of Object.entries(catObj)) {
+                if (patObj && patObj.blueprint) {
+                  patObj.blueprint = transformBlueprint(patObj.blueprint);
+                }
+              }
+            }
+
             // Helper to get all examples in a category
             const getCategoryExamples = (cat) => {
               const categoryExamples = examples[cat];
@@ -604,6 +638,7 @@ Returns complete, executable blueprints with:
               examples: getCategoryExamples(category),
               count: Object.keys(categoryExamples).length
             };
+            }
           `,
           timeout: 5000,
         },

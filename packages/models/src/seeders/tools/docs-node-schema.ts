@@ -71,6 +71,8 @@ Returns comprehensive schema with:
         description: 'Return comprehensive node schema information',
         parameters: {
           code: `
+            async function main(ctx) {
+            const input = ctx.$input || {};
             const nodeType = input.nodeType || 'all';
             const detail = input.detail || 'full';
             
@@ -451,19 +453,17 @@ Returns comprehensive schema with:
                 },
                 context: {
                   available: [
-                    'input - Input data',
-                    '$input() - Input accessor function',
+                    '$input - Input data',
                     '$lastOutputOf(nodeRef) - Get node output',
-                    'state - Execution state',
-                    'env(key) - Environment variable',
-                    'envAll() - All environment variables',
+                    '$state - Execution state',
+                    '$env(key) - Environment variable',
                     'console.log/warn/error - Logging',
                     'JSON, Math, Date - Utilities'
                   ],
-                  forbidden: ['setTimeout', 'setInterval', 'require', 'process', 'global', 'eval', 'Function']
+                  forbidden: ['setTimeout', 'setInterval', 'require', 'process', 'global', 'globalThis', 'import', 'eval', 'Function']
                 },
                 behavior: {
-                  input: 'Available as input and $input() in code context',
+                  input: 'Available as $input in code context',
                   output: 'Return value from code execution',
                   async: 'Supports async/await and promises',
                   sanitization: 'Non-finite numbers converted to strings'
@@ -577,6 +577,7 @@ Returns comprehensive schema with:
             }
             
             return response;
+            }
           `,
           timeout: 5000,
         },

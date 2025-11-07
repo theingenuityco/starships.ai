@@ -64,13 +64,10 @@ export class MigrationRunner {
 
     try {
       // Check if schema is already initialized
-      console.log('🔍 Checking for existing migration records...');
       const isApplied = await this.isMigrationApplied('000_postgresql_schema');
-      console.log(`   └─ Schema initialization status: ${isApplied ? 'exists' : 'needed'}`);
 
       if (isApplied) {
         // Force re-verification even if migration exists
-        console.log('🔍 Migration exists but forcing verification check...');
         const verificationResult = await this.verifySchemaInitialization();
         if (verificationResult.success) {
           result.warnings?.push('Schema already initialized and verified');
@@ -78,10 +75,8 @@ export class MigrationRunner {
           result.executionTime = Date.now() - startTime;
           return result;
         } else {
-          console.log('⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...');
           // Clear the incomplete migration record and re-run
           await this.getConnection().query('DELETE FROM migration_history WHERE migration_id = $1', ['000_postgresql_schema']);
-          console.log('   └─ Cleared incomplete migration record');
         }
       }
 
@@ -91,14 +86,13 @@ export class MigrationRunner {
         result.errors?.push(`Schema module not found: ${join(this.getMigrationsPath(), '000_postgresql_schema')}.(js|ts)`);
         return result;
       }
-      console.log('🚀 Initializing database schema via migration...');
+      console.log('🚀 Initializing database schema...');
       try {
         const mod = await import(schemaModulePath);
         if (!mod || typeof mod.up !== 'function') {
           throw new Error('Migration module must export an async function up(client)');
         }
         await mod.up(this.getConnection());
-        console.log('✅ Schema migration executed successfully, now verifying...');
       } catch (executionError) {
         console.error('❌ Schema JS migration execution failed:', executionError);
         throw executionError;
@@ -155,7 +149,6 @@ export class MigrationRunner {
         result.errors?.push(`Migration module not found: ${join(this.getMigrationsPath(), migrationId)}.(js|ts)`);
         return result;
       }
-      console.log(`🚀 Running migration ${migrationId}...`);
       const mod = await import(modulePath);
       if (!mod || typeof mod.up !== 'function') {
         result.errors?.push(`Migration ${migrationId} does not export up(client)`);
@@ -168,7 +161,6 @@ export class MigrationRunner {
 
       result.success = true;
       result.executionTime = Date.now() - startTime;
-      console.log(`✅ Migration ${migrationId} completed in ${result.executionTime}ms`);
       return result;
     } catch (error) {
       result.errors?.push(`Migration ${migrationId} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -392,14 +384,12 @@ export class MigrationRunner {
 
   /** Initialize database schema and then run any remaining pending migrations */
   async runAllPendingMigrations(): Promise<MigrationResult[]> {
-    console.log('🚀 Checking database schema and pending migrations...');
-
+    console.log('🔍 Scanning for pending migrations...');
     const results: MigrationResult[] = [];
 
     // Ensure history table exists before we check applied/pending
     await this.ensureMigrationTable();
 
-    console.log('🔍 Scanning for pending migrations...');
     const toRun = await this.getPendingMigrations();
 
     if (toRun.length === 0) {
@@ -408,12 +398,9 @@ export class MigrationRunner {
     }
 
     console.log(`🧩 Applying ${toRun.length} pending migration(s):`);
-    toRun.forEach((id, idx) => console.log(`   ${idx + 1}. ${id}`));
-
     const applied: string[] = [];
     const failed: { id: string; errors?: string[] }[] = [];
     for (const id of toRun) {
-      console.log(`▶️  [${id}] starting...`);
       const started = Date.now();
       const res = await this.runMigration(id);
       results.push(res);

@@ -69,8 +69,9 @@ export async function up(client: Client): Promise<void> {
       FROM ${t.table}
       WHERE jsonb_path_exists(${t.blueprintColumn}, '$.nodes ? (@.type == "code")')
     `;
-    const res = await client.query(selectSql);
-    for (const row of res.rows) {
+    const res = await (client as unknown as { query: (sql: string, params?: unknown[]) => Promise<unknown> }).query(selectSql);
+    const rows: unknown[] = Array.isArray(res) ? (res as unknown[]) : ((res as { rows?: unknown[] } | null | undefined)?.rows ?? []);
+    for (const row of rows as Array<{ id: string; log_key?: string; blueprint: BlueprintLike }>) {
       const id = row.id as string;
       const logKey = row.log_key as string | undefined;
       const bp = row.blueprint;

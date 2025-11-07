@@ -31,6 +31,7 @@ import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
 import webhooksRoutes from '@/routes/webhooks';
+import docsRoutes from '@/routes/docs';
 import ledgerRoutes from '@/routes/ledger';
 // import expeditionRoutes from '@/routes/expeditions';
 
@@ -95,6 +96,7 @@ app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
+app.use('/api/v1', docsRoutes);
 app.use('/api/v1', walletRoutes);
 app.use('/api/v1', topupRoutes);
 app.use('/api/v1', promoRoutes);

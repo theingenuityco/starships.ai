@@ -59,29 +59,6 @@ Returns complete, executable blueprints with:
             const category = input.category || 'all';
             const pattern = input.pattern;
 
-            // Normalize legacy code node strings to async main(ctx) API
-            function wrapCode(codeStr) {
-              if (typeof codeStr !== 'string') return codeStr;
-              let s = codeStr;
-              s = s.replace(/\benv\(/g, 'ctx.$env(')
-                   .replace(/\$lastOutputOf\(/g, 'ctx.$lastOutputOf(')
-                   .replace(/\binput\b/g, 'ctx.$input');
-              if (/async\s+function\s+main\s*\(/.test(s)) return s;
-              return 'async function main(ctx) {\n' + s + '\n}';
-            }
-
-            function transformBlueprint(bp) {
-              if (!bp || !Array.isArray(bp.nodes)) return bp;
-              const clone = JSON.parse(JSON.stringify(bp));
-              clone.nodes = clone.nodes.map((n) => {
-                if (n && n.type === 'code' && n.parameters && typeof n.parameters.code === 'string') {
-                  n.parameters.code = wrapCode(n.parameters.code);
-                }
-                return n;
-              });
-              return clone;
-            }
-
             const examples = {
               basic: {
                 simple_llm: {
@@ -286,8 +263,10 @@ Returns complete, executable blueprints with:
                         name: 'Prepare Tool Arguments',
                         parameters: {
                           code: \`
-                            const toolCall = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0];
-                            return toolCall.function.arguments_json || JSON.parse(toolCall.function.arguments);
+                            async function main(ctx) {
+                              const toolCall = ctx.$lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0];
+                              return toolCall.function.arguments_json || JSON.parse(toolCall.function.arguments);
+                            }
                           \`,
                           timeout: 2000
                         }
@@ -358,14 +337,16 @@ Returns complete, executable blueprints with:
                         name: 'Process Items',
                         parameters: {
                           code: \`
-                            const items = $lastOutputOf("fetch_data")[0].json.body;
-                            const processed = items.map(item => ({
-                              ...item,
-                              processedAt: Date.now(),
-                              score: item.value * 1.1
-                            }));
-                            const total = processed.reduce((sum, item) => sum + item.score, 0);
-                            return { items: processed, total };
+                            async function main(ctx) {
+                              const items = ctx.$lastOutputOf("fetch_data")[0].json.body;
+                              const processed = items.map(item => ({
+                                ...item,
+                                processedAt: Date.now(),
+                                score: item.value * 1.1
+                              }));
+                              const total = processed.reduce((sum, item) => sum + item.score, 0);
+                              return { items: processed, total };
+                            }
                           \`,
                           timeout: 5000
                         }
@@ -413,9 +394,12 @@ Returns complete, executable blueprints with:
                         name: 'Validate Input',
                         parameters: {
                           code: \`
-                            if (!input.query) throw new Error('Query is required');
-                            if (!input.maxResults) input.maxResults = 10;
-                            return input;
+                            async function main(ctx) {
+                              const input = ctx.$input || {};
+                              if (!input.query) throw new Error('Query is required');
+                              if (!input.maxResults) input.maxResults = 10;
+                              return input;
+                            }
                           \`,
                           timeout: 1000
                         }
@@ -448,8 +432,10 @@ Returns complete, executable blueprints with:
                                 name: 'Filter Results',
                                 parameters: {
                                   code: \`
-                                    const results = $lastOutputOf("sub_api")[0].json.body.results;
-                                    return results.filter(r => r.score > 0.5);
+                                    async function main(ctx) {
+                                      const results = ctx.$lastOutputOf("sub_api")[0].json.body.results;
+                                      return results.filter(r => r.score > 0.5);
+                                    }
                                   \`
                                 }
                               },
@@ -550,12 +536,14 @@ Returns complete, executable blueprints with:
                         name: 'Merge Results',
                         parameters: {
                           code: \`
-                            const primary = $lastOutputOf("primary_api")[0];
-                            const fallback = $lastOutputOf("fallback_api")[0];
-                            
-                            if (!primary.error) return { source: 'primary', data: primary.json };
-                            if (!fallback.error) return { source: 'fallback', data: fallback.json };
-                            return { source: 'none', error: 'Both APIs failed' };
+                            async function main(ctx) {
+                              const primary = ctx.$lastOutputOf("primary_api")[0];
+                              const fallback = ctx.$lastOutputOf("fallback_api")[0];
+                              
+                              if (!primary.error) return { source: 'primary', data: primary.json };
+                              if (!fallback.error) return { source: 'fallback', data: fallback.json };
+                              return { source: 'none', error: 'Both APIs failed' };
+                            }
                           \`
                         }
                       },
@@ -581,15 +569,6 @@ Returns complete, executable blueprints with:
               }
             };
             
-            // Normalize all example blueprints to new Code node API
-            for (const [catKey, catObj] of Object.entries(examples)) {
-              for (const [patKey, patObj] of Object.entries(catObj)) {
-                if (patObj && patObj.blueprint) {
-                  patObj.blueprint = transformBlueprint(patObj.blueprint);
-                }
-              }
-            }
-
             // Helper to get all examples in a category
             const getCategoryExamples = (cat) => {
               const categoryExamples = examples[cat];

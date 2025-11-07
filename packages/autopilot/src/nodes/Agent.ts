@@ -133,11 +133,14 @@ export class Agent implements NodeHandler {
       description: 'Materialize arguments into a plain object for Tool input',
       parameters: {
         code: `
-        const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-        let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
-        if (typeof j === 'string') { try { j = JSON.parse(j); } catch {} }
-        if (j && typeof j === 'object') { return j; }
-        throw new Error('Missing toolCall function.arguments');
+        async function main(ctx) {
+          const last = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json;
+          let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+          if (typeof j === 'string') { try { j = JSON.parse(j); } catch {}
+          }
+          if (j && typeof j === 'object') { return j; }
+          throw new Error('Missing toolCall function.arguments');
+        }
       `,
         timeout: 3000,
       },

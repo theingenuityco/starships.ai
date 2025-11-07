@@ -50,23 +50,25 @@ export const toolTestTool: ToolParams = {
         description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            const targetSlug = input.targetSlug;
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
-            if (!targetSlug) throw new Error('targetSlug is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('baseUrl is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              const targetSlug = ctx.$input.targetSlug;
+              if (!authToken) throw new Error('authToken is required');
+              if (!starshipId) throw new Error('starshipId is required');
+              if (!targetSlug) throw new Error('targetSlug is required');
 
-            return {
-              url: \`\${baseUrl}/starships/\${starshipId}/tools/\${targetSlug}\`,
-              method: 'GET',
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json',
-              }
-            };
+              return {
+                url: \`\${baseUrl}/starships/\${starshipId}/tools/\${targetSlug}\`,
+                method: 'GET',
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json',
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -90,20 +92,22 @@ export const toolTestTool: ToolParams = {
         description: 'Extract tool definition and prepare arguments',
         parameters: {
           code: `
-            const httpResult = $lastOutputOf("http_get_tool")[0].json;
-            const toolDef = httpResult.body?.data || httpResult.body;
-            
-            if (!toolDef || !toolDef.blueprint) {
-              throw new Error('Tool definition missing or invalid blueprint');
+            async function main(ctx) {
+              const httpResult = ctx.$lastOutputOf("http_get_tool")[0].json;
+              const toolDef = httpResult.body?.data || httpResult.body;
+              
+              if (!toolDef || !toolDef.blueprint) {
+                throw new Error('Tool definition missing or invalid blueprint');
+              }
+              
+              const testArgs = ctx.$lastOutputOf("__initial__")[0].json.arguments || {};
+              
+              return {
+                toolDef,
+                testArgs,
+                startTime: Date.now()
+              };
             }
-            
-            const testArgs = $lastOutputOf("__initial__")[0].json.arguments || {};
-            
-            return {
-              toolDef,
-              testArgs,
-              startTime: Date.now()
-            };
           `,
           timeout: 2000,
         },
@@ -115,8 +119,10 @@ export const toolTestTool: ToolParams = {
         description: 'Extract only the test arguments to pass into the Tool node',
         parameters: {
           code: `
-            const testArgs = $lastOutputOf("prepare_test")[0].json.testArgs || {};
-            return testArgs;
+            async function main(ctx) {
+              const testArgs = ctx.$lastOutputOf("prepare_test")[0].json.testArgs || {};
+              return testArgs;
+            }
           `,
           timeout: 1000,
         },

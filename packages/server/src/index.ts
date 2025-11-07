@@ -141,20 +141,20 @@ httpServer.listen(PORT, async () => {
     console.log('✅ Database schema initialized with seed data');
 
     // Initialize Tool Templates (seeds default templates)
-    try {
-      await seedToolTemplates();
-    } catch (error) {
-      console.error('⚠️ Failed to seed tool templates:', error);
-      // Continue - seeding is not critical for startup
-    }
+    // try {
+    //   await seedToolTemplates();
+    // } catch (error) {
+    //   console.error('⚠️ Failed to seed tool templates:', error);
+    //   // Continue - seeding is not critical for startup
+    // }
 
     // Initialize Agent Templates (seeds default templates)
-    try {
-      await seedAgentTemplates();
-    } catch (error) {
-      console.error('⚠️ Failed to seed agent templates:', error);
-      // Continue - seeding is not critical for startup
-    }
+    // try {
+    //   await seedAgentTemplates();
+    // } catch (error) {
+    //   console.error('⚠️ Failed to seed agent templates:', error);
+    //   // Continue - seeding is not critical for startup
+    // }
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

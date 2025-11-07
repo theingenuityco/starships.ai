@@ -1,4 +1,7 @@
--- PostgreSQL Migration: Complete Database Schema
+import type { Client } from 'pg';
+
+export async function up(client: Client): Promise<void> {
+  const sql = `-- PostgreSQL Migration: Complete Database Schema
 -- Description: Complete database schema for starships.ai
 -- Author: Migration Script
 -- Version: 2.1.0
@@ -553,3 +556,6 @@ COMMENT ON TABLE promo_redemptions IS 'Records when a user redeems a Stripe prom
 COMMENT ON COLUMN users.last_login_at IS 'Timestamp of user''s last successful login - used for welcome modal (first login detection) and security features';
 COMMENT ON COLUMN messages.agent_id IS 'ID of the agent that generated this message (assistant messages only)';
 COMMENT ON COLUMN messages.agent_name IS 'Denormalized agent name for display without join (assistant messages only)';
+`;
+  await client.query(sql);
+}

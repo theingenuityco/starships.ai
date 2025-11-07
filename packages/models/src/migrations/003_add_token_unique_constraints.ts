@@ -1,4 +1,7 @@
--- Migration: Add unique constraints for single active token per user
+import type { Client } from 'pg';
+
+export async function up(client: Client): Promise<void> {
+  const sql = `-- Migration: Add unique constraints for single active token per user
 -- Description: Ensures only one active (non-consumed) token exists per user for each token type
 -- Created: 2025-01-XX
 -- 
@@ -44,4 +47,6 @@ WHERE NOT consumed;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_email_change_tokens_user_pending
 ON email_change_tokens(user_id)
 WHERE NOT consumed;
-
+`;
+  await client.query(sql);
+}

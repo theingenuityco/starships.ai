@@ -1,4 +1,7 @@
--- Migration: Add email change tokens table
+import type { Client } from 'pg';
+
+export async function up(client: Client): Promise<void> {
+  const sql = `-- Migration: Add email change tokens table
 -- Description: Enables email change verification flow
 -- Created: 2025-01-XX
 
@@ -18,4 +21,6 @@ CREATE INDEX idx_email_change_tokens_token ON email_change_tokens(token) WHERE N
 CREATE INDEX idx_email_change_tokens_expires_at ON email_change_tokens(expires_at);
 CREATE INDEX idx_email_change_tokens_user_id ON email_change_tokens(user_id);
 CREATE INDEX idx_email_change_tokens_new_email ON email_change_tokens(new_email);
-
+`;
+  await client.query(sql);
+}

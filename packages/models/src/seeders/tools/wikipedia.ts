@@ -204,7 +204,7 @@ export const wikipediaTool: ToolParams = {
                           ? (titles as any[]).map((title, i) => ({
                               title,
                               description: (descriptions as any[])[i] || '',
-                              url: (urls as any[])[i] || `https://${'${'}language}.wikipedia.org/wiki/${'${'}encodeURIComponent(title)}`,
+                              url: (urls as any[])[i] || ('https://' + String(language) + '.wikipedia.org/wiki/' + encodeURIComponent(String(title))),
                             }))
                           : [],
                       };

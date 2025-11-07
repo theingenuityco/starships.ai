@@ -59,10 +59,10 @@ Behavior and limits:
               if (!authToken) throw new Error('AUTH_TOKEN is required');
 
               return {
-                url: `${'${'}baseUrl}/openrouter/models`,
+                url: String(baseUrl) + '/openrouter/models',
                 method: 'GET',
                 headers: {
-                  'Authorization': `Bearer ${'${'}authToken}`,
+                  'Authorization': 'Bearer ' + String(authToken),
                   'Content-Type': 'application/json'
                 }
               };

@@ -115,7 +115,7 @@ Returns server response.
               const prep = ctx.$lastOutputOf('prepare')[0].json;
               const toolSlug = prep.toolSlug;
 
-              const url = new URL(`${'${'}prep.baseUrl}/agents/${'${'}agentData.id}/tools/${'${'}toolSlug}`);
+            const url = new URL(String(prep.baseUrl) + '/agents/' + String(agentData.id) + '/tools/' + String(toolSlug));
               url.searchParams.set('starshipId', String(prep.starshipId));
 
               return {

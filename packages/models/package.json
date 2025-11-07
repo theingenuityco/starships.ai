@@ -24,7 +24,9 @@
     "pretest": "pnpm --filter @starships/autopilot build",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "migrate:code-nodes:dry": "tsx src/scripts/migrate-code-nodes-to-main.ts --dry-run",
+    "migrate:code-nodes": "tsx src/scripts/migrate-code-nodes-to-main.ts"
   },
   "dependencies": {
     "@starships/autopilot": "workspace:*",

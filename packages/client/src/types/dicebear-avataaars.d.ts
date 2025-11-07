@@ -2,46 +2,10 @@ declare module '@dicebear/avataaars/lib/types' {
   export interface Options {
     style?: ('circle' | 'default')[]
     base?: 'default'[]
-    clothing?: (
-      | 'blazerAndShirt'
-      | 'blazerAndSweater'
-      | 'collarAndSweater'
-      | 'graphicShirt'
-      | 'hoodie'
-      | 'overall'
-      | 'shirtCrewNeck'
-      | 'shirtScoopNeck'
-      | 'shirtVNeck'
-    )[]
-    mouth?: (
-      | 'concerned'
-      | 'default'
-      | 'disbelief'
-      | 'eating'
-      | 'grimace'
-      | 'sad'
-      | 'screamOpen'
-      | 'serious'
-      | 'smile'
-      | 'tongue'
-      | 'twinkle'
-      | 'vomit'
-    )[]
+    clothing?: ('blazerAndShirt' | 'blazerAndSweater' | 'collarAndSweater' | 'graphicShirt' | 'hoodie' | 'overall' | 'shirtCrewNeck' | 'shirtScoopNeck' | 'shirtVNeck')[]
+    mouth?: ('concerned' | 'default' | 'disbelief' | 'eating' | 'grimace' | 'sad' | 'screamOpen' | 'serious' | 'smile' | 'tongue' | 'twinkle' | 'vomit')[]
     nose?: 'default'[]
-    eyes?: (
-      | 'closed'
-      | 'cry'
-      | 'default'
-      | 'eyeRoll'
-      | 'happy'
-      | 'hearts'
-      | 'side'
-      | 'squint'
-      | 'surprised'
-      | 'winkWacky'
-      | 'wink'
-      | 'xDizzy'
-    )[]
+    eyes?: ('closed' | 'cry' | 'default' | 'eyeRoll' | 'happy' | 'hearts' | 'side' | 'squint' | 'surprised' | 'winkWacky' | 'wink' | 'xDizzy')[]
     eyebrows?: (
       | 'angryNatural'
       | 'defaultNatural'
@@ -108,4 +72,3 @@ declare module '@dicebear/avataaars/lib/types' {
     backgroundColor?: string[]
   }
 }
-

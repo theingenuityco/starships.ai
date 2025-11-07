@@ -34,6 +34,29 @@ export class MigrationRunner {
     return this.connection;
   }
 
+  private resolveMigrationModulePath(id: string): string | null {
+    const baseCandidates = [
+      // Typical when running compiled code from dist/scripts
+      join(__dirname, '../../migrations'),
+      // Fallback: sometimes transpiler preserves one fewer level
+      join(__dirname, '../migrations'),
+      // Dev: running from repo root with ts-node/tsx
+      join(process.cwd(), 'packages/models/src/migrations'),
+      join(process.cwd(), 'packages/models/dist/migrations'),
+      // Direct package path fallback (monorepo local)
+      join(__dirname, '../../../src/migrations'),
+      join(__dirname, '../../../dist/migrations'),
+    ];
+
+    for (const base of baseCandidates) {
+      const pNoExt = join(base, id);
+      if (existsSync(pNoExt + '.js')) return pNoExt + '.js';
+      if (existsSync(pNoExt + '.ts')) return pNoExt + '.ts';
+      if (existsSync(pNoExt)) return pNoExt; // in case extensionless resolvable
+    }
+    return null;
+  }
+
   /** Initialize schema if not already done (JS-first migrations) */
   async initializeSchema(): Promise<MigrationResult> {
     const startTime = Date.now();
@@ -70,14 +93,14 @@ export class MigrationRunner {
       }
 
       // Execute schema initialization via JS migration
-      const migrationModulePath = join(this.migrationsPath, '000_postgresql_schema');
-      if (!existsSync(migrationModulePath + '.js') && !existsSync(migrationModulePath + '.ts')) {
-        result.errors?.push(`Schema module not found: ${migrationModulePath}.(js|ts)`);
+      const schemaModulePath = this.resolveMigrationModulePath('000_postgresql_schema');
+      if (!schemaModulePath) {
+        result.errors?.push(`Schema module not found: ${join(this.migrationsPath, '000_postgresql_schema')}.(js|ts)`);
         return result;
       }
       console.log('🚀 Initializing database schema via JS migration...');
       try {
-        const mod = await import(migrationModulePath);
+        const mod = await import(schemaModulePath);
         if (!mod || typeof mod.up !== 'function') {
           throw new Error('Migration module must export an async function up(client)');
         }
@@ -139,15 +162,13 @@ export class MigrationRunner {
       }
 
       // Resolve JS/TS module
-      const migrationModulePath = join(this.migrationsPath, migrationId);
-      const jsPath = migrationModulePath + '.js';
-      const tsPath = migrationModulePath + '.ts';
-      if (!existsSync(jsPath) && !existsSync(tsPath)) {
-        result.errors?.push(`Migration module not found: ${migrationModulePath}.(js|ts)`);
+      const modulePath = this.resolveMigrationModulePath(migrationId);
+      if (!modulePath) {
+        result.errors?.push(`Migration module not found: ${join(this.migrationsPath, migrationId)}.(js|ts)`);
         return result;
       }
       console.log(`🚀 Running JS migration ${migrationId}...`);
-      const mod = await import(migrationModulePath);
+      const mod = await import(modulePath);
       if (!mod || typeof mod.up !== 'function') {
         result.errors?.push(`Migration ${migrationId} does not export up(client)`);
         return result;

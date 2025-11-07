@@ -1,5 +1,8 @@
 import type { Client } from 'pg';
 
+type JsonObject = Record<string, unknown>;
+type BlueprintLike = JsonObject & { nodes?: unknown[] };
+
 function transformCodeToMain(code: string): { code: string; changed: boolean } {
   if (!code || typeof code !== 'string') return { code, changed: false };
   if (/async\s+function\s+main\s*\(/.test(code)) return { code, changed: false };
@@ -18,31 +21,34 @@ function transformCodeToMain(code: string): { code: string; changed: boolean } {
     newCode = newCode.replace(/(?<![\w$])ctx\.(?!\$)/g, '_ctx.');
   }
 
-  const wrapped = `async function main(ctx) {\n${newCode}\n}`;
+const wrapped = `async function main(ctx) {\n${newCode}\n}`;
   return { code: wrapped, changed: true };
 }
 
-function migrateBlueprint(blueprint: any): { blueprint: any; changed: boolean; errors: string[] } {
+function migrateBlueprint(blueprint: BlueprintLike): { blueprint: BlueprintLike; changed: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!blueprint || typeof blueprint !== 'object') return { blueprint, changed: false, errors };
   if (!Array.isArray(blueprint.nodes)) return { blueprint, changed: false, errors };
   let changed = false;
-  for (const node of blueprint.nodes) {
+  for (const node of blueprint.nodes as unknown[]) {
     if (!node || typeof node !== 'object') continue;
-    if (node.type !== 'code') continue;
-    const params = node.parameters || {};
-    const codeStr = params.code;
-    if (typeof codeStr !== 'string' || codeStr.trim().length === 0) continue;
+    const nodeObj = node as JsonObject;
+    const nodeType = typeof nodeObj.type === 'string' ? (nodeObj.type as string) : undefined;
+    if (nodeType !== 'code') continue;
+    const params = nodeObj.parameters && typeof nodeObj.parameters === 'object' ? (nodeObj.parameters as JsonObject) : ({} as JsonObject);
+    const codeStr = typeof params.code === 'string' ? (params.code as string) : undefined;
+    if (!codeStr || codeStr.trim().length === 0) continue;
     const { code, changed: codeChanged } = transformCodeToMain(codeStr);
     if (codeChanged) {
       try {
         // compile check
         new Function('ctx', code);
-        params.code = code;
-        node.parameters = params;
+        (params as JsonObject).code = code;
+        (nodeObj as JsonObject).parameters = params;
         changed = true;
-      } catch (e: any) {
-        errors.push(`Node ${node.ref ?? '?'} code invalid after transform: ${e?.message ?? String(e)}`);
+      } catch (e: unknown) {
+        const err = e as { message?: string } | undefined;
+        errors.push(`Node ${(nodeObj as JsonObject).ref ?? '?'} code invalid after transform: ${err?.message ?? String(e)}`);
       }
     }
   }

@@ -52,19 +52,21 @@ Behavior and limits:
         description: 'Build URL and headers for OpenRouter models endpoint',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            if (!authToken) throw new Error('authToken is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
 
-            return {
-              url: \`\${baseUrl}/openrouter/models\`,
-              method: 'GET',
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
-              }
-            };
+              return {
+                url: `${'${'}baseUrl}/openrouter/models`,
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${'${'}authToken}`,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -88,19 +90,21 @@ Behavior and limits:
         description: 'Extract and format model data for easy consumption',
         parameters: {
           code: `
-            // Input is the HttpResponse from http_list
-            const http = input;
-            const body = http && typeof http === 'object' ? http.body : http;
-            // Server sendSuccess returns { data: T }, so prefer body.data when present
-            const data = (body && typeof body === 'object' && Array.isArray(body.data))
-              ? body.data
-              : (Array.isArray(body) ? body : []);
+            async function main(ctx) {
+              // Input is the HttpResponse from http_list
+              const http = ctx.$input;
+              const body = http && typeof http === 'object' ? (http as any).body : http;
+              // Server sendSuccess returns { data: T }, so prefer body.data when present
+              const data = (body && typeof body === 'object' && Array.isArray((body as any).data))
+                ? (body as any).data
+                : (Array.isArray(body) ? body : []);
 
-            // Return only model identifiers (prefer id, fallback to name)
-            const ids = data
-              .map((m) => (m && (m.id || m.name)))
-              .filter((v) => typeof v === 'string' && v.length > 0);
-            return ids;
+              // Return only model identifiers (prefer id, fallback to name)
+              const ids = (data as any[])
+                .map((m) => (m && (m.id || m.name)))
+                .filter((v) => typeof v === 'string' && (v as string).length > 0);
+              return ids as string[];
+            }
           `,
           timeout: 2000,
         },

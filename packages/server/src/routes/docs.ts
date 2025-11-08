@@ -15,7 +15,6 @@ const router: Router = Router();
 const DocsQuerySchema = z
   .object({
     q: z.string().optional(),
-    query: z.string().optional(),
     limit: z.coerce.number().min(1).max(100).optional(),
   })
   .strict();
@@ -163,7 +162,7 @@ router.get('/docs', async (req: Request, res: Response): Promise<void> => {
   if (!data) return;
   try {
     const limit = data.limit ?? 20;
-    const query = (data.q ?? data.query ?? '').trim();
+    const query = (data.q ?? '').trim();
     const index = await getDocsIndex();
 
     if (!query) {
@@ -188,6 +187,47 @@ router.get('/docs', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('[DOCS] Error handling docs route:', error);
     const message = error instanceof Error ? error.message : 'Failed to handle docs request';
+    sendError(res, 'INTERNAL_SERVER_ERROR', message, 500);
+  }
+});
+
+/**
+ * GET /docs/[slug] - return raw markdown content for a single doc
+ * Supports nested slugs like examples/example-10-kitchen-sink
+ */
+router.get('/docs/*', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const raw = (req.params as Record<string, unknown>)[0] as string | undefined;
+    const rawSlug = String(raw ?? '').trim();
+    if (!rawSlug) {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'Slug is required', 400, { field: 'slug' });
+      return;
+    }
+    // Normalize and validate slug to prevent traversal
+    const normalizedSlug = rawSlug
+      .replace(/^[./]+/, '')
+      .replace(/\\/g, '/')
+      .replace(/\.(md|mdx)$/i, '');
+    if (!normalizedSlug || normalizedSlug.includes('..')) {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid slug', 400, { field: 'slug' });
+      return;
+    }
+
+    const index = await getDocsIndex();
+    const rec = index.find((r) => toSlug(r.relativePath) === normalizedSlug);
+    if (!rec) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Doc not found', 404, { slug: normalizedSlug });
+      return;
+    }
+
+    sendSuccess(res, {
+      slug: normalizedSlug,
+      title: rec.title,
+      content: rec.content,
+    });
+  } catch (error) {
+    console.error('[DOCS] Error fetching doc by slug:', error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch doc';
     sendError(res, 'INTERNAL_SERVER_ERROR', message, 500);
   }
 });

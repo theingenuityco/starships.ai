@@ -8,29 +8,20 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const nodeSchemaIntrospectionTool: ToolParams = {
   name: 'Docs Node Schema',
   slug: 'docs-node-schema',
-  description: `Query detailed schema information for Autopilot node types including parameters, validation rules, and execution behavior.
+  description: `Fetch static markdown documentation for Autopilot node types.
 
 ## Purpose
-Provides real-time, accurate schema information for all Autopilot node types, including complex nested structures, validation requirements, and execution patterns.
+Provides concise, static documentation for all Autopilot node types.
 
 ## Query Capabilities
-- **Specific Node Type**: Get complete schema for a single node type
-- **All Node Types**: List all available node types with descriptions
-- **Parameter Details**: Deep dive into parameter schemas including nested structures
-- **Validation Rules**: Understand validation requirements and constraints
-- **Execution Patterns**: Learn how nodes execute and interact
+- **Specific Node Type**: Get markdown for a single node type
+- **All Node Types**: List all available node types with brief descriptions
 
 ## Node Types Available
 start, end, llm, agent, http_request, conditional, transform, mutate, tool, workflow, code, user_prompt
 
 ## Response Format
-Returns comprehensive schema with:
-- Parameter definitions with types and constraints
-- Required vs optional fields
-- Validation rules and ranges
-- Template expression support
-- Inline operation capabilities
-- Execution behavior notes`,
+Returns markdown content string under data.content.`,
   parameters: {
     type: 'object',
     properties: {
@@ -52,11 +43,6 @@ Returns comprehensive schema with:
           'user_prompt',
         ],
         description: 'Node type to query schema for, or "all" to list all types',
-      },
-      detail: {
-        type: 'string',
-        enum: ['summary', 'full', 'examples'],
-        description: 'Level of detail in the response',
       },
     },
     required: ['nodeType'],
@@ -80,8 +66,6 @@ Returns comprehensive schema with:
               qs.set('topic', 'node-schema');
               const nodeType = ctx.$input?.nodeType || 'all';
               qs.set('nodeType', nodeType);
-              const detail = ctx.$input?.detail || 'full';
-              if (detail) qs.set('detail', detail);
               const url = baseUrl + '/docs?' + qs.toString();
               const headers = authToken ? { 'Authorization': 'Bearer ' + authToken } : {};
               return { url, headers };
@@ -131,7 +115,7 @@ export const nodeSchemaIntrospectionToolTemplate: Omit<ToolTemplateModel, 'id' |
 
   slug: 'docs-node-schema',
   category: 'automation',
-  exampleUsage: '{ "nodeType": "llm", "detail": "full" } // returns complete LLM node schema',
+  exampleUsage: '{ "nodeType": "llm" } // returns LLM node markdown',
   requiresApiKey: false,
   configurationFields: [],
 };

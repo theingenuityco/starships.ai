@@ -269,10 +269,10 @@ export const wikipediaTool: ToolParams = {
                   case 'content':
                     if (typeof response === 'string' && response.includes('<')) {
                       let textContent = response
-                        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                        .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')
+                        .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')
                         .replace(/<[^>]+>/g, ' ')
-                        .replace(/\s+/g, ' ')
+                        .replace(/\\s+/g, ' ')
                         .trim();
                       if (textContent.length > 50000) {
                         textContent = textContent.substring(0, 50000) + '... [content truncated]';

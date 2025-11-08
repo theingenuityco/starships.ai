@@ -25,4 +25,18 @@
 - End node final output shape
   - Engine unwraps `{ result }` from End node to become the final return value.
 
+### HTTP body and data flow
+
+- Don’t template `parameters.body` (templates stringify). Either omit `body` and pass an object from upstream, or use a literal object. See Node: HttpRequest and Engine.
+- HttpRequest returns `{ status, statusText, headers, body, url }`. To pass only the payload to the next request, forward `body` via Transform/Code. See Node: HttpRequest.
+- Initial arguments are exposed as `$input` after `start`; from later nodes, use `ctx.$lastOutputOf('__initial__')[0]?.json`. See Node: Start and Node: Code.
+
+### Debugging and convergence checklist
+
+- Confirm endpoint and schema first; pick one API path and stick to it until fixed.
+- Add a Code node before/after critical nodes to `console.log('DEBUG $input', ctx.$input)` and verify shapes.
+- Validate required fields early; fail fast with clear error messages.
+- Prefer simplifying data flow (start → code → http_request → end) before adding extra nodes.
+- Avoid replacing HttpRequest with custom fetch unless you hit a documented limitation.
+
 

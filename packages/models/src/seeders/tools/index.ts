@@ -12,6 +12,8 @@ export { toolListToolTemplate } from './list-tools';
 export { toolGetToolTemplate } from './get-tool';
 export { toolOpenToolTemplate } from './open-tool';
 export { toolEditToolTemplate } from './edit-tool';
+export { docsSearchToolTemplate } from './search-docs';
+export { docsGetDocToolTemplate } from './get-doc';
 export { blueprintLintToolTemplate } from './test-tool-blueprint';
 export { toolTestToolTemplate } from './test-tool';
 export { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
@@ -39,6 +41,8 @@ import { toolListToolTemplate } from './list-tools';
 import { toolGetToolTemplate } from './get-tool';
 import { toolOpenToolTemplate } from './open-tool';
 import { toolEditToolTemplate } from './edit-tool';
+import { docsSearchToolTemplate } from './search-docs';
+import { docsGetDocToolTemplate } from './get-doc';
 import { blueprintLintToolTemplate } from './test-tool-blueprint';
 import { toolTestToolTemplate } from './test-tool';
 import { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
@@ -66,6 +70,8 @@ export const ALL_TOOL_TEMPLATES = [
   toolGetToolTemplate,
   toolOpenToolTemplate,
   toolEditToolTemplate,
+  docsSearchToolTemplate,
+  docsGetDocToolTemplate,
   blueprintLintToolTemplate,
   toolTestToolTemplate,
   toolAddBlueprintNodeToolTemplate,

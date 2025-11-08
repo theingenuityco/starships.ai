@@ -154,22 +154,78 @@ function countOccurrences(haystackLower: string, needleLower: string): number {
   return count;
 }
 
+function tokenize(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2);
+}
+
+function buildExcerptAtIndex(content: string, idx: number, radius = 160): string {
+  if (idx < 0 || idx >= content.length) {
+    const snippet = content.slice(0, radius).replace(/\s+/g, ' ').trim();
+    return snippet.length < content.length ? `${snippet}…` : snippet;
+  }
+  const start = Math.max(0, idx - Math.floor(radius / 2));
+  const end = Math.min(content.length, idx + Math.floor(radius / 2));
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < content.length ? '…' : '';
+  return `${prefix}${content.slice(start, end).replace(/\s+/g, ' ').trim()}${suffix}`;
+}
+
 function searchDocs(records: DocRecord[], query: string, limit: number): DocSearchResult[] {
   const q = query.trim();
   if (!q) return [];
   const qLower = q.toLowerCase();
+  const tokens = tokenize(qLower);
   const results: DocSearchResult[] = [];
 
   for (const rec of records) {
     let score = 0;
-    if (rec.title.toLowerCase().includes(qLower)) score += 10;
-    // Weight occurrences in content
-    score += Math.min(50, countOccurrences(rec.contentLower, qLower));
+    let excerptIdx = -1;
+    const titleLower = rec.title.toLowerCase();
+
+    // Phrase match bonus (exact substring of full query)
+    const phraseIdx = rec.contentLower.indexOf(qLower);
+    if (phraseIdx >= 0) {
+      score += 20;
+      excerptIdx = phraseIdx;
+    }
+
+    if (tokens.length > 0) {
+      // Title token hits (heavier weight)
+      for (const t of tokens) {
+        if (!t) continue;
+        if (titleLower.includes(t)) {
+          score += 10;
+        }
+      }
+
+      // Content token hits (cap per token to avoid overly long docs dominating)
+      for (const t of tokens) {
+        if (!t) continue;
+        const occurrences = countOccurrences(rec.contentLower, t);
+        if (occurrences > 0 && excerptIdx === -1) {
+          // First token hit - use for excerpt if phrase not found
+          excerptIdx = rec.contentLower.indexOf(t);
+        }
+        score += Math.min(15, occurrences); // per-token cap
+      }
+    } else {
+      // Fallback to simple phrase scoring when tokenization yields nothing meaningful
+      if (titleLower.includes(qLower)) score += 10;
+      score += Math.min(50, countOccurrences(rec.contentLower, qLower));
+      if (excerptIdx === -1 && score > 0) {
+        excerptIdx = rec.contentLower.indexOf(qLower);
+      }
+    }
+
     if (score === 0) continue;
     results.push({
       slug: toSlug(rec.relativePath),
       title: rec.title,
-      excerpt: buildExcerpt(rec.content, qLower),
+      excerpt: excerptIdx >= 0 ? buildExcerptAtIndex(rec.content, excerptIdx) : buildExcerpt(rec.content, qLower),
       score,
     });
   }

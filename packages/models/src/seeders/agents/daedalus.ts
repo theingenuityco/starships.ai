@@ -92,7 +92,6 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'edit-tool',
     'test-tool',
     'test-tool-blueprint',
-    'docs-node-schema',
     'docs-blueprint-examples',
     'add-tool-blueprint-node',
     'add-tool-blueprint-edge',

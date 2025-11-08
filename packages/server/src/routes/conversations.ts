@@ -325,7 +325,7 @@ router.post(
         const agent = await agentService.getAgent(agentId);
 
         if (!agent) {
-          sendError(res, 'NOT_FOUND', 'Agent not found', 404);
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
           return;
         }
 
@@ -479,7 +479,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       const agent = await agentService.getAgent(bodyValidation.agentId);
 
       if (!agent) {
-        sendError(res, 'NOT_FOUND', 'Agent not found', 404);
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
         return;
       }
 

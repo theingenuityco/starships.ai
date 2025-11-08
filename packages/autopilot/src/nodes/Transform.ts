@@ -88,13 +88,17 @@ export class Transform extends BaseNode<TransformParams> {
     // Resolve template expressions in the value with current data as input
     let resolvedValue = transform.value;
     if (transform.value !== undefined) {
-      resolvedValue = await this.eval.resolveTemplates(transform.value, tempExecution, currentData);
+      resolvedValue = await this.eval.resolveTemplates(transform.value, tempExecution, currentData, {
+        stringEvaluationMode: 'full-only',
+      });
     }
 
     // Resolve template expressions in the from path
     let resolvedFrom = transform.from;
     if (transform.from !== undefined) {
-      resolvedFrom = (await this.eval.resolveTemplates(transform.from, tempExecution, currentData)) as string;
+      resolvedFrom = (await this.eval.resolveTemplates(transform.from, tempExecution, currentData, {
+        stringEvaluationMode: 'full-only',
+      })) as string;
     }
 
     // Create JSON Patch operation

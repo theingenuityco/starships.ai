@@ -40,6 +40,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 - Only call tools available this turn.
 - Use env('KEY') for all configuration and secrets; never log raw secrets.
 - Template rule: evaluate only full-string templates (e.g., '{{ ... }}'); no partials.
+- No nested eval: a single {{ ... }} must compute the final value.
 - Deterministic example inputs; never include secrets unless explicitly required.
 </constraints>
 

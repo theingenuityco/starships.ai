@@ -30,10 +30,35 @@ type DocRecord = {
   contentLower: string;
 };
 
-const DOCS_ROOT_DIR =
-  process.env.PUBLIC_DOCS_DIR ||
-  // Resolve from monorepo root when server starts from workspace root
-  path.resolve(process.cwd(), 'public-docs');
+function resolveDocsRootDir(): string {
+  // 1) Explicit env override
+  const fromEnv = process.env.PUBLIC_DOCS_DIR;
+  if (fromEnv && fs.existsSync(fromEnv) && fs.statSync(fromEnv).isDirectory()) {
+    return fromEnv;
+  }
+
+  // 2) Common locations in dev/prod
+  const candidates = [
+    // When server is started from repo root
+    path.resolve(process.cwd(), 'public-docs'),
+    // When server cwd is packages/server (monorepo root two levels up)
+    path.resolve(process.cwd(), '..', '..', 'public-docs'),
+    path.resolve(process.cwd(), '..', 'public-docs'),
+    // K8s/dev mounts for docs source (see k8s manifests)
+    path.resolve(process.cwd(), '..', '..', 'packages', 'docs', '.source'),
+    path.resolve(process.cwd(), '..', 'packages', 'docs', '.source'),
+    path.resolve(process.cwd(), 'packages', 'docs', '.source'),
+  ];
+
+  for (const dir of candidates) {
+    if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+      return dir;
+    }
+  }
+
+  // Fallback to original default (will error later with clear message)
+  return path.resolve(process.cwd(), 'public-docs');
+}
 
 let docsIndexPromise: Promise<DocRecord[]> | null = null;
 
@@ -78,7 +103,7 @@ async function buildDocsIndex(rootDir: string): Promise<DocRecord[]> {
 
 async function getDocsIndex(): Promise<DocRecord[]> {
   if (!docsIndexPromise) {
-    docsIndexPromise = buildDocsIndex(DOCS_ROOT_DIR).catch((err) => {
+    docsIndexPromise = buildDocsIndex(resolveDocsRootDir()).catch((err) => {
       // Reset on failure so a subsequent call can retry
       docsIndexPromise = null;
       throw err;
@@ -172,7 +197,7 @@ router.get('/docs', async (req: Request, res: Response): Promise<void> => {
         query,
         count: index.length,
         results: listing,
-        sourceDir: path.basename(DOCS_ROOT_DIR),
+        sourceDir: path.basename(resolveDocsRootDir()),
       });
       return;
     }
@@ -182,7 +207,7 @@ router.get('/docs', async (req: Request, res: Response): Promise<void> => {
       query,
       count: results.length,
       results,
-      sourceDir: path.basename(DOCS_ROOT_DIR),
+      sourceDir: path.basename(resolveDocsRootDir()),
     });
   } catch (error) {
     console.error('[DOCS] Error handling docs route:', error);
@@ -195,9 +220,9 @@ router.get('/docs', async (req: Request, res: Response): Promise<void> => {
  * GET /docs/[slug] - return raw markdown content for a single doc
  * Supports nested slugs like examples/example-10-kitchen-sink
  */
-router.get('/docs/*', async (req: Request, res: Response): Promise<void> => {
+router.get(/^\/docs\/(.+)$/, async (req: Request, res: Response): Promise<void> => {
   try {
-    const raw = (req.params as Record<string, unknown>)[0] as string | undefined;
+    const raw = (req.params as unknown as string[])[0] as string | undefined;
     const rawSlug = String(raw ?? '').trim();
     if (!rawSlug) {
       sendError(res, 'MISSING_REQUIRED_FIELD', 'Slug is required', 400, { field: 'slug' });

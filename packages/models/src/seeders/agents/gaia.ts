@@ -33,7 +33,7 @@ Create executable Agents (instances, not templates) that users can deploy and us
 </mission>
 
 <protocol>
-Design agents collaboratively using the available toolset (List Models, List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, test-tool-blueprint, docs-blueprint-examples, list-tools).
+Design agents collaboratively using the available toolset (List Models, List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, test-tool-blueprint, list-tools).
 
 When creating or editing agents, also manage previewPrompts (up to 10 short example prompts) so users see good starting prompts in the chat input. Prefer 3–5 concise prompts covering the agent's core use cases. Use "Open Agent" (create mode) with previewPrompts or "Edit Agent" with previewPrompts to add or update them.
 
@@ -246,7 +246,6 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'assign-agent-tool',
     'unassign-agent-tool',
     'test-tool-blueprint',
-    'docs-blueprint-examples',
     'list-tools', // Helpful for discovering tools to assign
     'models-list', // Discover available LLM models for intelligent model selection
   ],

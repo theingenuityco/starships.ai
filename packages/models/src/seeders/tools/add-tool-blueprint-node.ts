@@ -141,7 +141,7 @@ Returns updated tool with new node in blueprint, or validation errors if additio
               if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
 
               const newNode = ctx.$lastOutputOf('prepare')[0].json.node;
-              const errors: string[] = [];
+              const errors = [];
 
               // Validate node structure
               if (!newNode.ref || typeof newNode.ref !== 'string') {
@@ -163,7 +163,7 @@ Returns updated tool with new node in blueprint, or validation errors if additio
               }
 
               // Check for ref conflicts
-              const existingRefs = new Set(blueprint.nodes.map((n: any) => n?.ref).filter(Boolean));
+              const existingRefs = new Set(blueprint.nodes.map((n) => n?.ref).filter(Boolean));
               if (existingRefs.has(newNode.ref)) {
                 errors.push(\`Node ref already exists: \${newNode.ref}\`);
               }

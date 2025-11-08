@@ -48,10 +48,10 @@ export const blueprintEditNodeTool: ToolParams = {
               if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
               const nodeRef = ctx.$lastOutputOf('prepare')[0].json.nodeRef;
               const updates = ctx.$lastOutputOf('prepare')[0].json.updates;
-              const nodeIndex = blueprint.nodes.findIndex((n: any) => n?.ref === nodeRef);
+              const nodeIndex = blueprint.nodes.findIndex((n) => n?.ref === nodeRef);
               if (nodeIndex === -1) return { success: false, error: \`Node not found: \${nodeRef}\`, toolData };
               const currentNode = blueprint.nodes[nodeIndex];
-              const errors: string[] = [];
+              const errors = [];
               if (updates.type) { if (typeof updates.type !== 'string') errors.push('Node type must be a string'); else if (!supportedTypes.includes(updates.type)) errors.push(\`Unsupported node type: \${updates.type}\`); }
               if (updates.name !== undefined && (typeof updates.name !== 'string' || updates.name.trim() === '')) errors.push('Node name must be a non-empty string');
               if (updates.parameters !== undefined && typeof updates.parameters !== 'object') errors.push('Node parameters must be an object');

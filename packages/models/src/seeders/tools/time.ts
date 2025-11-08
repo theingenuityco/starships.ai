@@ -37,10 +37,10 @@ export const timeTool: ToolParams = {
           code: `
             async function main(ctx) {
               const now = new Date();
-              const timezone = (ctx.$input && (ctx.$input as any).timezone) || 'UTC';
-              const format = (ctx.$input && (ctx.$input as any).format) || 'ISO';
+              const timezone = (ctx.$input && ctx.$input.timezone) || 'UTC';
+              const format = (ctx.$input && ctx.$input.format) || 'ISO';
               
-              let result: any;
+              let result;
               
               try {
                 switch (format) {
@@ -74,8 +74,8 @@ export const timeTool: ToolParams = {
                   format: format,
                   timestamp: now.getTime()
                 };
-              } catch (error: any) {
-                throw new Error('Error generating time: ' + (error?.message || String(error)));
+              } catch (error) {
+                throw new Error('Error generating time: ' + ((error && error.message) || String(error)));
               }
             }
           `,

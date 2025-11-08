@@ -107,7 +107,7 @@ Automatically inferred from agent state (do not pass manually):
 
               if (hasName) {
                 // Create draft
-                const body: any = {
+                const body = {
                   name: ctx.$input.name,
                   description: (ctx.$input && (ctx.$input).description) || '',
                   model: (ctx.$input && (ctx.$input).model) || 'openai/gpt-4o-mini',
@@ -122,7 +122,7 @@ Automatically inferred from agent state (do not pass manually):
                   body.maxTokens = (ctx.$input).maxTokens;
                 }
                 if (Array.isArray((ctx.$input).previewPrompts)) {
-                  const prompts = (ctx.$input).previewPrompts.filter((p: any) => typeof p === 'string' && p.trim()).slice(0, 10);
+                  const prompts = (ctx.$input).previewPrompts.filter((p) => typeof p === 'string' && p.trim()).slice(0, 10);
                   if (prompts.length > 0) body.previewPrompts = prompts;
                 }
                 

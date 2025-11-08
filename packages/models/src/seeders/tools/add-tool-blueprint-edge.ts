@@ -89,14 +89,14 @@ export const toolAddBlueprintEdgeTool: ToolParams = {
               if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
               if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
               const edge = ctx.$lastOutputOf('prepare')[0].json.edge;
-              const errors: string[] = [];
+              const errors = [];
               if (!edge.ref || typeof edge.ref !== 'string') errors.push('Edge must have a valid ref (string)');
               if (!edge.from || typeof edge.from !== 'string') errors.push('Edge must have a valid from (string)');
               if (!edge.to || typeof edge.to !== 'string') errors.push('Edge must have a valid to (string)');
-              const nodeRefs = new Set(blueprint.nodes.map((n: any) => n?.ref).filter(Boolean));
+              const nodeRefs = new Set(blueprint.nodes.map((n) => n?.ref).filter(Boolean));
               if (edge.from && !nodeRefs.has(edge.from)) errors.push(\`Unknown from node: \${edge.from}\`);
               if (edge.to && !nodeRefs.has(edge.to)) errors.push(\`Unknown to node: \${edge.to}\`);
-              const existingRefs = new Set(blueprint.edges.map((e: any) => e?.ref).filter(Boolean));
+              const existingRefs = new Set(blueprint.edges.map((e) => e?.ref).filter(Boolean));
               if (existingRefs.has(edge.ref)) errors.push(\`Edge ref already exists: \${edge.ref}\`);
               if (errors.length > 0) return { success: false, errors, toolData };
               blueprint.edges.push({ ref: edge.ref, from: edge.from, to: edge.to, ...(edge.condition ? { condition: edge.condition } : {}), ...(edge.label ? { label: edge.label } : {}), ...(edge.metadata ? { metadata: edge.metadata } : {}) });

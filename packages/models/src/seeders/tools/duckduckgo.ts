@@ -40,7 +40,7 @@ export const duckduckgoTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const { query, skipDisambiguation = true } = (ctx.$input || {}) as any;
+              const { query, skipDisambiguation = true } = (ctx.$input || {});
               if (!query || typeof query !== 'string') {
                 throw new Error('Query is required and must be a string');
               }
@@ -54,7 +54,7 @@ export const duckduckgoTool: ToolParams = {
                   throw new Error('Query contains potentially dangerous content');
                 }
               }
-              const params: string[] = [];
+              const params = [];
               params.push('q=' + encodeURIComponent(query));
               params.push('format=json');
               params.push('no_html=1');
@@ -102,8 +102,8 @@ export const duckduckgoTool: ToolParams = {
           code: `
             async function main(ctx) {
               const httpResponse = ctx.$input || {};
-              const metadata = (ctx.$state && (ctx.$state as any).duckduckgo_metadata) || {};
-              let parsedBody = (httpResponse as any).body;
+              const metadata = (ctx.$state && ctx.$state.duckduckgo_metadata) || {};
+              let parsedBody = httpResponse.body;
               if (typeof parsedBody === 'string') {
                 try {
                   parsedBody = JSON.parse(parsedBody);
@@ -113,7 +113,7 @@ export const duckduckgoTool: ToolParams = {
               }
               return {
                 httpResponse: {
-                  ...(httpResponse as any),
+                  ...(httpResponse),
                   body: parsedBody
                 },
                 metadata
@@ -131,13 +131,13 @@ export const duckduckgoTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const packed = (ctx.$input || {}) as any;
+              const packed = (ctx.$input || {});
               const httpResponse = packed.httpResponse || {};
               const metadata = packed.metadata || {};
-              const data = (httpResponse as any).body || {};
+              const data = httpResponse.body || {};
               const { query, timestamp } = metadata || {};
               try {
-                const result: any = {
+                const result = {
                   query: query || '',
                   timestamp: timestamp || new Date().toISOString(),
                   responseType: 'none',
@@ -178,8 +178,8 @@ export const duckduckgoTool: ToolParams = {
                 if (data.Infobox && data.Infobox.content && data.Infobox.content.length > 0) {
                   result.responseType = result.responseType === 'none' ? 'infobox' : 'mixed';
                   result.found = true;
-                  const infoboxData: Record<string, any> = {};
-                  data.Infobox.content.forEach((item: any) => {
+                  const infoboxData = {};
+                  data.Infobox.content.forEach((item) => {
                     if (item.label && item.value) {
                       const key = item.label
                         .toLowerCase()
@@ -195,8 +195,8 @@ export const duckduckgoTool: ToolParams = {
                   };
                 }
                 if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-                  const topics: any[] = [];
-                  data.RelatedTopics.forEach((topic: any) => {
+                  const topics = [];
+                  data.RelatedTopics.forEach((topic) => {
                     if (topic.Text) {
                       topics.push({
                         text: topic.Text,
@@ -204,7 +204,7 @@ export const duckduckgoTool: ToolParams = {
                         icon: topic.Icon ? topic.Icon.URL : null
                       });
                     } else if (topic.Topics && Array.isArray(topic.Topics)) {
-                      topic.Topics.forEach((subtopic: any) => {
+                      topic.Topics.forEach((subtopic) => {
                         if (subtopic.Text) {
                           topics.push({
                             text: subtopic.Text,
@@ -221,7 +221,7 @@ export const duckduckgoTool: ToolParams = {
                   }
                 }
                 if (data.Results && data.Results.length > 0) {
-                  result.data.webResults = data.Results.map((r: any) => ({
+                  result.data.webResults = data.Results.map((r) => ({
                     text: r.Text || '',
                     url: r.FirstURL || null,
                     icon: r.Icon ? r.Icon.URL : null
@@ -248,13 +248,13 @@ export const duckduckgoTool: ToolParams = {
                   type: data.Type || null
                 };
                 return result;
-              } catch (error: any) {
+              } catch (error) {
                 return {
                   query: query || '',
                   timestamp: timestamp || new Date().toISOString(),
                   responseType: 'error',
                   found: false,
-                  error: error?.message || 'Error processing DuckDuckGo response',
+                  error: (error && error.message) || 'Error processing DuckDuckGo response',
                   type: 'processing_error'
                 };
               }

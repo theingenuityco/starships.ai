@@ -43,19 +43,19 @@ export const blueprintRemoveNodeTool: ToolParams = {
               if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
               if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
               const nodeRef = ctx.$lastOutputOf('prepare')[0].json.nodeRef;
-              const nodeIndex = blueprint.nodes.findIndex((n: any) => n?.ref === nodeRef);
+              const nodeIndex = blueprint.nodes.findIndex((n) => n?.ref === nodeRef);
               if (nodeIndex === -1) return { success: false, error: \`Node not found: \${nodeRef}\`, toolData };
               const nodeToRemove = blueprint.nodes[nodeIndex];
-              const errors: string[] = [];
+              const errors = [];
               if (nodeToRemove.type === 'start' || nodeToRemove.type === 'end') {
-                const remainingStartNodes = blueprint.nodes.filter((n: any) => n?.type === 'start' && n.ref !== nodeRef).length;
-                const remainingEndNodes = blueprint.nodes.filter((n: any) => n?.type === 'end' && n.ref !== nodeRef).length;
+                const remainingStartNodes = blueprint.nodes.filter((n) => n?.type === 'start' && n.ref !== nodeRef).length;
+                const remainingEndNodes = blueprint.nodes.filter((n) => n?.type === 'end' && n.ref !== nodeRef).length;
                 if (nodeToRemove.type === 'start' && remainingStartNodes === 0) errors.push('Cannot remove last start node - workflow must have at least one start node');
                 if (nodeToRemove.type === 'end' && remainingEndNodes === 0) errors.push('Cannot remove last end node - workflow must have at least one end node');
               }
               if (errors.length > 0) return { success: false, errors, toolData };
-              const edgesToRemove = blueprint.edges.filter((e: any) => e?.from === nodeRef || e?.to === nodeRef);
-              blueprint.edges = blueprint.edges.filter((e: any) => e?.from !== nodeRef && e?.to !== nodeRef);
+              const edgesToRemove = blueprint.edges.filter((e) => e?.from === nodeRef || e?.to === nodeRef);
+              blueprint.edges = blueprint.edges.filter((e) => e?.from !== nodeRef && e?.to !== nodeRef);
               blueprint.nodes.splice(nodeIndex, 1);
               return { success: true, toolData, updatedBlueprint: blueprint, removedNode: nodeToRemove, removedEdges: edgesToRemove, nodeRef, remainingNodes: blueprint.nodes.length, remainingEdges: blueprint.edges.length };
             }

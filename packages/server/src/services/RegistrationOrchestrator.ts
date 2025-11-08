@@ -18,7 +18,7 @@ import { InvalidTokenError, EmailVerificationSendError, ConflictError } from '..
 export interface RegisterUserData {
   email: string;
   password: string;
-  name?: string;
+  displayName?: string;
 }
 
 export interface RegistrationResult {
@@ -75,7 +75,7 @@ export class RegistrationOrchestrator {
     }
 
     // Create user with email unverified (password is hashed in UserService.createUser)
-    const displayName = userData.name || userData.email.split('@')[0];
+    const displayName = userData.displayName || userData.email.split('@')[0];
     const user = await userService.createUser({
       email: userData.email,
       password: userData.password,

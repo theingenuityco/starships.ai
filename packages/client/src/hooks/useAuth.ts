@@ -208,7 +208,7 @@ export function useRegister() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, displayName: name }),
       })
 
       const data = await response.json()

@@ -2,7 +2,7 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { IdSchema, PaginationSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { validateData } from '@/utils/validation';
 import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
@@ -26,11 +26,11 @@ const PreviewPromptsSchema = z
 
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
-  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  description: z.string().optional(),
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  description: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   systemPrompt: z.string().optional(),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']).optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE })).optional(),
   isPublic: z.boolean().optional(),
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
@@ -42,11 +42,11 @@ const CreateAgentSchema = z.object({
 });
 
 const UpdateAgentSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  description: z.string().optional(),
+  name: z.string().min(1).max(255).optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  description: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   systemPrompt: z.string().optional(),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']).optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE })).optional(),
   isPublic: z.boolean().optional(),
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),

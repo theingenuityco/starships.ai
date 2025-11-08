@@ -9,7 +9,7 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
 import { StarshipService } from '@/services/StarshipService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import { PasswordSchema, EmailSchema } from '@/schemas/common';
+import { PasswordSchema, EmailSchema, DisplayNameSchema, AvatarSchema } from '@/schemas/common';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -28,63 +28,30 @@ const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
-// Flexible avatar schema: allows http/https URLs, data URLs, relative paths, or emoji
-const AvatarSchema = z
-  .string()
-  .max(500)
-  .refine(
-    (val) => {
-      if (typeof val !== 'string') return false;
-      const v = val.trim();
-      if (v.length === 0) return false;
-
-      // Absolute http(s) URL
-      if (/^https?:\/\//i.test(v)) return true;
-
-      // Data URL (commonly used for inline images)
-      if (/^data:image\//i.test(v)) return true;
-
-      // Relative path (served asset)
-      if (v.startsWith('/')) return true;
-
-      // Emoji (supports single emoji or ZWJ sequences)
-      try {
-        return /\p{Extended_Pictographic}/u.test(v);
-      } catch {
-        // Fallback for environments lacking Unicode property escapes
-        return /[\u{1F300}-\u{1FAFF}\u{1F1E6}-\u{1F1FF}]/u.test(v);
-      }
-    },
-    {
-      message: 'Invalid avatar format. Provide a URL, data URL, relative path, or an emoji.',
-    }
-  );
-
 const CreateUserSchema = z.object({
-  email: z.string().email().max(255).optional(),
-  displayName: z.string().min(1).max(100).optional(),
+  email: EmailSchema.optional(),
+  displayName: DisplayNameSchema.optional(),
   avatar: AvatarSchema.optional(),
 });
 
 const UpdateUserSchema = z.object({
-  email: z.string().email().max(255).optional(),
-  displayName: z.string().min(1).max(100).optional(),
+  email: EmailSchema.optional(),
+  displayName: DisplayNameSchema.optional(),
   avatar: AvatarSchema.optional(),
 });
 
 const UpdateUserProfileSchema = z.object({
-  email: z.string().email().max(255).optional(),
-  displayName: z.string().min(1).max(100).optional(),
+  email: EmailSchema.optional(),
+  displayName: DisplayNameSchema.optional(),
   avatar: AvatarSchema.optional(),
   currentPassword: z.string().min(1).optional(),
   newPassword: PasswordSchema.optional(),
 });
 
 const CreateUserWithPasswordSchema = z.object({
-  email: z.string().email().max(255),
+  email: EmailSchema,
   password: PasswordSchema,
-  displayName: z.string().min(1).max(100).optional(),
-  name: z.string().min(1).max(100).optional(), // Legacy support
+  displayName: DisplayNameSchema.optional(),
 });
 
 const InitiateEmailChangeSchema = z.object({

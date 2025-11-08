@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
-import { IdSchema, SlugSchema, PaginationSchema } from '@/schemas/common';
+import { IdSchema, SlugSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { ToolRepository, ToolTemplateRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
@@ -16,7 +16,7 @@ const router: Router = Router();
 
 const CreateToolSchema = z
   .object({
-    name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+    name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
     description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional().default(''),
     parameters: z
       .object({
@@ -50,7 +50,7 @@ const CreateToolSchema = z
   );
 
 const CreateToolTemplateSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
   description: z.string().min(1, 'Description is required').max(4000, 'Description must be less than 4000 characters'),
   parameters: z.object({
     type: z.literal('object'),
@@ -62,12 +62,12 @@ const CreateToolTemplateSchema = z.object({
     edges: z.array(z.unknown()),
   }),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']),
-  exampleUsage: z.string().optional(),
+  exampleUsage: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   requiresApiKey: z.boolean().optional(),
   configurationFields: z
     .array(
       z.object({
-        name: z.string(),
+        name: z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE }),
         type: z.enum(['string', 'number', 'boolean']),
         description: z.string(),
         required: z.boolean(),
@@ -78,7 +78,7 @@ const CreateToolTemplateSchema = z.object({
 
 // Separate schema for updates without defaults to avoid overwriting unspecified fields
 const UpdateToolSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional(),
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional(),
   slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters').optional(),
   parameters: z

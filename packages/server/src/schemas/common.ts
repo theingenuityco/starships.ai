@@ -1,6 +1,6 @@
 /**
  * Common Zod schemas shared across API routes
- * 
+ *
  * Provides centralized schema definitions for common validation patterns
  * used throughout the API, ensuring consistency and reducing duplication.
  */
@@ -125,3 +125,82 @@ export const DateRangeSchema = z.object({
  * Comprehensive filtering for list endpoints
  */
 export const FilterSchema = SearchSchema.merge(DateRangeSchema);
+
+/**
+ * XSS validation helper - rejects HTML tags and dangerous characters
+ * Can be used with .refine() on any string schema
+ */
+export const noXSS = (val: string): boolean => {
+  // Reject HTML tags
+  if (/<[^>]*>/.test(val)) {
+    return false;
+  }
+  // Reject dangerous characters: <, >, &, ", ', /, {, }, \
+  if (/[<>&"'\/\\{}]/.test(val)) {
+    return false;
+  }
+  // Reject control characters (except newlines and tabs)
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(val)) {
+    return false;
+  }
+  return true;
+};
+
+export const XSS_ERROR_MESSAGE = 'Contains invalid characters. HTML tags and special characters are not allowed.';
+
+/**
+ * Validation schema for display names
+ * Strict validation to prevent XSS attacks
+ * - Allows: letters, numbers, spaces, basic punctuation, Unicode (names in other languages), emojis
+ * - Rejects: HTML tags, special characters that could be used for injection
+ */
+export const DisplayNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Display name is required')
+  .max(100, 'Display name must be less than 100 characters')
+  .refine(noXSS, { message: XSS_ERROR_MESSAGE });
+
+/**
+ * Validation schema for avatar URLs
+ * Strict validation to prevent SSRF, XSS, and path traversal attacks
+ * - Allows: GitHub, Google, Dicebear avatar URLs, and emojis
+ * - Rejects: Arbitrary URLs, data URLs, local paths, internal IPs
+ */
+export const AvatarSchema = z
+  .string()
+  .max(500, 'Avatar URL must be less than 500 characters')
+  .refine(
+    (val) => {
+      if (typeof val !== 'string') return false;
+      const v = val.trim();
+      if (v.length === 0) return false;
+
+      // Allow GitHub avatars (avatars.githubusercontent.com)
+      if (/^https:\/\/avatars\.githubusercontent\.com\/.+$/i.test(v)) return true;
+
+      // Allow Google avatars (lh3.googleusercontent.com)
+      if (/^https:\/\/lh3\.googleusercontent\.com\/.+$/i.test(v)) return true;
+
+      // Allow Dicebear avatars (api.dicebear.com) - friendly avatar service
+      if (/^https:\/\/api\.dicebear\.com\/.+$/i.test(v)) return true;
+
+      // Emoji (supports single emoji or ZWJ sequences)
+      return /\p{Extended_Pictographic}/u.test(v);
+    },
+    {
+      message: 'Invalid avatar format. Only GitHub, Google, Dicebear avatar URLs, or emojis are allowed.',
+    }
+  );
+
+/**
+ * Validation schema for description fields (short, 500 chars max)
+ * Strict validation to prevent XSS attacks
+ * - Allows: letters, numbers, spaces, basic punctuation, Unicode, newlines
+ * - Rejects: HTML tags, dangerous characters
+ */
+export const DescriptionSchema = z
+  .string()
+  .trim()
+  .max(500, 'Description must be less than 500 characters')
+  .refine(noXSS, { message: XSS_ERROR_MESSAGE });

@@ -309,7 +309,6 @@ export class StarshipService {
         'edit-tool',
         'test-tool',
         'test-tool-blueprint',
-        'docs-node-schema',
         'docs-blueprint-examples',
       ];
 

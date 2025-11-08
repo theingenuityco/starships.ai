@@ -309,7 +309,6 @@ export class StarshipService {
         'edit-tool',
         'test-tool',
         'test-tool-blueprint',
-        'docs-blueprint-examples',
       ];
 
       for (const toolSlug of defaultToolSlugs) {

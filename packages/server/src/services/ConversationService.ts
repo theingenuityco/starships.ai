@@ -513,6 +513,7 @@ export class ConversationService {
       role: data.role,
       content: data.content,
       messageType: data.messageType,
+      ...(data.agentId && { agentId: data.agentId }),
     });
 
     // Broadcast user message immediately via streaming if available

@@ -10,7 +10,7 @@ import { ServiceFactory } from '@/services/ServiceFactory';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
-import { EmailSchema, PasswordSchema, OAuthProviderSchema } from '@/schemas/common';
+import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
@@ -30,7 +30,7 @@ const env = getEnvConfig();
 const RegisterSchema = z.object({
   email: EmailSchema,
   password: PasswordSchema,
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional(),
+  displayName: DisplayNameSchema.optional(),
 });
 
 const LoginSchema = z.object({
@@ -83,11 +83,11 @@ router.post('/auth/register', rateLimiters.auth, async (req: Request, res: Respo
     const bodyValidation = validateData(RegisterSchema, req.body, res, 'registration data');
     if (!bodyValidation) return;
 
-    const { email, password, name } = bodyValidation;
+    const { email, password, displayName } = bodyValidation;
 
     // Use RegistrationOrchestrator for clean business logic separation
     const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
-    const result = await registrationOrchestrator.registerUser({ email, password, name });
+    const result = await registrationOrchestrator.registerUser({ email, password, displayName });
 
     sendSuccess(res, result, 201);
   } catch (error) {

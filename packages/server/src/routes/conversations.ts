@@ -250,6 +250,7 @@ router.post(
       const bodyValidation = validateData(
         z.object({
           content: z.string().min(1, 'content is required'),
+          agentId: z.string().optional(),
           // baselineLength is no longer used on POST (streaming happens over GET SSE)
           baselineLength: z.coerce.number().int().min(0).optional(),
         }),
@@ -260,7 +261,7 @@ router.post(
       if (!bodyValidation) return;
 
       const { conversationId } = paramValidation;
-      const { content } = bodyValidation;
+      const { content, agentId } = bodyValidation;
 
       // Preflight billing gate: block when wallet balance is <= 0
       const conversationService = new ConversationService();
@@ -325,6 +326,7 @@ router.post(
             content,
             role: 'user',
             messageType: 'user_input',
+            ...(agentId && { agentId }),
           },
           { authorization: req.headers.authorization as string | undefined }
         )

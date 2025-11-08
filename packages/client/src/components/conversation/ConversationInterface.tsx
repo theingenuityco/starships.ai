@@ -357,6 +357,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
+    // CRITICAL: Don't apply Gaia fallback for existing conversations
+    // Let message restoration handle agent selection from stored messages
+    if (currentConversationId) {
+      return
+    }
+
     // Wait for agents to load
     if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) {
       return
@@ -374,7 +380,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
+  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent, currentConversationId])
 
   // Keep guard ref in sync with agent changes
   useEffect(() => {

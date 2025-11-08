@@ -977,6 +977,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
         content: data.content,
+        agentId: data.agentId,
       })
       return response.data
     },

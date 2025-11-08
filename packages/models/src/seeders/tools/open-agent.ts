@@ -103,26 +103,26 @@ Automatically inferred from agent state (do not pass manually):
               if (!starshipId) throw new Error('STARSHIP_ID is required');
 
               const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
-              const slug = ctx.$input && (ctx.$input as any).slug;
+              const slug = ctx.$input && (ctx.$input).slug;
 
               if (hasName) {
                 // Create draft
                 const body: any = {
                   name: ctx.$input.name,
-                  description: (ctx.$input && (ctx.$input as any).description) || '',
-                  model: (ctx.$input && (ctx.$input as any).model) || 'openai/gpt-4o-mini',
-                  systemPrompt: (ctx.$input && (ctx.$input as any).systemPrompt) || '',
+                  description: (ctx.$input && (ctx.$input).description) || '',
+                  model: (ctx.$input && (ctx.$input).model) || 'openai/gpt-4o-mini',
+                  systemPrompt: (ctx.$input && (ctx.$input).systemPrompt) || '',
                 };
                 
                 // Add optional numeric fields if provided
-                if (typeof (ctx.$input as any).temperature === 'number') {
-                  body.temperature = (ctx.$input as any).temperature;
+                if (typeof (ctx.$input).temperature === 'number') {
+                  body.temperature = (ctx.$input).temperature;
                 }
-                if (typeof (ctx.$input as any).maxTokens === 'number') {
-                  body.maxTokens = (ctx.$input as any).maxTokens;
+                if (typeof (ctx.$input).maxTokens === 'number') {
+                  body.maxTokens = (ctx.$input).maxTokens;
                 }
-                if (Array.isArray((ctx.$input as any).previewPrompts)) {
-                  const prompts = (ctx.$input as any).previewPrompts.filter((p: any) => typeof p === 'string' && p.trim()).slice(0, 10);
+                if (Array.isArray((ctx.$input).previewPrompts)) {
+                  const prompts = (ctx.$input).previewPrompts.filter((p: any) => typeof p === 'string' && p.trim()).slice(0, 10);
                   if (prompts.length > 0) body.previewPrompts = prompts;
                 }
                 

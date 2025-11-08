@@ -558,7 +558,7 @@ function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'e
     },
     code: {
       type: 'code',
-      description: 'JavaScript code execution in controlled sandbox',
+      description: 'Sandboxed JavaScript execution node requiring async function main(ctx) entrypoint',
       parameters: {
         code: { type: 'string', required: true, description: 'JavaScript code to execute' },
         timeout: { type: 'number', minimum: 100, default: 5000 },
@@ -575,13 +575,45 @@ function getNodeSchemaResponse(nodeType: string, detail: 'summary' | 'full' | 'e
         forbidden: ['setTimeout', 'setInterval', 'require', 'process', 'global', 'globalThis', 'import', 'eval', 'Function'],
       },
       behavior: {
+        entrypoint: 'Requires async function main(ctx)',
         input: 'Available as $input in code context',
-        output: 'Return value from code execution',
+        output: 'Resolved return value from main(ctx)',
         async: 'Supports async/await and promises',
-        sanitization: 'Non-finite numbers converted to strings',
+        sanitization: 'Non-finite numbers converted to strings (Infinity, -Infinity, NaN)',
+        logging: 'console methods are scoped and prefixed with [Code Node]',
       },
-      validation: ['Code syntax validation', 'Security pattern checks', 'Timeout >= 100ms'],
+      validation: ['Code syntax validation', 'Requires entrypoint async function main(ctx)', 'Security pattern checks', 'Timeout >= 100ms'],
       inlineOperations: true,
+      examples: [
+        {
+          ref: 'code_sum',
+          type: 'code',
+          name: 'Sum Numbers',
+          parameters: {
+            code: `
+              async function main(ctx) {
+                const { a = 0, b = 0 } = ctx.$input || {};
+                return { sum: a + b };
+              }
+            `,
+            timeout: 1000,
+          },
+        },
+        {
+          ref: 'code_prepare_args',
+          type: 'code',
+          name: 'Prepare Tool Arguments',
+          parameters: {
+            code: `
+              async function main(ctx) {
+                const toolCall = ctx.$lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0];
+                return toolCall.function.arguments_json || JSON.parse(toolCall.function.arguments);
+              }
+            `,
+            timeout: 2000,
+          },
+        },
+      ],
     },
     user_prompt: {
       type: 'user_prompt',

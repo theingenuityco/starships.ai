@@ -72,18 +72,18 @@ export const blueprintEditEdgeTool: ToolParams = {
               if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
               const edgeRef = ctx.$lastOutputOf('prepare')[0].json.edgeRef;
               const updates = ctx.$lastOutputOf('prepare')[0].json.updates;
-              const edgeIndex = blueprint.edges.findIndex((e: any) => e?.ref === edgeRef);
+              const edgeIndex = blueprint.edges.findIndex((e) => e?.ref === edgeRef);
               if (edgeIndex === -1) return { success: false, error: \`Edge not found: \${edgeRef}\`, toolData };
-              const currentEdge: any = blueprint.edges[edgeIndex];
-              const nodeRefs = new Set(blueprint.nodes.map((n: any) => n?.ref).filter(Boolean));
-              const errors: string[] = [];
+              const currentEdge = blueprint.edges[edgeIndex];
+              const nodeRefs = new Set(blueprint.nodes.map((n) => n?.ref).filter(Boolean));
+              const errors = [];
               if (updates.from !== undefined) { if (typeof updates.from !== 'string') errors.push('Edge from must be a string'); else if (!nodeRefs.has(updates.from)) errors.push(\`Source node does not exist: \${updates.from}\`); }
               if (updates.to !== undefined) { if (typeof updates.to !== 'string') errors.push('Edge to must be a string'); else if (!nodeRefs.has(updates.to)) errors.push(\`Target node does not exist: \${updates.to}\`); }
               if (updates.condition !== undefined && typeof updates.condition !== 'string') errors.push('Edge condition must be a string expression');
               if (updates.label !== undefined && typeof updates.label !== 'string') errors.push('Edge label must be a string');
               if (updates.metadata !== undefined && (typeof updates.metadata !== 'object' || Array.isArray(updates.metadata))) errors.push('Edge metadata must be an object');
               if (errors.length > 0) return { success: false, errors, toolData };
-              const updatedEdge: any = { ...currentEdge };
+              const updatedEdge = { ...currentEdge };
               if (updates.from !== undefined) updatedEdge.from = updates.from;
               if (updates.to !== undefined) updatedEdge.to = updates.to;
               if (updates.condition !== undefined) updatedEdge.condition = updates.condition;

@@ -93,17 +93,17 @@ Behavior and limits:
             async function main(ctx) {
               // Input is the HttpResponse from http_list
               const http = ctx.$input;
-              const body = http && typeof http === 'object' ? (http as any).body : http;
+              const body = http && typeof http === 'object' ? http.body : http;
               // Server sendSuccess returns { data: T }, so prefer body.data when present
-              const data = (body && typeof body === 'object' && Array.isArray((body as any).data))
-                ? (body as any).data
+              const data = (body && typeof body === 'object' && Array.isArray(body.data))
+                ? body.data
                 : (Array.isArray(body) ? body : []);
 
               // Return only model identifiers (prefer id, fallback to name)
-              const ids = (data as any[])
+              const ids = (Array.isArray(data) ? data : [])
                 .map((m) => (m && (m.id || m.name)))
-                .filter((v) => typeof v === 'string' && (v as string).length > 0);
-              return ids as string[];
+                .filter((v) => typeof v === 'string' && v.length > 0);
+              return ids;
             }
           `,
           timeout: 2000,

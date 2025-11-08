@@ -133,11 +133,11 @@ Automatically inferred from agent state (do not pass manually):
           code: `
             async function main(ctx) {
               const http = ctx.$input;
-              const body = http && typeof http === 'object' ? (http as any).body : http;
-              const data = (body && typeof body === 'object' && (body as any).data) ? (body as any).data : body;
+              const body = http && typeof http === 'object' ? http.body : http;
+              const data = (body && typeof body === 'object' && body.data) ? body.data : body;
 
               // Extract key information from test result
-              const status = (http && typeof http === 'object' && (http as any).status) ? (http as any).status : 0;
+              const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
               
               return {

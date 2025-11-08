@@ -160,7 +160,7 @@ export const wikipediaTool: ToolParams = {
           code: `
             async function main(ctx) {
               const httpResponse = ctx.$input || {};
-              const metadata = (ctx.$state && (ctx.$state as any).wikipedia_metadata) || {};
+              const metadata = (ctx.$state && ctx.$state.wikipedia_metadata) || {};
               return {
                 httpResponse,
                 metadata: {
@@ -182,29 +182,29 @@ export const wikipediaTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const packed = ctx.$input as any;
-              const httpResponse = packed?.httpResponse;
+              const packed = ctx.$input || {};
+              const httpResponse = packed && packed.httpResponse;
               const metadata = packed?.metadata || {};
               const response = httpResponse?.body;
               const { action, query, language } = metadata || {};
               const timestamp = new Date().toISOString();
               try {
-                let result: any;
+                let result;
                 switch (action) {
                   case 'search':
                     if (Array.isArray(response) && response.length >= 4) {
-                      const [searchQuery, titles, descriptions, urls] = response as any[];
+                      const [searchQuery, titles, descriptions, urls] = response;
                       result = {
                         action: 'search',
                         query,
                         language,
                         timestamp,
-                        totalResults: titles ? (titles as any[]).length : 0,
-                        results: titles
-                          ? (titles as any[]).map((title, i) => ({
+                        totalResults: Array.isArray(titles) ? titles.length : 0,
+                        results: Array.isArray(titles)
+                          ? titles.map((title, i) => ({
                               title,
-                              description: (descriptions as any[])[i] || '',
-                              url: (urls as any[])[i] || ('https://' + String(language) + '.wikipedia.org/wiki/' + encodeURIComponent(String(title))),
+                              description: (Array.isArray(descriptions) ? descriptions[i] : '') || '',
+                              url: (Array.isArray(urls) ? urls[i] : null) || ('https://' + String(language) + '.wikipedia.org/wiki/' + encodeURIComponent(String(title))),
                             }))
                           : [],
                       };
@@ -221,31 +221,31 @@ export const wikipediaTool: ToolParams = {
                     }
                     break;
                   case 'summary':
-                    if (response && (response as any).title) {
+                    if (response && response.title) {
                       result = {
                         action: 'summary',
                         query,
                         language,
                         timestamp,
                         found: true,
-                        title: (response as any).title,
-                        displayTitle: (response as any).displaytitle || (response as any).title,
-                        pageId: (response as any).pageid,
-                        extract: (response as any).extract || '',
-                        description: (response as any).description || null,
-                        url: (response as any).content_urls?.desktop?.page || null,
-                        mobileUrl: (response as any).content_urls?.mobile?.page || null,
-                        thumbnail: (response as any).thumbnail
+                        title: response.title,
+                        displayTitle: response.displaytitle || response.title,
+                        pageId: response.pageid,
+                        extract: response.extract || '',
+                        description: response.description || null,
+                        url: response.content_urls?.desktop?.page || null,
+                        mobileUrl: response.content_urls?.mobile?.page || null,
+                        thumbnail: response.thumbnail
                           ? {
-                              source: (response as any).thumbnail.source,
-                              width: (response as any).thumbnail.width,
-                              height: (response as any).thumbnail.height,
+                              source: response.thumbnail.source,
+                              width: response.thumbnail.width,
+                              height: response.thumbnail.height,
                             }
                           : null,
-                        coordinates: (response as any).coordinates || null,
-                        lastRevisionId: (response as any).revision || null,
+                        coordinates: response.coordinates || null,
+                        lastRevisionId: response.revision || null,
                       };
-                    } else if (response && (response as any).type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found') {
+                    } else if (response && response.type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found') {
                       result = {
                         action: 'summary',
                         query,
@@ -268,7 +268,7 @@ export const wikipediaTool: ToolParams = {
                     break;
                   case 'content':
                     if (typeof response === 'string' && response.includes('<')) {
-                      let textContent = (response as string)
+                      let textContent = response
                         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
                         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
                         .replace(/<[^>]+>/g, ' ')
@@ -300,17 +300,17 @@ export const wikipediaTool: ToolParams = {
                     }
                     break;
                   case 'sections':
-                    if (response && (response as any).parse && (response as any).parse.sections) {
-                      const sections = (response as any).parse.sections;
+                    if (response && response.parse && response.parse.sections) {
+                      const sections = response.parse.sections;
                       result = {
                         action: 'sections',
                         query,
                         language,
                         timestamp,
                         found: true,
-                        title: (response as any).parse.title || query,
+                        title: response.parse.title || query,
                         totalSections: sections.length,
-                        sections: (sections as any[]).map((section) => ({
+                        sections: sections.map((section) => ({
                           number: section.number,
                           level: parseInt(section.level) || 1,
                           title: section.line || 'Untitled',
@@ -319,14 +319,14 @@ export const wikipediaTool: ToolParams = {
                           byteOffset: section.byteoffset || null,
                         })),
                       };
-                    } else if (response && (response as any).error) {
+                    } else if (response && response.error) {
                       result = {
                         action: 'sections',
                         query,
                         language,
                         timestamp,
                         found: false,
-                        error: (response as any).error.info || 'Page not found',
+                        error: response.error.info || 'Page not found',
                       };
                     } else {
                       result = {
@@ -349,13 +349,13 @@ export const wikipediaTool: ToolParams = {
                     };
                 }
                 return result;
-              } catch (error: any) {
+              } catch (error) {
                 return {
                   action,
                   query,
                   language,
                   timestamp,
-                  error: error?.message || 'Error processing Wikipedia response',
+                  error: (error && error.message) || 'Error processing Wikipedia response',
                   type: 'processing_error',
                 };
               }

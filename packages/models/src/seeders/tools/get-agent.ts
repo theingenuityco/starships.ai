@@ -58,7 +58,7 @@ Behavior and limits:
               if (!authToken) throw new Error('AUTH_TOKEN is required');
               if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-              const slug = ctx.$input && (ctx.$input as any).slug;
+              const slug = ctx.$input && ctx.$input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
               return {

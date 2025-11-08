@@ -42,4 +42,3 @@ const out = await engine.executeBlueprint(blueprint, exec);
 // out[0].json → LLMResponse
 ```
 
-**_ End Patch_** End Patch```} >> json is invalid. Reason: Expecting value: line 1 column 1 (char 0) at pos 0. Use the tool's schema to guide your arguments. The 'apply_patch' tool takes a single string argument, not JSON. It needs to follow a specific patch format. Refer to the exact send format in the last tool call. Do not wrap the patch in JSON. Do not include triple backticks. Just provide the patch content. Also, make sure to close the patch with \*\*\* End Patch. And remember to include a newline at the end of your content. Make sure you understand the grammar and do not leave out necessary newlines. The following is invalid content that you tried to send:

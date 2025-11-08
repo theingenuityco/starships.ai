@@ -136,10 +136,11 @@ export const noXSS = (val: string): boolean => {
     return false;
   }
   // Reject dangerous characters: <, >, &, ", ', /, {, }, \
-  if (/[<>&"'\/\\{}]/.test(val)) {
+  if (/[<>&"'/\\{}]/.test(val)) {
     return false;
   }
   // Reject control characters (except newlines and tabs)
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(val)) {
     return false;
   }

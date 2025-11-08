@@ -4,9 +4,11 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
+import { AgentService } from '@/services/AgentService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
+import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -136,6 +138,25 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
     if (starship.ownerId !== (req as any).user!.id) {
       sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
+    }
+
+    // Authorization: verify user owns the agent (or agent has no starship assigned)
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+        resource: 'agent',
+        id: agentId,
+      });
+      return;
+    }
+
+    // If agent is already assigned to a starship, verify user owns that starship
+    if (agent.starshipId) {
+      if (!(await verifyResourceAccess(agent.starshipId, (req as any).user!.id, 'agent', agentId, res))) {
+        return;
+      }
     }
 
     // Deploy agent (service will verify agent exists)

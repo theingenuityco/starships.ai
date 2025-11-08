@@ -735,6 +735,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
                 }}
                 onBlur={() => setIsOverlayExpanded(false)}
                 onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
+                starshipSlug={slug}
               >
                 <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
               </ConversationMessageInput>

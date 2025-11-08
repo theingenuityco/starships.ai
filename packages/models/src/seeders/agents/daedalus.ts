@@ -86,6 +86,8 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
 
   // Tool assignment - comprehensive tools for tool creation and blueprint understanding
   assignedToolSlugs: [
+    'search-docs',
+    'get-doc',
     'list-tools',
     'get-tool',
     'open-tool',

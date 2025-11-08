@@ -14,7 +14,6 @@ export { toolOpenToolTemplate } from './open-tool';
 export { toolEditToolTemplate } from './edit-tool';
 export { blueprintLintToolTemplate } from './test-tool-blueprint';
 export { toolTestToolTemplate } from './test-tool';
-export { nodeSchemaIntrospectionToolTemplate } from './docs-node-schema';
 export { blueprintExamplesToolTemplate } from './docs-blueprint-examples';
 export { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
 export { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
@@ -43,7 +42,6 @@ import { toolOpenToolTemplate } from './open-tool';
 import { toolEditToolTemplate } from './edit-tool';
 import { blueprintLintToolTemplate } from './test-tool-blueprint';
 import { toolTestToolTemplate } from './test-tool';
-import { nodeSchemaIntrospectionToolTemplate } from './docs-node-schema';
 import { blueprintExamplesToolTemplate } from './docs-blueprint-examples';
 import { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
 import { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
@@ -72,7 +70,6 @@ export const ALL_TOOL_TEMPLATES = [
   toolEditToolTemplate,
   blueprintLintToolTemplate,
   toolTestToolTemplate,
-  nodeSchemaIntrospectionToolTemplate,
   blueprintExamplesToolTemplate,
   toolAddBlueprintNodeToolTemplate,
   toolAddBlueprintEdgeToolTemplate,

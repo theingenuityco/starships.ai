@@ -58,3 +58,22 @@ Cross-links
 
 - See Tool for argument expectations (object-only).
 - See Engine for template resolution rules (applied to parameters before handler execution).
+
+### Accessing initial tool/workflow arguments
+
+- Directly after `start`:
+  - Connect your Code node immediately after `start` to read tool/workflow arguments via `ctx.$input`.
+  - Example:
+    ```ts
+    async function main(ctx) {
+      const args = ctx.$input ?? {};
+      return { message: String(args.content ?? "") };
+    }
+    ```
+
+- From anywhere in the flow:
+  - You can also access the initial input using `ctx.$lastOutputOf('__initial__')[0]?.json`.
+  - Use this when your Code node is not directly downstream of `start` or when a previous node changed the shape of `$input`.
+
+- Do not use `ctx.$state` for arguments:
+  - Execution state is only mutated by Mutate reducers; initial tool/workflow arguments are not stored in `$state` unless you explicitly put them there.

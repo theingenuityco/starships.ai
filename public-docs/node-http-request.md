@@ -64,4 +64,9 @@ Cross-links
 - See Transform for output reshaping after an HTTP call.
 - See Engine for template resolution rules applied to parameters.
 
+### Notes
+
+- Parameters use stringEvaluationMode: full-only. Don’t template `parameters.body` (e.g., `{{ $input }}`) as this produces a string. Either omit `body` and pass an object from upstream, or use a literal object. See Engine → Template resolution rules.
+- When chaining requests, remember HttpRequest returns a wrapper (see Return value shape). If you need only the payload for the next request, forward `body` via a Transform/Code node.
+
 

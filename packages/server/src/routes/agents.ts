@@ -401,6 +401,12 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
     const hasAccess = await verifyResourceAccess(existing.starshipId, req.user!.id, 'agent', id, res);
     if (!hasAccess) return;
 
+    // Authorization: if changing starshipId, verify user owns the destination starship
+    if (updates.starshipId && updates.starshipId !== existing.starshipId) {
+      const hasDestAccess = await verifyStarshipAccess(updates.starshipId, req.user!.id, res);
+      if (!hasDestAccess) return;
+    }
+
     const agent = await agentService.updateAgent(id, updates as any);
     sendSuccess(res, agent);
   } catch (error) {

@@ -13,6 +13,7 @@ import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { getEnvConfig } from '@starships/env';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
+import { AgentService } from '@/services/AgentService';
 
 const router: Router = Router();
 
@@ -318,6 +319,22 @@ router.post(
         return;
       }
 
+      // Authorization: if agentId is provided, verify it belongs to the conversation's starship
+      if (agentId) {
+        const agentService = new AgentService();
+        const agent = await agentService.getAgent(agentId);
+
+        if (!agent) {
+          sendError(res, 'NOT_FOUND', 'Agent not found', 404);
+          return;
+        }
+
+        if (agent.starshipId !== starship.id) {
+          sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
+          return;
+        }
+      }
+
       // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
       conversationService
         .addConversationMessage(
@@ -448,6 +465,22 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     }
     if (!(await verifyStarshipAccess(bodyValidation.starshipId, authUserId, res))) {
       return;
+    }
+
+    // Authorization: if agentId is provided, verify it belongs to the same starship
+    if (bodyValidation.agentId) {
+      const agentService = new AgentService();
+      const agent = await agentService.getAgent(bodyValidation.agentId);
+
+      if (!agent) {
+        sendError(res, 'NOT_FOUND', 'Agent not found', 404);
+        return;
+      }
+
+      if (agent.starshipId !== bodyValidation.starshipId) {
+        sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
+        return;
+      }
     }
 
     const conversationService = new ConversationService();

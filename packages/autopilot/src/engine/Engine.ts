@@ -625,6 +625,46 @@ export class Engine {
       const errorMessages = templateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
       validationErrors.push(...errorMessages);
     }
+
+    // Enforce full-only policy: detect partial template usage in strings
+    const partialPaths: string[] = [];
+    const collect = (value: unknown, path = ''): void => {
+      if (typeof value === 'string') {
+        const regex = /\{\{\s*([\s\S]*?)\s*\}\}/g;
+        const matches = Array.from(value.matchAll(regex));
+        if (matches.length > 0 && !(matches.length === 1 && matches[0][0] === value)) {
+          partialPaths.push(path || '(root)');
+        }
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach((v, i) => collect(v, `${path}[${i}]`));
+        return;
+      }
+      if (value && typeof value === 'object') {
+        const o = value as Record<string, unknown>;
+        // Skip full blueprint-like objects
+        const isBlueprintLike = Array.isArray((o as Record<string, unknown>).nodes) && Array.isArray((o as Record<string, unknown>).edges);
+        if (isBlueprintLike) return;
+        for (const [k, v] of Object.entries(o)) {
+          // Skip child 'blueprint' that looks like a blueprint
+          if (k === 'blueprint' && v && typeof v === 'object') {
+            const bp = v as Record<string, unknown>;
+            const looksBlueprint = Array.isArray((bp as Record<string, unknown>).nodes) && Array.isArray((bp as Record<string, unknown>).edges);
+            if (looksBlueprint) continue;
+          }
+          collect(v, path ? `${path}.${k}` : k);
+        }
+      }
+    };
+    collect(node.parameters);
+    if (partialPaths.length) {
+      for (const p of partialPaths) {
+        validationErrors.push(
+          `${node.ref}: Partial template usage not supported at ${p}; wrap the entire string in a single {{ ... }} expression that returns the final value.`
+        );
+      }
+    }
   }
 
   private throwValidationErrors(unsupportedNodes: Array<{ ref: string; type: string }>, validationErrors: string[]): void {

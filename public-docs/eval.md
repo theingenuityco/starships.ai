@@ -42,3 +42,22 @@ Cross-links
 
 - See `engine.md` for when and how Eval is invoked for handler parameters vs inline operations.
 - See node docs for parameter fields that accept template expressions.
+
+Common mistakes and how to fix them
+
+- Partial templates in full-only contexts
+  - Problem: "Hello {{ name }}" will not evaluate where the engine enforces full-only mode (most parameter and inline contexts). It will be returned literally.
+  - Fix: Make the entire value a single template that returns the final string:
+    - Correct: "{{ `Hello ${$input('name')}` }}"
+
+- “Nested eval” attempts
+  - Problem: Writing {{ "{{ state.x }}" }} expecting a second evaluation pass.
+  - Fix: Evaluate once with the desired final value:
+    - Correct: "{{ String(state.x) }}"
+  - Note: Nested blueprints (objects with `nodes[]` and `edges[]`, or under `blueprint` / `tools[].blueprint`) are protected from evaluation and will be resolved only in their own scope.
+
+- Mixing literals with templates for Transform/Conditional
+  - Problem: Using partial templates inside `transform.value`, `transform.from`, or `condition`.
+  - Fix: Use a single expression that returns the final value:
+    - Transform value example: "{{ $input('user.first') + ' ' + $input('user.last') }}"
+    - Conditional example: "{{ state.retryCount < 3 ? 'retry' : 'stop' }}"

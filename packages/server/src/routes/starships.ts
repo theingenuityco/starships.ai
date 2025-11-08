@@ -8,6 +8,7 @@ import { AgentService } from '@/services/AgentService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
+import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -153,9 +154,7 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
 
     // If agent is already assigned to a starship, verify user owns that starship
     if (agent.starshipId) {
-      const agentStarship = await starshipService.getStarship(agent.starshipId);
-      if (agentStarship && agentStarship.ownerId !== (req as any).user!.id) {
-        sendError(res, 'ACCESS_DENIED', 'Cannot deploy an agent from another user\'s starship', 403);
+      if (!(await verifyResourceAccess(agent.starshipId, (req as any).user!.id, 'agent', agentId, res))) {
         return;
       }
     }

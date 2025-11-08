@@ -7,7 +7,7 @@ import { EnvironmentService } from '@/services/EnvironmentService';
 import { StarshipService } from '@/services/StarshipService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
-import { IdSchema, EnvironmentKeySchema } from '@/schemas/common';
+import { IdSchema, EnvironmentKeySchema, DescriptionSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -19,12 +19,12 @@ const router: Router = Router();
 const CreateEnvironmentVariableSchema = z.object({
   key: EnvironmentKeySchema,
   value: z.string().min(1, 'Value is required').max(10000, 'Value too large'),
-  description: z.string().max(500, 'Description too long').optional(),
+  description: DescriptionSchema.optional(),
 });
 
 const UpdateEnvironmentVariableSchema = z.object({
   value: z.string().min(1).max(10000).optional(),
-  description: z.string().max(500).optional(),
+  description: DescriptionSchema.optional(),
 });
 
 

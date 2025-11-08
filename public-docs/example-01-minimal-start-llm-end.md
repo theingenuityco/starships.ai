@@ -41,4 +41,3 @@ const exec = ExecutionItemUtils.createExecution();
 const out = await engine.executeBlueprint(blueprint, exec);
 // out[0].json → LLMResponse
 ```
-

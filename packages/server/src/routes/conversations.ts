@@ -14,12 +14,8 @@ import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { getEnvConfig } from '@starships/env';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
-import type { ConversationModel } from '@starships/protocol';
 
 const router: Router = Router();
-
-// Type helper: ConversationModel from repository includes starshipId (from ConversationEntity)
-type ConversationWithStarship = ConversationModel & { starshipId: string };
 
 // Using standard pagination schema for consistency
 
@@ -49,7 +45,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       });
       return;
     }
-    if (!(await verifyResourceAccess((convAuth as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess((convAuth as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -227,7 +223,7 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((exists as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess((exists as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -287,7 +283,7 @@ router.post(
         sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
         return;
       }
-      if (!(await verifyResourceAccess((conversation as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+      if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
         return;
       }
 
@@ -340,11 +336,7 @@ router.post(
 
         // Verify agent belongs to the same starship as the conversation
         if (agent.starshipId !== starship.id) {
-          sendError(res, 'ACCESS_DENIED', 'Agent must belong to the same starship as the conversation', 403, {
-            agentId,
-            agentStarshipId: agent.starshipId,
-            conversationStarshipId: starship.id,
-          });
+          sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
           return;
         }
       }
@@ -402,7 +394,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -498,11 +490,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 
       // Verify agent belongs to the same starship as the conversation
       if (agent.starshipId !== bodyValidation.starshipId) {
-        sendError(res, 'ACCESS_DENIED', 'Agent must belong to the same starship as the conversation', 403, {
-          agentId: bodyValidation.agentId,
-          agentStarshipId: agent.starshipId,
-          conversationStarshipId: bodyValidation.starshipId,
-        });
+        sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
         return;
       }
     }
@@ -556,7 +544,7 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -608,7 +596,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -664,7 +652,7 @@ router.patch('/conversations/:conversationId', jwtAuthMiddleware, async (req: Re
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as ConversationWithStarship).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 

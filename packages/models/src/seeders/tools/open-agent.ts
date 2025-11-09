@@ -94,63 +94,65 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Build URL, headers and body based on mode (create or open)',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-            const hasName = input && typeof input.name === 'string' && input.name.trim().length > 0;
-            const slug = input && input.slug;
+              const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
+              const slug = ctx.$input && (ctx.$input).slug;
 
-            if (hasName) {
-              // Create draft
-              const body = {
-                name: input.name,
-                description: (input && input.description) || '',
-                model: (input && input.model) || 'openai/gpt-4o-mini',
-                systemPrompt: (input && input.systemPrompt) || '',
-              };
-              
-              // Add optional numeric fields if provided
-              if (typeof input.temperature === 'number') {
-                body.temperature = input.temperature;
+              if (hasName) {
+                // Create draft
+                const body = {
+                  name: ctx.$input.name,
+                  description: (ctx.$input && (ctx.$input).description) || '',
+                  model: (ctx.$input && (ctx.$input).model) || 'openai/gpt-4o-mini',
+                  systemPrompt: (ctx.$input && (ctx.$input).systemPrompt) || '',
+                };
+                
+                // Add optional numeric fields if provided
+                if (typeof (ctx.$input).temperature === 'number') {
+                  body.temperature = (ctx.$input).temperature;
+                }
+                if (typeof (ctx.$input).maxTokens === 'number') {
+                  body.maxTokens = (ctx.$input).maxTokens;
+                }
+                if (Array.isArray((ctx.$input).previewPrompts)) {
+                  const prompts = (ctx.$input).previewPrompts.filter((p) => typeof p === 'string' && p.trim()).slice(0, 10);
+                  if (prompts.length > 0) body.previewPrompts = prompts;
+                }
+                
+                return {
+                  url: baseUrl + '/agents',
+                  method: 'POST',
+                  headers: {
+                    'Authorization': 'Bearer ' + String(authToken),
+                    'Content-Type': 'application/json'
+                  },
+                  body: {
+                    ...body,
+                    starshipId
+                  },
+                  timeout: 10000
+                };
               }
-              if (typeof input.maxTokens === 'number') {
-                body.maxTokens = input.maxTokens;
-              }
-              if (Array.isArray(input.previewPrompts)) {
-                const prompts = input.previewPrompts.filter(p => typeof p === 'string' && p.trim()).slice(0, 10);
-                if (prompts.length > 0) body.previewPrompts = prompts;
-              }
-              
+
+              // Open existing
+              if (!slug || typeof slug !== 'string') throw new Error('slug is required to open an agent');
               return {
-                url: \`\${baseUrl}/agents\`,
-                method: 'POST',
+                url: baseUrl + '/agents/' + String(slug),
+                method: 'GET',
                 headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
+                  'Authorization': 'Bearer ' + String(authToken),
                   'Content-Type': 'application/json'
                 },
-                body: {
-                  ...body,
-                  starshipId
-                },
-                timeout: 10000
+                timeout: 5000
               };
             }
-
-            // Open existing
-            if (!slug || typeof slug !== 'string') throw new Error('slug is required to open an agent');
-            return {
-              url: \`\${baseUrl}/agents/\${slug}\`,
-              method: 'GET',
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
-              },
-              timeout: 5000
-            };
           `,
           timeout: 3000,
         },

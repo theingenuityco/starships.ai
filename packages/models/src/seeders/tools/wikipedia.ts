@@ -158,26 +158,18 @@ export const wikipediaTool: ToolParams = {
         description: 'Combine request metadata with HTTP response',
         parameters: {
           code: `
-            // Get the HTTP response from the previous node (fetch_wikipedia)
-            const httpResponse = input || {};
-            
-            // Get metadata from state (stored by prepare_request)
-            const metadata = state.wikipedia_metadata || {};
-            
-            // console.log('[COMBINE DATA] Metadata from state:', metadata);
-            // console.log('[COMBINE DATA] HTTP Response type:', typeof httpResponse);
-            // console.log('[COMBINE DATA] HTTP Response keys:', Object.keys(httpResponse));
-            // console.log('[COMBINE DATA] HTTP Response sample:', JSON.stringify(httpResponse).substring(0, 200));
-            
-            // Pass both response and metadata to next node
-            return {
-              httpResponse: httpResponse,
-              metadata: {
-                action: metadata.action || 'unknown',
-                query: metadata.query || '',
-                language: metadata.language || 'en'
-              }
-            };
+            async function main(ctx) {
+              const httpResponse = ctx.$input || {};
+              const metadata = (ctx.$state && ctx.$state.wikipedia_metadata) || {};
+              return {
+                httpResponse,
+                metadata: {
+                  action: metadata.action || 'unknown',
+                  query: metadata.query || '',
+                  language: metadata.language || 'en'
+                }
+              };
+            }
           `,
           timeout: 5000,
         },
@@ -189,204 +181,184 @@ export const wikipediaTool: ToolParams = {
         description: 'Parse and format Wikipedia API response',
         parameters: {
           code: `
-            // Input now contains both httpResponse and metadata
-            const { httpResponse, metadata } = input || {};
-            const response = httpResponse?.body;
-            const { action, query, language } = metadata || {};
-            const timestamp = new Date().toISOString();
-            
-            // console.log('[PROCESS RESPONSE] Action:', action);
-            // console.log('[PROCESS RESPONSE] Response type:', typeof response);
-            // console.log('[PROCESS RESPONSE] Response is array?', Array.isArray(response));
-            // if (Array.isArray(response)) {
-            //   console.log('[PROCESS RESPONSE] Array length:', response.length);
-            //   console.log('[PROCESS RESPONSE] First element:', response[0]);
-            // }
-            // console.log('[PROCESS RESPONSE] Response sample:', JSON.stringify(response).substring(0, 300));
-            
-            try {
-              let result;
-              
-              switch(action) {
-                case 'search':
-                  // OpenSearch returns [query, titles[], descriptions[], urls[]]
-                  if (Array.isArray(response) && response.length >= 4) {
-                    const [searchQuery, titles, descriptions, urls] = response;
-                    
-                    result = {
-                      action: 'search',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      totalResults: titles ? titles.length : 0,
-                      results: titles ? titles.map((title, i) => ({
-                        title: title,
-                        description: descriptions[i] || '',
-                        url: urls[i] || \`https://\${language}.wikipedia.org/wiki/\${encodeURIComponent(title)}\`
-                      })) : []
-                    };
-                  } else {
-                    result = {
-                      action: 'search',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      totalResults: 0,
-                      results: [],
-                      error: 'Unexpected response format'
-                    };
-                  }
-                  break;
-                  
-                case 'summary':
-                  // REST API returns detailed summary object
-                  if (response && response.title) {
-                    result = {
-                      action: 'summary',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: true,
-                      title: response.title,
-                      displayTitle: response.displaytitle || response.title,
-                      pageId: response.pageid,
-                      extract: response.extract || '',
-                      description: response.description || null,
-                      url: response.content_urls?.desktop?.page || null,
-                      mobileUrl: response.content_urls?.mobile?.page || null,
-                      thumbnail: response.thumbnail ? {
-                        source: response.thumbnail.source,
-                        width: response.thumbnail.width,
-                        height: response.thumbnail.height
-                      } : null,
-                      coordinates: response.coordinates || null,
-                      lastRevisionId: response.revision || null
-                    };
-                  } else if (response && response.type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found') {
-                    result = {
-                      action: 'summary',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: false,
-                      error: 'Page not found',
-                      suggestion: 'Try using the search action first to find exact page titles'
-                    };
-                  } else {
-                    result = {
-                      action: 'summary',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: false,
-                      error: 'Unable to retrieve summary'
-                    };
-                  }
-                  break;
-                  
-                case 'content':
-                  // Mobile HTML response - extract text content
-                  if (typeof response === 'string' && response.includes('<')) {
-                    // Basic HTML stripping for content extraction
-                    let textContent = response
-                      .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '') // Remove scripts
-                      .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')   // Remove styles
-                      .replace(/<[^>]+>/g, ' ')                         // Remove HTML tags
-                      .replace(/\\s+/g, ' ')                              // Normalize whitespace
-                      .trim();
-                    
-                    // Limit content length
-                    if (textContent.length > 50000) {
-                      textContent = textContent.substring(0, 50000) + '... [content truncated]';
+            async function main(ctx) {
+              const packed = ctx.$input || {};
+              const httpResponse = packed && packed.httpResponse;
+              const metadata = packed?.metadata || {};
+              const response = httpResponse?.body;
+              const { action, query, language } = metadata || {};
+              const timestamp = new Date().toISOString();
+              try {
+                let result;
+                switch (action) {
+                  case 'search':
+                    if (Array.isArray(response) && response.length >= 4) {
+                      const [searchQuery, titles, descriptions, urls] = response;
+                      result = {
+                        action: 'search',
+                        query,
+                        language,
+                        timestamp,
+                        totalResults: Array.isArray(titles) ? titles.length : 0,
+                        results: Array.isArray(titles)
+                          ? titles.map((title, i) => ({
+                              title,
+                              description: (Array.isArray(descriptions) ? descriptions[i] : '') || '',
+                              url: (Array.isArray(urls) ? urls[i] : null) || ('https://' + String(language) + '.wikipedia.org/wiki/' + encodeURIComponent(String(title))),
+                            }))
+                          : [],
+                      };
+                    } else {
+                      result = {
+                        action: 'search',
+                        query,
+                        language,
+                        timestamp,
+                        totalResults: 0,
+                        results: [],
+                        error: 'Unexpected response format',
+                      };
                     }
-                    
+                    break;
+                  case 'summary':
+                    if (response && response.title) {
+                      result = {
+                        action: 'summary',
+                        query,
+                        language,
+                        timestamp,
+                        found: true,
+                        title: response.title,
+                        displayTitle: response.displaytitle || response.title,
+                        pageId: response.pageid,
+                        extract: response.extract || '',
+                        description: response.description || null,
+                        url: response.content_urls?.desktop?.page || null,
+                        mobileUrl: response.content_urls?.mobile?.page || null,
+                        thumbnail: response.thumbnail
+                          ? {
+                              source: response.thumbnail.source,
+                              width: response.thumbnail.width,
+                              height: response.thumbnail.height,
+                            }
+                          : null,
+                        coordinates: response.coordinates || null,
+                        lastRevisionId: response.revision || null,
+                      };
+                    } else if (response && response.type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found') {
+                      result = {
+                        action: 'summary',
+                        query,
+                        language,
+                        timestamp,
+                        found: false,
+                        error: 'Page not found',
+                        suggestion: 'Try using the search action first to find exact page titles',
+                      };
+                    } else {
+                      result = {
+                        action: 'summary',
+                        query,
+                        language,
+                        timestamp,
+                        found: false,
+                        error: 'Unable to retrieve summary',
+                      };
+                    }
+                    break;
+                  case 'content':
+                    if (typeof response === 'string' && response.includes('<')) {
+                      let textContent = response
+                        .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')
+                        .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/\\s+/g, ' ')
+                        .trim();
+                      if (textContent.length > 50000) {
+                        textContent = textContent.substring(0, 50000) + '... [content truncated]';
+                      }
+                      result = {
+                        action: 'content',
+                        query,
+                        language,
+                        timestamp,
+                        found: true,
+                        content: textContent,
+                        contentLength: textContent.length,
+                        format: 'text',
+                        note: 'HTML content converted to plain text',
+                      };
+                    } else {
+                      result = {
+                        action: 'content',
+                        query,
+                        language,
+                        timestamp,
+                        found: false,
+                        error: 'Unable to retrieve content',
+                      };
+                    }
+                    break;
+                  case 'sections':
+                    if (response && response.parse && response.parse.sections) {
+                      const sections = response.parse.sections;
+                      result = {
+                        action: 'sections',
+                        query,
+                        language,
+                        timestamp,
+                        found: true,
+                        title: response.parse.title || query,
+                        totalSections: sections.length,
+                        sections: sections.map((section) => ({
+                          number: section.number,
+                          level: parseInt(section.level) || 1,
+                          title: section.line || 'Untitled',
+                          index: section.index ? parseInt(section.index) : null,
+                          anchor: section.anchor || null,
+                          byteOffset: section.byteoffset || null,
+                        })),
+                      };
+                    } else if (response && response.error) {
+                      result = {
+                        action: 'sections',
+                        query,
+                        language,
+                        timestamp,
+                        found: false,
+                        error: response.error.info || 'Page not found',
+                      };
+                    } else {
+                      result = {
+                        action: 'sections',
+                        query,
+                        language,
+                        timestamp,
+                        found: false,
+                        error: 'Unable to retrieve sections',
+                      };
+                    }
+                    break;
+                  default:
                     result = {
-                      action: 'content',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: true,
-                      content: textContent,
-                      contentLength: textContent.length,
-                      format: 'text',
-                      note: 'HTML content converted to plain text'
+                      action,
+                      query,
+                      language,
+                      timestamp,
+                      error: 'Unknown action',
                     };
-                  } else {
-                    result = {
-                      action: 'content',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: false,
-                      error: 'Unable to retrieve content'
-                    };
-                  }
-                  break;
-                  
-                case 'sections':
-                  // Parse API returns sections array
-                  if (response && response.parse && response.parse.sections) {
-                    const sections = response.parse.sections;
-                    
-                    result = {
-                      action: 'sections',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: true,
-                      title: response.parse.title || query,
-                      totalSections: sections.length,
-                      sections: sections.map(section => ({
-                        number: section.number,
-                        level: parseInt(section.level) || 1,
-                        title: section.line || 'Untitled',
-                        index: section.index ? parseInt(section.index) : null,
-                        anchor: section.anchor || null,
-                        byteOffset: section.byteoffset || null
-                      }))
-                    };
-                  } else if (response && response.error) {
-                    result = {
-                      action: 'sections',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: false,
-                      error: response.error.info || 'Page not found'
-                    };
-                  } else {
-                    result = {
-                      action: 'sections',
-                      query: query,
-                      language: language,
-                      timestamp: timestamp,
-                      found: false,
-                      error: 'Unable to retrieve sections'
-                    };
-                  }
-                  break;
-                  
-                default:
-                  result = {
-                    action: action,
-                    query: query,
-                    language: language,
-                    timestamp: timestamp,
-                    error: 'Unknown action'
-                  };
+                }
+                return result;
+              } catch (error) {
+                return {
+                  action,
+                  query,
+                  language,
+                  timestamp,
+                  error: (error && error.message) || 'Error processing Wikipedia response',
+                  type: 'processing_error',
+                };
               }
-              
-              return result;
-              
-            } catch (error) {
-              return {
-                action: action,
-                query: query,
-                language: language,
-                timestamp: timestamp,
-                error: error.message || 'Error processing Wikipedia response',
-                type: 'processing_error'
-              };
             }
           `,
           timeout: 5000,

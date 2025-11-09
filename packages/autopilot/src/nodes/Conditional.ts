@@ -90,7 +90,9 @@ export class Conditional implements NodeHandler {
 
           // Evaluate expression using centralized Eval class with input data
           const inputData = ExecutionItemUtils.unwrapSingle(input);
-          result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
+          result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData, {
+            stringEvaluationMode: 'full-only',
+          });
 
           // Convert result to string condition - handle special cases
           if (result === null || result === undefined) {

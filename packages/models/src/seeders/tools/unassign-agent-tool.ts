@@ -59,26 +59,28 @@ Returns server response.
         description: 'Validate inputs and prepare context',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-            if (!input.agentSlug) throw new Error('agentSlug is required');
-            if (!input.toolSlug) throw new Error('toolSlug is required');
+              if (!ctx.$input.agentSlug) throw new Error('agentSlug is required');
+              if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
 
-            return {
-              baseUrl,
-              starshipId,
-              agentSlug: input.agentSlug,
-              toolSlug: input.toolSlug,
-              headers: {
-                'Authorization': \`Bearer \${authToken}\`,
-                'Content-Type': 'application/json'
-              }
-            };
+              return {
+                baseUrl,
+                starshipId,
+                agentSlug: ctx.$input.agentSlug,
+                toolSlug: ctx.$input.toolSlug,
+                headers: {
+                  'Authorization': \`Bearer \${authToken}\`,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -102,25 +104,27 @@ Returns server response.
         description: 'DELETE /agents/:id/tools/:toolSlug?starshipId=...',
         parameters: {
           code: `
-            const fetchResponse = $lastOutputOf('fetch_agent')[0]?.json ?? {};
-            const agentData = fetchResponse.body?.data || fetchResponse.body;
+            async function main(ctx) {
+              const fetchResponse = ctx.$lastOutputOf('fetch_agent')[0]?.json ?? {};
+              const agentData = fetchResponse.body?.data || fetchResponse.body;
 
-            if (!agentData || !agentData.id) {
-              throw new Error('Failed to fetch agent');
+              if (!agentData || !agentData.id) {
+                throw new Error('Failed to fetch agent');
+              }
+
+              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const toolSlug = prep.toolSlug;
+
+            const url = new URL(String(prep.baseUrl) + '/agents/' + String(agentData.id) + '/tools/' + String(toolSlug));
+              url.searchParams.set('starshipId', String(prep.starshipId));
+
+              return {
+                url: url.toString(),
+                method: 'DELETE',
+                headers: prep.headers,
+                timeout: 10000
+              };
             }
-
-            const ctx = $lastOutputOf('prepare')[0].json;
-            const toolSlug = ctx.toolSlug;
-
-            const url = new URL(\`${'${'}ctx.baseUrl}/agents/${'${'}agentData.id}/tools/${'${'}toolSlug}\`);
-            url.searchParams.set('starshipId', String(ctx.starshipId));
-
-            return {
-              url: url.toString(),
-              method: 'DELETE',
-              headers: ctx.headers,
-              timeout: 10000
-            };
           `,
           timeout: 3000,
         },

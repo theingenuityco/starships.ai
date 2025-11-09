@@ -74,37 +74,39 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Build test execution request',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-            const slug = input && input.slug;
-            if (!slug || typeof slug !== 'string') throw new Error('slug is required');
+              const slug = ctx.$input && ctx.$input.slug;
+              if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
-            if (input.input === undefined) {
-              throw new Error('input is required for testing');
-            }
+              if (ctx.$input.input === undefined) {
+                throw new Error('input is required for testing');
+              }
 
-            // Normalize input to messages array format if needed
-            let testInput = input.input;
-            if (typeof testInput === 'string') {
-              testInput = [{ role: 'user', content: testInput }];
-            }
+              // Normalize input to messages array format if needed
+              let testInput = ctx.$input.input;
+              if (typeof testInput === 'string') {
+                testInput = [{ role: 'user', content: testInput }];
+              }
 
             return {
-              url: \`\${baseUrl}/starships/\${starshipId}/agents/\${slug}/test\`,
+              url: String(baseUrl) + '/starships/' + String(starshipId) + '/agents/' + String(slug) + '/test',
               method: 'POST',
               headers: {
-                'Authorization': \`Bearer \${authToken}\`,
+                'Authorization': 'Bearer ' + String(authToken),
                 'Content-Type': 'application/json'
               },
               body: {
                 input: testInput
               }
             };
+            }
           `,
           timeout: 3000,
         },
@@ -129,21 +131,24 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Format test execution result for display',
         parameters: {
           code: `
-            const http = input;
-            const body = http && typeof http === 'object' ? http.body : http;
-            const data = (body && typeof body === 'object' && body.data) ? body.data : body;
+            async function main(ctx) {
+              const http = ctx.$input;
+              const body = http && typeof http === 'object' ? http.body : http;
+              const data = (body && typeof body === 'object' && body.data) ? body.data : body;
 
-            // Extract key information from test result
-            const success = http.status >= 200 && http.status < 300;
-            
-            return {
-              success,
-              status: http.status,
-              result: data,
-              message: success 
-                ? 'Agent test completed successfully' 
-                : 'Agent test failed'
-            };
+              // Extract key information from test result
+              const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
+              const success = status >= 200 && status < 300;
+              
+              return {
+                success,
+                status,
+                result: data,
+                message: success 
+                  ? 'Agent test completed successfully' 
+                  : 'Agent test failed'
+              };
+            }
           `,
           timeout: 2000,
         },

@@ -31,6 +31,7 @@ import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
 import webhooksRoutes from '@/routes/webhooks';
+import docsRoutes from '@/routes/docs';
 import ledgerRoutes from '@/routes/ledger';
 // import expeditionRoutes from '@/routes/expeditions';
 
@@ -95,6 +96,7 @@ app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
+app.use('/api/v1', docsRoutes);
 app.use('/api/v1', walletRoutes);
 app.use('/api/v1', topupRoutes);
 app.use('/api/v1', promoRoutes);
@@ -141,20 +143,20 @@ httpServer.listen(PORT, async () => {
     console.log('✅ Database schema initialized with seed data');
 
     // Initialize Tool Templates (seeds default templates)
-    // try {
-    //   await seedToolTemplates();
-    // } catch (error) {
-    //   console.error('⚠️ Failed to seed tool templates:', error);
-    //   // Continue - seeding is not critical for startup
-    // }
+    try {
+      await seedToolTemplates();
+    } catch (error) {
+      console.error('⚠️ Failed to seed tool templates:', error);
+      // Continue - seeding is not critical for startup
+    }
 
     // Initialize Agent Templates (seeds default templates)
-    // try {
-    //   await seedAgentTemplates();
-    // } catch (error) {
-    //   console.error('⚠️ Failed to seed agent templates:', error);
-    //   // Continue - seeding is not critical for startup
-    // }
+    try {
+      await seedAgentTemplates();
+    } catch (error) {
+      console.error('⚠️ Failed to seed agent templates:', error);
+      // Continue - seeding is not critical for startup
+    }
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

@@ -360,6 +360,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
+    // CRITICAL: If user just selected an agent, don't override
+    if (userSelectedAgentRef.current) {
+      return
+    }
+
     // If URL provided an initial agent, don't apply fallback
     if (initialAgentId) {
       return
@@ -373,6 +378,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // CRITICAL: Don't apply Gaia fallback for existing conversations
     // Let message restoration handle agent selection from stored messages
     if (currentConversationId) {
+      return
+    }
+
+    // ALSO check the external prop to catch race conditions
+    if (externalConversationId) {
       return
     }
 
@@ -393,8 +403,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-    // CRITICAL: currentConversationId is NOT in dependencies to prevent re-running when conversation is created
-    // We check it in the effect body instead
+    // CRITICAL: currentConversationId and externalConversationId are NOT in dependencies
+    // to prevent re-running when conversation is created or URL changes
+    // We check them in the effect body instead
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
 
   // Keep guard ref in sync with agent changes

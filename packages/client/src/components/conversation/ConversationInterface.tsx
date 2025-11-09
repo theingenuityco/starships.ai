@@ -315,8 +315,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   useEffect(() => {
     // Reset user selection flag when conversation actually changes
+    // BUT preserve the user's agent choice when creating the first conversation
+    const wasNull = currentConversationIdRef.current === null
+    const isNowSet = currentConversationId !== null
+    const isCreatingFirstConversation = wasNull && isNowSet
+
     if (currentConversationIdRef.current !== currentConversationId && currentConversationId) {
-      userSelectedAgentRef.current = false
+      // Don't reset user selection when creating first conversation - preserve their agent choice
+      if (!isCreatingFirstConversation) {
+        userSelectedAgentRef.current = false
+      }
     }
     currentConversationIdRef.current = currentConversationId
   }, [currentConversationId])
@@ -347,6 +355,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
+    // If user has ever set any agent (including via @mention), don't override
+    if (hasEverSetAnyAgentRef.current) {
+      return
+    }
+
+    // CRITICAL: If user just selected an agent, don't override
+    if (userSelectedAgentRef.current) {
+      return
+    }
+
     // If URL provided an initial agent, don't apply fallback
     if (initialAgentId) {
       return
@@ -360,6 +378,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // CRITICAL: Don't apply Gaia fallback for existing conversations
     // Let message restoration handle agent selection from stored messages
     if (currentConversationId) {
+      return
+    }
+
+    // ALSO check the external prop to catch race conditions
+    if (externalConversationId) {
       return
     }
 
@@ -380,7 +403,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent, currentConversationId])
+    // CRITICAL: currentConversationId and externalConversationId are NOT in dependencies
+    // to prevent re-running when conversation is created or URL changes
+    // We check them in the effect body instead
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
 
   // Keep guard ref in sync with agent changes
   useEffect(() => {
@@ -690,6 +717,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Skip if no messages yet or count hasn't changed (avoid processing same data)
       if (messageCount === 0) return
 
+      // CRITICAL: Don't override user's agent selection if they just made a choice
+      // This prevents race conditions where messages load before user's selection is processed
+      if (userSelectedAgentRef.current) {
+        // User recently selected an agent - don't override from messages yet
+        // Update count tracker but skip restoration
+        conversationMessageCountRef.current[currentConversationId] = messageCount
+        return
+      }
+
       // Update the count tracker
       conversationMessageCountRef.current[currentConversationId] = messageCount
 
@@ -707,12 +743,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             hasEverSetAnyAgentRef.current = true
             // Update the store so it's remembered for this conversation
             setConversationAgentStore(currentConversationId, messageAgent.id, messageAgent.name)
-            // Reset user selection flag so messages remain authoritative
-            userSelectedAgentRef.current = false
           }
         }
       }
-    }, [liveMessages, currentConversationId, starshipAgentsData, selectedAgent])
+    }, [liveMessages, currentConversationId, starshipAgentsData, selectedAgent, setConversationAgentStore])
 
     // Focus input when streaming transitions from true -> false
     useEffect(() => {

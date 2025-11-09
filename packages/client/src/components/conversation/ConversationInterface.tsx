@@ -315,8 +315,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   useEffect(() => {
     // Reset user selection flag when conversation actually changes
+    // BUT preserve the user's agent choice when creating the first conversation
+    const wasNull = currentConversationIdRef.current === null
+    const isNowSet = currentConversationId !== null
+    const isCreatingFirstConversation = wasNull && isNowSet
+
     if (currentConversationIdRef.current !== currentConversationId && currentConversationId) {
-      userSelectedAgentRef.current = false
+      // Don't reset user selection when creating first conversation - preserve their agent choice
+      if (!isCreatingFirstConversation) {
+        userSelectedAgentRef.current = false
+      }
     }
     currentConversationIdRef.current = currentConversationId
   }, [currentConversationId])

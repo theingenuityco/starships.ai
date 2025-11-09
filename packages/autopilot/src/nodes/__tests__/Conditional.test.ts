@@ -1,7 +1,7 @@
 /**
  * Conditional Node Handler Tests
  *
- * Tests for JSONata-based branching logic in workflows
+ * Tests for expression-based branching logic in workflows
  */
 
 import { Conditional } from '../Conditional';
@@ -40,9 +40,9 @@ describe('Conditional Node Handler', () => {
       });
     });
 
-    it('should evaluate JSONata expressions with template syntax', async () => {
+    it('should evaluate expressions with template syntax', async () => {
       const params: ConditionalParams = {
-        condition: '{{ state.user.isPremium = true }}',
+        condition: '{{ state.user.isPremium === true }}',
       };
 
       const conditional = new Conditional(params, {
@@ -58,7 +58,7 @@ describe('Conditional Node Handler', () => {
       });
     });
 
-    it('should evaluate JSONata string comparison expression', async () => {
+    it('should evaluate string comparison expression', async () => {
       const params: ConditionalParams = {
         condition: '{{ state.user.level === "gold" }}',
       };
@@ -76,7 +76,7 @@ describe('Conditional Node Handler', () => {
       });
     });
 
-    it('should evaluate JSONata numeric comparison expression', async () => {
+    it('should evaluate numeric comparison expression', async () => {
       const params: ConditionalParams = {
         condition: '{{ outputs[1].items[0].json.value > 40 }}',
       };
@@ -94,9 +94,9 @@ describe('Conditional Node Handler', () => {
       });
     });
 
-    it('should return false for failing JSONata conditions', async () => {
+    it('should return false for failing expression conditions', async () => {
       const params: ConditionalParams = {
-        condition: '{{ state.user.isPremium = false }}',
+        condition: '{{ state.user.isPremium === false }}',
       };
 
       const conditional = new Conditional(params, {
@@ -127,8 +127,8 @@ describe('Conditional Node Handler', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].json).toEqual({
-        edgeCondition: 'false',
-        result: false,
+        edgeCondition: 'true',
+        result: true,
       });
     });
 
@@ -196,7 +196,7 @@ describe('Conditional Node Handler', () => {
       expect(result.length).toBe(1);
     });
 
-    it('should return JSONata evaluated string values', async () => {
+    it('should return template evaluated string values', async () => {
       const params: ConditionalParams = {
         condition: '{{ state.user.level }}',
       };
@@ -214,7 +214,7 @@ describe('Conditional Node Handler', () => {
       expect(result.length).toBe(1);
     });
 
-    it('should return JSONata evaluated numeric values', async () => {
+    it('should return template evaluated numeric values', async () => {
       const params: ConditionalParams = {
         condition: '{{ outputs[1].items[0].json.value }}',
       };
@@ -232,7 +232,7 @@ describe('Conditional Node Handler', () => {
       expect(result.length).toBe(1);
     });
 
-    it('should handle null/undefined JSONata values', async () => {
+    it('should handle null/undefined template values', async () => {
       const params: ConditionalParams = {
         condition: '{{ state.nonexistent }}',
       };
@@ -285,7 +285,7 @@ describe('Conditional Node Handler', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle JSONata syntax errors', async () => {
+    it('should handle expression syntax errors', async () => {
       const params: ConditionalParams = {
         condition: '{{ invalid expression $$ }}',
       };
@@ -309,7 +309,7 @@ describe('Conditional Node Handler', () => {
       await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed');
     });
 
-    it('should handle missing execution context for JSONata expressions', async () => {
+    it('should handle missing execution context for expressions', async () => {
       const params: ConditionalParams = {
         condition: '{{ state.user.isPremium }}',
       };
@@ -343,7 +343,7 @@ describe('Conditional Node Handler', () => {
   describe('Virtual Node Pattern', () => {
     it('should work as standalone conditional node', async () => {
       const params: ConditionalParams = {
-        condition: '{{ state.user.isPremium = true }}',
+        condition: '{{ state.user.isPremium === true }}',
       };
 
       const conditional = new Conditional(params, {

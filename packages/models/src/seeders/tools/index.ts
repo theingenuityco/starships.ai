@@ -12,10 +12,10 @@ export { toolListToolTemplate } from './list-tools';
 export { toolGetToolTemplate } from './get-tool';
 export { toolOpenToolTemplate } from './open-tool';
 export { toolEditToolTemplate } from './edit-tool';
+export { docsSearchToolTemplate } from './search-docs';
+export { docsGetDocToolTemplate } from './get-doc';
 export { blueprintLintToolTemplate } from './test-tool-blueprint';
 export { toolTestToolTemplate } from './test-tool';
-export { nodeSchemaIntrospectionToolTemplate } from './docs-node-schema';
-export { blueprintExamplesToolTemplate } from './docs-blueprint-examples';
 export { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
 export { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
 export { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
@@ -41,10 +41,10 @@ import { toolListToolTemplate } from './list-tools';
 import { toolGetToolTemplate } from './get-tool';
 import { toolOpenToolTemplate } from './open-tool';
 import { toolEditToolTemplate } from './edit-tool';
+import { docsSearchToolTemplate } from './search-docs';
+import { docsGetDocToolTemplate } from './get-doc';
 import { blueprintLintToolTemplate } from './test-tool-blueprint';
 import { toolTestToolTemplate } from './test-tool';
-import { nodeSchemaIntrospectionToolTemplate } from './docs-node-schema';
-import { blueprintExamplesToolTemplate } from './docs-blueprint-examples';
 import { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
 import { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
 import { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
@@ -70,10 +70,10 @@ export const ALL_TOOL_TEMPLATES = [
   toolGetToolTemplate,
   toolOpenToolTemplate,
   toolEditToolTemplate,
+  docsSearchToolTemplate,
+  docsGetDocToolTemplate,
   blueprintLintToolTemplate,
   toolTestToolTemplate,
-  nodeSchemaIntrospectionToolTemplate,
-  blueprintExamplesToolTemplate,
   toolAddBlueprintNodeToolTemplate,
   toolAddBlueprintEdgeToolTemplate,
   toolEditBlueprintNodeToolTemplate,

@@ -69,42 +69,45 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Build URL, headers and partial body for tool update',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-            if (!input.slug) {
-              throw new Error('slug is required');
-            }
-
-            // Build partial update body with only provided and non-empty fields
-            const body = {};
-            if (typeof input.name === 'string' && input.name.trim().length > 0) body.name = input.name.trim();
-            if (typeof input.description === 'string' && input.description.trim().length > 0) body.description = input.description.trim();
-            if (input.parameters && typeof input.parameters === 'object' && Object.keys(input.parameters).length > 0) body.parameters = input.parameters;
-            if (input.blueprint && typeof input.blueprint === 'object') {
-              const hasNodes = Array.isArray(input.blueprint.nodes) && input.blueprint.nodes.length > 0;
-              const hasEdges = Array.isArray(input.blueprint.edges) && input.blueprint.edges.length > 0;
-              if (hasNodes || hasEdges) body.blueprint = input.blueprint;
-            }
-
-            if (Object.keys(body).length === 0) {
-              throw new Error('At least one field must be provided for update');
-            }
-
-            return {
-              baseUrl,
-              starshipId,
-              slug: input.slug,
-              body,
-              headers: {
-                'Authorization': 'Bearer ' + authToken,
-                'Content-Type': 'application/json'
+              const input = ctx.$input || {};
+              if (!input.slug) {
+                throw new Error('slug is required');
               }
-            };
+
+              // Build partial update body with only provided and non-empty fields
+              const body = {};
+              if (typeof input.name === 'string' && input.name.trim().length > 0) body.name = input.name.trim();
+              if (typeof input.description === 'string' && input.description.trim().length > 0) body.description = input.description.trim();
+              if (input.parameters && typeof input.parameters === 'object' && Object.keys(input.parameters).length > 0) body.parameters = input.parameters;
+              if (input.blueprint && typeof input.blueprint === 'object') {
+                const hasNodes = Array.isArray(input.blueprint.nodes) && input.blueprint.nodes.length > 0;
+                const hasEdges = Array.isArray(input.blueprint.edges) && input.blueprint.edges.length > 0;
+                if (hasNodes || hasEdges) body.blueprint = input.blueprint;
+              }
+
+              if (Object.keys(body).length === 0) {
+                throw new Error('At least one field must be provided for update');
+              }
+
+              return {
+                baseUrl,
+                starshipId,
+                slug: input.slug,
+                body,
+                headers: {
+                  'Authorization': 'Bearer ' + authToken,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -128,21 +131,23 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Extract tool ID and prepare PUT request',
         parameters: {
           code: `
-            const fetchResponse = $lastOutputOf('fetch_tool')[0]?.json ?? {};
-            const toolData = fetchResponse.body?.data || fetchResponse.body;
+            async function main(ctx) {
+              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const toolData = fetchResponse.body?.data || fetchResponse.body;
 
-            if (!toolData || !toolData.id) {
-              throw new Error('Failed to resolve tool by slug');
+              if (!toolData || !toolData.id) {
+                throw new Error('Failed to resolve tool by slug');
+              }
+
+              const prep = ctx.$lastOutputOf('prepare')[0].json;
+
+              return {
+                url: prep.baseUrl + '/tools/' + toolData.id,
+                method: 'PUT',
+                headers: prep.headers,
+                body: prep.body
+              };
             }
-
-            const ctx = $lastOutputOf('prepare')[0].json;
-
-            return {
-              url: ctx.baseUrl + '/tools/' + toolData.id,
-              method: 'PUT',
-              headers: ctx.headers,
-              body: ctx.body
-            };
           `,
           timeout: 3000,
         },

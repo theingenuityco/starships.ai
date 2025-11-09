@@ -96,46 +96,49 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Build URL, headers and partial body for agent update',
         parameters: {
           code: `
-            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
-            if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = env('AUTH_TOKEN');
-            const starshipId = env('STARSHIP_ID');
-            if (!authToken) throw new Error('authToken is required');
-            if (!starshipId) throw new Error('starshipId is required');
+            async function main(ctx) {
+              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              if (!baseUrl) throw new Error('BASE_URL is required');
+              const authToken = ctx.$env('AUTH_TOKEN');
+              const starshipId = ctx.$env('STARSHIP_ID');
+              if (!authToken) throw new Error('AUTH_TOKEN is required');
+              if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-            if (!input.slug) {
-              throw new Error('slug is required');
-            }
-
-            // Build partial update body with only provided fields
-            const body = {};
-            if (input.name !== undefined) body.name = input.name;
-            if (input.description !== undefined) body.description = input.description;
-            if (input.model !== undefined) body.model = input.model;
-            if (input.systemPrompt !== undefined) body.systemPrompt = input.systemPrompt;
-            if (input.temperature !== undefined) body.temperature = input.temperature;
-            if (input.maxTokens !== undefined) body.maxTokens = input.maxTokens;
-            if (input.blueprint !== undefined) body.blueprint = input.blueprint;
-            if (input.timeout !== undefined) body.timeout = input.timeout;
-            if (Array.isArray(input.previewPrompts)) {
-              const prompts = input.previewPrompts.filter(p => typeof p === 'string' && p.trim()).slice(0, 10);
-              body.previewPrompts = prompts;
-            }
-
-            if (Object.keys(body).length === 0) {
-              throw new Error('At least one field must be provided for update');
-            }
-
-            return {
-              baseUrl: baseUrl,
-              starshipId: starshipId,
-              slug: input.slug,
-              body: body,
-              headers: {
-                'Authorization': 'Bearer ' + authToken,
-                'Content-Type': 'application/json'
+              const input = ctx.$input || {};
+              if (!input.slug) {
+                throw new Error('slug is required');
               }
-            };
+
+              // Build partial update body with only provided fields
+              const body = {};
+              if (input.name !== undefined) body.name = input.name;
+              if (input.description !== undefined) body.description = input.description;
+              if (input.model !== undefined) body.model = input.model;
+              if (input.systemPrompt !== undefined) body.systemPrompt = input.systemPrompt;
+              if (input.temperature !== undefined) body.temperature = input.temperature;
+              if (input.maxTokens !== undefined) body.maxTokens = input.maxTokens;
+              if (input.blueprint !== undefined) body.blueprint = input.blueprint;
+              if (input.timeout !== undefined) body.timeout = input.timeout;
+              if (Array.isArray(input.previewPrompts)) {
+                const prompts = input.previewPrompts.filter(p => typeof p === 'string' && p.trim()).slice(0, 10);
+                body.previewPrompts = prompts;
+              }
+
+              if (Object.keys(body).length === 0) {
+                throw new Error('At least one field must be provided for update');
+              }
+
+              return {
+                baseUrl: baseUrl,
+                starshipId: starshipId,
+                slug: input.slug,
+                body: body,
+                headers: {
+                  'Authorization': 'Bearer ' + authToken,
+                  'Content-Type': 'application/json'
+                }
+              };
+            }
           `,
           timeout: 3000,
         },
@@ -159,21 +162,23 @@ Automatically inferred from agent state (do not pass manually):
         description: 'Extract agent ID and prepare PUT request',
         parameters: {
           code: `
-            const fetchResponse = $lastOutputOf('fetch_agent')[0]?.json ?? {};
-            const agentData = fetchResponse.body?.data || fetchResponse.body;
+            async function main(ctx) {
+              const fetchResponse = ctx.$lastOutputOf('fetch_agent')[0]?.json ?? {};
+              const agentData = fetchResponse.body?.data || fetchResponse.body;
 
-            if (!agentData || !agentData.id) {
-              throw new Error('Failed to resolve agent by slug');
+              if (!agentData || !agentData.id) {
+                throw new Error('Failed to resolve agent by slug');
+              }
+
+              const prep = ctx.$lastOutputOf('prepare')[0].json;
+
+              return {
+                url: prep.baseUrl + '/agents/' + agentData.id,
+                method: 'PUT',
+                headers: prep.headers,
+                body: prep.body
+              };
             }
-
-            const ctx = $lastOutputOf('prepare')[0].json;
-
-            return {
-              url: ctx.baseUrl + '/agents/' + agentData.id,
-              method: 'PUT',
-              headers: ctx.headers,
-              body: ctx.body
-            };
           `,
           timeout: 3000,
         },

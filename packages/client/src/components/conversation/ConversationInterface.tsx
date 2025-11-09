@@ -355,6 +355,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
+    // If user has ever set any agent (including via @mention), don't override
+    if (hasEverSetAnyAgentRef.current) {
+      return
+    }
+
     // If URL provided an initial agent, don't apply fallback
     if (initialAgentId) {
       return
@@ -388,7 +393,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent, currentConversationId])
+    // CRITICAL: currentConversationId is NOT in dependencies to prevent re-running when conversation is created
+    // We check it in the effect body instead
+  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
 
   // Keep guard ref in sync with agent changes
   useEffect(() => {

@@ -381,14 +381,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
-<<<<<<< HEAD
     // ALSO check the external prop to catch race conditions
     if (externalConversationId) {
       return
     }
 
-=======
->>>>>>> c8ac10f7d58b7597a9d3e12a2b9a8b1bbfdef6c5
     // Wait for agents to load
     if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) {
       return
@@ -406,15 +403,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       setSelectedAgentWithLogging(fallback)
     }
-<<<<<<< HEAD
     // CRITICAL: currentConversationId and externalConversationId are NOT in dependencies
     // to prevent re-running when conversation is created or URL changes
     // We check them in the effect body instead
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
-=======
-  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent, currentConversationId])
->>>>>>> c8ac10f7d58b7597a9d3e12a2b9a8b1bbfdef6c5
 
   // Keep guard ref in sync with agent changes
   useEffect(() => {

@@ -705,6 +705,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Skip if no messages yet or count hasn't changed (avoid processing same data)
       if (messageCount === 0) return
 
+      // CRITICAL: Don't override user's agent selection if they just made a choice
+      // This prevents race conditions where messages load before user's selection is processed
+      if (userSelectedAgentRef.current) {
+        // User recently selected an agent - don't override from messages yet
+        // Update count tracker but skip restoration
+        conversationMessageCountRef.current[currentConversationId] = messageCount
+        return
+      }
+
       // Update the count tracker
       conversationMessageCountRef.current[currentConversationId] = messageCount
 
@@ -722,12 +731,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             hasEverSetAnyAgentRef.current = true
             // Update the store so it's remembered for this conversation
             setConversationAgentStore(currentConversationId, messageAgent.id, messageAgent.name)
-            // Reset user selection flag so messages remain authoritative
-            userSelectedAgentRef.current = false
           }
         }
       }
-    }, [liveMessages, currentConversationId, starshipAgentsData, selectedAgent])
+    }, [liveMessages, currentConversationId, starshipAgentsData, selectedAgent, setConversationAgentStore])
 
     // Focus input when streaming transitions from true -> false
     useEffect(() => {

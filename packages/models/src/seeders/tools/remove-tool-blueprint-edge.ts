@@ -43,7 +43,7 @@ export const blueprintRemoveEdgeTool: ToolParams = {
               if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];
               if (!Array.isArray(blueprint.edges)) blueprint.edges = [];
               const edgeRef = ctx.$lastOutputOf('prepare')[0].json.edgeRef;
-              const edgeIndex = blueprint.edges.findIndex((e: any) => e?.ref === edgeRef);
+              const edgeIndex = blueprint.edges.findIndex((e) => e?.ref === edgeRef);
               if (edgeIndex === -1) return { success: false, error: \`Edge not found: \${edgeRef}\`, toolData };
               const removedEdge = blueprint.edges[edgeIndex];
               blueprint.edges.splice(edgeIndex, 1);

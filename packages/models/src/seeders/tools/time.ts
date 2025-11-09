@@ -35,46 +35,48 @@ export const timeTool: ToolParams = {
         description: 'Generate current time with timezone and format options',
         parameters: {
           code: `
-            const now = new Date();
-            const timezone = input.timezone || 'UTC';
-            const format = input.format || 'ISO';
-            
-            let result;
-            
-            try {
-              switch (format) {
-                case 'ISO':
-                  if (timezone === 'UTC') {
-                    result = now.toISOString();
-                  } else {
-                    // For non-UTC, convert to locale string then back to ISO-like format
-                    const localeString = now.toLocaleString('en-US', { timeZone: timezone });
-                    result = new Date(localeString).toISOString();
-                  }
-                  break;
-                  
-                case 'locale':
-                  result = timezone === 'UTC'
-                    ? now.toUTCString()
-                    : now.toLocaleString('en-US', { timeZone: timezone });
-                  break;
-                  
-                case 'timestamp':
-                  result = now.getTime();
-                  break;
-                  
-                default:
-                  result = now.toISOString();
-              }
+            async function main(ctx) {
+              const now = new Date();
+              const timezone = (ctx.$input && ctx.$input.timezone) || 'UTC';
+              const format = (ctx.$input && ctx.$input.format) || 'ISO';
               
-              return {
-                currentTime: result,
-                timezone: timezone,
-                format: format,
-                timestamp: now.getTime()
-              };
-            } catch (error) {
-              throw new Error('Error generating time: ' + error.message);
+              let result;
+              
+              try {
+                switch (format) {
+                  case 'ISO':
+                    if (timezone === 'UTC') {
+                      result = now.toISOString();
+                    } else {
+                      // For non-UTC, convert to locale string then back to ISO-like format
+                      const localeString = now.toLocaleString('en-US', { timeZone: timezone });
+                      result = new Date(localeString).toISOString();
+                    }
+                    break;
+                    
+                  case 'locale':
+                    result = timezone === 'UTC'
+                      ? now.toUTCString()
+                      : now.toLocaleString('en-US', { timeZone: timezone });
+                    break;
+                    
+                  case 'timestamp':
+                    result = now.getTime();
+                    break;
+                    
+                  default:
+                    result = now.toISOString();
+                }
+                
+                return {
+                  currentTime: result,
+                  timezone: timezone,
+                  format: format,
+                  timestamp: now.getTime()
+                };
+              } catch (error) {
+                throw new Error('Error generating time: ' + ((error && error.message) || String(error)));
+              }
             }
           `,
           timeout: 3000,

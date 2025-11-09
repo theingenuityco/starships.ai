@@ -198,6 +198,25 @@ The engine supports two string evaluation modes:
 "API: {{ env('URL') }}/data"; // → "API: https://api.example.com/data"
 ```
 
+## Common mistakes and how to fix them
+
+- Partial templates in full-only contexts
+  - Problem: `"Hello {{ name }}"` does not evaluate when the engine uses full-only mode (most parameter and inline contexts).
+  - Fix: Make the entire value a single template that returns the final string:
+    - Correct: `"{{ \`Hello \${$input('name')}\` }}"`
+
+- “Nested eval” attempts
+  - Problem: Writing `{{ "{{ state.x }}" }}` expecting double evaluation.
+  - Fix: Avoid nesting. Evaluate once with the desired final value:
+    - Correct: `"{{ String(state.x) }}"`
+  - If you intend to carry a literal `{{ ... }}` for a nested blueprint, put the nested definition under a `blueprint` key (or `tools[].blueprint`); the engine protects these from evaluation automatically.
+
+- Mixing literals with templates for Transform/Conditional
+  - Problem: Using partial templates inside `transform.value`, `transform.from`, or `condition`.
+  - Fix: Return the desired value with a single expression:
+    - Example (Transform value): `"{{ $input('user.first') + ' ' + $input('user.last') }}"`
+    - Example (Condition): `"{{ state.retryCount < 3 ? 'retry' : 'stop' }}"`
+
 ## Blueprint-Safe Evaluation
 
 The engine automatically detects and protects blueprint-like objects to prevent cross-scope evaluation:

@@ -46,8 +46,7 @@ describe('State Management Features', () => {
             parameters: {
               reducers: [
                 {
-                  code:
-                    "(state, ctx) => ({ ...state, userId: 'user-123', sessionStart: new Date().toISOString(), counter: 0 })",
+                  code: "(state, ctx) => ({ ...state, userId: 'user-123', sessionStart: new Date().toISOString(), counter: 0 })",
                 },
               ],
             },
@@ -58,10 +57,10 @@ describe('State Management Features', () => {
             name: 'API Call',
             description: 'Make HTTP request with dynamic parameters',
             parameters: {
-              url: 'https://api.example.com/users/{{ state.userId }}',
+              url: '{{ `https://api.example.com/users/${state.userId}` }}',
               method: 'POST',
               headers: {
-                Authorization: 'Bearer {{ state.apiToken }}',
+                Authorization: '{{ `Bearer ${state.apiToken}` }}',
                 'Content-Type': 'application/json',
               },
               body: {
@@ -71,8 +70,7 @@ describe('State Management Features', () => {
               },
               reducers: [
                 {
-                  code:
-                    '(state, ctx) => { const history = Array.isArray(state.apiCallHistory) ? state.apiCallHistory.slice() : []; history.push({ url: state.userId, timestamp: new Date().toISOString() }); return { ...state, counter: (state.counter ?? 0) + 1, lastApiCall: new Date().toISOString(), apiCallHistory: history }; }',
+                  code: '(state, ctx) => { const history = Array.isArray(state.apiCallHistory) ? state.apiCallHistory.slice() : []; history.push({ url: state.userId, timestamp: new Date().toISOString() }); return { ...state, counter: (state.counter ?? 0) + 1, lastApiCall: new Date().toISOString(), apiCallHistory: history }; }',
                 },
               ],
             },
@@ -83,9 +81,7 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Complete workflow',
             parameters: {
-              reducers: [
-                { code: '(state) => ({ ...state, completedAt: new Date().toISOString(), totalCalls: state.counter })' },
-              ],
+              reducers: [{ code: '(state) => ({ ...state, completedAt: new Date().toISOString(), totalCalls: state.counter })' }],
             },
           },
         ],
@@ -132,9 +128,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize',
             parameters: {
-              reducers: [
-                { code: "(state) => ({ ...state, userTier: 'premium', requestCount: 5 })" },
-              ],
+              reducers: [{ code: "(state) => ({ ...state, userTier: 'premium', requestCount: 5 })" }],
             },
           },
           {
@@ -145,7 +139,9 @@ describe('State Management Features', () => {
             parameters: {
               condition: '{{ state.userTier === "premium" && state.requestCount > 3 }}',
               reducers: [
-                { code: '(state) => ({ ...state, conditionEvaluated: new Date().toISOString(), isPremiumUser: state.userTier === "premium" })' },
+                {
+                  code: '(state) => ({ ...state, conditionEvaluated: new Date().toISOString(), isPremiumUser: state.userTier === "premium" })',
+                },
               ],
             },
           },
@@ -155,11 +151,9 @@ describe('State Management Features', () => {
             name: 'Premium Action',
             description: 'Action for premium users',
             parameters: {
-              url: 'https://api.example.com/premium/{{ state.userTier }}',
+              url: '{{ `https://api.example.com/premium/${state.userTier}` }}',
               method: 'GET',
-              reducers: [
-                { code: "(state) => ({ ...state, premiumActionExecuted: true, executionPath: 'premium' })" },
-              ],
+              reducers: [{ code: "(state) => ({ ...state, premiumActionExecuted: true, executionPath: 'premium' })" }],
             },
           },
           {
@@ -170,9 +164,7 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/standard',
               method: 'GET',
-              reducers: [
-                { code: "(state) => ({ ...state, standardActionExecuted: true, executionPath: 'standard' })" },
-              ],
+              reducers: [{ code: "(state) => ({ ...state, standardActionExecuted: true, executionPath: 'standard' })" }],
             },
           },
           {
@@ -314,8 +306,7 @@ describe('State Management Features', () => {
             parameters: {
               reducers: [
                 {
-                  code:
-                    '(state) => ({ ...state, metrics: { requests: 0, errors: 0, successRate: 0 }, userSessions: [], startTime: new Date().toISOString() })',
+                  code: '(state) => ({ ...state, metrics: { requests: 0, errors: 0, successRate: 0 }, userSessions: [], startTime: new Date().toISOString() })',
                 },
               ],
             },
@@ -334,8 +325,7 @@ describe('State Management Features', () => {
               },
               reducers: [
                 {
-                  code:
-                    "(state) => { const metrics = { ...(state.metrics || { requests: 0, errors: 0, successRate: 0 }) }; metrics.requests = (metrics.requests ?? 0) + 1; const userSessions = Array.isArray(state.userSessions) ? state.userSessions.slice() : []; userSessions.push({ id: Math.random(), timestamp: new Date().toISOString() }); metrics.successRate = metrics.requests > 0 ? ((metrics.requests) - (metrics.errors ?? 0)) / (metrics.requests) : 0; const executionHistory = Array.isArray(state.executionHistory) ? state.executionHistory.slice() : []; executionHistory.push({ node: 'process-data', timestamp: new Date().toISOString(), success: true }); return { ...state, metrics, userSessions, executionHistory }; }",
+                  code: "(state) => { const metrics = { ...(state.metrics || { requests: 0, errors: 0, successRate: 0 }) }; metrics.requests = (metrics.requests ?? 0) + 1; const userSessions = Array.isArray(state.userSessions) ? state.userSessions.slice() : []; userSessions.push({ id: Math.random(), timestamp: new Date().toISOString() }); metrics.successRate = metrics.requests > 0 ? ((metrics.requests) - (metrics.errors ?? 0)) / (metrics.requests) : 0; const executionHistory = Array.isArray(state.executionHistory) ? state.executionHistory.slice() : []; executionHistory.push({ node: 'process-data', timestamp: new Date().toISOString(), success: true }); return { ...state, metrics, userSessions, executionHistory }; }",
                 },
               ],
             },
@@ -396,8 +386,7 @@ describe('State Management Features', () => {
             parameters: {
               reducers: [
                 {
-                  code:
-                    "(state) => { const original = { name: 'updated', count: 5 }; const moved = [1,2,3,4]; const backup = { ...original }; return { ...state, original, backup, moved }; }",
+                  code: "(state) => { const original = { name: 'updated', count: 5 }; const moved = [1,2,3,4]; const backup = { ...original }; return { ...state, original, backup, moved }; }",
                 },
               ],
             },
@@ -409,7 +398,9 @@ describe('State Management Features', () => {
             description: 'Remove some data',
             parameters: {
               reducers: [
-                { code: '(state) => { const original = { ...(state.original || {}) }; delete original.count; return { ...state, original }; }' },
+                {
+                  code: '(state) => { const original = { ...(state.original || {}) }; delete original.count; return { ...state, original }; }',
+                },
               ],
             },
           },

@@ -39,52 +39,43 @@ export const duckduckgoTool: ToolParams = {
         description: 'Build DuckDuckGo API URL with query parameters',
         parameters: {
           code: `
-            // Extract and validate input parameters
-            const { query, skipDisambiguation = true } = input || {};
-            
-            // Input validation
-            if (!query || typeof query !== 'string') {
-              throw new Error('Query is required and must be a string');
-            }
-            
-            // Security: Length check
-            if (query.length > 200) {
-              throw new Error('Query too long - maximum 200 characters');
-            }
-            
-            // Security: Dangerous content check
-            const dangerous = ['<script', 'javascript:', 'onclick', 'onerror', '<iframe', 'document.', 'window.'];
-            const lowerQuery = query.toLowerCase();
-            for (let i = 0; i < dangerous.length; i++) {
-              if (lowerQuery.indexOf(dangerous[i]) !== -1) {
-                throw new Error('Query contains potentially dangerous content');
+            async function main(ctx) {
+              const { query, skipDisambiguation = true } = (ctx.$input || {});
+              if (!query || typeof query !== 'string') {
+                throw new Error('Query is required and must be a string');
               }
-            }
-            
-            // Manual URL parameter building (URLSearchParams not available in code node)
-            const params = [];
-            params.push('q=' + encodeURIComponent(query));
-            params.push('format=json');
-            params.push('no_html=1');
-            params.push('skip_disambig=' + (skipDisambiguation ? '1' : '0'));
-            params.push('no_redirect=1');
-            
-            const url = 'https://api.duckduckgo.com/?' + params.join('&');
-            
-            return {
-              request: {
-                url: url,
-                method: 'GET',
-                headers: {
-                  'Accept': 'application/json',
-                  'User-Agent': 'StarshipsAI-ResearchAgent/1.0'
+              if (query.length > 200) {
+                throw new Error('Query too long - maximum 200 characters');
+              }
+              const dangerous = ['<script', 'javascript:', 'onclick', 'onerror', '<iframe', 'document.', 'window.'];
+              const lowerQuery = query.toLowerCase();
+              for (let i = 0; i < dangerous.length; i++) {
+                if (lowerQuery.indexOf(dangerous[i]) !== -1) {
+                  throw new Error('Query contains potentially dangerous content');
                 }
-              },
-              metadata: {
-                query: query,
-                timestamp: new Date().toISOString()
               }
-            };
+              const params = [];
+              params.push('q=' + encodeURIComponent(query));
+              params.push('format=json');
+              params.push('no_html=1');
+              params.push('skip_disambig=' + (skipDisambiguation ? '1' : '0'));
+              params.push('no_redirect=1');
+              const url = 'https://api.duckduckgo.com/?' + params.join('&');
+              return {
+                request: {
+                  url,
+                  method: 'GET',
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'StarshipsAI-ResearchAgent/1.0'
+                  }
+                },
+                metadata: {
+                  query,
+                  timestamp: new Date().toISOString()
+                }
+              };
+            }
           `,
           timeout: 5000,
           reducers: ["(state, ctx) => ({ ...state, duckduckgo_metadata: ctx.$lastOutputOf('prepare_request')[0].json.metadata })"],
@@ -109,31 +100,25 @@ export const duckduckgoTool: ToolParams = {
         description: 'Combine request metadata with HTTP response',
         parameters: {
           code: `
-            // Get the HTTP response from the previous node - it's the direct input
-            const httpResponse = input || {};
-            
-            // Get metadata from state (stored by prepare_request)
-            const metadata = state.duckduckgo_metadata || {};
-            
-            // Parse the response body if it's a string
-            let parsedBody = httpResponse.body;
-            if (typeof httpResponse.body === 'string') {
-              try {
-                parsedBody = JSON.parse(httpResponse.body);
-              } catch (e) {
-                console.error('Failed to parse DuckDuckGo response as JSON');
-                parsedBody = {};
+            async function main(ctx) {
+              const httpResponse = ctx.$input || {};
+              const metadata = (ctx.$state && ctx.$state.duckduckgo_metadata) || {};
+              let parsedBody = httpResponse.body;
+              if (typeof parsedBody === 'string') {
+                try {
+                  parsedBody = JSON.parse(parsedBody);
+                } catch (e) {
+                  parsedBody = {};
+                }
               }
+              return {
+                httpResponse: {
+                  ...(httpResponse),
+                  body: parsedBody
+                },
+                metadata
+              };
             }
-            
-            // Pass parsed response and metadata to next node
-            return {
-              httpResponse: {
-                ...httpResponse,
-                body: parsedBody
-              },
-              metadata: metadata
-            };
           `,
           timeout: 5000,
         },
@@ -145,165 +130,135 @@ export const duckduckgoTool: ToolParams = {
         description: 'Parse and structure DuckDuckGo API response',
         parameters: {
           code: `
-            // Input now contains both httpResponse and metadata
-            const { httpResponse, metadata } = input || {};
-            const data = httpResponse?.body || {};
-            const { query, timestamp } = metadata || {};
-            
-            try {
-              // Initialize result structure
-              const result = {
-                query: query || '',
-                timestamp: timestamp || new Date().toISOString(),
-                responseType: 'none',
-                found: false,
-                data: {}
-              };
-              
-              // Check for Abstract (topic summary)
-            if (data.Abstract && data.Abstract.length > 0) {
-              result.responseType = 'abstract';
-              result.found = true;
-              result.data = {
-                abstract: {
-                  text: data.AbstractText || data.Abstract,
-                  source: data.AbstractSource || null,
-                  url: data.AbstractURL || null,
-                  heading: data.Heading || null,
-                  image: data.Image || null
+            async function main(ctx) {
+              const packed = (ctx.$input || {});
+              const httpResponse = packed.httpResponse || {};
+              const metadata = packed.metadata || {};
+              const data = httpResponse.body || {};
+              const { query, timestamp } = metadata || {};
+              try {
+                const result = {
+                  query: query || '',
+                  timestamp: timestamp || new Date().toISOString(),
+                  responseType: 'none',
+                  found: false,
+                  data: {}
+                };
+                if (data.Abstract && data.Abstract.length > 0) {
+                  result.responseType = 'abstract';
+                  result.found = true;
+                  result.data = {
+                    abstract: {
+                      text: data.AbstractText || data.Abstract,
+                      source: data.AbstractSource || null,
+                      url: data.AbstractURL || null,
+                      heading: data.Heading || null,
+                      image: data.Image || null
+                    }
+                  };
                 }
-              };
-            }
-            
-            // Check for Definition
-            if (data.Definition && data.Definition.length > 0) {
-              result.responseType = result.responseType === 'none' ? 'definition' : 'mixed';
-              result.found = true;
-              result.data.definition = {
-                text: data.Definition,
-                source: data.DefinitionSource || null,
-                url: data.DefinitionURL || null
-              };
-            }
-            
-            // Check for Answer (instant answer - calculations, conversions, etc.)
-            if (data.Answer && data.Answer.length > 0) {
-              result.responseType = result.responseType === 'none' ? 'answer' : 'mixed';
-              result.found = true;
-              result.data.answer = {
-                text: data.Answer,
-                type: data.AnswerType || 'instant',
-                // Extract numeric value if present (for calculations)
-                value: data.Answer.match(/[0-9,.-]+/) ? 
-                  parseFloat(data.Answer.match(/[0-9,.-]+/)[0].replace(/,/g, '')) : null
-              };
-            }
-            
-            // Check for Infobox (structured data)
-            if (data.Infobox && data.Infobox.content && data.Infobox.content.length > 0) {
-              result.responseType = result.responseType === 'none' ? 'infobox' : 'mixed';
-              result.found = true;
-              
-              // Process infobox content into key-value pairs
-              const infoboxData = {};
-              data.Infobox.content.forEach(item => {
-                if (item.label && item.value) {
-                  // Clean up the label to be a valid key
-                  const key = item.label
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, '_')
-                    .replace(/_+/g, '_')
-                    .replace(/^_|_$/g, '');
-                  infoboxData[key] = item.value;
+                if (data.Definition && data.Definition.length > 0) {
+                  result.responseType = result.responseType === 'none' ? 'definition' : 'mixed';
+                  result.found = true;
+                  result.data.definition = {
+                    text: data.Definition,
+                    source: data.DefinitionSource || null,
+                    url: data.DefinitionURL || null
+                  };
                 }
-              });
-              
-              result.data.infobox = {
-                data: infoboxData,
-                meta: data.Infobox.meta || []
-              };
-            }
-            
-            // Check for Related Topics
-            if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-              const topics = [];
-              
-              data.RelatedTopics.forEach(topic => {
-                if (topic.Text) {
-                  // Direct topic
-                  topics.push({
-                    text: topic.Text,
-                    url: topic.FirstURL || null,
-                    icon: topic.Icon ? topic.Icon.URL : null
+                if (data.Answer && data.Answer.length > 0) {
+                  result.responseType = result.responseType === 'none' ? 'answer' : 'mixed';
+                  result.found = true;
+                  result.data.answer = {
+                    text: data.Answer,
+                    type: data.AnswerType || 'instant',
+                    value: data.Answer.match(/[0-9,.-]+/) ? parseFloat(data.Answer.match(/[0-9,.-]+/)[0].replace(/,/g, '')) : null
+                  };
+                }
+                if (data.Infobox && data.Infobox.content && data.Infobox.content.length > 0) {
+                  result.responseType = result.responseType === 'none' ? 'infobox' : 'mixed';
+                  result.found = true;
+                  const infoboxData = {};
+                  data.Infobox.content.forEach((item) => {
+                    if (item.label && item.value) {
+                      const key = item.label
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]/g, '_')
+                        .replace(/_+/g, '_')
+                        .replace(/^_|_$/g, '');
+                      infoboxData[key] = item.value;
+                    }
                   });
-                } else if (topic.Topics && Array.isArray(topic.Topics)) {
-                  // Grouped topics
-                  topic.Topics.forEach(subtopic => {
-                    if (subtopic.Text) {
+                  result.data.infobox = {
+                    data: infoboxData,
+                    meta: data.Infobox.meta || []
+                  };
+                }
+                if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+                  const topics = [];
+                  data.RelatedTopics.forEach((topic) => {
+                    if (topic.Text) {
                       topics.push({
-                        text: subtopic.Text,
-                        url: subtopic.FirstURL || null,
-                        icon: subtopic.Icon ? subtopic.Icon.URL : null,
-                        category: topic.Name || null
+                        text: topic.Text,
+                        url: topic.FirstURL || null,
+                        icon: topic.Icon ? topic.Icon.URL : null
+                      });
+                    } else if (topic.Topics && Array.isArray(topic.Topics)) {
+                      topic.Topics.forEach((subtopic) => {
+                        if (subtopic.Text) {
+                          topics.push({
+                            text: subtopic.Text,
+                            url: subtopic.FirstURL || null,
+                            icon: subtopic.Icon ? subtopic.Icon.URL : null,
+                            category: topic.Name || null
+                          });
+                        }
                       });
                     }
                   });
+                  if (topics.length > 0) {
+                    result.data.relatedTopics = topics.slice(0, 5);
+                  }
                 }
-              });
-              
-              if (topics.length > 0) {
-                result.data.relatedTopics = topics.slice(0, 5); // Limit to 5 topics
+                if (data.Results && data.Results.length > 0) {
+                  result.data.webResults = data.Results.map((r) => ({
+                    text: r.Text || '',
+                    url: r.FirstURL || null,
+                    icon: r.Icon ? r.Icon.URL : null
+                  })).slice(0, 3);
+                }
+                if (data.Type === 'D') {
+                  result.responseType = 'disambiguation';
+                  result.data.disambiguation = {
+                    options: result.data.relatedTopics || [],
+                    message: 'Multiple meanings found. Please be more specific.'
+                  };
+                }
+                if (!result.found) {
+                  result.responseType = 'no_results';
+                  result.data = {
+                    message: 'No instant answers found for this query',
+                    suggestion: 'Try rephrasing your question or search for more specific terms'
+                  };
+                }
+                result.metadata = {
+                  api: 'DuckDuckGo Instant Answer API',
+                  responseTime: new Date().toISOString(),
+                  redirect: data.Redirect || null,
+                  type: data.Type || null
+                };
+                return result;
+              } catch (error) {
+                return {
+                  query: query || '',
+                  timestamp: timestamp || new Date().toISOString(),
+                  responseType: 'error',
+                  found: false,
+                  error: (error && error.message) || 'Error processing DuckDuckGo response',
+                  type: 'processing_error'
+                };
               }
             }
-            
-            // Check for Results (general web results - rarely populated in instant API)
-            if (data.Results && data.Results.length > 0) {
-              result.data.webResults = data.Results.map(r => ({
-                text: r.Text || '',
-                url: r.FirstURL || null,
-                icon: r.Icon ? r.Icon.URL : null
-              })).slice(0, 3); // Limit to 3 results
-            }
-            
-            // Handle disambiguation
-            if (data.Type === 'D') {
-              result.responseType = 'disambiguation';
-              result.data.disambiguation = {
-                options: result.data.relatedTopics || [],
-                message: 'Multiple meanings found. Please be more specific.'
-              };
-            }
-            
-            // Handle no results
-            if (!result.found) {
-              result.responseType = 'no_results';
-              result.data = {
-                message: 'No instant answers found for this query',
-                suggestion: 'Try rephrasing your question or search for more specific terms'
-              };
-            }
-            
-            // Add metadata
-            result.metadata = {
-              api: 'DuckDuckGo Instant Answer API',
-              responseTime: new Date().toISOString(),
-              redirect: data.Redirect || null,
-              type: data.Type || null
-            };
-            
-            return result;
-            
-          } catch (error) {
-            // Return error response
-            return {
-              query: query || '',
-              timestamp: timestamp || new Date().toISOString(),
-              responseType: 'error',
-              found: false,
-              error: error.message || 'Error processing DuckDuckGo response',
-              type: 'processing_error'
-            };
-          }
           `,
           timeout: 5000,
         },

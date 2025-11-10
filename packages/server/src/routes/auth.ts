@@ -46,13 +46,15 @@ const OAuthCallbackSchema = z.object({
 });
 
 // Zod schema for setting password
-const SetPasswordSchema = z.object({
-  newPassword: PasswordSchema,
-  confirmPassword: z.string().min(1, 'Password confirmation is required'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
+const SetPasswordSchema = z
+  .object({
+    newPassword: PasswordSchema,
+    confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 // Zod schema for email verification
 const EmailVerificationSchema = z.object({
@@ -64,14 +66,19 @@ const ForgotPasswordSchema = z.object({
   email: EmailSchema,
 });
 
-const ResetPasswordSchema = z.object({
-  token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
-  newPassword: PasswordSchema,
-  confirmPassword: z.string().min(1, 'Password confirmation is required'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
+const ResetPasswordSchema = z
+  .object({
+    token: z
+      .string()
+      .length(64, 'Invalid token format')
+      .regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+    newPassword: PasswordSchema,
+    confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 /**
  * Register new user
@@ -439,7 +446,11 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('[EMAIL-CHANGE-VERIFY] Error:', { error });
     const env = getEnvConfig();
-    return res.redirect(`${env.PUBLIC_URL}/login?emailChange=error`);
+    const params = new URLSearchParams({
+      emailChange: 'error',
+      logout: 'true',
+    });
+    return res.redirect(`${env.PUBLIC_URL}/login?${params.toString()}`);
   }
 });
 
@@ -697,7 +708,6 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     handleError(error, res, 'Setting password failed');
   }
 });
-
 
 /**
  * Get user authentication methods

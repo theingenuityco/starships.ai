@@ -36,7 +36,7 @@ function LoginContent() {
 
   const logoutParam = searchParams?.get('logout')
   const expectedEmail = searchParams?.get('expectedEmail')
-  const logoutTriggeredRef = React.useRef(false)
+  const forcedLogoutRef = React.useRef(false)
 
   // Redirect authenticated users to their starship (skip while forced logout is pending)
   React.useEffect(() => {
@@ -44,18 +44,22 @@ function LoginContent() {
       return
     }
     if (isAuthenticated) {
-      if ((logoutParam === 'true' || expectedEmail) && !logoutTriggeredRef.current) {
-        logoutTriggeredRef.current = true
-        logout().finally(() => {
-          logoutTriggeredRef.current = false
-          if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search)
-            params.delete('logout')
-            const query = params.toString()
-            const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
-            window.history.replaceState(null, '', newUrl)
+      if ((logoutParam === 'true' || expectedEmail) && !forcedLogoutRef.current) {
+        forcedLogoutRef.current = true
+        ;(async () => {
+          try {
+            await logout()
+          } finally {
+            forcedLogoutRef.current = false
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search)
+              params.delete('logout')
+              const query = params.toString()
+              const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+              window.history.replaceState(null, '', newUrl)
+            }
           }
-        })
+        })()
         return
       }
 
@@ -75,7 +79,7 @@ function LoginContent() {
   }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout])
 
   // Show loading state while checking authentication or mounting
-  if (!mounted || isLoading || (isAuthenticated && starshipsLoading)) {
+  if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {
     return <AuthLoadingScreen message="Loading..." />
   }
 

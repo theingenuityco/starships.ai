@@ -39,7 +39,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  * JWT-based login and registration form
  */
 export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
+  const { login, register, oauthLogin, resendVerification, logout, isLoading } = useAuth()
   const searchParams = useSearchParams()
 
   // OAuth initiation function - uses relative URL like regular auth
@@ -76,6 +76,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
   const passwordResetToastShownRef = useRef(false)
   const emailVerificationToastShownRef = useRef(false)
   const emailChangeToastShownRef = useRef(false)
+  const logoutHandledRef = useRef(false)
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
@@ -91,11 +92,25 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       const resetSuccess = searchParams.get('reset')
       const emailChange = searchParams.get('emailChange')
       const expectedEmail = searchParams.get('expectedEmail')
+      const logoutParam = searchParams.get('logout')
 
       // Handle password reset success message
       if (resetSuccess === 'success' && !passwordResetToastShownRef.current) {
         passwordResetToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      if (logoutParam === 'true' && !logoutHandledRef.current) {
+        logoutHandledRef.current = true
+        logout().finally(() => {
+          if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search)
+            params.delete('logout')
+            const query = params.toString()
+            const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+            window.history.replaceState(null, '', newUrl)
+          }
+        })
       }
 
       if (emailChange === 'success' && expectedEmail && !emailChangeToastShownRef.current) {

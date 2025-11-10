@@ -425,7 +425,7 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
     } else {
       // User is not authenticated OR userId mismatch - redirect to login page with guidance
       const returnUrl = encodeURIComponent(`${profilePath}?emailChange=success`);
-      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}&emailChange=success&expectedEmail=${expectedEmailParam}`;
+      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}&emailChange=success&expectedEmail=${expectedEmailParam}&logout=true`;
     }
 
     return res.redirect(redirectPath);

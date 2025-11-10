@@ -34,8 +34,13 @@ function LoginContent() {
     setMounted(true)
   }, [])
 
-  // Redirect authenticated users to their starship
+  const logoutParam = searchParams?.get('logout')
+
+  // Redirect authenticated users to their starship (skip while forced logout is pending)
   React.useEffect(() => {
+    if (logoutParam === 'true') {
+      return
+    }
     if (mounted && isAuthenticated && !isLoading && !starshipsLoading) {
       // Handle redirect with returnUrl pattern
       const returnUrl = searchParams?.get('returnUrl')
@@ -50,7 +55,7 @@ function LoginContent() {
         router.push('/profile')
       }
     }
-  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams])
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam])
 
   // Show loading state while checking authentication or mounting
   if (!mounted || isLoading || (isAuthenticated && starshipsLoading)) {

@@ -1,23 +1,24 @@
 'use client'
 
 
-import React from 'react'
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAccountForm } from '@/hooks/useAccountForm'
 import { useAuth } from '@/hooks/useAuth'
-import { useState } from 'react'
 import AccountTopBar from './AccountTopBar'
 import ProfileOverviewCard from './ProfileOverviewCard'
 import AccountDetailsCard from './AccountDetailsCard'
 import SecurityCard from './SecurityCard'
 import { OAuthAccountsSettings } from './OAuthAccountsSettings'
 import { SetPasswordDialog } from './SetPasswordDialog'
-import DangerZoneCard from './DangerZoneCard'
 import ConfirmUpdateDialog from './ConfirmUpdateDialog'
 import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import AccountFormSkeleton from './AccountFormSkeleton'
+import SignOutSection from './SignOutSection'
 
 export default function AccountForm() {
-  const { hasPassword, authMethods, isOAuthOnly, userAvatar } = useAuth()
+  const router = useRouter()
+  const { hasPassword, authMethods, isOAuthOnly, userAvatar, logout } = useAuth()
   const [showSetPassword, setShowSetPassword] = useState(false)
   
   const {
@@ -66,8 +67,12 @@ export default function AccountForm() {
     <>
       <AccountTopBar dirty={dirty} saving={saving} onReset={onRevertAll} formId="account-form" />
 
-      <form id="account-form" onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 xl:gap-8">
-        <div className="lg:col-span-4">
+      <form
+        id="account-form"
+        onSubmit={onSave}
+        className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start"
+      >
+        <div className="space-y-6">
           <ProfileOverviewCard
             initials={initials}
             displayName={form.displayName || currentUser?.displayName}
@@ -76,9 +81,10 @@ export default function AccountForm() {
             profileImageUrl={userAvatar}
             onSelectEmoji={emoji => setForm(prev => ({ ...prev, avatar: emoji }))}
           />
+          <OAuthAccountsSettings />
         </div>
 
-        <div className="lg:col-span-8 space-y-6">
+        <div className="space-y-6">
           <AccountDetailsCard
             form={form}
             setForm={setForm}
@@ -103,10 +109,7 @@ export default function AccountForm() {
             onSetPassword={() => setShowSetPassword(true)}
           />
 
-          <OAuthAccountsSettings />
-
-          {/* TODO: Temporarily disabled - Delete account functionality */}
-          {/* <DangerZoneCard deleting={deleting} onDelete={onDelete} /> */}
+          <SignOutSection onSignOut={logout} onNavigateHome={() => router.push('/')} />
         </div>
       </form>
 

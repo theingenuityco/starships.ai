@@ -4,6 +4,7 @@ import * as Radix from '@radix-ui/react-icons'
 import { Icon as Iconify } from '@iconify/react'
 import * as Phosphor from 'phosphor-react'
 import { resolveIcon } from './iconMap'
+import type { ResolvedIcon } from './iconMap'
 
 type IconProps = {
   name: string
@@ -13,11 +14,12 @@ type IconProps = {
   strokeWidth?: number
   className?: string
   color?: string
+  iconOverride?: ResolvedIcon
   [key: string]: any
 }
 
-export function Icon({ name, label, size = 20, weight = 'regular', strokeWidth, className, color, ...rest }: IconProps) {
-  const resolved = resolveIcon(name)
+export function Icon({ name, label, size = 20, weight = 'regular', className, color, iconOverride, ...rest }: IconProps) {
+  const resolved = iconOverride ?? resolveIcon(name)
 
   if (resolved?.type === 'phosphor') {
     const P = (Phosphor as any)[resolved.component]

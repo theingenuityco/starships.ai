@@ -11,8 +11,6 @@ import ShipManagement from '@/components/profile/ShipManagement'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
-import { useAuth } from '@/hooks/useAuth'
-import SignOutSection from '@/components/profile/SignOutSection'
 
 const VALID_TABS = ['profile', 'usage', 'billing'] as const
 type TabValue = (typeof VALID_TABS)[number]
@@ -20,8 +18,6 @@ type TabValue = (typeof VALID_TABS)[number]
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
-  const { logout } = useAuth()
-
   const isValidTab = VALID_TABS.includes(tab as TabValue)
   const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'usage'
 
@@ -68,12 +64,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               <TabsContent value="profile">
                 <section aria-labelledby="profile-section" className="rounded-xl border border-border/80 bg-background p-6">
                   <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
-                      <AccountForm />
-                    </div>
-
-                    <SignOutSection onSignOut={logout} onNavigateHome={() => router.push('/')} />
+                    <AccountForm />
                   </div>
                 </section>
               </TabsContent>

@@ -39,7 +39,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  * JWT-based login and registration form
  */
 export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { login, register, oauthLogin, resendVerification, isLoading, error } = useAuth()
+  const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
   const searchParams = useSearchParams()
 
   // OAuth initiation function - uses relative URL like regular auth
@@ -75,6 +75,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
   // Track if success messages have been shown to prevent duplicates
   const passwordResetToastShownRef = useRef(false)
   const emailVerificationToastShownRef = useRef(false)
+  const emailChangeToastShownRef = useRef(false)
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
@@ -89,11 +90,23 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       const verification = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
       const emailChange = searchParams.get('emailChange')
-
+      const expectedEmail = searchParams.get('expectedEmail')
       // Handle password reset success message
       if (resetSuccess === 'success' && !passwordResetToastShownRef.current) {
         passwordResetToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      if (emailChange === 'success' && expectedEmail && !emailChangeToastShownRef.current) {
+        emailChangeToastShownRef.current = true
+        toast.success(`Email verified. Please sign in as ${expectedEmail} to continue.`)
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search)
+          params.delete('expectedEmail')
+          const query = params.toString()
+          const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+          window.history.replaceState(null, '', newUrl)
+        }
       }
 
       // Handle email verification success message
@@ -146,7 +159,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     }
 
     if (!result.success) {
-      setFormError(result.error || 'Login failed')
+      return
     }
   }
 
@@ -204,7 +217,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     }
 
     if (!result.success) {
-      setFormError(result.error || 'Registration failed')
+      return
     }
   }
 
@@ -302,9 +315,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </div>
                 </div>
 
-                {(formError || (error && !autoSwitchedToRegister)) && (
+                {formError && (
                   <Alert variant="destructive">
-                    <AlertDescription>{formError || error}</AlertDescription>
+                    <AlertDescription>{formError}</AlertDescription>
                   </Alert>
                 )}
 
@@ -420,9 +433,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </div>
                 </div>
 
-                {(formError || error) && (
+                {formError && (
                   <Alert variant="destructive">
-                    <AlertDescription>{formError || error}</AlertDescription>
+                    <AlertDescription>{formError}</AlertDescription>
                   </Alert>
                 )}
 

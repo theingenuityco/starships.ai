@@ -21,9 +21,9 @@ export default function SignOutSection({ onSignOut, onNavigateHome }: SignOutSec
   }
 
   return (
-    <Card className="shadow-sm border-border/50 bg-background/80">
+    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm shadow-sm">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-destructive">Sign Out</h3>
             <p className="text-sm text-muted-foreground">End your current session</p>
@@ -34,9 +34,6 @@ export default function SignOutSection({ onSignOut, onNavigateHome }: SignOutSec
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">You&apos;ll need to sign in again to access your starships.</p>
-      </CardContent>
     </Card>
   )
 }

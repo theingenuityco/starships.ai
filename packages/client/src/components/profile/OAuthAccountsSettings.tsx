@@ -6,6 +6,7 @@ import React, { useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { type ResolvedIcon, registerIcons } from '@/components/primitives/iconMap'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -83,12 +84,12 @@ function useUnlinkOAuthAccount() {
   })
 }
 
-const ProviderIcon = ({ provider }: { provider: 'google' | 'github' }) => {
-  if (provider === 'google') {
-    return <Icon name="chrome" className="h-4 w-4 text-blue-600" />
-  }
-  return <Icon name="github" className="h-4 w-4 text-gray-900 dark:text-gray-100" />
+const PROVIDER_ICON_MAP: Record<'google' | 'github', ResolvedIcon> = {
+  google: { type: 'iconify', icon: 'logos:google-icon' },
+  github: { type: 'iconify', icon: 'mdi:github' },
 }
+
+const ProviderIcon = ({ provider }: { provider: 'google' | 'github' }) => <Icon name={provider} size={18} className="text-foreground" iconOverride={PROVIDER_ICON_MAP[provider]} aria-hidden />
 
 const ProviderName = ({ provider }: { provider: 'google' | 'github' }) => {
   return provider === 'google' ? 'Google' : 'GitHub'
@@ -188,7 +189,7 @@ export function OAuthAccountsSettings() {
 
   if (isLoading) {
     return (
-      <Card className="border-border/60 bg-background/70 backdrop-blur-sm">
+      <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="text-base">Connected Accounts</CardTitle>
           <CardDescription>Loading your connected accounts...</CardDescription>
@@ -215,7 +216,7 @@ export function OAuthAccountsSettings() {
 
   if (error) {
     return (
-      <Card className="border-border/60 bg-background/70 backdrop-blur-sm">
+      <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="text-base">Connected Accounts</CardTitle>
           <CardDescription>Failed to load connected accounts</CardDescription>
@@ -230,16 +231,16 @@ export function OAuthAccountsSettings() {
   }
 
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
-          <Icon name="shield" className="h-4 w-4 text-primary" />
+          <Icon name="globe" className="h-4 w-4 text-primary" />
           Connected Accounts
         </CardTitle>
         <CardDescription className="text-sm">Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-1 flex-col gap-4">
         {(['google', 'github'] as const).map(provider => {
           const isLinked = getProviderStatus(provider)
           const account = getProviderAccount(provider)
@@ -252,7 +253,12 @@ export function OAuthAccountsSettings() {
               className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-muted/30">
+                  {isLinked && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-background bg-emerald-500 text-[9px] text-background">
+                      <Icon name="check" size={10} className="text-background" />
+                    </span>
+                  )}
                   <ProviderIcon provider={provider} />
                 </div>
                 <div className="space-y-1">
@@ -260,21 +266,8 @@ export function OAuthAccountsSettings() {
                     <p className="text-sm font-medium">
                       <ProviderName provider={provider} />
                     </p>
-                    {isLinked && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Icon name="check-circle" className="h-3 w-3 mr-1" />
-                        Connected
-                      </Badge>
-                    )}
                   </div>
-                  {isLinked && account ? (
-                    <p className="text-xs text-muted-foreground">
-                      {account.email}
-                      {account.profileData?.name && ` • ${account.profileData.name}`}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Not connected</p>
-                  )}
+                  {isLinked && account ? <p className="text-xs text-muted-foreground">{account.email}</p> : <p className="text-xs text-muted-foreground">Not connected</p>}
                 </div>
               </div>
 
@@ -294,13 +287,6 @@ export function OAuthAccountsSettings() {
             </motion.div>
           )
         })}
-
-        {accounts.length > 0 && (
-          <Alert>
-            <Icon name="shield" className="h-4 w-4" />
-            <AlertDescription>You can use any linked account to sign in securely. We only use these for authentication - no data access or actions are performed on your accounts.</AlertDescription>
-          </Alert>
-        )}
       </CardContent>
     </Card>
   )

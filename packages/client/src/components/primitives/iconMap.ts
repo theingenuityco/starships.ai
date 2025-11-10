@@ -129,6 +129,7 @@ const map: Record<string, ResolvedIcon> = {
   'help-circle': { type: 'phosphor', component: 'Question' },
   'shield-alert': { type: 'phosphor', component: 'ShieldWarning' },
   lifebuoy: { type: 'phosphor', component: 'Lifebuoy' },
+  'id-card': { type: 'phosphor', component: 'IdentificationCard' },
 
   // Animated affordances → Iconify line-md
   loading: { type: 'iconify', icon: 'line-md:loading-twotone-loop' },

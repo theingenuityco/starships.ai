@@ -33,6 +33,7 @@ export function EmailChangeToastHandler() {
 
     try {
       const emailChange = searchParams.get('emailChange')
+      const expectedEmail = searchParams.get('expectedEmail')
 
       // Handle email change success message
       if (emailChange === 'success' && !emailChangeToastShownRef.current) {
@@ -41,7 +42,12 @@ export function EmailChangeToastHandler() {
         
         // Use a small delay to ensure the page has fully loaded
         const timeoutId = setTimeout(() => {
-          toast.success('Email changed successfully!')
+          const message =
+            expectedEmail && expectedEmail.trim().length > 0
+              ? `Email changed successfully. Please sign in as ${expectedEmail}.`
+              : 'Email changed successfully!'
+
+          toast.success(message)
 
           // Refresh user data if user is authenticated
           if (userId) {
@@ -53,6 +59,7 @@ export function EmailChangeToastHandler() {
           setTimeout(() => {
             const newUrl = new URL(window.location.href)
             newUrl.searchParams.delete('emailChange')
+            newUrl.searchParams.delete('expectedEmail')
             const newPath = newUrl.pathname + (newUrl.search ? newUrl.search : '')
             router.replace(newPath, { scroll: false })
           }, 100)

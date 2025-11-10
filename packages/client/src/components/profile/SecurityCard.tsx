@@ -52,7 +52,7 @@ export default function SecurityCard({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   return (
-    <Card className="border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm h-fit">
+    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="shield" className="h-4 w-4 text-primary" />
@@ -61,7 +61,7 @@ export default function SecurityCard({
         <CardDescription className="text-sm">Manage your authentication methods and security settings.</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="flex flex-1 flex-col gap-6">
         {/* PASSWORD SECTION */}
         {hasPassword && (
           <div className="space-y-4">

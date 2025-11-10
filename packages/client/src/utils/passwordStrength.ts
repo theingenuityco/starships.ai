@@ -48,50 +48,42 @@ export function calculatePasswordStrength(password: string): PasswordStrength {
 
   const requirements = checkPasswordRequirements(password);
   const feedback: string[] = [];
-  let score = 0;
 
-  // Check minimum length
-  if (requirements.minLength) {
-    score += 1;
-  } else {
+  if (!requirements.minLength) {
     feedback.push('At least 8 characters required');
   }
-
-  // Check for uppercase
-  if (requirements.hasUppercase) {
-    score += 0.5;
-  } else {
+  if (!requirements.hasUppercase) {
     feedback.push('Add at least one uppercase letter');
   }
-
-  // Check for lowercase
-  if (requirements.hasLowercase) {
-    score += 0.5;
-  } else {
+  if (!requirements.hasLowercase) {
     feedback.push('Add at least one lowercase letter');
   }
-
-  // Check for numbers
-  if (requirements.hasNumber) {
-    score += 0.5;
-  } else {
+  if (!requirements.hasNumber) {
     feedback.push('Add at least one number');
   }
-
-  // Check for special characters
-  if (requirements.hasSpecial) {
-    score += 0.5;
-  } else {
+  if (!requirements.hasSpecial) {
     feedback.push('Add at least one special character (!@#$%^&*...)');
   }
 
-  // Bonus points for length
-  if (password.length >= 12) {
-    score += 0.5;
+  const totalRequirements = Object.keys(requirements).length;
+  const metRequirements = Object.values(requirements).filter(Boolean).length;
+  const meetsAllRequirements = metRequirements === totalRequirements;
+
+  // Base score primarily from requirement coverage (0-3 scale)
+  const requirementsScore = (metRequirements / totalRequirements) * 3;
+
+  // Length bonuses only apply when all core requirements are satisfied
+  let bonusScore = 0;
+  if (meetsAllRequirements) {
+    if (password.length >= 12) {
+      bonusScore += 0.5;
+    }
+    if (password.length >= 16) {
+      bonusScore += 0.5;
+    }
   }
-  if (password.length >= 16) {
-    score += 0.5;
-  }
+
+  let score = Math.min(requirementsScore + bonusScore, 4);
 
   // Cap the score at 4
   score = Math.min(score, 4);
@@ -121,7 +113,7 @@ export function calculatePasswordStrength(password: string): PasswordStrength {
   const percentage = Math.min((score / 4) * 100, 100);
 
   // Provide positive feedback for strong passwords
-  if (score >= 3) {
+  if (meetsAllRequirements && score >= 3) {
     feedback.length = 0; // Clear negative feedback
     if (password.length >= 16) {
       feedback.push('Excellent password length!');

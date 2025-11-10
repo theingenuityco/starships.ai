@@ -46,13 +46,15 @@ const OAuthCallbackSchema = z.object({
 });
 
 // Zod schema for setting password
-const SetPasswordSchema = z.object({
-  newPassword: PasswordSchema,
-  confirmPassword: z.string().min(1, 'Password confirmation is required'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
+const SetPasswordSchema = z
+  .object({
+    newPassword: PasswordSchema,
+    confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 // Zod schema for email verification
 const EmailVerificationSchema = z.object({
@@ -64,14 +66,19 @@ const ForgotPasswordSchema = z.object({
   email: EmailSchema,
 });
 
-const ResetPasswordSchema = z.object({
-  token: z.string().length(64, 'Invalid token format').regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
-  newPassword: PasswordSchema,
-  confirmPassword: z.string().min(1, 'Password confirmation is required'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
+const ResetPasswordSchema = z
+  .object({
+    token: z
+      .string()
+      .length(64, 'Invalid token format')
+      .regex(/^[a-f0-9]{64}$/, 'Invalid token format'),
+    newPassword: PasswordSchema,
+    confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 /**
  * Register new user
@@ -414,26 +421,36 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
 
     // Check if user is authenticated using helper function
     const authenticatedUser = await getAuthenticatedUserFromRequest(req);
+    const profilePath = await userService.getProfileRedirectPath(result.userId);
+    const expectedEmailParam = encodeURIComponent(result.newEmail);
 
     // Determine redirect based on authentication status
     let redirectPath: string;
     if (authenticatedUser && authenticatedUser.id === result.userId) {
       // User is authenticated AND userId matches - redirect to profile page
-      redirectPath = await userService.getProfileRedirectPath(result.userId);
-      redirectPath = `${env.PUBLIC_URL}${redirectPath}?emailChange=success`;
+      redirectPath = `${env.PUBLIC_URL}${profilePath}?emailChange=success`;
     } else {
-      // User is not authenticated OR userId mismatch - redirect to login page with returnUrl and emailChange param
-      // This ensures they get redirected to profile after login, and toast shows on login page
-      const profilePath = await userService.getProfileRedirectPath(result.userId);
-      const returnUrl = encodeURIComponent(`${profilePath}?emailChange=success`);
-      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}&emailChange=success`;
+      // User is not authenticated OR userId mismatch - redirect to login page with guidance
+      const params = new URLSearchParams({
+        returnUrl: `${profilePath}?emailChange=success`,
+        emailChange: 'success',
+        logout: 'true',
+      });
+      if (result.newEmail) {
+        params.set('expectedEmail', result.newEmail);
+      }
+      redirectPath = `${env.PUBLIC_URL}/login?${params.toString()}`;
     }
 
     return res.redirect(redirectPath);
   } catch (error) {
     logger.error('[EMAIL-CHANGE-VERIFY] Error:', { error });
     const env = getEnvConfig();
-    return res.redirect(`${env.PUBLIC_URL}/login?emailChange=error`);
+    const params = new URLSearchParams({
+      emailChange: 'error',
+      logout: 'true',
+    });
+    return res.redirect(`${env.PUBLIC_URL}/login?${params.toString()}`);
   }
 });
 
@@ -691,7 +708,6 @@ router.post('/auth/set-password', jwtAuthMiddleware, async (req: Request, res: R
     handleError(error, res, 'Setting password failed');
   }
 });
-
 
 /**
  * Get user authentication methods

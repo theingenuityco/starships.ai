@@ -19,7 +19,7 @@ import Link from 'next/link'
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 function LoginContent() {
-  const { isAuthenticated, isLoading, user } = useAuth()
+  const { isAuthenticated, isLoading, user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('login')
   const [mounted, setMounted] = useState(false)
   const [logoTrigger, setLogoTrigger] = useState(0)
@@ -34,9 +34,35 @@ function LoginContent() {
     setMounted(true)
   }, [])
 
-  // Redirect authenticated users to their starship
+  const logoutParam = searchParams?.get('logout')
+  const expectedEmail = searchParams?.get('expectedEmail')
+  const forcedLogoutRef = React.useRef(false)
+
+  // Redirect authenticated users to their starship (skip while forced logout is pending)
   React.useEffect(() => {
-    if (mounted && isAuthenticated && !isLoading && !starshipsLoading) {
+    if (!mounted || isLoading || starshipsLoading) {
+      return
+    }
+    if (isAuthenticated) {
+      if ((logoutParam === 'true' || expectedEmail) && !forcedLogoutRef.current) {
+        forcedLogoutRef.current = true
+        ;(async () => {
+          try {
+            await logout()
+          } finally {
+            forcedLogoutRef.current = false
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search)
+              params.delete('logout')
+              const query = params.toString()
+              const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+              window.history.replaceState(null, '', newUrl)
+            }
+          }
+        })()
+        return
+      }
+
       // Handle redirect with returnUrl pattern
       const returnUrl = searchParams?.get('returnUrl')
 
@@ -50,15 +76,15 @@ function LoginContent() {
         router.push('/profile')
       }
     }
-  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams])
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout])
 
   // Show loading state while checking authentication or mounting
-  if (!mounted || isLoading || (isAuthenticated && starshipsLoading)) {
+  if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {
     return <AuthLoadingScreen message="Loading..." />
   }
 
   // If already authenticated, show redirecting state
-  if (isAuthenticated) {
+  if (isAuthenticated && logoutParam !== 'true' && !expectedEmail) {
     return <AuthLoadingScreen message="Redirecting..." />
   }
 

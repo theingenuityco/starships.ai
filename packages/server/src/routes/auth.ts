@@ -414,19 +414,18 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
 
     // Check if user is authenticated using helper function
     const authenticatedUser = await getAuthenticatedUserFromRequest(req);
+    const profilePath = await userService.getProfileRedirectPath(result.userId);
+    const expectedEmailParam = encodeURIComponent(result.email);
 
     // Determine redirect based on authentication status
     let redirectPath: string;
     if (authenticatedUser && authenticatedUser.id === result.userId) {
       // User is authenticated AND userId matches - redirect to profile page
-      redirectPath = await userService.getProfileRedirectPath(result.userId);
-      redirectPath = `${env.PUBLIC_URL}${redirectPath}?emailChange=success`;
+      redirectPath = `${env.PUBLIC_URL}${profilePath}?emailChange=success`;
     } else {
-      // User is not authenticated OR userId mismatch - redirect to login page with returnUrl and emailChange param
-      // This ensures they get redirected to profile after login, and toast shows on login page
-      const profilePath = await userService.getProfileRedirectPath(result.userId);
+      // User is not authenticated OR userId mismatch - redirect to login page with guidance
       const returnUrl = encodeURIComponent(`${profilePath}?emailChange=success`);
-      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}&emailChange=success`;
+      redirectPath = `${env.PUBLIC_URL}/login?returnUrl=${returnUrl}&emailChange=success&expectedEmail=${expectedEmailParam}`;
     }
 
     return res.redirect(redirectPath);

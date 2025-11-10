@@ -75,6 +75,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
   // Track if success messages have been shown to prevent duplicates
   const passwordResetToastShownRef = useRef(false)
   const emailVerificationToastShownRef = useRef(false)
+  const emailChangeToastShownRef = useRef(false)
 
   // OAuth callback, verification error, and password reset success handling
   useEffect(() => {
@@ -89,11 +90,17 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
       const verification = searchParams.get('verification')
       const resetSuccess = searchParams.get('reset')
       const emailChange = searchParams.get('emailChange')
+      const expectedEmail = searchParams.get('expectedEmail')
 
       // Handle password reset success message
       if (resetSuccess === 'success' && !passwordResetToastShownRef.current) {
         passwordResetToastShownRef.current = true
         toast.success('Password reset successful! You can now log in with your new password.')
+      }
+
+      if (emailChange === 'success' && expectedEmail && !emailChangeToastShownRef.current) {
+        emailChangeToastShownRef.current = true
+        toast.success(`Email verified. Please sign in as ${expectedEmail} to continue.`)
       }
 
       // Handle email verification success message

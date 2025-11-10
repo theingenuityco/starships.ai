@@ -39,7 +39,7 @@ function getOAuthErrorMessage(errorCode: string): string {
  * JWT-based login and registration form
  */
 export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { login, register, oauthLogin, resendVerification, isLoading, error } = useAuth()
+  const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
   const searchParams = useSearchParams()
 
   // OAuth initiation function - uses relative URL like regular auth
@@ -146,7 +146,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     }
 
     if (!result.success) {
-      setFormError(result.error || 'Login failed')
+      return
     }
   }
 
@@ -204,7 +204,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     }
 
     if (!result.success) {
-      setFormError(result.error || 'Registration failed')
+      return
     }
   }
 
@@ -302,9 +302,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </div>
                 </div>
 
-                {(formError || (error && !autoSwitchedToRegister)) && (
+                {formError && (
                   <Alert variant="destructive">
-                    <AlertDescription>{formError || error}</AlertDescription>
+                    <AlertDescription>{formError}</AlertDescription>
                   </Alert>
                 )}
 
@@ -420,9 +420,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   </div>
                 </div>
 
-                {(formError || error) && (
+                {formError && (
                   <Alert variant="destructive">
-                    <AlertDescription>{formError || error}</AlertDescription>
+                    <AlertDescription>{formError}</AlertDescription>
                   </Alert>
                 )}
 

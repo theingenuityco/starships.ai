@@ -422,7 +422,7 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
     // Check if user is authenticated using helper function
     const authenticatedUser = await getAuthenticatedUserFromRequest(req);
     const profilePath = await userService.getProfileRedirectPath(result.userId);
-    const expectedEmailParam = encodeURIComponent(result.email);
+    const expectedEmailParam = encodeURIComponent(result.newEmail);
 
     // Determine redirect based on authentication status
     let redirectPath: string;
@@ -436,8 +436,8 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
         emailChange: 'success',
         logout: 'true',
       });
-      if (result.email) {
-        params.set('expectedEmail', result.email);
+      if (result.newEmail) {
+        params.set('expectedEmail', result.newEmail);
       }
       redirectPath = `${env.PUBLIC_URL}/login?${params.toString()}`;
     }

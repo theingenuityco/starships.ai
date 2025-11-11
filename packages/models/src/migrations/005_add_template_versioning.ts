@@ -57,7 +57,8 @@ export async function up(client: Client): Promise<void> {
         AND (version IS NULL OR template_snapshot_at IS NULL)
     `);
 
-    if (parseInt(nullCheck.rows[0].count) > 0) {
+    const count = nullCheck?.rows?.[0]?.count || '0';
+    if (parseInt(count) > 0) {
       throw new Error('Found template-based agents with NULL version after backfill');
     }
 

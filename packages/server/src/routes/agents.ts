@@ -622,4 +622,98 @@ router.delete('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Requ
   }
 });
 
+// ============================================================================
+// TEMPLATE VERSIONING & UPDATE ROUTES
+// ============================================================================
+
+/**
+ * GET /agents/:id/check-update - Check if agent has updates available from its template
+ */
+router.get('/agents/:id/check-update', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+      }),
+      req.params,
+      res,
+      'agent ID'
+    );
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+
+    const agentService = new AgentService();
+    const updateCheck = await agentService.checkForUpdate(agentId);
+
+    sendSuccess(res, {
+      data: updateCheck,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error checking for updates:', error);
+    handleError(error, res);
+  }
+});
+
+/**
+ * POST /agents/:id/update-from-template - Update agent with latest template data
+ */
+router.post('/agents/:id/update-from-template', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+      }),
+      req.params,
+      res,
+      'agent ID'
+    );
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.updateFromTemplate(agentId, userId);
+
+    sendSuccess(res, {
+      message: 'Agent updated successfully from template',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error updating from template:', error);
+    handleError(error, res);
+  }
+});
+
+/**
+ * GET /starships/:starshipId/agents/with-updates - Get all agents in starship that have updates available
+ */
+router.get('/starships/:starshipId/agents/with-updates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+      }),
+      req.params,
+      res,
+      'starship ID'
+    );
+    if (!paramValidation) return;
+
+    const { starshipId } = paramValidation;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+    const agents = await agentService.getAgentsWithUpdates(starshipId, userId);
+
+    sendSuccess(res, {
+      data: agents,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error getting agents with updates:', error);
+    handleError(error, res);
+  }
+});
+
 export default router;

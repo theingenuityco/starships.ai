@@ -5,7 +5,8 @@ import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository'
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
+import { compareVersions } from '@/utils/version';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel, AgentUpdateCheckResponse } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
   constructor() {
@@ -256,6 +257,7 @@ export class AgentRepository extends BaseRepository {
         const slug = await generateUniqueAgentSlug(template.slug, this);
 
         // Create agent from template with optional customizations
+        const now = new Date().toISOString();
         const agentData: CreateAgentRequest = {
           name: customizations?.name || template.name,
           slug,
@@ -270,10 +272,11 @@ export class AgentRepository extends BaseRepository {
           previewPrompts: customizations?.previewPrompts || template.previewPrompts,
           assignedToolSlugs: customizations?.assignedToolSlugs,
           templateId,
+          version: template.version, // Copy template version
+          templateSnapshotAt: now, // Capture snapshot time
         };
 
         // Create agent with template_id foreign key
-        const now = new Date().toISOString();
         const agentProps = {
           ...agentData,
           starshipId: starshipId,
@@ -430,6 +433,130 @@ export class AgentRepository extends BaseRepository {
       'assignToolsToAgent',
       'Agent',
       agentId
+    );
+  }
+
+  // ============================================================================
+  // TEMPLATE VERSIONING & UPDATE MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Check if agent needs update from its source template
+   */
+  async checkForUpdate(agentId: string): Promise<AgentUpdateCheckResponse> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const agent = await this.findById(agentId);
+
+        // No template = no updates available
+        if (!agent?.templateId) {
+          return {
+            needsUpdate: false,
+            currentVersion: agent?.version || '1.0.0',
+            latestVersion: agent?.version || '1.0.0',
+          };
+        }
+
+        const templateRepo = new AgentTemplateRepository();
+        const template = await templateRepo.findById(agent.templateId);
+
+        if (!template) {
+          return {
+            needsUpdate: false,
+            currentVersion: agent.version,
+            latestVersion: agent.version,
+          };
+        }
+
+        const currentVersion = agent.version || '1.0.0';
+        const latestVersion = template.version;
+
+        // Compare versions (not timestamps!)
+        const needsUpdate = compareVersions(latestVersion, currentVersion) > 0;
+
+        return {
+          needsUpdate,
+          currentVersion,
+          latestVersion,
+          templateUpdatedAt: template.updatedAt,
+        };
+      },
+      'checkForUpdate',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Update agent with latest template data
+   */
+  async updateFromTemplate(agentId: string): Promise<AgentModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const agent = await this.findById(agentId);
+
+        if (!agent) {
+          this.handleNotFound('Agent', agentId);
+        }
+
+        if (!agent.templateId) {
+          throw new Error('Agent is not linked to a template');
+        }
+
+        const templateRepo = new AgentTemplateRepository();
+        const template = await templateRepo.findById(agent.templateId);
+
+        if (!template) {
+          this.handleNotFound('AgentTemplate', agent.templateId);
+        }
+
+        // Copy current template data to agent
+        const updates: UpdateAgentRequest = {
+          systemPrompt: template.systemPrompt,
+          blueprint: template.blueprint,
+          model: template.model,
+          temperature: template.temperature,
+          maxTokens: template.maxTokens,
+          timeout: template.timeout,
+          version: template.version, // Copy template version to agent
+          templateSnapshotAt: new Date().toISOString(),
+        };
+
+        const updated = await this.update(agentId, updates);
+        if (!updated) {
+          throw new Error('Failed to update agent from template');
+        }
+
+        return updated;
+      },
+      'updateFromTemplate',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Get all agents with available updates for a starship
+   */
+  async getAgentsWithUpdates(starshipId: string): Promise<AgentModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const agents = await this.findByStarship(starshipId);
+        const agentsWithUpdates: AgentModel[] = [];
+
+        for (const agent of agents) {
+          if (agent.templateId) {
+            const updateCheck = await this.checkForUpdate(agent.id);
+            if (updateCheck.needsUpdate) {
+              agentsWithUpdates.push(agent);
+            }
+          }
+        }
+
+        return agentsWithUpdates;
+      },
+      'getAgentsWithUpdates',
+      'Agent'
     );
   }
 }

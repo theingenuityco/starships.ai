@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React from 'react'
+import React, { useState } from 'react'
 import type { AgentModel } from '@starships/protocol'
 
 import { Card } from '@/components/ui/card'
@@ -11,6 +11,8 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAgentUpdateCheck, useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 
 interface AgentCardProps {
   agent: AgentModel
@@ -24,6 +26,20 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest, onAnalytics, showActions = false }: AgentCardProps) {
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false)
+
+  // Check for updates if agent has a template
+  const { data: updateCheck, isLoading: isCheckingUpdate } = useAgentUpdateCheck(agent.id, !!agent.templateId)
+  const updateMutation = useUpdateAgentFromTemplate()
+
+  const handleUpdate = () => {
+    updateMutation.mutate(agent.id, {
+      onSuccess: () => {
+        setShowUpdateDialog(false)
+      },
+    })
+  }
+
   const inferCategoryFromName = (agentName: string): 'general' | 'coding' | 'creative' | 'analysis' | 'support' => {
     const name = agentName.toLowerCase()
     if (name.includes('support')) {
@@ -145,11 +161,34 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                 )}
               </div>
 
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <Badge className={`text-xs ${getCategoryColor(agent.name)} flex items-center border font-semibold`}>
                   {getCategoryIcon(agent.name)}
                   {inferCategoryFromName(agent.name).charAt(0).toUpperCase() + inferCategoryFromName(agent.name).slice(1)}
                 </Badge>
+
+                {/* Version Badge */}
+                {agent.version && (
+                  <Badge variant="outline" className="text-xs font-mono">
+                    v{agent.version}
+                  </Badge>
+                )}
+
+                {/* Update Available Badge */}
+                {!isCheckingUpdate && updateCheck?.needsUpdate && (
+                  <Badge
+                    variant="default"
+                    className="text-xs cursor-pointer hover:opacity-80 bg-blue-600 hover:bg-blue-700 flex items-center gap-1"
+                    onClick={e => {
+                      e.stopPropagation()
+                      setShowUpdateDialog(true)
+                    }}
+                  >
+                    <Icon name="arrow-up-circle" className="w-3 h-3" />
+                    Update to v{updateCheck.latestVersion}
+                  </Badge>
+                )}
+
                 <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
                   <Icon name="brain" className="w-3 h-3 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground font-mono">{agent.model}</span>
@@ -257,6 +296,48 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
         {/* Hover effect overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </Card>
+
+      {/* Update Dialog */}
+      {updateCheck && (
+        <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+          <DialogContent onClick={e => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>Update Agent</DialogTitle>
+              <DialogDescription>A new version of this agent template is available.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Current Version:</p>
+                  <p className="font-mono font-semibold">v{updateCheck.currentVersion}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Latest Version:</p>
+                  <p className="font-mono font-semibold text-blue-600">v{updateCheck.latestVersion}</p>
+                </div>
+              </div>
+
+              <div className="text-sm">
+                <p className="text-muted-foreground">This will update your agent with the latest template configuration, including system prompt, blueprint, and model settings.</p>
+              </div>
+
+              {updateCheck.templateUpdatedAt && (
+                <div className="text-xs text-muted-foreground">Template last updated: {new Date(updateCheck.templateUpdatedAt).toLocaleString()}</div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowUpdateDialog(false)}>
+                Later
+              </Button>
+              <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Updating...' : 'Update Now'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

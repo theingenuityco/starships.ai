@@ -31,6 +31,9 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   templateId?: string;
   // Optional example prompts surfaced on agents (may be inherited from template)
   previewPrompts?: string[];
+  // Versioning fields
+  version: string; // Semantic version (e.g., '1.0.2')
+  templateSnapshotAt?: string; // When agent last synced with template
 }
 
 // ============================================================================
@@ -54,4 +57,14 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
   templateId?: string;
   previewPrompts?: string[];
+}
+
+/**
+ * Response type for update check
+ */
+export interface AgentUpdateCheckResponse {
+  needsUpdate: boolean;
+  currentVersion: string; // Agent's current version
+  latestVersion: string; // Template's latest version
+  templateUpdatedAt?: string;
 }

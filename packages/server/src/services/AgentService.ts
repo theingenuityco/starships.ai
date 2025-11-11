@@ -7,10 +7,10 @@
  */
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
-import { NotFoundError, ValidationError } from '@starships/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository, StarshipRepository } from '@starships/models';
 import { generateSimpleAgentSlug, generateUniqueAgentSlug } from '@starships/models';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, AgentUpdateCheckResponse } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
@@ -796,5 +796,43 @@ export class AgentService {
         error: error?.message || 'Unknown error during agent execution',
       };
     }
+  }
+
+  /**
+   * Check if agent has updates available from its template
+   */
+  async checkForUpdate(agentId: string): Promise<AgentUpdateCheckResponse> {
+    return await this.agentRepository.checkForUpdate(agentId);
+  }
+
+  /**
+   * Update agent to latest template version
+   */
+  async updateFromTemplate(agentId: string, userId: string): Promise<AgentModel> {
+    // Verify ownership
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    const starship = await this.starshipRepository.findById(agent.starshipId);
+    if (!starship || starship.ownerId !== userId) {
+      throw new ForbiddenError('You do not have permission to update this agent');
+    }
+
+    return await this.agentRepository.updateFromTemplate(agentId);
+  }
+
+  /**
+   * Get agents with available updates for starship
+   */
+  async getAgentsWithUpdates(starshipId: string, userId: string): Promise<AgentModel[]> {
+    // Verify ownership
+    const starship = await this.starshipRepository.findById(starshipId);
+    if (!starship || starship.ownerId !== userId) {
+      throw new ForbiddenError('You do not have permission to access this starship');
+    }
+
+    return await this.agentRepository.getAgentsWithUpdates(starshipId);
   }
 }

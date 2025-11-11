@@ -33,6 +33,7 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
   // Template metadata
   category: AgentTemplateCategory;
   usageCount: number;
+  version: string; // Semantic version (e.g., '1.0.2')
 
   // Template preview
   icon?: string;

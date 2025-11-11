@@ -49,6 +49,9 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   // Optional template reference and prompts
   templateId?: string;
   previewPrompts?: string[];
+  // Versioning fields
+  version?: string;
+  templateSnapshotAt?: string;
 };
 
 /**
@@ -57,6 +60,8 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
   templateId?: string;
   previewPrompts?: string[];
+  version?: string;
+  templateSnapshotAt?: string;
 }
 
 /**

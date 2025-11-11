@@ -129,6 +129,10 @@ export class AgentRepository extends BaseRepository {
           blueprint: data.blueprint,
           previewPrompts: data.previewPrompts,
 
+          // Versioning fields
+          version: data.version || '1.0.0',
+          templateSnapshotAt: data.templateSnapshotAt,
+
           // PostgreSQL specific fields
           starshipId: starshipId, // Direct foreign key
           deployedAt: now, // Agent is deployed immediately upon creation

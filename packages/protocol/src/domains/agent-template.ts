@@ -63,4 +63,5 @@ export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMe
   icon?: string;
   previewPrompts?: string[];
   assignedToolSlugs?: string[];
+  version?: string;
 }

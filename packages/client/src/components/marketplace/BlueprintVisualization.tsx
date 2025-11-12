@@ -28,6 +28,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import Editor, { OnMount } from '@monaco-editor/react'
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
@@ -737,9 +738,69 @@ const NodeDetailsPanel: React.FC<{
   onClose: () => void
 }> = ({ node, onClose }) => {
   const colors = getNodeColors(node.type)
+  const { theme } = useTheme()
+  const handleCodeEditorMount: OnMount = (editor, monaco) => {
+    try {
+      monaco.editor.defineTheme('starships-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+          { token: 'string.key.json', foreground: '9cdcfe' },
+          { token: 'string.value.json', foreground: 'ce9178' },
+          { token: 'number', foreground: 'b5cea8' },
+          { token: 'keyword', foreground: '569cd6' },
+          { token: 'comment', foreground: '6a9955' },
+          { token: 'delimiter', foreground: 'd4d4d4' },
+        ],
+        colors: {
+          'editor.background': '#00000000',
+          'editor.foreground': '#f2f2f2',
+          'editorLineNumber.foreground': '#4a5568',
+          'editor.selectionBackground': '#2e3541',
+          'editor.inactiveSelectionBackground': '#171a20',
+          'editorCursor.foreground': '#3b82f6',
+          'editor.lineHighlightBackground': '#ffffff08',
+          'editorWidget.background': '#171a20',
+          'editorSuggestWidget.background': '#171a20',
+          'editorHoverWidget.background': '#171a20',
+          contrastBorder: '#00000000',
+          contrastActiveBorder: '#00000000',
+          focusBorder: '#00000000',
+        },
+      })
+      monaco.editor.defineTheme('starships-light', {
+        base: 'vs',
+        inherit: true,
+        rules: [
+          { token: 'string.key.json', foreground: '0070c1' },
+          { token: 'string.value.json', foreground: 'a31515' },
+          { token: 'number', foreground: '098658' },
+          { token: 'keyword', foreground: '0000ff' },
+          { token: 'comment', foreground: '008000' },
+          { token: 'delimiter', foreground: '000000' },
+        ],
+        colors: {
+          'editor.background': '#00000000',
+          'editor.foreground': '#141414',
+          'editorLineNumber.foreground': '#999999',
+          'editor.selectionBackground': '#add6ff',
+          'editor.inactiveSelectionBackground': '#e5ebf1',
+          'editorCursor.foreground': '#3b82f6',
+          'editor.lineHighlightBackground': '#00000008',
+          'editorWidget.background': '#ffffff',
+          'editorSuggestWidget.background': '#ffffff',
+          'editorHoverWidget.background': '#ffffff',
+          contrastBorder: '#00000000',
+          contrastActiveBorder: '#00000000',
+          focusBorder: '#00000000',
+        },
+      })
+      monaco.editor.setTheme(theme === 'dark' ? 'starships-dark' : 'starships-light')
+    } catch {}
+  }
 
   return (
-    <Card className="absolute top-4 right-4 w-[420px] max-h-[calc(100vh-8rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
+    <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[640px] max-h-[calc(100vh-8rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
       <div className="flex items-center justify-between p-3 border-b border-border/40">
         <div className="flex items-center gap-2.5">
           <div
@@ -766,6 +827,57 @@ const NodeDetailsPanel: React.FC<{
 
       <ScrollArea className="max-h-[calc(100vh-14rem)]">
         <div className="p-3 space-y-3">
+          {/* Code (for code nodes) */}
+          {node.type === 'code' && typeof (node as any)?.parameters?.code === 'string' && (node as any).parameters.code.trim().length > 0 && (
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Code</h4>
+              <div className="rounded-lg border bg-muted/30 overflow-hidden">
+                <Editor
+                  height="300px"
+                  defaultLanguage="javascript"
+                  value={(node as any).parameters.code as string}
+                  onMount={handleCodeEditorMount}
+                  theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
+                  options={{
+                    readOnly: true,
+                    domReadOnly: true,
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    lineNumbers: 'on',
+                    glyphMargin: false,
+                    lineNumbersMinChars: 2,
+                    lineDecorationsWidth: 12,
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    wrappingIndent: 'indent',
+                    automaticLayout: true,
+                    tabSize: 2,
+                    insertSpaces: true,
+                    folding: false,
+                    overviewRulerLanes: 0,
+                    hideCursorInOverviewRuler: true,
+                    overviewRulerBorder: false,
+                    stickyScroll: { enabled: true },
+                    padding: { top: 12, bottom: 12 },
+                    renderIndentGuides: false,
+                    scrollbar: {
+                      verticalScrollbarSize: 10,
+                      horizontalScrollbarSize: 10,
+                      useShadows: false,
+                      alwaysConsumeMouseWheel: false,
+                    },
+                    guides: {
+                      indentation: false,
+                      bracketPairs: false,
+                      bracketPairsHorizontal: false,
+                      highlightActiveBracketPair: false,
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Description */}
           {node.description && (
             <div className="space-y-1.5">
@@ -781,11 +893,13 @@ const NodeDetailsPanel: React.FC<{
           </div>
 
           {/* Parameters */}
-          {node.parameters && Object.keys(node.parameters).length > 0 && (
+          {node.parameters && Object.keys(node.parameters).filter(k => k !== 'code').length > 0 && (
             <div className="space-y-1.5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase">Parameters</h4>
               <div className="space-y-1.5">
-                {Object.entries(node.parameters).map(([key, value]) => (
+                {Object.entries(node.parameters)
+                  .filter(([key]) => key !== 'code')
+                  .map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <div className="text-xs font-medium text-foreground">{key}</div>
                     <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</pre>
@@ -937,7 +1051,16 @@ function BlueprintFlow({
       </ReactFlow>
 
       {/* Node Details Panel */}
-      {selectedNode && <NodeDetailsPanel node={selectedNode} onClose={() => setSelectedNode(null)} />}
+      {selectedNode && (
+        <>
+          <div
+            className="absolute inset-0 z-40 bg-background/50 backdrop-blur-sm"
+            onClick={() => setSelectedNode(null)}
+            aria-hidden
+          />
+          <NodeDetailsPanel node={selectedNode} onClose={() => setSelectedNode(null)} />
+        </>
+      )}
     </div>
   )
 }

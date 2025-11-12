@@ -33,33 +33,28 @@ export async function up(client: Client): Promise<void> {
       ON agents(template_snapshot_at)
     `);
 
-    // 3. Backfill versions for existing templates
-    await client.query(`
-      UPDATE agent_templates
-      SET version = '1.0.0'
-      WHERE version IS NULL OR version = ''
-    `);
-
-    // 4. Backfill versions for existing agents (only template-based agents)
+    // 3. Set template_snapshot_at for existing template-based agents
+    // Note: The version column already has default '1.0.0' applied automatically by ALTER TABLE
+    // Only need to set template_snapshot_at which has no default
     await client.query(`
       UPDATE agents
-      SET version = '1.0.0',
-          template_snapshot_at = created_at
+      SET template_snapshot_at = created_at
       WHERE template_id IS NOT NULL
-        AND (version IS NULL OR version = '')
+        AND template_snapshot_at IS NULL
     `);
 
-    // 5. Verify no NULL values for template-based agents
+    // 4. Verify data integrity for template-based agents
+    // Version can't be NULL (has NOT NULL constraint), but template_snapshot_at can be NULL
     const nullCheck = await client.query(`
       SELECT COUNT(*) as count
       FROM agents
       WHERE template_id IS NOT NULL
-        AND (version IS NULL OR template_snapshot_at IS NULL)
+        AND template_snapshot_at IS NULL
     `);
 
     const count = nullCheck?.rows?.[0]?.count || '0';
     if (parseInt(count) > 0) {
-      throw new Error('Found template-based agents with NULL version after backfill');
+      throw new Error(`Found ${count} template-based agents with NULL template_snapshot_at after migration`);
     }
 
     await client.query('COMMIT');

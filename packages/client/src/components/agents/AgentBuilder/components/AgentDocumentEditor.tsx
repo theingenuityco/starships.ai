@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -163,15 +164,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!agentIdForUpdate) return
 
     try {
-      const result = await updateMutation.mutateAsync(agentIdForUpdate)
-      toast.success('Agent updated successfully', {
-        description: `Updated to version ${result.version}`
-      })
+      await updateMutation.mutateAsync(agentIdForUpdate)
       // Reload the page to refresh all data
       window.location.reload()
     } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'Failed to update agent'
-      toast.error('Update failed', { description: message })
+      // Error toast is handled by the mutation hook
     }
   }
 
@@ -269,13 +266,55 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     <div className="space-y-4 pt-14 pb-28">
       {/* Template Agent Update Banner */}
       {isTemplateAgent && fullAgent && updateCheck?.needsUpdate && (
-        <Alert variant="default" className="border">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <Icon name="arrow-up-circle" className="h-4 w-4 text-muted-foreground" />
-              <div className="flex items-center gap-2 flex-wrap flex-1">
-                <span className="text-sm text-muted-foreground">Update available</span>
-                <Badge variant="outline" className="text-xs font-mono">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="relative overflow-hidden rounded-xl p-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(124, 58, 237, 0.05))',
+            borderColor: 'rgba(139, 92, 246, 0.2)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+          }}
+        >
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
+            }}
+            animate={{
+              x: ['-100%', '200%'],
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: 'linear',
+            }}
+          />
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="relative z-10 flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+                style={{
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                }}
+              >
+                <Icon name="download" className="h-4 w-4" style={{ color: 'rgb(139, 92, 246)' }} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">New update available</span>
+                <Badge
+                  variant="outline"
+                  className="text-xs font-mono flex items-center gap-1"
+                  style={{
+                    borderColor: 'rgba(139, 92, 246, 0.3)',
+                    background: 'rgba(139, 92, 246, 0.05)',
+                    color: 'rgb(139, 92, 246)',
+                  }}
+                >
+                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
                   v{updateCheck.latestVersion}
                 </Badge>
               </div>
@@ -283,14 +322,19 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             <Button
               type="button"
               size="sm"
-              variant="outline"
               onClick={handleUpdateFromTemplate}
               disabled={updateMutation.isPending}
+              style={{
+                background: 'rgba(139, 92, 246, 0.1)',
+                borderColor: 'rgba(139, 92, 246, 0.3)',
+                color: 'rgb(139, 92, 246)',
+              }}
+              className="hover:opacity-80 transition-opacity"
             >
-              {updateMutation.isPending ? 'Updating...' : 'Update'}
+              {updateMutation.isPending ? 'Updating...' : 'Update Now'}
             </Button>
           </div>
-        </Alert>
+        </motion.div>
       )}
 
       {/* Title */}
@@ -298,13 +342,18 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         <div className="space-y-6">
           <AgentAvatar seed={value.name} size={64} className="rounded-md overflow-hidden" />
           <div className="space-y-1">
-            <input
-              className="w-full bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder="Untitled Agent"
-              value={value.name}
-              onChange={e => handleNameChange(e.target.value)}
-              disabled={isTemplateAgent}
-            />
+            <div className="flex items-baseline gap-3">
+              <input
+                className="flex-1 bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                placeholder="Untitled Agent"
+                value={value.name}
+                onChange={e => handleNameChange(e.target.value)}
+                disabled={isTemplateAgent}
+              />
+              {isTemplateAgent && fullAgent?.version && (
+                <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
           </div>
         </div>

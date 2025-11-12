@@ -753,16 +753,24 @@ const NodeDetailsPanel: React.FC<{
           { token: 'delimiter', foreground: 'd4d4d4' },
         ],
         colors: {
-          'editor.background': '#00000000',
+          // Match app background (dark): black
+          'editor.background': '#000000',
           'editor.foreground': '#f2f2f2',
           'editorLineNumber.foreground': '#4a5568',
           'editor.selectionBackground': '#2e3541',
           'editor.inactiveSelectionBackground': '#171a20',
           'editorCursor.foreground': '#3b82f6',
           'editor.lineHighlightBackground': '#ffffff08',
-          'editorWidget.background': '#171a20',
-          'editorSuggestWidget.background': '#171a20',
-          'editorHoverWidget.background': '#171a20',
+          // Match widgets to app background for seamless look
+          'editorWidget.background': '#000000',
+          'editorSuggestWidget.background': '#000000',
+          'editorHoverWidget.background': '#000000',
+          // Sticky header background equals app background
+          'editorStickyScroll.background': '#000000',
+          'editorStickyScrollHover.background': '#000000',
+          'editorStickyScroll.shadow': '#00000000', // remove 1px shadow/border line
+          // Remove top scrollbar shadow line that can appear above content
+          'scrollbar.shadow': '#00000000',
           contrastBorder: '#00000000',
           contrastActiveBorder: '#00000000',
           focusBorder: '#00000000',
@@ -780,16 +788,24 @@ const NodeDetailsPanel: React.FC<{
           { token: 'delimiter', foreground: '000000' },
         ],
         colors: {
-          'editor.background': '#00000000',
+          // Match app background (light): hsl(0 0% 98%) ~ #fafafa
+          'editor.background': '#fafafa',
           'editor.foreground': '#141414',
           'editorLineNumber.foreground': '#999999',
           'editor.selectionBackground': '#add6ff',
           'editor.inactiveSelectionBackground': '#e5ebf1',
           'editorCursor.foreground': '#3b82f6',
           'editor.lineHighlightBackground': '#00000008',
-          'editorWidget.background': '#ffffff',
-          'editorSuggestWidget.background': '#ffffff',
-          'editorHoverWidget.background': '#ffffff',
+          // Match widgets to app background
+          'editorWidget.background': '#fafafa',
+          'editorSuggestWidget.background': '#fafafa',
+          'editorHoverWidget.background': '#fafafa',
+          // Sticky header background equals app background
+          'editorStickyScroll.background': '#fafafa',
+          'editorStickyScrollHover.background': '#fafafa',
+          'editorStickyScroll.shadow': '#00000000', // remove 1px shadow/border line
+          // Remove top scrollbar shadow line that can appear above content
+          'scrollbar.shadow': '#00000000',
           contrastBorder: '#00000000',
           contrastActiveBorder: '#00000000',
           focusBorder: '#00000000',
@@ -800,7 +816,7 @@ const NodeDetailsPanel: React.FC<{
   }
 
   return (
-    <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[640px] max-h-[calc(100vh-8rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
+    <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] max-h-[calc(100vh-6rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
       <div className="flex items-center justify-between p-3 border-b border-border/40">
         <div className="flex items-center gap-2.5">
           <div
@@ -831,9 +847,9 @@ const NodeDetailsPanel: React.FC<{
           {node.type === 'code' && typeof (node as any)?.parameters?.code === 'string' && (node as any).parameters.code.trim().length > 0 && (
             <div className="space-y-1.5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase">Code</h4>
-              <div className="rounded-lg border bg-muted/30 overflow-hidden">
+              <div className="rounded-lg border bg-background overflow-hidden">
                 <Editor
-                  height="300px"
+                  height="640px"
                   defaultLanguage="javascript"
                   value={(node as any).parameters.code as string}
                   onMount={handleCodeEditorMount}
@@ -842,11 +858,11 @@ const NodeDetailsPanel: React.FC<{
                     readOnly: true,
                     domReadOnly: true,
                     minimap: { enabled: false },
-                    fontSize: 12,
+                    fontSize: 13,
                     lineNumbers: 'on',
                     glyphMargin: false,
-                    lineNumbersMinChars: 2,
-                    lineDecorationsWidth: 12,
+                    lineNumbersMinChars: 4,
+                    lineDecorationsWidth: 20,
                     scrollBeyondLastLine: false,
                     wordWrap: 'on',
                     wrappingIndent: 'indent',

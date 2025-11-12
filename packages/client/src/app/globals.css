@@ -282,6 +282,15 @@
   padding-right: 20px !important;
 }
 
+/* Monaco Sticky Header - remove borders/shadows that can create a 1px seam */
+.monaco-editor .sticky-scroll,
+.monaco-editor .sticky-scroll .monaco-sticky-line,
+.monaco-editor .sticky-scroll .monaco-sticky-element {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

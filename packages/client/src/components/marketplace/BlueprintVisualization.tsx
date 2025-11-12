@@ -739,6 +739,7 @@ const NodeDetailsPanel: React.FC<{
 }> = ({ node, onClose }) => {
   const colors = getNodeColors(node.type)
   const { theme } = useTheme()
+  const [editorHeight, setEditorHeight] = useState<number>(0)
   const handleCodeEditorMount: OnMount = (editor, monaco) => {
     try {
       monaco.editor.defineTheme('starships-dark', {
@@ -756,7 +757,9 @@ const NodeDetailsPanel: React.FC<{
           // Match app background (dark): black
           'editor.background': '#000000',
           'editor.foreground': '#f2f2f2',
-          'editorLineNumber.foreground': '#4a5568',
+          'editorLineNumber.foreground': '#4a5568', // dim line numbers
+          'editorLineNumber.activeForeground': '#9aa4b2', // active line number slightly brighter
+          'editorGutter.background': '#0a0a0a', // gutter slightly different from editor background
           'editor.selectionBackground': '#2e3541',
           'editor.inactiveSelectionBackground': '#171a20',
           'editorCursor.foreground': '#3b82f6',
@@ -791,7 +794,9 @@ const NodeDetailsPanel: React.FC<{
           // Match app background (light): hsl(0 0% 98%) ~ #fafafa
           'editor.background': '#fafafa',
           'editor.foreground': '#141414',
-          'editorLineNumber.foreground': '#999999',
+          'editorLineNumber.foreground': '#999999', // dim line numbers
+          'editorLineNumber.activeForeground': '#666666', // active line number darker
+          'editorGutter.background': '#f2f2f2', // gutter slightly different from editor background
           'editor.selectionBackground': '#add6ff',
           'editor.inactiveSelectionBackground': '#e5ebf1',
           'editorCursor.foreground': '#3b82f6',
@@ -813,10 +818,49 @@ const NodeDetailsPanel: React.FC<{
       })
       monaco.editor.setTheme(theme === 'dark' ? 'starships-dark' : 'starships-light')
     } catch {}
+
+    // Auto-resize editor height to fit content and remove inner scrollbars
+    const updateHeight = () => {
+      const contentHeight = editor.getContentHeight()
+      const container = editor.getContainerDomNode()
+      const width = container.clientWidth
+      const nextHeight = contentHeight
+      setEditorHeight(nextHeight)
+      editor.layout({ width, height: nextHeight })
+    }
+
+    // Hide internal scrollbars
+    editor.updateOptions({
+      scrollbar: {
+        vertical: 'hidden',
+        horizontal: 'hidden',
+        useShadows: false,
+        alwaysConsumeMouseWheel: false,
+      },
+      scrollBeyondLastLine: false,
+    })
+
+    // Initial height
+    updateHeight()
+    // React to content size changes
+    const disposable = editor.onDidContentSizeChange(() => {
+      updateHeight()
+    })
+    // React to container resize
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight()
+    })
+    resizeObserver.observe(editor.getContainerDomNode())
+
+    // Cleanup
+    return () => {
+      disposable.dispose()
+      resizeObserver.disconnect()
+    }
   }
 
   return (
-    <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] max-h-[calc(100vh-6rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg">
+    <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[calc(100vh-6rem)] z-50 frosted-glass-card rounded-xl shadow-frosted-lg flex flex-col overflow-hidden">
       <div className="flex items-center justify-between p-3 border-b border-border/40">
         <div className="flex items-center gap-2.5">
           <div
@@ -841,7 +885,7 @@ const NodeDetailsPanel: React.FC<{
         </Button>
       </div>
 
-      <ScrollArea className="max-h-[calc(100vh-14rem)]">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-3">
           {/* Code (for code nodes) */}
           {node.type === 'code' && typeof (node as any)?.parameters?.code === 'string' && (node as any).parameters.code.trim().length > 0 && (
@@ -849,7 +893,7 @@ const NodeDetailsPanel: React.FC<{
               <h4 className="text-xs font-medium text-muted-foreground uppercase">Code</h4>
               <div className="rounded-lg border bg-background overflow-hidden">
                 <Editor
-                  height="640px"
+                  height={editorHeight ? `${editorHeight}px` : '200px'}
                   defaultLanguage="javascript"
                   value={(node as any).parameters.code as string}
                   onMount={handleCodeEditorMount}
@@ -877,8 +921,8 @@ const NodeDetailsPanel: React.FC<{
                     padding: { top: 12, bottom: 12 },
                     renderIndentGuides: false,
                     scrollbar: {
-                      verticalScrollbarSize: 10,
-                      horizontalScrollbarSize: 10,
+                      vertical: 'hidden',
+                      horizontal: 'hidden',
                       useShadows: false,
                       alwaysConsumeMouseWheel: false,
                     },

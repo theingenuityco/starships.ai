@@ -549,6 +549,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
             options={{
               minimap: { enabled: false },
+              fixedOverflowWidgets: true,
               fontSize: 12,
               lineNumbers: 'off',
               glyphMargin: true,

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'

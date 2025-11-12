@@ -19,7 +19,15 @@ interface ParsedVersion {
  */
 function parseVersion(version: string): ParsedVersion | null {
   // Match semantic versioning format: major.minor.patch[-prerelease][+build]
-  const regex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
+  // Pre-release and build identifiers:
+  // - Must start and end with alphanumeric characters
+  // - Can contain hyphens in the middle
+  // - Must be dot-separated (no leading/trailing/consecutive dots)
+  const identifierPattern = '[0-9A-Za-z](?:[-0-9A-Za-z]*[0-9A-Za-z])?';
+  const preReleasePattern = `(?:-${identifierPattern}(?:\\.${identifierPattern})*)`;
+  const buildPattern = `(?:\\+${identifierPattern}(?:\\.${identifierPattern})*)`;
+  const regex = new RegExp(`^(\\d+)\\.(\\d+)\\.(\\d+)${preReleasePattern}?${buildPattern}?$`);
+
   const match = version.match(regex);
 
   if (!match) return null;
@@ -109,10 +117,22 @@ export function compareVersions(v1: string, v2: string): number {
 /**
  * Validate version format (e.g., '1.0.0', '1.0.0-beta.1', '1.0.0+build.123')
  * Supports full semantic versioning: major.minor.patch[-prerelease][+build]
+ *
+ * Validates that:
+ * - Each identifier starts and ends with alphanumeric characters
+ * - Hyphens can only appear in the middle of identifiers
+ * - No empty identifiers, no leading/trailing/consecutive dots
+ *
  * @param version Version string to validate
  * @returns true if valid, false otherwise
  */
 export function isValidVersion(version: string): boolean {
   // Semantic versioning regex: major.minor.patch[-prerelease][+build]
-  return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version);
+  // Identifier pattern: alphanumeric start/end, hyphens allowed in middle
+  const identifierPattern = '[0-9A-Za-z](?:[-0-9A-Za-z]*[0-9A-Za-z])?';
+  const preReleasePattern = `(?:-${identifierPattern}(?:\\.${identifierPattern})*)`;
+  const buildPattern = `(?:\\+${identifierPattern}(?:\\.${identifierPattern})*)`;
+  const regex = new RegExp(`^\\d+\\.\\d+\\.\\d+${preReleasePattern}?${buildPattern}?$`);
+
+  return regex.test(version);
 }

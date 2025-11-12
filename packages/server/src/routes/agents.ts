@@ -643,7 +643,17 @@ router.get('/agents/:id/check-update', jwtAuthMiddleware, async (req: Request, r
 
     const { id: agentId } = paramValidation;
 
+    // Authorization: verify caller owns the agent
     const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
     const updateCheck = await agentService.checkForUpdate(agentId);
 
     sendSuccess(res, updateCheck);
@@ -671,7 +681,17 @@ router.post('/agents/:id/update-from-template', jwtAuthMiddleware, async (req: R
     const { id: agentId } = paramValidation;
     const userId = req.user!.id;
 
+    // Authorization: verify caller owns the agent
     const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
     const updated = await agentService.updateFromTemplate(agentId, userId);
 
     // Return minimal response - only essential fields

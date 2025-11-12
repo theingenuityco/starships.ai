@@ -160,11 +160,25 @@ export class AgentRepository extends BaseRepository {
   async update(id: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        // Ensure numeric fields are properly typed (convert strings to numbers if needed)
+        // Only convert values that are not null/undefined to avoid NaN or 0 from null
+        const typedUpdates: UpdateAgentRequest = { ...updates };
+
+        if (updates.temperature !== undefined && updates.temperature !== null) {
+          typedUpdates.temperature = Number(updates.temperature);
+        }
+        if (updates.maxTokens !== undefined && updates.maxTokens !== null) {
+          typedUpdates.maxTokens = Number(updates.maxTokens);
+        }
+        if (updates.timeout !== undefined && updates.timeout !== null) {
+          typedUpdates.timeout = Number(updates.timeout);
+        }
+
         // Use lean validation from AgentEntity for updates
-        await AgentEntity.validate(updates, 'update');
+        await AgentEntity.validate(typedUpdates, 'update');
 
         const updateProps: Partial<AgentModel> = {
-          ...(updates as Partial<AgentModel>),
+          ...(typedUpdates as Partial<AgentModel>),
           updatedAt: new Date().toISOString(),
         };
 
@@ -515,16 +529,26 @@ export class AgentRepository extends BaseRepository {
         }
 
         // Copy current template data to agent
+        // Only include fields that are defined in the template (not null/undefined)
+        // This allows templates to omit optional fields and use system defaults
         const updates: UpdateAgentRequest = {
           systemPrompt: template.systemPrompt,
           blueprint: template.blueprint,
           model: template.model,
-          temperature: template.temperature,
-          maxTokens: template.maxTokens,
-          timeout: template.timeout,
           version: template.version, // Copy template version to agent
           templateSnapshotAt: new Date().toISOString(),
         };
+
+        // Only copy optional numeric fields if they're defined in the template
+        if (template.temperature !== null && template.temperature !== undefined) {
+          updates.temperature = template.temperature;
+        }
+        if (template.maxTokens !== null && template.maxTokens !== undefined) {
+          updates.maxTokens = template.maxTokens;
+        }
+        if (template.timeout !== null && template.timeout !== undefined) {
+          updates.timeout = template.timeout;
+        }
 
         const updated = await this.update(agentId, updates);
         if (!updated) {

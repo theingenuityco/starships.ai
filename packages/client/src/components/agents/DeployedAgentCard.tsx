@@ -12,6 +12,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { AgentUpdateBadge } from './AgentUpdateBadge'
 
 interface DeployedAgentCardProps {
   agent: AgentModel
@@ -164,7 +165,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
 
             {/* Agent name and badge */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{agent.name}</CardTitle>
                 {isSystemAgent && (
                   <Badge
@@ -180,6 +181,8 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                     System
                   </Badge>
                 )}
+                {/* Show update badge if agent has a template */}
+                {agent.templateId && <AgentUpdateBadge agentId={agent.id} agentName={agent.name} />}
               </div>
               <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
                 {agent.description || 'No description provided'}

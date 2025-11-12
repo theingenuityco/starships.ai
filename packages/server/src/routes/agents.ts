@@ -646,12 +646,10 @@ router.get('/agents/:id/check-update', jwtAuthMiddleware, async (req: Request, r
     const agentService = new AgentService();
     const updateCheck = await agentService.checkForUpdate(agentId);
 
-    sendSuccess(res, {
-      data: updateCheck,
-    });
+    sendSuccess(res, updateCheck);
   } catch (error) {
     console.error('[AGENTS] Error checking for updates:', error);
-    handleError(error, res);
+    handleError(error, res, 'checking for updates');
   }
 });
 
@@ -676,13 +674,18 @@ router.post('/agents/:id/update-from-template', jwtAuthMiddleware, async (req: R
     const agentService = new AgentService();
     const updated = await agentService.updateFromTemplate(agentId, userId);
 
+    // Return minimal response - only essential fields
     sendSuccess(res, {
+      id: updated.id,
+      name: updated.name,
+      version: updated.version,
+      templateSnapshotAt: updated.templateSnapshotAt,
+      updatedAt: updated.updatedAt,
       message: 'Agent updated successfully from template',
-      data: updated,
     });
   } catch (error) {
     console.error('[AGENTS] Error updating from template:', error);
-    handleError(error, res);
+    handleError(error, res, 'updating from template');
   }
 });
 
@@ -707,12 +710,10 @@ router.get('/starships/:starshipId/agents/with-updates', jwtAuthMiddleware, asyn
     const agentService = new AgentService();
     const agents = await agentService.getAgentsWithUpdates(starshipId, userId);
 
-    sendSuccess(res, {
-      data: agents,
-    });
+    sendSuccess(res, agents);
   } catch (error) {
     console.error('[AGENTS] Error getting agents with updates:', error);
-    handleError(error, res);
+    handleError(error, res, 'getting agents with updates');
   }
 });
 

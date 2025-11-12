@@ -1,5 +1,5 @@
-import api, { agentAPI } from '@/lib/api'
-import type { AgentModel, AgentUpdateCheckResponse, ApiResponse } from '@starships/protocol'
+import api from '@/lib/api'
+import type { AgentModel, AgentUpdateCheckResponse, AgentUpdateResponse, ApiResponse } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -22,8 +22,8 @@ export function useAgentUpdateCheck(agentId: string, enabled: boolean = true) {
       return response.data.data
     },
     enabled: !!agentId && enabled,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in memory for 10 minutes
+    staleTime: 30 * 1000, // 30 seconds - consistent with other agent queries
+    gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true, // Recheck when user returns to window
   })
 }
@@ -35,18 +35,18 @@ export function useUpdateAgentFromTemplate() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (agentId: string): Promise<AgentModel> => {
-      const response: FetchResponse<ApiResponse<AgentModel>> = await api.post(`/api/v1/agents/${agentId}/update-from-template`)
+    mutationFn: async (agentId: string): Promise<AgentUpdateResponse> => {
+      const response: FetchResponse<ApiResponse<AgentUpdateResponse>> = await api.post(`/api/v1/agents/${agentId}/update-from-template`)
       return response.data.data
     },
-    onSuccess: (updatedAgent) => {
-      // Invalidate relevant queries to trigger refetch
+    onSuccess: (updateResponse) => {
+      // Invalidate relevant queries to trigger refetch of full agent data
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
-      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(updatedAgent.id) })
-      queryClient.invalidateQueries({ queryKey: AGENT_UPDATE_QUERY_KEYS.checkUpdate(updatedAgent.id) })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(updateResponse.id) })
+      queryClient.invalidateQueries({ queryKey: AGENT_UPDATE_QUERY_KEYS.checkUpdate(updateResponse.id) })
 
       toast.success('Agent updated successfully!', {
-        description: `Updated to version ${updatedAgent.version}`,
+        description: `Updated to version ${updateResponse.version}`,
       })
     },
     onError: (error: Error) => {

@@ -73,3 +73,15 @@ export interface AgentUpdateCheckResponse {
   latestVersion: string; // Template's latest version
   templateUpdatedAt?: string;
 }
+
+/**
+ * Response type for update from template (minimal response)
+ */
+export interface AgentUpdateResponse {
+  id: string;
+  name: string;
+  version: string;
+  templateSnapshotAt?: string;
+  updatedAt: string;
+  message: string;
+}

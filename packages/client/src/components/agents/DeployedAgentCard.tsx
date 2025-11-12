@@ -12,7 +12,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { AgentUpdateBadge } from './AgentUpdateBadge'
+import { useAgentUpdateCheck } from '@/hooks/useAgentUpdate'
 
 interface DeployedAgentCardProps {
   agent: AgentModel
@@ -25,8 +25,11 @@ interface DeployedAgentCardProps {
 }
 
 export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
-  // Check if this is a system agent (Gaia or Daedalus)
-  const isSystemAgent = agent.name === 'Gaia' || agent.name === 'Daedalus'
+  // Check if this is a template-based agent (has templateId) - these are protected
+  const isTemplateAgent = !!agent.templateId
+
+  // Check for updates (only for template agents)
+  const { data: updateCheck } = useAgentUpdateCheck(agent.id, isTemplateAgent)
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
@@ -91,7 +94,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                {onDelete && !isSystemAgent && (
+                {onDelete && !isTemplateAgent && (
                   <DropdownMenuItem
                     onClick={e => {
                       e.stopPropagation()
@@ -104,7 +107,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                   </DropdownMenuItem>
                 )}
 
-                {onDelete != null && isSystemAgent && (
+                {onDelete != null && isTemplateAgent && (
                   <DropdownMenuItem disabled className="flex items-center gap-2 opacity-50">
                     <Icon name="shield" className="w-4 h-4" />
                     <span>Protected Agent</span>
@@ -165,12 +168,20 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
 
             {/* Agent name and badge */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <div className="flex items-center gap-2 mb-2">
                 <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{agent.name}</CardTitle>
-                {isSystemAgent && (
+                {/* Show version badge next to name */}
+                {agent.version && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                    v{agent.version}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {isTemplateAgent && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] px-1.5 py-0.5"
+                    className="text-[10px] px-1.5 py-0.5 flex items-center"
                     style={{
                       borderColor: 'rgba(245,158,11,0.4)',
                       backgroundColor: 'rgba(245,158,11,0.15)',
@@ -181,8 +192,43 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                     System
                   </Badge>
                 )}
-                {/* Show update badge if agent has a template */}
-                {agent.templateId && <AgentUpdateBadge agentId={agent.id} agentName={agent.name} />}
+                {/* Premium update available indicator with subtle animation */}
+                {isTemplateAgent && updateCheck?.needsUpdate && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                  >
+                    <Badge
+                      className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
+                        borderColor: 'rgba(139, 92, 246, 0.3)',
+                        color: 'rgb(139, 92, 246)',
+                        boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
+                      }}
+                    >
+                      <motion.div
+                        className="absolute inset-0"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
+                        }}
+                        animate={{
+                          x: ['-100%', '100%'],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: 'linear',
+                        }}
+                      />
+                      <span className="relative z-10 flex items-center gap-1">
+                        <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
+                        NEW UPDATE AVAILABLE
+                      </span>
+                    </Badge>
+                  </motion.div>
+                )}
               </div>
               <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
                 {agent.description || 'No description provided'}

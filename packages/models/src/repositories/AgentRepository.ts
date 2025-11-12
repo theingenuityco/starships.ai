@@ -5,7 +5,7 @@ import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository'
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
-import { compareVersions } from '@/utils/version';
+import { compareVersions, isValidVersion } from '@/utils/version';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel, AgentUpdateCheckResponse } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
@@ -489,8 +489,37 @@ export class AgentRepository extends BaseRepository {
         const currentVersion = agent.version || '1.0.0';
         const latestVersion = template.version;
 
+        // Validate versions before comparison
+        if (!isValidVersion(currentVersion)) {
+          console.warn(`Invalid current version format for agent ${agentId}: ${currentVersion}`);
+          return {
+            needsUpdate: false,
+            currentVersion,
+            latestVersion,
+            templateUpdatedAt: template.updatedAt,
+          };
+        }
+
+        if (!isValidVersion(latestVersion)) {
+          console.warn(`Invalid template version format for template ${agent.templateId}: ${latestVersion}`);
+          return {
+            needsUpdate: false,
+            currentVersion,
+            latestVersion,
+            templateUpdatedAt: template.updatedAt,
+          };
+        }
+
         // Compare versions (not timestamps!)
-        const needsUpdate = compareVersions(latestVersion, currentVersion) > 0;
+        // compareVersions throws an error if versions are invalid, but we've validated above
+        let needsUpdate = false;
+        try {
+          needsUpdate = compareVersions(latestVersion, currentVersion) > 0;
+        } catch (error) {
+          console.error(`Error comparing versions for agent ${agentId}:`, error);
+          // If comparison fails, assume no update needed
+          needsUpdate = false;
+        }
 
         return {
           needsUpdate,

@@ -7,21 +7,66 @@ function transformCodeToMain(code: string): { code: string; changed: boolean } {
   if (!code || typeof code !== 'string') return { code, changed: false };
   if (/async\s+function\s+main\s*\(/.test(code)) return { code, changed: false };
 
-  let newCode = code;
-  // Only replace standalone identifiers, not object keys
-  newCode = newCode.replace(/(?<![\w$])input(?![\w$]|\s*:)/g, 'ctx.$input');
-  newCode = newCode.replace(/(?<![\w$])state(?![\w$]|\s*:)/g, 'ctx.$state');
-  newCode = newCode.replace(/\benv\s*\(/g, 'ctx.$env(');
-  newCode = newCode.replace(/\$lastOutputOf\s*\(/g, 'ctx.$lastOutputOf(');
-  newCode = newCode.replace(/\s+as\s+(any|unknown|never)/g, '');
+  // Helper to compile-check a candidate
+  const compiles = (candidate: string): boolean => {
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function('ctx', candidate);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
-  // Local ctx collision
-  if (/\b(const|let|var)\s+ctx\s*=/.test(newCode)) {
-    newCode = newCode.replace(/\b(const|let|var)\s+ctx\s*=/g, (_, kw) => `${kw} _ctx =`);
-    newCode = newCode.replace(/(?<![\w$])ctx\.(?!\$)/g, '_ctx.');
+  // Strategy A: full transform (original behavior)
+  const applyFullTransform = (src: string): string => {
+    let transformed = src;
+    // Only replace standalone identifiers, not object keys
+    transformed = transformed.replace(/(?<![\w$])input(?![\w$]|\s*:)/g, 'ctx.$input');
+    transformed = transformed.replace(/(?<![\w$])state(?![\w$]|\s*:)/g, 'ctx.$state');
+    transformed = transformed.replace(/\benv\s*\(/g, 'ctx.$env(');
+    transformed = transformed.replace(/\$lastOutputOf\s*\(/g, 'ctx.$lastOutputOf(');
+    transformed = transformed.replace(/\s+as\s+(any|unknown|never)/g, '');
+
+    // Local ctx collision
+    if (/\b(const|let|var)\s+ctx\s*=/.test(transformed)) {
+      transformed = transformed.replace(/\b(const|let|var)\s+ctx\s*=/g, (_, kw) => `${kw} _ctx =`);
+      transformed = transformed.replace(/(?<![\w$])ctx\.(?!\$)/g, '_ctx.');
+    }
+    return transformed;
+  };
+
+  // Strategy B: minimal transform (wrap only + env helpers)
+  const applyMinimalTransform = (src: string): string => {
+    let transformed = src;
+    transformed = transformed.replace(/\benv\s*\(/g, 'ctx.$env(');
+    transformed = transformed.replace(/\$lastOutputOf\s*\(/g, 'ctx.$lastOutputOf(');
+    transformed = transformed.replace(/\s+as\s+(any|unknown|never)/g, '');
+    if (/\b(const|let|var)\s+ctx\s*=/.test(transformed)) {
+      transformed = transformed.replace(/\b(const|let|var)\s+ctx\s*=/g, (_, kw) => `${kw} _ctx =`);
+      transformed = transformed.replace(/(?<![\w$])ctx\.(?!\$)/g, '_ctx.');
+    }
+    return transformed;
+  };
+
+  // Try full transform first
+  let candidate = applyFullTransform(code);
+  let wrapped = `async function main(ctx) {\n${candidate}\n}`;
+  if (compiles(wrapped)) {
+    return { code: wrapped, changed: true };
   }
 
-const wrapped = `async function main(ctx) {\n${newCode}\n}`;
+  // If that failed (e.g., due to naive 'input'/'state' replacements inside template literals),
+  // fall back to a minimal transform that avoids those replacements.
+  candidate = applyMinimalTransform(code);
+  wrapped = `async function main(ctx) {\n${candidate}\n}`;
+  if (compiles(wrapped)) {
+    return { code: wrapped, changed: true };
+  }
+
+  // Final fallback: wrap original code only. If this still does not compile,
+  // let the caller capture and report the error.
+  wrapped = `async function main(ctx) {\n${code}\n}`;
   return { code: wrapped, changed: true };
 }
 

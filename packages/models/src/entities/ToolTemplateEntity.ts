@@ -89,6 +89,11 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   @IsNumber()
   usageCount!: number;
 
+  @Expose()
+  @IsString()
+  @Length(1, 20)
+  version!: string; // Semantic version (e.g., '1.0.2')
+
   // Template preview
   @Expose()
   @IsOptional()
@@ -138,6 +143,7 @@ export class ToolTemplateEntity implements ToolTemplateModel {
         condition: dataRecord.condition,
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount || 0,
+        version: dataRecord.version || '1.0.0',
         exampleUsage: dataRecord.exampleUsage,
         requiresApiKey: dataRecord.requiresApiKey,
         configurationFields: dataRecord.configurationFields || [],

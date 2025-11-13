@@ -125,6 +125,7 @@ export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | '
   blueprint: toolGetTool.blueprint,
 
   slug: 'get-tool',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{ "slug": "calc" } // returns full tool model; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

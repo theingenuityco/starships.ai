@@ -177,7 +177,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap mb-2">
                 {isTemplateAgent && (
                   <Badge
                     variant="outline"

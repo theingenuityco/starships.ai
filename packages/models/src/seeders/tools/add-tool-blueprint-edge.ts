@@ -139,7 +139,7 @@ export const toolAddBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' | 'c
   blueprint: toolAddBlueprintEdgeTool.blueprint,
 
   slug: 'add-tool-blueprint-edge',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "edge": { "ref": "edge_process", "from": "start", "to": "process" } }',
   requiresApiKey: false,

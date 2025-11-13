@@ -57,7 +57,7 @@ export const echoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'upd
   blueprint: echoTool.blueprint,
 
   slug: 'echo',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'utility',
   exampleUsage: 'Use in LLM function-calling: { "name": "echo", "arguments": { "message": "Hello Tools!" } }',
   requiresApiKey: false,

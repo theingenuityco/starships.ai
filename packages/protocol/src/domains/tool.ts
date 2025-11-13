@@ -71,6 +71,9 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   createdAt: string;
   updatedAt: string;
 
+  // Foreign key relationships
+  starshipId: string; // Tool belongs to a starship
+
   // Template relationship (optional)
   templateId?: string;
 

@@ -387,7 +387,7 @@ router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response):
       return;
     }
 
-    const hasAccess = await verifyResourceAccess((existingTool as any).starshipId, userId, 'tool', paramValidation.id, res);
+    const hasAccess = await verifyResourceAccess(existingTool.starshipId, userId, 'tool', paramValidation.id, res);
     if (!hasAccess) return;
 
     const tool = await toolRepository.update(paramValidation.id, bodyValidation as any);
@@ -424,7 +424,7 @@ router.delete('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Respons
       return;
     }
 
-    const hasAccess = await verifyResourceAccess((existingTool as any).starshipId, userId, 'tool', paramValidation.id, res);
+    const hasAccess = await verifyResourceAccess(existingTool.starshipId, userId, 'tool', paramValidation.id, res);
     if (!hasAccess) return;
 
     const deleted = await toolRepository.delete(paramValidation.id);
@@ -478,7 +478,7 @@ router.get('/tools/:id/check-update', jwtAuthMiddleware, async (req: Request, re
     sendSuccess(res, updateCheck);
   } catch (error) {
     console.error('[TOOLS] Error checking for updates:', error);
-    handleError(error, res, 'checking for updates');
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to check for updates');
   }
 });
 
@@ -524,7 +524,7 @@ router.post('/tools/:id/update-from-template', jwtAuthMiddleware, async (req: Re
     });
   } catch (error) {
     console.error('[TOOLS] Error updating from template:', error);
-    handleError(error, res, 'updating from template');
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool from template');
   }
 });
 
@@ -556,7 +556,7 @@ router.get('/starships/:starshipId/tools/with-updates', jwtAuthMiddleware, async
     sendSuccess(res, { tools: toolsWithUpdates });
   } catch (error) {
     console.error('[TOOLS] Error getting tools with updates:', error);
-    handleError(error, res, 'getting tools with updates');
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get tools with updates');
   }
 });
 

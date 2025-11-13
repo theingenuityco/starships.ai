@@ -28,6 +28,7 @@ import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
 import { useAgentUpdateCheck, useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -58,6 +59,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Store full agent data including version info
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
+
+  // Dialog state for update confirmation
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false)
 
   // Check if this is a template-based agent (has templateId) - these are read-only
   const isTemplateAgent = useMemo(() => {
@@ -165,6 +169,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     try {
       await updateMutation.mutateAsync(agentIdForUpdate)
+      setShowUpdateDialog(false)
       // Reload the page to refresh all data
       window.location.reload()
     } catch (error: any) {
@@ -322,8 +327,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             <Button
               type="button"
               size="sm"
-              onClick={handleUpdateFromTemplate}
-              disabled={updateMutation.isPending}
+              onClick={() => setShowUpdateDialog(true)}
               style={{
                 background: 'rgba(139, 92, 246, 0.1)',
                 borderColor: 'rgba(139, 92, 246, 0.3)',
@@ -331,11 +335,56 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               }}
               className="hover:opacity-80 transition-opacity"
             >
-              {updateMutation.isPending ? 'Updating...' : 'Update Now'}
+              Update Now
             </Button>
           </div>
         </motion.div>
       )}
+
+      {/* Update Confirmation Dialog */}
+      <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Agent</DialogTitle>
+            <DialogDescription>A new version of this agent template is available.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground mb-1">Current Version:</p>
+                <p className="font-mono font-semibold text-base">v{updateCheck?.currentVersion}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Latest Version:</p>
+                <p className="font-mono font-semibold text-base text-purple-600">v{updateCheck?.latestVersion}</p>
+              </div>
+            </div>
+
+            <div className="text-sm bg-muted/50 p-4 rounded-lg border">
+              <p className="text-muted-foreground">
+                This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.
+              </p>
+            </div>
+
+            {updateCheck?.templateUpdatedAt && (
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <Icon name="clock" className="w-3.5 h-3.5" />
+                Template last updated: {new Date(updateCheck.templateUpdatedAt).toLocaleString()}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpdateDialog(false)} disabled={updateMutation.isPending}>
+              Later
+            </Button>
+            <Button onClick={handleUpdateFromTemplate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Updating...' : 'Update Now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Title */}
       <div className="space-y-4">

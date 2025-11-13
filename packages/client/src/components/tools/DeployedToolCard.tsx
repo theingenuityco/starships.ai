@@ -96,6 +96,12 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{tool.name}</CardTitle>
+              {/* Show version badge next to name */}
+              {tool.version && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                  v{tool.version}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap mb-2">
               {tool.templateId && (

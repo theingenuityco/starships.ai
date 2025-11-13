@@ -227,7 +227,7 @@ export const agentEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentEditTool.blueprint,
 
   slug: 'edit-agent',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "systemPrompt": "Updated instructions", "previewPrompts": ["New example 1", "New example 2"] } // partial updates by slug',

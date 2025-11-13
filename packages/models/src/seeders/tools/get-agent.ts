@@ -112,7 +112,7 @@ export const agentGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: agentGetTool.blueprint,
 
   slug: 'get-agent',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{ "slug": "customer-support" } // returns complete agent details',
   requiresApiKey: false,

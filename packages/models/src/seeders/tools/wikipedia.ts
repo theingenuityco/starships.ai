@@ -401,7 +401,7 @@ export const wikipediaToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
 
   // Template metadata
   slug: 'wikipedia-search',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'data',
   exampleUsage: JSON.stringify(
     {

@@ -300,7 +300,7 @@ export const duckduckgoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
 
   // Template metadata
   slug: 'duckduckgo-instant',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'data',
   exampleUsage: JSON.stringify(
     {

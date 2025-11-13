@@ -959,11 +959,11 @@ const NodeDetailsPanel: React.FC<{
                 {Object.entries(node.parameters)
                   .filter(([key]) => key !== 'code')
                   .map(([key, value]) => (
-                  <div key={key} className="space-y-1">
-                    <div className="text-xs font-medium text-foreground">{key}</div>
-                    <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</pre>
-                  </div>
-                ))}
+                    <div key={key} className="space-y-1">
+                      <div className="text-xs font-medium text-foreground">{key}</div>
+                      <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</pre>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
@@ -1112,11 +1112,7 @@ function BlueprintFlow({
       {/* Node Details Panel */}
       {selectedNode && (
         <>
-          <div
-            className="absolute inset-0 z-40 bg-background/50 backdrop-blur-sm"
-            onClick={() => setSelectedNode(null)}
-            aria-hidden
-          />
+          <div className="absolute inset-0 z-40 bg-background/50 backdrop-blur-sm" onClick={() => setSelectedNode(null)} aria-hidden />
           <NodeDetailsPanel node={selectedNode} onClose={() => setSelectedNode(null)} />
         </>
       )}

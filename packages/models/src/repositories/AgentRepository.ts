@@ -5,8 +5,8 @@ import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository'
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
-import { compareVersions, isValidVersion } from '@/utils/version';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel, AgentUpdateCheckResponse } from '@starships/protocol';
+import { compareVersions } from '@/utils/version';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
   constructor() {
@@ -28,7 +28,30 @@ export class AgentRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const result = await super.findEntityById<Record<string, unknown>>('agents', id);
-        return result ? fromDatabase(AgentEntity, result) : null;
+        if (!result) return null;
+
+        const agent = fromDatabase(AgentEntity, result);
+
+        // If agent has a template, fetch it and populate updateInfo
+        if (agent.templateId) {
+          const connection = this.getConnection();
+          const templateResult = await connection.queryOne<Record<string, unknown>>(
+            'SELECT * FROM agent_templates WHERE id = $1',
+            [agent.templateId]
+          );
+
+          if (templateResult) {
+            const template = fromDatabase(AgentTemplateEntity, templateResult);
+            const comparison = compareVersions(agent.version, template.version);
+            agent.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: template.version,
+              templateUpdatedAt: template.updatedAt,
+            };
+          }
+        }
+
+        return agent;
       },
       'findById',
       'Agent',
@@ -44,7 +67,43 @@ export class AgentRepository extends BaseRepository {
           'SELECT * FROM agents WHERE starship_id = $1 ORDER BY created_at DESC',
           [starshipId]
         );
-        return fromDatabaseArray(AgentEntity, result);
+        const agents = fromDatabaseArray(AgentEntity, result);
+
+        // Collect unique template IDs
+        const templateIds = [...new Set(agents.filter(a => a.templateId).map(a => a.templateId))];
+
+        // If there are templates, fetch them in a single query
+        if (templateIds.length > 0) {
+          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          const templates = await connection.query<Record<string, unknown>>(
+            `SELECT * FROM agent_templates WHERE id IN (${placeholders})`,
+            templateIds
+          );
+
+          // Build a map of template ID to template for quick lookup
+          const templateMap = new Map<string, AgentTemplateModel>();
+          for (const template of templates) {
+            const templateModel = fromDatabase(AgentTemplateEntity, template);
+            templateMap.set(templateModel.id, templateModel);
+          }
+
+          // Populate updateInfo for each agent with a template
+          for (const agent of agents) {
+            if (agent.templateId) {
+              const template = templateMap.get(agent.templateId);
+              if (template) {
+                const comparison = compareVersions(agent.version, template.version);
+                agent.updateInfo = {
+                  needsUpdate: comparison < 0,
+                  latestVersion: template.version,
+                  templateUpdatedAt: template.updatedAt,
+                };
+              }
+            }
+          }
+        }
+
+        return agents;
       },
       'findByStarship',
       'Agent'
@@ -459,82 +518,6 @@ export class AgentRepository extends BaseRepository {
   // ============================================================================
 
   /**
-   * Check if agent needs update from its source template
-   */
-  async checkForUpdate(agentId: string): Promise<AgentUpdateCheckResponse> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const agent = await this.findById(agentId);
-
-        // No template = no updates available
-        if (!agent?.templateId) {
-          return {
-            needsUpdate: false,
-            currentVersion: agent?.version || '1.0.0',
-            latestVersion: agent?.version || '1.0.0',
-          };
-        }
-
-        const templateRepo = new AgentTemplateRepository();
-        const template = await templateRepo.findById(agent.templateId);
-
-        if (!template) {
-          return {
-            needsUpdate: false,
-            currentVersion: agent.version,
-            latestVersion: agent.version,
-          };
-        }
-
-        const currentVersion = agent.version || '1.0.0';
-        const latestVersion = template.version;
-
-        // Validate versions before comparison
-        if (!isValidVersion(currentVersion)) {
-          console.warn(`Invalid current version format for agent ${agentId}: ${currentVersion}`);
-          return {
-            needsUpdate: false,
-            currentVersion,
-            latestVersion,
-            templateUpdatedAt: template.updatedAt,
-          };
-        }
-
-        if (!isValidVersion(latestVersion)) {
-          console.warn(`Invalid template version format for template ${agent.templateId}: ${latestVersion}`);
-          return {
-            needsUpdate: false,
-            currentVersion,
-            latestVersion,
-            templateUpdatedAt: template.updatedAt,
-          };
-        }
-
-        // Compare versions (not timestamps!)
-        // compareVersions throws an error if versions are invalid, but we've validated above
-        let needsUpdate = false;
-        try {
-          needsUpdate = compareVersions(latestVersion, currentVersion) > 0;
-        } catch (error) {
-          console.error(`Error comparing versions for agent ${agentId}:`, error);
-          // If comparison fails, assume no update needed
-          needsUpdate = false;
-        }
-
-        return {
-          needsUpdate,
-          currentVersion,
-          latestVersion,
-          templateUpdatedAt: template.updatedAt,
-        };
-      },
-      'checkForUpdate',
-      'Agent',
-      agentId
-    );
-  }
-
-  /**
    * Update agent with latest template data
    */
   async updateFromTemplate(agentId: string): Promise<AgentModel> {
@@ -589,31 +572,6 @@ export class AgentRepository extends BaseRepository {
       'updateFromTemplate',
       'Agent',
       agentId
-    );
-  }
-
-  /**
-   * Get all agents with available updates for a starship
-   */
-  async getAgentsWithUpdates(starshipId: string): Promise<AgentModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const agents = await this.findByStarship(starshipId);
-        const agentsWithUpdates: AgentModel[] = [];
-
-        for (const agent of agents) {
-          if (agent.templateId) {
-            const updateCheck = await this.checkForUpdate(agent.id);
-            if (updateCheck.needsUpdate) {
-              agentsWithUpdates.push(agent);
-            }
-          }
-        }
-
-        return agentsWithUpdates;
-      },
-      'getAgentsWithUpdates',
-      'Agent'
     );
   }
 }

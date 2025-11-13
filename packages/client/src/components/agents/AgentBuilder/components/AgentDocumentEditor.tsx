@@ -26,7 +26,7 @@ import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
-import { useAgentUpdateCheck, useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
+import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
@@ -68,12 +68,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return !!fullAgent?.templateId
   }, [fullAgent?.templateId])
 
-  // Update hooks for template agents (only fetch when we have an agentId)
-  const [agentIdForUpdate, setAgentIdForUpdate] = useState<string | null>(null)
-  const { data: updateCheck, isLoading: isCheckingUpdate } = useAgentUpdateCheck(
-    agentIdForUpdate || '',
-    !!agentIdForUpdate && isTemplateAgent
-  )
+  // Update mutation for template agents
   const updateMutation = useUpdateAgentFromTemplate()
 
   const { data: starshipTools = [] } = useQuery({
@@ -117,7 +112,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       if (!starshipId || !value?.slug || value.slug === 'new') {
         console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
         setAgentId(null)
-        setAgentIdForUpdate(null)
         return
       }
       const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
@@ -127,13 +121,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
         if (!cancelled) {
           setAgentId(agent?.id || null)
-          setAgentIdForUpdate(agent?.id || null)
           setFullAgent(agent as AgentModel)
         }
       } else {
         if (!cancelled) {
           setAgentId(null)
-          setAgentIdForUpdate(null)
           setFullAgent(null)
         }
       }
@@ -165,10 +157,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   }
 
   const handleUpdateFromTemplate = async () => {
-    if (!agentIdForUpdate) return
+    if (!agentId) return
 
     try {
-      await updateMutation.mutateAsync(agentIdForUpdate)
+      await updateMutation.mutateAsync(agentId)
       setShowUpdateDialog(false)
       // Reload the page to refresh all data
       window.location.reload()
@@ -270,7 +262,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   return (
     <div className="space-y-4 pt-14 pb-28">
       {/* Template Agent Update Banner */}
-      {isTemplateAgent && fullAgent && updateCheck?.needsUpdate && (
+      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -320,7 +312,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   }}
                 >
                   <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                  v{updateCheck.latestVersion}
+                  v{fullAgent?.updateInfo?.latestVersion}
                 </Badge>
               </div>
             </div>
@@ -353,11 +345,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground mb-1">Current Version:</p>
-                <p className="font-mono font-semibold text-base">v{updateCheck?.currentVersion}</p>
+                <p className="font-mono font-semibold text-base">v{fullAgent?.version}</p>
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Latest Version:</p>
-                <p className="font-mono font-semibold text-base text-purple-600">v{updateCheck?.latestVersion}</p>
+                <p className="font-mono font-semibold text-base text-purple-600">v{fullAgent?.updateInfo?.latestVersion}</p>
               </div>
             </div>
 
@@ -367,10 +359,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </p>
             </div>
 
-            {updateCheck?.templateUpdatedAt && (
+            {fullAgent?.updateInfo?.templateUpdatedAt && (
               <div className="text-xs text-muted-foreground flex items-center gap-2">
                 <Icon name="clock" className="w-3.5 h-3.5" />
-                Template last updated: {new Date(updateCheck.templateUpdatedAt).toLocaleString()}
+                Template last updated: {new Date(fullAgent.updateInfo.templateUpdatedAt).toLocaleString()}
               </div>
             )}
           </div>

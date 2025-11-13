@@ -446,43 +446,6 @@ router.delete('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 // ============================================================================
 
 /**
- * GET /tools/:id/check-update - Check if tool has updates available from its template
- */
-router.get('/tools/:id/check-update', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(
-      z.object({
-        id: IdSchema,
-      }),
-      req.params,
-      res,
-      'tool ID'
-    );
-    if (!paramValidation) return;
-
-    const { id: toolId } = paramValidation;
-
-    // Authorization: verify caller owns the tool
-    const toolRepository = new ToolRepository();
-    const tool = await toolRepository.findById(toolId);
-    if (!tool) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
-      return;
-    }
-
-    const hasAccess = await verifyResourceAccess(tool.starshipId, req.user!.id, 'tool', toolId, res);
-    if (!hasAccess) return;
-
-    const updateCheck = await toolRepository.checkForUpdate(toolId);
-
-    sendSuccess(res, updateCheck);
-  } catch (error) {
-    console.error('[TOOLS] Error checking for updates:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to check for updates');
-  }
-});
-
-/**
  * POST /tools/:id/update-from-template - Update tool with latest template data
  */
 router.post('/tools/:id/update-from-template', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -525,38 +488,6 @@ router.post('/tools/:id/update-from-template', jwtAuthMiddleware, async (req: Re
   } catch (error) {
     console.error('[TOOLS] Error updating from template:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool from template');
-  }
-});
-
-/**
- * GET /starships/:starshipId/tools/with-updates - Get all tools in starship that have updates available
- */
-router.get('/starships/:starshipId/tools/with-updates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(
-      z.object({
-        starshipId: IdSchema,
-      }),
-      req.params,
-      res,
-      'starship ID'
-    );
-    if (!paramValidation) return;
-
-    const { starshipId } = paramValidation;
-    const userId = req.user!.id;
-
-    // Verify starship access
-    const hasAccess = await verifyStarshipAccess(starshipId, userId, res);
-    if (!hasAccess) return;
-
-    const toolRepository = new ToolRepository();
-    const toolsWithUpdates = await toolRepository.getToolsWithUpdates(starshipId);
-
-    sendSuccess(res, { tools: toolsWithUpdates });
-  } catch (error) {
-    console.error('[TOOLS] Error getting tools with updates:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get tools with updates');
   }
 });
 

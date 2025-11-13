@@ -75,14 +75,20 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
+              const envFn = ctx && typeof ctx === 'object' && typeof ctx.$env === 'function' ? ctx.$env : undefined;
+              const baseUrlRaw = envFn ? envFn('BASE_URL') : undefined;
+              const baseUrl = typeof baseUrlRaw === 'string' ? baseUrlRaw.replace(/\\/+$/, '') : '';
               if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
+              const authToken = envFn ? envFn('AUTH_TOKEN') : undefined;
+              const starshipId = envFn ? envFn('STARSHIP_ID') : undefined;
               if (!authToken) throw new Error('AUTH_TOKEN is required');
               if (!starshipId) throw new Error('STARSHIP_ID is required');
 
-              const slug = ctx.$input && ctx.$input.slug;
+              if (!ctx || typeof ctx !== 'object' || !ctx.$input) {
+                throw new Error('Tool arguments missing');
+              }
+
+              const slug = ctx.$input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
               if (ctx.$input.input === undefined) {
@@ -95,17 +101,17 @@ Automatically inferred from agent state (do not pass manually):
                 testInput = [{ role: 'user', content: testInput }];
               }
 
-            return {
-              url: String(baseUrl) + '/starships/' + String(starshipId) + '/agents/' + String(slug) + '/test',
-              method: 'POST',
-              headers: {
-                'Authorization': 'Bearer ' + String(authToken),
-                'Content-Type': 'application/json'
-              },
-              body: {
-                input: testInput
-              }
-            };
+              return {
+                url: String(baseUrl) + '/starships/' + String(starshipId) + '/agents/' + String(slug) + '/test',
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + String(authToken),
+                  'Content-Type': 'application/json'
+                },
+                body: {
+                  input: testInput
+                }
+              };
             }
           `,
           timeout: 3000,

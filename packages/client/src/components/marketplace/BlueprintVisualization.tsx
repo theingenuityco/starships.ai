@@ -919,7 +919,6 @@ const NodeDetailsPanel: React.FC<{
                     overviewRulerBorder: false,
                     stickyScroll: { enabled: true },
                     padding: { top: 12, bottom: 12 },
-                    renderIndentGuides: false,
                     scrollbar: {
                       vertical: 'hidden',
                       horizontal: 'hidden',

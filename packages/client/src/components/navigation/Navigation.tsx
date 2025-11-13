@@ -214,8 +214,8 @@ export function Navigation(props: NavigationProps) {
           contain: 'layout style paint',
         }}
       >
-        {/* Header with Theme Toggle – matches sidebar background */}
-        <div className="px-3 py-3 flex-shrink-0 flex items-center justify-between gap-3">
+        {/* Header – logo and brand */}
+        <div className="px-3 py-3 flex-shrink-0 flex items-center justify-start gap-2">
           <div className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-start gap-2" onClick={handleLogoClick} title="Go to Landing Screen">
             <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
               <StarshipsLogo
@@ -241,9 +241,6 @@ export function Navigation(props: NavigationProps) {
                 starships.ai
               </motion.span>
             )}
-          </div>
-          <div className="flex-shrink-0">
-            <ThemeToggle />
           </div>
         </div>
 
@@ -283,8 +280,16 @@ export function Navigation(props: NavigationProps) {
           </div>
         )}
 
-        {/* Spacer to push user profile to bottom */}
+        {/* Spacer to push theme toggle + user profile toward bottom when needed */}
         {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+
+        {/* Theme toggle above profile section - styled like a nav item */}
+        <div className="flex-shrink-0 px-3 pb-1">
+          <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 px-2 text-xs transition-colors">
+            <span className="font-medium">Appearance</span>
+            <ThemeToggle />
+          </div>
+        </div>
 
         {/* User Profile Section */}
         <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>

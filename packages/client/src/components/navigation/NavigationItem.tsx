@@ -45,8 +45,8 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       <div
         className="flex-shrink-0"
         style={{
-          width: '1.25rem',
-          height: '1.25rem',
+          width: '1.5rem',
+          height: '1.5rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -54,7 +54,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
           pointerEvents: 'none',
         }}
       >
-        <Icon name={icon} className="w-4 h-4" />
+        <Icon name={icon} className="w-5 h-5" />
       </div>
     )
   }, [icon])

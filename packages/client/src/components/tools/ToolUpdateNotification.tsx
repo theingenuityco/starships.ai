@@ -3,29 +3,28 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useToolUpdateCheck, useUpdateToolFromTemplate } from '@/hooks/useToolUpdate'
+import { useUpdateToolFromTemplate } from '@/hooks/useToolUpdate'
 import Icon from '@/components/primitives/Icon'
 import { motion } from 'motion/react'
 import { useState } from 'react'
+import type { ToolModel } from '@starships/protocol'
 
 interface ToolUpdateNotificationProps {
-  toolId: string
-  isTemplateBasedTool: boolean
+  tool: ToolModel
 }
 
-export function ToolUpdateNotification({ toolId, isTemplateBasedTool }: ToolUpdateNotificationProps) {
-  const { data: updateCheck, isLoading } = useToolUpdateCheck(toolId, isTemplateBasedTool && !!toolId)
+export function ToolUpdateNotification({ tool }: ToolUpdateNotificationProps) {
   const updateMutation = useUpdateToolFromTemplate()
   const [showDialog, setShowDialog] = useState(false)
 
-  // Don't show if not template-based, loading, or no update available
-  if (!isTemplateBasedTool || isLoading || !updateCheck?.needsUpdate) {
+  // Don't show if no template or no update available
+  if (!tool.templateId || !tool.updateInfo?.needsUpdate) {
     return null
   }
 
   const handleUpdate = async () => {
-    if (!toolId) return
-    await updateMutation.mutateAsync(toolId, {
+    if (!tool.id) return
+    await updateMutation.mutateAsync(tool.id, {
       onSuccess: () => {
         setShowDialog(false)
       },
@@ -82,7 +81,7 @@ export function ToolUpdateNotification({ toolId, isTemplateBasedTool }: ToolUpda
               }}
             >
               <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-              v{updateCheck.latestVersion}
+              v{tool.updateInfo.latestVersion}
             </Badge>
           </div>
           <Button
@@ -112,11 +111,11 @@ export function ToolUpdateNotification({ toolId, isTemplateBasedTool }: ToolUpda
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground mb-1">Current Version:</p>
-                <p className="font-mono font-semibold text-base">v{updateCheck.currentVersion}</p>
+                <p className="font-mono font-semibold text-base">v{tool.version}</p>
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Latest Version:</p>
-                <p className="font-mono font-semibold text-base text-purple-600">v{updateCheck.latestVersion}</p>
+                <p className="font-mono font-semibold text-base text-purple-600">v{tool.updateInfo.latestVersion}</p>
               </div>
             </div>
 
@@ -126,10 +125,10 @@ export function ToolUpdateNotification({ toolId, isTemplateBasedTool }: ToolUpda
               </p>
             </div>
 
-            {updateCheck.templateUpdatedAt && (
+            {tool.updateInfo.templateUpdatedAt && (
               <div className="text-xs text-muted-foreground flex items-center gap-2">
                 <Icon name="clock" className="w-3.5 h-3.5" />
-                Template last updated: {new Date(updateCheck.templateUpdatedAt).toLocaleString()}
+                Template last updated: {new Date(tool.updateInfo.templateUpdatedAt).toLocaleString()}
               </div>
             )}
           </div>

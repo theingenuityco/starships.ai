@@ -110,6 +110,16 @@ export class ToolEntity implements ToolModel {
   @IsISO8601()
   templateSnapshotAt?: string; // When tool last synced with template
 
+  // Update availability info (computed at runtime, not stored in DB)
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  updateInfo?: {
+    needsUpdate: boolean;
+    latestVersion: string;
+    templateUpdatedAt?: string;
+  };
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

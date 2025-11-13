@@ -9,14 +9,14 @@
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
 import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository, StarshipRepository } from '@starships/models';
-import { generateSimpleAgentSlug, generateUniqueAgentSlug } from '@starships/models';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, AgentUpdateCheckResponse } from '@starships/protocol';
+import { generateUniqueAgentSlug } from '@starships/models';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import { UsageService } from './UsageService';
-import { BillingService, InsufficientFundsError } from './BillingService';
+import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
 
 export interface ConversationRequest {
@@ -799,13 +799,6 @@ export class AgentService {
   }
 
   /**
-   * Check if agent has updates available from its template
-   */
-  async checkForUpdate(agentId: string): Promise<AgentUpdateCheckResponse> {
-    return await this.agentRepository.checkForUpdate(agentId);
-  }
-
-  /**
    * Update agent to latest template version
    */
   async updateFromTemplate(agentId: string, userId: string): Promise<AgentModel> {
@@ -821,18 +814,5 @@ export class AgentService {
     }
 
     return await this.agentRepository.updateFromTemplate(agentId);
-  }
-
-  /**
-   * Get agents with available updates for starship
-   */
-  async getAgentsWithUpdates(starshipId: string, userId: string): Promise<AgentModel[]> {
-    // Verify ownership
-    const starship = await this.starshipRepository.findById(starshipId);
-    if (!starship || starship.ownerId !== userId) {
-      throw new ForbiddenError('You do not have permission to access this starship');
-    }
-
-    return await this.agentRepository.getAgentsWithUpdates(starshipId);
   }
 }

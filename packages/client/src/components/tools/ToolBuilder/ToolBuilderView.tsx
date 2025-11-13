@@ -11,7 +11,6 @@ import { useToolForm } from './hooks/useToolForm'
 import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ParametersPanel } from './components/ParametersPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
-import { ToolUpdateNotification } from '../ToolUpdateNotification'
 
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, toolId, templateId }, ref) => {
   const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })
@@ -59,13 +58,6 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
             {/* Settings Panel */}
             <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
           </div>
-
-          {/* Update Notification - Top Right */}
-          {toolId && templateId && (
-            <div className="absolute top-6 right-6 z-10">
-              <ToolUpdateNotification toolId={toolId} isTemplateBasedTool={!!templateId} />
-            </div>
-          )}
 
           {/* Blueprint or Empty State */}
           {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (

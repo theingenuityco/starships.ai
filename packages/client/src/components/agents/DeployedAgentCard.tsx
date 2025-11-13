@@ -12,8 +12,6 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useAgentUpdateCheck } from '@/hooks/useAgentUpdate'
-
 interface DeployedAgentCardProps {
   agent: AgentModel
   onClick: () => void
@@ -28,8 +26,8 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
   // Check if this is a template-based agent (has templateId) - these are protected
   const isTemplateAgent = !!agent.templateId
 
-  // Check for updates (only for template agents)
-  const { data: updateCheck } = useAgentUpdateCheck(agent.id, isTemplateAgent)
+  // Get update info from agent object (populated by API)
+  const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
@@ -193,7 +191,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                   </Badge>
                 )}
                 {/* Premium update available indicator with subtle animation */}
-                {isTemplateAgent && updateCheck?.needsUpdate && (
+                {needsUpdate && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}

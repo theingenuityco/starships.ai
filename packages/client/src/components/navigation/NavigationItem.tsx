@@ -70,8 +70,8 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/40'
       }`}
       style={{
-        paddingLeft: '0.25rem',
-        paddingRight: '0.25rem',
+        paddingLeft: '0.5rem',
+        paddingRight: '0.5rem',
         paddingTop: '0.25rem',
         paddingBottom: '0.25rem',
         justifyContent: 'flex-start',

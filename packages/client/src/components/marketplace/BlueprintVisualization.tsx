@@ -759,7 +759,6 @@ const NodeDetailsPanel: React.FC<{
           'editor.foreground': '#f2f2f2',
           'editorLineNumber.foreground': '#4a5568', // dim line numbers
           'editorLineNumber.activeForeground': '#9aa4b2', // active line number slightly brighter
-          'editorGutter.background': '#0a0a0a', // gutter slightly different from editor background
           'editor.selectionBackground': '#2e3541',
           'editor.inactiveSelectionBackground': '#171a20',
           'editorCursor.foreground': '#3b82f6',
@@ -796,7 +795,6 @@ const NodeDetailsPanel: React.FC<{
           'editor.foreground': '#141414',
           'editorLineNumber.foreground': '#999999', // dim line numbers
           'editorLineNumber.activeForeground': '#666666', // active line number darker
-          'editorGutter.background': '#f2f2f2', // gutter slightly different from editor background
           'editor.selectionBackground': '#add6ff',
           'editor.inactiveSelectionBackground': '#e5ebf1',
           'editorCursor.foreground': '#3b82f6',
@@ -864,14 +862,16 @@ const NodeDetailsPanel: React.FC<{
       <div className="flex items-center justify-between p-3 border-b border-border/40">
         <div className="flex items-center gap-2.5">
           <div
-            className="flex items-center justify-center w-8 h-8 rounded-lg"
+            className="flex items-center justify-center w-10 h-10 rounded-lg"
             style={{
               backgroundColor: colors.handle + '15',
               color: colors.handle,
               border: `2px solid ${colors.handle}30`,
             }}
           >
-            <NodeIcon nodeType={node.type} />
+            <div className="scale-125">
+              <NodeIcon nodeType={node.type} />
+            </div>
           </div>
           <div>
             <h3 className="font-semibold text-sm">{node.name}</h3>

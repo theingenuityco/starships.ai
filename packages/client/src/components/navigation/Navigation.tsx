@@ -34,8 +34,8 @@ export function Navigation(props: NavigationProps) {
   const { isAuthenticated, user, userName } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
-  // State for navbar hover expansion
-  const [isHovered, setIsHovered] = useState(false)
+  // Navbar is always expanded in the client
+  const isExpanded = true
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -177,15 +177,6 @@ export function Navigation(props: NavigationProps) {
     router.push('/')
   }, [router])
 
-  // Memoize hover handlers to prevent unnecessary re-renders
-  const handleMouseEnter = useCallback(() => setIsHovered(true), [])
-  const handleMouseLeave = useCallback(() => setIsHovered(false), [])
-
-  // Handle recents click - show tooltip only, navigation handled by expansion
-  const handleRecentsClick = useCallback(() => {
-    // No action needed - just shows tooltip in collapsed state
-  }, [])
-
   // Memoize main navigation items - only recalculate when dependencies change
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
@@ -196,8 +187,6 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'tools', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
-      // Add Recents to same hierarchy when collapsed - it will be hidden when expanded via conditional rendering
-      ...(isAuthenticated && starshipSlug && starshipData?.id && !isHovered ? [{ href: '#', label: 'Recents', icon: '', isActive: false, onClick: handleRecentsClick }] : []),
     ],
     [
       isAuthenticated,
@@ -210,32 +199,23 @@ export function Navigation(props: NavigationProps) {
       pathname,
       isEnvironmentSettingsRoute,
       handleNewConversation,
-      handleRecentsClick,
-      isHovered,
       starshipData?.id,
     ]
   )
 
-  // Floating mode - expandable layout
   return (
-    <div
-      ref={sidebarRef}
-      className="flex flex-row rounded-2xl overflow-hidden border border-border/40 bg-card shadow-lg transition-all duration-300 ease-in-out"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      style={{ willChange: 'width' }}
-    >
+    <div ref={sidebarRef} className="flex flex-row h-full overflow-hidden border-r border-border/40 bg-card transition-all duration-300 ease-in-out" style={{ willChange: 'width' }}>
       <div
         className="flex flex-col transition-all duration-300 ease-in-out"
         style={{
-          width: isHovered ? '16rem' : '3.5rem',
-          height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding from layout
+          width: '16rem',
+          height: '100%',
           willChange: 'width',
           contain: 'layout style paint',
         }}
       >
-        {/* Compact Header with Theme Toggle */}
-        <div className="px-3 py-3 border-b border-border/20 flex-shrink-0 flex items-center justify-between gap-3 bg-muted/60">
+        {/* Header with Theme Toggle – matches sidebar background */}
+        <div className="px-3 py-3 flex-shrink-0 flex items-center justify-between gap-3">
           <div className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-start gap-3" onClick={handleLogoClick} title="Go to Landing Screen">
             <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center">
               <StarshipsLogo
@@ -250,7 +230,7 @@ export function Navigation(props: NavigationProps) {
                 playOnMountOnce={false}
               />
             </div>
-            {isHovered && (
+            {isExpanded && (
               <motion.span
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -270,15 +250,15 @@ export function Navigation(props: NavigationProps) {
         {/* Navigation Content - Moved to top */}
         <div
           className="flex-shrink-0"
-          style={{ marginTop: '0.25rem', marginBottom: '0.75rem', paddingTop: '0.75rem', paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isHovered ? '0' : '0.75rem' }}
+          style={{ marginTop: '0.25rem', marginBottom: '0.75rem', paddingTop: '0.75rem', paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.75rem' }}
         >
           <div className="flex flex-col space-y-1 w-full">
-            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isHovered} />
+            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} />
           </div>
         </div>
 
-        {/* Conversation History List - Recents - Show when navbar is expanded */}
-        {isAuthenticated && starshipSlug && isHovered && starshipData?.id && (
+        {/* Conversation History List - Recents - Navbar is always expanded, so always show when starship data is available */}
+        {isAuthenticated && starshipSlug && starshipData?.id && (
           <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Divider above Recents */}
             <div className="w-full border-t border-border/40 my-2"></div>
@@ -304,13 +284,13 @@ export function Navigation(props: NavigationProps) {
         )}
 
         {/* Spacer to push user profile to bottom */}
-        {(!isHovered || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+        {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
 
         {/* User Profile Section */}
         <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
           {/* Profile section */}
           <div className="w-full" style={{ paddingLeft: '0.75rem', paddingRight: '0.75rem' }}>
-            {isHovered ? (
+            {isExpanded ? (
               <div
                 className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full"
                 onClick={handleUserProfileClick}
@@ -337,7 +317,7 @@ export function Navigation(props: NavigationProps) {
                   </motion.div>
                 </AnimatePresence>
                 <AnimatePresence mode="wait">
-                  {isHovered && (
+                  {isExpanded && (
                     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}>
                       <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                     </motion.div>

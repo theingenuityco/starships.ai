@@ -183,6 +183,7 @@ export const agentTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentTestTool.blueprint,
 
   slug: 'test-agent',
+  version: '1.0.0',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Hello" }] } // test with messages\n{ "slug": "analyzer", "input": "Test data" } // test with simple text',

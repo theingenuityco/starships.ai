@@ -136,6 +136,7 @@ export const toolEditBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' | '
   blueprint: blueprintEditEdgeTool.blueprint,
 
   slug: 'edit-tool-blueprint-edge',
+  version: '1.0.0',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "edgeRef": "edge1", "updates": { "to": "process" } }',
   requiresApiKey: false,

@@ -382,7 +382,6 @@ export const wikipediaTool: ToolParams = {
       { ref: 'e5', from: 'process_response', to: 'end_1' },
     ],
     metadata: {
-      version: '1.0.0',
       author: 'Starships.ai',
       requiresApiKey: false,
       rateLimit: 'Wikipedia API rate limits apply (200 requests per hour per IP)',
@@ -402,6 +401,7 @@ export const wikipediaToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
 
   // Template metadata
   slug: 'wikipedia-search',
+  version: '1.0.0',
   category: 'data',
   exampleUsage: JSON.stringify(
     {

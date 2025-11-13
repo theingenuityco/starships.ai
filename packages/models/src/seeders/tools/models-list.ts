@@ -136,6 +136,7 @@ export const modelsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: modelsListTool.blueprint,
 
   slug: 'models-list',
+  version: '1.0.0',
   category: 'automation',
   exampleUsage: '{} // returns array of model IDs as strings (e.g., "anthropic/claude-sonnet-4.5")',
   requiresApiKey: false,

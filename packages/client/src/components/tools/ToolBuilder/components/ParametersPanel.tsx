@@ -14,9 +14,10 @@ interface ParametersPanelProps {
   formData: ToolFormData
   errors: FormErrors
   onFieldChange: (field: keyof ToolFormData, value: string | boolean) => void
+  readonly?: boolean
 }
 
-export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, errors, onFieldChange }) => {
+export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, errors, onFieldChange, readonly = false }) => {
   return (
     <Collapsible defaultOpen={false}>
       <div className="frosted-glass-card rounded-xl shadow-frosted-lg overflow-hidden w-full">
@@ -32,7 +33,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({ formData, erro
         <CollapsibleContent>
           <div className="border-t border-border/40">
             <ScrollArea className="max-h-[calc(100vh-14rem)]">
-              <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} />
+              <ParameterEditor value={formData.parameters} onChange={value => onFieldChange('parameters', value)} error={errors.parameters} readonly={readonly} />
             </ScrollArea>
           </div>
         </CollapsibleContent>

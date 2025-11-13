@@ -99,6 +99,17 @@ export class ToolEntity implements ToolModel {
   @IsString()
   status?: 'draft' | 'active';
 
+  // Versioning fields
+  @Expose()
+  @IsString()
+  @Length(1, 20)
+  version!: string; // Semantic version (e.g., '1.0.2')
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  templateSnapshotAt?: string; // When tool last synced with template
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -138,6 +149,8 @@ export class ToolEntity implements ToolModel {
         configuration: dataRecord.configuration || {},
         isEnabled: dataRecord.isEnabled ?? true,
         status: status,
+        version: dataRecord.version || '1.0.0',
+        templateSnapshotAt: dataRecord.templateSnapshotAt,
         ...dataRecord,
       });
     } else {

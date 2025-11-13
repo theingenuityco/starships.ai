@@ -281,7 +281,6 @@ export const duckduckgoTool: ToolParams = {
       { ref: 'e5', from: 'process_response', to: 'end_1' },
     ],
     metadata: {
-      version: '1.0.0',
       author: 'Starships.ai',
       requiresApiKey: false,
       rateLimit: 'No official rate limit, but be respectful',
@@ -301,6 +300,7 @@ export const duckduckgoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
 
   // Template metadata
   slug: 'duckduckgo-instant',
+  version: '1.0.0',
   category: 'data',
   exampleUsage: JSON.stringify(
     {

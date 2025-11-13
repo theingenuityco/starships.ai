@@ -71,6 +71,7 @@ export const toolRemoveBlueprintEdgeToolTemplate: Omit<ToolTemplateModel, 'id' |
   blueprint: blueprintRemoveEdgeTool.blueprint,
 
   slug: 'remove-tool-blueprint-edge',
+  version: '1.0.0',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "edgeRef": "old_edge" }',
   requiresApiKey: false,

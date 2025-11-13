@@ -125,6 +125,7 @@ export const docsSearchToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsSearchTool.blueprint,
 
   slug: 'search-docs',
+  version: '1.0.0',
   category: 'data',
   exampleUsage: '{ "q": "tools", "limit": 10 } // returns search results; env baseUrl inferred',
   requiresApiKey: false,

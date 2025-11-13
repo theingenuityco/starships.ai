@@ -622,4 +622,119 @@ router.delete('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Requ
   }
 });
 
+// ============================================================================
+// TEMPLATE VERSIONING & UPDATE ROUTES
+// ============================================================================
+
+/**
+ * GET /agents/:id/check-update - Check if agent has updates available from its template
+ */
+router.get('/agents/:id/check-update', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+      }),
+      req.params,
+      res,
+      'agent ID'
+    );
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+
+    // Authorization: verify caller owns the agent
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const updateCheck = await agentService.checkForUpdate(agentId);
+
+    sendSuccess(res, updateCheck);
+  } catch (error) {
+    console.error('[AGENTS] Error checking for updates:', error);
+    handleError(error, res, 'checking for updates');
+  }
+});
+
+/**
+ * POST /agents/:id/update-from-template - Update agent with latest template data
+ */
+router.post('/agents/:id/update-from-template', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+      }),
+      req.params,
+      res,
+      'agent ID'
+    );
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const userId = req.user!.id;
+
+    // Authorization: verify caller owns the agent
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const updated = await agentService.updateFromTemplate(agentId, userId);
+
+    // Return minimal response - only essential fields
+    sendSuccess(res, {
+      id: updated.id,
+      name: updated.name,
+      version: updated.version,
+      templateSnapshotAt: updated.templateSnapshotAt,
+      updatedAt: updated.updatedAt,
+      message: 'Agent updated successfully from template',
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error updating from template:', error);
+    handleError(error, res, 'updating from template');
+  }
+});
+
+/**
+ * GET /starships/:starshipId/agents/with-updates - Get all agents in starship that have updates available
+ */
+router.get('/starships/:starshipId/agents/with-updates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+      }),
+      req.params,
+      res,
+      'starship ID'
+    );
+    if (!paramValidation) return;
+
+    const { starshipId } = paramValidation;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+    const agents = await agentService.getAgentsWithUpdates(starshipId, userId);
+
+    sendSuccess(res, agents);
+  } catch (error) {
+    console.error('[AGENTS] Error getting agents with updates:', error);
+    handleError(error, res, 'getting agents with updates');
+  }
+});
+
 export default router;

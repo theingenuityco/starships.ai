@@ -1,4 +1,4 @@
-import type { ApiResponse, TemplateCategory, ToolModel as Tool } from '@starships/protocol'
+import type { ApiResponse, TemplateCategory, ToolModel as Tool, AgentUpdateCheckResponse } from '@starships/protocol'
 
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
@@ -507,6 +507,23 @@ export const agentAPI = {
   // Get agent analytics
   getAnalytics: async (id: string): Promise<any> => {
     const data = await api.get(`/api/v1/agents/${id}/analytics`).then(res => extractResponseData<any>(res))
+    return data
+  },
+
+  // Template versioning methods
+  checkForUpdate: async (agentId: string): Promise<AgentUpdateCheckResponse> => {
+    const data = await api.get(`/api/v1/agents/${agentId}/check-update`).then(res => extractResponseData<AgentUpdateCheckResponse>(res))
+    return data
+  },
+
+  updateFromTemplate: async (agentId: string): Promise<Agent> => {
+    const data = await api.post(`/api/v1/agents/${agentId}/update-from-template`).then(res => extractResponseData<Agent>(res))
+    invalidateAgentCaches(agentId)
+    return data
+  },
+
+  getAgentsWithUpdates: async (starshipId: string): Promise<Agent[]> => {
+    const data = await api.get(`/api/v1/starships/${starshipId}/agents/with-updates`).then(res => extractResponseData<Agent[]>(res))
     return data
   },
 }

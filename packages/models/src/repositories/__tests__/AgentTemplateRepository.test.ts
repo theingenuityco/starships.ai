@@ -42,6 +42,7 @@ describe('AgentTemplateRepository', () => {
     maxTokens: 2000,
     timeout: 30000,
     usageCount: 10,
+    version: '1.0.0',
     icon: '🤖',
     systemPrompt: 'You are a helpful assistant.',
     previewPrompts: ['Hello', 'How can I help?'],

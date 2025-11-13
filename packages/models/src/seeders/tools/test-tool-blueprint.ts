@@ -223,6 +223,7 @@ export const blueprintLintToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
   blueprint: blueprintLintTool.blueprint,
 
   slug: 'test-tool-blueprint',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{ "blueprint": { "nodes": [...], "edges": [...] } } // returns { ok, issues, summary }',
   requiresApiKey: false,

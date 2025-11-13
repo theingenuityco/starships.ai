@@ -7,16 +7,16 @@
  */
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
-import { NotFoundError, ValidationError } from '@starships/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository, StarshipRepository } from '@starships/models';
-import { generateSimpleAgentSlug, generateUniqueAgentSlug } from '@starships/models';
+import { generateUniqueAgentSlug } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import { UsageService } from './UsageService';
-import { BillingService, InsufficientFundsError } from './BillingService';
+import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
 
 export interface ConversationRequest {
@@ -796,5 +796,23 @@ export class AgentService {
         error: error?.message || 'Unknown error during agent execution',
       };
     }
+  }
+
+  /**
+   * Update agent to latest template version
+   */
+  async updateFromTemplate(agentId: string, userId: string): Promise<AgentModel> {
+    // Verify ownership
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    const starship = await this.starshipRepository.findById(agent.starshipId);
+    if (!starship || starship.ownerId !== userId) {
+      throw new ForbiddenError('You do not have permission to update this agent');
+    }
+
+    return await this.agentRepository.updateFromTemplate(agentId);
   }
 }

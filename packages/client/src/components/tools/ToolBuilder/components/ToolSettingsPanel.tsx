@@ -15,9 +15,10 @@ interface ToolSettingsPanelProps {
   formData: ToolFormData
   errors: FormErrors
   onFieldChange: (field: keyof ToolFormData, value: string | boolean) => void
+  readonly?: boolean
 }
 
-export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, errors, onFieldChange }) => {
+export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, errors, onFieldChange, readonly = false }) => {
   return (
     <Collapsible defaultOpen={false}>
       <div className="frosted-glass-card rounded-xl shadow-frosted-lg overflow-hidden w-full">
@@ -35,7 +36,7 @@ export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, 
             <ScrollArea className="max-h-[calc(100vh-14rem)]">
               <div className="p-3 space-y-3">
                 {/* Category */}
-                <CategorySelector selectedCategory={formData.category} onCategoryChange={value => onFieldChange('category', value)} />
+                <CategorySelector selectedCategory={formData.category} onCategoryChange={value => onFieldChange('category', value)} disabled={readonly} />
 
                 {/* Example Usage */}
                 <div className="space-y-1.5">
@@ -48,7 +49,9 @@ export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, 
                     value={formData.exampleUsage}
                     onChange={e => onFieldChange('exampleUsage', e.target.value)}
                     rows={2}
-                    className="text-xs"
+                    className={`text-xs ${readonly ? 'cursor-not-allowed opacity-70' : ''}`}
+                    readOnly={readonly}
+                    disabled={readonly}
                   />
                 </div>
 
@@ -58,10 +61,11 @@ export const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({ formData, 
                     type="checkbox"
                     id="tool-requires-api-key"
                     checked={formData.requiresApiKey}
-                    onChange={e => onFieldChange('requiresApiKey', e.target.checked)}
-                    className="w-3 h-3 rounded border-input text-primary focus:ring-primary focus:ring-offset-background"
+                    onChange={e => !readonly && onFieldChange('requiresApiKey', e.target.checked)}
+                    disabled={readonly}
+                    className={`w-3 h-3 rounded border-input text-primary focus:ring-primary focus:ring-offset-background ${readonly ? 'cursor-not-allowed opacity-70' : ''}`}
                   />
-                  <Label htmlFor="tool-requires-api-key" className="cursor-pointer flex-1 text-xs">
+                  <Label htmlFor="tool-requires-api-key" className={`flex-1 text-xs ${readonly ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     Requires API Key
                   </Label>
                 </div>

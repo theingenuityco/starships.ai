@@ -102,6 +102,27 @@ export class AgentEntity implements AgentModel {
   @IsString({ each: true })
   previewPrompts?: string[];
 
+  // Versioning fields
+  @Expose()
+  @IsString()
+  @Length(1, 20)
+  version!: string; // Semantic version (e.g., '1.0.2')
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  templateSnapshotAt?: string; // When agent last synced with template
+
+  // Update availability info (computed at runtime, not stored in DB)
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  updateInfo?: {
+    needsUpdate: boolean;
+    latestVersion: string;
+    templateUpdatedAt?: string;
+  };
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -131,6 +152,8 @@ export class AgentEntity implements AgentModel {
         systemPrompt: dataRecord.systemPrompt,
         state: dataRecord.state || { messages: [], tools: [] },
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        version: dataRecord.version || '1.0.0',
+        templateSnapshotAt: dataRecord.templateSnapshotAt,
         ...dataRecord,
       });
     } else {

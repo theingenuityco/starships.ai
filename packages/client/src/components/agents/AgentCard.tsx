@@ -145,11 +145,19 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                 )}
               </div>
 
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <Badge className={`text-xs ${getCategoryColor(agent.name)} flex items-center border font-semibold`}>
                   {getCategoryIcon(agent.name)}
                   {inferCategoryFromName(agent.name).charAt(0).toUpperCase() + inferCategoryFromName(agent.name).slice(1)}
                 </Badge>
+
+                {/* Version Badge */}
+                {agent.version && (
+                  <Badge variant="outline" className="text-xs font-mono">
+                    v{agent.version}
+                  </Badge>
+                )}
+
                 <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
                   <Icon name="brain" className="w-3 h-3 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground font-mono">{agent.model}</span>
@@ -257,6 +265,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
         {/* Hover effect overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </Card>
+
     </div>
   )
 }

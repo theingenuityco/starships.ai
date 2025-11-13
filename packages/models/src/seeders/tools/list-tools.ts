@@ -132,6 +132,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolListTool.blueprint,
 
   slug: 'list-tools',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of tools; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

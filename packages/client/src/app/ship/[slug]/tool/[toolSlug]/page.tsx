@@ -20,6 +20,7 @@ import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationM
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
+import { ToolUpdateNotification } from '@/components/tools/ToolUpdateNotification'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -716,7 +717,19 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
         onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
       />
-      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
+      {/* Update Notification - Floating top right */}
+      {existingTool && (
+        <div className="absolute top-6 right-6 z-50">
+          <ToolUpdateNotification tool={existingTool} />
+        </div>
+      )}
+      <ToolBuilderView
+        ref={toolBuilderRef}
+        starshipId={starship.id}
+        onCancel={handleCancel}
+        toolId={existingTool?.id}
+        templateId={existingTool?.templateId}
+      />
       {conversationId && (
         <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">

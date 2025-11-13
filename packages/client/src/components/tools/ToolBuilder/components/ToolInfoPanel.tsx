@@ -12,9 +12,10 @@ interface ToolInfoPanelProps {
   formData: ToolFormData
   errors: FormErrors
   onFieldChange: (field: keyof ToolFormData, value: string) => void
+  readonly?: boolean
 }
 
-export const ToolInfoPanel: React.FC<ToolInfoPanelProps> = ({ formData, errors, onFieldChange }) => {
+export const ToolInfoPanel: React.FC<ToolInfoPanelProps> = ({ formData, errors, onFieldChange, readonly = false }) => {
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize description textarea on mount and when description changes
@@ -37,19 +38,24 @@ export const ToolInfoPanel: React.FC<ToolInfoPanelProps> = ({ formData, errors, 
             placeholder="Tool name..."
             value={formData.name}
             onChange={e => onFieldChange('name', e.target.value)}
-            className={`text-sm font-semibold h-auto py-0.5 px-1.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''}`}
+            readOnly={readonly}
+            disabled={readonly}
+            className={`text-sm font-semibold h-auto py-0.5 px-1.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 ${errors.name ? 'text-destructive' : ''} ${readonly ? 'cursor-not-allowed opacity-70' : ''}`}
           />
           <Textarea
             ref={descriptionTextareaRef}
             placeholder="Brief description..."
             value={formData.description}
             onChange={e => {
+              if (readonly) return
               onFieldChange('description', e.target.value)
               // Auto-resize textarea
               e.target.style.height = 'auto'
               e.target.style.height = `${e.target.scrollHeight}px`
             }}
-            className={`text-xs min-h-[28px] max-h-[100px] py-0.5 px-1.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''}`}
+            readOnly={readonly}
+            disabled={readonly}
+            className={`text-xs min-h-[28px] max-h-[100px] py-0.5 px-1.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground resize-none ${errors.description ? 'text-destructive' : ''} ${readonly ? 'cursor-not-allowed opacity-70' : ''}`}
             rows={1}
           />
         </div>

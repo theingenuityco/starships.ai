@@ -5,6 +5,7 @@ import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository'
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
+import { compareVersions } from '@/utils/version';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
@@ -27,7 +28,30 @@ export class AgentRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const result = await super.findEntityById<Record<string, unknown>>('agents', id);
-        return result ? fromDatabase(AgentEntity, result) : null;
+        if (!result) return null;
+
+        const agent = fromDatabase(AgentEntity, result);
+
+        // If agent has a template, fetch it and populate updateInfo
+        if (agent.templateId) {
+          const connection = this.getConnection();
+          const templateResult = await connection.queryOne<Record<string, unknown>>(
+            'SELECT * FROM agent_templates WHERE id = $1',
+            [agent.templateId]
+          );
+
+          if (templateResult) {
+            const template = fromDatabase(AgentTemplateEntity, templateResult);
+            const comparison = compareVersions(agent.version, template.version);
+            agent.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: template.version,
+              templateUpdatedAt: template.updatedAt,
+            };
+          }
+        }
+
+        return agent;
       },
       'findById',
       'Agent',
@@ -43,7 +67,43 @@ export class AgentRepository extends BaseRepository {
           'SELECT * FROM agents WHERE starship_id = $1 ORDER BY created_at DESC',
           [starshipId]
         );
-        return fromDatabaseArray(AgentEntity, result);
+        const agents = fromDatabaseArray(AgentEntity, result);
+
+        // Collect unique template IDs
+        const templateIds = [...new Set(agents.filter(a => a.templateId).map(a => a.templateId))];
+
+        // If there are templates, fetch them in a single query
+        if (templateIds.length > 0) {
+          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          const templates = await connection.query<Record<string, unknown>>(
+            `SELECT * FROM agent_templates WHERE id IN (${placeholders})`,
+            templateIds
+          );
+
+          // Build a map of template ID to template for quick lookup
+          const templateMap = new Map<string, AgentTemplateModel>();
+          for (const template of templates) {
+            const templateModel = fromDatabase(AgentTemplateEntity, template);
+            templateMap.set(templateModel.id, templateModel);
+          }
+
+          // Populate updateInfo for each agent with a template
+          for (const agent of agents) {
+            if (agent.templateId) {
+              const template = templateMap.get(agent.templateId);
+              if (template) {
+                const comparison = compareVersions(agent.version, template.version);
+                agent.updateInfo = {
+                  needsUpdate: comparison < 0,
+                  latestVersion: template.version,
+                  templateUpdatedAt: template.updatedAt,
+                };
+              }
+            }
+          }
+        }
+
+        return agents;
       },
       'findByStarship',
       'Agent'
@@ -128,6 +188,10 @@ export class AgentRepository extends BaseRepository {
           blueprint: data.blueprint,
           previewPrompts: data.previewPrompts,
 
+          // Versioning fields
+          version: data.version || '1.0.0',
+          templateSnapshotAt: data.templateSnapshotAt,
+
           // PostgreSQL specific fields
           starshipId: starshipId, // Direct foreign key
           deployedAt: now, // Agent is deployed immediately upon creation
@@ -155,11 +219,25 @@ export class AgentRepository extends BaseRepository {
   async update(id: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        // Ensure numeric fields are properly typed (convert strings to numbers if needed)
+        // Only convert values that are not null/undefined to avoid NaN or 0 from null
+        const typedUpdates: UpdateAgentRequest = { ...updates };
+
+        if (updates.temperature !== undefined && updates.temperature !== null) {
+          typedUpdates.temperature = Number(updates.temperature);
+        }
+        if (updates.maxTokens !== undefined && updates.maxTokens !== null) {
+          typedUpdates.maxTokens = Number(updates.maxTokens);
+        }
+        if (updates.timeout !== undefined && updates.timeout !== null) {
+          typedUpdates.timeout = Number(updates.timeout);
+        }
+
         // Use lean validation from AgentEntity for updates
-        await AgentEntity.validate(updates, 'update');
+        await AgentEntity.validate(typedUpdates, 'update');
 
         const updateProps: Partial<AgentModel> = {
-          ...(updates as Partial<AgentModel>),
+          ...(typedUpdates as Partial<AgentModel>),
           updatedAt: new Date().toISOString(),
         };
 
@@ -256,6 +334,7 @@ export class AgentRepository extends BaseRepository {
         const slug = await generateUniqueAgentSlug(template.slug, this);
 
         // Create agent from template with optional customizations
+        const now = new Date().toISOString();
         const agentData: CreateAgentRequest = {
           name: customizations?.name || template.name,
           slug,
@@ -270,10 +349,11 @@ export class AgentRepository extends BaseRepository {
           previewPrompts: customizations?.previewPrompts || template.previewPrompts,
           assignedToolSlugs: customizations?.assignedToolSlugs,
           templateId,
+          version: template.version, // Copy template version
+          templateSnapshotAt: now, // Capture snapshot time
         };
 
         // Create agent with template_id foreign key
-        const now = new Date().toISOString();
         const agentProps = {
           ...agentData,
           starshipId: starshipId,
@@ -428,6 +508,68 @@ export class AgentRepository extends BaseRepository {
         }
       },
       'assignToolsToAgent',
+      'Agent',
+      agentId
+    );
+  }
+
+  // ============================================================================
+  // TEMPLATE VERSIONING & UPDATE MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Update agent with latest template data
+   */
+  async updateFromTemplate(agentId: string): Promise<AgentModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const agent = await this.findById(agentId);
+
+        if (!agent) {
+          this.handleNotFound('Agent', agentId);
+        }
+
+        if (!agent.templateId) {
+          throw new Error('Agent is not linked to a template');
+        }
+
+        const templateRepo = new AgentTemplateRepository();
+        const template = await templateRepo.findById(agent.templateId);
+
+        if (!template) {
+          this.handleNotFound('AgentTemplate', agent.templateId);
+        }
+
+        // Copy current template data to agent
+        // Only include fields that are defined in the template (not null/undefined)
+        // This allows templates to omit optional fields and use system defaults
+        const updates: UpdateAgentRequest = {
+          systemPrompt: template.systemPrompt,
+          blueprint: template.blueprint,
+          model: template.model,
+          version: template.version, // Copy template version to agent
+          templateSnapshotAt: new Date().toISOString(),
+        };
+
+        // Only copy optional numeric fields if they're defined in the template
+        if (template.temperature !== null && template.temperature !== undefined) {
+          updates.temperature = template.temperature;
+        }
+        if (template.maxTokens !== null && template.maxTokens !== undefined) {
+          updates.maxTokens = template.maxTokens;
+        }
+        if (template.timeout !== null && template.timeout !== undefined) {
+          updates.timeout = template.timeout;
+        }
+
+        const updated = await this.update(agentId, updates);
+        if (!updated) {
+          throw new Error('Failed to update agent from template');
+        }
+
+        return updated;
+      },
+      'updateFromTemplate',
       'Agent',
       agentId
     );

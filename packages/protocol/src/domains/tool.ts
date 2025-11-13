@@ -89,6 +89,12 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   // Versioning fields
   version: string; // Semantic version (e.g., '1.0.2')
   templateSnapshotAt?: string; // When tool last synced with template
+  // Update availability info (populated in listing endpoints)
+  updateInfo?: {
+    needsUpdate: boolean;
+    latestVersion: string; // Template's latest version
+    templateUpdatedAt?: string; // When template was last updated
+  };
 }
 
 // ============================================================================

@@ -34,7 +34,30 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const result = await super.findEntityById<Record<string, unknown>>('tools', id);
-        return result ? fromDatabase(ToolEntity, result) : null;
+        if (!result) return null;
+
+        const tool = fromDatabase(ToolEntity, result);
+
+        // If tool has a template, fetch it and populate updateInfo
+        if (tool.templateId) {
+          const connection = this.getConnection();
+          const templateResult = await connection.queryOne<Record<string, unknown>>(
+            'SELECT * FROM tool_templates WHERE id = $1',
+            [tool.templateId]
+          );
+
+          if (templateResult) {
+            const template = fromDatabase(ToolTemplateEntity, templateResult);
+            const comparison = compareVersions(tool.version, template.version);
+            tool.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: template.version,
+              templateUpdatedAt: template.updatedAt,
+            };
+          }
+        }
+
+        return tool;
       },
       'findById',
       'Tool',
@@ -63,7 +86,43 @@ export class ToolRepository extends BaseRepository {
           'SELECT * FROM tools WHERE starship_id = $1 ORDER BY created_at DESC',
           [starshipId]
         );
-        return fromDatabaseArray(ToolEntity, result);
+        const tools = fromDatabaseArray(ToolEntity, result);
+
+        // Collect unique template IDs
+        const templateIds = [...new Set(tools.filter(t => t.templateId).map(t => t.templateId))];
+
+        // If there are templates, fetch them in a single query
+        if (templateIds.length > 0) {
+          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          const templates = await connection.query<Record<string, unknown>>(
+            `SELECT * FROM tool_templates WHERE id IN (${placeholders})`,
+            templateIds
+          );
+
+          // Build a map of template ID to template for quick lookup
+          const templateMap = new Map<string, ToolTemplateModel>();
+          for (const template of templates) {
+            const templateModel = fromDatabase(ToolTemplateEntity, template);
+            templateMap.set(templateModel.id, templateModel);
+          }
+
+          // Populate updateInfo for each tool with a template
+          for (const tool of tools) {
+            if (tool.templateId) {
+              const template = templateMap.get(tool.templateId);
+              if (template) {
+                const comparison = compareVersions(tool.version, template.version);
+                tool.updateInfo = {
+                  needsUpdate: comparison < 0,
+                  latestVersion: template.version,
+                  templateUpdatedAt: template.updatedAt,
+                };
+              }
+            }
+          }
+        }
+
+        return tools;
       },
       'findByStarship',
       'Tool'
@@ -78,7 +137,29 @@ export class ToolRepository extends BaseRepository {
           slug,
           starshipId,
         ]);
-        return result ? fromDatabase(ToolEntity, result) : null;
+        if (!result) return null;
+
+        const tool = fromDatabase(ToolEntity, result);
+
+        // If tool has a template, fetch it and populate updateInfo
+        if (tool.templateId) {
+          const templateResult = await connection.queryOne<Record<string, unknown>>(
+            'SELECT * FROM tool_templates WHERE id = $1',
+            [tool.templateId]
+          );
+
+          if (templateResult) {
+            const template = fromDatabase(ToolTemplateEntity, templateResult);
+            const comparison = compareVersions(tool.version, template.version);
+            tool.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: template.version,
+              templateUpdatedAt: template.updatedAt,
+            };
+          }
+        }
+
+        return tool;
       },
       'findBySlugAndStarship',
       'Tool',

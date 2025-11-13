@@ -14,6 +14,8 @@ export interface ToolBuilderViewProps {
   onSave?: (data: ToolFormData) => void
   onCancel?: () => void
   starshipId?: string
+  toolId?: string
+  templateId?: string | null
 }
 
 export interface ToolBuilderViewRef {

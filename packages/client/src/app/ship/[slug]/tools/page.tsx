@@ -6,7 +6,6 @@ import React, { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
@@ -17,6 +16,7 @@ import type { FetchResponse } from '@/lib/types'
 import type { ToolModel } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { DeployedToolCard } from '@/components/tools/DeployedToolCard'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -142,23 +142,12 @@ export default function StarshipToolsPage(): React.JSX.Element {
                       {filteredTools.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {filteredTools.map(tool => (
-                            <Card
+                            <DeployedToolCard
                               key={tool.id}
-                              className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer"
+                              tool={tool}
                               onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
-                            >
-                              <CardHeader className="pb-3">
-                                <div className="mb-1">
-                                  <CardTitle className="text-base font-semibold truncate">{tool.name}</CardTitle>
-                                </div>
-                                <div className="mb-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {tool.slug}
-                                  </Badge>
-                                </div>
-                                {tool.description && <CardDescription className="text-xs line-clamp-2">{tool.description}</CardDescription>}
-                              </CardHeader>
-                            </Card>
+                              onOpen={(t) => router.push(`/ship/${slug}/tool/${t.slug}`)}
+                            />
                           ))}
                         </div>
                       ) : (

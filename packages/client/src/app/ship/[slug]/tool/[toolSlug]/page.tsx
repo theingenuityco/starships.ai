@@ -716,7 +716,13 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
         onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
       />
-      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} />
+      <ToolBuilderView
+        ref={toolBuilderRef}
+        starshipId={starship.id}
+        onCancel={handleCancel}
+        toolId={existingTool?.id}
+        templateId={existingTool?.templateId}
+      />
       {conversationId && (
         <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">

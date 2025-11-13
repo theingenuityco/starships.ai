@@ -102,6 +102,7 @@ export const timeToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'upd
   blueprint: timeTool.blueprint,
 
   slug: 'get-current-time',
+  version: '1.0.1',
   category: 'utility',
   exampleUsage: 'Use in LLM function-calling: { "name": "get_current_time", "arguments": { "timezone": "UTC", "format": "ISO" } }',
   requiresApiKey: false,

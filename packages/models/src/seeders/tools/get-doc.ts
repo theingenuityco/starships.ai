@@ -120,6 +120,7 @@ export const docsGetDocToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsGetDocTool.blueprint,
 
   slug: 'get-doc',
+  version: '1.0.1',
   category: 'data',
   exampleUsage: '{ "slug": "core-concepts/tools" } // returns markdown content; env baseUrl inferred',
   requiresApiKey: false,

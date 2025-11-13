@@ -11,9 +11,13 @@ import { useToolForm } from './hooks/useToolForm'
 import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ParametersPanel } from './components/ParametersPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
+import { ToolUpdateNotification } from '../ToolUpdateNotification'
 
-export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave }, ref) => {
+export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, toolId, templateId }, ref) => {
   const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })
+
+  // Determine if this is a template-based tool (readonly)
+  const isReadonly = !!templateId
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -47,14 +51,21 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           {/* Floating Panels - Top Left */}
           <div className="absolute top-6 left-28 z-10 w-[420px] space-y-2">
             {/* Tool Info Panel */}
-            <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
+            <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
 
             {/* Parameters Panel */}
-            <ParametersPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
+            <ParametersPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
 
             {/* Settings Panel */}
-            <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} />
+            <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
           </div>
+
+          {/* Update Notification - Top Right */}
+          {toolId && templateId && (
+            <div className="absolute top-6 right-6 z-10">
+              <ToolUpdateNotification toolId={toolId} isTemplateBasedTool={!!templateId} />
+            </div>
+          )}
 
           {/* Blueprint or Empty State */}
           {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (

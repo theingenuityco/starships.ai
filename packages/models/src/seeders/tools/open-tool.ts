@@ -145,6 +145,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolOpenTool.blueprint,
 
   slug: 'open-tool',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage:
     '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',

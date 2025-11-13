@@ -220,7 +220,7 @@ export function Navigation(props: NavigationProps) {
   return (
     <div
       ref={sidebarRef}
-      className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out"
+      className="flex flex-row rounded-2xl overflow-hidden border border-border/40 bg-card shadow-lg transition-all duration-300 ease-in-out"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{ willChange: 'width' }}

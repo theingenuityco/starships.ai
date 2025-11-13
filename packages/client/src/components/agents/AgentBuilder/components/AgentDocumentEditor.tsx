@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -25,6 +26,9 @@ import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
+import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -52,6 +56,20 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         .replace(/^-+|-+$/g, ''),
     [value.name]
   )
+
+  // Store full agent data including version info
+  const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
+
+  // Dialog state for update confirmation
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false)
+
+  // Check if this is a template-based agent (has templateId) - these are read-only
+  const isTemplateAgent = useMemo(() => {
+    return !!fullAgent?.templateId
+  }, [fullAgent?.templateId])
+
+  // Update mutation for template agents
+  const updateMutation = useUpdateAgentFromTemplate()
 
   const { data: starshipTools = [] } = useQuery({
     queryKey: ['starship-tools', starshipId] as const,
@@ -101,9 +119,15 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       if (result.ok && (result.data as any)?.id) {
         const agent: any = result.data as any
         console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
-        if (!cancelled) setAgentId(agent?.id || null)
+        if (!cancelled) {
+          setAgentId(agent?.id || null)
+          setFullAgent(agent as AgentModel)
+        }
       } else {
-        if (!cancelled) setAgentId(null)
+        if (!cancelled) {
+          setAgentId(null)
+          setFullAgent(null)
+        }
       }
     }
     void load()
@@ -114,6 +138,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Toggle tool assignment with optimistic UI and server persistence when possible
   const handleToggleTool = async (slug: string, isSelected: boolean) => {
+    // Prevent tool changes for template agents
+    if (isTemplateAgent) {
+      toast.error('Cannot modify tools', { description: 'Template agents are read-only. Use the update button to sync with the latest template version.' })
+      return
+    }
     const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
     onFieldChange?.('assignedToolSlugs', next)
     if (!agentId) return
@@ -127,7 +156,24 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
   }
 
+  const handleUpdateFromTemplate = async () => {
+    if (!agentId) return
+
+    try {
+      await updateMutation.mutateAsync(agentId)
+      setShowUpdateDialog(false)
+      // Reload the page to refresh all data
+      window.location.reload()
+    } catch (error: any) {
+      // Error toast is handled by the mutation hook
+    }
+  }
+
   const handleNameChange = (name: string) => {
+    if (isTemplateAgent) {
+      toast.error('Cannot modify name', { description: 'Template agents are read-only' })
+      return
+    }
     const shouldUpdateSlug = !value.slug || value.slug === generatedSlug
     onFieldChange?.('name', name)
     if (shouldUpdateSlug) {
@@ -215,17 +261,140 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   return (
     <div className="space-y-4 pt-14 pb-28">
+      {/* Template Agent Update Banner */}
+      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="relative overflow-hidden rounded-xl p-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(124, 58, 237, 0.05))',
+            borderColor: 'rgba(139, 92, 246, 0.2)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+          }}
+        >
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
+            }}
+            animate={{
+              x: ['-100%', '200%'],
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: 'linear',
+            }}
+          />
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="relative z-10 flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+                style={{
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                }}
+              >
+                <Icon name="download" className="h-4 w-4" style={{ color: 'rgb(139, 92, 246)' }} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">New update available</span>
+                <Badge
+                  variant="outline"
+                  className="text-xs font-mono flex items-center gap-1"
+                  style={{
+                    borderColor: 'rgba(139, 92, 246, 0.3)',
+                    background: 'rgba(139, 92, 246, 0.05)',
+                    color: 'rgb(139, 92, 246)',
+                  }}
+                >
+                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
+                  v{fullAgent?.updateInfo?.latestVersion}
+                </Badge>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setShowUpdateDialog(true)}
+              style={{
+                background: 'rgba(139, 92, 246, 0.1)',
+                borderColor: 'rgba(139, 92, 246, 0.3)',
+                color: 'rgb(139, 92, 246)',
+              }}
+              className="hover:opacity-80 transition-opacity"
+            >
+              Update Now
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Update Confirmation Dialog */}
+      <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Agent</DialogTitle>
+            <DialogDescription>A new version of this agent template is available.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground mb-1">Current Version:</p>
+                <p className="font-mono font-semibold text-base">v{fullAgent?.version}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Latest Version:</p>
+                <p className="font-mono font-semibold text-base text-purple-600">v{fullAgent?.updateInfo?.latestVersion}</p>
+              </div>
+            </div>
+
+            <div className="text-sm bg-muted/50 p-4 rounded-lg border">
+              <p className="text-muted-foreground">
+                This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.
+              </p>
+            </div>
+
+            {fullAgent?.updateInfo?.templateUpdatedAt && (
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <Icon name="clock" className="w-3.5 h-3.5" />
+                Template last updated: {new Date(fullAgent.updateInfo.templateUpdatedAt).toLocaleString()}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpdateDialog(false)} disabled={updateMutation.isPending}>
+              Later
+            </Button>
+            <Button onClick={handleUpdateFromTemplate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Updating...' : 'Update Now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Title */}
       <div className="space-y-4">
         <div className="space-y-6">
           <AgentAvatar seed={value.name} size={64} className="rounded-md overflow-hidden" />
           <div className="space-y-1">
-            <input
-              className="w-full bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
-              placeholder="Untitled Agent"
-              value={value.name}
-              onChange={e => handleNameChange(e.target.value)}
-            />
+            <div className="flex items-baseline gap-3">
+              <input
+                className="flex-1 bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                placeholder="Untitled Agent"
+                value={value.name}
+                onChange={e => handleNameChange(e.target.value)}
+                disabled={isTemplateAgent}
+              />
+              {isTemplateAgent && fullAgent?.version && (
+                <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
           </div>
         </div>
@@ -241,11 +410,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <span className="text-xs font-semibold">Category</span>
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild disabled={isTemplateAgent}>
                 <div
                   role="button"
                   aria-label="Change category"
-                  className="flex items-center cursor-pointer select-none rounded-xl h-7 px-2 hover:bg-muted/30 hover:shadow-sm transition-colors border border-border/20"
+                  className={cn(
+                    "flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20",
+                    isTemplateAgent ? "opacity-60 cursor-not-allowed" : "cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
+                  )}
                 >
                   <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
                     {getCategoryIcon(value.category)}
@@ -288,7 +460,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
-            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels}>
+            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels || isTemplateAgent}>
               <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
                 <SelectValue placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'} />
               </SelectTrigger>
@@ -312,11 +484,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
             <div className="flex-1">
               <Popover>
-                <PopoverTrigger asChild>
+                <PopoverTrigger asChild disabled={isTemplateAgent}>
                   <div
                     role="button"
                     aria-label="Select tools"
-                    className="flex items-center cursor-pointer select-none rounded-xl h-7 px-2 hover:bg-muted/30 hover:shadow-sm transition-colors border border-border/20"
+                    className={cn(
+                      "flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20",
+                      isTemplateAgent ? "opacity-60 cursor-not-allowed" : "cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
+                    )}
                   >
                     {selectedToolSlugs.length === 0 ? (
                       <span className="text-xs text-muted-foreground">Select tools</span>
@@ -330,7 +505,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                         ))}
                       </div>
                     )}
-                    <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
+                    {!isTemplateAgent && <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />}
                   </div>
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-[420px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
@@ -381,7 +556,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <RichMarkdownEditor value={value.description} onChange={val => onFieldChange?.('description', val)} placeholder="Write a clear description. Markdown supported." noMinHeight />
+          <div className={cn(isTemplateAgent && "opacity-60 pointer-events-none cursor-not-allowed")}>
+            <RichMarkdownEditor value={value.description} onChange={val => onFieldChange?.('description', val)} placeholder="Write a clear description. Markdown supported." noMinHeight />
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
@@ -391,12 +568,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <RichMarkdownEditor
-            value={value.systemPrompt}
-            onChange={val => onFieldChange?.('systemPrompt', val)}
-            placeholder="Define the agent's character, mission, and behavior..."
-            minHeightPx={200}
-          />
+          <div className={cn(isTemplateAgent && "opacity-60 pointer-events-none cursor-not-allowed")}>
+            <RichMarkdownEditor
+              value={value.systemPrompt}
+              onChange={val => onFieldChange?.('systemPrompt', val)}
+              placeholder="Define the agent's character, mission, and behavior..."
+              minHeightPx={200}
+            />
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
@@ -408,9 +587,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         <CollapsibleContent>
           <div className="space-y-2">
             <textarea
-              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px]"
+              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
               value={(value.previewPrompts || []).join('\n')}
+              disabled={isTemplateAgent}
               onChange={e => {
                 const lines = e.target.value
                   .split('\n')
@@ -467,6 +647,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 step="0.1"
                 value={value.temperature}
                 onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
+                disabled={isTemplateAgent}
                 className="text-xs"
               />
             </div>
@@ -481,6 +662,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 step="1"
                 value={value.maxTokens}
                 onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
+                disabled={isTemplateAgent}
                 className="text-xs"
               />
             </div>
@@ -495,6 +677,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 step="1000"
                 value={value.timeout}
                 onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
+                disabled={isTemplateAgent}
                 className="text-xs"
               />
             </div>

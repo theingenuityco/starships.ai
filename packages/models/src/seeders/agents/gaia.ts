@@ -228,6 +228,7 @@ Build test input appropriate for agent type:
 export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Gaia',
   slug: 'gaia',
+  version: '1.0.0',
   description:
     'Expert agent creator that designs and scaffolds new agents (Agent instances) on the current starship. Creates agents with custom system prompts, tool assignments, and workflows.',
   category: 'automation',

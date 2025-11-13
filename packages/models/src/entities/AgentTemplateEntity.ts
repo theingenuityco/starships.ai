@@ -136,6 +136,11 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @Min(0)
   usageCount!: number;
 
+  @Expose()
+  @IsString()
+  @Length(1, 20)
+  version!: string; // Semantic version (e.g., '1.0.2')
+
   // Template preview
   @Expose()
   @IsOptional()
@@ -179,6 +184,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
         assignedToolSlugs: dataRecord.assignedToolSlugs || [],
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount ?? 0,
+        version: dataRecord.version || '1.0.0',
         icon: dataRecord.icon,
         previewPrompts: dataRecord.previewPrompts || [],
         ...dataRecord,

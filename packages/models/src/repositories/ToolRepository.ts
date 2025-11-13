@@ -2,8 +2,17 @@ import { ToolEntity } from '@/entities/ToolEntity';
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { ToolModel, CreateToolRequest, UpdateToolRequest, ToolSearchParams, ToolTemplateModel } from '@starships/protocol';
+import type {
+  ToolModel,
+  CreateToolRequest,
+  UpdateToolRequest,
+  ToolSearchParams,
+  ToolTemplateModel,
+  ToolUpdateCheckResponse,
+} from '@starships/protocol';
 import { generateUniqueToolSlug } from '@/utils/slugGenerator';
+import { compareVersions, isValidVersion } from '@/utils/version';
+import { ToolTemplateRepository } from './ToolTemplateRepository';
 
 export class ToolRepository extends BaseRepository {
   constructor() {
@@ -25,7 +34,30 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const result = await super.findEntityById<Record<string, unknown>>('tools', id);
-        return result ? fromDatabase(ToolEntity, result) : null;
+        if (!result) return null;
+
+        const tool = fromDatabase(ToolEntity, result);
+
+        // If tool has a template, fetch it and populate updateInfo
+        if (tool.templateId) {
+          const connection = this.getConnection();
+          const templateResult = await connection.queryOne<Record<string, unknown>>(
+            'SELECT * FROM tool_templates WHERE id = $1',
+            [tool.templateId]
+          );
+
+          if (templateResult) {
+            const template = fromDatabase(ToolTemplateEntity, templateResult);
+            const comparison = compareVersions(tool.version, template.version);
+            tool.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: template.version,
+              templateUpdatedAt: template.updatedAt,
+            };
+          }
+        }
+
+        return tool;
       },
       'findById',
       'Tool',
@@ -54,7 +86,43 @@ export class ToolRepository extends BaseRepository {
           'SELECT * FROM tools WHERE starship_id = $1 ORDER BY created_at DESC',
           [starshipId]
         );
-        return fromDatabaseArray(ToolEntity, result);
+        const tools = fromDatabaseArray(ToolEntity, result);
+
+        // Collect unique template IDs
+        const templateIds = [...new Set(tools.filter(t => t.templateId).map(t => t.templateId))];
+
+        // If there are templates, fetch them in a single query
+        if (templateIds.length > 0) {
+          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          const templates = await connection.query<Record<string, unknown>>(
+            `SELECT * FROM tool_templates WHERE id IN (${placeholders})`,
+            templateIds
+          );
+
+          // Build a map of template ID to template for quick lookup
+          const templateMap = new Map<string, ToolTemplateModel>();
+          for (const template of templates) {
+            const templateModel = fromDatabase(ToolTemplateEntity, template);
+            templateMap.set(templateModel.id, templateModel);
+          }
+
+          // Populate updateInfo for each tool with a template
+          for (const tool of tools) {
+            if (tool.templateId) {
+              const template = templateMap.get(tool.templateId);
+              if (template) {
+                const comparison = compareVersions(tool.version, template.version);
+                tool.updateInfo = {
+                  needsUpdate: comparison < 0,
+                  latestVersion: template.version,
+                  templateUpdatedAt: template.updatedAt,
+                };
+              }
+            }
+          }
+        }
+
+        return tools;
       },
       'findByStarship',
       'Tool'
@@ -69,7 +137,29 @@ export class ToolRepository extends BaseRepository {
           slug,
           starshipId,
         ]);
-        return result ? fromDatabase(ToolEntity, result) : null;
+        if (!result) return null;
+
+        const tool = fromDatabase(ToolEntity, result);
+
+        // If tool has a template, fetch it and populate updateInfo
+        if (tool.templateId) {
+          const templateResult = await connection.queryOne<Record<string, unknown>>(
+            'SELECT * FROM tool_templates WHERE id = $1',
+            [tool.templateId]
+          );
+
+          if (templateResult) {
+            const template = fromDatabase(ToolTemplateEntity, templateResult);
+            const comparison = compareVersions(tool.version, template.version);
+            tool.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: template.version,
+              templateUpdatedAt: template.updatedAt,
+            };
+          }
+        }
+
+        return tool;
       },
       'findBySlugAndStarship',
       'Tool',
@@ -190,6 +280,10 @@ export class ToolRepository extends BaseRepository {
           starshipId: starshipId,
           ...(data.templateId ? { templateId: data.templateId } : {}),
 
+          // Versioning fields
+          version: (data as UpdateToolRequest).version || '1.0.0',
+          ...((data as UpdateToolRequest).templateSnapshotAt ? { templateSnapshotAt: (data as UpdateToolRequest).templateSnapshotAt } : {}),
+
           // Database-specific fields
           createdAt: now,
           updatedAt: now,
@@ -288,6 +382,7 @@ export class ToolRepository extends BaseRepository {
         const template = fromDatabase(ToolTemplateEntity, templateResult);
 
         // Create tool from template
+        const now = new Date().toISOString();
         const toolData: CreateToolRequest = {
           name: template.name,
           description: template.description,
@@ -301,6 +396,8 @@ export class ToolRepository extends BaseRepository {
           templateId: template.id,
           configuration: configuration || {},
           isEnabled: true,
+          version: template.version, // Copy template version
+          templateSnapshotAt: now, // Capture snapshot time
         };
 
         // Ensure global uniqueness via create and return tool
@@ -339,6 +436,155 @@ export class ToolRepository extends BaseRepository {
       'getSourceTemplate',
       'Tool',
       toolId
+    );
+  }
+
+  /**
+   * Check if tool needs update from its source template
+   */
+  async checkForUpdate(toolId: string): Promise<ToolUpdateCheckResponse> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const tool = await this.findById(toolId);
+
+        // No template = no updates available
+        if (!tool?.templateId) {
+          return {
+            needsUpdate: false,
+            currentVersion: tool?.version || '1.0.0',
+            latestVersion: tool?.version || '1.0.0',
+          };
+        }
+
+        const templateRepo = new ToolTemplateRepository();
+        const template = await templateRepo.findById(tool.templateId);
+
+        if (!template) {
+          return {
+            needsUpdate: false,
+            currentVersion: tool.version,
+            latestVersion: tool.version,
+          };
+        }
+
+        const currentVersion = tool.version || '1.0.0';
+        const latestVersion = template.version;
+
+        // Validate versions before comparison
+        if (!isValidVersion(currentVersion)) {
+          console.warn(`Invalid current version format for tool ${toolId}: ${currentVersion}`);
+          return {
+            needsUpdate: false,
+            currentVersion,
+            latestVersion,
+            templateUpdatedAt: template.updatedAt,
+          };
+        }
+
+        if (!isValidVersion(latestVersion)) {
+          console.warn(`Invalid template version format for template ${tool.templateId}: ${latestVersion}`);
+          return {
+            needsUpdate: false,
+            currentVersion,
+            latestVersion,
+            templateUpdatedAt: template.updatedAt,
+          };
+        }
+
+        // Compare versions (not timestamps!)
+        // compareVersions throws an error if versions are invalid, but we've validated above
+        let needsUpdate = false;
+        try {
+          needsUpdate = compareVersions(latestVersion, currentVersion) > 0;
+        } catch (error) {
+          console.error(`Error comparing versions for tool ${toolId}:`, error);
+          // If comparison fails, assume no update needed
+          needsUpdate = false;
+        }
+
+        return {
+          needsUpdate,
+          currentVersion,
+          latestVersion,
+          templateUpdatedAt: template.updatedAt,
+        };
+      },
+      'checkForUpdate',
+      'Tool',
+      toolId
+    );
+  }
+
+  /**
+   * Update tool with latest template data
+   */
+  async updateFromTemplate(toolId: string): Promise<ToolModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const tool = await this.findById(toolId);
+
+        if (!tool) {
+          this.handleNotFound('Tool', toolId);
+        }
+
+        if (!tool.templateId) {
+          throw new Error('Tool is not linked to a template');
+        }
+
+        const templateRepo = new ToolTemplateRepository();
+        const template = await templateRepo.findById(tool.templateId);
+
+        if (!template) {
+          this.handleNotFound('ToolTemplate', tool.templateId);
+        }
+
+        // Copy current template data to tool
+        const updates: UpdateToolRequest = {
+          description: template.description,
+          parameters: template.parameters,
+          blueprint: template.blueprint,
+          transforms: template.transforms,
+          mutations: template.mutations,
+          condition: template.condition,
+          version: template.version, // Copy template version to tool
+          templateSnapshotAt: new Date().toISOString(),
+        };
+
+        const updated = await this.update(toolId, updates);
+        if (!updated) {
+          throw new Error('Failed to update tool from template');
+        }
+
+        return updated;
+      },
+      'updateFromTemplate',
+      'Tool',
+      toolId
+    );
+  }
+
+  /**
+   * Get all tools with available updates for a starship
+   */
+  async getToolsWithUpdates(starshipId: string): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const tools = await this.findByStarship(starshipId);
+        const toolsWithUpdates: ToolModel[] = [];
+
+        for (const tool of tools) {
+          if (!tool.templateId) continue;
+
+          const updateCheck = await this.checkForUpdate(tool.id);
+          if (updateCheck.needsUpdate) {
+            toolsWithUpdates.push(tool);
+          }
+        }
+
+        return toolsWithUpdates;
+      },
+      'getToolsWithUpdates',
+      'Tool'
     );
   }
 

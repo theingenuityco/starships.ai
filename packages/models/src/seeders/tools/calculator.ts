@@ -188,6 +188,7 @@ export const calculatorToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
 
   // Template metadata
   slug: 'calculator',
+  version: '1.0.1',
   category: 'utility',
   exampleUsage: 'Use in LLM function-calling: { "name": "calculator", "arguments": { "expression": "2 + 3 * 4" } }',
   requiresApiKey: false,

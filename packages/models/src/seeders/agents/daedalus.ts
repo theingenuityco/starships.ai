@@ -88,6 +88,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Daedalus',
   slug: 'daedalus',
+  version: '1.0.1',
   description:
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',

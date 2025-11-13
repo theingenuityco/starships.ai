@@ -387,7 +387,7 @@ router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response):
       return;
     }
 
-    const hasAccess = await verifyResourceAccess((existingTool as any).starshipId, userId, 'tool', paramValidation.id, res);
+    const hasAccess = await verifyResourceAccess(existingTool.starshipId, userId, 'tool', paramValidation.id, res);
     if (!hasAccess) return;
 
     const tool = await toolRepository.update(paramValidation.id, bodyValidation as any);
@@ -424,7 +424,7 @@ router.delete('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Respons
       return;
     }
 
-    const hasAccess = await verifyResourceAccess((existingTool as any).starshipId, userId, 'tool', paramValidation.id, res);
+    const hasAccess = await verifyResourceAccess(existingTool.starshipId, userId, 'tool', paramValidation.id, res);
     if (!hasAccess) return;
 
     const deleted = await toolRepository.delete(paramValidation.id);
@@ -438,6 +438,56 @@ router.delete('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   } catch (error) {
     console.error('[TOOLS] Error deleting tool:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete tool');
+  }
+});
+
+// ============================================================================
+// TEMPLATE VERSIONING & UPDATE ROUTES
+// ============================================================================
+
+/**
+ * POST /tools/:id/update-from-template - Update tool with latest template data
+ */
+router.post('/tools/:id/update-from-template', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+      }),
+      req.params,
+      res,
+      'tool ID'
+    );
+    if (!paramValidation) return;
+
+    const { id: toolId } = paramValidation;
+    const userId = req.user!.id;
+
+    // Authorization: verify caller owns the tool
+    const toolRepository = new ToolRepository();
+    const tool = await toolRepository.findById(toolId);
+    if (!tool) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(tool.starshipId, userId, 'tool', toolId, res);
+    if (!hasAccess) return;
+
+    const updated = await toolRepository.updateFromTemplate(toolId);
+
+    // Return minimal response - only essential fields
+    sendSuccess(res, {
+      id: updated.id,
+      name: updated.name,
+      version: updated.version,
+      templateSnapshotAt: updated.templateSnapshotAt,
+      updatedAt: updated.updatedAt,
+      message: 'Tool updated successfully from template',
+    });
+  } catch (error) {
+    console.error('[TOOLS] Error updating from template:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool from template');
   }
 });
 

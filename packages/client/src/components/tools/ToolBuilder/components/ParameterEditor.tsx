@@ -13,6 +13,7 @@ interface ParameterEditorProps {
   value: string
   onChange: (value: string) => void
   error?: string
+  readonly?: boolean
 }
 
 interface ValidationError {
@@ -20,7 +21,7 @@ interface ValidationError {
   details: string | null
 }
 
-export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChange, error }) => {
+export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChange, error, readonly = false }) => {
   const [validationError, setValidationError] = useState<ValidationError | null>(null)
   const [isValid, setIsValid] = useState<boolean>(false)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
@@ -523,6 +524,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
   }, [theme])
 
   const handleChange = (newValue: string | undefined) => {
+    if (readonly) return
     const val = newValue || ''
     onChange(val)
     validateJsonSchema(val)
@@ -548,6 +550,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             onMount={handleEditorDidMount}
             theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
             options={{
+              readOnly: readonly,
               minimap: { enabled: false },
               fixedOverflowWidgets: true,
               fontSize: 12,
@@ -561,9 +564,9 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
               insertSpaces: true,
               formatOnPaste: true,
               formatOnType: true,
-              quickSuggestions: true,
-              suggestOnTriggerCharacters: true,
-              acceptSuggestionOnEnter: 'on',
+              quickSuggestions: !readonly,
+              suggestOnTriggerCharacters: !readonly,
+              acceptSuggestionOnEnter: readonly ? 'off' : 'on',
               folding: false,
               overviewRulerLanes: 0,
               hideCursorInOverviewRuler: true,

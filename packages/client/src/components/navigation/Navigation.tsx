@@ -182,10 +182,10 @@ export function Navigation(props: NavigationProps) {
   const mainNavigationItems = useMemo(
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'agents', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'tools', isActive: isToolsRoute || isToolBuilderRoute }] : []),
-      { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
+      { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
     ],
     [
@@ -216,12 +216,12 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Header with Theme Toggle – matches sidebar background */}
         <div className="px-3 py-3 flex-shrink-0 flex items-center justify-between gap-3">
-          <div className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-start gap-3" onClick={handleLogoClick} title="Go to Landing Screen">
-            <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center">
+          <div className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-start gap-2" onClick={handleLogoClick} title="Go to Landing Screen">
+            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
               <StarshipsLogo
-                width={36}
-                height={36}
-                className="opacity-70"
+                width={24}
+                height={24}
+                className=""
                 gradientId="nav-gradient"
                 animationDelay={1}
                 repeatDelay={20}
@@ -236,7 +236,7 @@ export function Navigation(props: NavigationProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                className={`${orbitron.className} text-lg font-normal tracking-tight leading-none whitespace-nowrap`}
+                className={`${orbitron.className} text-sm font-medium tracking-tight leading-none whitespace-nowrap`}
               >
                 starships.ai
               </motion.span>
@@ -252,7 +252,7 @@ export function Navigation(props: NavigationProps) {
           className="flex-shrink-0"
           style={{ marginTop: '0.25rem', marginBottom: '0.75rem', paddingTop: '0.75rem', paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.75rem' }}
         >
-          <div className="flex flex-col space-y-1 w-full">
+          <div className="flex flex-col space-y-1 w-full px-2">
             <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} />
           </div>
         </div>
@@ -310,7 +310,7 @@ export function Navigation(props: NavigationProps) {
                     <p className="text-sm font-semibold truncate">{userName || user?.email || 'User'}</p>
                     {starshipData && (
                       <div className="flex items-center gap-1 mt-0.5">
-                        <StarshipsLogo width={12} height={12} className="opacity-70 flex-shrink-0" />
+                        <StarshipsLogo width={12} height={12} className="flex-shrink-0" />
                         <p className="text-xs text-muted-foreground truncate">{starshipData.name || 'Starship'}</p>
                       </div>
                     )}

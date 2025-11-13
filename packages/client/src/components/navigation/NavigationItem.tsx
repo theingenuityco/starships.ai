@@ -1,8 +1,7 @@
 'use client'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { LordIcon } from '@/components/animated/LordIcon'
-import { getLordiconUrl } from '@/components/primitives/lordiconMap'
+import Icon from '@/components/primitives/Icon'
 import { motion, AnimatePresence } from 'motion/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -36,9 +35,6 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
     [href, router, onClick]
   )
 
-  // Memoize icon URL - this is critical to prevent reloading
-  const iconUrl = useMemo(() => getLordiconUrl(icon), [icon])
-
   // Create stable icon component that never changes - memoized at component level
   const StableIcon = useMemo(() => {
     // Don't render icon if icon prop is empty
@@ -46,25 +42,36 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       return null
     }
     return (
-      <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-        <LordIcon src={iconUrl} width={20} height={20} className="w-5 h-5" trigger="hover" />
+      <div
+        className="flex-shrink-0"
+        style={{
+          width: '1.25rem',
+          height: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: 0,
+          pointerEvents: 'none',
+        }}
+      >
+        <Icon name={icon} className="w-4 h-4" />
       </div>
     )
-  }, [iconUrl, icon])
+  }, [icon])
 
   const motionDiv = (
     <div
       onClick={handleClick}
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm ${
         special
-          ? 'bg-primary text-primary-foreground border-primary/40 hover:bg-primary/90 hover:text-primary-foreground shadow-sm'
+          ? 'text-primary border-transparent hover:bg-muted/40 hover:text-primary'
           : isActive
             ? 'text-primary bg-primary/10 border-primary/30'
             : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/40'
       }`}
       style={{
-        paddingLeft: '0.5rem',
-        paddingRight: '0.5rem',
+        paddingLeft: '0.25rem',
+        paddingRight: '0.25rem',
         paddingTop: '0.25rem',
         paddingBottom: '0.25rem',
         justifyContent: 'flex-start',
@@ -92,9 +99,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className={`ml-3 whitespace-nowrap pointer-events-none text-[13px] ${
-              special ? 'font-semibold' : 'font-medium'
-            }`}
+            className="ml-3 whitespace-nowrap pointer-events-none text-[13px] font-medium"
             style={{ marginLeft: '0.5rem' }}
           >
             {label}

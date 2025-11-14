@@ -24,7 +24,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useRouter } from 'next/navigation'
-import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 
 interface ConversationInterfaceProps {
@@ -164,19 +163,33 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const agentSuggestionCards = useMemo(() => {
     if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) return []
 
-    const items: { id: string; agent: Agent; text: string }[] = []
+    const perAgent: { agent: Agent; prompts: string[] }[] = []
 
     for (const agent of starshipAgentsData as Agent[]) {
       const a: any = agent as any
       const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
       if (!Array.isArray(list)) continue
       const prompts = (list as string[]).filter(Boolean).slice(0, 3)
-      prompts.forEach((text, idx) => {
-        items.push({ id: `${agent.id}:${idx}`, agent, text })
-      })
+      if (prompts.length === 0) continue
+      perAgent.push({ agent, prompts })
     }
 
-    return items.slice(0, 9)
+    const items: { id: string; agent: Agent; text: string }[] = []
+    const maxPerAgent = 3
+
+    // Interleave prompts so first row uses one suggestion per agent, and additional
+    // suggestions from each agent appear in later rows.
+    for (let idx = 0; idx < maxPerAgent; idx++) {
+      for (const entry of perAgent) {
+        const text = entry.prompts[idx]
+        if (!text) continue
+        items.push({ id: `${entry.agent.id}:${idx}`, agent: entry.agent, text })
+        if (items.length >= 9) break
+      }
+      if (items.length >= 9) break
+    }
+
+    return items
   }, [starshipAgentsData])
 
   // For collapsed view, show at most one suggestion per agent
@@ -942,13 +955,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   return (
-    <div className="relative flex flex-col h-screen transition-all duration-500 ease-in-out">
+    <div className="relative flex flex-col h-screen">
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
         {/* Key prop forces provider to remount and create fresh stream when conversation changes */}
         <ConversationStreamProvider key={currentConversationId || 'no-conversation'} conversationId={currentConversationId} starshipId={starshipId}>
-          {/* Messages Area or Welcome Screen */}
+          {/* Messages Area */}
           {showMessagesArea ? (
             <>
               <ConversationSummaryBar conversationId={currentConversationId} starshipId={starshipId} />
@@ -958,21 +971,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               {/* Single place for stream-dependent side-effects to avoid duplicate SSE subscriptions */}
               <StreamSideEffects />
             </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>
-          )}
+          ) : null}
         </ConversationStreamProvider>
 
-        {/* Floating Input Container - Always bottom-anchored; we animate inner translateY only */}
-        <div ref={inputContainerRef} className="absolute left-0 right-0 bottom-0 p-6 pointer-events-none z-30">
-          <motion.div
-            className="max-w-2xl mx-auto pointer-events-auto opacity-100 relative"
+        {/* Input Container - Centered on welcome, bottom section during conversation */}
+        <div
+          ref={inputContainerRef}
+          className={cn(
+            'px-6 pb-4 pt-2',
+            !showMessagesArea && 'flex flex-1 items-center justify-center py-4'
+          )}
+        >
+          <div
+            className={cn(
+              'w-full max-w-3xl mx-auto pointer-events-auto opacity-100 relative',
+              !showMessagesArea && 'mt-[-240px]'
+            )}
             data-message-input
-            initial={false}
-            animate={{ y: isInputDocked ? 0 : -dockOffsetPx }}
-            transition={{ type: 'spring', stiffness: 210, damping: 24 }}
-            style={{ willChange: 'transform' }}
           >
+            {!showMessagesArea && (
+              <div className="mb-4 text-center opacity-100">
+                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
+                <p className="text-muted-foreground text-lg font-light">Choose a suggested task below to start collaborating on your project</p>
+              </div>
+            )}
             <ConversationMessageInput
               key={inputKey}
               ref={messageInputRef}
@@ -993,9 +1015,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
-            {/* Suggestion cards masonry below the input */}
+            {/* Suggestion cards positioned below the input without shifting it */}
             {!showMessagesArea && agentSuggestionCards.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-4 absolute inset-x-0 top-full">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested tasks</p>
                   {agentSuggestionCards.length > 3 && (
@@ -1042,17 +1064,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 </div>
               </div>
             )}
-            <AnimatePresence initial={false} mode="wait">
-              {!showMessagesArea && (
-                <motion.div key="welcome-copy" exit={{ opacity: 0, y: -12, transition: { duration: 0.2, ease: 'easeOut' } }} className="absolute inset-x-0 bottom-full mb-6 text-center opacity-100">
-                  <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                  <p className="text-muted-foreground text-lg font-light">Choose a suggested task below to start collaborating on your project</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {/* Suggestions removed */}
-          </motion.div>
+          </div>
         </div>
+        {/* Extra space after suggestions so the page can scroll past the last card */}
+        {!showMessagesArea && agentSuggestionCards.length > 0 && <div className="h-32" />}
       </div>
     </div>
   )

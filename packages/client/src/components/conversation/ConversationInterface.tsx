@@ -7,7 +7,6 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
@@ -153,6 +152,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
+  const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -160,7 +160,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
 
-  // Build suggestion cards from agents' preview/example prompts
+  // Build suggestion cards from agents' preview/example prompts (grouped per agent)
   const agentSuggestionCards = useMemo(() => {
     if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) return []
 
@@ -178,6 +178,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
     return items.slice(0, 9)
   }, [starshipAgentsData])
+
+  // For collapsed view, show at most one suggestion per agent
+  const collapsedSuggestionCards = useMemo(() => {
+    const seen = new Set<string>()
+    const result: { id: string; agent: Agent; text: string }[] = []
+    for (const item of agentSuggestionCards) {
+      if (seen.has(item.agent.id)) continue
+      seen.add(item.agent.id)
+      result.push(item)
+    }
+    return result
+  }, [agentSuggestionCards])
 
   // Gate UI by presence of a conversation id; streaming details are handled in context consumers
   const showMessagesArea = Boolean(currentConversationId)
@@ -981,46 +993,53 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
-            {/* Suggestion cards carousel below the input */}
+            {/* Suggestion cards masonry below the input */}
             {!showMessagesArea && agentSuggestionCards.length > 0 && (
               <div className="mt-4">
-                <Carousel
-                  className="w-full"
-                  opts={{
-                    align: 'start',
-                    dragFree: true,
-                  }}
-                >
-                  <CarouselContent>
-                    {agentSuggestionCards.map(item => (
-                      <CarouselItem key={item.id} className="md:basis-1/2 lg:basis-1/3">
-                        <button
-                          type="button"
-                          onClick={() => messageInputRef.current?.handleSuggestionSubmit?.(item.text)}
-                          className="group flex w-full flex-col rounded-xl border bg-card/95 p-4 text-left transition-all duration-150 hover:bg-primary/5 hover:border-primary/40"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="line-clamp-3 text-base leading-relaxed text-foreground/95 group-hover:text-primary">
-                              <span className="mr-1 text-lg align-top text-primary/70">“</span>
-                              {item.text}
-                              <span className="ml-1 text-lg align-baseline text-primary/70">”</span>
-                            </p>
-                          </div>
-                          <div className="mt-3 flex items-center gap-2">
-                            <Avatar className="h-7 w-7 flex-shrink-0 ring-[0.5px] ring-border/40 bg-muted flex items-center justify-center">
-                              <AgentAvatar seed={item.agent.name} size={24} rounded />
-                            </Avatar>
-                            <p className="text-xs font-medium text-muted-foreground truncate group-hover:text-foreground">
-                              {item.agent.name}
-                            </p>
-                          </div>
-                        </button>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="-left-8 top-1/2 -translate-y-1/2 bg-background/90 border-border/60 shadow-sm hover:bg-muted" />
-                  <CarouselNext className="-right-8 top-1/2 -translate-y-1/2 bg-background/90 border-border/60 shadow-sm hover:bg-muted" />
-                </Carousel>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested tasks</p>
+                  {agentSuggestionCards.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllSuggestions(v => !v)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      {showAllSuggestions ? 'Show fewer' : 'Explore all'}
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
+                    <div key={item.id} className="h-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
+                            messageInputRef.current?.focusInput?.()
+                          } catch {}
+                        }}
+                        className="group flex h-40 w-full flex-col rounded-xl border bg-card/95 p-4 text-left transition-all duration-150 hover:bg-primary/5 hover:border-primary/40"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="line-clamp-3 text-base leading-relaxed text-foreground/95 group-hover:text-primary break-words">
+                            <span className="mr-1 text-lg align-top text-primary/70">“</span>
+                            {item.text}
+                            <span className="ml-1 text-lg align-baseline text-primary/70">”</span>
+                          </p>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                          <Avatar className="h-7 w-7 flex-shrink-0 ring-[0.5px] ring-border/40 bg-muted flex items-center justify-center">
+                            <AgentAvatar seed={item.agent.name} size={24} rounded />
+                          </Avatar>
+                          <p className="text-xs font-medium text-muted-foreground truncate group-hover:text-foreground">
+                            {item.agent.name}
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             <AnimatePresence initial={false} mode="wait">

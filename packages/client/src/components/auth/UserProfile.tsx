@@ -55,7 +55,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     const isInteractive = !!onClick
 
     return (
-      <div className="flex justify-start">
+      <div className="flex justify-start -ml-0.5">
         <div
           className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
           role={isInteractive ? 'button' : undefined}
@@ -68,12 +68,12 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           }}
         >
           {isImageUrl(userAvatar) ? (
-            <Avatar className="w-8 h-8 ring-1 ring-border/40">
+            <Avatar className="w-7 h-7 ring-1 ring-border/40">
               <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" />
             </Avatar>
           ) : (
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-muted/40">
-              <LordIcon src={getLordiconUrl('user')} width={20} height={20} className="w-5 h-5" trigger="click" />
+            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-muted/40">
+              <LordIcon src={getLordiconUrl('user')} width={18} height={18} className="w-4 h-4" trigger="click" />
             </div>
           )}
         </div>

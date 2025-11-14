@@ -1,7 +1,5 @@
 'use client'
 
-import { LordIcon } from '@/components/animated/LordIcon'
-import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 import Icon from '@/components/primitives/Icon'
 
 import { UserProfile } from '@/components/auth/UserProfile'
@@ -313,16 +311,27 @@ export function Navigation(props: NavigationProps) {
         {/* Conversation History List - Recents - only when expanded and data is available */}
         {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
           <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col overflow-hidden px-2">
-            {/* Divider above Recents */}
-            <div className="w-full border-t border-border/40 my-2"></div>
+            {/* Divider above Recents - make more visible */}
+            <div className="w-full border-t border-border my-3" />
 
-            {/* Recents header - aligns with nav items (same horizontal padding as nav item content) */}
+            {/* Recents header - styled to match nav items (icon + label spacing) */}
             <div className="w-full">
-              <div className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground px-2 py-2" style={{ justifyContent: 'flex-start' }}>
-                <div className="flex-shrink-0" style={{ width: '1rem', height: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, marginRight: '0.60rem' }}>
-                  <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4" trigger="hover" />
+              <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-2" style={{ justifyContent: 'flex-start' }}>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: 0,
+                    marginRight: '0.5rem',
+                  }}
+                >
+                  <Icon name="history" className="w-5 h-5" />
                 </div>
-                <span className="text-xs font-medium">Recents</span>
+                <span className="text-[13px] font-medium">Recents</span>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">

@@ -35,6 +35,7 @@ export function Navigation(props: NavigationProps) {
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   const [isExpanded, setIsExpanded] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
+  const [isCollapsing, setIsCollapsing] = useState(false)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -45,6 +46,18 @@ export function Navigation(props: NavigationProps) {
   const conversationHistoryRef = useRef<HTMLDivElement>(null)
   // Ref for user section
   const userSectionRef = useRef<HTMLDivElement>(null)
+
+  // Ref for collapse timeout to keep logo stable during collapse animation
+  const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup collapse timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (collapseTimeoutRef.current) {
+        clearTimeout(collapseTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
@@ -251,7 +264,7 @@ export function Navigation(props: NavigationProps) {
             style={{ cursor: isExpanded ? 'w-resize' : 'e-resize' }}
           >
             <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-              {isExpanded || !isHovered ? (
+              {isExpanded || isCollapsing || !isHovered ? (
                 <StarshipsLogo
                   width={24}
                   height={24}
@@ -283,7 +296,20 @@ export function Navigation(props: NavigationProps) {
           {isExpanded && (
             <button
               type="button"
-              onClick={() => setIsExpanded(prev => !prev)}
+              onClick={() => {
+                // Start collapsing: keep logo visible during animation
+                setIsCollapsing(true)
+                setIsExpanded(false)
+
+                if (collapseTimeoutRef.current) {
+                  clearTimeout(collapseTimeoutRef.current)
+                }
+
+                // Match the CSS transition duration (300ms)
+                collapseTimeoutRef.current = setTimeout(() => {
+                  setIsCollapsing(false)
+                }, 300)
+              }}
               className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
               aria-label="Collapse sidebar"
               style={{ cursor: 'w-resize' }}

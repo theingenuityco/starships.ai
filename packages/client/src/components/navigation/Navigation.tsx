@@ -314,7 +314,7 @@ export function Navigation(props: NavigationProps) {
               aria-label="Collapse sidebar"
               style={{ cursor: 'w-resize' }}
             >
-              <Icon name="sidebar" className="w-4 h-4" />
+              <Icon name="sidebar" className="w-5 h-5" />
             </button>
           )}
         </div>

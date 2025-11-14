@@ -312,16 +312,13 @@ export function Navigation(props: NavigationProps) {
 
         {/* Conversation History List - Recents - only when expanded and data is available */}
         {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
-          <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col overflow-hidden px-2">
             {/* Divider above Recents */}
             <div className="w-full border-t border-border/40 my-2"></div>
 
-            {/* Recents header - aligns with nav items */}
+            {/* Recents header - aligns with nav items (same horizontal padding as nav item content) */}
             <div className="w-full">
-              <div
-                className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground"
-                style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', justifyContent: 'flex-start' }}
-              >
+              <div className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground px-2 py-2" style={{ justifyContent: 'flex-start' }}>
                 <div className="flex-shrink-0" style={{ width: '1rem', height: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, marginRight: '0.60rem' }}>
                   <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4" trigger="hover" />
                 </div>
@@ -329,7 +326,7 @@ export function Navigation(props: NavigationProps) {
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="px-2 pb-3 space-y-1">
+              <div className="pb-3 space-y-1">
                 <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
               </div>
             </div>

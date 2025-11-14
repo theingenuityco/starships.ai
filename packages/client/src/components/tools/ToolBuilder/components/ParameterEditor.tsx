@@ -552,6 +552,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
             options={{
               readOnly: readonly,
               minimap: { enabled: false },
+              fixedOverflowWidgets: true,
               fontSize: 12,
               lineNumbers: 'off',
               glyphMargin: true,

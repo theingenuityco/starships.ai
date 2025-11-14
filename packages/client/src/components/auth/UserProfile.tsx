@@ -96,13 +96,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
         {isImageUrl(userAvatar) ? (
           <div className="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-primary/10 group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
             <Avatar className="w-full h-full rounded-none">
-              <AvatarImage 
-                src={userAvatar!} 
-                alt={userName || userEmail || 'User avatar'} 
-                referrerPolicy="no-referrer" 
-                crossOrigin="anonymous"
-                className="w-full h-full object-cover"
-              />
+              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="w-full h-full object-cover" />
             </Avatar>
           </div>
         ) : (
@@ -119,10 +113,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           <p className="text-xs text-muted-foreground truncate">{starshipName || 'No starship selected'}</p>
         </div>
       </div>
-      <Icon 
-        name="chevron-right" 
-        className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300 flex-shrink-0" 
-      />
+      <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300 flex-shrink-0" />
     </div>
   )
 })

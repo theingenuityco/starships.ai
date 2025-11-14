@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useStarshipConversations } from '@/hooks/useConversations'
+import { useStarshipConversations, useConversationAgents } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
@@ -13,12 +13,46 @@ import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { ScrollArea } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
+import { Avatar } from '../ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 
 interface ConversationListProps {
   starshipId: string
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
+}
+
+interface ConversationAgent {
+  id?: string
+  name: string
+  slug?: string
+  model?: string
+}
+
+function CompactConversationAgents({ conversationId }: { conversationId: string }) {
+  const { data: convAgents = [] } = useConversationAgents(conversationId || null)
+
+  const agents = Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []
+  if (!agents.length) return null
+
+  const maxToShow = 2
+  const visibleAgents = agents.slice(0, maxToShow)
+  const remaining = agents.length - visibleAgents.length
+
+  return (
+    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+      {visibleAgents.map(agent => (
+        <div key={agent.id ?? agent.slug ?? agent.name} className="flex items-center gap-1 max-w-[6.5rem]">
+          <Avatar className="h-4 w-4 ring-1 ring-border/40">
+            <AgentAvatar seed={agent.name} size={16} />
+          </Avatar>
+          <span className="truncate">{agent.name}</span>
+        </div>
+      ))}
+      {remaining > 0 && <span className="text-[10px] text-muted-foreground/70">+{remaining}</span>}
+    </div>
+  )
 }
 
 export function ConversationList({ starshipId, onConversationDelete, onConversationSelect, compact = false }: ConversationListProps) {
@@ -112,13 +146,13 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               <div
                 key={conversation.id}
                 className={cn(
-                  'group flex items-center gap-2 py-2 pr-2 pl-4 rounded-lg transition-all text-xs text-muted-foreground hover:text-foreground relative',
-                  'hover:bg-muted/50',
-                  isActive && 'bg-[#DD961C]/20 text-foreground'
+                  'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
+                  isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/60 hover:border-border/60'
                 )}
               >
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-                  <p className={cn('text-xs font-medium truncate', isActive && 'text-[#DD961C]')}>{title}</p>
+                  <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
+                  <CompactConversationAgents conversationId={conversation.id} />
                 </div>
                 {/* Delete button - appears on hover */}
                 {onConversationDelete && (

@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/node';
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates } from '@starships/models';
+import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates, seedUpdateDeployedInstances } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -155,6 +155,14 @@ httpServer.listen(PORT, async () => {
       await seedAgentTemplates();
     } catch (error) {
       console.error('⚠️ Failed to seed agent templates:', error);
+      // Continue - seeding is not critical for startup
+    }
+
+    // Update deployed instances to match latest template versions
+    try {
+      await seedUpdateDeployedInstances();
+    } catch (error) {
+      console.error('⚠️ Failed to update deployed instances:', error);
       // Continue - seeding is not critical for startup
     }
   } catch (error) {

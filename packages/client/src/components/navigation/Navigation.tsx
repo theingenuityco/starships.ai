@@ -1,7 +1,5 @@
 'use client'
 
-import { LordIcon } from '@/components/animated/LordIcon'
-import { getLordiconUrl } from '@/components/primitives/lordiconMap'
 import Icon from '@/components/primitives/Icon'
 
 import { UserProfile } from '@/components/auth/UserProfile'
@@ -34,8 +32,10 @@ export function Navigation(props: NavigationProps) {
   const { isAuthenticated, user, userName } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
-  // State for navbar hover expansion
+  // Navbar expansion state (GPT-style: expanded by default, collapsible)
+  const [isExpanded, setIsExpanded] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
+  const [isCollapsing, setIsCollapsing] = useState(false)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -46,6 +46,18 @@ export function Navigation(props: NavigationProps) {
   const conversationHistoryRef = useRef<HTMLDivElement>(null)
   // Ref for user section
   const userSectionRef = useRef<HTMLDivElement>(null)
+
+  // Ref for collapse timeout to keep logo stable during collapse animation
+  const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup collapse timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (collapseTimeoutRef.current) {
+        clearTimeout(collapseTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
@@ -177,27 +189,25 @@ export function Navigation(props: NavigationProps) {
     router.push('/')
   }, [router])
 
-  // Memoize hover handlers to prevent unnecessary re-renders
-  const handleMouseEnter = useCallback(() => setIsHovered(true), [])
-  const handleMouseLeave = useCallback(() => setIsHovered(false), [])
-
-  // Handle recents click - show tooltip only, navigation handled by expansion
-  const handleRecentsClick = useCallback(() => {
-    // No action needed - just shows tooltip in collapsed state
-  }, [])
+  // Header click: expand when collapsed, otherwise go to landing
+  const handleHeaderClick = useCallback(() => {
+    if (!isExpanded) {
+      setIsExpanded(true)
+      return
+    }
+    handleLogoClick()
+  }, [isExpanded, handleLogoClick])
 
   // Memoize main navigation items - only recalculate when dependencies change
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'overview', isActive: isOverviewRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'agents', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'tools', isActive: isToolsRoute || isToolBuilderRoute }] : []),
-      { href: `/marketplace`, label: 'Marketplace', icon: 'hub', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
+      { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
-      // Add Recents to same hierarchy when collapsed - it will be hidden when expanded via conditional rendering
-      ...(isAuthenticated && starshipSlug && starshipData?.id && !isHovered ? [{ href: '#', label: 'Recents', icon: '', isActive: false, onClick: handleRecentsClick }] : []),
     ],
     [
       isAuthenticated,
@@ -210,114 +220,179 @@ export function Navigation(props: NavigationProps) {
       pathname,
       isEnvironmentSettingsRoute,
       handleNewConversation,
-      handleRecentsClick,
-      isHovered,
       starshipData?.id,
     ]
   )
 
-  // Floating mode - expandable layout
+  const handleSidebarBackgroundClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (isExpanded) return
+      // If click originated from a button/link/interactive element, ignore
+      const target = e.target as HTMLElement
+      if (target.closest('button, a, [role="button"], input, label')) {
+        return
+      }
+      setIsExpanded(true)
+    },
+    [isExpanded]
+  )
+
   return (
     <div
       ref={sidebarRef}
-      className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-lg transition-all duration-300 ease-in-out"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      style={{ willChange: 'width' }}
+      className="flex flex-row h-full overflow-hidden border-r border-border/40 bg-card transition-all duration-300 ease-in-out"
+      style={{ willChange: 'width', cursor: isExpanded ? 'auto' : 'e-resize' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={handleSidebarBackgroundClick}
     >
       <div
         className="flex flex-col transition-all duration-300 ease-in-out"
         style={{
-          width: isHovered ? '16rem' : '3.5rem',
-          height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding from layout
+          width: isExpanded ? '16rem' : '3.5rem',
+          height: '100%',
           willChange: 'width',
           contain: 'layout style paint',
         }}
       >
-        {/* Compact Header with Theme Toggle */}
-        <div className="px-3 py-3 border-b border-border/20 flex-shrink-0 flex items-center justify-between gap-3 bg-muted/60">
-          <div className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-start gap-3" onClick={handleLogoClick} title="Go to Landing Screen">
-            <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center">
-              <StarshipsLogo
-                width={36}
-                height={36}
-                className="opacity-70"
-                gradientId="nav-gradient"
-                animationDelay={1}
-                repeatDelay={20}
-                triggerAnimation={animationTrigger}
-                idleLoop={false}
-                playOnMountOnce={false}
-              />
+        {/* Header – logo, brand, and collapse toggle */}
+        <div className="px-4 pt-5 pb-3 flex-shrink-0 flex items-center justify-between gap-2">
+          <div
+            className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0"
+            onClick={handleHeaderClick}
+            title={isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
+            style={{ cursor: isExpanded ? 'w-resize' : 'e-resize' }}
+          >
+            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+              {isExpanded || isCollapsing || !isHovered ? (
+                <StarshipsLogo
+                  width={24}
+                  height={24}
+                  className=""
+                  gradientId="nav-gradient"
+                  animationDelay={1}
+                  repeatDelay={20}
+                  triggerAnimation={animationTrigger}
+                  idleLoop={false}
+                  playOnMountOnce={false}
+                />
+              ) : (
+                <Icon name="sidebar" className="w-5 h-5" />
+              )}
             </div>
-            {isHovered && (
+            {isExpanded && (
               <motion.span
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                className={`${orbitron.className} text-lg font-normal tracking-tight leading-none whitespace-nowrap`}
+                className={`${orbitron.className} text-sm font-medium tracking-tight leading-none whitespace-nowrap`}
+                style={{ marginLeft: '0.5rem' }}
               >
                 starships.ai
               </motion.span>
             )}
           </div>
-          <div className="flex-shrink-0">
-            <ThemeToggle />
-          </div>
+          {isExpanded && (
+            <button
+              type="button"
+              onClick={() => {
+                // Start collapsing: keep logo visible during animation
+                setIsCollapsing(true)
+                setIsExpanded(false)
+
+                if (collapseTimeoutRef.current) {
+                  clearTimeout(collapseTimeoutRef.current)
+                }
+
+                // Match the CSS transition duration (300ms)
+                collapseTimeoutRef.current = setTimeout(() => {
+                  setIsCollapsing(false)
+                }, 300)
+              }}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label="Collapse sidebar"
+              style={{ cursor: 'w-resize' }}
+            >
+              <Icon name="sidebar" className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
-        {/* Navigation Content - Moved to top */}
+        {/* Navigation Content - directly under header */}
         <div
           className="flex-shrink-0"
-          style={{ marginTop: '0.25rem', marginBottom: '0.75rem', paddingTop: '0.75rem', paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isHovered ? '0' : '0.75rem' }}
+          style={{
+            marginTop: '0rem',
+            marginBottom: '0.75rem',
+            paddingTop: '0.25rem',
+            paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.75rem',
+          }}
         >
-          <div className="flex flex-col space-y-1 w-full">
-            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isHovered} />
+          <div className="flex flex-col space-y-1 w-full px-2">
+            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} />
           </div>
         </div>
 
-        {/* Conversation History List - Recents - Show when navbar is expanded */}
-        {isAuthenticated && starshipSlug && isHovered && starshipData?.id && (
-          <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {/* Divider above Recents */}
-            <div className="w-full border-t border-border/40 my-2"></div>
+        {/* Conversation History List - Recents - only when expanded and data is available */}
+        {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
+          <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col px-2">
+            {/* Divider above Recents - make more visible */}
+            <div className="w-full border-t border-border my-3" />
 
-            {/* Recents header - matches NavigationItem exactly with space-y-1 gap (0.25rem) */}
+            {/* Recents header - styled to match nav items (icon + label spacing) */}
             <div className="w-full">
-              <div
-                className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground"
-                style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', paddingLeft: '0.75rem', paddingRight: '0.75rem', justifyContent: 'flex-start' }}
-              >
-                <div className="flex-shrink-0" style={{ width: '1rem', height: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, marginRight: '0.60rem' }}>
-                  <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4" trigger="hover" />
+              <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-2" style={{ justifyContent: 'flex-start' }}>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: 0,
+                    marginRight: '0.5rem',
+                  }}
+                >
+                  <Icon name="history" className="w-5 h-5" />
                 </div>
-                <span className="text-xs font-medium">Recents</span>
+                <span className="text-[13px] font-medium">Recents</span>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="px-3 pb-3 space-y-1">
+              <div className="pb-3 space-y-1">
                 <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
               </div>
             </div>
           </div>
         )}
 
-        {/* Spacer to push user profile to bottom */}
-        {(!isHovered || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+        {/* Spacer to push theme toggle + user profile toward bottom when needed */}
+        {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+
+        {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
+        {isExpanded && (
+          <div className="flex-shrink-0 px-2 pb-1">
+            <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 px-2 text-xs transition-colors">
+              <span className="font-medium">Appearance</span>
+              <ThemeToggle />
+            </div>
+          </div>
+        )}
 
         {/* User Profile Section */}
-        <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+        <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative py-2">
           {/* Profile section */}
-          <div className="w-full" style={{ paddingLeft: '0.75rem', paddingRight: '0.75rem' }}>
-            {isHovered ? (
+          <div className="w-full px-2">
+            {isExpanded ? (
               <div
-                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full"
+                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full py-2 px-2"
                 onClick={handleUserProfileClick}
-                style={{ justifyContent: 'flex-start', paddingTop: '0.5rem', paddingBottom: '0.5rem', minHeight: '2.5rem' }}
+                style={{ justifyContent: 'flex-start', minHeight: '2.5rem' }}
               >
-                <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
-                  <UserProfile mode="collapsed" active={isSettingsRoute} onClick={handleUserProfileClick} />
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -330,14 +405,14 @@ export function Navigation(props: NavigationProps) {
                     <p className="text-sm font-semibold truncate">{userName || user?.email || 'User'}</p>
                     {starshipData && (
                       <div className="flex items-center gap-1 mt-0.5">
-                        <StarshipsLogo width={12} height={12} className="opacity-70 flex-shrink-0" />
+                        <StarshipsLogo width={12} height={12} className="flex-shrink-0" />
                         <p className="text-xs text-muted-foreground truncate">{starshipData.name || 'Starship'}</p>
                       </div>
                     )}
                   </motion.div>
                 </AnimatePresence>
                 <AnimatePresence mode="wait">
-                  {isHovered && (
+                  {isExpanded && (
                     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}>
                       <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                     </motion.div>
@@ -345,9 +420,9 @@ export function Navigation(props: NavigationProps) {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center w-full" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-                <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
-                  <UserProfile mode="collapsed" active={isSettingsRoute} onClick={handleUserProfileClick} />
+              <div className="flex items-center w-full px-2" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>
               </div>
             )}

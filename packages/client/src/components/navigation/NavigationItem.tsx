@@ -24,6 +24,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
+      e.stopPropagation()
       if (onClick) {
         // Custom click handler
         onClick()
@@ -62,7 +63,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm ${
+      className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 py-1 ${
         special
           ? 'text-primary border-transparent hover:bg-muted/40 hover:text-primary'
           : isActive
@@ -70,10 +71,6 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/40'
       }`}
       style={{
-        paddingLeft: '0.5rem',
-        paddingRight: '0.5rem',
-        paddingTop: '0.25rem',
-        paddingBottom: '0.25rem',
         justifyContent: 'flex-start',
         transition: 'background-color 0.15s ease, transform 0.1s ease',
         cursor: 'pointer',

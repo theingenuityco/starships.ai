@@ -72,7 +72,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           }}
         >
           {isImageUrl(userAvatar) ? (
-            <Avatar className="w-7 h-7">
+            <Avatar className="w-8 h-8">
               <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" />
             </Avatar>
           ) : (

@@ -41,7 +41,7 @@ function CompactConversationAgents({ conversationId }: { conversationId: string 
   const remaining = agents.length - visibleAgents.length
 
   return (
-    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">
       {visibleAgents.map(agent => (
         <div key={agent.id ?? agent.slug ?? agent.name} className="flex items-center gap-1 max-w-[6.5rem]">
           <Avatar className="h-4 w-4 ring-1 ring-border/40">
@@ -50,7 +50,7 @@ function CompactConversationAgents({ conversationId }: { conversationId: string 
           <span className="truncate">{agent.name}</span>
         </div>
       ))}
-      {remaining > 0 && <span className="text-[10px] text-muted-foreground/70">+{remaining}</span>}
+      {remaining > 0 && <span className="text-[10px] text-muted-foreground/70 group-hover:text-foreground/80">+{remaining}</span>}
     </div>
   )
 }
@@ -147,7 +147,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                 key={conversation.id}
                 className={cn(
                   'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
-                  isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/60 hover:border-border/60'
+                  isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
                 )}
               >
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>

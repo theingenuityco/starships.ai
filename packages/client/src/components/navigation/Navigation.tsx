@@ -348,7 +348,7 @@ export function Navigation(props: NavigationProps) {
         {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
         {isExpanded && (
           <div className="flex-shrink-0 px-2 pb-1">
-            <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 pl-1 pr-0 text-xs transition-colors">
+            <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 px-2 text-xs transition-colors">
               <span className="font-medium">Appearance</span>
               <ThemeToggle />
             </div>
@@ -361,7 +361,7 @@ export function Navigation(props: NavigationProps) {
           <div className="w-full px-2">
             {isExpanded ? (
               <div
-                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full py-2"
+                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full py-2 px-2"
                 onClick={handleUserProfileClick}
                 style={{ justifyContent: 'flex-start', minHeight: '2.5rem' }}
               >
@@ -394,7 +394,7 @@ export function Navigation(props: NavigationProps) {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center w-full" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+              <div className="flex items-center w-full px-2" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
                 <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
                   <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>

@@ -17,12 +17,14 @@ import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
+import { AgentCard } from '@/components/agents/AgentCard'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
+import { cn } from '@/lib/utils'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -1018,6 +1020,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
+            {/* Agent cards row under the input */}
+            {Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
+              <div className="mt-4 grid w-full gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {starshipAgentsData.map(agent => (
+                  <AgentCard key={agent.id} agent={agent as any} isSelected={selectedAgent?.id === agent.id} onClick={() => handleAgentChange(agent)} showActions={false} />
+                ))}
+              </div>
+            )}
             <AnimatePresence initial={false} mode="wait">
               {!showMessagesArea && (
                 <motion.div key="welcome-copy" exit={{ opacity: 0, y: -12, transition: { duration: 0.2, ease: 'easeOut' } }} className="absolute inset-x-0 bottom-full mb-6 text-center opacity-100">

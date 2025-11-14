@@ -1,7 +1,7 @@
 export type ResolvedIcon = { type: 'phosphor'; component: string } | { type: 'radix'; component: string } | { type: 'iconify'; icon: string }
 
 const map: Record<string, ResolvedIcon> = {
-  // Controls → Radix
+  // Controls → Radix / Phosphor / Iconify
   'chevron-right': { type: 'radix', component: 'ChevronRightIcon' },
   'chevron-left': { type: 'radix', component: 'ChevronLeftIcon' },
   'chevron-down': { type: 'radix', component: 'ChevronDownIcon' },
@@ -12,6 +12,8 @@ const map: Record<string, ResolvedIcon> = {
   'arrow-up': { type: 'phosphor', component: 'ArrowUp' },
   // Caret (filled supported via weight)
   'caret-right': { type: 'phosphor', component: 'CaretRight' },
+  // Sidebar toggle icon (used for nav collapse/expand)
+  sidebar: { type: 'iconify', icon: 'ph:sidebar-simple' },
 
   // Common → Phosphor
   search: { type: 'phosphor', component: 'MagnifyingGlass' },

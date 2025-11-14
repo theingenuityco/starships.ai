@@ -1,8 +1,7 @@
 'use client'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { LordIcon } from '@/components/animated/LordIcon'
-import { getLordiconUrl } from '@/components/primitives/lordiconMap'
+import Icon from '@/components/primitives/Icon'
 import { motion, AnimatePresence } from 'motion/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -25,6 +24,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
+      e.stopPropagation()
       if (onClick) {
         // Custom click handler
         onClick()
@@ -36,83 +36,44 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
     [href, router, onClick]
   )
 
-  // Memoize icon URL - this is critical to prevent reloading
-  const iconUrl = useMemo(() => getLordiconUrl(icon), [icon])
-
   // Create stable icon component that never changes - memoized at component level
   const StableIcon = useMemo(() => {
-    if (special) {
-      return (
-        <div
-          className="rounded-full bg-[#DD961C] hover:bg-[#CC860C] transition-colors duration-200 flex-shrink-0"
-          style={{
-            width: '1.625rem',
-            height: '1.625rem',
-            margin: 0,
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span
-            className="text-black font-light text-lg"
-            style={{
-              lineHeight: '0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: '-2px',
-            }}
-          >
-            +
-          </span>
-        </div>
-      )
-    }
     // Don't render icon if icon prop is empty
     if (!icon || icon === '') {
       return null
     }
     return (
-      <div className="flex-shrink-0" style={{ width: '1.5rem', height: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-        <LordIcon src={iconUrl} width={24} height={24} className="w-6 h-6" trigger="hover" />
+      <div
+        className="flex-shrink-0"
+        style={{
+          width: '1.5rem',
+          height: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: 0,
+          pointerEvents: 'none',
+        }}
+      >
+        <Icon name={icon} className="w-5 h-5" />
       </div>
     )
-  }, [iconUrl, special, icon])
+  }, [icon])
 
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-xl flex items-center border w-full h-10 cursor-pointer ${
-        isActive
-          ? 'text-primary bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border-primary/30'
-          : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+      className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 py-1 ${
+        special
+          ? 'text-primary border-transparent hover:text-primary hover:bg-muted hover:border-muted'
+          : isActive
+            ? 'text-primary bg-primary/10 border-primary/30'
+            : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
       }`}
       style={{
-        paddingLeft: '0.75rem',
-        paddingRight: '0.75rem',
-        paddingTop: '0.5rem',
-        paddingBottom: '0.5rem',
         justifyContent: 'flex-start',
-        transition: 'background-color 0.2s ease, transform 0.2s ease',
+        transition: 'background-color 0.15s ease',
         cursor: 'pointer',
-      }}
-      onMouseEnter={e => {
-        if (expanded) {
-          e.currentTarget.style.transform = 'scale(1.02)'
-        } else {
-          e.currentTarget.style.transform = 'scale(1.05)'
-        }
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'scale(1)'
-      }}
-      onMouseDown={e => {
-        e.currentTarget.style.transform = expanded ? 'scale(0.98)' : 'scale(0.95)'
-      }}
-      onMouseUp={e => {
-        e.currentTarget.style.transform = 'scale(1)'
       }}
     >
       {StableIcon}
@@ -122,9 +83,9 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-            className={`ml-3 font-medium whitespace-nowrap pointer-events-none ${special ? 'text-[#DD961C] text-sm' : 'text-xs'}`}
-            style={{ marginLeft: '0.75rem' }}
+            transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
+            className="ml-3 whitespace-nowrap pointer-events-none text-[13px] font-medium"
+            style={{ marginLeft: '0.5rem' }}
           >
             {label}
           </motion.span>

@@ -1856,8 +1856,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   .flat(),
               })
             } catch {}
-            const newParagraph = { type: 'paragraph', content: [desiredMention, prefill, ...rest] }
-            const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+
+            const hasAfterText = typeof afterText === 'string' && afterText.trim().length > 0
+            const baseContent = hasAfterText ? [desiredMention, prefill] : [desiredMention, prefill, ...rest]
+            const newParagraph = { type: 'paragraph', content: baseContent }
+            // When we have explicit afterText (e.g. clicking a suggestion card), replace the whole doc
+            // so the new suggestion doesn't append to any existing content.
+            const newDoc = hasAfterText ? { type: 'doc', content: [newParagraph] } : { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
             scheduleSetContent(newDoc)
             lastEnforcedAgentIdRef.current = agent.id
             // Focus and place caret at end to continue typing naturally

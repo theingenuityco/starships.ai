@@ -54,6 +54,7 @@ export { migrationRunner } from './scripts/migration-runner';
 export { seedToolTemplates } from './scripts/seed-tool-templates';
 export { seedAgentTemplates } from './scripts/seed-agent-templates';
 export { seedUpdateDeployedInstances } from './scripts/seed-update-deployed-instances';
+export { migrateDocTools } from './scripts/migrate-doc-tools';
 
 // Utilities
 export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';

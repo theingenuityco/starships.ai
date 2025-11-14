@@ -365,7 +365,7 @@ export function Navigation(props: NavigationProps) {
                 onClick={handleUserProfileClick}
                 style={{ justifyContent: 'flex-start', minHeight: '2.5rem' }}
               >
-                <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
+                <div className="flex-shrink-0 flex items-center justify-center">
                   <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>
                 <AnimatePresence mode="wait">
@@ -395,7 +395,7 @@ export function Navigation(props: NavigationProps) {
               </div>
             ) : (
               <div className="flex items-center w-full px-2" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-                <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
+                <div className="flex-shrink-0 flex items-center justify-center">
                   <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>
               </div>

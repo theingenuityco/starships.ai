@@ -55,13 +55,9 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     const isInteractive = !!onClick
 
     return (
-      <div className="flex justify-start group">
+      <div className="flex justify-start">
         <div
-          className={`group relative transition-all duration-300 rounded-xl w-10 h-10 flex items-center justify-center border ${
-            active
-              ? 'text-foreground bg-gradient-to-r from-muted/40 to-muted/30 shadow-md border-transparent'
-              : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-          } ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
+          className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
           role={isInteractive ? 'button' : undefined}
           aria-label={isInteractive ? 'Open user menu' : undefined}
           tabIndex={isInteractive ? 0 : -1}
@@ -72,11 +68,13 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           }}
         >
           {isImageUrl(userAvatar) ? (
-            <Avatar className="w-8 h-8">
+            <Avatar className="w-8 h-8 ring-1 ring-border/40">
               <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" />
             </Avatar>
           ) : (
-            <LordIcon src={getLordiconUrl('user')} width={28} height={28} className="w-[28px] h-[28px]" trigger="click" />
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-muted/40">
+              <LordIcon src={getLordiconUrl('user')} width={20} height={20} className="w-5 h-5" trigger="click" />
+            </div>
           )}
         </div>
       </div>

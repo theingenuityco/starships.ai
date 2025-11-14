@@ -286,11 +286,11 @@ export function Navigation(props: NavigationProps) {
             <button
               type="button"
               onClick={() => setIsExpanded(prev => !prev)}
-              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
               aria-label="Collapse sidebar"
               style={{ cursor: 'w-resize' }}
             >
-              <Icon name="sidebar" className="w-5 h-5" />
+              <Icon name="sidebar" className="w-4 h-4" />
             </button>
           )}
         </div>

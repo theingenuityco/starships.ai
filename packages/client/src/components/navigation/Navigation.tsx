@@ -325,7 +325,7 @@ export function Navigation(props: NavigationProps) {
         {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
         {isExpanded && (
           <div className="flex-shrink-0 px-3 pb-1">
-            <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 px-2 text-xs transition-colors">
+            <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 pl-1 pr-0 text-xs transition-colors">
               <span className="font-medium">Appearance</span>
               <ThemeToggle />
             </div>

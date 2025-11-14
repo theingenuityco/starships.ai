@@ -65,27 +65,15 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       onClick={handleClick}
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 py-1 ${
         special
-          ? 'text-primary border-transparent hover:bg-muted/40 hover:text-primary'
+          ? 'text-primary border-transparent hover:bg-muted/60 hover:text-primary'
           : isActive
             ? 'text-primary bg-primary/10 border-primary/30'
-            : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/40'
+            : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/60 hover:border-border/60'
       }`}
       style={{
         justifyContent: 'flex-start',
-        transition: 'background-color 0.15s ease, transform 0.1s ease',
+        transition: 'background-color 0.15s ease',
         cursor: 'pointer',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'scale(1.02)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'scale(1)'
-      }}
-      onMouseDown={e => {
-        e.currentTarget.style.transform = expanded ? 'scale(0.98)' : 'scale(0.95)'
-      }}
-      onMouseUp={e => {
-        e.currentTarget.style.transform = 'scale(1)'
       }}
     >
       {StableIcon}

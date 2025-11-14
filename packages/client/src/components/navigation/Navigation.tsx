@@ -310,7 +310,7 @@ export function Navigation(props: NavigationProps) {
 
         {/* Conversation History List - Recents - only when expanded and data is available */}
         {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
-          <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col overflow-hidden px-2">
+          <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col px-2">
             {/* Divider above Recents - make more visible */}
             <div className="w-full border-t border-border my-3" />
 

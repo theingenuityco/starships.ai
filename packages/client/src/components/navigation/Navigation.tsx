@@ -213,13 +213,27 @@ export function Navigation(props: NavigationProps) {
     ]
   )
 
+  const handleSidebarBackgroundClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (isExpanded) return
+      // If click originated from a button/link/interactive element, ignore
+      const target = e.target as HTMLElement
+      if (target.closest('button, a, [role="button"], input, label')) {
+        return
+      }
+      setIsExpanded(true)
+    },
+    [isExpanded]
+  )
+
   return (
     <div
       ref={sidebarRef}
       className="flex flex-row h-full overflow-hidden border-r border-border/40 bg-card transition-all duration-300 ease-in-out"
-      style={{ willChange: 'width' }}
+      style={{ willChange: 'width', cursor: isExpanded ? 'auto' : 'e-resize' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={handleSidebarBackgroundClick}
     >
       <div
         className="flex flex-col transition-all duration-300 ease-in-out"
@@ -231,14 +245,14 @@ export function Navigation(props: NavigationProps) {
         }}
       >
         {/* Header – logo, brand, and collapse toggle */}
-        <div className="px-3 py-3 flex-shrink-0 flex items-center justify-between gap-2">
+        <div className="px-4 py-3 flex-shrink-0 flex items-center justify-between gap-2">
           <div
-            className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-2"
+            className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0"
             onClick={handleHeaderClick}
             title={isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
             style={{ cursor: isExpanded ? 'w-resize' : 'e-resize' }}
           >
-            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
               {isExpanded || !isHovered ? (
                 <StarshipsLogo
                   width={24}
@@ -262,6 +276,7 @@ export function Navigation(props: NavigationProps) {
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                 className={`${orbitron.className} text-sm font-medium tracking-tight leading-none whitespace-nowrap`}
+                style={{ marginLeft: '0.5rem' }}
               >
                 starships.ai
               </motion.span>
@@ -301,11 +316,11 @@ export function Navigation(props: NavigationProps) {
             {/* Divider above Recents */}
             <div className="w-full border-t border-border/40 my-2"></div>
 
-            {/* Recents header - matches NavigationItem exactly with space-y-1 gap (0.25rem) */}
+            {/* Recents header - aligns with nav items */}
             <div className="w-full">
               <div
                 className="w-full rounded-xl flex items-center border border-transparent text-muted-foreground"
-                style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', paddingLeft: '0.75rem', paddingRight: '0.75rem', justifyContent: 'flex-start' }}
+                style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', justifyContent: 'flex-start' }}
               >
                 <div className="flex-shrink-0" style={{ width: '1rem', height: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, marginRight: '0.60rem' }}>
                   <LordIcon src={getLordiconUrl('history')} width={16} height={16} className="w-4 h-4" trigger="hover" />
@@ -314,7 +329,7 @@ export function Navigation(props: NavigationProps) {
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="px-3 pb-3 space-y-1">
+              <div className="px-2 pb-3 space-y-1">
                 <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
               </div>
             </div>
@@ -326,7 +341,7 @@ export function Navigation(props: NavigationProps) {
 
         {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
         {isExpanded && (
-          <div className="flex-shrink-0 px-3 pb-1">
+          <div className="flex-shrink-0 px-2 pb-1">
             <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 pl-1 pr-0 text-xs transition-colors">
               <span className="font-medium">Appearance</span>
               <ThemeToggle />
@@ -337,7 +352,7 @@ export function Navigation(props: NavigationProps) {
         {/* User Profile Section */}
         <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
           {/* Profile section */}
-          <div className="w-full" style={{ paddingLeft: '0.75rem', paddingRight: '0.75rem' }}>
+          <div className="w-full" style={{ paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
             {isExpanded ? (
               <div
                 className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full"

@@ -52,19 +52,22 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
   }
 
   if (mode === 'collapsed') {
+    const isInteractive = !!onClick
+
     return (
       <div className="flex justify-start group">
         <div
-          className={`group relative transition-all duration-300 rounded-xl w-10 h-10 flex items-center justify-center border cursor-pointer ${
+          className={`group relative transition-all duration-300 rounded-xl w-10 h-10 flex items-center justify-center border ${
             active
               ? 'text-foreground bg-gradient-to-r from-muted/40 to-muted/30 shadow-md border-transparent'
               : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-          }`}
-          role="button"
-          aria-label="Open user menu"
-          tabIndex={0}
-          onClick={onClick}
+          } ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
+          role={isInteractive ? 'button' : undefined}
+          aria-label={isInteractive ? 'Open user menu' : undefined}
+          tabIndex={isInteractive ? 0 : -1}
+          onClick={isInteractive ? onClick : undefined}
           onKeyDown={e => {
+            if (!isInteractive) return
             if (e.key === 'Enter' || e.key === ' ') onClick?.()
           }}
         >

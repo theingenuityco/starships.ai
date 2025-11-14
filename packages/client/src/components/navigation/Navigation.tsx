@@ -245,7 +245,7 @@ export function Navigation(props: NavigationProps) {
         }}
       >
         {/* Header – logo, brand, and collapse toggle */}
-        <div className="px-4 py-3 flex-shrink-0 flex items-center justify-between gap-2">
+        <div className="px-4 pt-5 pb-3 flex-shrink-0 flex items-center justify-between gap-2">
           <div
             className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0"
             onClick={handleHeaderClick}
@@ -350,17 +350,17 @@ export function Navigation(props: NavigationProps) {
         )}
 
         {/* User Profile Section */}
-        <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative" style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+        <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative py-2">
           {/* Profile section */}
-          <div className="w-full" style={{ paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
+          <div className="w-full px-2">
             {isExpanded ? (
               <div
-                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full"
+                className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full py-2"
                 onClick={handleUserProfileClick}
-                style={{ justifyContent: 'flex-start', paddingTop: '0.5rem', paddingBottom: '0.5rem', minHeight: '2.5rem' }}
+                style={{ justifyContent: 'flex-start', minHeight: '2.5rem' }}
               >
                 <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
-                  <UserProfile mode="collapsed" active={isSettingsRoute} onClick={handleUserProfileClick} />
+                  <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -390,7 +390,7 @@ export function Navigation(props: NavigationProps) {
             ) : (
               <div className="flex items-center w-full" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
                 <div className="flex-shrink-0" style={{ width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', margin: 0 }}>
-                  <UserProfile mode="collapsed" active={isSettingsRoute} onClick={handleUserProfileClick} />
+                  <UserProfile mode="collapsed" active={isSettingsRoute} />
                 </div>
               </div>
             )}

@@ -1987,11 +1987,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         {/* Input Container with Expandable Overlay */}
         <div
           className={cn(
-            'relative transition-all overflow-visible',
-            minimal
-              ? 'frosted-glass-card rounded-xl shadow-frosted-lg focus-within:ring-1 focus-within:ring-primary/15'
-              : 'frosted-glass-card rounded-2xl shadow-frosted-lg focus-within:ring-2 focus-within:ring-primary/20',
-            'focus-within:border-primary/40',
+            'relative transition-all overflow-visible bg-card border border-border/60',
+            minimal ? 'rounded-xl shadow-sm' : 'rounded-2xl shadow-sm',
+            'focus-within:border-primary/70',
             disabled && 'opacity-50'
           )}
         >
@@ -2058,7 +2056,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         {/* Agent Indicator - Only show in non-minimal mode */}
         {!minimal && selectedAgent && (
-          <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
+          <div className="absolute -top-3 left-4 px-2 py-1 bg-card border border-border/60 text-primary text-xs rounded-full shadow-sm">
             {isStreamingEffective ? `${selectedAgent.name} is responding...` : sending ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
           </div>
         )}

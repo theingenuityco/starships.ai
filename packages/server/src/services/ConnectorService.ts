@@ -259,7 +259,7 @@ export class ConnectorService {
   async completeDiscordOAuth(
     code: string,
     stateToken: string,
-    callbackParams: { guild_id?: string; permissions?: string },
+    callbackParams: { guild_id?: string; permissions?: string }
   ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const env = getEnvConfig();
     const clientId = env.DISCORD_CLIENT_ID;
@@ -267,9 +267,7 @@ export class ConnectorService {
     const redirectUri = env.DISCORD_REDIRECT_URL;
 
     if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error(
-        'Discord OAuth is not configured. Please set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_REDIRECT_URL.',
-      );
+      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_REDIRECT_URL.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);

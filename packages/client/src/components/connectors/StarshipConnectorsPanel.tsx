@@ -1,12 +1,17 @@
 'use client'
 
-import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth } from '@/hooks/useConnectors'
+import {
+  useConnectorCatalog,
+  useDisconnectConnector,
+  useStarshipConnectors,
+  useStartLinkedInOAuth,
+  useStartDiscordOAuth,
+} from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
-import { useConnectDiscord } from '@/hooks/useConnectors'
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -17,10 +22,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
-  const discordMutation = useConnectDiscord(starshipId)
-
-  const [discordToken, setDiscordToken] = useState('')
-  const [discordChannelId, setDiscordChannelId] = useState('')
+  const discordMutation = useStartDiscordOAuth(starshipId)
 
   const getConnectorState = (provider: 'linkedin' | 'discord') =>
     connectors.find(connector => connector.provider === provider)
@@ -37,14 +39,10 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   }
 
   const handleDiscordConnect = async () => {
-    if (!discordToken.trim()) return
-
-    await discordMutation.mutateAsync({
-      apiKey: discordToken.trim(),
-      extraConfig: discordChannelId.trim() ? { defaultChannelId: discordChannelId.trim() } : undefined,
-    })
-    setDiscordToken('')
-    setDiscordChannelId('')
+    const result = await discordMutation.mutateAsync()
+    if (result) {
+      window.location.href = result
+    }
   }
 
   if (isLoading) {
@@ -129,37 +127,19 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             <p className="text-sm text-muted-foreground mt-2">{discord.description}</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Bot token</label>
-                <Input
-                  type="password"
-                  placeholder="DISCORD_BOT_TOKEN"
-                  value={discordToken}
-                  onChange={e => setDiscordToken(e.target.value)}
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  Default channel ID <span className="text-muted-foreground">(optional)</span>
-                </label>
-                <Input
-                  type="text"
-                  placeholder="1234567890"
-                  value={discordChannelId}
-                  onChange={e => setDiscordChannelId(e.target.value)}
-                  className="h-9 text-sm"
-                />
-              </div>
+            <div className="text-xs text-muted-foreground">
+              <div className="font-medium mb-1">Bot access</div>
+              <p className="mb-2">
+                Install the Starships bot into your Discord server. The bot can send messages in channels where it has permission.
+              </p>
             </div>
             <div className="flex gap-2">
               <Button
                 size="sm"
                 onClick={handleDiscordConnect}
-                disabled={discordMutation.isPending || !discordToken.trim()}
+                disabled={discordMutation.isPending}
               >
-                {discordState?.status === 'connected' ? 'Update Discord' : 'Connect Discord'}
+                {discordState?.status === 'connected' ? 'Reconnect Discord' : 'Connect Discord'}
               </Button>
               {discordState?.status === 'connected' && (
                 <Button
@@ -171,21 +151,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   Disconnect
                 </Button>
               )}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              <div className="font-medium mb-1">Managed environment variables</div>
-              <ul className="list-disc list-inside space-y-1">
-                {discord.requiredEnvKeys.map(key => (
-                  <li key={key}>
-                    <span className="font-mono text-[11px]">{key}</span>
-                  </li>
-                ))}
-                {(discord.optionalEnvKeys || []).map(key => (
-                  <li key={key}>
-                    <span className="font-mono text-[11px]">{key}</span> <span className="text-muted-foreground">(optional)</span>
-                  </li>
-                ))}
-              </ul>
             </div>
           </CardContent>
         </Card>

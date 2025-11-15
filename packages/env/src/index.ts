@@ -117,5 +117,11 @@ export function getEnvConfig(): EnvironmentConfig {
     LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
     LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
     LINKEDIN_REDIRECT_URL: process.env.LINKEDIN_REDIRECT_URL,
+
+    // Discord Bot OAuth Configuration (optional)
+    DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+    DISCORD_REDIRECT_URL: process.env.DISCORD_REDIRECT_URL,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
   };
 }

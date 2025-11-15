@@ -29,10 +29,11 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
   {
     provider: 'discord',
     displayName: 'Discord',
-    description: 'Connect a Discord bot token to enable tools that send messages or notifications to your Discord servers.',
-    authType: 'api_key',
-    requiredEnvKeys: ['DISCORD_BOT_TOKEN'],
-    optionalEnvKeys: ['DISCORD_DEFAULT_CHANNEL_ID'],
+    description:
+      'Connect a Discord bot to enable tools that send messages or notifications to your Discord servers via an installed bot.',
+    authType: 'oauth2',
+    requiredEnvKeys: [],
+    optionalEnvKeys: [],
     docsSlug: '/public-docs/environment#discord-connector',
   },
 ];

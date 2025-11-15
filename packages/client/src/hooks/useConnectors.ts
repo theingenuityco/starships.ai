@@ -5,7 +5,6 @@ import type {
   ConnectorCatalogResponse,
   ConnectorListItem,
   ConnectorListResponse,
-  ConnectWithApiKeyRequest,
 } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
@@ -46,34 +45,6 @@ export function useStarshipConnectors(starshipId: string, enabled: boolean = tru
   })
 }
 
-export function useConnectDiscord(starshipId: string) {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (payload: ConnectWithApiKeyRequest): Promise<ConnectorListItem['metadata']> => {
-      const response: FetchResponse<ApiResponse<{ connector: ConnectorListItem }>> = await api.post(
-        `/api/v1/starships/${starshipId}/connectors/discord/api-key`,
-        payload,
-      )
-      return response.data.data.connector.metadata
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId),
-      })
-      toast.success('Discord connected', {
-        description: 'Discord connector is now active for this starship.',
-      })
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to connect Discord'
-      toast.error('Failed to connect Discord', {
-        description: errorMessage,
-      })
-    },
-  })
-}
-
 export function useDisconnectConnector(starshipId: string) {
   const queryClient = useQueryClient()
 
@@ -110,6 +81,23 @@ export function useStartLinkedInOAuth(starshipId: string) {
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start LinkedIn connection'
       toast.error('Failed to connect LinkedIn', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
+export function useStartDiscordOAuth(starshipId: string) {
+  return useMutation({
+    mutationFn: async (): Promise<string> => {
+      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
+        `/api/v1/starships/${starshipId}/connectors/discord/oauth/start`,
+      )
+      return response.data.data.authorizationUrl
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start Discord connection'
+      toast.error('Failed to connect Discord', {
         description: errorMessage,
       })
     },

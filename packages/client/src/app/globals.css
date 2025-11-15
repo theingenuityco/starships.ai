@@ -360,7 +360,7 @@
     /* Enhanced Dark Theme - Pure Black Foundation */
     --background: 0 0% 0%; /* Pure black base */
     --foreground: 0 0% 95%;
-    --card: 0 0% 3%;
+    --card: 0 0% 6%;
     --card-foreground: 0 0% 95%;
     --primary: 38 92% 54%; /* Amber primary in dark */
     --primary-foreground: 0 0% 0%;
@@ -662,7 +662,7 @@
   /* Use same values as .dark class for consistency */
   --background: 0 0% 0% !important; /* Pure black base - matches .dark */
   --foreground: 0 0% 95% !important;
-  --card: 0 0% 3% !important;
+  --card: 0 0% 6% !important;
   --card-foreground: 0 0% 95% !important;
   --primary: 38 92% 54% !important; /* Amber primary in dark */
   --primary-foreground: 0 0% 0% !important;

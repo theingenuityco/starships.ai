@@ -22,7 +22,7 @@ const router: Router = Router();
 
 const ApiKeyConnectSchema = z.object({
   apiKey: z.string().min(1, 'API key is required'),
-  extraConfig: z.record(z.unknown()).optional(),
+  extraConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
 const ProviderParamSchema = z.object({
@@ -31,7 +31,7 @@ const ProviderParamSchema = z.object({
 });
 
 // GET /connectors/catalog - Static connector catalog
-router.get('/connectors/catalog', async (_req: Request, res: Response): Promise<void> => {
+router.get('/connectors/catalog', async (req: Request, res: Response): Promise<void> => {
   try {
     const connectorService = new ConnectorService();
     const catalog = connectorService.getConnectorCatalog();
@@ -75,141 +75,121 @@ router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, 
 });
 
 // POST /starships/:id/connectors/:provider/api-key - Connect via API key (e.g., Discord)
-router.post(
-  '/starships/:id/connectors/:provider/api-key',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = (req as any).user?.id;
-      if (!userId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-
-      const paramsValidation = validateData(
-        ProviderParamSchema,
-        { id: req.params.id, provider: req.params.provider },
-        res,
-        'connector parameters',
-      );
-      if (!paramsValidation) return;
-
-      const { id: starshipId, provider } = paramsValidation;
-
-      if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
-
-      const bodyValidation = validateData(
-        ApiKeyConnectSchema,
-        req.body as ConnectWithApiKeyRequest,
-        res,
-        'API key connector payload',
-      );
-      if (!bodyValidation) return;
-
-      const connectorService = new ConnectorService();
-      const connector = await connectorService.connectWithApiKey(
-        starshipId,
-        provider,
-        bodyValidation as ConnectWithApiKeyRequest,
-        userId,
-      );
-
-      sendSuccess(res, { connector });
-    } catch (error) {
-      handleError(error, res, 'connecting connector via API key');
+router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
     }
-  },
-);
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const bodyValidation = validateData(ApiKeyConnectSchema, req.body as ConnectWithApiKeyRequest, res, 'API key connector payload');
+    if (!bodyValidation) return;
+
+    const connectorService = new ConnectorService();
+    const connector = await connectorService.connectWithApiKey(starshipId, provider, bodyValidation as ConnectWithApiKeyRequest, userId);
+
+    sendSuccess(res, { connector });
+  } catch (error) {
+    handleError(error, res, 'connecting connector via API key');
+  }
+});
 
 // POST /starships/:id/connectors/:provider/disconnect - Disconnect connector
-router.post(
-  '/starships/:id/connectors/:provider/disconnect',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = (req as any).user?.id;
-      if (!userId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-
-      const paramsValidation = validateData(
-        ProviderParamSchema,
-        { id: req.params.id, provider: req.params.provider },
-        res,
-        'connector parameters',
-      );
-      if (!paramsValidation) return;
-
-      const { id: starshipId, provider } = paramsValidation;
-
-      if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
-
-      const connectorService = new ConnectorService();
-      const disconnected = await connectorService.disconnect(starshipId, provider);
-
-      if (!disconnected) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Connector not found for this starship', 404, {
-          starshipId,
-          provider,
-        });
-        return;
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      handleError(error, res, 'disconnecting connector');
+router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
     }
-  },
-);
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const connectorService = new ConnectorService();
+    const disconnected = await connectorService.disconnect(starshipId, provider);
+
+    if (!disconnected) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector not found for this starship', 404, {
+        starshipId,
+        provider,
+      });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    handleError(error, res, 'disconnecting connector');
+  }
+});
 
 // POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (e.g., LinkedIn)
-router.post(
-  '/starships/:id/connectors/:provider/oauth/start',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = (req as any).user?.id;
-      if (!userId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-
-      const paramsValidation = validateData(
-        ProviderParamSchema,
-        { id: req.params.id, provider: req.params.provider },
-        res,
-        'connector parameters',
-      );
-      if (!paramsValidation) return;
-
-      const { id: starshipId, provider } = paramsValidation;
-
-      if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
-
-      if (provider !== 'linkedin') {
-        sendError(res, 'NOT_IMPLEMENTED', 'OAuth start is only supported for LinkedIn at this time', 501);
-        return;
-      }
-
-      const connectorService = new ConnectorService();
-      const _body = req.body as StartOAuthRequest | undefined;
-
-      const authorizationUrl = await connectorService.startLinkedInOAuth(starshipId, userId);
-
-      const response: StartOAuthResponse = {
-        authorizationUrl,
-      };
-
-      sendSuccess(res, response);
-    } catch (error) {
-      handleError(error, res, 'starting OAuth connector flow');
+router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
     }
-  },
-);
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const connectorService = new ConnectorService();
+    const _body = req.body as StartOAuthRequest | undefined;
+
+    if (provider !== 'linkedin') {
+      sendError(res, 'OPERATION_NOT_ALLOWED', 'OAuth start is only supported for LinkedIn at this time', 501, {
+        provider,
+      });
+      return;
+    }
+
+    const authorizationUrl = await connectorService.startLinkedInOAuth(starshipId, userId);
+
+    const response: StartOAuthResponse = {
+      authorizationUrl,
+    };
+
+    sendSuccess(res, response);
+  } catch (error) {
+    handleError(error, res, 'starting OAuth connector flow');
+  }
+});
 
 const OAuthCallbackSchema = z.object({
-  code: z.string().min(1, 'Authorization code is required'),
+  code: z.string().min(1, 'Authorization code is required').optional(),
   state: z.string().min(1, 'State parameter is required'),
   error: z.string().optional(),
 });
@@ -217,12 +197,7 @@ const OAuthCallbackSchema = z.object({
 // GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn)
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
-    const paramsValidation = validateData(
-      z.object({ provider: z.enum(['linkedin']) }),
-      req.params,
-      res,
-      'connector OAuth provider',
-    );
+    const paramsValidation = validateData(z.object({ provider: z.enum(['linkedin']) }), req.params, res, 'connector OAuth provider');
     if (!paramsValidation) return;
 
     const { provider } = paramsValidation;
@@ -232,7 +207,7 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
 
     const { code, state, error } = queryValidation;
 
-    if (error) {
+    if (error || !code) {
       const redirectParams = new URLSearchParams({
         connector: provider,
         status: 'error',
@@ -267,5 +242,3 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
 });
 
 export default router;
-
-

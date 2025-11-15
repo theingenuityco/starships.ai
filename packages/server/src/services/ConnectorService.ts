@@ -1,10 +1,5 @@
 import { getConnectorCatalog, getConnectorDefinition } from '@/config/connectors';
-import type {
-  ConnectorCatalogItem,
-  ConnectorListItem,
-  ConnectorProvider,
-  ConnectWithApiKeyRequest,
-} from '@starships/protocol';
+import type { ConnectorCatalogItem, ConnectorListItem, ConnectorProvider, ConnectWithApiKeyRequest } from '@starships/protocol';
 import { ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
@@ -51,7 +46,7 @@ export class ConnectorService {
       provider: 'linkedin',
     });
 
-    const scope = 'w_member_social';
+    const scope = 'openid profile email w_member_social';
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
@@ -67,10 +62,7 @@ export class ConnectorService {
    * Complete LinkedIn OAuth flow: validate state, exchange code for token,
    * store LINKEDIN_ACCESS_TOKEN env var, and update connector status/metadata.
    */
-  async completeLinkedInOAuth(
-    code: string,
-    stateToken: string,
-  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+  async completeLinkedInOAuth(code: string, stateToken: string): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const env = getEnvConfig();
     const clientId = env.LINKEDIN_CLIENT_ID;
     const clientSecret = env.LINKEDIN_CLIENT_SECRET;
@@ -78,7 +70,7 @@ export class ConnectorService {
 
     if (!clientId || !clientSecret || !redirectUri) {
       throw new Error(
-        'LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, and LINKEDIN_REDIRECT_URL.',
+        'LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, and LINKEDIN_REDIRECT_URL.'
       );
     }
 
@@ -213,12 +205,7 @@ export class ConnectorService {
    * This method is provider-aware and will upsert the appropriate
    * environment variables for the starship.
    */
-  async connectWithApiKey(
-    starshipId: string,
-    provider: ConnectorProvider,
-    payload: ConnectWithApiKeyRequest,
-    userId: string,
-  ) {
+  async connectWithApiKey(starshipId: string, provider: ConnectorProvider, payload: ConnectWithApiKeyRequest, userId: string) {
     const definition = getConnectorDefinition(provider);
     if (!definition) {
       throw new Error(`Unsupported connector provider: ${provider}`);
@@ -235,12 +222,7 @@ export class ConnectorService {
 
         const defaultChannelId = (payload.extraConfig as any)?.defaultChannelId;
         if (typeof defaultChannelId === 'string' && defaultChannelId.trim().length > 0) {
-          await this.upsertEnvironmentVariable(
-            starshipId,
-            'DISCORD_DEFAULT_CHANNEL_ID',
-            defaultChannelId.trim(),
-            userId,
-          );
+          await this.upsertEnvironmentVariable(starshipId, 'DISCORD_DEFAULT_CHANNEL_ID', defaultChannelId.trim(), userId);
         }
         break;
       }
@@ -288,7 +270,7 @@ export class ConnectorService {
         if (existing) {
           await this.environmentRepository.delete(existing.id);
         }
-      }),
+      })
     );
 
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
@@ -309,12 +291,7 @@ export class ConnectorService {
   /**
    * Helper to create or update an environment variable with encryption.
    */
-  private async upsertEnvironmentVariable(
-    starshipId: string,
-    key: string,
-    value: string,
-    userId: string,
-  ): Promise<void> {
+  private async upsertEnvironmentVariable(starshipId: string, key: string, value: string, userId: string): Promise<void> {
     const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
 
     if (!existing) {
@@ -335,5 +312,3 @@ export class ConnectorService {
     });
   }
 }
-
-

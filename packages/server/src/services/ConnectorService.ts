@@ -236,8 +236,8 @@ export class ConnectorService {
       provider: 'discord',
     });
 
-    // Minimal permissions: SEND_MESSAGES (2048). Extend as needed for richer behavior.
-    const permissions = '2048';
+    // Permissions bitmask; currently configured via env/plan as 117760.
+    const permissions = '117760';
     const scope = 'bot applications.commands identify';
 
     const params = new URLSearchParams({

@@ -62,4 +62,9 @@ export interface EnvironmentConfig {
   EMAIL_FROM_ADDRESS: string;
   EMAIL_FROM_NAME: string;
   AWS_SES_REGION: string;
+
+  // LinkedIn OAuth Configuration (optional)
+  LINKEDIN_CLIENT_ID?: string;
+  LINKEDIN_CLIENT_SECRET?: string;
+  LINKEDIN_REDIRECT_URL?: string;
 }

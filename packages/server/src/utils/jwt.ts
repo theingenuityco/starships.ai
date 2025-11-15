@@ -41,7 +41,11 @@ export async function generateJWT(user: JWTUser): Promise<string> {
 /**
  * Generate OAuth state token for CSRF protection
  */
-export async function generateOAuthState(isLinking: boolean = false, userId?: string): Promise<string> {
+export async function generateOAuthState(
+  isLinking: boolean = false,
+  userId?: string,
+  context?: Record<string, unknown>,
+): Promise<string> {
   const payload: any = {
     purpose: 'oauth_state',
     nonce: crypto.randomBytes(16).toString('hex'),
@@ -51,6 +55,10 @@ export async function generateOAuthState(isLinking: boolean = false, userId?: st
   // If linking, include the authenticated user ID for security
   if (isLinking && userId) {
     payload.userId = userId;
+  }
+
+  if (context && typeof context === 'object') {
+    payload.context = context;
   }
   
   return await new SignJWT(payload)
@@ -64,14 +72,17 @@ export async function generateOAuthState(isLinking: boolean = false, userId?: st
 /**
  * Validate OAuth state token
  */
-export async function validateOAuthState(state: string): Promise<{ valid: boolean; isLinking?: boolean; userId?: string }> {
+export async function validateOAuthState(
+  state: string,
+): Promise<{ valid: boolean; isLinking?: boolean; userId?: string; context?: Record<string, unknown> }> {
   try {
     const { payload } = await jwtVerify(state, JWT_SECRET, { issuer: JWT_ISSUER });
     if (payload.purpose === 'oauth_state') {
       return { 
         valid: true, 
         isLinking: payload.isLinking as boolean,
-        userId: payload.userId as string | undefined
+        userId: payload.userId as string | undefined,
+        context: (payload as any).context as Record<string, unknown> | undefined,
       };
     }
     return { valid: false };

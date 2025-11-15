@@ -47,6 +47,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 <constraints>
 - Only call tools available this turn.
 - Use env('KEY') for all configuration and secrets; never log raw secrets.
+- For LinkedIn/Discord integrations, prefer standard connector-managed keys: LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_ID, DISCORD_BOT_TOKEN, DISCORD_DEFAULT_CHANNEL_ID.
 - Template rule: evaluate only full-string templates (e.g., '{{ ... }}'); no partials.
 - No nested eval: a single {{ ... }} must compute the final value.
 - Deterministic example inputs; never include secrets unless explicitly required.

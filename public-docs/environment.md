@@ -309,6 +309,21 @@ Notes:
 
 ---
 
+## Connectors and Managed Environment Variables
+
+Connectors provide guided flows for configuring third-party APIs. For example:
+
+- LinkedIn connector (OAuth) manages:
+  - `LINKEDIN_ACCESS_TOKEN`
+  - `LINKEDIN_ORG_ID` (optional)
+- Discord connector (API key) manages:
+  - `DISCORD_BOT_TOKEN`
+  - `DISCORD_DEFAULT_CHANNEL_ID` (optional)
+
+These values are stored in the same encrypted `environments` table and injected via `env('KEY')` / `ctx.$env('KEY')`. Use connectors from the starship settings → Environment & Connectors page; advanced users can still edit the underlying env vars directly.
+
+---
+
 ## Testing and Debugging
 
 - Verify presence (not value): `console.log('API_TOKEN present:', !!ctx.$env('API_TOKEN'))`

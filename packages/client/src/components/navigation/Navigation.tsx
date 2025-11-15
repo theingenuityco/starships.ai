@@ -22,20 +22,31 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 interface NavigationProps {
   isMobile?: boolean
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 // (All items are composed into a single NavigationSection below)
 
 export function Navigation(props: NavigationProps) {
+  const { isMobile = false, isOpen = true, onClose } = props
   const pathname = usePathname()
   const router = useRouter()
   const { isAuthenticated, user, userName } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
+  // On mobile, always expanded (no collapse functionality)
   const [isExpanded, setIsExpanded] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
   const [isCollapsing, setIsCollapsing] = useState(false)
+
+  // Force expanded state on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setIsExpanded(true)
+    }
+  }, [isMobile])
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -164,22 +175,25 @@ export function Navigation(props: NavigationProps) {
   const handleNewConversation = useCallback(() => {
     if (!starshipSlug) return
     router.push(`/ship/${starshipSlug}/conversations`)
-  }, [router, starshipSlug])
+    if (isMobile && onClose) onClose()
+  }, [router, starshipSlug, isMobile, onClose])
 
   // Handle conversation selection - memoized
   const handleConversationSelect = useCallback(
     (conversationId: string) => {
       if (!starshipSlug) return
       router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)
+      if (isMobile && onClose) onClose()
     },
-    [router, starshipSlug]
+    [router, starshipSlug, isMobile, onClose]
   )
 
   // Handle user profile click - memoized
   const handleUserProfileClick = useCallback(() => {
     if (!starshipSlug) return
     router.push(`/ship/${starshipSlug}/settings`)
-  }, [router, starshipSlug])
+    if (isMobile && onClose) onClose()
+  }, [router, starshipSlug, isMobile, onClose])
 
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
@@ -238,14 +252,33 @@ export function Navigation(props: NavigationProps) {
   )
 
   return (
-    <div
-      ref={sidebarRef}
-      className="flex flex-row h-full overflow-hidden border-r border-border/40 bg-card transition-all duration-300 ease-in-out"
-      style={{ willChange: 'width', cursor: isExpanded ? 'auto' : 'e-resize' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={handleSidebarBackgroundClick}
-    >
+    <>
+      {/* Mobile backdrop overlay */}
+      {isMobile && isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-black/50 z-40"
+          style={{ backdropFilter: 'blur(2px)' }}
+        />
+      )}
+
+      {/* Navigation sidebar */}
+      <motion.div
+        ref={sidebarRef}
+        initial={isMobile ? { x: '-100%' } : false}
+        animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
+        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        className={`flex flex-row h-full overflow-hidden border-r border-border/40 bg-card ${
+          isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'
+        }`}
+        style={{ willChange: isMobile ? 'transform' : 'width', cursor: !isMobile && !isExpanded ? 'e-resize' : 'auto' }}
+        onMouseEnter={() => !isMobile && setIsHovered(true)}
+        onMouseLeave={() => !isMobile && setIsHovered(false)}
+        onClick={handleSidebarBackgroundClick}
+      >
       <div
         className="flex flex-col transition-all duration-300 ease-in-out"
         style={{
@@ -259,9 +292,9 @@ export function Navigation(props: NavigationProps) {
         <div className="px-4 pt-5 pb-3 flex-shrink-0 flex items-center justify-between gap-2">
           <div
             className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0"
-            onClick={handleHeaderClick}
-            title={isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
-            style={{ cursor: isExpanded ? 'w-resize' : 'e-resize' }}
+            onClick={isMobile ? undefined : handleHeaderClick}
+            title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
+            style={{ cursor: isMobile ? 'default' : isExpanded ? 'w-resize' : 'e-resize' }}
           >
             <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
               {isExpanded || isCollapsing || !isHovered ? (
@@ -293,29 +326,41 @@ export function Navigation(props: NavigationProps) {
               </motion.span>
             )}
           </div>
-          {isExpanded && (
+          {/* Close button for mobile, collapse button for desktop */}
+          {isMobile && isExpanded && onClose ? (
             <button
               type="button"
-              onClick={() => {
-                // Start collapsing: keep logo visible during animation
-                setIsCollapsing(true)
-                setIsExpanded(false)
-
-                if (collapseTimeoutRef.current) {
-                  clearTimeout(collapseTimeoutRef.current)
-                }
-
-                // Match the CSS transition duration (300ms)
-                collapseTimeoutRef.current = setTimeout(() => {
-                  setIsCollapsing(false)
-                }, 300)
-              }}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              aria-label="Collapse sidebar"
-              style={{ cursor: 'w-resize' }}
+              onClick={onClose}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label="Close sidebar"
             >
-              <Icon name="sidebar" className="w-5 h-5" />
+              <Icon name="x" className="w-5 h-5" />
             </button>
+          ) : (
+            isExpanded && !isMobile && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Start collapsing: keep logo visible during animation
+                  setIsCollapsing(true)
+                  setIsExpanded(false)
+
+                  if (collapseTimeoutRef.current) {
+                    clearTimeout(collapseTimeoutRef.current)
+                  }
+
+                  // Match the CSS transition duration (300ms)
+                  collapseTimeoutRef.current = setTimeout(() => {
+                    setIsCollapsing(false)
+                  }, 300)
+                }}
+                className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                aria-label="Collapse sidebar"
+                style={{ cursor: 'w-resize' }}
+              >
+                <Icon name="sidebar" className="w-5 h-5" />
+              </button>
+            )
           )}
         </div>
 
@@ -330,7 +375,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           <div className="flex flex-col space-y-1 w-full px-2">
-            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} />
+            <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
           </div>
         </div>
 
@@ -429,6 +474,7 @@ export function Navigation(props: NavigationProps) {
           </div>
         </div>
       </div>
-    </div>
+      </motion.div>
+    </>
   )
 }

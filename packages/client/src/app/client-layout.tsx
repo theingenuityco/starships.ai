@@ -103,24 +103,35 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
-            <div className="flex-shrink-0 relative z-50">
-              <aside className="relative h-full">
-                <Navigation />
-              </aside>
-            </div>
+            <>
+              {/* Desktop: always visible */}
+              {!isMobile && (
+                <div className="flex-shrink-0 relative z-50">
+                  <aside className="relative h-full">
+                    <Navigation isMobile={false} isOpen={true} />
+                  </aside>
+                </div>
+              )}
+
+              {/* Mobile: overlay navigation */}
+              {isMobile && (
+                <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />
+              )}
+            </>
           )}
 
-          {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
-          {isMobile && !shouldHideNavigation && (
+          {/* Mobile Toggle Button - only show when menu is closed */}
+          {isMobile && !shouldHideNavigation && !showMobileMenu && (
             <motion.button
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="fixed top-4 left-4 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+              exit={{ opacity: 0, scale: 0.8 }}
+              onClick={() => setShowMobileMenu(true)}
+              className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
               aria-label="Open navigation menu"
               style={{ zIndex: 999 }}
             >
-              <Icon name="menu" className="w-5 h-5" />
+              <Icon name="sidebar" className="w-5 h-5" />
             </motion.button>
           )}
 
@@ -144,24 +155,35 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
-              <div className="flex-shrink-0 relative z-50">
-              <aside className="relative h-full">
-                  <Navigation />
-                </aside>
-              </div>
+              <>
+                {/* Desktop: always visible */}
+                {!isMobile && (
+                  <div className="flex-shrink-0 relative z-50">
+                    <aside className="relative h-full">
+                      <Navigation isMobile={false} isOpen={true} />
+                    </aside>
+                  </div>
+                )}
+
+                {/* Mobile: overlay navigation */}
+                {isMobile && (
+                  <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />
+                )}
+              </>
             )}
 
-            {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
-            {isMobile && !shouldHideNavigation && (
+            {/* Mobile Toggle Button - only show when menu is closed */}
+            {isMobile && !shouldHideNavigation && !showMobileMenu && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="fixed top-4 left-2 z-[999] p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+                exit={{ opacity: 0, scale: 0.8 }}
+                onClick={() => setShowMobileMenu(true)}
+                className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
                 aria-label="Open navigation menu"
                 style={{ zIndex: 999 }}
               >
-                <Icon name="menu" className="w-5 h-5" />
+                <Icon name="sidebar" className="w-5 h-5" />
               </motion.button>
             )}
 

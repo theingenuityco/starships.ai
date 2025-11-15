@@ -10,7 +10,7 @@ import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
-import { LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
+import { Cacheable, CacheableSystemMessage, LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -225,18 +225,34 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
-   * Convert ToolParams to OpenAI function calling format
+   * Convert ToolParams to OpenAI function calling format with caching
+   * Adds cache_control to LAST tool definition (caches all tools as a group)
    * Uses tool.slug as the function name for consistent kebab-case format
    */
-  private convertToOpenAITools(tools: ToolParams[]): OpenAI.Chat.ChatCompletionTool[] {
-    return tools.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.slug,
-        description: tool.description,
-        parameters: tool.parameters as Record<string, unknown>,
-      },
-    }));
+  private convertToOpenAITools(tools: ToolParams[]): Array<OpenAI.Chat.ChatCompletionTool & Cacheable> {
+    if (!Array.isArray(tools) || tools.length === 0) {
+      return [];
+    }
+
+    return tools.map((tool, index) => {
+      const isLastTool = index === tools.length - 1;
+
+      const toolDef: OpenAI.Chat.ChatCompletionTool & Cacheable = {
+        type: 'function' as const,
+        function: {
+          name: tool.slug,
+          description: tool.description,
+          parameters: tool.parameters as Record<string, unknown>,
+        },
+      };
+
+      // Add cache_control to last tool (caches ALL tool definitions)
+      if (isLastTool) {
+        toolDef.cache_control = { type: 'ephemeral' };
+      }
+
+      return toolDef;
+    });
   }
 
   /**
@@ -287,8 +303,18 @@ export class LLM extends BaseNode<LlmParams> {
       } as OpenAI.Chat.ChatCompletionToolMessageParam;
     }
 
+    // SYSTEM MESSAGE: Add caching (universal for all OpenRouter providers)
+    // Note: cache_control is an OpenRouter extension not in OpenAI's types
     if (role === 'system') {
-      return { role: 'system', content: contentVal } as OpenAI.Chat.ChatCompletionSystemMessageParam;
+      const message: CacheableSystemMessage = {
+        role: 'system',
+        content: [{
+          type: 'text',
+          text: contentVal,
+          cache_control: { type: 'ephemeral' }
+        }]
+      };
+      return message as OpenAI.Chat.ChatCompletionSystemMessageParam;
     }
 
     // default user

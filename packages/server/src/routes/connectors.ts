@@ -74,7 +74,7 @@ router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, 
   }
 });
 
-// POST /starships/:id/connectors/:provider/api-key - Connect via API key (e.g., Discord)
+// POST /starships/:id/connectors/:provider/api-key - Connect via API key
 router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
@@ -97,6 +97,13 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
 
     const bodyValidation = validateData(ApiKeyConnectSchema, req.body as ConnectWithApiKeyRequest, res, 'API key connector payload');
     if (!bodyValidation) return;
+
+    if (provider === 'discord') {
+      sendError(res, 'OPERATION_NOT_ALLOWED', 'Discord connector no longer supports API key flow; use OAuth instead.', 400, {
+        provider,
+      });
+      return;
+    }
 
     const connectorService = new ConnectorService();
     const connector = await connectorService.connectWithApiKey(starshipId, provider, bodyValidation as ConnectWithApiKeyRequest, userId);
@@ -145,7 +152,7 @@ router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware,
   }
 });
 
-// POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (e.g., LinkedIn)
+// POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (LinkedIn, Discord)
 router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
@@ -169,14 +176,17 @@ router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware
     const connectorService = new ConnectorService();
     const _body = req.body as StartOAuthRequest | undefined;
 
-    if (provider !== 'linkedin') {
-      sendError(res, 'OPERATION_NOT_ALLOWED', 'OAuth start is only supported for LinkedIn at this time', 501, {
+    let authorizationUrl: string;
+    if (provider === 'linkedin') {
+      authorizationUrl = await connectorService.startLinkedInOAuth(starshipId, userId);
+    } else if (provider === 'discord') {
+      authorizationUrl = await connectorService.startDiscordOAuth(starshipId, userId);
+    } else {
+      sendError(res, 'OPERATION_NOT_ALLOWED', 'OAuth start is not supported for this provider', 400, {
         provider,
       });
       return;
     }
-
-    const authorizationUrl = await connectorService.startLinkedInOAuth(starshipId, userId);
 
     const response: StartOAuthResponse = {
       authorizationUrl,
@@ -194,10 +204,10 @@ const OAuthCallbackSchema = z.object({
   error: z.string().optional(),
 });
 
-// GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn)
+// GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn, Discord)
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
-    const paramsValidation = validateData(z.object({ provider: z.enum(['linkedin']) }), req.params, res, 'connector OAuth provider');
+    const paramsValidation = validateData(z.object({ provider: z.enum(['linkedin', 'discord']) }), req.params, res, 'connector OAuth provider');
     if (!paramsValidation) return;
 
     const { provider } = paramsValidation;
@@ -218,7 +228,30 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     }
 
     const connectorService = new ConnectorService();
-    const { starshipId, starshipSlug } = await connectorService.completeLinkedInOAuth(code, state);
+    let starshipId: string;
+    let starshipSlug: string | undefined;
+
+    if (provider === 'linkedin') {
+      const result = await connectorService.completeLinkedInOAuth(code, state);
+      starshipId = result.starshipId;
+      starshipSlug = result.starshipSlug;
+    } else if (provider === 'discord') {
+      const result = await connectorService.completeDiscordOAuth(code, state, {
+        guild_id: typeof (req.query as any).guild_id === 'string' ? ((req.query as any).guild_id as string) : undefined,
+        permissions:
+          typeof (req.query as any).permissions === 'string' ? ((req.query as any).permissions as string) : undefined,
+      });
+      starshipId = result.starshipId;
+      starshipSlug = result.starshipSlug;
+    } else {
+      const redirectParams = new URLSearchParams({
+        connector: provider,
+        status: 'error',
+      });
+      const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
+      res.redirect(redirectUrl);
+      return;
+    }
 
     const redirectParams = new URLSearchParams({
       connector: provider,
@@ -233,7 +266,7 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
   } catch (error) {
     // On error, redirect back with a generic failure state
     const redirectParams = new URLSearchParams({
-      connector: 'linkedin',
+      connector: (req.params as any).provider || 'linkedin',
       status: 'error',
     });
     const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;

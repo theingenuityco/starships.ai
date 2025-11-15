@@ -201,9 +201,9 @@ export class ConnectorService {
   }
 
   /**
-   * Connect a provider using an API key (e.g., Discord).
-   * This method is provider-aware and will upsert the appropriate
-   * environment variables for the starship.
+   * Connect a provider using an API key.
+   * Currently no connectors use API keys; this method is kept for
+   * future providers that may adopt API-key-based flows.
    */
   async connectWithApiKey(starshipId: string, provider: ConnectorProvider, payload: ConnectWithApiKeyRequest, userId: string) {
     const definition = getConnectorDefinition(provider);
@@ -215,42 +215,132 @@ export class ConnectorService {
       throw new Error(`Connector ${provider} does not use API key authentication`);
     }
 
-    // Provider-specific handling
-    switch (provider) {
-      case 'discord': {
-        await this.upsertEnvironmentVariable(starshipId, 'DISCORD_BOT_TOKEN', payload.apiKey, userId);
+    // No current providers use API key authentication.
+    throw new Error(`API key connector not implemented for provider: ${provider}`);
+  }
 
-        const defaultChannelId = (payload.extraConfig as any)?.defaultChannelId;
-        if (typeof defaultChannelId === 'string' && defaultChannelId.trim().length > 0) {
-          await this.upsertEnvironmentVariable(starshipId, 'DISCORD_DEFAULT_CHANNEL_ID', defaultChannelId.trim(), userId);
-        }
-        break;
-      }
-      default:
-        throw new Error(`API key connector not implemented for provider: ${provider}`);
+  /**
+   * Start Discord OAuth flow for a starship and return the authorization URL.
+   */
+  async startDiscordOAuth(starshipId: string, userId: string): Promise<string> {
+    const env = getEnvConfig();
+    const clientId = env.DISCORD_CLIENT_ID;
+    const redirectUri = env.DISCORD_REDIRECT_URL;
+
+    if (!clientId || !redirectUri) {
+      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_REDIRECT_URL.');
     }
 
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
-    const mergedMetadata = {
-      ...(existing?.metadata || {}),
-      ...(payload.extraConfig || {}),
+    const state = await generateOAuthState(true, userId, {
+      starshipId,
+      provider: 'discord',
+    });
+
+    // Minimal permissions: SEND_MESSAGES (2048). Extend as needed for richer behavior.
+    const permissions = '2048';
+    const scope = 'bot applications.commands identify';
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope,
+      permissions,
+      state,
+    });
+
+    return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+  }
+
+  /**
+   * Complete Discord OAuth flow: validate state, exchange code (if needed),
+   * record guild configuration, and update connector status/metadata.
+   */
+  async completeDiscordOAuth(
+    code: string,
+    stateToken: string,
+    callbackParams: { guild_id?: string; permissions?: string },
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+    const env = getEnvConfig();
+    const clientId = env.DISCORD_CLIENT_ID;
+    const clientSecret = env.DISCORD_CLIENT_SECRET;
+    const redirectUri = env.DISCORD_REDIRECT_URL;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error(
+        'Discord OAuth is not configured. Please set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_REDIRECT_URL.',
+      );
+    }
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) {
+      throw new Error('Invalid or expired OAuth state');
+    }
+
+    const { userId, context } = stateValidation;
+    if (!userId) {
+      throw new Error('OAuth state missing user information');
+    }
+
+    const starshipId = (context as any)?.starshipId as string | undefined;
+    const provider = (context as any)?.provider as string | undefined;
+
+    if (!starshipId || provider !== 'discord') {
+      throw new Error('OAuth state missing starship context');
+    }
+
+    // Exchange code for an access token (not strictly needed for posting as a bot,
+    // but kept for future use or validation if necessary).
+    const tokenParams = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+    });
+
+    await axios.post('https://discord.com/api/oauth2/token', tokenParams.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    const guildId = callbackParams.guild_id;
+    const permissions = callbackParams.permissions;
+
+    const metadata: Record<string, unknown> = {
+      provider: 'discord',
+      ...(guildId ? { guildId } : {}),
+      ...(permissions ? { permissions } : {}),
     };
 
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'discord');
     if (!existing) {
-      return this.connectorRepository.create({
+      await this.connectorRepository.create({
         starshipId,
-        provider,
+        provider: 'discord',
         status: 'connected',
-        metadata: mergedMetadata,
+        metadata,
         lastError: undefined,
+      });
+    } else {
+      await this.connectorRepository.update(existing.id, {
+        status: 'connected',
+        metadata: {
+          ...(existing.metadata || {}),
+          ...metadata,
+        },
+        lastError: null,
       });
     }
 
-    return this.connectorRepository.update(existing.id, {
-      status: 'connected',
-      metadata: mergedMetadata,
-      lastError: null,
-    });
+    const starship = await this.starshipRepository.findById(starshipId);
+
+    return {
+      starshipId,
+      starshipSlug: starship?.slug,
+      userId,
+    };
   }
 
   /**

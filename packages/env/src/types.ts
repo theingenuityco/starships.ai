@@ -67,4 +67,10 @@ export interface EnvironmentConfig {
   LINKEDIN_CLIENT_ID?: string;
   LINKEDIN_CLIENT_SECRET?: string;
   LINKEDIN_REDIRECT_URL?: string;
+
+  // Discord Bot OAuth Configuration (optional)
+  DISCORD_CLIENT_ID?: string;
+  DISCORD_CLIENT_SECRET?: string;
+  DISCORD_REDIRECT_URL?: string;
+  DISCORD_BOT_TOKEN?: string;
 }

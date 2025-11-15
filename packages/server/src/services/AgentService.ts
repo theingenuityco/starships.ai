@@ -628,6 +628,7 @@ export class AgentService {
       const env = getEnvConfig();
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const openRouterKey = env.OPENROUTER_API_KEY || '';
+      const discordBotToken = env.DISCORD_BOT_TOKEN || '';
       const starshipEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
 
       const secureEnv: Record<string, string> = {
@@ -635,6 +636,7 @@ export class AgentService {
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
         ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
+        ...(discordBotToken ? { DISCORD_BOT_TOKEN: String(discordBotToken) } : {}),
         ...starshipEnv,
       };
 

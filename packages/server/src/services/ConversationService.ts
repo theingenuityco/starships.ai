@@ -606,12 +606,14 @@ export class ConversationService {
       const rawAuth = ctx?.authorization ?? '';
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
       const openRouterKey = env.OPENROUTER_API_KEY || '';
+      const discordBotToken = env.DISCORD_BOT_TOKEN || '';
       const starshipEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
       const secureEnv: Record<string, string> = {
         STARSHIP_ID: starship.id,
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
         ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
+        ...(discordBotToken ? { DISCORD_BOT_TOKEN: String(discordBotToken) } : {}),
         ...starshipEnv,
       };
 

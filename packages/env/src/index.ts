@@ -112,5 +112,10 @@ export function getEnvConfig(): EnvironmentConfig {
     EMAIL_FROM_ADDRESS: requiredEnvVars.EMAIL_FROM_ADDRESS!,
     EMAIL_FROM_NAME: requiredEnvVars.EMAIL_FROM_NAME!,
     AWS_SES_REGION: requiredEnvVars.AWS_SES_REGION!,
+
+    // LinkedIn OAuth Configuration (optional)
+    LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
+    LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
+    LINKEDIN_REDIRECT_URL: process.env.LINKEDIN_REDIRECT_URL,
   };
 }

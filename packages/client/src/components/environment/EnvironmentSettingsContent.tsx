@@ -9,6 +9,7 @@ import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnviron
 import { EnvironmentVariableList } from './EnvironmentVariableList'
 import { EnvironmentVariableForm } from './EnvironmentVariableForm'
 import { EnvironmentVariableDeleteModal } from './EnvironmentVariableDeleteModal'
+import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -25,6 +26,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedVariable, setSelectedVariable] = useState<EnvironmentSummary | undefined>()
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'variables' | 'connectors'>('variables')
 
   // Fetch starship data
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
@@ -138,44 +140,93 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="key" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Environment Variables</h1>
+                <h1 className="text-2xl font-bold">Environment & Connectors</h1>
               </div>
               <p className="text-muted-foreground">
-                Manage environment variables for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
+                Manage environment variables and third-party connectors for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
               </p>
             </div>
 
-            {/* Search */}
-            <div className="mb-8 sticky top-6 z-30">
-              <div className="relative max-w-md mb-6 mx-auto">
-                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                <Input
-                  type="text"
-                  placeholder="Search environment variables..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
-                />
+            {/* Tabs */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="inline-flex items-center rounded-full border border-border/40 bg-muted/40 p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('variables')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    activeTab === 'variables'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Variables
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('connectors')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    activeTab === 'connectors'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Connectors
+                </button>
               </div>
             </div>
 
-            {/* Security Notice */}
-            <Alert>
-              <Icon name="shield" className="h-4 w-4" />
-              <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
-            </Alert>
+            {activeTab === 'variables' && (
+              <>
+                {/* Search */}
+                <div className="mb-8 sticky top-6 z-30">
+                  <div className="relative max-w-md mb-6 mx-auto">
+                    <Icon
+                      name="search"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none"
+                    />
+                    <Input
+                      type="text"
+                      placeholder="Search environment variables..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
+                    />
+                  </div>
+                </div>
 
-            {/* Variables List */}
-            <div>
-              {variablesError ? (
+                {/* Security Notice */}
                 <Alert>
-                  <Icon name="info" className="h-4 w-4" />
-                  <AlertDescription>Failed to load environment variables. Please try refreshing the page.</AlertDescription>
+                  <Icon name="shield" className="h-4 w-4" />
+                  <AlertDescription>
+                    All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.
+                  </AlertDescription>
                 </Alert>
-              ) : (
-                <EnvironmentVariableList variables={filteredVariables} loading={variablesLoading} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
-              )}
-            </div>
+
+                {/* Variables List */}
+                <div>
+                  {variablesError ? (
+                    <Alert>
+                      <Icon name="info" className="h-4 w-4" />
+                      <AlertDescription>Failed to load environment variables. Please try refreshing the page.</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <EnvironmentVariableList
+                      variables={filteredVariables}
+                      loading={variablesLoading}
+                      onAdd={handleAdd}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  )}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'connectors' && starship.id && (
+              <div className="mt-4">
+                <StarshipConnectorsPanel starshipId={starship.id} />
+              </div>
+            )}
           </div>
         </div>
 

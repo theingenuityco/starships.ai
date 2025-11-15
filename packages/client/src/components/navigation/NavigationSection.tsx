@@ -21,9 +21,10 @@ interface NavigationSectionProps {
   renderAfter?: RenderAfterFn
   showLabels?: boolean
   expanded?: boolean
+  onItemClick?: () => void
 }
 
-export function NavigationSection({ title, items, pathname, renderAfter, showLabels = false, expanded = false }: NavigationSectionProps) {
+export function NavigationSection({ title, items, pathname, renderAfter, showLabels = false, expanded = false, onItemClick }: NavigationSectionProps) {
   return (
     <div className="space-y-1 w-full">
       {items.map((item, index) => {
@@ -34,7 +35,7 @@ export function NavigationSection({ title, items, pathname, renderAfter, showLab
 
         return (
           <div key={uniqueKey} className="w-full">
-            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} />
+            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} onItemClick={onItemClick} />
             {renderAfter ? renderAfter(item, index) : null}
           </div>
         )

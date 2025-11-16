@@ -236,8 +236,10 @@ export class ConnectorService {
       provider: 'discord',
     });
 
-    // Permissions bitmask; currently configured via env/plan as 117760.
-    const permissions = '117760';
+    // Permissions bitmask: Make-style admin-ish set + SEND_MESSAGES.
+    // Includes: CREATE_INSTANT_INVITE, MANAGE_CHANNELS, VIEW_CHANNEL,
+    // SEND_MESSAGES, MANAGE_MESSAGES, MANAGE_ROLES, MANAGE_WEBHOOKS.
+    const permissions = '805317649';
     const scope = 'bot applications.commands identify';
 
     const params = new URLSearchParams({

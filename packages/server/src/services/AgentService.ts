@@ -624,7 +624,7 @@ export class AgentService {
         ? testInput // Already in messages format
         : [{ role: 'user', content: testInput }]; // Convert string to message
 
-      // 5. Prepare environment variables
+      // 5. Prepare non-secret runtime configuration
       const env = getEnvConfig();
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const runtimeConfig: Record<string, unknown> = {
@@ -632,16 +632,11 @@ export class AgentService {
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
       };
-      const openRouterKey = env.OPENROUTER_API_KEY || '';
-      const hostCallbacks = {
-        getLlmApiKey: () => (openRouterKey ? String(openRouterKey) : null),
-      };
 
       // 6. Create agent instance and prepare execution
       const agent = new Agent(agentWithTools, {
         eventCallback: onEvent,
         runtimeConfig,
-        hostCallbacks,
       });
 
       // 7. Execute with runner (same pattern as ConversationService)
@@ -693,7 +688,6 @@ export class AgentService {
       await runner.run(blueprint, exec, {
         eventCallback: onEvent,
         runtimeConfig,
-        hostCallbacks,
       } as any);
 
       console.log('🔍 Post-execution state:', {

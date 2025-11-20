@@ -96,10 +96,10 @@ describe('Tool Get Tool', () => {
   });
 
   describe('Real Tool Execution', () => {
-    async function executeToolWithMockEnv(input: unknown, mockEnv: Record<string, string>) {
+    async function executeToolWithMockConfig(input: unknown, mockConfig: Record<string, string>) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        secureEnv: mockEnv,
+        runtimeConfig: mockConfig,
         execution: ExecutionItemUtils.createExecution(),
       };
 
@@ -118,38 +118,38 @@ describe('Tool Get Tool', () => {
     }
 
     it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({ slug: 'calc' }, {})).resolves.toMatchObject({
+      await expect(executeToolWithMockConfig({ slug: 'calc' }, {})).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('baseUrl is required'),
       });
     });
 
     it('should fail without auth token', async () => {
-      const env = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 'test-starship' };
-      await expect(executeToolWithMockEnv({ slug: 'calc' }, env as never)).resolves.toMatchObject({
+      const cfg = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 'test-starship' };
+      await expect(executeToolWithMockConfig({ slug: 'calc' }, cfg as never)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('authToken is required'),
       });
     });
 
     it('should fail without starship ID', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ slug: 'calc' }, env as never)).resolves.toMatchObject({
+      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
+      await expect(executeToolWithMockConfig({ slug: 'calc' }, cfg as never)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('starshipId is required'),
       });
     });
 
     it('should fail when slug is missing', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({}, env)).resolves.toMatchObject({
+      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
+      await expect(executeToolWithMockConfig({}, cfg)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('slug is required'),
       });
     });
 
     it('should successfully fetch tool by slug with mocked API response', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'mock-auth-token', STARSHIP_ID: 'test-starship' };
+      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'mock-auth-token', STARSHIP_ID: 'test-starship' };
 
       const apiPayload = {
         data: {
@@ -164,7 +164,7 @@ describe('Tool Get Tool', () => {
 
       (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(apiPayload));
 
-      const result = await executeToolWithMockEnv({ slug: 'calc' }, env);
+      const result = await executeToolWithMockConfig({ slug: 'calc' }, cfg);
 
       expect(result).toBeDefined();
       const tool = result as { id: string; slug: string; name: string };
@@ -184,20 +184,20 @@ describe('Tool Get Tool', () => {
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {
-      const env = { BASE_URL: 'https://api.example.com///', AUTH_TOKEN: 'abc', STARSHIP_ID: 'ship-1' };
+      const cfg = { BASE_URL: 'https://api.example.com///', AUTH_TOKEN: 'abc', STARSHIP_ID: 'ship-1' };
 
       const apiPayload = { data: { id: 't', slug: 'calc', name: 'Calculator', blueprint: { nodes: [], edges: [] } } };
       (global.fetch as jest.Mock).mockImplementation(async () =>
         createMockResponse(apiPayload, { url: 'https://api.example.com/starships/ship-1/tools/calc' })
       );
 
-      await executeToolWithMockEnv({ slug: 'calc' }, env);
+      await executeToolWithMockConfig({ slug: 'calc' }, cfg);
 
       expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/starships/ship-1/tools/calc', expect.any(Object));
     });
 
     it('should handle HTTP errors gracefully', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
+      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
@@ -207,7 +207,7 @@ describe('Tool Get Tool', () => {
         text: async () => JSON.stringify({ error: 'Not Found' }),
       });
 
-      await expect(executeToolWithMockEnv({ slug: 'missing' }, env)).resolves.toMatchObject({
+      await expect(executeToolWithMockConfig({ slug: 'missing' }, cfg)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('404 Not Found'),
       });

@@ -24,7 +24,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY! } });
+const engine = new Engine();
 // Provide an initial input string; Start will pass it through
 const exec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle('What is 2+2?'));
 const out = await engine.executeBlueprint(blueprint, exec);

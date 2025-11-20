@@ -78,8 +78,8 @@ describe('Tool List Tool', () => {
       const nodeTypes = blueprint.nodes.map((n) => n.type);
       expect(nodeTypes).toContain('start');
       expect(nodeTypes).toContain('end');
-      expect(nodeTypes).toContain('code'); // prepare and summarize
-      expect(nodeTypes).toContain('http_request');
+      expect(nodeTypes).toContain('code'); // summarize
+      expect(nodeTypes).toContain('integration');
 
       // Verify node connectivity
       const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
@@ -89,13 +89,13 @@ describe('Tool List Tool', () => {
       }
     });
 
-    it('should have sequential flow: prepare -> http -> summarize -> end', () => {
+    it('should have sequential flow: start -> integration -> summarize -> end', () => {
       const blueprint = toolListTool.blueprint;
       const edges = blueprint.edges;
 
       const hasCorrectFlow = [
-        edges.some((e: Edge) => e.from === 'prepare' && e.to === 'http_list'),
-        edges.some((e: Edge) => e.from === 'http_list' && e.to === 'summarize'),
+        edges.some((e: Edge) => e.from === 'start_1' && e.to === 'integration_list'),
+        edges.some((e: Edge) => e.from === 'integration_list' && e.to === 'summarize'),
         edges.some((e: Edge) => e.from === 'summarize' && e.to === 'end_1'),
       ];
 
@@ -117,13 +117,14 @@ describe('Tool List Tool', () => {
     });
   });
 
-  describe('Real Tool Execution', () => {
-    async function executeToolWithMockEnv(input: unknown, mockEnv: Record<string, string>) {
+  describe('Real Tool Execution (connector-backed)', () => {
+    async function executeToolWithMockConnector(
+      input: unknown,
+      callConnector: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>
+    ) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        secureEnv: mockEnv,
-        // Force in-process execution so HTTP mocking (global.fetch) works reliably in tests
-        // This still runs the full Autopilot engine, only avoids child process isolation
+        callConnector,
         execution: ExecutionItemUtils.createExecution(),
       };
 
@@ -143,69 +144,31 @@ describe('Tool List Tool', () => {
       return ExecutionItemUtils.unwrapSingle(result);
     }
 
-    it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({}, {})).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('baseUrl is required'),
+    it('should successfully execute with mocked connector response', async () => {
+      const tools = [
+        {
+          id: 'tool-1',
+          slug: 'calculator',
+          name: 'Calculator',
+          description: 'Perform mathematical calculations',
+          isEnabled: true,
+        },
+        {
+          id: 'tool-2',
+          slug: 'echo',
+          name: 'Echo',
+          description: 'Echo back the input',
+          isEnabled: true,
+        },
+      ];
+
+      const callConnector = jest.fn(async ({ slug, payload }) => {
+        expect(slug).toBe('starships-ai');
+        expect(payload.operation).toBe('tools.list');
+        return tools;
       });
-    });
 
-    it('should fail without auth token', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.test.com',
-        STARSHIP_ID: 'test-starship-123',
-        // Missing AUTH_TOKEN
-      };
-
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('authToken is required'),
-      });
-    });
-
-    it('should fail without starship ID', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.test.com',
-        AUTH_TOKEN: 'mock-token',
-        // Missing STARSHIP_ID
-      };
-
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('starshipId is required'),
-      });
-    });
-
-    it('should successfully execute with mocked API response', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.test.com',
-        AUTH_TOKEN: 'mock-auth-token',
-        STARSHIP_ID: 'test-starship-123',
-      };
-
-      // Mock successful API response
-      const mockResponseData = {
-        data: [
-          {
-            id: 'tool-1',
-            slug: 'calculator',
-            name: 'Calculator',
-            description: 'Perform mathematical calculations',
-            isEnabled: true,
-          },
-          {
-            id: 'tool-2',
-            slug: 'echo',
-            name: 'Echo',
-            description: 'Echo back the input',
-            isEnabled: true,
-          },
-        ],
-      };
-
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
-
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockConnector({}, callConnector);
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
@@ -226,93 +189,7 @@ describe('Tool List Tool', () => {
         expect(toolList[0]).toHaveProperty('isEnabled');
       }
 
-      // Verify correct API call was made
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.test.com/starships/test-starship-123/tools',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer mock-auth-token',
-            'Content-Type': 'application/json',
-          }),
-        })
-      );
-    });
-
-    it('should handle API failure gracefully', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.test.com',
-        AUTH_TOKEN: 'mock-auth-token',
-        STARSHIP_ID: 'test-starship-123',
-      };
-
-      // Mock network failure
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
-
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Network error'),
-      });
-    });
-
-    it('should handle trailing slashes in BASE_URL', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.example.com///',
-        AUTH_TOKEN: 'test-token',
-        STARSHIP_ID: 'starship-123',
-      };
-
-      const mockResponseData = { data: [] };
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
-
-      const result = await executeToolWithMockEnv({}, mockEnv);
-
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-
-      // Verify URL was cleaned up properly (no double slashes)
-      expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/starships/starship-123/tools', expect.any(Object));
-    });
-
-    it('should handle malformed input gracefully', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.test.com',
-        AUTH_TOKEN: 'mock-auth-token',
-        STARSHIP_ID: 'test-starship-123',
-      };
-
-      const mockResponseData = { data: [] };
-      // Reuse the same successful mock for multiple iterations
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
-
-      // Tool doesn't require input parameters, so various inputs should work
-      const inputs = [{ invalid: 'parameter' }, 123, 'string-input', null, undefined];
-
-      for (const input of inputs) {
-        await expect(executeToolWithMockEnv(input, mockEnv)).resolves.toBeDefined();
-      }
-    });
-
-    it('should handle HTTP errors gracefully', async () => {
-      const mockEnv = {
-        BASE_URL: 'https://api.test.com',
-        AUTH_TOKEN: 'mock-auth-token',
-        STARSHIP_ID: 'test-starship-123',
-      };
-
-      // Mock HTTP error response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: async () => ({ error: 'Starship not found' }),
-        text: async () => JSON.stringify({ error: 'Starship not found' }),
-      });
-
-      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('404 Not Found'),
-      });
+      expect(callConnector).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -405,7 +282,7 @@ describe('Tool.execute return value - list-tools', () => {
 
     const options: NodeHandlerOptions = {
       eventCallback: jest.fn(),
-      secureEnv: mockEnv,
+      runtimeConfig: mockEnv,
       execution: ExecutionItemUtils.createExecution(),
     };
 

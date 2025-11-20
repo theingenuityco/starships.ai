@@ -69,9 +69,10 @@ Edge selection algorithm (detailed)
   - edge with no condition
   - else: stop (no next node)
 
-Secure environment
+Runtime configuration and secrets
 
-- Provided via `Engine({ secureEnv })` to nodes. Eval/context helpers expose `env(key)` and `envAll()`. Engine attempts to redact secret values from events/logs.
+- Non-secret configuration is provided via `Engine({ runtimeConfig })` and is exposed to templates/code as `config('KEY')` / `ctx.$config('KEY')`.
+- Secrets (LLM keys, third-party API tokens, etc.) are used only inside server-side integrations and connectors; workflows never see raw secret values.
 
 Cross-links
 

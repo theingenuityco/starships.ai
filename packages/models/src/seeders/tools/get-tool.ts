@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Tool
- * Get full tool details (including blueprint) by slug for the specified starship using server REST API
+ * Get full tool details (including blueprint) by slug for the specified starship using the starships-ai connector.
  */
 export const toolGetTool: ToolParams = {
   name: 'Get Tool',
@@ -13,18 +13,13 @@ export const toolGetTool: ToolParams = {
 Inputs:
 - slug: string (tool slug on this starship)
 
-Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
-- STARSHIP_ID: derived from agent.state.starshipId
-
 Output:
-- Full tool model as returned by GET /starships/:starshipId/tools/:slug (includes blueprint)
+- Full tool model as returned by the server (includes blueprint)
 
 Behavior and limits:
 - Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, not found (404), network errors`,
+- Timeouts: validation 2s, connector call handled server-side
+- Typical failures: missing slug, connector/transport errors, tool not found`,
   parameters: {
     type: 'object',
     properties: {
@@ -36,66 +31,32 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'prepare',
+        ref: 'validate',
         type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
+        name: 'Validate Input',
+        description: 'Ensure slug is provided and correctly typed',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-
-              const slug = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input.slug : undefined;
-              if (!slug || typeof slug !== 'string') throw new Error('slug is required');
-
-              return {
-                url: \`\${baseUrl}/starships/\${starshipId}/tools/\${slug}\`,
-                method: 'GET',
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
-              };
-            }
-          `,
-          timeout: 3000,
-        },
-      },
-      {
-        ref: 'http_get',
-        type: 'http_request',
-        name: 'Get Tool',
-        description: 'GET /starships/:starshipId/tools/:slug',
-        parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 5000,
-        },
-      },
-      {
-        ref: 'extract',
-        type: 'code',
-        name: 'Extract Payload',
-        description: 'Return the tool model (prefer body.data when present)',
-        parameters: {
-          code: `
-            async function main(ctx) {
-              const http = ctx.$input;
-              const body = http && typeof http === 'object' ? http.body : http;
-              // Server sendSuccess returns { data: T }, prefer data when present
-              if (body && typeof body === 'object' && body.data !== undefined) {
-                return body.data;
+              const input = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input : {};
+              const slug = input.slug;
+              if (!slug || typeof slug !== 'string') {
+                throw new Error('slug is required and must be a string');
               }
-              return body;
+              return { slug };
             }
           `,
           timeout: 2000,
+        },
+      },
+      {
+        ref: 'integration_get',
+        type: 'integration',
+        name: 'Get Tool (Starships)',
+        description: 'Fetch tool definition via starships-ai connector',
+        parameters: {
+          connectorSlug: 'starships-ai',
+          operation: 'tools.get',
         },
       },
       {
@@ -104,15 +65,14 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("extract")[0].json }}',
+          output: '{{ $lastOutputOf("integration_get")[0].json }}',
         },
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_get' },
-      { ref: 'e3', from: 'http_get', to: 'extract' },
-      { ref: 'e4', from: 'extract', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'validate' },
+      { ref: 'e2', from: 'validate', to: 'integration_get' },
+      { ref: 'e3', from: 'integration_get', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -127,7 +87,7 @@ export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | '
   slug: 'get-tool',
   version: '1.0.1',
   category: 'automation',
-  exampleUsage: '{ "slug": "calc" } // returns full tool model; env (baseUrl, authToken, starshipId) is inferred',
+  exampleUsage: '{ "slug": "calc" } // returns full tool model; connector infers starship context',
   requiresApiKey: false,
   configurationFields: [],
 };

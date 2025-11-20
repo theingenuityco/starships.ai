@@ -77,11 +77,12 @@ export interface EnvironmentVariableListResponse {
 }
 
 /**
- * Summary of system-level environment variables passed into the workflow runner's secureEnv.
+ * Summary of system-level environment variables that are made available to the
+ * Autopilot runtime as non-secret configuration (for example via runtimeConfig).
  */
 export interface SystemEnvironmentVariableSummary {
   /**
-   * Name of the secureEnv key available at runtime (e.g. OPEN_ROUTER_KEY, DISCORD_BOT_TOKEN).
+   * Name of the configuration key available at runtime (e.g. OPEN_ROUTER_KEY, DISCORD_BOT_TOKEN).
    */
   key: string;
   /**

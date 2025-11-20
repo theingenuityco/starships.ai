@@ -75,3 +75,28 @@ export interface EnvironmentVariableListResponse {
   starshipId: string;
   variables: EnvironmentSummary[];
 }
+
+/**
+ * Summary of system-level environment variables passed into the workflow runner's secureEnv.
+ */
+export interface SystemEnvironmentVariableSummary {
+  /**
+   * Name of the secureEnv key available at runtime (e.g. OPEN_ROUTER_KEY, DISCORD_BOT_TOKEN).
+   */
+  key: string;
+  /**
+   * Whether this key is currently configured and will be present at runtime.
+   */
+  present: boolean;
+  /**
+   * Optional human-readable description of what this key is used for.
+   */
+  description?: string;
+}
+
+/**
+ * System environment variables list response
+ */
+export interface SystemEnvironmentVariableListResponse {
+  systemEnv: SystemEnvironmentVariableSummary[];
+}

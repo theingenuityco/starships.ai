@@ -2,10 +2,10 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { EnvironmentSummary } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnvironmentVariable, useDeleteEnvironmentVariable } from '@/hooks/useEnvironmentVariables'
+import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnvironmentVariable, useDeleteEnvironmentVariable, useSystemEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { EnvironmentVariableList } from './EnvironmentVariableList'
 import { EnvironmentVariableForm } from './EnvironmentVariableForm'
 import { EnvironmentVariableDeleteModal } from './EnvironmentVariableDeleteModal'
@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Input } from '@/components/ui/input'
+import { useConnectorCatalog, useStarshipConnectors } from '@/hooks/useConnectors'
 
 interface EnvironmentSettingsContentProps {
   slug: string
@@ -31,13 +32,35 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
   // Fetch starship data
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
 
+  // Fetch connector data for grouping managed environment variables
+  const { data: connectorCatalog = [] } = useConnectorCatalog()
+  const { data: starshipConnectors = [] } = useStarshipConnectors(starship?.id || '', !!starship?.id)
+
   // Fetch environment variables
   const { data: variables = [], isLoading: variablesLoading, error: variablesError } = useEnvironmentVariables(starship?.id || '', !!starship?.id)
+
+  // Fetch system-level environment variables passed into the workflow runner
+  const { data: systemEnv = [], isLoading: systemEnvLoading } = useSystemEnvironmentVariables(starship?.id || '', !!starship?.id)
 
   // Filter variables based on search query
   const filteredVariables = variables.filter(
     variable => variable.key.toLowerCase().includes(searchQuery.toLowerCase()) || (variable.description && variable.description.toLowerCase().includes(searchQuery.toLowerCase()))
   )
+
+  // Map connectorId -> human-friendly connector label (e.g. "LinkedIn", "Discord")
+  const managedConnectorLabelsById = useMemo(() => {
+    if (!starshipConnectors || starshipConnectors.length === 0) return {}
+
+    const catalogByProvider = new Map(connectorCatalog.map(entry => [entry.provider, entry]))
+
+    return starshipConnectors.reduce<Record<string, string>>((acc, connector) => {
+      const catalogEntry = catalogByProvider.get(connector.provider)
+      const displayName = catalogEntry?.displayName || connector.provider.charAt(0).toUpperCase() + connector.provider.slice(1)
+
+      acc[connector.id] = displayName
+      return acc
+    }, {})
+  }, [starshipConnectors, connectorCatalog])
 
   // Mutations
   const createMutation = useCreateEnvironmentVariable(starship?.id || '')
@@ -154,9 +177,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                   type="button"
                   onClick={() => setActiveTab('variables')}
                   className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                    activeTab === 'variables'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                    activeTab === 'variables' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Variables
@@ -165,9 +186,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                   type="button"
                   onClick={() => setActiveTab('connectors')}
                   className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                    activeTab === 'connectors'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                    activeTab === 'connectors' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Connectors
@@ -180,10 +199,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                 {/* Search */}
                 <div className="mb-8 sticky top-6 z-30">
                   <div className="relative max-w-md mb-6 mx-auto">
-                    <Icon
-                      name="search"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none"
-                    />
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
                     <Input
                       type="text"
                       placeholder="Search environment variables..."
@@ -197,9 +213,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                 {/* Security Notice */}
                 <Alert>
                   <Icon name="shield" className="h-4 w-4" />
-                  <AlertDescription>
-                    All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.
-                  </AlertDescription>
+                  <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
                 </Alert>
 
                 {/* Variables List */}
@@ -216,8 +230,59 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                       onAdd={handleAdd}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      managedConnectorLabelsById={managedConnectorLabelsById}
                     />
                   )}
+                </div>
+
+                {/* System environment variables passed into secureEnv */}
+                <div className="mt-6">
+                  <Card className="frosted-glass-card shadow-frosted-lg">
+                    <CardHeader className="pb-1">
+                      <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                        <Icon name="server" className="h-4 w-4 text-primary" />
+                        System environment variables
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <p className="text-xs text-muted-foreground mt-0 mb-1 px-6 pt-0">
+                        These read-only variables are injected into the workflow runner&apos;s <code className="font-mono text-[11px]">secureEnv</code> for this starship. They can be accessed in
+                        workflows via <code className="font-mono text-[11px]">env('KEY')</code> or <code className="font-mono text-[11px]">envAll()</code>.
+                      </p>
+
+                      {systemEnvLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground px-6 py-4">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          <span>Loading system environment variables...</span>
+                        </div>
+                      ) : systemEnv.length === 0 ? (
+                        <p className="text-xs text-muted-foreground px-6 py-4">No system environment variables are currently configured.</p>
+                      ) : (
+                        <div className="divide-y">
+                          {systemEnv.map(item => (
+                            <div key={item.key} className="group px-6 py-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Icon name="key" className="h-4 w-4 text-primary flex-shrink-0" />
+                                  <span className="font-mono font-medium text-sm">{item.key}</span>
+                                </div>
+                                {item.description && <span className="text-[11px] text-muted-foreground">{item.description}</span>}
+                              </div>
+                              <div className="ml-4 flex items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                    item.present ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/40' : 'bg-destructive/5 text-destructive border border-destructive/40'
+                                  }`}
+                                >
+                                  {item.present ? 'Configured' : 'Missing'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </>
             )}

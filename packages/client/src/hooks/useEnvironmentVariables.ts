@@ -6,6 +6,8 @@ import type {
   EnvironmentVariableListResponse,
   CreateEnvironmentVariableRequest,
   UpdateEnvironmentVariableRequest,
+  SystemEnvironmentVariableSummary,
+  SystemEnvironmentVariableListResponse,
 } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
@@ -19,6 +21,7 @@ export const ENVIRONMENT_QUERY_KEYS = {
   details: () => [...ENVIRONMENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (starshipId: string, variableId: string) => [...ENVIRONMENT_QUERY_KEYS.details(), starshipId, variableId] as const,
   byStarship: (starshipId: string) => [...ENVIRONMENT_QUERY_KEYS.all, 'starship', starshipId] as const,
+  system: (starshipId: string) => [...ENVIRONMENT_QUERY_KEYS.all, 'system', starshipId] as const,
 } as const
 
 /**
@@ -34,6 +37,25 @@ export function useEnvironmentVariables(starshipId: string, enabled: boolean = t
     enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+  })
+}
+
+/**
+ * Get system-level environment variables that are injected into the workflow runner's secureEnv.
+ */
+export function useSystemEnvironmentVariables(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ENVIRONMENT_QUERY_KEYS.system(starshipId),
+    queryFn: async (): Promise<SystemEnvironmentVariableSummary[]> => {
+      const response: FetchResponse<ApiResponse<SystemEnvironmentVariableListResponse>> = await api.get(
+        `/api/v1/starships/${starshipId}/environment/system`,
+      )
+      return response.data.data.systemEnv
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
   })
 }

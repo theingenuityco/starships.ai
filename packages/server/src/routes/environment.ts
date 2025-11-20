@@ -11,6 +11,7 @@ import { IdSchema, EnvironmentKeySchema, DescriptionSchema } from '@/schemas/com
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
+import { getEnvConfig } from '@starships/env';
 
 const router: Router = Router();
 
@@ -73,6 +74,59 @@ router.get('/starships/:id/environment', jwtAuthMiddleware, async (req: Request,
     sendSuccess(res, { starshipId, variables });
   } catch (error) {
     handleError(error, res, 'fetching environment variables');
+  }
+});
+
+// GET /starships/:id/environment/system - List system-level env vars passed into the workflow runner
+router.get('/starships/:id/environment/system', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id: starshipId } = req.params;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    // Validate starship ID
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    // Verify access
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const env = getEnvConfig();
+    const baseUrl = `${env.SERVER_URL}/api/v1`;
+    const openRouterKey = env.OPENROUTER_API_KEY || '';
+    const discordBotToken = env.DISCORD_BOT_TOKEN || '';
+
+    // This list should mirror the secureEnv keys constructed in ConversationService/AgentService.
+    const systemEnv = [
+      {
+        key: 'STARSHIP_ID',
+        present: true,
+        description: 'ID of the current starship, injected automatically into secureEnv.',
+      },
+      {
+        key: 'BASE_URL',
+        present: !!baseUrl,
+        description: 'Base API URL for this deployment (SERVER_URL/api/v1).',
+      },
+      {
+        key: 'OPEN_ROUTER_KEY',
+        present: !!openRouterKey,
+        description: 'OpenRouter API key used by LLM nodes via secureEnv.OPEN_ROUTER_KEY.',
+      },
+      {
+        key: 'DISCORD_BOT_TOKEN',
+        present: !!discordBotToken,
+        description: 'Discord bot token used by Discord tools via secureEnv.DISCORD_BOT_TOKEN.',
+      },
+    ];
+
+    sendSuccess(res, { systemEnv });
+  } catch (error) {
+    handleError(error, res, 'fetching system environment variables');
   }
 });
 

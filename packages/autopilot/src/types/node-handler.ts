@@ -39,10 +39,7 @@ export interface NodeHandlerOptions {
    * by slug, injecting credentials, performing the external call, and
    * returning a sanitized JSON result. Workflows never see secrets directly.
    */
-  callConnector?: (args: {
-    slug: string;
-    payload: Record<string, unknown>;
-  }) => Promise<unknown>;
+  callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
 }
 /**
  * Constructor type for handlers that accept the full node object

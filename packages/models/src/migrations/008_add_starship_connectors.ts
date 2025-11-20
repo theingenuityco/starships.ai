@@ -4,7 +4,7 @@ export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    console.log('🚀 Creating connectors table...');
+    console.log('🚀 Creating connectors table and linking environments...');
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS connectors (
@@ -30,11 +30,22 @@ export async function up(client: Client): Promise<void> {
       ON connectors(provider)
     `);
 
+    // Link environments to connectors via optional foreign key
+    await client.query(`
+      ALTER TABLE environments
+      ADD COLUMN IF NOT EXISTS connector_id VARCHAR(255) REFERENCES connectors(id) ON DELETE SET NULL
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_environments_connector_id
+      ON environments(connector_id)
+    `);
+
     await client.query('COMMIT');
-    console.log('✅ connectors table created successfully');
+    console.log('✅ connectors table and environment linkage created successfully');
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('❌ Failed to create connectors table:', error);
+    console.error('❌ Failed to create connectors table and linkage:', error);
     throw error;
   }
 }
@@ -43,18 +54,19 @@ export async function down(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    console.log('🔄 Dropping connectors table...');
+    console.log('🔄 Dropping connectors table and unlinking environments...');
+
+    await client.query('DROP INDEX IF EXISTS idx_environments_connector_id');
+    await client.query('ALTER TABLE environments DROP COLUMN IF EXISTS connector_id');
 
     await client.query('DROP INDEX IF EXISTS idx_connectors_provider');
     await client.query('DROP INDEX IF EXISTS idx_connectors_starship_id');
     await client.query('DROP TABLE IF EXISTS connectors');
 
     await client.query('COMMIT');
-    console.log('✅ starship_connectors table dropped successfully');
+    console.log('✅ connectors table and environment linkage dropped successfully');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   }
 }
-
-

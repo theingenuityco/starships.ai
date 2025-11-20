@@ -27,6 +27,7 @@ export { PromoRedemptionEntity } from './entities/PromoRedemptionEntity';
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
+export { AttachmentRepository } from './repositories/AttachmentRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EnvironmentRepository } from './repositories/EnvironmentRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';

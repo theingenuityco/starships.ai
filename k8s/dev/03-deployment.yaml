@@ -242,6 +242,16 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: AWS_SES_REGION
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_S3_BUCKET
+            - name: AWS_S3_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_S3_REGION
             - name: ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:

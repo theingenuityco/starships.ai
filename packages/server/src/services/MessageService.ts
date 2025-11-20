@@ -5,7 +5,7 @@
  * Orchestrates between database persistence (MessageRepository) and business logic.
  */
 
-import { MessageRepository } from '@starships/models';
+import { MessageRepository, AttachmentRepository } from '@starships/models';
 import type { Message, MessageModel } from '@starships/protocol';
 
 /**
@@ -13,9 +13,11 @@ import type { Message, MessageModel } from '@starships/protocol';
  */
 export class MessageService {
   private messageRepository: MessageRepository;
+  private attachmentRepository: AttachmentRepository;
 
   constructor() {
     this.messageRepository = new MessageRepository();
+    this.attachmentRepository = new AttachmentRepository();
   }
 
   // ============================================================================
@@ -25,8 +27,8 @@ export class MessageService {
   /**
    * Create a new message with streaming support
    */
-  async createMessage(request: Message & { conversationId: string }): Promise<MessageModel> {
-    // Create message with all available properties including toolCalls, toolCallId, agentId, and agentName
+  async createMessage(request: Message & { conversationId: string; attachmentIds?: string[] }): Promise<MessageModel> {
+    // Create message with all available properties including toolCalls, toolCallId, agentId, agentName, and attachmentIds
     const message = await this.messageRepository.create({
       role: request.role,
       content: request.content,
@@ -37,7 +39,15 @@ export class MessageService {
       ...(request.toolCallId && { toolCallId: request.toolCallId }),
       ...(request.agentId && { agentId: request.agentId }),
       ...(request.agentName && { agentName: request.agentName }),
+      ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
     });
+
+    // Link attachments to message if provided
+    if (request.attachmentIds && request.attachmentIds.length > 0) {
+      await Promise.all(
+        request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id))
+      );
+    }
 
     return message;
   }
@@ -68,9 +78,39 @@ export class MessageService {
   // Removed duplicate updateMessage method that restricted updates to content only
 
   /**
-   * Delete message
+   * Delete message and cleanup associated S3 files
    */
   async deleteMessage(messageId: string): Promise<boolean> {
+    // First, get the message with starshipId to access its attachments
+    const connection = this.messageRepository['getConnection']();
+    const messageData = await connection.queryOne<{
+      id: string;
+      starship_id: string;
+      attachment_ids: string[];
+    }>('SELECT id, starship_id, attachment_ids FROM messages WHERE id = $1', [messageId]);
+
+    if (!messageData) {
+      return false;
+    }
+
+    // Delete attachments and their S3 files before deleting the message
+    if (messageData.attachment_ids && messageData.attachment_ids.length > 0) {
+      const { AttachmentService } = await import('@/services/AttachmentService');
+      const attachmentService = new AttachmentService();
+
+      console.log(`[MessageService] Deleting ${messageData.attachment_ids.length} attachments for message ${messageId}`);
+
+      for (const attachmentId of messageData.attachment_ids) {
+        try {
+          await attachmentService.deleteAttachment(attachmentId, messageData.starship_id);
+        } catch (error) {
+          console.error(`[MessageService] Failed to delete attachment ${attachmentId}:`, error);
+          // Continue deleting other attachments even if one fails
+        }
+      }
+    }
+
+    // Now delete the message (CASCADE will delete any remaining attachment records)
     const deleted = await this.messageRepository.delete(messageId);
     return deleted;
   }

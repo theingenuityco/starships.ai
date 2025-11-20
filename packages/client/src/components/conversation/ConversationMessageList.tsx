@@ -12,6 +12,9 @@ import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationStreamed, useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
+import type { LlmToolCall } from '@starships/autopilot'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
@@ -392,7 +395,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="max-w-4xl mx-auto space-y-2 bg-transparent">
           {renderMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} agentName={message.agentName || agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} />
+            <MemoizedMessageBubble key={message.id} message={message} agentName={message.agentName || agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} starshipId={starshipId} />
           ))}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
@@ -422,15 +425,62 @@ interface StreamChunk {
   timestamp: number
 }
 
+// Extended message type with streaming properties
+interface ExtendedMessage extends MessageModel {
+  streaming?: boolean
+  chunks?: StreamChunk[]
+  sending?: boolean
+  reasoning?: string
+  reasoningChunks?: StreamChunk[]
+  toolCalls?: LlmToolCall[]
+  toolResults?: Array<{
+    toolCallId?: string
+    content?: string
+  }>
+  attachmentIds?: string[]
+}
+
 interface ConversationMessageBubbleProps {
-  message: MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }
+  message: ExtendedMessage
   agentName?: string
   isStreamingActive?: boolean
+  starshipId?: string
+}
+
+// User message attachments component
+function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: string[]; starshipId: string }) {
+  const { data: attachments, isLoading } = useMessageAttachments(attachmentIds, starshipId)
+
+  if (isLoading) {
+    return (
+      <div className="mb-1 space-y-2">
+        {attachmentIds.map((id) => (
+          <MessageAttachmentSkeleton key={id} className="max-w-xs" />
+        ))}
+      </div>
+    )
+  }
+
+  if (!attachments || attachments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mb-1 space-y-2">
+      {attachments.map((attachment) => (
+        <MessageAttachment
+          key={attachment.id}
+          attachment={attachment}
+          className="max-w-xs"
+        />
+      ))}
+    </div>
+  )
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName, isStreamingActive }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName, isStreamingActive, starshipId }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
 
     if (isUser) {
@@ -438,13 +488,20 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-end">
           <div className="mb-4 mt-6 flex items-end gap-3 max-w-[70%]">
-            <div className={`bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
-              {message.sending && (
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[hsl(var(--accent))] border-2 border-background rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-[hsl(var(--accent-foreground))] rounded-full animate-pulse" />
-                </div>
+            <div className="flex flex-col gap-2 items-end">
+              {/* Attachments outside bubble */}
+              {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && (
+                <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />
               )}
+              {/* Message bubble */}
+              <div className={`bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
+                {message.sending && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[hsl(var(--accent))] border-2 border-background rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-[hsl(var(--accent-foreground))] rounded-full animate-pulse" />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
               <Icon name="user" className="w-4 h-4 text-primary" />
@@ -470,12 +527,14 @@ const MemoizedMessageBubble = memo(
                 isStreaming={!!isStreamingActive}
                 className="text-foreground"
                 chunks={message.chunks}
-                reasoning={(message as any).reasoning}
-                reasoningChunks={(message as any).reasoningChunks}
+                reasoning={message.reasoning}
+                reasoningChunks={message.reasoningChunks}
                 agentName={agentName}
-                toolCalls={(message as any).toolCalls}
-                toolResults={(message as any).toolResults}
+                toolCalls={message.toolCalls}
+                toolResults={message.toolResults}
                 messageType={message.messageType}
+                attachmentIds={message.attachmentIds}
+                starshipId={starshipId}
               />
             </div>
           </div>

@@ -72,6 +72,8 @@ const map: Record<string, ResolvedIcon> = {
   'shield-check': { type: 'phosphor', component: 'ShieldCheck' },
   shield: { type: 'phosphor', component: 'Shield' },
   'file-text': { type: 'phosphor', component: 'FileText' },
+  file: { type: 'phosphor', component: 'File' },
+  image: { type: 'phosphor', component: 'Image' },
   eye: { type: 'phosphor', component: 'Eye' },
   'eye-off': { type: 'phosphor', component: 'EyeSlash' },
   lock: { type: 'phosphor', component: 'Lock' },

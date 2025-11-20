@@ -73,4 +73,10 @@ export interface EnvironmentConfig {
   DISCORD_CLIENT_SECRET?: string;
   DISCORD_REDIRECT_URL?: string;
   DISCORD_BOT_TOKEN?: string;
+
+  // AWS S3 Configuration (File Attachments)
+  AWS_S3_BUCKET?: string;
+  AWS_S3_REGION?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
 }

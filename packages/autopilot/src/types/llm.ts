@@ -43,9 +43,19 @@ export type ReasoningDetail =
       index?: number;
     };
 
+/**
+ * Multimodal content types (OpenRouter/OpenAI compatible)
+ */
+export type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' } }
+  | { type: 'file'; file: { filename: string; file_data: string } }; // OpenRouter PDFs/documents
+
+export type MessageContent = string | ContentBlock[];
+
 export interface LlmMessage {
   role: LLMMessageRole;
-  content: string;
+  content: MessageContent; // Support both string and multimodal content
   // Optional model-provided reasoning/thinking text (for reasoning-capable models)
   reasoning?: string;
   // Optional unified reasoning details (OpenRouter normalized)

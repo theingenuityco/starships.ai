@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { NodeHandler, NodeHandlerConstructor, HostCallbacks } from '@/types/node-handler';
+import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation, ReducerSpec } from '@/types/node-parameters';
@@ -40,9 +40,15 @@ export interface EngineConfig {
    */
   runtimeConfig?: Record<string, unknown>;
   /**
-   * Host-level callbacks for secret-using operations (LLM calls, connectors, etc).
+   * Connector invocation hook for secret-using operations (LLM calls,
+   * third-party APIs, internal Starships APIs, etc).
+   *
+   * Engine passes this through to node handlers; the embedding runtime/server
+   * is responsible for looking up connector records by slug, injecting
+   * credentials, performing the external call, and returning a sanitized
+   * JSON result. Workflows and templates never see raw secrets.
    */
-  hostCallbacks?: HostCallbacks;
+  callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
 }
 
 export class Engine {
@@ -50,13 +56,13 @@ export class Engine {
   private eval: Eval;
   private failOnNodeError: boolean;
   private runtimeConfig?: Record<string, unknown>;
-  private hostCallbacks?: HostCallbacks;
+  private callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
     this.runtimeConfig = config.runtimeConfig;
-    this.hostCallbacks = config.hostCallbacks;
+    this.callConnector = config.callConnector;
     this.eval = new Eval(this.runtimeConfig);
   }
 
@@ -71,7 +77,7 @@ export class Engine {
       eventCallback: this.eventCallback,
       execution: execution,
       runtimeConfig: this.runtimeConfig,
-      hostCallbacks: this.hostCallbacks,
+      callConnector: this.callConnector,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);

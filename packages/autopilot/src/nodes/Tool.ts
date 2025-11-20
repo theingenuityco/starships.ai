@@ -64,7 +64,7 @@ export class Tool extends BaseNode<ToolParams> {
         eventCallback: this.getEventCallback(),
         failOnNodeError: true,
         runtimeConfig: this.getOptions()?.runtimeConfig,
-        hostCallbacks: this.getOptions()?.hostCallbacks,
+        callConnector: this.getOptions()?.callConnector,
       };
       const depth = subExec.depth ?? 0;
       const runner = RunnerFactory.getTopLevelRunner(depth);

@@ -79,20 +79,16 @@ export class LLM extends BaseNode<LlmParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    const hostCallbacks = this.getOptions()?.hostCallbacks;
     let apiKey: string | null = null;
 
-    if (hostCallbacks && typeof hostCallbacks.getLlmApiKey === 'function') {
-      apiKey = (await hostCallbacks.getLlmApiKey()) ?? null;
-    }
-
-    // Fallback for isolated runners (child/remote) where host callbacks cannot cross
-    if (!apiKey && typeof process !== 'undefined') {
+    // TODO: migrate LLM execution behind slug-based callConnector; for now, read
+    // OpenRouter API key directly from process.env in the host environment.
+    if (typeof process !== 'undefined') {
       apiKey = process.env.OPENROUTER_API_KEY ?? null;
     }
     if (!apiKey) {
       throw this.handleExecutionError(
-        new Error('OpenRouter API key is required. Provide it via the host getLlmApiKey() callback.')
+        new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY in the host environment.')
       );
     }
 

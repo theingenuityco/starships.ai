@@ -175,7 +175,7 @@ export class ChildProcessRunner implements Runner {
       }
 
       // Prepare safe config (functions cannot cross the IPC boundary)
-      const safeConfig = config ? { ...config, eventCallback: undefined, hostCallbacks: undefined } : undefined;
+      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined } : undefined;
 
       const autopilotCredentials = {
         openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined,
@@ -314,7 +314,7 @@ export class ChildProcessRunner implements Runner {
         }, timeoutMs);
       }
 
-      const safeConfig = config ? { ...config, eventCallback: undefined, hostCallbacks: undefined } : undefined;
+      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined } : undefined;
       const autopilotCredentials = { openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined };
       child.send({ type: 'parent_ready' });
       child.send({ type: 'start', payload: { blueprint, execution, config: safeConfig, autopilotCredentials } });

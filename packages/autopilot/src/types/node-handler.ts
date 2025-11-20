@@ -12,37 +12,6 @@ import { EventCallback } from '@/types/events';
  * Handlers are now instantiated with parameters via constructor
  */
 
-/**
- * Host-level callbacks provided by the embedding runtime.
- *
- * These callbacks are the ONLY place where secrets (LLM keys, connector
- * credentials, etc.) should ever be used. They are invoked from trusted
- * node implementations and are never exposed to user-authored templates
- * or Code/Mutate reducers.
- */
-export interface HostCallbacks {
-  /**
-   * Retrieve an LLM API key or equivalent auth token for the current runtime.
-   * Implementations may return null/undefined when LLM access is not
-   * configured; nodes should surface a clear error in that case.
-   */
-  getLlmApiKey?: () => string | null | Promise<string | null>;
-
-  /**
-   * Generic connector invocation hook.
-   *
-   * Autopilot does not know how connectors are stored or what secrets they
-   * use. The host is responsible for looking up connector configuration,
-   * injecting credentials, performing the external call, and returning a
-   * sanitized JSON result.
-   */
-  callConnector?: (args: {
-    provider: string;
-    logicalId?: string | null;
-    payload: Record<string, unknown>;
-  }) => Promise<unknown>;
-}
-
 export interface NodeHandler {
   /** Execute with parameters already injected via constructor and optional input items */
   execute(input?: ExecutionItem[]): Promise<ExecutionItem[]>;
@@ -57,14 +26,23 @@ export interface NodeHandlerOptions {
   /**
    * Non-secret runtime configuration values that may be safely exposed to
    * templates and user-authored code (Code/Mutate). Secrets MUST NOT be
-   * placed here; they should only ever flow through HostCallbacks.
+   * placed here; they should only ever flow through server-side connector
+   * execution.
    */
   runtimeConfig?: Record<string, unknown>;
 
   /**
-   * Host-level callbacks for secret-using operations (LLM calls, connectors, etc).
+   * Generic connector invocation hook.
+   *
+   * Autopilot does not know how connectors are stored or what secrets they
+   * use. The host/server is responsible for looking up connector configuration
+   * by slug, injecting credentials, performing the external call, and
+   * returning a sanitized JSON result. Workflows never see secrets directly.
    */
-  hostCallbacks?: HostCallbacks;
+  callConnector?: (args: {
+    slug: string;
+    payload: Record<string, unknown>;
+  }) => Promise<unknown>;
 }
 /**
  * Constructor type for handlers that accept the full node object

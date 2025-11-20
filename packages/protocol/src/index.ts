@@ -22,6 +22,7 @@ export type TemplateCategory =
 /* Export domain types (database domains) */
 export * from './domains/agent';
 export * from './domains/agent-template';
+export * from './domains/attachment';
 export * from './domains/auth';
 export * from './domains/conversation';
 export * from './domains/message';

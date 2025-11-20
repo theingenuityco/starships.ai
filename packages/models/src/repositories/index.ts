@@ -1,5 +1,6 @@
 export { AgentRepository } from './AgentRepository';
 export { AgentTemplateRepository } from './AgentTemplateRepository';
+export { AttachmentRepository } from './AttachmentRepository';
 export { ConversationRepository } from './ConversationRepository';
 export { EnvironmentRepository } from './EnvironmentRepository';
 export { MessageRepository } from './MessageRepository';

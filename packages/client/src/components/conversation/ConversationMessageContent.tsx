@@ -17,6 +17,8 @@ import { getMarkdownComponents } from '@/components/markdown/markdownComponents'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 
 interface StreamChunk {
   content: string
@@ -40,6 +42,9 @@ interface MessageContentProps {
   toolCalls?: NonNullable<MessageModel['toolCalls']>
   toolResults?: any[]
   messageType?: MessageModel['messageType']
+  // Attachments
+  attachmentIds?: string[]
+  starshipId?: string
 }
 
 export function ConversationMessageContent({
@@ -57,9 +62,14 @@ export function ConversationMessageContent({
   toolCalls,
   toolResults = [],
   messageType,
+  attachmentIds,
+  starshipId,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+
+  // Fetch attachments metadata
+  const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
@@ -261,6 +271,19 @@ export function ConversationMessageContent({
               </blockquote>
             </CollapsibleContent>
           </Collapsible>
+        </div>
+      )}
+
+      {/* Attachments */}
+      {attachmentIds && attachmentIds.length > 0 && starshipId && (
+        <div className="mb-1 space-y-2">
+          {isLoadingAttachments ? (
+            // Loading state
+            attachmentIds.map((id) => <MessageAttachmentSkeleton key={id} />)
+          ) : (
+            // Render attachments
+            attachments?.map((attachment) => <MessageAttachment key={attachment.id} attachment={attachment} />)
+          )}
         </div>
       )}
 

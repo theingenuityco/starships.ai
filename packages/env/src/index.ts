@@ -112,5 +112,11 @@ export function getEnvConfig(): EnvironmentConfig {
     EMAIL_FROM_ADDRESS: requiredEnvVars.EMAIL_FROM_ADDRESS!,
     EMAIL_FROM_NAME: requiredEnvVars.EMAIL_FROM_NAME!,
     AWS_SES_REGION: requiredEnvVars.AWS_SES_REGION!,
+
+    // AWS S3 Configuration (File Attachments) - Optional, feature disabled if not set
+    AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,
+    AWS_S3_REGION: process.env.AWS_S3_REGION || 'us-east-1',
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   };
 }

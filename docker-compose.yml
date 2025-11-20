@@ -60,6 +60,15 @@ services:
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID}
       USERBACK_TOKEN: ${USERBACK_TOKEN}
 
+      # AWS Configuration (SES and S3)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SES_REGION: ${AWS_SES_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME}
+
     volumes:
       # Application data
       - starships-data:/app/data

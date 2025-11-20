@@ -2,6 +2,7 @@ import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
+import { AttachmentService } from '@/services/AttachmentService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM } from '@starships/autopilot';
 import type {
   ToolParams,
@@ -16,6 +17,7 @@ import type {
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
+import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
@@ -303,7 +305,7 @@ export class ConversationService {
   }
 
   /**
-   * Delete a conversation
+   * Delete a conversation and cleanup all associated S3 files
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
@@ -317,7 +319,47 @@ export class ConversationService {
 
       console.log(`[ConversationService] Found conversation ${conversationId} (title: "${conversation.title}"), proceeding with deletion`);
 
-      // Use the repository's delete method which should handle CASCADE properly
+      // IMPORTANT: Delete all S3 files before deleting the conversation
+      // This prevents orphaned files in S3 bucket
+      const attachmentService = new AttachmentService();
+
+      try {
+        // Query all messages in this conversation
+        const connection = this.conversationRepository['getConnection']();
+        const messages = await connection.query<{ id: string; attachment_ids: string[] }>(
+          'SELECT id, attachment_ids FROM messages WHERE conversation_id = $1',
+          [conversationId]
+        );
+
+        console.log(`[ConversationService] Found ${messages.length} messages in conversation ${conversationId}`);
+
+        // For each message, delete its attachments (which will delete S3 files)
+        let totalAttachmentsDeleted = 0;
+        for (const message of messages) {
+          if (message.attachment_ids && message.attachment_ids.length > 0) {
+            console.log(`[ConversationService] Deleting ${message.attachment_ids.length} attachments for message ${message.id}`);
+
+            for (const attachmentId of message.attachment_ids) {
+              try {
+                await attachmentService.deleteAttachment(attachmentId, conversation.starshipId);
+                totalAttachmentsDeleted++;
+              } catch (error) {
+                console.error(`[ConversationService] Failed to delete attachment ${attachmentId}:`, error);
+                // Continue deleting other attachments even if one fails
+              }
+            }
+          }
+        }
+
+        if (totalAttachmentsDeleted > 0) {
+          console.log(`[ConversationService] Successfully deleted ${totalAttachmentsDeleted} attachments and their S3 files`);
+        }
+      } catch (error) {
+        console.error(`[ConversationService] Error deleting attachments for conversation ${conversationId}:`, error);
+        // Continue with conversation deletion even if attachment cleanup fails
+      }
+
+      // Now delete the conversation (CASCADE will delete message and attachment records)
       const deleted = await this.conversationRepository.delete(conversationId);
 
       if (deleted) {
@@ -506,7 +548,62 @@ export class ConversationService {
     }
   }
 
-  async addConversationMessage(data: Message & { conversationId: string }, ctx?: { authorization?: string }): Promise<void> {
+  /**
+   * Build multimodal content blocks from message with attachments
+   *
+   * Converts messages with attachments into ContentBlock[] format for LLMs.
+   * Supports images (vision models) and documents (PDFs, text files).
+   * If no attachments, returns string content as-is.
+   */
+  private async buildMessageContent(message: MessageModel, starshipId: string): Promise<MessageContent> {
+    // No attachments - return string content
+    if (!message.attachmentIds || message.attachmentIds.length === 0) {
+      return message.content;
+    }
+
+    // Load attachments with presigned URLs (1 minute expiry, secured)
+    const attachmentService = new AttachmentService();
+    const attachments = await attachmentService.getAttachments(message.attachmentIds, starshipId);
+
+    // Build content blocks - text first, then attachments
+    const contentBlocks: ContentBlock[] = [{ type: 'text', text: message.content }];
+
+    // Add attachment blocks based on type
+    for (const attachment of attachments) {
+      if (attachment.mimeType.startsWith('image/')) {
+        // Image block for vision models (GPT-4o, Claude 3.5 Sonnet, etc.)
+        contentBlocks.push({
+          type: 'image_url',
+          image_url: {
+            url: attachment.url, // Presigned S3 URL - secure, temporary
+            detail: 'high',
+          },
+        });
+      } else if (attachment.mimeType === 'application/pdf') {
+        // File block for PDFs (OpenRouter format)
+        // OpenRouter will parse PDFs automatically and pass to any model
+        contentBlocks.push({
+          type: 'file',
+          file: {
+            filename: attachment.filename,
+            file_data: attachment.url, // Presigned S3 URL (1 minute expiry)
+          },
+        });
+      }
+      // TODO: Handle text files by reading content and appending to message text
+      // } else if (attachment.mimeType.startsWith('text/') || attachment.mimeType === 'application/json') {
+      //   const textContent = await fetchTextFromS3(attachment.s3Key);
+      //   contentBlocks[0].text += `\n\n--- Content of ${attachment.filename} ---\n${textContent}`;
+      // }
+    }
+
+    return contentBlocks;
+  }
+
+  async addConversationMessage(
+    data: Message & { conversationId: string; attachmentIds?: string[] },
+    ctx?: { authorization?: string }
+  ): Promise<void> {
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
       conversationId: data.conversationId,
@@ -514,6 +611,7 @@ export class ConversationService {
       content: data.content,
       messageType: data.messageType,
       ...(data.agentId && { agentId: data.agentId }),
+      ...(data.attachmentIds && { attachmentIds: data.attachmentIds }),
     });
 
     // Broadcast user message immediately via streaming if available
@@ -640,21 +738,26 @@ export class ConversationService {
           },
         };
 
-        // Prepare input messages snapshot for this agent
-        const llmMessages: LlmMessage[] = messages.map((msg): LlmMessage => {
-          const baseMessage: LlmMessage = {
-            role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-            content: msg.content,
-            ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
-          };
-          if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
-            (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
-          }
-          if (msg.role === 'tool' && typeof msg.toolCallId === 'string') {
-            (baseMessage as LlmMessage).toolCallId = msg.toolCallId;
-          }
-          return baseMessage;
-        });
+        // Prepare input messages snapshot for this agent (with multimodal content support)
+        const llmMessages: LlmMessage[] = await Promise.all(
+          messages.map(async (msg): Promise<LlmMessage> => {
+            // Build multimodal content if message has attachments
+            const content = await this.buildMessageContent(msg, starship.id);
+
+            const baseMessage: LlmMessage = {
+              role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+              content,
+              ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
+            };
+            if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+              (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
+            }
+            if (msg.role === 'tool' && typeof msg.toolCallId === 'string') {
+              (baseMessage as LlmMessage).toolCallId = msg.toolCallId;
+            }
+            return baseMessage;
+          })
+        );
         // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
@@ -1966,10 +2069,15 @@ export class ConversationService {
                 const messageType = role === 'tool' ? 'tool_result' : 'agent_response';
                 // For assistant messages, include agent attribution
                 const agent = role === 'assistant' ? this.currentAgentForConversation.get(conversationId) : undefined;
+
+                // Extract string content (LLM responses are always string, not ContentBlock[])
+                const contentString =
+                  typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
+
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,
                   role,
-                  content: lm.content,
+                  content: contentString,
                   messageType,
                   ...(toolCallId ? { toolCallId } : {}),
                   ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),

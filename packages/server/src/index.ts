@@ -18,6 +18,7 @@ import { createServer } from 'http';
 // Route imports
 import agentTemplateRoutes from '@/routes/agent-templates';
 import agentRoutes from '@/routes/agents';
+import attachmentRoutes from '@/routes/attachments';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
 import environmentRoutes from '@/routes/environment';
@@ -90,6 +91,7 @@ app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1', agentRoutes);
 app.use('/api/v1', agentTemplateRoutes);
+app.use('/api/v1', attachmentRoutes);
 app.use('/api/v1', conversationRoutes);
 app.use('/api/v1', environmentRoutes);
 app.use('/api/v1', messageRoutes);

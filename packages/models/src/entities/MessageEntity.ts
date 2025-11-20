@@ -99,6 +99,13 @@ export class MessageEntity implements MessageModel {
   @Length(1, 100)
   agentName?: string;
 
+  // File attachments (array of attachment IDs)
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentIds?: string[];
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

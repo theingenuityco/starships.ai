@@ -10,7 +10,7 @@ import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
-import { Cacheable, CacheableSystemMessage, LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
+import { Cacheable, CacheableSystemMessage, ContentBlock, LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall, MessageContent } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -190,7 +190,7 @@ export class LLM extends BaseNode<LlmParams> {
       //   messages: summarizedMessages,
       // };
 
-      // console.log('>>> REQUEST >>>', JSON.stringify(requestSummary, null, 2));
+      // console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
       // Stream with OpenAI SDK (handles all accumulation reliably)
       const stream = await client.chat.completions.create(requestOptions);
       const llmResponse = await this.processOpenAIStream(stream);
@@ -269,6 +269,11 @@ export class LLM extends BaseNode<LlmParams> {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
 
+    // Helper to get string content (for roles that require string)
+    const getStringContent = (): string => {
+      return typeof contentVal === 'string' ? contentVal : contentVal[0]?.type === 'text' ? contentVal[0].text : '';
+    };
+
     if (role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
       const toolCalls = m.toolCalls.map((tc) => ({
         id: typeof tc.id === 'string' ? tc.id : undefined,
@@ -289,7 +294,7 @@ export class LLM extends BaseNode<LlmParams> {
       }));
       return {
         role: 'assistant',
-        content: contentVal,
+        content: getStringContent(),
         tool_calls: toolCalls,
       } as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
@@ -298,7 +303,7 @@ export class LLM extends BaseNode<LlmParams> {
       const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
       return {
         role: 'tool',
-        content: contentVal,
+        content: getStringContent(),
         tool_call_id: toolCallId,
       } as OpenAI.Chat.ChatCompletionToolMessageParam;
     }
@@ -308,16 +313,20 @@ export class LLM extends BaseNode<LlmParams> {
     if (role === 'system') {
       const message: CacheableSystemMessage = {
         role: 'system',
-        content: [{
-          type: 'text',
-          text: contentVal,
-          cache_control: { type: 'ephemeral' }
-        }]
+        content: [
+          {
+            type: 'text',
+            text: getStringContent(),
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
       };
       return message as OpenAI.Chat.ChatCompletionSystemMessageParam;
     }
 
-    // default user
+    // USER MESSAGE: Support multimodal content (images, etc.)
+    // If content is already an array of ContentBlocks, pass directly
+    // OpenAI SDK supports both string and ContentPart[] for user messages
     return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
   }
 
@@ -333,7 +342,14 @@ export class LLM extends BaseNode<LlmParams> {
       const obj = item as Record<string, unknown>;
 
       const role = (typeof obj.role === 'string' ? obj.role : 'user') as LLMMessageRole;
-      const content = typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content ?? '');
+      // Preserve content as-is if it's a string or array (multimodal content blocks)
+      // Only stringify if it's neither (fallback for unexpected types)
+      const content: MessageContent = 
+        typeof obj.content === 'string' 
+          ? obj.content 
+          : Array.isArray(obj.content) 
+            ? (obj.content as ContentBlock[])
+            : JSON.stringify(obj.content ?? '');
 
       const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : undefined;
 

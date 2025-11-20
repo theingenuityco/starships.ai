@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Doc
- * Fetch a single documentation page by slug via server REST API
+ * Fetch a single documentation page by slug via the internal starships-ai connector.
  */
 export const docsGetDocTool: ToolParams = {
   name: 'Get Doc',
@@ -12,10 +12,6 @@ export const docsGetDocTool: ToolParams = {
 
 Inputs:
 - slug: string (doc slug; nested slugs supported, e.g., "core-concepts/tools")
-
-Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl (must include /api/v1)
-- AUTH_TOKEN: derived from agent.state.authToken (optional for public docs)
 
 Output:
 - { slug: string, title: string, content: string }
@@ -35,59 +31,44 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'prepare',
+        ref: 'validate',
         type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers for GET /docs/:slug',
+        name: 'Validate Input',
+        description: 'Ensure slug is provided and correctly typed',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-
               const slug = ctx.$input && typeof ctx.$input.slug === 'string' ? ctx.$input.slug.trim() : '';
               if (!slug) throw new Error('slug is required');
-
-              const headers = { 'Content-Type': 'application/json' };
-              if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-
-              return {
-                url: baseUrl + '/docs/' + slug.replace(/^\\/+/, ''),
-                method: 'GET',
-                headers,
-              };
+              return { slug };
             }
           `,
-          timeout: 3000,
+          timeout: 2000,
         },
       },
       {
-        ref: 'http_get',
-        type: 'http_request',
-        name: 'Get Doc',
-        description: 'GET /docs/:slug',
+        ref: 'integration_get_doc',
+        type: 'integration',
+        name: 'Get Doc (Starships)',
+        description: 'Fetch documentation page via starships-ai connector',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 5000,
+          connectorSlug: 'starships-ai',
+          operation: 'docs.get',
         },
       },
       {
         ref: 'extract',
         type: 'code',
         name: 'Extract Payload',
-        description: 'Return the server payload (prefer body.data when present)',
+        description: 'Return the connector payload',
         parameters: {
           code: `
             async function main(ctx) {
-              const http = ctx.$input;
-              const body = http && typeof http === 'object' ? http.body : http;
-              if (body && typeof body === 'object' && body.data !== undefined) {
-                return body.data;
+              const payload = ctx.$input;
+              if (payload && typeof payload === 'object' && payload.data !== undefined) {
+                return payload.data;
               }
-              return body;
+              return payload;
             }
           `,
           timeout: 2000,
@@ -104,9 +85,9 @@ Behavior and limits:
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_get' },
-      { ref: 'e3', from: 'http_get', to: 'extract' },
+      { ref: 'e1', from: 'start_1', to: 'validate' },
+      { ref: 'e2', from: 'validate', to: 'integration_get_doc' },
+      { ref: 'e3', from: 'integration_get_doc', to: 'extract' },
       { ref: 'e4', from: 'extract', to: 'end_1' },
     ],
     metadata: {},

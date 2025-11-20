@@ -27,7 +27,8 @@ export type NodeType =
   | 'transform'
   | 'mutate'
   | 'tool'
-  | 'code';
+  | 'code'
+  | 'integration';
 
 /**
  * Base node interface (untyped parameters)

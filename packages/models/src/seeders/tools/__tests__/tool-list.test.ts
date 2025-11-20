@@ -146,20 +146,20 @@ describe('Tool List Tool', () => {
 
     it('should successfully execute with mocked connector response', async () => {
       const tools = [
-        {
-          id: 'tool-1',
-          slug: 'calculator',
-          name: 'Calculator',
-          description: 'Perform mathematical calculations',
-          isEnabled: true,
-        },
-        {
-          id: 'tool-2',
-          slug: 'echo',
-          name: 'Echo',
-          description: 'Echo back the input',
-          isEnabled: true,
-        },
+          {
+            id: 'tool-1',
+            slug: 'calculator',
+            name: 'Calculator',
+            description: 'Perform mathematical calculations',
+            isEnabled: true,
+          },
+          {
+            id: 'tool-2',
+            slug: 'echo',
+            name: 'Echo',
+            description: 'Echo back the input',
+            isEnabled: true,
+          },
       ];
 
       const callConnector = jest.fn(async ({ slug, payload }) => {

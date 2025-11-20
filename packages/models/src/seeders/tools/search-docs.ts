@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Search Docs
- * Query Starships documentation via server REST API
+ * Query Starships documentation via the internal starships-ai connector.
  */
 export const docsSearchTool: ToolParams = {
   name: 'Search Docs',
@@ -13,10 +13,6 @@ export const docsSearchTool: ToolParams = {
 Inputs:
 - q: string (search query; empty returns a lightweight listing)
 - limit?: number (max items to return; default 20)
-
-Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl (must include /api/v1)
-- AUTH_TOKEN: derived from agent.state.authToken (optional for public docs)
 
 Output:
 - { query: string, count: number, results: Array<{ slug, title, excerpt? }>, sourceDir: string }
@@ -38,61 +34,43 @@ Behavior and limits:
       {
         ref: 'prepare',
         type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers for GET /docs?q=...&limit=...',
+        name: 'Prepare Payload',
+        description: 'Normalize query and limit for connector payload',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-
-              const q = ctx.$input && typeof ctx.$input.q === 'string' ? ctx.$input.q : '';
-              const limit = ctx.$input && typeof ctx.$input.limit === 'number' ? ctx.$input.limit : undefined;
-
-              const params = new URLSearchParams();
-              if (q) params.set('q', q);
-              if (typeof limit === 'number') params.set('limit', String(limit));
-
-              const headers = { 'Content-Type': 'application/json' };
-              if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-
-              return {
-                url: baseUrl + '/docs' + (params.toString() ? ('?' + params.toString()) : ''),
-                method: 'GET',
-                headers,
-              };
+              const input = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input : {};
+              const q = typeof input.q === 'string' ? input.q : '';
+              const limit = typeof input.limit === 'number' ? input.limit : undefined;
+              return { q, limit };
             }
           `,
-          timeout: 3000,
+          timeout: 2000,
         },
       },
       {
-        ref: 'http_search',
-        type: 'http_request',
-        name: 'Search Docs',
-        description: 'GET /docs',
+        ref: 'integration_search',
+        type: 'integration',
+        name: 'Search Docs (Starships)',
+        description: 'Search documentation via starships-ai connector',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 5000,
+          connectorSlug: 'starships-ai',
+          operation: 'docs.search',
         },
       },
       {
         ref: 'extract',
         type: 'code',
         name: 'Extract Payload',
-        description: 'Return server payload (prefer body.data when present)',
+        description: 'Return connector payload (prefer data when present)',
         parameters: {
           code: `
             async function main(ctx) {
-              const http = ctx.$input;
-              const body = http && typeof http === 'object' ? http.body : http;
-              if (body && typeof body === 'object' && body.data !== undefined) {
-                return body.data;
+              const payload = ctx.$input;
+              if (payload && typeof payload === 'object' && payload.data !== undefined) {
+                return payload.data;
               }
-              return body;
+              return payload;
             }
           `,
           timeout: 2000,
@@ -110,8 +88,8 @@ Behavior and limits:
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_search' },
-      { ref: 'e3', from: 'http_search', to: 'extract' },
+      { ref: 'e2', from: 'prepare', to: 'integration_search' },
+      { ref: 'e3', from: 'integration_search', to: 'extract' },
       { ref: 'e4', from: 'extract', to: 'end_1' },
     ],
     metadata: {},
@@ -131,5 +109,3 @@ export const docsSearchToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   requiresApiKey: false,
   configurationFields: [],
 };
-
-

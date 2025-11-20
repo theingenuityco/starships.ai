@@ -17,6 +17,10 @@ export interface EnvironmentModel {
   key: string;
   encryptedValue: string;
   description?: string;
+  /**
+   * Optional foreign key to the connector that manages this env var (if any)
+   */
+  connectorId?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -30,6 +34,7 @@ export interface EnvironmentSummary {
   starshipId: string;
   key: string;
   description?: string;
+  connectorId?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;

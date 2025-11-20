@@ -112,24 +112,23 @@ export class ConnectorService {
       throw new Error('Failed to obtain LinkedIn access token');
     }
 
-    // Persist env var for this starship
-    await this.upsertEnvironmentVariable(starshipId, 'LINKEDIN_ACCESS_TOKEN', accessToken, userId);
-
     const metadata: Record<string, unknown> = {
       ...(expiresIn ? { expiresIn } : {}),
       provider: 'linkedin',
     };
 
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'linkedin');
-    if (!existing) {
-      await this.connectorRepository.create({
+    const connector =
+      existing ??
+      (await this.connectorRepository.create({
         starshipId,
         provider: 'linkedin',
         status: 'connected',
         metadata,
         lastError: undefined,
-      });
-    } else {
+      }));
+
+    if (existing) {
       await this.connectorRepository.update(existing.id, {
         status: 'connected',
         metadata: {
@@ -139,6 +138,9 @@ export class ConnectorService {
         lastError: null,
       });
     }
+
+    // Persist env var for this starship and link it to the connector
+    await this.upsertEnvironmentVariable(starshipId, 'LINKEDIN_ACCESS_TOKEN', accessToken, userId, connector.id);
 
     const starship = await this.starshipRepository.findById(starshipId);
 
@@ -380,8 +382,15 @@ export class ConnectorService {
 
   /**
    * Helper to create or update an environment variable with encryption.
+   * Optionally associates the variable with a connector.
    */
-  private async upsertEnvironmentVariable(starshipId: string, key: string, value: string, userId: string): Promise<void> {
+  private async upsertEnvironmentVariable(
+    starshipId: string,
+    key: string,
+    value: string,
+    userId: string,
+    connectorId?: string
+  ): Promise<void> {
     const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
 
     if (!existing) {
@@ -391,6 +400,7 @@ export class ConnectorService {
         value,
         description: `Managed by connector`,
         createdBy: userId,
+        connectorId,
       });
       return;
     }

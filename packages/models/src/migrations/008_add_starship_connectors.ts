@@ -4,10 +4,10 @@ export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    console.log('🚀 Creating starship_connectors table...');
+    console.log('🚀 Creating connectors table...');
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS starship_connectors (
+      CREATE TABLE IF NOT EXISTS connectors (
         id VARCHAR(255) PRIMARY KEY,
         starship_id VARCHAR(255) NOT NULL REFERENCES starships(id) ON DELETE CASCADE,
         provider VARCHAR(50) NOT NULL CHECK (provider IN ('linkedin', 'discord')),
@@ -21,20 +21,20 @@ export async function up(client: Client): Promise<void> {
     `);
 
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_starship_connectors_starship_id
-      ON starship_connectors(starship_id)
+      CREATE INDEX IF NOT EXISTS idx_connectors_starship_id
+      ON connectors(starship_id)
     `);
 
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_starship_connectors_provider
-      ON starship_connectors(provider)
+      CREATE INDEX IF NOT EXISTS idx_connectors_provider
+      ON connectors(provider)
     `);
 
     await client.query('COMMIT');
-    console.log('✅ starship_connectors table created successfully');
+    console.log('✅ connectors table created successfully');
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('❌ Failed to create starship_connectors table:', error);
+    console.error('❌ Failed to create connectors table:', error);
     throw error;
   }
 }
@@ -43,11 +43,11 @@ export async function down(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    console.log('🔄 Dropping starship_connectors table...');
+    console.log('🔄 Dropping connectors table...');
 
-    await client.query('DROP INDEX IF EXISTS idx_starship_connectors_provider');
-    await client.query('DROP INDEX IF EXISTS idx_starship_connectors_starship_id');
-    await client.query('DROP TABLE IF EXISTS starship_connectors');
+    await client.query('DROP INDEX IF EXISTS idx_connectors_provider');
+    await client.query('DROP INDEX IF EXISTS idx_connectors_starship_id');
+    await client.query('DROP TABLE IF EXISTS connectors');
 
     await client.query('COMMIT');
     console.log('✅ starship_connectors table dropped successfully');

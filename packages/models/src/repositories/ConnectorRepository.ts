@@ -17,7 +17,7 @@ export class ConnectorRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
-          'SELECT * FROM starship_connectors WHERE starship_id = $1 ORDER BY provider',
+          'SELECT * FROM connectors WHERE starship_id = $1 ORDER BY provider',
           [starshipId]
         );
 
@@ -37,7 +37,7 @@ export class ConnectorRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM starship_connectors WHERE starship_id = $1 AND provider = $2',
+          'SELECT * FROM connectors WHERE starship_id = $1 AND provider = $2',
           [starshipId, provider]
         );
 
@@ -73,7 +73,7 @@ export class ConnectorRepository extends BaseRepository {
 
         const connectorEntity = toEntityInstance(ConnectorEntity, connectorData);
         const databaseFormat = toDatabase(connectorEntity);
-        const result = await this.createEntity<Record<string, unknown>>('starship_connectors', databaseFormat);
+        const result = await this.createEntity<Record<string, unknown>>('connectors', databaseFormat);
 
         return fromDatabase(ConnectorEntity, result);
       },
@@ -126,13 +126,13 @@ export class ConnectorRepository extends BaseRepository {
         const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
 
         if (Object.keys(filteredUpdateData).length === 0) {
-          const existing = await this.getConnection().queryOne<Record<string, unknown>>('SELECT * FROM starship_connectors WHERE id = $1', [
+          const existing = await this.getConnection().queryOne<Record<string, unknown>>('SELECT * FROM connectors WHERE id = $1', [
             id,
           ]);
           return existing ? fromDatabase(ConnectorEntity, existing) : null;
         }
 
-        const result = await this.updateEntity<Record<string, unknown>>('starship_connectors', id, filteredUpdateData);
+        const result = await this.updateEntity<Record<string, unknown>>('connectors', id, filteredUpdateData);
         return result ? fromDatabase(ConnectorEntity, result) : null;
       },
       'update',
@@ -148,7 +148,7 @@ export class ConnectorRepository extends BaseRepository {
           throw new Error('ID is required for delete operation');
         }
 
-        return await this.deleteEntity('starship_connectors', id);
+        return await this.deleteEntity('connectors', id);
       },
       'delete',
       'Connector',

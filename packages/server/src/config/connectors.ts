@@ -14,7 +14,8 @@ export interface ConnectorCatalogEntry {
  * Static catalog of supported connectors.
  *
  * Secrets for these connectors are always stored in the existing
- * `environments` table and injected into the engine via secureEnv.
+ * `environments` table and consumed exclusively by server-side connector
+ * execution; they are never exposed to workflows or templates.
  */
 export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
   {

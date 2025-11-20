@@ -7,7 +7,8 @@
 import { Engine } from '@/engine/Engine';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { Blueprint, Node } from '@/types';
-// Autopilot credentials are no longer used; secureEnv is passed to Engine
+// Autopilot credentials are no longer stored here; host callbacks/config are
+// passed to Engine by the embedding runtime.
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
@@ -771,7 +772,7 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 

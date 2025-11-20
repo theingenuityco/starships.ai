@@ -79,10 +79,21 @@ export class LLM extends BaseNode<LlmParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    const secureEnv = this.getOptions()?.secureEnv;
-    const apiKey = secureEnv?.OPEN_ROUTER_KEY;
+    const hostCallbacks = this.getOptions()?.hostCallbacks;
+    let apiKey: string | null = null;
+
+    if (hostCallbacks && typeof hostCallbacks.getLlmApiKey === 'function') {
+      apiKey = (await hostCallbacks.getLlmApiKey()) ?? null;
+    }
+
+    // Fallback for isolated runners (child/remote) where host callbacks cannot cross
+    if (!apiKey && typeof process !== 'undefined') {
+      apiKey = process.env.OPENROUTER_API_KEY ?? null;
+    }
     if (!apiKey) {
-      throw this.handleExecutionError(new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY").'));
+      throw this.handleExecutionError(
+        new Error('OpenRouter API key is required. Provide it via the host getLlmApiKey() callback.')
+      );
     }
 
     try {
@@ -809,7 +820,7 @@ export class LLM extends BaseNode<LlmParams> {
       });
     }
 
-    // API key validation moved to runtime via secureEnv only
+    // API key validation moved to runtime via host-level callbacks only
 
     // Parameter range validation using helper methods
     const tempError = this.validateParameterRange(params.temperature, 'Temperature', 0, 2);

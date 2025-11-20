@@ -166,7 +166,9 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                 <h1 className="text-2xl font-bold">Environment & Connectors</h1>
               </div>
               <p className="text-muted-foreground">
-                Manage environment variables and third-party connectors for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
+                Manage environment variables and third-party connectors for <strong>{starship.name}</strong>. These variables will be securely
+                encrypted. Non-secret values may be exposed to workflows as configuration; secrets are only used by the platform when executing
+                connectors and tools.
               </p>
             </div>
 
@@ -235,7 +237,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                   )}
                 </div>
 
-                {/* System environment variables passed into secureEnv */}
+                {/* System environment variables used by the runtime and connectors */}
                 <div className="mt-6">
                   <Card className="frosted-glass-card shadow-frosted-lg">
                     <CardHeader className="pb-1">
@@ -246,8 +248,9 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                     </CardHeader>
                     <CardContent className="p-0">
                       <p className="text-xs text-muted-foreground mt-0 mb-1 px-6 pt-0">
-                        These read-only variables are injected into the workflow runner&apos;s <code className="font-mono text-[11px]">secureEnv</code> for this starship. They can be accessed in
-                        workflows via <code className="font-mono text-[11px]">env('KEY')</code> or <code className="font-mono text-[11px]">envAll()</code>.
+                        These read-only variables indicate which system capabilities are configured for this deployment (for example, base API URL,
+                        LLM provider keys, or Discord bot access). Non-secret values may be surfaced to workflows as configuration; secret values are
+                        never directly readable from workflows and are only used by the platform when calling LLMs or connectors.
                       </p>
 
                       {systemEnvLoading ? (

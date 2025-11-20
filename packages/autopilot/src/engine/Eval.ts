@@ -32,9 +32,9 @@ export interface EvalContext {
   // General-purpose helpers
   $exists: (value: unknown) => boolean;
 
-  // Unified env/secret system (uniform naming across eval and code)
-  env: (key: string) => unknown;
-  envAll: () => Record<string, unknown>;
+  // Non-secret runtime configuration (provided by host)
+  config: (key: string) => unknown;
+  configAll: () => Record<string, unknown>;
 }
 
 /**
@@ -61,7 +61,11 @@ export interface EvalOptions {
 export class Eval {
   private static readonly TEMPLATE_REGEX = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
-  constructor(private readonly secureEnv?: Record<string, string>) {}
+  /**
+   * @param runtimeConfig Non-secret configuration values injected by the host.
+   *                      Secrets MUST NOT be passed here.
+   */
+  constructor(private readonly runtimeConfig?: Record<string, unknown>) {}
 
   /**
    * Normalize/sanitize an extracted JS expression before compiling.
@@ -86,6 +90,8 @@ export class Eval {
    * Build evaluation context from execution state
    */
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
+    const cfg = { ...(this.runtimeConfig ?? {}) };
+
     const context = {
       state: execution.state,
       outputs: execution.results, // Use array format directly
@@ -116,13 +122,13 @@ export class Eval {
       // General-purpose helpers
       $exists: (value: unknown) => value !== undefined && value !== null,
 
-      // Unified env/secret system (uniform naming across eval and code)
-      env: (key: string) => {
+      // Non-secret configuration access
+      config: (key: string) => {
         if (!key || typeof key !== 'string') return undefined;
-        return this.secureEnv?.[key];
+        return cfg[key];
       },
-      envAll: () => {
-        return { ...(this.secureEnv ?? {}) };
+      configAll: () => {
+        return { ...cfg };
       },
     };
 

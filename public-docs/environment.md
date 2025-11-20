@@ -1,12 +1,14 @@
 # Environment Variables in Starships Tools
 
-Use secure environment variables for configuration and secrets throughout your tool blueprints. The runtime injects a secure environment object; you access it differently in template strings vs Code nodes.
+Use environment variables for configuration and secrets throughout your tool blueprints. The runtime exposes **non-secret** configuration to
+workflows and uses **secrets only inside server-side integrations** (LLM calls, connectors, etc.). You access configuration differently in
+template strings vs Code nodes.
 
 ## Quick Reference
 
-- Templates (eval in string): `{{ env('KEY') }}`
-- Code node: `ctx.$env('KEY')`
-- Never log raw secret values; redact or omit in outputs and logs.
+- Templates (eval in string): `{{ config('KEY') }}`
+- Code node: `ctx.$config('KEY')`
+- Never log raw secret values from workflows; they are only used by the platform when calling external services.
 
 ---
 
@@ -18,10 +20,10 @@ Examples:
 
 ```json
 {
-  "url": "{{ env('API_BASE') }}/v1/users/{{ $input('userId') }}",
+  "url": "{{ config('API_BASE') }}/v1/users/{{ $input('userId') }}",
   "headers": {
-    "Authorization": "Bearer {{ env('API_TOKEN') }}",
-    "X-Org": "{{ env('ORG_ID') }}"
+    "Authorization": "Bearer {{ config('API_TOKEN') }}",
+    "X-Org": "{{ config('ORG_ID') }}"
   },
   "body": {
     "source": "starships",
@@ -33,7 +35,7 @@ Examples:
 Rules:
 
 - Full-string only: do not concatenate multiple partial templates.
-- Available helpers include: `env('KEY')`, `$input(path?)`, `$lastOutputOf(ref)`, `Date`, simple expressions/conditionals.
+- Available helpers include: `config('KEY')`, `$input(path?)`, `$lastOutputOf(ref)`, `Date`, simple expressions/conditionals.
 
 Incorrect (partials):
 
@@ -59,13 +61,13 @@ Correct:
 
 ## Code Node (`type: "code"`)
 
-Access env via `ctx.$env('KEY')`. Example:
+Access non-secret config via `ctx.$config('KEY')`. Example:
 
 ```js
 async function main(ctx) {
-  const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\/+$/, '');
+  const baseUrl = (ctx.$config('BASE_URL') || '').replace(/\/+$/, '');
   if (!baseUrl) throw new Error('BASE_URL missing');
-  const token = ctx.$env('API_TOKEN');
+  const token = ctx.$config('API_TOKEN');
   if (!token) throw new Error('API_TOKEN missing');
 
   return {
@@ -84,8 +86,8 @@ async function main(ctx) {
 
 Notes:
 
-- Use `ctx.$env('KEY')` instead of `process.env`.
-- Validate required env early and fail fast with clear errors.
+- Use `ctx.$config('KEY')` instead of `process.env` for non-secret values.
+- Validate required config early and fail fast with clear errors.
 
 ---
 
@@ -95,10 +97,10 @@ Notes:
 {
   "type": "http_request",
   "parameters": {
-    "url": "{{ env('API_BASE') }}/v2/events",
+    "url": "{{ config('API_BASE') }}/v2/events",
     "method": "POST",
     "headers": {
-      "Authorization": "Bearer {{ env('API_TOKEN') }}",
+      "Authorization": "Bearer {{ config('API_TOKEN') }}",
       "Content-Type": "application/json"
     },
     "body": {
@@ -115,40 +117,41 @@ Notes:
 
 ## Best Practices
 
-- Name secrets clearly (e.g., `LINKEDIN_API_TOKEN`, `GITHUB_APP_ID`, `BASE_URL`).
-- Never log/echo the secret values; redact if needed.
+- Name secrets clearly (e.g., `LINKEDIN_ACCESS_TOKEN`, `GITHUB_APP_ID`, `BASE_URL`).
+- Never log/echo secret values from workflows; redact or omit in outputs and logs.
 - Prefer template expressions for headers and URLs; use Code node when you need logic.
-- If a new variable is needed, reference it directly (e.g., `{{ env('NEW_SECRET') }}`) and proceed—no hardcoding defaults.
+- If a new variable is needed, reference it directly in configuration (e.g., `NEW_SECRET`) and let the platform wire it into the appropriate
+  integration; do not hardcode defaults.
 
 ---
 
 ## See Also
 
-- `eval.md`: Template evaluation rules and helpers (`env()`, `$input()`, etc.)
-- `engine.md`: Secure environment design overview
+- `eval.md`: Template evaluation rules and helpers (`config()`, `$input()`, etc.)
+- `engine.md`: Runtime configuration and secret-handling overview
 
 ---
 
 ## Strict Rules
 
 - Always use full-string templates: wrap the entire string in a single `{{ ... }}`. No concatenation around templates.
-- Never access `process.env` directly; use `{{ env('KEY') }}` in templates or `ctx.$env('KEY')` in Code.
-- Do not print secret values. You may log presence/absence or last-4 chars if truly necessary; prefer omitting entirely.
+- Never access `process.env` directly from workflows; server-side integrations own secret usage.
+- Do not print secret values. You may log presence/absence from server-side logs; prefer omitting entirely in workflows.
 - Do not attempt nested templates or multiple passes; evaluation happens once.
 - JSON context must remain valid JSON. Put the entire expression inside the quotes.
 - Keys are case-sensitive. Recommended naming: UPPERCASE letters, digits, and underscores only.
-- Missing env returns `undefined` (templates) or `undefined` (Code). Validate early, fail fast with actionable messages.
+- Missing config returns `undefined` (templates) or `undefined` (Code). Validate early, fail fast with actionable messages.
 - Avoid defaults that hide configuration gaps. If truly required, implement explicit validation and error with guidance.
 
 Allowed helpers inside `{{ ... }}` (non-exhaustive):
 
-- `env('KEY')`, `envAll()`
+- `config('KEY')`, `configAll()`
 - `$input(path?)`, `$lastOutputOf(ref)`
 - `Date`, `Math`, simple ternaries/expressions
 
 Disallowed patterns:
 
-- Partial templates: `"Bearer " + "{{ env('TOKEN') }}"` (evaluate to literal pieces, not supported)
+- Partial templates: `"Bearer " + "{{ config('TOKEN') }}"` (evaluate to literal pieces, not supported)
 - Multi-stage templating: writing template syntax that expects another pass
 - Direct secret echoing in outputs or logs
 

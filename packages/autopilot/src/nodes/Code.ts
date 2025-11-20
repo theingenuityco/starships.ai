@@ -28,6 +28,7 @@ export class Code extends BaseNode<CodeParams> {
 
       // Get execution context for state and other data
       const execution = this.getOptions()?.execution;
+      const runtimeConfig = this.getOptions()?.runtimeConfig || {};
 
       // Create helpers for ctx
       const $lastOutputOf = (ref: string): ExecutionItem[] => {
@@ -45,15 +46,11 @@ export class Code extends BaseNode<CodeParams> {
         }
       };
 
-      // Secure env accessor only (no envAll)
-      const secureEnv = this.getOptions()?.secureEnv || {};
-      const $env = (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined);
-
       // Build ctx surface (prefixed keys)
       const ctx = {
         $input: inputData,
         $state: execution?.state || {},
-        $env,
+        $config: (key: string) => (typeof key === 'string' ? (runtimeConfig as Record<string, unknown>)[key] : undefined),
         $lastOutputOf,
       };
 

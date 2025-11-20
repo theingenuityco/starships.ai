@@ -87,7 +87,10 @@ describe('LLM Node Handler', () => {
       mockCreate.mockResolvedValue(mockStream);
 
       const eventCallback = jest.fn();
-      const llm = new LLM(params, { eventCallback, secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, {
+        eventCallback,
+        hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' },
+      });
 
       const responseItems = await llm.execute();
 
@@ -147,7 +150,7 @@ describe('LLM Node Handler', () => {
 
       mockCreate.mockResolvedValue(mockStream);
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
       await llm.execute();
 
       expect(mockCreate).toHaveBeenCalledWith(
@@ -185,7 +188,7 @@ describe('LLM Node Handler', () => {
 
       mockCreate.mockRejectedValue(new Error('HTTP 401: Unauthorized'));
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
 
       await expect(llm.execute()).rejects.toThrow('HTTP 401: Unauthorized');
     });
@@ -212,7 +215,7 @@ describe('LLM Node Handler', () => {
 
       mockCreate.mockResolvedValue(mockStream);
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
 
       await expect(llm.execute()).rejects.toThrow('LLM streaming execution failed: Stream error');
     });
@@ -243,7 +246,7 @@ describe('LLM Node Handler', () => {
 
       mockCreate.mockResolvedValue(mockStream);
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
       const response = await llm.execute();
 
       // Should recover and process valid chunks
@@ -286,7 +289,7 @@ describe('LLM Node Handler', () => {
         timeout: 500, // Invalid: < 1000
       };
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
       const validation = llm.validate();
 
       expect(validation.valid).toBe(false);
@@ -311,7 +314,7 @@ describe('LLM Node Handler', () => {
       const llm = new LLM(params);
       const validation = llm.validate();
 
-      // Validation should pass; API key is checked at execute-time via secureEnv
+      // Validation should pass; API key is checked at execute-time via host callbacks
       expect(validation.valid).toBe(true);
     });
   });
@@ -348,7 +351,7 @@ describe('LLM Node Handler', () => {
 
       mockCreate.mockResolvedValue(mockStream);
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
       const response = await llm.execute();
 
       const responseData = response[0].json as LLMResponse;
@@ -383,7 +386,7 @@ describe('LLM Node Handler', () => {
 
       mockCreate.mockResolvedValue(mockStream);
 
-      const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
+      const llm = new LLM(params, { hostCallbacks: { getLlmApiKey: () => 'test-api-key-123' } });
       const response = await llm.execute();
 
       const responseData = response[0].json as LLMResponse;

@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: models_list
- * List all available OpenRouter models via the Starships API proxy
+ * List all available OpenRouter models via the internal starships-ai connector.
  */
 export const modelsListTool: ToolParams = {
   name: 'List Models',
@@ -17,10 +17,6 @@ When to use:
 
 Inputs:
 - {} (no arguments)
-
-Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
 
 Output:
   - Array of strings: model IDs (provider/model), e.g., "anthropic/claude-sonnet-4.5"
@@ -46,41 +42,13 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'prepare',
-        type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers for OpenRouter models endpoint',
+        ref: 'integration_models',
+        type: 'integration',
+        name: 'List Models (Starships)',
+        description: 'List models via starships-ai connector',
         parameters: {
-          code: `
-            async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-
-              return {
-                url: String(baseUrl) + '/openrouter/models',
-                method: 'GET',
-                headers: {
-                  'Authorization': 'Bearer ' + String(authToken),
-                  'Content-Type': 'application/json'
-                }
-              };
-            }
-          `,
-          timeout: 3000,
-        },
-      },
-      {
-        ref: 'http_list',
-        type: 'http_request',
-        name: 'Fetch Models',
-        description: 'GET /openrouter/models',
-        parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 10000,
+          connectorSlug: 'starships-ai',
+          operation: 'models.list',
         },
       },
       {
@@ -91,13 +59,10 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              // Input is the HttpResponse from http_list
-              const http = ctx.$input;
-              const body = http && typeof http === 'object' ? http.body : http;
-              // Server sendSuccess returns { data: T }, so prefer body.data when present
-              const data = (body && typeof body === 'object' && Array.isArray(body.data))
-                ? body.data
-                : (Array.isArray(body) ? body : []);
+              const payload = ctx.$input;
+              const data = payload && typeof payload === 'object' && Array.isArray(payload.data)
+                ? payload.data
+                : (Array.isArray(payload) ? payload : []);
 
               // Return only model identifiers (prefer id, fallback to name)
               const ids = (Array.isArray(data) ? data : [])
@@ -120,10 +85,9 @@ Behavior and limits:
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_list' },
-      { ref: 'e3', from: 'http_list', to: 'process' },
-      { ref: 'e4', from: 'process', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'integration_models' },
+      { ref: 'e2', from: 'integration_models', to: 'process' },
+      { ref: 'e3', from: 'process', to: 'end_1' },
     ],
     metadata: {},
   },

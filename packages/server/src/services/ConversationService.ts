@@ -1071,13 +1071,13 @@ export class ConversationService {
       // Use autopilot LLM node directly (no runner/engine).
       // The LLM node reads OPENROUTER_API_KEY from the host environment; we only pass non-secret config here.
       const llm = new LLM({
-        model,
-        messages: [
-          { role: 'system' as const, content: sys },
-          { role: 'user' as const, content: prompt },
-        ],
-        temperature: 0.3,
-        maxTokens: 32,
+          model,
+          messages: [
+            { role: 'system' as const, content: sys },
+            { role: 'user' as const, content: prompt },
+          ],
+          temperature: 0.3,
+          maxTokens: 32,
       });
 
       const items = await llm.execute();

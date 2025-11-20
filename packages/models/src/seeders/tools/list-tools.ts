@@ -38,43 +38,14 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'prepare',
-        type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers',
+        ref: 'integration_list',
+        type: 'integration',
+        name: 'List Tools (Starships)',
+        description: 'List tools via starships-ai connector',
         parameters: {
-          code: `
-            async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-
-              return {
-                url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
-                method: 'GET',
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
-              };
-            }
-          `,
-          timeout: 3000,
-        },
-      },
-      {
-        ref: 'http_list',
-        type: 'http_request',
-        name: 'List Tools',
-        description: 'GET /starships/:starshipId/tools',
-        parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 5000,
+          connectorSlug: 'starships-ai',
+          operation: 'tools.list',
+          // No explicit payload needed for now; connector infers starship context.
         },
       },
       {
@@ -85,13 +56,12 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              // Input is the HttpResponse from http_list (see HttpRequest node contract)
-              const http = ctx.$input;
-              const body = http && typeof http === 'object' ? http.body : http;
-              // Server sendSuccess returns { data: T }, so prefer body.data when present
-              const data = body && typeof body === 'object' && Array.isArray(body.data)
-                ? body.data
-                : (Array.isArray(body) ? body : []);
+              // Expect the connector to return either a bare array of tools
+              // or an object with a data array property.
+              const raw = ctx.$input;
+              const data = raw && typeof raw === 'object' && Array.isArray((raw as any).data)
+                ? (raw as any).data
+                : (Array.isArray(raw) ? raw : []);
 
               // Return a lean summary to avoid leaking large/templated blueprint contents
               return data.map((t) => ({
@@ -116,10 +86,9 @@ Behavior and limits:
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_list' },
-      { ref: 'e3', from: 'http_list', to: 'summarize' },
-      { ref: 'e4', from: 'summarize', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'integration_list' },
+      { ref: 'e2', from: 'integration_list', to: 'summarize' },
+      { ref: 'e3', from: 'summarize', to: 'end_1' },
     ],
     metadata: {},
   },

@@ -299,6 +299,34 @@ export interface CodeParams extends BaseParams {
 }
 
 /**
+ * Integration node parameters for connector-backed capabilities
+ *
+ * This node delegates to the host/server via callConnector(slug, payload)
+ * to perform secret-using operations (LLMs, third-party APIs, internal
+ * Starships APIs, etc.). Workflows only see connector slugs and JSON
+ * payloads/results, never raw secrets.
+ */
+export interface IntegrationParams extends BaseParams {
+  /**
+   * Connector slug to use for this call.
+   * Example: "starships-ai-core", "openrouter-default", "linkedin-main".
+   */
+  connectorSlug: string;
+
+  /**
+   * Logical operation name understood by the connector implementation.
+   * Example: "tools.list", "tools.get", "agents.test", "docs.search".
+   */
+  operation: string;
+
+  /**
+   * Arbitrary JSON payload for the connector. Typically shaped from
+   * $input / $lastOutputOf via templates at the blueprint level.
+   */
+  payload?: unknown;
+}
+
+/**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
@@ -313,7 +341,8 @@ export type NodeParameters =
   | ConditionalParams
   | TransformParams
   | MutateParams
-  | CodeParams;
+  | CodeParams
+  | IntegrationParams;
 
 /**
  * Reducer specification for Mutate node (pure-return only)

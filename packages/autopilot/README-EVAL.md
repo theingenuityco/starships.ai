@@ -139,32 +139,33 @@ Extracts data from input using dot notation:
 }
 ```
 
-### `env(key)` / `envAll()`
+### `config(key)` / `configAll()`
 
-Secure access to environment variables and secrets:
+Access non-secret runtime configuration values provided by the host:
 
 ```javascript
-// Single environment variable
+// Single config value
 {
   {
-    env('API_KEY');
+    config('BASE_URL');
   }
 }
 {
   {
-    env('DATABASE_URL');
+    config('STARSHIP_ID');
   }
 }
 
-// All environment variables
+// All configuration values
 {
   {
-    envAll();
+    configAll();
   }
 }
 ```
 
-**Security**: Environment access is sandboxed and controlled by the execution context.
+**Security**: Only non-secret configuration values are exposed via `config()`. Secrets
+must be used exclusively inside host-level callbacks (e.g. LLM or connector drivers).
 
 ## String Evaluation Modes
 
@@ -183,7 +184,7 @@ The engine supports two string evaluation modes:
 
 // These will NOT be evaluated (returned as-is):
 'Hello {{ name }}!'; // → "Hello {{ name }}!"
-"API: {{ env('URL') }}/data"; // → "API: {{ env('URL') }}/data"
+"API: {{ config('URL') }}/data"; // → "API: {{ config('URL') }}/data"
 ```
 
 ### Allow-Partial Mode (`stringEvaluationMode: 'allow-partial'`, default)
@@ -195,7 +196,7 @@ The engine supports two string evaluation modes:
 // All of these will be evaluated:
 '{{ state.counter }}'; // → 42
 "Hello {{ $input('name') }}!"; // → "Hello Alice!"
-"API: {{ env('URL') }}/data"; // → "API: https://api.example.com/data"
+"API: {{ config('URL') }}/data"; // → "API: https://api.example.com/data"
 ```
 
 ## Common mistakes and how to fix them

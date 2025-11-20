@@ -137,7 +137,7 @@ export class Mutate implements NodeHandler {
 
   private buildReducerContext(input?: ExecutionItem[]): Record<string, unknown> {
     const execution = this.options?.execution;
-    const secureEnv = this.options?.secureEnv || {};
+    const runtimeConfig = this.options?.runtimeConfig || {};
 
     // Helper to access last output of a node within current execution
     const $lastOutputOf = (ref: string): ExecutionItem[] => {
@@ -162,8 +162,8 @@ export class Mutate implements NodeHandler {
       $input: () => inputData,
       $lastOutputOf,
       state: execution?.state || {},
-      env: (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined),
-      envAll: () => ({ ...secureEnv }),
+      config: (key: string) => (typeof key === 'string' ? (runtimeConfig as Record<string, unknown>)[key] : undefined),
+      configAll: () => ({ ...(runtimeConfig as Record<string, unknown>) }),
       // Utilities and safe builtins
       JSON: JSON,
       Math: Math,

@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
+import { NodeHandler, NodeHandlerConstructor, HostCallbacks } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation, ReducerSpec } from '@/types/node-parameters';
@@ -33,20 +33,31 @@ export interface EngineConfig {
   eventCallback?: EventCallback;
   failOnNodeError?: boolean;
   runner?: Runner;
-  secureEnv?: Record<string, string>;
+  /**
+   * Non-secret runtime configuration values that may be safely exposed to
+   * templates and user-authored code (Code/Mutate). Secrets MUST NOT be
+   * placed here.
+   */
+  runtimeConfig?: Record<string, unknown>;
+  /**
+   * Host-level callbacks for secret-using operations (LLM calls, connectors, etc).
+   */
+  hostCallbacks?: HostCallbacks;
 }
 
 export class Engine {
   private eventCallback?: EventCallback;
   private eval: Eval;
   private failOnNodeError: boolean;
-  private secureEnv?: Record<string, string>;
+  private runtimeConfig?: Record<string, unknown>;
+  private hostCallbacks?: HostCallbacks;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
-    this.secureEnv = config.secureEnv;
-    this.eval = new Eval(this.secureEnv);
+    this.runtimeConfig = config.runtimeConfig;
+    this.hostCallbacks = config.hostCallbacks;
+    this.eval = new Eval(this.runtimeConfig);
   }
 
   async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
@@ -59,7 +70,8 @@ export class Engine {
     const handlerOptions = {
       eventCallback: this.eventCallback,
       execution: execution,
-      secureEnv: this.secureEnv,
+      runtimeConfig: this.runtimeConfig,
+      hostCallbacks: this.hostCallbacks,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);
@@ -715,32 +727,9 @@ export class Engine {
         executionDepth: execution.depth ?? 0,
         data: { execution },
       };
-      // Redact any secureEnv values from outgoing events/logs by default
-      const redacted = this.redactSensitive(event);
-      await this.eventCallback(redacted);
+      await this.eventCallback(event);
     } catch (error) {
       console.error('Error in external streaming emitter:', error);
-    }
-  }
-
-  private redactSensitive<T = unknown>(payload: T): T {
-    try {
-      const secretValues = Object.values(this.secureEnv ?? {}).filter((v) => typeof v === 'string' && v.length > 0) as string[];
-      if (secretValues.length === 0) return payload;
-
-      let json = JSON.stringify(payload);
-      for (const value of secretValues) {
-        // Replace all occurrences; keep it simple for now
-        try {
-          const safe = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          json = json.replace(new RegExp(safe, 'g'), '[REDACTED]');
-        } catch {
-          json = json.split(value).join('[REDACTED]');
-        }
-      }
-      return JSON.parse(json) as T;
-    } catch {
-      return payload;
     }
   }
 }

@@ -109,7 +109,7 @@ describe('End-to-End Workflow Execution', () => {
       // Mock LLM API failure
       mockFetch.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
+      const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
 
       await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM');
@@ -411,7 +411,7 @@ describe('End-to-End Workflow Execution', () => {
 
       const eventCallback = jest.fn();
 
-      const engine = new Engine({ eventCallback, secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
+      const engine = new Engine({ eventCallback });
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
@@ -572,7 +572,7 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"approved":true,"post_id":"123"}',
         });
 
-      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
+      const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 

@@ -627,23 +627,21 @@ export class AgentService {
       // 5. Prepare environment variables
       const env = getEnvConfig();
       const baseUrl = `${env.SERVER_URL}/api/v1`;
-      const openRouterKey = env.OPENROUTER_API_KEY || '';
-      const discordBotToken = env.DISCORD_BOT_TOKEN || '';
-      const starshipEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
-
-      const secureEnv: Record<string, string> = {
+      const runtimeConfig: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
-        ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
-        ...(discordBotToken ? { DISCORD_BOT_TOKEN: String(discordBotToken) } : {}),
-        ...starshipEnv,
+      };
+      const openRouterKey = env.OPENROUTER_API_KEY || '';
+      const hostCallbacks = {
+        getLlmApiKey: () => (openRouterKey ? String(openRouterKey) : null),
       };
 
       // 6. Create agent instance and prepare execution
       const agent = new Agent(agentWithTools, {
         eventCallback: onEvent,
-        secureEnv,
+        runtimeConfig,
+        hostCallbacks,
       });
 
       // 7. Execute with runner (same pattern as ConversationService)
@@ -694,7 +692,8 @@ export class AgentService {
 
       await runner.run(blueprint, exec, {
         eventCallback: onEvent,
-        secureEnv,
+        runtimeConfig,
+        hostCallbacks,
       } as any);
 
       console.log('🔍 Post-execution state:', {

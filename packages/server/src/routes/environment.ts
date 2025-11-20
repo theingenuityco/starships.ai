@@ -100,12 +100,12 @@ router.get('/starships/:id/environment/system', jwtAuthMiddleware, async (req: R
     const openRouterKey = env.OPENROUTER_API_KEY || '';
     const discordBotToken = env.DISCORD_BOT_TOKEN || '';
 
-    // This list should mirror the secureEnv keys constructed in ConversationService/AgentService.
+    // This list should mirror the non-secret runtime config keys constructed in ConversationService/AgentService.
     const systemEnv = [
       {
         key: 'STARSHIP_ID',
         present: true,
-        description: 'ID of the current starship, injected automatically into secureEnv.',
+        description: 'ID of the current starship, injected automatically into the runtime configuration.',
       },
       {
         key: 'BASE_URL',
@@ -115,12 +115,12 @@ router.get('/starships/:id/environment/system', jwtAuthMiddleware, async (req: R
       {
         key: 'OPEN_ROUTER_KEY',
         present: !!openRouterKey,
-        description: 'OpenRouter API key used by LLM nodes via secureEnv.OPEN_ROUTER_KEY.',
+        description: 'OpenRouter API key used by LLM integrations via server-side host callbacks only.',
       },
       {
         key: 'DISCORD_BOT_TOKEN',
         present: !!discordBotToken,
-        description: 'Discord bot token used by Discord tools via secureEnv.DISCORD_BOT_TOKEN.',
+        description: 'Discord bot token used by Discord integrations via server-side connectors only.',
       },
     ];
 

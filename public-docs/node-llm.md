@@ -4,7 +4,7 @@ What it is: Streams model outputs via OpenRouter (OpenAI-compatible API) with re
 
 Specification (authoritative)
 - Handler: `packages/autopilot/src/nodes/LLM.ts`
-- Requires secure env `OPEN_ROUTER_KEY` provided via `Engine({ secureEnv })`.
+- Requires an OpenRouter-compatible API key provided by the hosting runtime (for example via environment variables or host callbacks). The key is never exposed to workflows.
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
   - model: string (required) — e.g., "anthropic/claude-3.5-sonnet"
   - messages: array | string (required) — if array, coerced to canonical `LlmMessage[]`; if string with templates, resolved
@@ -106,6 +106,6 @@ Example (chat with tools)
 
 Cross-links
 - See Tool for how tool schemas/blueprints are invoked.
-- See Engine for event delivery and secureEnv handling.
+- See Engine for event delivery and runtime configuration handling.
 
 

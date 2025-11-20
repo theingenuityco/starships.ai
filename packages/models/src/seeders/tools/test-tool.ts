@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Test Tool
- * Fetch a tool by slug from the server and execute its blueprint with provided arguments.
+ * Fetch a tool by slug (via the starships-ai connector) and execute its blueprint with provided arguments.
  * Returns { ok, durationMs, result }.
  */
 export const toolTestTool: ToolParams = {
@@ -11,15 +11,12 @@ export const toolTestTool: ToolParams = {
   slug: 'test-tool',
   description: `Execute another tool by slug and report pass/fail with timing.
 
-  Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
+  Fetch a tool by slug via the internal starships-ai connector and execute its blueprint with provided arguments, reporting pass/fail and duration.
 
   Inputs:
   - targetSlug: string (required)
   - arguments: object (optional; passed as initial input to the target blueprint)
   - timeoutMs: number (optional; default 60000 for the nested run)
-
-  Implicit environment (do not pass):
-  - BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
 
   Output:
   - { ok: boolean, durationMs: number, result: any }
@@ -46,27 +43,23 @@ export const toolTestTool: ToolParams = {
       {
         ref: 'prepare',
         type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
+        name: 'Validate Input',
+        description: 'Validate targetSlug and normalize test arguments',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              const targetSlug = ctx.$input.targetSlug;
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-              if (!targetSlug) throw new Error('targetSlug is required');
-
+              const input = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input : {};
+              const targetSlug = input.targetSlug;
+              if (!targetSlug || typeof targetSlug !== 'string') {
+                throw new Error('targetSlug is required');
+              }
+              const args = input.arguments && typeof input.arguments === 'object' ? input.arguments : {};
+              const timeoutMs = typeof input.timeoutMs === 'number' && input.timeoutMs > 0 ? input.timeoutMs : 60000;
               return {
-                url: \`\${baseUrl}/starships/\${starshipId}/tools/\${targetSlug}\`,
-                method: 'GET',
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json',
-                }
+                slug: targetSlug,
+                arguments: args,
+                timeoutMs,
+                startTime: Date.now(),
               };
             }
           `,
@@ -74,15 +67,13 @@ export const toolTestTool: ToolParams = {
         },
       },
       {
-        ref: 'http_get_tool',
-        type: 'http_request',
-        name: 'Get Tool',
-        description: 'GET /starships/:starshipId/tools/:slug',
+        ref: 'integration_get_tool',
+        type: 'integration',
+        name: 'Get Tool (Starships)',
+        description: 'Fetch tool definition via starships-ai connector',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 8000,
+          connectorSlug: 'starships-ai',
+          operation: 'tools.get',
         },
       },
       {
@@ -93,19 +84,20 @@ export const toolTestTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const httpResult = ctx.$lastOutputOf("http_get_tool")[0].json;
-              const toolDef = httpResult.body?.data || httpResult.body;
+              const integrationResult = ctx.$lastOutputOf("integration_get_tool")[0]?.json ?? {};
+              const toolDef = integrationResult;
               
               if (!toolDef || !toolDef.blueprint) {
                 throw new Error('Tool definition missing or invalid blueprint');
               }
               
-              const testArgs = ctx.$lastOutputOf("__initial__")[0].json.arguments || {};
+              const prepared = ctx.$lastOutputOf("prepare")[0].json || {};
+              const testArgs = prepared.arguments || {};
               
               return {
                 toolDef,
                 testArgs,
-                startTime: Date.now()
+                startTime: prepared.startTime || Date.now()
               };
             }
           `,
@@ -158,8 +150,8 @@ export const toolTestTool: ToolParams = {
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_get_tool' },
-      { ref: 'e3', from: 'http_get_tool', to: 'prepare_test' },
+      { ref: 'e2', from: 'prepare', to: 'integration_get_tool' },
+      { ref: 'e3', from: 'integration_get_tool', to: 'prepare_test' },
       { ref: 'e4', from: 'prepare_test', to: 'emit_args' },
       { ref: 'e5', from: 'emit_args', to: 'run_tool' },
       { ref: 'e6', from: 'run_tool', to: 'end_1' },

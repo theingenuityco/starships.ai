@@ -19,7 +19,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY! } });
+const engine = new Engine();
 const exec = ExecutionItemUtils.createExecution();
 // First run partially:
 await engine.executeBlueprint(blueprint, exec);

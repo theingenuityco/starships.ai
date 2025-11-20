@@ -42,7 +42,8 @@ export function useEnvironmentVariables(starshipId: string, enabled: boolean = t
 }
 
 /**
- * Get system-level environment variables that are injected into the workflow runner's secureEnv.
+ * Get system-level environment variables that are exposed to the Autopilot runtime
+ * as non-secret configuration (e.g. BASE_URL, STARSHIP_ID, LLM provider keys).
  */
 export function useSystemEnvironmentVariables(starshipId: string, enabled: boolean = true) {
   return useQuery({

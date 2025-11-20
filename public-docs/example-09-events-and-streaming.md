@@ -33,7 +33,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ eventCallback, secureEnv: { OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY! } });
+const engine = new Engine({ eventCallback });
 const exec = ExecutionItemUtils.createExecution();
 await engine.executeBlueprint(blueprint, exec);
 

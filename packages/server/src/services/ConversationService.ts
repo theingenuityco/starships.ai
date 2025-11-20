@@ -25,6 +25,7 @@ import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
+import { StarshipsIntegrationService } from '@/services/StarshipsIntegrationService';
 
 // Debug flags
 const DEBUG_TOOLCALLS = false;
@@ -64,6 +65,7 @@ export class ConversationService {
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
+  private starshipsIntegrationService!: StarshipsIntegrationService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
@@ -145,6 +147,7 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
+    this.starshipsIntegrationService = new StarshipsIntegrationService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
 
@@ -703,14 +706,27 @@ export class ConversationService {
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const rawAuth = ctx?.authorization ?? '';
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
-      const openRouterKey = env.OPENROUTER_API_KEY || '';
       const runtimeConfig: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
       };
-      const hostCallbacks = {
-        getLlmApiKey: () => (openRouterKey ? String(openRouterKey) : null),
+
+      // Connector invocation hook passed down into Autopilot Engine.
+      // For now we support internal Starships capabilities via the
+      // slugged "starships-ai" connector.
+      const callConnector = async ({
+        slug,
+        payload,
+      }: {
+        slug: string;
+        payload: Record<string, unknown>;
+      }): Promise<unknown> => {
+        if (slug === 'starships-ai') {
+          return await this.starshipsIntegrationService.execute(starship.id, payload);
+        }
+
+        throw new Error(`Unsupported connector slug: ${slug}`);
       };
 
       // Orchestrate sequentially with mention-based handoffs
@@ -766,7 +782,7 @@ export class ConversationService {
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
           runtimeConfig,
-          hostCallbacks,
+          callConnector,
         });
 
         const baselineCount = messages.length;
@@ -776,7 +792,7 @@ export class ConversationService {
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeConfig,
-          hostCallbacks,
+          callConnector,
         } as any;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
@@ -1037,12 +1053,6 @@ export class ConversationService {
   private async generateConversationTitle(starshipId: string, conversationId: string, userContent: string): Promise<string | null> {
     try {
       const env = getEnvConfig();
-      const openRouterKey = env.OPENROUTER_API_KEY || '';
-      if (!openRouterKey) {
-        console.warn('[TITLE] OPENROUTER_API_KEY missing; skipping title generation');
-        return null;
-      }
-
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
@@ -1058,19 +1068,17 @@ export class ConversationService {
         .replace(/\n+/g, ' ')
         .slice(0, 400)}"\n\nReturn only the title text.`;
 
-      // Use autopilot LLM node directly (no runner/engine). Secure env provides API key.
-      const llm = new LLM(
-        {
-          model,
-          messages: [
-            { role: 'system' as const, content: sys },
-            { role: 'user' as const, content: prompt },
-          ],
-          temperature: 0.3,
-          maxTokens: 32,
-        },
-        { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
-      );
+      // Use autopilot LLM node directly (no runner/engine).
+      // The LLM node reads OPENROUTER_API_KEY from the host environment; we only pass non-secret config here.
+      const llm = new LLM({
+        model,
+        messages: [
+          { role: 'system' as const, content: sys },
+          { role: 'user' as const, content: prompt },
+        ],
+        temperature: 0.3,
+        maxTokens: 32,
+      });
 
       const items = await llm.execute();
       const res = (items?.[0]?.json || {}) as {

@@ -14,7 +14,7 @@ Reducer ctx (available keys)
 - $input(): same as input
 - $lastOutputOf(ref): latest `ExecutionItem[]` for ref within current execution
 - state: current execution.state (object)
-- env(key), envAll(): access non-secret runtime configuration provided to Engine
+- env(key): access non-secret runtime configuration provided to Engine
 - JSON, Math, Date; console shim for log/error/warn
 - Dangerous globals blocked: setTimeout, setInterval, require, process, global, eval, Function
 

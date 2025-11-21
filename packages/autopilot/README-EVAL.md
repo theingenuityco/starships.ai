@@ -139,7 +139,7 @@ Extracts data from input using dot notation:
 }
 ```
 
-### `env(key)` / `envAll()`
+### `env(key)`
 
 Access non-secret runtime configuration values provided by the host:
 
@@ -153,13 +153,6 @@ Access non-secret runtime configuration values provided by the host:
 {
   {
     env('STARSHIP_ID');
-  }
-}
-
-// All environment values
-{
-  {
-    envAll();
   }
 }
 ```

@@ -22,7 +22,6 @@ Context (`EvalContext`)
   - $input(path?: string): unknown — returns input or a path-derived value when provided
   - $exists(value: unknown): boolean
   - env(key: string): unknown — secure env lookup
-  - envAll(): Record<string, unknown> — full secure env object
 
 Notable behaviors
 
@@ -36,7 +35,7 @@ Validation
 
 Security
 
-- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via provided helpers (`env`/`envAll`) and does not inherit untrusted globals.
+- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via the provided `env()` helper and does not inherit untrusted globals.
 
 Cross-links
 

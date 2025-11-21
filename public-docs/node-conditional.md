@@ -12,7 +12,7 @@ Specification (authoritative)
 Evaluation rules
 - If condition is string and contains templates, Eval resolves it with access to:
   - state, outputs, status, currentNodeRef, input
-  - helpers: `$lastOutputOf(nodeRef)`, `$input(path?)`, `$exists(value)`, `env(key)`, `envAll()`
+  - helpers: `$lastOutputOf(nodeRef)`, `$input(path?)`, `$exists(value)`, `env(key)`
 - Result mapping → `edgeCondition`:
   - null/undefined => `edgeCondition` omitted
   - boolean => `'true'` or `'false'`

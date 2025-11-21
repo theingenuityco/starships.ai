@@ -19,8 +19,6 @@ Inputs:
 - slug (required): Agent slug to fetch
 
 Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
 - STARSHIP_ID: derived from agent.state.starshipId
 
 Output:

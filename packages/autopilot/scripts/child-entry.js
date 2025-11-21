@@ -18,6 +18,10 @@
 let isParentReady = false;
 let eventBuffer = [];
 
+// HostRuntime HTTP bridging
+let nextHttpRequestId = 1;
+const pendingHttpRequests = new Map();
+
 function safeSend(msg) {
   try {
     if (process.send) {
@@ -47,6 +51,17 @@ function flushEventBuffer() {
   }
 }
 
+function createHostRuntimeBridge() {
+  return {
+    http: (request) =>
+      new Promise((resolve, reject) => {
+        const id = nextHttpRequestId++;
+        pendingHttpRequests.set(id, { resolve, reject });
+        safeSend({ type: 'host_http', id, request });
+      }),
+  };
+}
+
 process.on('message', async (msg) => {
   if (!msg || typeof msg !== 'object') return;
 
@@ -54,6 +69,21 @@ process.on('message', async (msg) => {
   if (msg.type === 'parent_ready') {
     isParentReady = true;
     flushEventBuffer();
+    return;
+  }
+
+  // Handle HostRuntime HTTP results from parent
+  if (msg.type === 'host_http_result') {
+    const entry = pendingHttpRequests.get(msg.id);
+    if (!entry) {
+      return;
+    }
+    pendingHttpRequests.delete(msg.id);
+    if (msg.error) {
+      entry.reject(new Error(String(msg.error)));
+    } else {
+      entry.resolve(msg.response);
+    }
     return;
   }
 
@@ -78,11 +108,12 @@ process.on('message', async (msg) => {
 
     const { Engine } = require('../engine/Engine.js');
 
-    // Bridge event callback to parent
+    // Bridge event callback to parent and hostRuntime HTTP via IPC
     const bridgedConfig = Object.assign({}, config, {
       eventCallback: async (event) => {
         safeSend({ type: 'event', event });
       },
+      hostRuntime: createHostRuntimeBridge(),
     });
 
     const engine = new Engine(bridgedConfig);

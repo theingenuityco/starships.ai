@@ -29,8 +29,6 @@ Apply partial updates to any agent by providing its slug. Supports updating indi
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- **BASE_URL**: API server endpoint
-- **AUTH_TOKEN**: Authentication token
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response & Behavior

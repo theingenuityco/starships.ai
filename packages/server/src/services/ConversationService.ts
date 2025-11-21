@@ -709,8 +709,6 @@ export class ConversationService {
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
       const runtimeConfig: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
-        BASE_URL: baseUrl,
-        ...(authToken ? { AUTH_TOKEN: authToken } : {}),
       };
 
       const hostRuntime: HostRuntime = {

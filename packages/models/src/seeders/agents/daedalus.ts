@@ -36,8 +36,8 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 - Stop when tests pass and the description, parameters, and blueprint are stable.
 - Env quick ref: Code → ctx.$env('KEY'); Templates → {{ env('KEY') }}; never log/echo secrets; validate required env and fail fast.
 - Templates quick rule: compute the entire value within one {{ ... }}; no concatenation or nested templates; JSON must remain valid.
-- Prefer templates for URLs/headers; use Code node for logic; normalize BASE_URL by stripping trailing slashes before concatenation.
-- Use runtime env only (BASE_URL, AUTH_TOKEN, STARSHIP_ID, etc.); never process.env; reference new vars directly (e.g., env('LINKEDIN_API_TOKEN')).
+- Prefer templates for URLs/headers; use Code node for logic; normalize any API base URLs by stripping trailing slashes before concatenation.
+- Use runtime env only (e.g., STARSHIP_ID and connector-managed keys); never process.env; reference new vars directly (e.g., env('LINKEDIN_API_TOKEN')).
 - HttpRequest body: do not set \`parameters.body\` via string templates (e.g. "{{ $input }}"); templates stringify. Either omit \`body\` and pass an object from a Code node upstream, or set a literal object.
 - HttpRequest chaining: an HttpRequest returns a wrapper { status, statusText, headers, body, url }. Use Transform/Code to forward only \`body\` to the next HttpRequest if needed.
 - Initial arguments: immediately after \`start\`, read args from \`ctx.$input\`; from later nodes use \`ctx.$lastOutputOf('__initial__')[0]?.json\`. Do not assume args live in \`ctx.$state\`.

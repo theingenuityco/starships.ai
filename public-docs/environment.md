@@ -65,13 +65,14 @@ Access non-secret env via `ctx.$env('KEY')`. Example:
 
 ```js
 async function main(ctx) {
-  const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\/+$/, '');
-  if (!baseUrl) throw new Error('BASE_URL missing');
+  const baseUrl = ctx.$env('API_BASE_URL');
   const token = ctx.$env('API_TOKEN');
+
+  if (!baseUrl) throw new Error('API_BASE_URL missing');
   if (!token) throw new Error('API_TOKEN missing');
 
   return {
-    url: baseUrl + '/v1/resource',
+    url: baseUrl.replace(/\/+$/, '') + '/v1/resource',
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + token,
@@ -157,20 +158,20 @@ Disallowed patterns:
 
 ---
 
-## Built-in Environment Keys (Provided by runtime)
+## Example Environment Keys
 
-Some tools rely on standard variables supplied by the Starships runtime:
+Some tools rely on standard variables supplied by the Starships runtime or your own configuration:
 
-- `BASE_URL`: API base, typically including `/api/v1` (trim trailing slashes when composing)
-- `AUTH_TOKEN`: Bearer token for authenticated internal API calls
-- `STARSHIP_ID`: Current starship identifier
+- `STARSHIP_ID`: Current starship identifier (injected by the platform)
+- `API_BASE_URL`: API base for your own services (you configure this)
+- `API_TOKEN`: Bearer token for authenticated internal API calls (you configure this)
 
 Usage examples:
 
-- Templates: `"{{ env('BASE_URL') }}/starships/{{ env('STARSHIP_ID') }}/tools"`
-- Code: `const token = ctx.$env('AUTH_TOKEN'); if (!token) throw new Error('AUTH_TOKEN missing');`
+- Templates: `"{{ env('API_BASE_URL') }}/starships/{{ env('STARSHIP_ID') }}/tools"`
+- Code: `const token = ctx.$env('API_TOKEN'); if (!token) throw new Error('API_TOKEN missing');`
 
-Do not hardcode these; reference them via env.
+Do not hardcode these; reference them via env where appropriate.
 
 ---
 
@@ -215,8 +216,8 @@ Do not hardcode these; reference them via env.
 ## Common Pitfalls and Fixes
 
 - Trailing slashes in URLs
-  - Pitfall: `"{{ env('BASE_URL') }}/endpoint"` where `BASE_URL` already ends with `/`
-  - Fix (Code): `const base = (ctx.$env('BASE_URL') || '').replace(/\/+$/, '');`
+  - Pitfall: `"{{ env('API_BASE_URL') }}/endpoint"` where `API_BASE_URL` already ends with `/`
+  - Fix (Code): `const base = (ctx.$env('API_BASE_URL') || '').replace(/\/+$/, '');`
   - Or adjust input values to avoid double slashes.
 
 - Logging secrets

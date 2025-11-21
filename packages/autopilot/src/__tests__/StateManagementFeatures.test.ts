@@ -8,30 +8,27 @@
 import { Engine } from '../engine/Engine';
 import { ExecutionItemUtils } from '../utils/ExecutionItemUtils';
 import { Blueprint } from '../types';
+import type { HostRuntime } from '../types/node-handler';
 
-// Mock fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+let hostRuntime: HostRuntime;
+let httpMock: jest.Mock;
 
 describe('State Management Features', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Setup mock fetch
-    const mockHeaders = new Map([['content-type', 'application/json']]);
-    mockHeaders.forEach = jest.fn((callback) => {
-      callback('application/json', 'content-type', mockHeaders);
-    });
-
-    mockFetch.mockResolvedValue({
-      ok: true,
+    // Default HostRuntime HTTP mock that returns a basic JSON body
+    httpMock = jest.fn(async ({ url }) => ({
       status: 200,
       statusText: 'OK',
-      url: 'https://api.example.com/test',
-      headers: mockHeaders,
-      json: async () => ({ success: true }),
-      text: async () => '{"success":true}',
-    });
+      headers: { 'content-type': 'application/json' },
+      body: { success: true, url },
+      url,
+    }));
+
+    hostRuntime = {
+      http: httpMock as HostRuntime['http'],
+    };
   });
 
   describe('Template Resolution', () => {
@@ -97,6 +94,7 @@ describe('State Management Features', () => {
 
       const engine = new Engine({
         eventCallback: async () => {},
+        hostRuntime,
       });
       const execution = ExecutionItemUtils.createExecution();
       execution.state = { apiToken: 'abc123token' };
@@ -190,6 +188,7 @@ describe('State Management Features', () => {
 
       const engine = new Engine({
         eventCallback: async () => {},
+        hostRuntime,
       });
       const execution = ExecutionItemUtils.createExecution();
 
@@ -348,7 +347,7 @@ describe('State Management Features', () => {
         ],
         metadata: {},
       };
-      const engine = new Engine();
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 

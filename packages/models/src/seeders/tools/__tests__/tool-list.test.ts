@@ -11,11 +11,13 @@ import type { ExecutionItem, NodeHandlerOptions, Edge, HostRuntime } from '@star
 function createMockResponse(
   body: unknown,
   {
+    ok = true,
     status = 200,
     statusText = 'OK',
     url = 'https://api.test.com/starships/test-starship-123/tools',
     headers = {},
   }: {
+    ok?: boolean;
     status?: number;
     statusText?: string;
     url?: string;
@@ -23,6 +25,7 @@ function createMockResponse(
   } = {}
 ) {
   return {
+    ok,
     status,
     statusText,
     headers: headers ?? {},

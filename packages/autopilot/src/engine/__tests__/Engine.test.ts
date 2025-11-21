@@ -7,6 +7,7 @@
 import { Engine } from '../Engine';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { Blueprint, NodeType } from '@/types';
+import type { HostRuntime } from '@/types/node-handler';
 
 // Test utilities
 const createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
@@ -177,11 +178,14 @@ describe('Engine', () => {
         metadata: {},
       };
 
-      // Mock fetch to reject with network error
-      global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+      // Mock HostRuntime HTTP to reject with network error
+      const httpMock = jest.fn().mockRejectedValue(new Error('Network error'));
+      const hostRuntime: HostRuntime = {
+        http: httpMock as HostRuntime['http'],
+      };
 
       const eventCallback = jest.fn();
-      const engine = new Engine({ eventCallback });
+      const engine = new Engine({ eventCallback, hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
 
       await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow();

@@ -155,7 +155,7 @@ export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   blueprint: agentUnassignToolTool.blueprint,
 
   slug: 'unassign-agent-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
   requiresApiKey: false,

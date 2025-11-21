@@ -181,7 +181,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolEditTool.blueprint,
 
   slug: 'edit-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,

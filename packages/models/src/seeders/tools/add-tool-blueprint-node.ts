@@ -222,7 +222,7 @@ export const toolAddBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' | 'c
   blueprint: toolAddBlueprintNodeTool.blueprint,
 
   slug: 'add-tool-blueprint-node',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage:
     '{ "toolSlug": "my-tool", "node": { "ref": "process", "type": "code", "name": "Process Data", "parameters": { "code": "return input;" } } }',

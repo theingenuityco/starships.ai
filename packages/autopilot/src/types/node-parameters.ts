@@ -57,7 +57,8 @@ export interface UserPromptChoice {
 
 /**
  * HTTP request node parameters for making HTTP calls
- * Fully compatible with fetch RequestInit structure
+ * Fully compatible with fetch RequestInit structure at the surface, but
+ * execution is delegated to the host runtime (HostRuntime.http).
  */
 export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'> {
   // Required URL (not part of RequestInit as it's the first parameter to fetch)
@@ -65,6 +66,13 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
 
   // Overriding body to make it a string or object
   body?: Record<string, unknown> | string | null;
+
+  /**
+   * Optional connector slug to execute this HTTP request through. When
+   * provided, the host runtime may resolve connector records and inject
+   * secrets/policies before performing the request.
+   */
+  connectorSlug?: string;
 
   // Custom properties for convenience
   timeout?: number;

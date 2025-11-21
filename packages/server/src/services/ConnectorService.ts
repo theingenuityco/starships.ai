@@ -187,12 +187,17 @@ export class ConnectorService {
         };
       }
 
-      // Virtual connector entry for providers without a persisted record yet
+      // Virtual connector entry for providers without a persisted record yet.
+      // For Starships, treat the connector as always available for the current
+      // starship; it reuses the platform's JWT + SERVER_URL and does not
+      // require additional managed env vars.
+      const status = entry.provider === 'starships' ? 'connected' : 'disconnected';
+
       return {
         id: `${starshipId}:${entry.provider}`,
         starshipId,
         provider: entry.provider,
-        status: 'disconnected',
+        status,
         metadata: {},
         lastError: undefined,
         createdAt: now,

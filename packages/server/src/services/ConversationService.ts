@@ -20,6 +20,7 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
+import type { HostRuntime } from '@starships/autopilot';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
@@ -712,21 +713,73 @@ export class ConversationService {
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
       };
 
-      // Connector invocation hook passed down into Autopilot Engine.
-      // For now we support internal Starships capabilities via the
-      // slugged "starships-ai" connector.
-      const callConnector = async ({
-        slug,
-        payload,
-      }: {
-        slug: string;
-        payload: Record<string, unknown>;
-      }): Promise<unknown> => {
-        if (slug === 'starships-ai') {
-          return await this.starshipsIntegrationService.execute(starship.id, payload);
-        }
+      const hostRuntime: HostRuntime = {
+        http: async ({ method, url, headers = {}, body, timeoutMs, connectorSlug }) => {
+          const controller = new AbortController();
+          const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        throw new Error(`Unsupported connector slug: ${slug}`);
+          try {
+            const finalMethod = method.toUpperCase();
+            const init: RequestInit = {
+              method: finalMethod,
+              headers: headers as HeadersInit,
+              signal: controller.signal,
+            };
+
+            if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
+              if (typeof body === 'string') {
+                init.body = body;
+              } else if (body && typeof body === 'object') {
+                init.body = JSON.stringify(body);
+                (init.headers as Record<string, string>) =
+                  typeof init.headers === 'object' && !Array.isArray(init.headers)
+                    ? { 'content-type': 'application/json', ...(init.headers as Record<string, string>) }
+                    : { 'content-type': 'application/json' };
+              }
+            }
+
+            // NOTE: connectorSlug is currently a hint; future versions can
+            // route via connector records instead of direct HTTP.
+            // For now we treat all HTTP uniformly and rely on URL/auth headers.
+
+            const resp = await fetch(url, init);
+            const contentType = resp.headers.get('content-type') || '';
+            let responseBody: unknown;
+            if (contentType.includes('application/json')) {
+              try {
+                responseBody = await resp.json();
+              } catch {
+                responseBody = await resp.text();
+              }
+            } else {
+              responseBody = await resp.text();
+            }
+
+            const responseHeaders: Record<string, unknown> = {};
+            resp.headers.forEach((value, key) => {
+              responseHeaders[key] = value;
+            });
+
+            return {
+              status: resp.status,
+              statusText: resp.statusText,
+              headers: responseHeaders,
+              body: responseBody,
+              url: resp.url,
+            };
+          } catch (error) {
+            const reason =
+              controller.signal.aborted && !(error instanceof Error)
+                ? `timeout after ${timeout}ms`
+                : error instanceof Error
+                  ? error.message
+                  : 'Unknown error';
+            throw new Error(`HTTP request failed: ${method.toUpperCase()} ${url} -> ${reason}`);
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        },
       };
 
       // Orchestrate sequentially with mention-based handoffs

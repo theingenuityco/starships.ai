@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Doc
- * Fetch a single documentation page by slug via the internal starships-ai connector.
+ * Fetch a single documentation page by slug via the Starships HTTP API.
  */
 export const docsGetDocTool: ToolParams = {
   name: 'Get Doc',
@@ -47,13 +47,17 @@ Behavior and limits:
         },
       },
       {
-        ref: 'integration_get_doc',
-        type: 'integration',
+        ref: 'http_get_doc',
+        type: 'http_request',
         name: 'Get Doc (Starships)',
-        description: 'Fetch documentation page via starships-ai connector',
+        description: 'Fetch documentation page via Starships docs HTTP API',
         parameters: {
-          connectorSlug: 'starships-ai',
-          operation: 'docs.get',
+          method: 'GET',
+          url: '{{ $runtimeConfig.BASE_URL }}/docs/{{ $lastOutputOf("validate")[0].json.slug }}',
+          headers: {
+            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
+          },
+          timeout: 5000,
         },
       },
       {
@@ -64,9 +68,10 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const payload = ctx.$input;
-              if (payload && typeof payload === 'object' && payload.data !== undefined) {
-                return payload.data;
+              const raw = ctx.$input;
+              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
+              if (payload && typeof payload === 'object' && (payload as any).data !== undefined) {
+                return (payload as any).data;
               }
               return payload;
             }
@@ -86,8 +91,8 @@ Behavior and limits:
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'validate' },
-      { ref: 'e2', from: 'validate', to: 'integration_get_doc' },
-      { ref: 'e3', from: 'integration_get_doc', to: 'extract' },
+      { ref: 'e2', from: 'validate', to: 'http_get_doc' },
+      { ref: 'e3', from: 'http_get_doc', to: 'extract' },
       { ref: 'e4', from: 'extract', to: 'end_1' },
     ],
     metadata: {},
@@ -107,5 +112,3 @@ export const docsGetDocToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   requiresApiKey: false,
   configurationFields: [],
 };
-
-

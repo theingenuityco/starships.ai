@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Test Tool
- * Fetch a tool by slug (via the starships-ai connector) and execute its blueprint with provided arguments.
+ * Fetch a tool by slug via the Starships HTTP API and execute its blueprint with provided arguments.
  * Returns { ok, durationMs, result }.
  */
 export const toolTestTool: ToolParams = {
@@ -11,7 +11,7 @@ export const toolTestTool: ToolParams = {
   slug: 'test-tool',
   description: `Execute another tool by slug and report pass/fail with timing.
 
-  Fetch a tool by slug via the internal starships-ai connector and execute its blueprint with provided arguments, reporting pass/fail and duration.
+  Fetch a tool by slug via the Starships HTTP API and execute its blueprint with provided arguments, reporting pass/fail and duration.
 
   Inputs:
   - targetSlug: string (required)
@@ -67,13 +67,17 @@ export const toolTestTool: ToolParams = {
         },
       },
       {
-        ref: 'integration_get_tool',
-        type: 'integration',
+        ref: 'http_get_tool',
+        type: 'http_request',
         name: 'Get Tool (Starships)',
-        description: 'Fetch tool definition via starships-ai connector',
+        description: 'Fetch tool definition via Starships tools HTTP API',
         parameters: {
-          connectorSlug: 'starships-ai',
-          operation: 'tools.get',
+          method: 'GET',
+          url: '{{ $runtimeConfig.BASE_URL }}/starships/{{ $runtimeConfig.STARSHIP_ID }}/tools/{{ $lastOutputOf("prepare")[0].json.slug }}',
+          headers: {
+            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
+          },
+          timeout: 5000,
         },
       },
       {
@@ -84,8 +88,10 @@ export const toolTestTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const integrationResult = ctx.$lastOutputOf("integration_get_tool")[0]?.json ?? {};
-              const toolDef = integrationResult;
+              const httpResult = ctx.$lastOutputOf("http_get_tool")[0]?.json ?? {};
+              const toolDef = httpResult && typeof httpResult === 'object' && (httpResult as any).body
+                ? (httpResult as any).body
+                : httpResult;
               
               if (!toolDef || !toolDef.blueprint) {
                 throw new Error('Tool definition missing or invalid blueprint');
@@ -150,8 +156,8 @@ export const toolTestTool: ToolParams = {
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'integration_get_tool' },
-      { ref: 'e3', from: 'integration_get_tool', to: 'prepare_test' },
+      { ref: 'e2', from: 'prepare', to: 'http_get_tool' },
+      { ref: 'e3', from: 'http_get_tool', to: 'prepare_test' },
       { ref: 'e4', from: 'prepare_test', to: 'emit_args' },
       { ref: 'e5', from: 'emit_args', to: 'run_tool' },
       { ref: 'e6', from: 'run_tool', to: 'end_1' },

@@ -37,6 +37,17 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
     optionalEnvKeys: [],
     docsSlug: '/public-docs/environment#discord-connector',
   },
+  {
+    provider: 'starships',
+    displayName: 'Starships',
+    description:
+      'Use the Starships API itself (tools, docs, models, etc.) as a connector-backed capability for this starship.',
+    authType: 'oauth2',
+    // Starships connector reuses the platform\'s existing JWT + SERVER_URL; no extra env keys are required.
+    requiredEnvKeys: [],
+    optionalEnvKeys: [],
+    docsSlug: '/public-docs/environment#starships-connector',
+  },
 ];
 
 export function getConnectorCatalog(): ConnectorCatalogEntry[] {

@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
+import { NodeHandler, NodeHandlerConstructor, HostRuntime } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation, ReducerSpec } from '@/types/node-parameters';
@@ -41,15 +41,12 @@ export interface EngineConfig {
    */
   runtimeConfig?: Record<string, unknown>;
   /**
-   * Connector invocation hook for secret-using operations (LLM calls,
-   * third-party APIs, internal Starships APIs, etc).
-   *
-   * Engine passes this through to node handlers; the embedding runtime/server
-   * is responsible for looking up connector records by slug, injecting
-   * credentials, performing the external call, and returning a sanitized
-   * JSON result. Workflows and templates never see raw secrets.
+   * Host runtime surface for side-effecting operations (HTTP, etc.).
+   * Autopilot delegates to this interface instead of talking to the network
+   * or connectors directly. The embedding host is responsible for resolving
+   * connectors, injecting secrets, enforcing policies, and performing calls.
    */
-  callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
+  hostRuntime?: HostRuntime;
 }
 
 export class Engine {
@@ -57,13 +54,13 @@ export class Engine {
   private eval: Eval;
   private failOnNodeError: boolean;
   private runtimeConfig?: Record<string, unknown>;
-  private callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
+  private hostRuntime?: HostRuntime;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
     this.runtimeConfig = config.runtimeConfig;
-    this.callConnector = config.callConnector;
+    this.hostRuntime = config.hostRuntime;
     this.eval = new Eval(this.runtimeConfig);
   }
 
@@ -78,7 +75,7 @@ export class Engine {
       eventCallback: this.eventCallback,
       execution: execution,
       runtimeConfig: this.runtimeConfig,
-      callConnector: this.callConnector,
+      hostRuntime: this.hostRuntime,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);

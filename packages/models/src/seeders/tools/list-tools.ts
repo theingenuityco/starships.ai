@@ -60,10 +60,12 @@ Behavior and limits:
               // Expect the HTTP node to return a response object with { status, headers, body, url }.
               // The body may be a bare array of tools or an object with a data array property.
               const raw = ctx.$input;
-              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
 
-              const data = payload && typeof payload === 'object' && Array.isArray((payload as any).data)
-                ? (payload as any).data
+              const isObject = payload && typeof payload === 'object';
+              const data = isObject && Array.isArray(payload.data)
+                ? payload.data
                 : (Array.isArray(payload) ? payload : []);
 
               // Return a lean summary to avoid leaking large/templated blueprint contents

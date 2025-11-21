@@ -89,9 +89,8 @@ export const toolTestTool: ToolParams = {
           code: `
             async function main(ctx) {
               const httpResult = ctx.$lastOutputOf("http_get_tool")[0]?.json ?? {};
-              const toolDef = httpResult && typeof httpResult === 'object' && (httpResult as any).body
-                ? (httpResult as any).body
-                : httpResult;
+              const hasBody = httpResult && typeof httpResult === 'object' && Object.prototype.hasOwnProperty.call(httpResult, 'body');
+              const toolDef = hasBody ? httpResult.body : httpResult;
               
               if (!toolDef || !toolDef.blueprint) {
                 throw new Error('Tool definition missing or invalid blueprint');

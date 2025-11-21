@@ -63,9 +63,11 @@ Behavior and limits:
           code: `
             async function main(ctx) {
               const raw = ctx.$input;
-              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
-              const data = payload && typeof payload === 'object' && Array.isArray((payload as any).data)
-                ? (payload as any).data
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+              const isObject = payload && typeof payload === 'object';
+              const data = isObject && Array.isArray(payload.data)
+                ? payload.data
                 : (Array.isArray(payload) ? payload : []);
 
               // Return only model identifiers (prefer id, fallback to name)

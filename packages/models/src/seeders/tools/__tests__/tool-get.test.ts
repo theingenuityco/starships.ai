@@ -5,54 +5,33 @@
 
 import { toolGetTool, toolGetToolTemplate } from '../get-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
+import type { ExecutionItem, HostRuntime, NodeHandlerOptions } from '@starships/autopilot';
 
-// Helper to create a realistic Fetch Response-like object for our HttpRequest node
-function createMockResponse(
+// Helper to create a realistic HostRuntime HTTP response for our HttpRequest node
+function createMockHttpResponse(
   body: unknown,
   {
-    ok = true,
     status = 200,
     statusText = 'OK',
-    contentType = 'application/json; charset=utf-8',
-    url = 'https://api.test.com/starships/test-starship/tools/calc',
-    extraHeaders = {},
+    url = '/starships/self/tools/calc',
+    headers = {},
   }: {
-    ok?: boolean;
     status?: number;
     statusText?: string;
-    contentType?: string;
     url?: string;
-    extraHeaders?: Record<string, string>;
+    headers?: Record<string, unknown>;
   } = {}
 ) {
-  const headersMap: Record<string, string> = { 'content-type': contentType, ...extraHeaders };
   return {
-    ok,
     status,
     statusText,
     url,
-    headers: {
-      get: (name: string) => headersMap[name.toLowerCase()] ?? null,
-      forEach: (cb: (value: string, key: string) => void) => {
-        for (const [k, v] of Object.entries(headersMap)) cb(v, k);
-      },
-    },
-    json: async () => body,
-    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    headers,
+    body,
   };
 }
 
 describe('Tool Get Tool', () => {
-  beforeEach(() => {
-    // Mock fetch globally for HTTP requests
-    global.fetch = jest.fn() as unknown as jest.Mock;
-  });
-
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
-
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
       expect(toolGetTool.name).toBe('Get Tool');
@@ -96,10 +75,11 @@ describe('Tool Get Tool', () => {
   });
 
   describe('Real Tool Execution', () => {
-    async function executeToolWithMockConfig(input: unknown, mockConfig: Record<string, string>) {
+    async function executeToolWithMockRuntime(input: unknown, hostRuntime: HostRuntime) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        runtimeConfig: mockConfig,
+        runtimeConfig: {},
+        hostRuntime,
         execution: ExecutionItemUtils.createExecution(),
       };
 
@@ -117,40 +97,18 @@ describe('Tool Get Tool', () => {
       return ExecutionItemUtils.unwrapSingle(result);
     }
 
-    it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockConfig({ slug: 'calc' }, {})).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('baseUrl is required'),
-      });
-    });
-
-    it('should fail without auth token', async () => {
-      const cfg = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 'test-starship' };
-      await expect(executeToolWithMockConfig({ slug: 'calc' }, cfg as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('authToken is required'),
-      });
-    });
-
-    it('should fail without starship ID', async () => {
-      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockConfig({ slug: 'calc' }, cfg as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('starshipId is required'),
-      });
-    });
-
     it('should fail when slug is missing', async () => {
-      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockConfig({}, cfg)).resolves.toMatchObject({
+      const hostRuntime: HostRuntime = {
+        http: jest.fn(async () => createMockHttpResponse({})) as HostRuntime['http'],
+      };
+
+      await expect(executeToolWithMockRuntime({}, hostRuntime)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('slug is required'),
       });
     });
 
     it('should successfully fetch tool by slug with mocked API response', async () => {
-      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'mock-auth-token', STARSHIP_ID: 'test-starship' };
-
       const apiPayload = {
         data: {
           id: 'tool-1',
@@ -162,52 +120,42 @@ describe('Tool Get Tool', () => {
         },
       };
 
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(apiPayload));
+      const httpMock = jest.fn(async ({ method, url, connectorSlug }) => {
+        expect(method).toBe('GET');
+        expect(connectorSlug).toBe('starships');
+        expect(url).toBe('/starships/self/tools/calc');
 
-      const result = await executeToolWithMockConfig({ slug: 'calc' }, cfg);
+        return createMockHttpResponse(apiPayload, {
+          url: 'https://api.test.com/starships/test-starship/tools/calc',
+        });
+      }) as HostRuntime['http'];
+
+      const hostRuntime: HostRuntime = { http: httpMock };
+
+      const result = await executeToolWithMockRuntime({ slug: 'calc' }, hostRuntime);
 
       expect(result).toBeDefined();
       const tool = result as { id: string; slug: string; name: string };
       expect(tool.slug).toBe('calc');
       expect(tool.name).toBe('Calculator');
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.test.com/starships/test-starship/tools/calc',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer mock-auth-token',
-            'Content-Type': 'application/json',
-          }),
-        })
-      );
-    });
-
-    it('should handle trailing slashes in BASE_URL', async () => {
-      const cfg = { BASE_URL: 'https://api.example.com///', AUTH_TOKEN: 'abc', STARSHIP_ID: 'ship-1' };
-
-      const apiPayload = { data: { id: 't', slug: 'calc', name: 'Calculator', blueprint: { nodes: [], edges: [] } } };
-      (global.fetch as jest.Mock).mockImplementation(async () =>
-        createMockResponse(apiPayload, { url: 'https://api.example.com/starships/ship-1/tools/calc' })
-      );
-
-      await executeToolWithMockConfig({ slug: 'calc' }, cfg);
-
-      expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/starships/ship-1/tools/calc', expect.any(Object));
+      expect(httpMock).toHaveBeenCalledTimes(1);
     });
 
     it('should handle HTTP errors gracefully', async () => {
-      const cfg = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
+      const httpMock = jest.fn(async ({ url }) =>
+        createMockHttpResponse(
+          { error: 'Not Found' },
+          {
+            status: 404,
+            statusText: 'Not Found',
+            url,
+          }
+        )
+      ) as HostRuntime['http'];
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: async () => ({ error: 'Not Found' }),
-        text: async () => JSON.stringify({ error: 'Not Found' }),
-      });
+      const hostRuntime: HostRuntime = { http: httpMock };
 
-      await expect(executeToolWithMockConfig({ slug: 'missing' }, cfg)).resolves.toMatchObject({
+      await expect(executeToolWithMockRuntime({ slug: 'missing' }, hostRuntime)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('404 Not Found'),
       });
@@ -223,9 +171,8 @@ describe('Tool Get Tool', () => {
 
       const params = (node?.parameters || {}) as { code?: string };
       expect(params.code).toBeDefined();
-      expect(params.code).toContain("method: 'GET'");
-      expect(params.code).toContain('Authorization');
       expect(params.code).toContain('slug');
+      expect(params.code).toContain('slug is required and must be a string');
     });
 
     it('should configure HTTP node correctly', () => {
@@ -235,8 +182,10 @@ describe('Tool Get Tool', () => {
       const params = (http?.parameters || {}) as Record<string, unknown>;
       expect(params.url).toBeDefined();
       expect(params.method).toBeDefined();
-      expect(params.headers).toBeDefined();
       expect(params.timeout).toBeDefined();
+      expect(params.method).toBe('GET');
+      expect(params.url).toBe('{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.slug }}');
+      expect(params.connectorSlug).toBe('starships');
     });
   });
 });

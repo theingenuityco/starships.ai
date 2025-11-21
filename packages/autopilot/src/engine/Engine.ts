@@ -27,7 +27,6 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   mutate: () => import('@/nodes/Mutate').then((m) => m.Mutate as NodeHandlerConstructor),
   tool: () => import('@/nodes/Tool').then((m) => m.Tool as NodeHandlerConstructor),
   code: () => import('@/nodes/Code').then((m) => m.Code as NodeHandlerConstructor),
-  integration: () => import('@/nodes/Integration').then((m) => m.Integration as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {

@@ -33,8 +33,6 @@ IMPORTANT: Use "List Models" tool first to discover available models before crea
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- BASE_URL: API server endpoint
-- AUTH_TOKEN: Authentication token
 - STARSHIP_ID: Current starship identifier
 
 ## Response & Behavior

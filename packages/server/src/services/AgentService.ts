@@ -629,8 +629,6 @@ export class AgentService {
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const runtimeConfig: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
-        BASE_URL: baseUrl,
-        ...(authToken ? { AUTH_TOKEN: authToken } : {}),
       };
 
       // 6. Create agent instance and prepare execution

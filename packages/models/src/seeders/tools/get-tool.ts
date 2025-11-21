@@ -31,10 +31,10 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'validate',
+        ref: 'prepare',
         type: 'code',
-        name: 'Validate Input',
-        description: 'Ensure slug is provided and correctly typed',
+        name: 'Prepare Request',
+        description: 'Validate slug and prepare relative URL for Starships connector',
         parameters: {
           code: `
             async function main(ctx) {
@@ -56,11 +56,30 @@ Behavior and limits:
         description: 'Fetch tool definition via Starships tools HTTP API',
         parameters: {
           method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
-          // and resolve the current starship.
-          url: '/starships/self/tools/{{ $lastOutputOf("validate")[0].json.slug }}',
+          // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1 and inject auth.
+          url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
           connectorSlug: 'starships',
           timeout: 5000,
+        },
+      },
+      {
+        ref: 'extract',
+        type: 'code',
+        name: 'Extract Payload',
+        description: 'Return the connector payload body (preferring data when present)',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const raw = ctx.$input;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+                return payload.data;
+              }
+              return payload;
+            }
+          `,
+          timeout: 2000,
         },
       },
       {
@@ -69,14 +88,15 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("http_get")[0].json.body }}',
+          output: '{{ $lastOutputOf("extract")[0].json }}',
         },
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'validate' },
-      { ref: 'e2', from: 'validate', to: 'http_get' },
-      { ref: 'e3', from: 'http_get', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'prepare' },
+      { ref: 'e2', from: 'prepare', to: 'http_get' },
+      { ref: 'e3', from: 'http_get', to: 'extract' },
+      { ref: 'e4', from: 'extract', to: 'end_1' },
     ],
     metadata: {},
   },

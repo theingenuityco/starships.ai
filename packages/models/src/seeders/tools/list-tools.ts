@@ -42,7 +42,7 @@ Behavior and limits:
         description: 'List tools via Starships HTTP API',
         parameters: {
           method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
+          // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1, inject auth,
           // and resolve the current starship.
           url: '/starships/self/tools',
           connectorSlug: 'starships',

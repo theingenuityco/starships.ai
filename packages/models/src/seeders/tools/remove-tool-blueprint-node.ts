@@ -75,7 +75,7 @@ export const toolRemoveBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' |
   blueprint: blueprintRemoveNodeTool.blueprint,
 
   slug: 'remove-tool-blueprint-node',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "nodeRef": "old_node" }',
   requiresApiKey: false,

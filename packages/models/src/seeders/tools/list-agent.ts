@@ -119,7 +119,7 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentListTool.blueprint,
 
   slug: 'list-agent',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

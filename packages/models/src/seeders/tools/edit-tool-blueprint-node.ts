@@ -80,7 +80,7 @@ export const toolEditBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' | '
   blueprint: blueprintEditNodeTool.blueprint,
 
   slug: 'edit-tool-blueprint-node',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "toolSlug": "my-tool", "nodeRef": "process", "updates": { "name": "Process Data" } }',
   requiresApiKey: false,

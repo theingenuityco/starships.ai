@@ -156,7 +156,7 @@ export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'create
   blueprint: agentAssignToolTool.blueprint,
 
   slug: 'assign-agent-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
   requiresApiKey: false,

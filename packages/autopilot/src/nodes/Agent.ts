@@ -289,7 +289,7 @@ export class Agent implements NodeHandler {
         eventCallback: this.options?.eventCallback,
         failOnNodeError: false,
         runtimeConfig: this.options?.runtimeConfig,
-        callConnector: this.options?.callConnector,
+        hostRuntime: this.options?.hostRuntime,
       };
 
       // Execute using runner chosen by current execution depth

@@ -38,14 +38,50 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'integration_list',
-        type: 'integration',
-        name: 'List Tools (Starships)',
-        description: 'List tools via starships-ai connector',
+        ref: 'prepare',
+        type: 'code',
+        name: 'Prepare HTTP Request',
+        description: 'Prepare request metadata using runtime configuration',
         parameters: {
-          connectorSlug: 'starships-ai',
-          operation: 'tools.list',
-          // No explicit payload needed for now; connector infers starship context.
+          code: `
+            async function main(ctx) {
+              const baseUrl = ctx.$config ? ctx.$config('BASE_URL') : undefined;
+              const authToken = ctx.$config ? ctx.$config('AUTH_TOKEN') : undefined;
+              const starshipId = ctx.$config ? ctx.$config('STARSHIP_ID') : undefined;
+
+              if (!baseUrl || !authToken || !starshipId) {
+                throw new Error('Missing required runtime configuration for tools.list');
+              }
+
+              return {
+                baseUrl,
+                authToken,
+                starshipId,
+                request: {
+                  method: 'GET',
+                  url: baseUrl + '/starships/' + starshipId + '/tools',
+                  headers: {
+                    Authorization: 'Bearer ' + authToken,
+                  },
+                },
+              };
+            }
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'http_list',
+        type: 'http_request',
+        name: 'List Tools (HTTP)',
+        description: 'List tools via Starships HTTP API',
+        parameters: {
+          method: 'GET',
+          url: '{{ $runtimeConfig.BASE_URL }}/starships/{{ $runtimeConfig.STARSHIP_ID }}/tools',
+          headers: {
+            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
+          },
+          timeout: 5000,
         },
       },
       {
@@ -56,12 +92,14 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              // Expect the connector to return either a bare array of tools
-              // or an object with a data array property.
+              // Expect the HTTP node to return a response object with { status, headers, body, url }.
+              // The body may be a bare array of tools or an object with a data array property.
               const raw = ctx.$input;
-              const data = raw && typeof raw === 'object' && Array.isArray((raw as any).data)
-                ? (raw as any).data
-                : (Array.isArray(raw) ? raw : []);
+              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
+
+              const data = payload && typeof payload === 'object' && Array.isArray((payload as any).data)
+                ? (payload as any).data
+                : (Array.isArray(payload) ? payload : []);
 
               // Return a lean summary to avoid leaking large/templated blueprint contents
               return data.map((t) => ({
@@ -86,8 +124,9 @@ Behavior and limits:
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'integration_list' },
-      { ref: 'e2', from: 'integration_list', to: 'summarize' },
+      { ref: 'e1', from: 'start_1', to: 'prepare' },
+      { ref: 'e2', from: 'prepare', to: 'http_list' },
+      { ref: 'e3', from: 'http_list', to: 'summarize' },
       { ref: 'e3', from: 'summarize', to: 'end_1' },
     ],
     metadata: {},

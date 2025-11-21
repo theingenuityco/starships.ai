@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Tool
- * Get full tool details (including blueprint) by slug for the specified starship using the starships-ai connector.
+ * Get full tool details (including blueprint) by slug for the specified starship using the Starships HTTP API.
  */
 export const toolGetTool: ToolParams = {
   name: 'Get Tool',
@@ -50,13 +50,17 @@ Behavior and limits:
         },
       },
       {
-        ref: 'integration_get',
-        type: 'integration',
+        ref: 'http_get',
+        type: 'http_request',
         name: 'Get Tool (Starships)',
-        description: 'Fetch tool definition via starships-ai connector',
+        description: 'Fetch tool definition via Starships tools HTTP API',
         parameters: {
-          connectorSlug: 'starships-ai',
-          operation: 'tools.get',
+          method: 'GET',
+          url: '{{ $runtimeConfig.BASE_URL }}/starships/{{ $runtimeConfig.STARSHIP_ID }}/tools/{{ $lastOutputOf("validate")[0].json.slug }}',
+          headers: {
+            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
+          },
+          timeout: 5000,
         },
       },
       {
@@ -65,14 +69,14 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("integration_get")[0].json }}',
+          output: '{{ $lastOutputOf("http_get")[0].json.body }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'validate' },
-      { ref: 'e2', from: 'validate', to: 'integration_get' },
-      { ref: 'e3', from: 'integration_get', to: 'end_1' },
+      { ref: 'e2', from: 'validate', to: 'http_get' },
+      { ref: 'e3', from: 'http_get', to: 'end_1' },
     ],
     metadata: {},
   },

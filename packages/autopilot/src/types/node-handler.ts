@@ -20,6 +20,39 @@ export interface NodeHandler {
   validate(): ValidationResult;
 }
 
+/**
+ * HostRuntime
+ *
+ * Typed surface provided by the embedding host/server to perform side-effecting
+ * operations (HTTP, etc.). Workflows never talk to the network directly; they
+ * delegate via this interface so the host can own secrets, policies, and
+ * observability.
+ */
+export interface HostRuntime {
+  /**
+   * HTTP execution entrypoint.
+   *
+   * All HTTP performed by Autopilot nodes should flow through this method.
+   * When connectorSlug is provided, the host may resolve connector records,
+   * inject secrets, and apply connector-specific policies before performing
+   * the actual request.
+   */
+  http(request: {
+    method: string;
+    url: string;
+    headers?: Record<string, unknown>;
+    body?: unknown;
+    timeoutMs?: number;
+    connectorSlug?: string;
+  }): Promise<{
+    status: number;
+    statusText: string;
+    headers: Record<string, unknown>;
+    body: unknown;
+    url: string;
+  }>;
+}
+
 export interface NodeHandlerOptions {
   eventCallback?: EventCallback;
   execution?: Execution;
@@ -30,14 +63,13 @@ export interface NodeHandlerOptions {
    * execution.
    */
   runtimeConfig?: Record<string, unknown>;
-
   /**
-   * Generic connector invocation hook.
-   *
-   * Autopilot does not know how connectors are stored or what secrets they
-   * use. The host/server is responsible for looking up connector configuration
-   * by slug, injecting credentials, performing the external call, and
-   * returning a sanitized JSON result. Workflows never see secrets directly.
+   * Host-provided runtime surface for side-effecting operations (HTTP, etc.).
+   * This replaces the legacy callConnector hook with a typed interface.
+   */
+  hostRuntime?: HostRuntime;
+  /**
+   * @deprecated Legacy generic connector hook. Prefer HostRuntime instead.
    */
   callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
 }

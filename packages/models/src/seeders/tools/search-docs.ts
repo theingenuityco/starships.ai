@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Search Docs
- * Query Starships documentation via the internal starships-ai connector.
+ * Query Starships documentation via the Starships HTTP API.
  */
 export const docsSearchTool: ToolParams = {
   name: 'Search Docs',
@@ -49,13 +49,17 @@ Behavior and limits:
         },
       },
       {
-        ref: 'integration_search',
-        type: 'integration',
+        ref: 'http_search',
+        type: 'http_request',
         name: 'Search Docs (Starships)',
-        description: 'Search documentation via starships-ai connector',
+        description: 'Search documentation via Starships docs HTTP API',
         parameters: {
-          connectorSlug: 'starships-ai',
-          operation: 'docs.search',
+          method: 'GET',
+          url: '{{ $runtimeConfig.BASE_URL }}/docs?q={{ $lastOutputOf("prepare")[0].json.q }}&limit={{ $lastOutputOf("prepare")[0].json.limit }}',
+          headers: {
+            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
+          },
+          timeout: 5000,
         },
       },
       {
@@ -66,9 +70,10 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const payload = ctx.$input;
-              if (payload && typeof payload === 'object' && payload.data !== undefined) {
-                return payload.data;
+              const raw = ctx.$input;
+              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
+              if (payload && typeof payload === 'object' && (payload as any).data !== undefined) {
+                return (payload as any).data;
               }
               return payload;
             }
@@ -88,8 +93,8 @@ Behavior and limits:
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'integration_search' },
-      { ref: 'e3', from: 'integration_search', to: 'extract' },
+      { ref: 'e2', from: 'prepare', to: 'http_search' },
+      { ref: 'e3', from: 'http_search', to: 'extract' },
       { ref: 'e4', from: 'extract', to: 'end_1' },
     ],
     metadata: {},

@@ -8,7 +8,7 @@
 // CONNECTOR TYPES
 // ============================================================================
 
-export type ConnectorProvider = 'linkedin' | 'discord';
+export type ConnectorProvider = 'linkedin' | 'discord' | 'starships';
 
 export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
@@ -74,5 +74,3 @@ export interface StartOAuthRequest {
 export interface StartOAuthResponse {
   authorizationUrl: string;
 }
-
-

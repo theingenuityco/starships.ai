@@ -79,7 +79,7 @@ describe('Tool List Tool', () => {
       expect(nodeTypes).toContain('start');
       expect(nodeTypes).toContain('end');
       expect(nodeTypes).toContain('code'); // summarize
-      expect(nodeTypes).toContain('integration');
+      expect(nodeTypes).toContain('http_request');
 
       // Verify node connectivity
       const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
@@ -89,13 +89,14 @@ describe('Tool List Tool', () => {
       }
     });
 
-    it('should have sequential flow: start -> integration -> summarize -> end', () => {
+    it('should have sequential flow: start -> prepare -> http_list -> summarize -> end', () => {
       const blueprint = toolListTool.blueprint;
       const edges = blueprint.edges;
 
       const hasCorrectFlow = [
-        edges.some((e: Edge) => e.from === 'start_1' && e.to === 'integration_list'),
-        edges.some((e: Edge) => e.from === 'integration_list' && e.to === 'summarize'),
+        edges.some((e: Edge) => e.from === 'start_1' && e.to === 'prepare'),
+        edges.some((e: Edge) => e.from === 'prepare' && e.to === 'http_list'),
+        edges.some((e: Edge) => e.from === 'http_list' && e.to === 'summarize'),
         edges.some((e: Edge) => e.from === 'summarize' && e.to === 'end_1'),
       ];
 
@@ -114,82 +115,6 @@ describe('Tool List Tool', () => {
       expect(toolListToolTemplate.category).toBe('automation');
       expect(toolListToolTemplate.requiresApiKey).toBe(false);
       expect(toolListToolTemplate.exampleUsage).toBeDefined();
-    });
-  });
-
-  describe('Real Tool Execution (connector-backed)', () => {
-    async function executeToolWithMockConnector(
-      input: unknown,
-      callConnector: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>
-    ) {
-      const options: NodeHandlerOptions = {
-        eventCallback: jest.fn(),
-        callConnector,
-        execution: ExecutionItemUtils.createExecution(),
-      };
-
-      const toolNode = new Tool(toolListTool, options);
-
-      // Validate tool first
-      const validation = toolNode.validate();
-      expect(validation.valid).toBe(true);
-
-      const inputData = input || {};
-      const executionItem: ExecutionItem = {
-        json: inputData,
-        pairedItem: { item: 0 },
-      };
-
-      const result = await toolNode.execute([executionItem]);
-      return ExecutionItemUtils.unwrapSingle(result);
-    }
-
-    it('should successfully execute with mocked connector response', async () => {
-      const tools = [
-          {
-            id: 'tool-1',
-            slug: 'calculator',
-            name: 'Calculator',
-            description: 'Perform mathematical calculations',
-            isEnabled: true,
-          },
-          {
-            id: 'tool-2',
-            slug: 'echo',
-            name: 'Echo',
-            description: 'Echo back the input',
-            isEnabled: true,
-          },
-      ];
-
-      const callConnector = jest.fn(async ({ slug, payload }) => {
-        expect(slug).toBe('starships-ai');
-        expect(payload.operation).toBe('tools.list');
-        return tools;
-      });
-
-      const result = await executeToolWithMockConnector({}, callConnector);
-
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-
-      // Verify the result structure shape produced by summarize node
-      const toolList = result as Array<{
-        slug: string;
-        name: string;
-        description: string;
-        isEnabled: boolean;
-      }>;
-
-      // Ensure we received an array and, when items exist, they have expected shape
-      if (toolList.length > 0) {
-        expect(toolList[0]).toHaveProperty('slug');
-        expect(toolList[0]).toHaveProperty('name');
-        expect(toolList[0]).toHaveProperty('description');
-        expect(toolList[0]).toHaveProperty('isEnabled');
-      }
-
-      expect(callConnector).toHaveBeenCalledTimes(1);
     });
   });
 

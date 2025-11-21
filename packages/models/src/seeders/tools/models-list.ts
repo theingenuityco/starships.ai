@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: models_list
- * List all available OpenRouter models via the internal starships-ai connector.
+ * List all available OpenRouter models via the Starships HTTP API.
  */
 export const modelsListTool: ToolParams = {
   name: 'List Models',
@@ -42,13 +42,17 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'integration_models',
-        type: 'integration',
+        ref: 'http_models',
+        type: 'http_request',
         name: 'List Models (Starships)',
-        description: 'List models via starships-ai connector',
+        description: 'List models via Starships OpenRouter proxy API',
         parameters: {
-          connectorSlug: 'starships-ai',
-          operation: 'models.list',
+          method: 'GET',
+          url: '{{ $runtimeConfig.BASE_URL }}/openrouter/models',
+          headers: {
+            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
+          },
+          timeout: 10000,
         },
       },
       {
@@ -59,9 +63,10 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const payload = ctx.$input;
-              const data = payload && typeof payload === 'object' && Array.isArray(payload.data)
-                ? payload.data
+              const raw = ctx.$input;
+              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
+              const data = payload && typeof payload === 'object' && Array.isArray((payload as any).data)
+                ? (payload as any).data
                 : (Array.isArray(payload) ? payload : []);
 
               // Return only model identifiers (prefer id, fallback to name)
@@ -85,8 +90,8 @@ Behavior and limits:
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'integration_models' },
-      { ref: 'e2', from: 'integration_models', to: 'process' },
+      { ref: 'e1', from: 'start_1', to: 'http_models' },
+      { ref: 'e2', from: 'http_models', to: 'process' },
       { ref: 'e3', from: 'process', to: 'end_1' },
     ],
     metadata: {},

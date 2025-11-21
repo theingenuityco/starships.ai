@@ -70,13 +70,6 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               const input = ctx.$input || {};
               if (!input.slug) {
                 throw new Error('slug is required');
@@ -98,14 +91,8 @@ Automatically inferred from agent state (do not pass manually):
               }
 
               return {
-                baseUrl,
-                starshipId,
                 slug: input.slug,
                 body,
-                headers: {
-                  'Authorization': 'Bearer ' + authToken,
-                  'Content-Type': 'application/json'
-                }
               };
             }
           `,
@@ -116,11 +103,11 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'fetch_tool',
         type: 'http_request',
         name: 'Fetch Tool by Slug',
-        description: 'GET /starships/:starshipId/tools/:slug to resolve tool ID',
+        description: 'GET /starships/self/tools/:slug to resolve tool ID',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },
@@ -142,9 +129,7 @@ Automatically inferred from agent state (do not pass manually):
               const prep = ctx.$lastOutputOf('prepare')[0].json;
 
               return {
-                url: prep.baseUrl + '/tools/' + toolData.id,
-                method: 'PUT',
-                headers: prep.headers,
+                toolId: String(toolData.id),
                 body: prep.body
               };
             }
@@ -158,10 +143,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Update Tool',
         description: 'PUT /tools/:id with partial updates',
         parameters: {
-          url: '{{ $lastOutputOf("prepare_update")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare_update")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare_update")[0].json.headers }}',
+          url: '{{ "/tools/" + $lastOutputOf("prepare_update")[0].json.toolId }}',
+          method: 'PUT',
           body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
+          connectorSlug: 'starships',
           timeout: 10000,
         },
       },

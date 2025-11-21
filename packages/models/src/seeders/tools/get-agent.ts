@@ -47,27 +47,15 @@ Behavior and limits:
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL and headers',
+        description: 'Validate inputs',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               const slug = ctx.$input && ctx.$input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
               return {
-                url: baseUrl + '/starships/' + String(starshipId) + '/agents/' + String(slug),
-                method: 'GET',
-                headers: {
-                  'Authorization': 'Bearer ' + String(authToken),
-                  'Content-Type': 'application/json'
-                }
+                slug: String(slug)
               };
             }
           `,
@@ -80,9 +68,9 @@ Behavior and limits:
         name: 'Get Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          method: 'GET',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },

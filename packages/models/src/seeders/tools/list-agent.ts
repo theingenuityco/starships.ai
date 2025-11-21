@@ -39,24 +39,12 @@ Behavior and limits:
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL and headers',
+        description: 'Validate inputs',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-
               return {
-                url: \`\${baseUrl}/starships/\${starshipId}/agents\`,
-                method: 'GET',
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
+                ok: true
               };
             }
           `,
@@ -69,9 +57,9 @@ Behavior and limits:
         name: 'List Agents',
         description: 'GET /starships/:starshipId/agents',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          url: '/starships/self/agents',
+          method: 'GET',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },

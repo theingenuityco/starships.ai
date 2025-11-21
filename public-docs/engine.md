@@ -71,7 +71,7 @@ Edge selection algorithm (detailed)
 
 Runtime configuration and secrets
 
-- Non-secret configuration is provided via `Engine({ runtimeConfig })` and is exposed to templates/code as `config('KEY')` / `ctx.$config('KEY')`.
+- Non-secret configuration is provided via `Engine({ runtimeConfig })` and is exposed to templates/code as `env('KEY')` / `ctx.$env('KEY')`.
 - Secrets (LLM keys, third-party API tokens, etc.) are used only inside server-side integrations and connectors; workflows never see raw secret values.
 
 Cross-links

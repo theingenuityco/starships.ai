@@ -50,6 +50,9 @@ export class Code extends BaseNode<CodeParams> {
       const ctx = {
         $input: inputData,
         $state: execution?.state || {},
+        // Preferred helper: $env (maps to non-secret runtime configuration)
+        $env: (key: string) => (typeof key === 'string' ? (runtimeConfig as Record<string, unknown>)[key] : undefined),
+        // Backwards-compatible alias
         $config: (key: string) => (typeof key === 'string' ? (runtimeConfig as Record<string, unknown>)[key] : undefined),
         $lastOutputOf,
       };

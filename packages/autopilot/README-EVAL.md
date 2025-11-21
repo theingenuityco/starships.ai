@@ -150,11 +150,6 @@ Access non-secret runtime configuration values provided by the host:
     env('STARSHIP_ID');
   }
 }
-{
-  {
-    env('API_TOKEN');
-  }
-}
 ```
 
 **Security**: Only non-secret configuration values are exposed via `env()`. Secrets
@@ -243,9 +238,9 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 ```javascript
 // Dynamic URL construction
 {
-  url: "{{ env('API_BASE_URL') }}/users/{{ $input('userId') }}",
+  url: "{{ env('KEY') }}/users/{{ $input('userId') }}",
   headers: {
-    "Authorization": "Bearer {{ env('API_TOKEN') }}",
+    "Authorization": "Bearer {{ env('KEY') }}",
     "Content-Type": "application/json"
   },
   body: {

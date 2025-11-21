@@ -40,12 +40,6 @@ export interface EngineConfig {
    * placed here.
    */
   runtimeConfig?: Record<string, unknown>;
-  /**
-   * Host runtime surface for side-effecting operations (HTTP, etc.).
-   * Autopilot delegates to this interface instead of talking to the network
-   * or connectors directly. The embedding host is responsible for resolving
-   * connectors, injecting secrets, enforcing policies, and performing calls.
-   */
   hostRuntime?: HostRuntime;
 }
 

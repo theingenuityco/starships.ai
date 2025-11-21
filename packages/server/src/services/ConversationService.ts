@@ -719,11 +719,43 @@ export class ConversationService {
           const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
           const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+          // Normalize URL and apply connector-aware rewriting in the outer scope so
+          // we can safely reference finalUrl in both success and error paths.
+          let finalUrl = url;
+
+          // Normalize URL: prefix baseUrl for relative paths
+          if (finalUrl.startsWith('/')) {
+            finalUrl = baseUrl + finalUrl;
+          }
+
+          // Connector-aware URL rewriting / auth injection
+          if (connectorSlug === 'starships') {
+            // Replace /starships/self with /starships/{starship.id}
+            const selfPrefix = '/starships/self';
+            if (url.startsWith(selfPrefix)) {
+              finalUrl = baseUrl + `/starships/${starship.id}${url.slice(selfPrefix.length)}`;
+            }
+
+            // Ensure Authorization header is present when we have an auth token
+            if (authToken) {
+              const lowered: Record<string, unknown> = {};
+              Object.entries(headers).forEach(([k, v]) => {
+                lowered[k.toLowerCase()] = v;
+              });
+              if (!lowered['authorization']) {
+                headers = {
+                  ...headers,
+                  Authorization: `Bearer ${authToken}`,
+                };
+              }
+            }
+          }
+
           try {
             const finalMethod = method.toUpperCase();
             const init: RequestInit = {
               method: finalMethod,
-              headers: headers as HeadersInit,
+              headers: headers as Record<string, string>,
               signal: controller.signal,
             };
 
@@ -743,7 +775,7 @@ export class ConversationService {
             // route via connector records instead of direct HTTP.
             // For now we treat all HTTP uniformly and rely on URL/auth headers.
 
-            const resp = await fetch(url, init);
+            const resp = await fetch(finalUrl, init);
             const contentType = resp.headers.get('content-type') || '';
             let responseBody: unknown;
             if (contentType.includes('application/json')) {
@@ -775,7 +807,7 @@ export class ConversationService {
                 : error instanceof Error
                   ? error.message
                   : 'Unknown error';
-            throw new Error(`HTTP request failed: ${method.toUpperCase()} ${url} -> ${reason}`);
+            throw new Error(`HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> ${reason}`);
           } finally {
             clearTimeout(timeoutId);
           }
@@ -835,7 +867,7 @@ export class ConversationService {
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
           runtimeConfig,
-          callConnector,
+          hostRuntime,
         });
 
         const baselineCount = messages.length;
@@ -845,7 +877,7 @@ export class ConversationService {
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeConfig,
-          callConnector,
+          hostRuntime,
         } as any;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
@@ -1124,13 +1156,13 @@ export class ConversationService {
       // Use autopilot LLM node directly (no runner/engine).
       // The LLM node reads OPENROUTER_API_KEY from the host environment; we only pass non-secret config here.
       const llm = new LLM({
-          model,
-          messages: [
-            { role: 'system' as const, content: sys },
-            { role: 'user' as const, content: prompt },
-          ],
-          temperature: 0.3,
-          maxTokens: 32,
+        model,
+        messages: [
+          { role: 'system' as const, content: sys },
+          { role: 'user' as const, content: prompt },
+        ],
+        temperature: 0.3,
+        maxTokens: 32,
       });
 
       const items = await llm.execute();

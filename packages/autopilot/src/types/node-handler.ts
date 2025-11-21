@@ -68,10 +68,6 @@ export interface NodeHandlerOptions {
    * This replaces the legacy callConnector hook with a typed interface.
    */
   hostRuntime?: HostRuntime;
-  /**
-   * @deprecated Legacy generic connector hook. Prefer HostRuntime instead.
-   */
-  callConnector?: (args: { slug: string; payload: Record<string, unknown> }) => Promise<unknown>;
 }
 /**
  * Constructor type for handlers that accept the full node object

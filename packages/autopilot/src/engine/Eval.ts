@@ -33,8 +33,7 @@ export interface EvalContext {
   $exists: (value: unknown) => boolean;
 
   // Non-secret runtime configuration (provided by host)
-  config: (key: string) => unknown;
-  configAll: () => Record<string, unknown>;
+  env: (key: string) => unknown;
 }
 
 /**
@@ -123,12 +122,9 @@ export class Eval {
       $exists: (value: unknown) => value !== undefined && value !== null,
 
       // Non-secret configuration access
-      config: (key: string) => {
+      env: (key: string) => {
         if (!key || typeof key !== 'string') return undefined;
         return cfg[key];
-      },
-      configAll: () => {
-        return { ...cfg };
       },
     };
 

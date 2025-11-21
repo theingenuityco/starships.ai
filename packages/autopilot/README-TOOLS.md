@@ -226,7 +226,7 @@ When authoring tool blueprints that include a `code` node, write code as a modul
 async function main(ctx) {
   // Access tool arguments via ctx.$input
   // Access workflow state via ctx.$state
-  // Access non-secret config via ctx.$config('KEY')
+  // Access non-secret env via ctx.$env('KEY')
   // Read prior node output via ctx.$lastOutputOf('node_ref')
   return { ok: true };
 }

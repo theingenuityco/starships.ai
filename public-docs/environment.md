@@ -145,7 +145,7 @@ Notes:
 
 Allowed helpers inside `{{ ... }}` (non-exhaustive):
 
-- `env('KEY')`, `envAll()`
+- `env('KEY')`
 - `$input(path?)`, `$lastOutputOf(ref)`
 - `Date`, `Math`, simple ternaries/expressions
 

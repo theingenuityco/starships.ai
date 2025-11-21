@@ -102,9 +102,39 @@ export class ChildProcessRunner implements Runner {
         });
       }
 
-      // Bridge events back to caller
+      // Bridge events and hostRuntime HTTP back to caller
       child.on('message', async (msg: unknown) => {
         try {
+          const m = msg as any;
+
+          // HostRuntime HTTP bridge: child -> parent
+          if (m && typeof m === 'object' && m.type === 'host_http') {
+            const host = config?.hostRuntime as any;
+            if (!host || typeof host.http !== 'function') {
+              child.send?.({
+                type: 'host_http_result',
+                id: m.id,
+                error: 'Host runtime http() not available in parent process',
+              });
+              return;
+            }
+            try {
+              const response = await host.http(m.request);
+              child.send?.({
+                type: 'host_http_result',
+                id: m.id,
+                response,
+              });
+            } catch (err) {
+              child.send?.({
+                type: 'host_http_result',
+                id: m.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+            return;
+          }
+
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
@@ -175,7 +205,9 @@ export class ChildProcessRunner implements Runner {
       }
 
       // Prepare safe config (functions cannot cross the IPC boundary)
-      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined } : undefined;
+      const safeConfig = config
+        ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined }
+        : undefined;
 
       const autopilotCredentials = {
         openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined,
@@ -246,6 +278,36 @@ export class ChildProcessRunner implements Runner {
     const promise = new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
       child.on('message', async (msg: unknown) => {
         try {
+          const m = msg as any;
+
+          // HostRuntime HTTP bridge: child -> parent
+          if (m && typeof m === 'object' && m.type === 'host_http') {
+            const host = config?.hostRuntime as any;
+            if (!host || typeof host.http !== 'function') {
+              child.send?.({
+                type: 'host_http_result',
+                id: m.id,
+                error: 'Host runtime http() not available in parent process',
+              });
+              return;
+            }
+            try {
+              const response = await host.http(m.request);
+              child.send?.({
+                type: 'host_http_result',
+                id: m.id,
+                response,
+              });
+            } catch (err) {
+              child.send?.({
+                type: 'host_http_result',
+                id: m.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+            return;
+          }
+
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
@@ -314,7 +376,9 @@ export class ChildProcessRunner implements Runner {
         }, timeoutMs);
       }
 
-      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined } : undefined;
+      const safeConfig = config
+        ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined }
+        : undefined;
       const autopilotCredentials = { openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined };
       child.send({ type: 'parent_ready' });
       child.send({ type: 'start', payload: { blueprint, execution, config: safeConfig, autopilotCredentials } });

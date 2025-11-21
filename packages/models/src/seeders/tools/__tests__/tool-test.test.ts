@@ -74,10 +74,7 @@ describe('Tool Test Tool', () => {
   });
 
   describe('Real Tool Execution', () => {
-    async function executeToolWithMockConfig(
-      input: unknown,
-      hostRuntime: HostRuntime
-    ) {
+    async function executeToolWithMockConfig(input: unknown, hostRuntime: HostRuntime) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
         runtimeConfig: {},
@@ -138,13 +135,12 @@ describe('Tool Test Tool', () => {
 
       const nested = makeNestedEchoBlueprint();
       const hostRuntime: HostRuntime = {
-        http: jest
-          .fn(async ({ method, url, connectorSlug }) => {
-            expect(method).toBe('GET');
-            expect(connectorSlug).toBe('starships');
-            expect(url).toContain('/starships/self/tools/demo');
-            return createMockResponse({ blueprint: nested });
-          }) as unknown as HostRuntime['http'],
+        http: jest.fn(async ({ method, url, connectorSlug }) => {
+          expect(method).toBe('GET');
+          expect(connectorSlug).toBe('starships');
+          expect(url).toContain('/starships/self/tools/demo');
+          return createMockResponse({ blueprint: nested });
+        }) as unknown as HostRuntime['http'],
       };
 
       const result = (await executeToolWithMockConfig(input, hostRuntime)) as {

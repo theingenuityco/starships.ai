@@ -29,6 +29,7 @@ function createMockStream(chunks: OpenAI.Chat.Completions.ChatCompletionChunk[])
 
 describe('LLM Node Handler', () => {
   let mockCreate: jest.Mock;
+  let previousApiKey: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -42,10 +43,22 @@ describe('LLM Node Handler', () => {
         },
       } as unknown as OpenAI;
     });
+
+    // Ensure an API key is available by default for tests that expect
+    // execution to reach the OpenAI client. Individual tests can override.
+    previousApiKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
   });
 
   afterEach(() => {
     consoleSpy.mockClear();
+
+    // Restore previous API key state
+    if (previousApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = previousApiKey;
+    }
   });
 
   describe('Basic LLM Functionality', () => {
@@ -173,6 +186,9 @@ describe('LLM Node Handler', () => {
         model: 'anthropic/claude-3.5-sonnet',
         messages: [{ role: 'user', content: 'Hello!' }],
       };
+
+      // Explicitly remove API key for this test
+      delete process.env.OPENROUTER_API_KEY;
 
       const llm = new LLM(params);
 

@@ -120,7 +120,6 @@ Returns server response indicating success.
         parameters: {
           url: '{{ "/agents/" + $lastOutputOf("update_tools")[0].json.agentId + "/tools/" + $lastOutputOf("update_tools")[0].json.toolSlug }}',
           method: 'POST',
-          body: { starshipId: '{{ env("STARSHIP_ID") }}' },
           connectorSlug: 'starships',
           timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
         },

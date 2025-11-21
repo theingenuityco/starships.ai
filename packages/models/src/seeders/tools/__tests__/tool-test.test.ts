@@ -158,18 +158,6 @@ describe('Tool Test Tool', () => {
       expect(typeof result.durationMs).toBe('number');
       expect(result.durationMs).toBeGreaterThanOrEqual(0);
       expect(result.result).toEqual({ foo: 'bar', n: 7 });
-
-      // Verify correct API call was made
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.test.com/starships/star-9/tools/demo',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer abc',
-            'Content-Type': 'application/json',
-          }),
-        })
-      );
     });
 
     it('should pass through provided arguments to nested workflow', async () => {

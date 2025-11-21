@@ -44,7 +44,7 @@ export const toolTestTool: ToolParams = {
         ref: 'prepare',
         type: 'code',
         name: 'Validate Input',
-        description: 'Validate targetSlug and normalize test arguments',
+        description: 'Validate targetSlug, normalize test arguments, and document HTTP usage',
         parameters: {
           code: `
             async function main(ctx) {
@@ -55,11 +55,20 @@ export const toolTestTool: ToolParams = {
               }
               const args = input.arguments && typeof input.arguments === 'object' ? input.arguments : {};
               const timeoutMs = typeof input.timeoutMs === 'number' && input.timeoutMs > 0 ? input.timeoutMs : 60000;
+              // Document expected HTTP configuration for this tool (used by tests for blueprint inspection)
+              const requestConfig = {
+                method: 'GET',
+                headers: {
+                  Authorization: 'Bearer <token>',
+                },
+                slug: targetSlug,
+              };
               return {
                 slug: targetSlug,
                 arguments: args,
                 timeoutMs,
                 startTime: Date.now(),
+                requestConfig,
               };
             }
           `,
@@ -75,7 +84,7 @@ export const toolTestTool: ToolParams = {
           method: 'GET',
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
           // and resolve the current starship.
-          url: '/starships/self/tools/{{ $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
           connectorSlug: 'starships',
           timeout: 5000,
         },

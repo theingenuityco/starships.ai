@@ -67,42 +67,42 @@ export class HttpRequest implements NodeHandler {
     const timeoutMs = this.params.timeout || 30000;
 
     const response = await runtime.http({
-      method,
+        method,
       url: this.params.url,
-      headers,
+        headers,
       body: bodyData ?? undefined,
       timeoutMs,
       connectorSlug: this.params.connectorSlug,
     });
 
     const httpResponse: HttpResponse = {
-      status: response.status,
-      statusText: response.statusText,
+          status: response.status,
+          statusText: response.statusText,
       headers: response.headers,
       body: response.body,
-      url: response.url,
-    };
+          url: response.url,
+        };
 
-    // Fail the workflow on non-2xx responses
+        // Fail the workflow on non-2xx responses
     if (httpResponse.status < 200 || httpResponse.status >= 300) {
-      const snippet =
+          const snippet =
         typeof httpResponse.body === 'string'
           ? httpResponse.body.slice(0, 300)
-          : (() => {
-              try {
+              : (() => {
+                  try {
                 return JSON.stringify(httpResponse.body).slice(0, 300);
-              } catch {
-                return '';
-              }
-            })();
-      throw new Error(
+                  } catch {
+                    return '';
+                  }
+                })();
+          throw new Error(
         `HTTP request failed: ${method} ${this.params.url} -> ${httpResponse.status} ${httpResponse.statusText}${
-          snippet ? ` | body: ${snippet}` : ''
-        }`
-      );
-    }
+              snippet ? ` | body: ${snippet}` : ''
+            }`
+          );
+        }
 
-    return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
+        return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
   }
 
   /**

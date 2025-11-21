@@ -55,10 +55,9 @@ Behavior and limits:
         description: 'Search documentation via Starships docs HTTP API',
         parameters: {
           method: 'GET',
-          url: '{{ $runtimeConfig.BASE_URL }}/docs?q={{ $lastOutputOf("prepare")[0].json.q }}&limit={{ $lastOutputOf("prepare")[0].json.limit }}',
-          headers: {
-            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
-          },
+          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
+          url: '/docs?q={{ $lastOutputOf("prepare")[0].json.q }}&limit={{ $lastOutputOf("prepare")[0].json.limit }}',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },

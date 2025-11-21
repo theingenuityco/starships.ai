@@ -48,10 +48,9 @@ Behavior and limits:
         description: 'List models via Starships OpenRouter proxy API',
         parameters: {
           method: 'GET',
-          url: '{{ $runtimeConfig.BASE_URL }}/openrouter/models',
-          headers: {
-            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
-          },
+          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
+          url: '/openrouter/models',
+          connectorSlug: 'starships',
           timeout: 10000,
         },
       },

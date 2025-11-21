@@ -5,54 +5,33 @@
 
 import { toolListTool, toolListToolTemplate } from '../list-tools';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, Edge, HostRuntime } from '@starships/autopilot';
 
-// Helper to create a realistic Fetch Response-like object for our HttpRequest node
+// Helper to create a realistic HttpResponse-like object for our HttpRequest node
 function createMockResponse(
   body: unknown,
   {
-    ok = true,
     status = 200,
     statusText = 'OK',
-    contentType = 'application/json; charset=utf-8',
     url = 'https://api.test.com/starships/test-starship-123/tools',
-    extraHeaders = {},
+    headers = {},
   }: {
-    ok?: boolean;
     status?: number;
     statusText?: string;
-    contentType?: string;
     url?: string;
-    extraHeaders?: Record<string, string>;
+    headers?: Record<string, unknown>;
   } = {}
 ) {
-  const headersMap: Record<string, string> = { 'content-type': contentType, ...extraHeaders };
   return {
-    ok,
     status,
     statusText,
+    headers: headers ?? {},
     url,
-    headers: {
-      get: (name: string) => headersMap[name.toLowerCase()] ?? null,
-      forEach: (cb: (value: string, key: string) => void) => {
-        for (const [k, v] of Object.entries(headersMap)) cb(v, k);
-      },
-    },
-    json: async () => body,
-    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    body,
   };
 }
 
 describe('Tool List Tool', () => {
-  beforeEach(() => {
-    // Mock fetch globally for HTTP requests
-    global.fetch = jest.fn();
-  });
-
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
-
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
       expect(toolListTool.name).toBe('List Tools');

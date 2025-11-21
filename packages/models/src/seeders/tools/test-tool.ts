@@ -73,8 +73,9 @@ export const toolTestTool: ToolParams = {
         description: 'Fetch tool definition via Starships tools HTTP API',
         parameters: {
           method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
-          url: '/starships/{{ $runtimeConfig.STARSHIP_ID }}/tools/{{ $lastOutputOf("prepare")[0].json.slug }}',
+          // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
+          // and resolve the current starship.
+          url: '/starships/self/tools/{{ $lastOutputOf("prepare")[0].json.slug }}',
           connectorSlug: 'starships',
           timeout: 5000,
         },

@@ -68,9 +68,10 @@ Behavior and limits:
           code: `
             async function main(ctx) {
               const raw = ctx.$input;
-              const payload = raw && typeof raw === 'object' && (raw as any).body !== undefined ? (raw as any).body : raw;
-              if (payload && typeof payload === 'object' && (payload as any).data !== undefined) {
-                return (payload as any).data;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+                return payload.data;
               }
               return payload;
             }

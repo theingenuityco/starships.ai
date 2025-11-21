@@ -19,9 +19,7 @@ Inputs:
 - {} (no arguments)
 
 Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
-- STARSHIP_ID: derived from agent.state.starshipId
+- STARSHIP_ID: derived from the current starship context
 
 Output:
 - Array of { slug, name, description, isEnabled } (deliberately lean; heavy fields like blueprint are omitted)
@@ -38,49 +36,15 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'prepare',
-        type: 'code',
-        name: 'Prepare HTTP Request',
-        description: 'Prepare request metadata using runtime configuration',
-        parameters: {
-          code: `
-            async function main(ctx) {
-              const baseUrl = ctx.$config ? ctx.$config('BASE_URL') : undefined;
-              const authToken = ctx.$config ? ctx.$config('AUTH_TOKEN') : undefined;
-              const starshipId = ctx.$config ? ctx.$config('STARSHIP_ID') : undefined;
-
-              if (!baseUrl || !authToken || !starshipId) {
-                throw new Error('Missing required runtime configuration for tools.list');
-              }
-
-              return {
-                baseUrl,
-                authToken,
-                starshipId,
-                request: {
-                  method: 'GET',
-                  url: baseUrl + '/starships/' + starshipId + '/tools',
-                  headers: {
-                    Authorization: 'Bearer ' + authToken,
-                  },
-                },
-              };
-            }
-          `,
-          timeout: 3000,
-        },
-      },
-      {
         ref: 'http_list',
         type: 'http_request',
         name: 'List Tools (HTTP)',
         description: 'List tools via Starships HTTP API',
         parameters: {
           method: 'GET',
-          url: '{{ $runtimeConfig.BASE_URL }}/starships/{{ $runtimeConfig.STARSHIP_ID }}/tools',
-          headers: {
-            Authorization: 'Bearer {{ $runtimeConfig.AUTH_TOKEN }}',
-          },
+          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
+          url: '/starships/{{ $runtimeConfig.STARSHIP_ID }}/tools',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },
@@ -124,9 +88,8 @@ Behavior and limits:
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_list' },
-      { ref: 'e3', from: 'http_list', to: 'summarize' },
+      { ref: 'e1', from: 'start_1', to: 'http_list' },
+      { ref: 'e2', from: 'http_list', to: 'summarize' },
       { ref: 'e3', from: 'summarize', to: 'end_1' },
     ],
     metadata: {},

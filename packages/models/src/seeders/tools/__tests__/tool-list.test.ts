@@ -89,13 +89,12 @@ describe('Tool List Tool', () => {
       }
     });
 
-    it('should have sequential flow: start -> prepare -> http_list -> summarize -> end', () => {
+    it('should have sequential flow: start -> http_list -> summarize -> end', () => {
       const blueprint = toolListTool.blueprint;
       const edges = blueprint.edges;
 
       const hasCorrectFlow = [
-        edges.some((e: Edge) => e.from === 'start_1' && e.to === 'prepare'),
-        edges.some((e: Edge) => e.from === 'prepare' && e.to === 'http_list'),
+        edges.some((e: Edge) => e.from === 'start_1' && e.to === 'http_list'),
         edges.some((e: Edge) => e.from === 'http_list' && e.to === 'summarize'),
         edges.some((e: Edge) => e.from === 'summarize' && e.to === 'end_1'),
       ];
@@ -119,25 +118,6 @@ describe('Tool List Tool', () => {
   });
 
   describe('Blueprint Implementation Details', () => {
-    it('should have correct prepare node implementation', () => {
-      const blueprint = toolListTool.blueprint;
-      const prepareNode = blueprint.nodes.find((n) => n.ref === 'prepare');
-
-      expect(prepareNode).toBeDefined();
-      expect(prepareNode?.type).toBe('code');
-
-      if (prepareNode?.parameters) {
-        const params = prepareNode.parameters as { code: string };
-        expect(params.code).toBeDefined();
-        expect(params.code).toContain('baseUrl');
-        expect(params.code).toContain('authToken');
-        expect(params.code).toContain('starshipId');
-        expect(params.code).toContain("method: 'GET'");
-        expect(params.code).toContain('Authorization');
-        expect(params.code).toContain('Bearer');
-      }
-    });
-
     it('should have correct summarize node implementation', () => {
       const blueprint = toolListTool.blueprint;
       const summarizeNode = blueprint.nodes.find((n) => n.ref === 'summarize');
@@ -167,8 +147,8 @@ describe('Tool List Tool', () => {
         const params = httpNode.parameters as Record<string, unknown>;
         expect(params.url).toBeDefined();
         expect(params.method).toBeDefined();
-        expect(params.headers).toBeDefined();
         expect(params.timeout).toBeDefined();
+        expect(params.connectorSlug).toBe('starships');
       }
     });
   });
@@ -176,12 +156,6 @@ describe('Tool List Tool', () => {
 
 describe('Tool.execute return value - list-tools', () => {
   it('should return a single ExecutionItem with summarized tool list and preserved pairedItem', async () => {
-    const mockEnv = {
-      BASE_URL: 'https://api.test.com',
-      AUTH_TOKEN: 'mock-auth-token',
-      STARSHIP_ID: 'test-starship-123',
-    };
-
     const mockResponseData = {
       data: [
         {
@@ -201,13 +175,24 @@ describe('Tool.execute return value - list-tools', () => {
       ],
     };
 
-    // Local fetch mock for this test
-    global.fetch = jest.fn() as unknown as jest.Mock;
-    (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
+    // Local HostRuntime mock for this test
+    const hostRuntime: HostRuntime = {
+      http: jest.fn(async () =>
+        createMockResponse(mockResponseData, {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          url: 'https://api.test.com/starships/test-starship-123/tools',
+        })
+      ) as unknown as HostRuntime['http'],
+    };
 
     const options: NodeHandlerOptions = {
       eventCallback: jest.fn(),
-      runtimeConfig: mockEnv,
+      runtimeConfig: {
+        STARSHIP_ID: 'test-starship-123',
+      },
+      hostRuntime,
       execution: ExecutionItemUtils.createExecution(),
     };
 

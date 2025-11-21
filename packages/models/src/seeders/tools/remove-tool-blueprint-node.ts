@@ -20,20 +20,14 @@ export const blueprintRemoveNodeTool: ToolParams = {
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-      { ref: 'prepare', type: 'code', name: 'Prepare Request', description: 'Build URL, headers and validate inputs', parameters: { code: `
+      { ref: 'prepare', type: 'code', name: 'Prepare Request', description: 'Validate inputs', parameters: { code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
               if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
               if (!ctx.$input.nodeRef || typeof ctx.$input.nodeRef !== 'string') throw new Error('nodeRef is required and must be a string');
-              return { baseUrl, starshipId, toolSlug: ctx.$input.toolSlug, nodeRef: ctx.$input.nodeRef, headers: { 'Authorization': \`Bearer \${authToken}\`, 'Content-Type': 'application/json' } };
+              return { toolSlug: ctx.$input.toolSlug, nodeRef: ctx.$input.nodeRef };
             }
           `, timeout: 3000 } },
-      { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/:starshipId/tools/:toolSlug', parameters: { url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', headers: '{{ $lastOutputOf("prepare")[0].json.headers }}', timeout: 5000 } },
+      { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/self/tools/:toolSlug', parameters: { url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', connectorSlug: 'starships', timeout: 5000 } },
       { ref: 'validate', type: 'code', name: 'Validate and Remove Node', description: 'Remove node and clean up edges', parameters: { code: `
             async function main(ctx) {
               const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
@@ -60,7 +54,7 @@ export const blueprintRemoveNodeTool: ToolParams = {
               return { success: true, toolData, updatedBlueprint: blueprint, removedNode: nodeToRemove, removedEdges: edgesToRemove, nodeRef, remainingNodes: blueprint.nodes.length, remainingEdges: blueprint.edges.length };
             }
           `, timeout: 3000 } },
-      { ref: 'update_tool', type: 'http_request', name: 'Update Tool with Modified Blueprint', description: 'PUT /tools/:id with updated blueprint', parameters: { url: '{{ $lastOutputOf("validate")[0].json.toolData.id ? $lastOutputOf("prepare")[0].json.baseUrl + "/tools/" + $lastOutputOf("validate")[0].json.toolData.id : "" }}', method: 'PUT', headers: '{{ $lastOutputOf("prepare")[0].json.headers }}', body: '{{ (() => { const result = $lastOutputOf("validate")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}', timeout: 10000 } },
+      { ref: 'update_tool', type: 'http_request', name: 'Update Tool with Modified Blueprint', description: 'PUT /tools/:id with updated blueprint', parameters: { url: '{{ $lastOutputOf("validate")[0].json.toolData.id ? "/tools/" + $lastOutputOf("validate")[0].json.toolData.id : "" }}', method: 'PUT', body: '{{ (() => { const result = $lastOutputOf("validate")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}', connectorSlug: 'starships', timeout: 10000 } },
       { ref: 'end_1', type: 'end', name: 'End', description: 'Return updated tool or validation errors', parameters: { output: '{{ $lastOutputOf("update_tool")[0].json }}' } },
     ],
     edges: [

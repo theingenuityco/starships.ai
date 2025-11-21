@@ -70,17 +70,10 @@ Returns updated tool with new node in blueprint, or validation errors if additio
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL, headers and validate inputs',
+        description: 'Validate inputs',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               if (!ctx.$input.toolSlug) {
                 throw new Error('toolSlug is required');
               }
@@ -90,14 +83,8 @@ Returns updated tool with new node in blueprint, or validation errors if additio
               }
 
               return {
-                baseUrl,
-                starshipId,
                 toolSlug: ctx.$input.toolSlug,
-                node: ctx.$input.node,
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
+                node: ctx.$input.node
               };
             }
           `,
@@ -108,11 +95,11 @@ Returns updated tool with new node in blueprint, or validation errors if additio
         ref: 'fetch_tool',
         type: 'http_request',
         name: 'Fetch Current Tool',
-        description: 'GET /starships/:starshipId/tools/:toolSlug',
+        description: 'GET /starships/self/tools/:toolSlug',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
+          url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },
@@ -197,10 +184,10 @@ Returns updated tool with new node in blueprint, or validation errors if additio
         name: 'Update Tool with New Blueprint',
         description: 'PUT /tools/:id with updated blueprint',
         parameters: {
-          url: '{{ $lastOutputOf("validate_node")[0].json.toolData.id ? $lastOutputOf("prepare")[0].json.baseUrl + "/tools/" + $lastOutputOf("validate_node")[0].json.toolData.id : "" }}',
+          url: '{{ $lastOutputOf("validate_node")[0].json.toolData.id ? "/tools/" + $lastOutputOf("validate_node")[0].json.toolData.id : "" }}',
           method: 'PUT',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
           body: '{{ (() => { const result = $lastOutputOf("validate_node")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}',
+          connectorSlug: 'starships',
           timeout: 10000,
         },
       },

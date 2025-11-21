@@ -75,13 +75,6 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               const slug = ctx.$input && ctx.$input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
@@ -96,15 +89,8 @@ Automatically inferred from agent state (do not pass manually):
               }
 
             return {
-              url: String(baseUrl) + '/starships/' + String(starshipId) + '/agents/' + String(slug) + '/test',
-              method: 'POST',
-              headers: {
-                'Authorization': 'Bearer ' + String(authToken),
-                'Content-Type': 'application/json'
-              },
-              body: {
-                input: testInput
-              }
+              slug,
+              input: testInput
             };
             }
           `,
@@ -117,10 +103,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute Agent Test',
         description: 'POST /starships/:starshipId/agents/:slug/test',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
+          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.slug + "/test" }}',
+          method: 'POST',
+          body: { input: '{{ $lastOutputOf("prepare")[0].json.input }}' },
+          connectorSlug: 'starships',
           timeout: 60000,
         },
       },

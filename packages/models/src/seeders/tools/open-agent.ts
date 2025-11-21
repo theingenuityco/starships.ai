@@ -95,13 +95,6 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
               const slug = ctx.$input && (ctx.$input).slug;
 
@@ -127,16 +120,8 @@ Automatically inferred from agent state (do not pass manually):
                 }
                 
                 return {
-                  url: baseUrl + '/agents',
-                  method: 'POST',
-                  headers: {
-                    'Authorization': 'Bearer ' + String(authToken),
-                    'Content-Type': 'application/json'
-                  },
-                  body: {
-                    ...body,
-                    starshipId
-                  },
+                  mode: 'create',
+                  body,
                   timeout: 10000
                 };
               }
@@ -144,12 +129,8 @@ Automatically inferred from agent state (do not pass manually):
               // Open existing
               if (!slug || typeof slug !== 'string') throw new Error('slug is required to open an agent');
               return {
-                url: baseUrl + '/agents/' + String(slug),
-                method: 'GET',
-                headers: {
-                  'Authorization': 'Bearer ' + String(authToken),
-                  'Content-Type': 'application/json'
-                },
+                mode: 'open',
+                slug: String(slug),
                 timeout: 5000
               };
             }
@@ -163,10 +144,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute',
         description: 'Create or fetch agent',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
+          url: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? "/agents" : "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          method: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? "POST" : "GET" }}',
+          body: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? { ...$lastOutputOf("prepare")[0].json.body, starshipId: env("STARSHIP_ID") } : undefined }}',
+          connectorSlug: 'starships',
           timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
         },
       },

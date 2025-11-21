@@ -60,25 +60,12 @@ Returns server response.
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               if (!ctx.$input.agentSlug) throw new Error('agentSlug is required');
               if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
 
               return {
-                baseUrl,
-                starshipId,
                 agentSlug: ctx.$input.agentSlug,
-                toolSlug: ctx.$input.toolSlug,
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
+                toolSlug: ctx.$input.toolSlug
               };
             }
           `,
@@ -91,9 +78,9 @@ Returns server response.
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
+          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },
@@ -115,13 +102,9 @@ Returns server response.
               const prep = ctx.$lastOutputOf('prepare')[0].json;
               const toolSlug = prep.toolSlug;
 
-            const url = new URL(String(prep.baseUrl) + '/agents/' + String(agentData.id) + '/tools/' + String(toolSlug));
-              url.searchParams.set('starshipId', String(prep.starshipId));
-
               return {
-                url: url.toString(),
-                method: 'DELETE',
-                headers: prep.headers,
+                agentId: String(agentData.id),
+                toolSlug: String(toolSlug),
                 timeout: 10000
               };
             }
@@ -135,9 +118,9 @@ Returns server response.
         name: 'Unassign Tool',
         description: 'DELETE /agents/:id/tools/:toolSlug',
         parameters: {
-          url: '{{ $lastOutputOf("update_tools")[0].json.url }}',
-          method: '{{ $lastOutputOf("update_tools")[0].json.method }}',
-          headers: '{{ $lastOutputOf("update_tools")[0].json.headers }}',
+          url: '{{ "/agents/" + $lastOutputOf("update_tools")[0].json.agentId + "/tools/" + $lastOutputOf("update_tools")[0].json.toolSlug }}',
+          method: 'DELETE',
+          connectorSlug: 'starships',
           timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
         },
       },

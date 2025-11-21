@@ -97,13 +97,6 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
               const input = ctx.$input || {};
               if (!input.slug) {
                 throw new Error('slug is required');
@@ -129,14 +122,8 @@ Automatically inferred from agent state (do not pass manually):
               }
 
               return {
-                baseUrl: baseUrl,
-                starshipId: starshipId,
                 slug: input.slug,
-                body: body,
-                headers: {
-                  'Authorization': 'Bearer ' + authToken,
-                  'Content-Type': 'application/json'
-                }
+                body: body
               };
             }
           `,
@@ -147,11 +134,11 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'fetch_agent',
         type: 'http_request',
         name: 'Fetch Agent by Slug',
-        description: 'GET /starships/:starshipId/agents/:slug to resolve agent ID',
+        description: 'GET /starships/self/agents/:slug to resolve agent ID',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connectorSlug: 'starships',
           timeout: 5000,
         },
       },
@@ -173,9 +160,7 @@ Automatically inferred from agent state (do not pass manually):
               const prep = ctx.$lastOutputOf('prepare')[0].json;
 
               return {
-                url: prep.baseUrl + '/agents/' + agentData.id,
-                method: 'PUT',
-                headers: prep.headers,
+                agentId: String(agentData.id),
                 body: prep.body
               };
             }
@@ -189,10 +174,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Update Agent',
         description: 'PUT /agents/:id with partial updates',
         parameters: {
-          url: '{{ $lastOutputOf("prepare_update")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare_update")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare_update")[0].json.headers }}',
+          url: '{{ "/agents/" + $lastOutputOf("prepare_update")[0].json.agentId }}',
+          method: 'PUT',
           body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
+          connectorSlug: 'starships',
           timeout: 10000,
         },
       },

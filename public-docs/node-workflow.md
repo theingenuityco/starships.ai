@@ -41,9 +41,9 @@ Example (summarize)
         { ref: "s", type: "start", name: "Start", parameters: {} },
         { ref: "llm", type: "llm", name: "Summarize", parameters: {
             model: "anthropic/claude-3.5-sonnet",
-            messages: [ { role: "user", content: "Summarize this: {{ $input() }}" } ]
+            messages: [ { role: "user", content: "Summarize this: {{ input }}" } ]
         } },
-        { ref: "e", type: "end", name: "End", parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } }
+        { ref: "e", type: "end", name: "End", parameters: { output: '{{ lastOutputOf("llm") }}' } }
       ],
       edges: [
         { ref: "e1", from: "s", to: "llm" },

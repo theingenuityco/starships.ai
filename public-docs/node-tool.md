@@ -82,12 +82,12 @@ Example (calculator)
         { ref: "code", type: "code", name: "Add", parameters: {
           code: `
             async function main(ctx) {
-              const { a, b } = ctx.$input || {};
+              const { a, b } = ctx.input || {};
               return { sum: Number(a) + Number(b) };
             }
           `
         }},
-        { ref: "e", type: "end", name: "End", parameters: { output: '{{ $lastOutputOf("code")?.[0]?.json }}' } }
+        { ref: "e", type: "end", name: "End", parameters: { output: '{{ lastOutputOf("code") }}' } }
       ],
       edges: [
         { ref: "e1", from: "s", to: "code" },

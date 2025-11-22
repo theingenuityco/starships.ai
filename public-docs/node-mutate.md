@@ -12,10 +12,9 @@ Specification (authoritative)
 
 Reducer ctx (available keys)
 
-- input: unwrapped input item
-- $input(): same as input
-- $lastOutputOf(ref): latest `ExecutionItem[]` for ref within current execution
-- state: current execution.state (object)
+- input: unwrapped input item (`ctx.input`)
+- lastOutputOf(ref): latest output json for ref within current execution (`ctx.lastOutputOf(ref)`)
+- state: current execution.state (object) (`ctx.state`)
 - env(key): reads non-secret runtime configuration from `runtimeEnv` (e.g., `env('STARSHIP_ID')` in hosted Starships)
 - JSON, Math, Date; console shim for log/error/warn
 - Dangerous globals blocked: setTimeout, setInterval, require, process, global, eval, Function
@@ -52,7 +51,7 @@ Example (append tool result)
     reducers: [
       `
       (state, ctx) => {
-        const toolResult = ctx.$lastOutputOf("execute_tool")[0]?.json ?? {};
+        const toolResult = ctx.lastOutputOf("execute_tool") ?? {};
         const content = (typeof toolResult === 'string') ? toolResult : JSON.stringify(toolResult);
         const next = { ...(state || {}) };
         next.messages = [...(state?.messages ?? []), { role: 'tool', content }];

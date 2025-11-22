@@ -60,5 +60,5 @@ Common mistakes and how to fix them
 - Mixing literals with templates for Transform/Conditional
   - Problem: Using partial templates inside `transform.value`, `transform.from`, or `condition`.
   - Fix: Use a single expression that returns the final value:
-    - Transform value example: "{{ $input('user.first') + ' ' + $input('user.last') }}"
+    - Transform value example: "{{ input.user.first + ' ' + input.user.last }}"
     - Conditional example: "{{ state.retryCount < 3 ? 'retry' : 'stop' }}"

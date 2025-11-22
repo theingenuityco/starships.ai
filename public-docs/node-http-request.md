@@ -103,11 +103,11 @@ Cross-links
 
 ### Notes
 
-- Parameters use stringEvaluationMode: full-only. When a template is used for `parameters.body` (for example `{{ $input }}`), the resolved value is passed directly to the host runtime:
+- Parameters use stringEvaluationMode: full-only. When a template is used for `parameters.body` (for example `{{ input }}`), the resolved value is passed directly to the host runtime:
   - strings are sent as-is
   - objects are JSON-stringified by the host runtime with `Content-Type: application/json`
   - undefined is omitted
-- Prefer passing objects (either from upstream `$input` via an explicit template, or literals) rather than manually stringifying JSON yourself.
+- Prefer passing objects (either from upstream `input` via an explicit template, or literals) rather than manually stringifying JSON yourself.
 - When chaining requests, remember HttpRequest returns a wrapper (see Return value shape). If you need only the payload for the next request, forward `body` via a Transform/Code node.
 
 

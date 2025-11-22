@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useMemo, useState } from 'react'
+import Image from 'next/image'
+import { CONNECTOR_LOGOS } from '@/lib/connectorLogos'
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -108,9 +110,21 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-3">
+                  {CONNECTOR_LOGOS.linkedin && (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
+                      <Image
+                        src={CONNECTOR_LOGOS.linkedin}
+                        alt="LinkedIn logo"
+                        width={18}
+                        height={18}
+                      />
+                    </div>
+                  )}
                   <span className="text-lg">LinkedIn</span>
-                  <Badge variant={linkedinState?.status === 'connected' ? 'default' : 'outline'}>{linkedinState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
+                  <Badge variant={linkedinState?.status === 'connected' ? 'default' : 'outline'}>
+                    {linkedinState?.status === 'connected' ? 'Connected' : 'Not connected'}
+                  </Badge>
                 </CardTitle>
               </div>
               <p className="text-sm text-muted-foreground mt-2">{linkedin.description}</p>
@@ -149,9 +163,21 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-3">
+                  {CONNECTOR_LOGOS.discord && (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
+                      <Image
+                        src={CONNECTOR_LOGOS.discord}
+                        alt="Discord logo"
+                        width={18}
+                        height={18}
+                      />
+                    </div>
+                  )}
                   <span className="text-lg">Discord</span>
-                  <Badge variant={discordState?.status === 'connected' ? 'default' : 'outline'}>{discordState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
+                  <Badge variant={discordState?.status === 'connected' ? 'default' : 'outline'}>
+                    {discordState?.status === 'connected' ? 'Connected' : 'Not connected'}
+                  </Badge>
                 </CardTitle>
               </div>
               <p className="text-sm text-muted-foreground mt-2">{discord.description}</p>
@@ -179,7 +205,17 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-3">
+                  {CONNECTOR_LOGOS.google_drive && (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
+                      <Image
+                        src={CONNECTOR_LOGOS.google_drive}
+                        alt="Google Drive logo"
+                        width={18}
+                        height={18}
+                      />
+                    </div>
+                  )}
                   <span className="text-lg">Google Drive</span>
                   <Badge variant={googleDriveState?.status === 'connected' ? 'default' : 'outline'}>
                     {googleDriveState?.status === 'connected' ? 'Connected' : 'Not connected'}

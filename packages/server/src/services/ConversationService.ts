@@ -1422,15 +1422,15 @@ export class ConversationService {
               : [];
             const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
-            // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
+            // Extract reasoning from OpenRouter unified fields (reasoning and reasoning_details)
             const extractReasoning = (node: unknown): string => {
               try {
                 if (!node || typeof node !== 'object') return '';
                 const rec = node as Record<string, unknown>;
                 const parts: string[] = [];
 
-                // Unified fields
-                const raw = (rec.reasoning ?? rec.thinking) as unknown;
+                // Unified reasoning field
+                const raw = rec.reasoning as unknown;
 
                 const appendFromRaw = (r: unknown): void => {
                   if (!r) return;

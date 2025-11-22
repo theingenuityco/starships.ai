@@ -530,17 +530,15 @@ export class LLM extends BaseNode<LlmParams> {
           content += piece;
         }
 
-        // Accumulate reasoning text from providers that support reasoning-capable models
+        // Accumulate reasoning text from OpenRouter reasoning-capable models
         try {
           const extractReasoning = (node: unknown): string => {
             if (!node || typeof node !== 'object') return '';
             const rec = node as Record<string, unknown>;
             const parts: string[] = [];
 
-            // Unified fields (reasoning / thinking)
-            const raw =
-              (rec as { reasoning?: unknown; thinking?: unknown }).reasoning ??
-              (rec as { reasoning?: unknown; thinking?: unknown }).thinking;
+            // Unified reasoning field from OpenRouter
+            const raw = (rec as { reasoning?: unknown }).reasoning;
 
             const appendFromRaw = (r: unknown): void => {
               if (!r) return;

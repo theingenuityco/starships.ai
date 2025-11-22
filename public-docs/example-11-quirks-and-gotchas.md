@@ -38,5 +38,3 @@
 - Validate required fields early; fail fast with clear error messages.
 - Prefer simplifying data flow (start → code → http_request → end) before adding extra nodes.
 - Avoid replacing HttpRequest with custom fetch unless you hit a documented limitation.
-
-

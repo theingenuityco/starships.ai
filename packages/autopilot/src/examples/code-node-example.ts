@@ -26,7 +26,8 @@ const calculatorBlueprint: Blueprint = {
       parameters: {
         code: `
           async function main(ctx) {
-            const expression = ctx.$input.expression;
+            const input = ctx.input || {};
+            const expression = input.expression;
             
             if (!expression || typeof expression !== 'string') {
               throw new Error('Expression is required and must be a string');
@@ -130,8 +131,9 @@ const timeBlueprint: Blueprint = {
       parameters: {
         code: `
           async function main(ctx) {
-            const timezone = ctx.$input.timezone || 'UTC';
-            const format = ctx.$input.format || 'ISO';
+            const input = ctx.input || {};
+            const timezone = input.timezone || 'UTC';
+            const format = input.format || 'ISO';
             const now = new Date();
             
             let result;

@@ -30,31 +30,31 @@ export class Code extends BaseNode<CodeParams> {
       const execution = this.getOptions()?.execution;
       const runtimeEnv = this.getOptions()?.runtimeEnv || {};
 
-      // Create helpers for ctx
-      const $lastOutputOf = (ref: string): ExecutionItem[] => {
-        try {
-          if (!execution?.results || !ref) return [];
-          for (let i = execution.results.length - 1; i >= 0; i--) {
-            const entry = execution.results[i];
-            if (entry?.nodeRef === ref) {
-              return entry.items ?? [];
-            }
+      // Helper to access last output of a node with unwrapped json semantics
+      const lastOutputOf = (ref: string): unknown => {
+        if (!execution?.results || !ref) return undefined;
+        for (let i = execution.results.length - 1; i >= 0; i--) {
+          const entry = execution.results[i];
+          if (entry?.nodeRef === ref) {
+            const items = entry.items ?? [];
+            if (!items.length) return undefined;
+            if (items.length === 1) return items[0]?.json;
+            return items.map((it) => it.json);
           }
-          return [];
-        } catch {
-          return [];
         }
+        return undefined;
       };
 
-      // Build ctx surface (prefixed keys)
+      // Build ctx surface matching the unified Context contract
       const ctx = {
-        $input: inputData,
-        $state: execution?.state || {},
-        // Preferred helper: $env (maps to non-secret runtime environment)
-        $env: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
-        // Backwards-compatible alias
-        $config: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
-        $lastOutputOf,
+        input: inputData,
+        state: execution?.state || {},
+        outputs: execution?.results || [],
+        status: execution?.status ?? 'not_started',
+        currentNodeRef: execution?.currentNodeRef,
+        lastOutputOf,
+        exists: (value: unknown) => value !== undefined && value !== null,
+        env: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
       };
 
       // Console shim for scoping

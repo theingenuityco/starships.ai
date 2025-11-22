@@ -139,29 +139,31 @@ export class Mutate implements NodeHandler {
     const execution = this.options?.execution;
     const runtimeEnv = this.options?.runtimeEnv || {};
 
-    // Helper to access last output of a node within current execution
-    const $lastOutputOf = (ref: string): ExecutionItem[] => {
-      try {
-        if (!execution?.results || !ref) return [];
-        for (let i = execution.results.length - 1; i >= 0; i--) {
-          const entry = execution.results[i];
-          if (entry?.nodeRef === ref) {
-            return entry.items ?? [];
-          }
+    // Helper to access last output of a node within current execution (unwrapped json)
+    const lastOutputOf = (ref: string): unknown => {
+      if (!execution?.results || !ref) return undefined;
+      for (let i = execution.results.length - 1; i >= 0; i--) {
+        const entry = execution.results[i];
+        if (entry?.nodeRef === ref) {
+          const items = entry.items ?? [];
+          if (!items.length) return undefined;
+          if (items.length === 1) return items[0]?.json;
+          return items.map((it) => it.json);
         }
-        return [];
-      } catch {
-        return [];
       }
+      return undefined;
     };
 
     const inputData = ExecutionItemUtils.unwrapSingle(input);
 
     const ctx = {
       input: inputData,
-      $input: () => inputData,
-      $lastOutputOf,
       state: execution?.state || {},
+      outputs: execution?.results || [],
+      status: execution?.status ?? 'not_started',
+      currentNodeRef: execution?.currentNodeRef,
+      lastOutputOf,
+      exists: (value: unknown) => value !== undefined && value !== null,
       // Non-secret runtime configuration, aligned with Eval's env helper
       env: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
       // Utilities and safe builtins

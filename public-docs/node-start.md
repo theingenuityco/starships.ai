@@ -27,12 +27,12 @@ Example
 ### Passing initial input to downstream nodes
 
 - If a tool/workflow is invoked with an initial argument object, `start` will pass it through unchanged.
-- The next node (e.g., a Code node) can read it via `ctx.$input`.
+- The next node (e.g., a Code node) can read it via `ctx.input`.
 - Example:
   ```ts
   // Code node after start
   async function main(ctx) {
-    const args = ctx.$input ?? {};
+    const args = ctx.input ?? {};
     // build request body, validate, etc.
     return { body: String(args?.content ?? "") };
   }

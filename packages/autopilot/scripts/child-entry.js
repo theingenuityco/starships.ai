@@ -22,6 +22,31 @@ let eventBuffer = [];
 let nextHttpRequestId = 1;
 const pendingHttpRequests = new Map();
 
+// Sanitize objects before sending over IPC: remove functions and non-cloneable values.
+// This prevents host_http requests from getting stuck when parameters accidentally
+// contain runtime helpers (for example, (path) => this.extractPath(inputData, path)).
+function sanitizeForIpc(value, depth = 0) {
+  if (depth > 8) return undefined;
+  if (value === null || value === undefined) return value;
+  const t = typeof value;
+  if (t === 'function') {
+    return undefined;
+  }
+  if (t !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => sanitizeForIpc(v, depth + 1));
+  }
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const v = value[key];
+    if (typeof v === 'function') continue;
+    out[key] = sanitizeForIpc(v, depth + 1);
+  }
+  return out;
+}
+
 function safeSend(msg) {
   try {
     if (process.send) {
@@ -33,7 +58,9 @@ function safeSend(msg) {
       process.send(msg);
     }
   } catch (e) {
-    // ignore send errors (parent may have exited)
+    // Log send errors to help diagnose stuck host_http requests (e.g., IPC channel closed).
+    // eslint-disable-next-line no-console
+    console.error('[autopilot:child] safeSend error', e);
   }
 }
 
@@ -57,7 +84,15 @@ function createHostRuntimeBridge() {
       new Promise((resolve, reject) => {
         const id = nextHttpRequestId++;
         pendingHttpRequests.set(id, { resolve, reject });
-        safeSend({ type: 'host_http', id, request });
+        const safeRequest = sanitizeForIpc(request);
+        // Debug trace for outbound host HTTP requests from the child process.
+        console.log('[autopilot:child] host_http -> parent', {
+          id,
+          method: safeRequest && safeRequest.method,
+          url: safeRequest && safeRequest.url,
+          connector: safeRequest && safeRequest.connector,
+        });
+        safeSend({ type: 'host_http', id, request: safeRequest });
       }),
   };
 }
@@ -76,12 +111,18 @@ process.on('message', async (msg) => {
   if (msg.type === 'host_http_result') {
     const entry = pendingHttpRequests.get(msg.id);
     if (!entry) {
+      // eslint-disable-next-line no-console
+      console.warn('[autopilot:child] host_http_result with unknown id', { id: msg.id });
       return;
     }
     pendingHttpRequests.delete(msg.id);
     if (msg.error) {
+      // eslint-disable-next-line no-console
+      console.error('[autopilot:child] host_http_result error', { id: msg.id, error: msg.error });
       entry.reject(new Error(String(msg.error)));
     } else {
+      // eslint-disable-next-line no-console
+      console.log('[autopilot:child] host_http_result ok', { id: msg.id });
       entry.resolve(msg.response);
     }
     return;

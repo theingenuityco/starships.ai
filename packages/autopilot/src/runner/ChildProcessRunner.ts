@@ -6,6 +6,7 @@
 
 import type { Blueprint, Execution, ExecutionItem } from '@/types';
 import type { EngineConfig } from '@/engine/Engine';
+import type { HostRuntime } from '@/types/node-handler';
 import type { Runner } from './Runner';
 import { fork, type StdioOptions } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
@@ -105,11 +106,11 @@ export class ChildProcessRunner implements Runner {
       // Bridge events and hostRuntime HTTP back to caller
       child.on('message', async (msg: unknown) => {
         try {
-          const m = msg as any;
+          const m = msg as { type?: unknown; [key: string]: unknown };
 
           // HostRuntime HTTP bridge: child -> parent
           if (m && typeof m === 'object' && m.type === 'host_http') {
-            const host = config?.hostRuntime as any;
+            const host = config?.hostRuntime;
             if (!host || typeof host.http !== 'function') {
               child.send?.({
                 type: 'host_http_result',
@@ -119,13 +120,28 @@ export class ChildProcessRunner implements Runner {
               return;
             }
             try {
-              const response = await host.http(m.request);
+              type HostHttpRequest = Parameters<HostRuntime['http']>[0];
+              const request = (m as { request: HostHttpRequest }).request;
+              console.log('[ChildProcessRunner] host_http received from child', {
+                pid: child.pid,
+                id: m.id,
+                method: request.method,
+                url: request.url,
+                connector: request.connector,
+              });
+              const response = await host.http(request);
+              console.log('[ChildProcessRunner] host_http success', { pid: child.pid, id: m.id });
               child.send?.({
                 type: 'host_http_result',
                 id: m.id,
                 response,
               });
             } catch (err) {
+              console.error('[ChildProcessRunner] host_http error', {
+                pid: child.pid,
+                id: m.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
               child.send?.({
                 type: 'host_http_result',
                 id: m.id,
@@ -164,8 +180,8 @@ export class ChildProcessRunner implements Runner {
               // ignore
             }
           }
-        } catch {
-          // ignore
+        } catch (err) {
+          console.error('[ChildProcessRunner] message handler error (run)', err);
         }
       });
 
@@ -205,9 +221,7 @@ export class ChildProcessRunner implements Runner {
       }
 
       // Prepare safe config (functions cannot cross the IPC boundary)
-      const safeConfig = config
-        ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined }
-        : undefined;
+      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined } : undefined;
 
       const autopilotCredentials = {
         openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined,
@@ -278,11 +292,11 @@ export class ChildProcessRunner implements Runner {
     const promise = new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
       child.on('message', async (msg: unknown) => {
         try {
-          const m = msg as any;
+          const m = msg as { type?: unknown; [key: string]: unknown };
 
           // HostRuntime HTTP bridge: child -> parent
           if (m && typeof m === 'object' && m.type === 'host_http') {
-            const host = config?.hostRuntime as any;
+            const host = config?.hostRuntime;
             if (!host || typeof host.http !== 'function') {
               child.send?.({
                 type: 'host_http_result',
@@ -292,13 +306,28 @@ export class ChildProcessRunner implements Runner {
               return;
             }
             try {
-              const response = await host.http(m.request);
+              type HostHttpRequest = Parameters<HostRuntime['http']>[0];
+              const request = (m as { request: HostHttpRequest }).request;
+              console.log('[ChildProcessRunner] host_http received from child', {
+                pid: child.pid,
+                id: m.id,
+                method: request.method,
+                url: request.url,
+                connector: request.connector,
+              });
+              const response = await host.http(request);
+              console.log('[ChildProcessRunner] host_http success', { pid: child.pid, id: m.id });
               child.send?.({
                 type: 'host_http_result',
                 id: m.id,
                 response,
               });
             } catch (err) {
+              console.error('[ChildProcessRunner] host_http error', {
+                pid: child.pid,
+                id: m.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
               child.send?.({
                 type: 'host_http_result',
                 id: m.id,
@@ -337,8 +366,8 @@ export class ChildProcessRunner implements Runner {
               // ignore
             }
           }
-        } catch {
-          // ignore
+        } catch (err) {
+          console.error('[ChildProcessRunner] message handler error (runWithController)', err);
         }
       });
 
@@ -376,9 +405,7 @@ export class ChildProcessRunner implements Runner {
         }, timeoutMs);
       }
 
-      const safeConfig = config
-        ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined }
-        : undefined;
+      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined } : undefined;
       const autopilotCredentials = { openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined };
       child.send({ type: 'parent_ready' });
       child.send({ type: 'start', payload: { blueprint, execution, config: safeConfig, autopilotCredentials } });

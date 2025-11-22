@@ -15,7 +15,7 @@ export class ConnectorEntity implements ConnectorModel {
 
   @Expose()
   @IsString()
-  @IsIn(['linkedin', 'discord'] satisfies ConnectorProvider[])
+  @IsIn(['linkedin', 'discord', 'google_drive'] satisfies ConnectorProvider[])
   provider!: ConnectorProvider;
 
   @Expose()

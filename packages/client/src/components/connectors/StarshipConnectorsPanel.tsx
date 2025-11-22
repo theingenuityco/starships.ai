@@ -21,9 +21,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
   const [searchQuery, setSearchQuery] = useState('')
 
-  const getConnectorState = (provider: 'linkedin' | 'discord') => connectors.find(connector => connector.provider === provider)
+  const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive') => connectors.find(connector => connector.provider === provider)
 
-  const handleDisconnect = (provider: 'linkedin' | 'discord') => {
+  const handleDisconnect = (provider: 'linkedin' | 'discord' | 'google_drive') => {
     disconnectMutation.mutate(provider)
   }
 

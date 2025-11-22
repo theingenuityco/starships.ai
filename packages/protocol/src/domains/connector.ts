@@ -8,7 +8,7 @@
 // CONNECTOR TYPES
 // ============================================================================
 
-export type ConnectorProvider = 'linkedin' | 'discord' | 'starships';
+export type ConnectorProvider = 'linkedin' | 'discord' | 'starships' | 'google_drive';
 
 export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 

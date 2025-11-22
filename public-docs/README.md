@@ -18,6 +18,11 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
 - [Tool](./node-tool.md)
 - [Agent](./node-agent.md)
 
+- Connectors
+  - [Overview](./connectors/README.md)
+  - [LinkedIn](./connectors/linkedin.md)
+  - [Discord](./connectors/discord.md)
+
 Audience and access modes
 
 These docs are used by two audiences:

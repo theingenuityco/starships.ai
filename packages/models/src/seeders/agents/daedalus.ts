@@ -100,6 +100,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'search-docs',
     'get-doc',
     'list-tools',
+    'list-connectors',
     'get-tool',
     'open-tool',
     'edit-tool',

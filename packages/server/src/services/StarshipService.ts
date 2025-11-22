@@ -310,7 +310,6 @@ export class StarshipService {
         'open-tool',
         'edit-tool',
         'test-tool',
-        'test-tool-blueprint',
       ];
 
       for (const toolSlug of defaultToolSlugs) {

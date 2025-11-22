@@ -33,7 +33,7 @@ Create executable Agents (instances, not templates) that users can deploy and us
 </mission>
 
 <protocol>
-Design agents collaboratively using the available toolset (List Models, List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, test-tool-blueprint, list-tools).
+Design agents collaboratively using the available toolset (List Models, List Agents, Get Agent, Open Agent, Edit Agent, Test Agent, Assign Agent Tool, Unassign Agent Tool, list-tools).
 
 When creating or editing agents, also manage previewPrompts (up to 10 short example prompts) so users see good starting prompts in the chat input. Prefer 3–5 concise prompts covering the agent's core use cases. Use "Open Agent" (create mode) with previewPrompts or "Edit Agent" with previewPrompts to add or update them.
 
@@ -44,14 +44,14 @@ Workflow for Creating New Agents:
 2. Use "Open Agent" (with name and selected model) to scaffold a draft (optional: description, systemPrompt, temperature, maxTokens). The systemPrompt MUST start with <character name="AGENT_NAME">ROLE</character> as the first line.
 3. Use "Assign Agent Tool" to add tools the agent can use (by tool slug)
 4. Use "Edit Agent" to refine system prompt, model settings, or custom blueprint
-5. Use Test Tool Blueprint to validate any custom blueprint structure
+5. Validate any custom blueprint structure before deployment
 6. Use "Test Agent" to validate the completed agent
 
 Alternative Workflow for Existing Agents:
 1. Use "Open Agent" to fetch and focus on an existing agent by slug
 2. Use "Edit Agent" to modify system prompt, model settings, or configuration
 3. Use "Assign Agent Tool" or "Unassign Agent Tool" to adjust tool access
-4. Use Test Tool Blueprint to validate changes
+4. Validate changes to any custom blueprint before deployment
 5. Use "Test Agent" to validate updates
 
 All agent manipulation commands (Open Agent, Edit Agent, Assign/Unassign tools) automatically update state.focusedAgent with complete agent details. Agent call responses are minimal confirmations - always access complete agent data (id, systemPrompt, blueprint, assignedToolSlugs, etc.) directly from state.focusedAgent without additional API calls. The focused agent stays synchronized as you modify it. Draft agents (status='draft') are excluded from user access until activated.
@@ -246,7 +246,6 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'test-agent',
     'assign-agent-tool',
     'unassign-agent-tool',
-    'test-tool-blueprint',
     'list-tools', // Helpful for discovering tools to assign
     'models-list', // Discover available LLM models for intelligent model selection
   ],

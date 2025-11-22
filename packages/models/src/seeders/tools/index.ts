@@ -15,12 +15,8 @@ export { toolEditToolTemplate } from './edit-tool';
 export { docsSearchToolTemplate } from './search-docs';
 export { docsGetDocToolTemplate } from './get-doc';
 export { toolTestToolTemplate } from './test-tool';
-export { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
-export { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
-export { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
-export { toolRemoveBlueprintNodeToolTemplate } from './remove-tool-blueprint-node';
-export { toolEditBlueprintEdgeToolTemplate } from './edit-tool-blueprint-edge';
-export { toolRemoveBlueprintEdgeToolTemplate } from './remove-tool-blueprint-edge';
+export { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-node';
+export { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 export { agentListToolTemplate } from './list-agent';
 export { agentGetToolTemplate } from './get-agent';
 export { agentOpenToolTemplate } from './open-agent';
@@ -43,12 +39,8 @@ import { toolEditToolTemplate } from './edit-tool';
 import { docsSearchToolTemplate } from './search-docs';
 import { docsGetDocToolTemplate } from './get-doc';
 import { toolTestToolTemplate } from './test-tool';
-import { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
-import { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
-import { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
-import { toolRemoveBlueprintNodeToolTemplate } from './remove-tool-blueprint-node';
-import { toolEditBlueprintEdgeToolTemplate } from './edit-tool-blueprint-edge';
-import { toolRemoveBlueprintEdgeToolTemplate } from './remove-tool-blueprint-edge';
+import { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-node';
+import { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 import { agentListToolTemplate } from './list-agent';
 import { agentGetToolTemplate } from './get-agent';
 import { agentOpenToolTemplate } from './open-agent';
@@ -71,12 +63,8 @@ export const ALL_TOOL_TEMPLATES = [
   docsSearchToolTemplate,
   docsGetDocToolTemplate,
   toolTestToolTemplate,
-  toolAddBlueprintNodeToolTemplate,
-  toolAddBlueprintEdgeToolTemplate,
-  toolEditBlueprintNodeToolTemplate,
-  toolRemoveBlueprintNodeToolTemplate,
-  toolEditBlueprintEdgeToolTemplate,
-  toolRemoveBlueprintEdgeToolTemplate,
+  toolModifyBlueprintNodeToolTemplate,
+  toolModifyBlueprintEdgeToolTemplate,
   agentListToolTemplate,
   agentGetToolTemplate,
   agentOpenToolTemplate,

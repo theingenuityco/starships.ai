@@ -3,6 +3,7 @@
 What it is: Streams model outputs via OpenRouter (OpenAI-compatible API) with reliable accumulation and function calling. Normalizes message/tool formats and usage accounting.
 
 Specification (authoritative)
+
 - Handler: `packages/autopilot/src/nodes/LLM.ts`
 - Requires an OpenRouter-compatible API key provided by the hosting runtime (for example via environment variables or host callbacks). The key is never exposed to workflows.
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
@@ -18,6 +19,7 @@ Specification (authoritative)
   - reasoning?: { effort?: 'low'|'medium'|'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean }
 
 Message normalization and conversion
+
 - Input `messages` are coerced into canonical `LlmMessage[]`:
   - supports both `toolCalls` (camelCase) and `tool_calls` (snake_case)
   - tool arguments strings are parsed when possible; objects are preserved
@@ -26,6 +28,7 @@ Message normalization and conversion
   - tool messages map `toolCallId` => `tool_call_id`
 
 Streaming and events
+
 - Uses the OpenAI SDK streaming client; chunks are normalized:
   - content tokens accumulated into a single `content` string
   - tool call fragments accumulated safely (balanced flush of JSON segments)
@@ -36,7 +39,9 @@ Streaming and events
   - tool_call_detected: when a tool call is first observed (id+name)
 
 Return value (shape)
+
 - Final `LLMResponse`:
+
 ```ts
 {
   id, object: 'chat.completion', created, model,
@@ -57,6 +62,7 @@ Return value (shape)
 ```
 
 Validation rules (strict)
+
 - model: required
 - messages: array with at least 1 entry (must be explicitly provided or resolve to a non-empty array)
 - tools: must be an array of ToolParams or a template string; other types invalid
@@ -68,6 +74,7 @@ Validation rules (strict)
   - timeout: >= 1000ms is recommended at call-sites; the node validates minimums where applicable
 
 Edge cases and guarantees
+
 - `parallel_tool_calls` is set to false to prevent multiple tool calls within a single assistant response.
 - Provider-snapshot toolCalls are respected; arguments snapshot is used as a fallback if delta assembly yields shorter content.
 - Errors are surfaced with descriptive messages; handler throws if API key is missing.
@@ -104,7 +111,6 @@ Example (chat with tools)
 ```
 
 Cross-links
+
 - See Tool for how tool schemas/blueprints are invoked.
 - See Engine for event delivery and runtime configuration handling.
-
-

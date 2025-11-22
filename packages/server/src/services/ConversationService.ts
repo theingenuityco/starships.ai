@@ -28,6 +28,7 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { StarshipsIntegrationService } from '@/services/StarshipsIntegrationService';
+import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 
 // Debug flags
 const DEBUG_TOOLCALLS = false;
@@ -68,6 +69,7 @@ export class ConversationService {
   private billingService!: BillingService;
   private walletService!: WalletService;
   private starshipsIntegrationService!: StarshipsIntegrationService;
+  private connectorRuntimeService!: ConnectorRuntimeService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
@@ -150,6 +152,7 @@ export class ConversationService {
     this.billingService = new BillingService();
     this.walletService = new WalletService();
     this.starshipsIntegrationService = new StarshipsIntegrationService();
+    this.connectorRuntimeService = new ConnectorRuntimeService(this.environmentService);
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
 
@@ -704,108 +707,11 @@ export class ConversationService {
     try {
       // starship already resolved above
 
-      const env = getEnvConfig();
-      const baseUrl = `${env.SERVER_URL}/api/v1`;
-      const rawAuth = ctx?.authorization ?? '';
-      const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
       };
 
-      const hostRuntime: HostRuntime = {
-        http: async ({ method, url, headers = {}, body, timeoutMs, connector }) => {
-          const controller = new AbortController();
-          const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-          // Normalize URL and apply connector-aware auth in the outer scope so
-          // we can safely reference finalUrl in both success and error paths.
-          let finalUrl = url;
-
-          // Normalize URL: prefix baseUrl for relative paths
-          if (finalUrl.startsWith('/')) {
-            finalUrl = baseUrl + finalUrl;
-          }
-
-          // Connector-aware auth injection
-          if (connector === 'starships') {
-            // Ensure Authorization header is present when we have an auth token
-            if (authToken) {
-              const lowered: Record<string, unknown> = {};
-              Object.entries(headers).forEach(([k, v]) => {
-                lowered[k.toLowerCase()] = v;
-              });
-              if (!lowered['authorization']) {
-                headers = {
-                  ...headers,
-                  Authorization: `Bearer ${authToken}`,
-                };
-              }
-            }
-          }
-
-          try {
-            const finalMethod = method.toUpperCase();
-            const init: RequestInit = {
-              method: finalMethod,
-              headers: headers as Record<string, string>,
-              signal: controller.signal,
-            };
-
-            if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
-              if (typeof body === 'string') {
-                init.body = body;
-              } else if (body && typeof body === 'object') {
-                init.body = JSON.stringify(body);
-                (init.headers as Record<string, string>) =
-                  typeof init.headers === 'object' && !Array.isArray(init.headers)
-                    ? { 'content-type': 'application/json', ...(init.headers as Record<string, string>) }
-                    : { 'content-type': 'application/json' };
-              }
-            }
-
-            // NOTE: connector is currently a hint; future versions can
-            // route via connector records instead of direct HTTP.
-            // For now we treat all HTTP uniformly and rely on URL/auth headers.
-
-            const resp = await fetch(finalUrl, init);
-            const contentType = resp.headers.get('content-type') || '';
-            let responseBody: unknown;
-            if (contentType.includes('application/json')) {
-              try {
-                responseBody = await resp.json();
-              } catch {
-                responseBody = await resp.text();
-              }
-            } else {
-              responseBody = await resp.text();
-            }
-
-            const responseHeaders: Record<string, unknown> = {};
-            resp.headers.forEach((value, key) => {
-              responseHeaders[key] = value;
-            });
-
-            return {
-              status: resp.status,
-              statusText: resp.statusText,
-              headers: responseHeaders,
-              body: responseBody,
-              url: resp.url,
-            };
-          } catch (error) {
-            const reason =
-              controller.signal.aborted && !(error instanceof Error)
-                ? `timeout after ${timeout}ms`
-                : error instanceof Error
-                  ? error.message
-                  : 'Unknown error';
-            throw new Error(`HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> ${reason}`);
-          } finally {
-            clearTimeout(timeoutId);
-          }
-        },
-      };
+      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);
 
       // Orchestrate sequentially with mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {

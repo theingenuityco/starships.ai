@@ -14,9 +14,7 @@ export function createDefaultAgentBlueprint(config: DefaultBlueprintConfig): Blu
     model: config.model,
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
-    ...(config.reasoningEffort !== undefined
-      ? { reasoning: { enabled: true, effort: config.reasoningEffort } }
-      : {}),
+    ...(config.reasoningEffort !== undefined ? { reasoning: { enabled: true, effort: config.reasoningEffort } } : {}),
   });
 
   return agent.getCurrentBlueprint();

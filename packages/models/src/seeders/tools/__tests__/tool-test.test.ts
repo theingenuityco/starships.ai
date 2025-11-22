@@ -139,7 +139,17 @@ describe('Tool Test Tool', () => {
           expect(method).toBe('GET');
           expect(connector).toBe('starships');
           expect(url).toBe('/starships/test-starship/tools/demo');
-          return createMockResponse({ blueprint: nested });
+
+          // Tools API contract: { data: Tool }
+          return createMockResponse({
+            data: {
+              name: 'Nested Echo Tool',
+              slug: 'nested-echo',
+              description: 'Echo initial arguments from __initial__',
+              parameters: { type: 'object', properties: {} },
+              blueprint: nested,
+            },
+          });
         }) as unknown as HostRuntime['http'],
       };
 
@@ -159,7 +169,17 @@ describe('Tool Test Tool', () => {
     it('should pass through provided arguments to nested workflow', async () => {
       const nested = makeNestedEchoBlueprint();
       const hostRuntime: HostRuntime = {
-        http: jest.fn(async () => createMockResponse({ blueprint: nested })) as unknown as HostRuntime['http'],
+        http: jest.fn(async () =>
+          createMockResponse({
+            data: {
+              name: 'Nested Echo Tool',
+              slug: 'nested-echo',
+              description: 'Echo initial arguments from __initial__',
+              parameters: { type: 'object', properties: {} },
+              blueprint: nested,
+            },
+          })
+        ) as unknown as HostRuntime['http'],
       };
 
       const args = { a: 1, b: { deep: true } };
@@ -229,7 +249,17 @@ describe('Tool.execute return value - test-tool', () => {
     };
 
     const hostRuntime: HostRuntime = {
-      http: jest.fn(async () => createMockResponse({ blueprint: nested })) as unknown as HostRuntime['http'],
+      http: jest.fn(async () =>
+        createMockResponse({
+          data: {
+            name: 'Nested Echo Tool',
+            slug: 'nested-echo',
+            description: 'Echo initial arguments from __initial__',
+            parameters: { type: 'object', properties: {} },
+            blueprint: nested,
+          },
+        })
+      ) as unknown as HostRuntime['http'],
     };
     const args = { x: 1, y: { deep: true } };
     const options: NodeHandlerOptions = {

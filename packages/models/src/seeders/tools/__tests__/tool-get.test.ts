@@ -179,13 +179,13 @@ describe('Tool Get Tool', () => {
       const bp = toolGetTool.blueprint;
       const http = bp.nodes.find((n) => n.ref === 'http_get');
       expect(http?.type).toBe('http_request');
-      const params = (http?.parameters || {}) as Record<string, unknown>;
+      const params = (http?.parameters || {}) as Record<string, unknown> & { connector?: string };
       expect(params.url).toBeDefined();
       expect(params.method).toBeDefined();
       expect(params.timeout).toBeDefined();
       expect(params.method).toBe('GET');
       expect(params.url).toBe('{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}');
-      expect((params as any).connector).toBe('starships');
+      expect(params.connector).toBe('starships');
     });
   });
 });

@@ -5,6 +5,7 @@ export interface DefaultBlueprintConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 export function createDefaultAgentBlueprint(config: DefaultBlueprintConfig): Blueprint {
@@ -13,6 +14,9 @@ export function createDefaultAgentBlueprint(config: DefaultBlueprintConfig): Blu
     model: config.model,
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+    ...(config.reasoningEffort !== undefined
+      ? { reasoning: { enabled: true, effort: config.reasoningEffort } }
+      : {}),
   });
 
   return agent.getCurrentBlueprint();

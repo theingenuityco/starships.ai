@@ -81,6 +81,7 @@ export class Agent implements NodeHandler {
         ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
         ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
         ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+        ...(this.params.reasoning !== undefined && { reasoning: this.params.reasoning }),
         reducers: [
           `
           (state, ctx) => {

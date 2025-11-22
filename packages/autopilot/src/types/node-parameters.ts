@@ -244,6 +244,13 @@ export interface AgentParams extends BaseParams {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  // Optional reasoning configuration forwarded to the underlying LLM node
+  reasoning?: {
+    effort?: 'low' | 'medium' | 'high';
+    max_tokens?: number;
+    exclude?: boolean;
+    enabled?: boolean;
+  };
 
   // Execution parameters
   timeout?: number;

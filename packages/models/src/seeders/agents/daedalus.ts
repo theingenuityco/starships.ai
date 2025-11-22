@@ -7,6 +7,7 @@ function createDaedalusDefaultBlueprint(): Blueprint {
   return createDefaultAgentBlueprint({
     name: 'Daedalus',
     model: 'openai/gpt-5.1',
+    reasoningEffort: 'medium',
   });
 }
 

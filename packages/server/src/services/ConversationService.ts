@@ -13,6 +13,7 @@ import type {
   Execution,
   LlmToolCall,
   LlmMessage,
+  EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
@@ -870,7 +871,7 @@ export class ConversationService {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
           hostRuntime,
-        } as any;
+        } as EngineConfig;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
         // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages

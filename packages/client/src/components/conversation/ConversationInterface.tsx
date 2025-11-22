@@ -552,12 +552,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           const toolBuilderSlugFragments = [
             'open-tool',
             'edit-tool',
-            'add-tool-blueprint-node',
-            'add-tool-blueprint-edge',
-            'edit-tool-blueprint-node',
-            'remove-tool-blueprint-node',
-            'edit-tool-blueprint-edge',
-            'remove-tool-blueprint-edge',
+            'modify-tool-blueprint-node',
+            'modify-tool-blueprint-edge',
           ]
           if (toolBuilderSlugFragments.some(s => toolNameLc.includes(s)) || toolNameLc.includes('tool-blueprint-')) {
             try {
@@ -626,16 +622,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         }
 
         // Tool tools - fetch and sync tool data
-        const toolTools = [
-          'open-tool',
-          'edit-tool',
-          'add-tool-blueprint-node',
-          'add-tool-blueprint-edge',
-          'edit-tool-blueprint-node',
-          'remove-tool-blueprint-node',
-          'edit-tool-blueprint-edge',
-          'remove-tool-blueprint-edge',
-        ]
+        const toolTools = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
         if (toolTools.includes(toolName) && toolArgs?.slug) {
           // Fetch complete tool data by slug
           const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
@@ -834,16 +821,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
           if (!name) continue
 
-          const toolFragments = [
-            'open-tool',
-            'edit-tool',
-            'add-tool-blueprint-node',
-            'add-tool-blueprint-edge',
-            'edit-tool-blueprint-node',
-            'remove-tool-blueprint-node',
-            'edit-tool-blueprint-edge',
-            'remove-tool-blueprint-edge',
-          ]
+          const toolFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
           const agentFragments = ['open-agent', 'edit-agent']
 
           let args: any = tc?.function?.arguments

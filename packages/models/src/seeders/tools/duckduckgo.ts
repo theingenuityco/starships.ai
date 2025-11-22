@@ -40,7 +40,9 @@ export const duckduckgoTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const { query, skipDisambiguation = true } = (ctx.$input || {});
+              const input = ctx.input || {};
+              const query = input.query;
+              const skipDisambiguation = input.skipDisambiguation === undefined ? true : !!input.skipDisambiguation;
               if (!query || typeof query !== 'string') {
                 throw new Error('Query is required and must be a string');
               }
@@ -78,7 +80,7 @@ export const duckduckgoTool: ToolParams = {
             }
           `,
           timeout: 5000,
-          reducers: ["(state, ctx) => ({ ...state, duckduckgo_metadata: ctx.$lastOutputOf('prepare_request')[0].json.metadata })"],
+          reducers: ["(state, ctx) => { const prepared = ctx.lastOutputOf('prepare_request') || {}; return { ...state, duckduckgo_metadata: prepared.metadata }; }"],
         },
       },
       {
@@ -87,9 +89,9 @@ export const duckduckgoTool: ToolParams = {
         name: 'Fetch from DuckDuckGo',
         description: 'Execute HTTP request to DuckDuckGo Instant Answer API',
         parameters: {
-          url: '{{ $lastOutputOf("prepare_request")[0].json.request.url }}',
-          method: '{{ $lastOutputOf("prepare_request")[0].json.request.method }}',
-          headers: '{{ $lastOutputOf("prepare_request")[0].json.request.headers }}',
+          url: '{{ (lastOutputOf("prepare_request") || {}).request?.url }}',
+          method: '{{ (lastOutputOf("prepare_request") || {}).request?.method }}',
+          headers: '{{ (lastOutputOf("prepare_request") || {}).request?.headers }}',
           timeout: 30000,
         },
       },
@@ -101,8 +103,8 @@ export const duckduckgoTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const httpResponse = ctx.$input || {};
-              const metadata = (ctx.$state && ctx.$state.duckduckgo_metadata) || {};
+              const httpResponse = ctx.input || {};
+              const metadata = (ctx.state && ctx.state.duckduckgo_metadata) || {};
               let parsedBody = httpResponse.body;
               if (typeof parsedBody === 'string') {
                 try {
@@ -131,7 +133,7 @@ export const duckduckgoTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const packed = (ctx.$input || {});
+              const packed = ctx.input || {};
               const httpResponse = packed.httpResponse || {};
               const metadata = packed.metadata || {};
               const data = httpResponse.body || {};
@@ -269,7 +271,7 @@ export const duckduckgoTool: ToolParams = {
         name: 'End',
         description: 'Return DuckDuckGo instant answer results',
         parameters: {
-          output: '{{ $input() }}',
+          output: '{{ input }}',
         },
       },
     ],

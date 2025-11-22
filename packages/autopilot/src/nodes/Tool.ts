@@ -63,7 +63,8 @@ export class Tool extends BaseNode<ToolParams> {
       const engineConfig: EngineConfig = {
         eventCallback: this.getEventCallback(),
         failOnNodeError: true,
-        secureEnv: this.getOptions()?.secureEnv,
+        runtimeEnv: this.getOptions()?.runtimeEnv,
+        hostRuntime: this.getOptions()?.hostRuntime,
       };
       const depth = subExec.depth ?? 0;
       const runner = RunnerFactory.getTopLevelRunner(depth);

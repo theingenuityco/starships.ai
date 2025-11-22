@@ -19,8 +19,6 @@ Inputs:
 - slug (required): Agent slug to fetch
 
 Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
 - STARSHIP_ID: derived from agent.state.starshipId
 
 Output:
@@ -47,27 +45,16 @@ Behavior and limits:
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL and headers',
+        description: 'Validate inputs',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
-              const slug = ctx.$input && ctx.$input.slug;
+              const input = ctx.input || {};
+              const slug = input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
               return {
-                url: baseUrl + '/starships/' + String(starshipId) + '/agents/' + String(slug),
-                method: 'GET',
-                headers: {
-                  'Authorization': 'Bearer ' + String(authToken),
-                  'Content-Type': 'application/json'
-                }
+                slug: String(slug)
               };
             }
           `,
@@ -80,9 +67,9 @@ Behavior and limits:
         name: 'Get Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
+          method: 'GET',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -92,7 +79,7 @@ Behavior and limits:
         name: 'End',
         description: 'Return complete agent details',
         parameters: {
-          output: '{{ $lastOutputOf("http_get")[0].json }}',
+          output: '{{ lastOutputOf("http_get") }}',
         },
       },
     ],
@@ -112,7 +99,7 @@ export const agentGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: agentGetTool.blueprint,
 
   slug: 'get-agent',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "slug": "customer-support" } // returns complete agent details',
   requiresApiKey: false,

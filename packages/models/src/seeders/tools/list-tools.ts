@@ -19,9 +19,7 @@ Inputs:
 - {} (no arguments)
 
 Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
-- STARSHIP_ID: derived from agent.state.starshipId
+- STARSHIP_ID: derived from the current starship context
 
 Output:
 - Array of { slug, name, description, isEnabled } (deliberately lean; heavy fields like blueprint are omitted)
@@ -38,42 +36,16 @@ Behavior and limits:
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
-        ref: 'prepare',
-        type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers',
-        parameters: {
-          code: `
-            async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-
-              return {
-                url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
-                method: 'GET',
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
-              };
-            }
-          `,
-          timeout: 3000,
-        },
-      },
-      {
         ref: 'http_list',
         type: 'http_request',
-        name: 'List Tools',
-        description: 'GET /starships/:starshipId/tools',
+        name: 'List Tools (HTTP)',
+        description: 'List tools via Starships HTTP API',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          method: 'GET',
+          // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1, inject auth,
+          // and use STARSHIP_ID from env.
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" }}',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -85,13 +57,16 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              // Input is the HttpResponse from http_list (see HttpRequest node contract)
-              const http = ctx.$input;
-              const body = http && typeof http === 'object' ? http.body : http;
-              // Server sendSuccess returns { data: T }, so prefer body.data when present
-              const data = body && typeof body === 'object' && Array.isArray(body.data)
-                ? body.data
-                : (Array.isArray(body) ? body : []);
+              // Expect the HTTP node to return a response object with { status, headers, body, url }.
+              // The body may be a bare array of tools or an object with a data array property.
+              const raw = ctx.input;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+
+              const isObject = payload && typeof payload === 'object';
+              const data = isObject && Array.isArray(payload.data)
+                ? payload.data
+                : (Array.isArray(payload) ? payload : []);
 
               // Return a lean summary to avoid leaking large/templated blueprint contents
               return data.map((t) => ({
@@ -111,15 +86,14 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("summarize")[0].json }}',
+          output: '{{ lastOutputOf("summarize") }}',
         },
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_list' },
-      { ref: 'e3', from: 'http_list', to: 'summarize' },
-      { ref: 'e4', from: 'summarize', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'http_list' },
+      { ref: 'e2', from: 'http_list', to: 'summarize' },
+      { ref: 'e3', from: 'summarize', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -132,7 +106,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolListTool.blueprint,
 
   slug: 'list-tools',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of tools; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

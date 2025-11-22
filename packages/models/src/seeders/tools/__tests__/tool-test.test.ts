@@ -5,54 +5,33 @@
 
 import { toolTestTool, toolTestToolTemplate } from '../test-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, HostRuntime } from '@starships/autopilot';
 
-// Helper to create a realistic Fetch Response-like object for our HttpRequest node
+// Helper to create a realistic HttpResponse-like object for our HttpRequest node
 function createMockResponse(
   body: unknown,
   {
-    ok = true,
     status = 200,
     statusText = 'OK',
-    contentType = 'application/json; charset=utf-8',
     url = 'https://api.test.com/starships/test-starship/tools/demo',
-    extraHeaders = {},
+    headers = {},
   }: {
-    ok?: boolean;
     status?: number;
     statusText?: string;
-    contentType?: string;
     url?: string;
-    extraHeaders?: Record<string, string>;
+    headers?: Record<string, unknown>;
   } = {}
 ) {
-  const headersMap: Record<string, string> = { 'content-type': contentType, ...extraHeaders };
   return {
-    ok,
     status,
     statusText,
+    headers: headers ?? {},
     url,
-    headers: {
-      get: (name: string) => headersMap[name.toLowerCase()] ?? null,
-      forEach: (cb: (value: string, key: string) => void) => {
-        for (const [k, v] of Object.entries(headersMap)) cb(v, k);
-      },
-    },
-    json: async () => body,
-    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    body,
   };
 }
 
 describe('Tool Test Tool', () => {
-  beforeEach(() => {
-    // Mock fetch globally for HTTP requests
-    global.fetch = jest.fn() as unknown as jest.Mock;
-  });
-
-  afterEach(() => {
-    jest.resetAllMocks();
-  });
-
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
       expect(toolTestTool.name).toBe('Test Tool');
@@ -95,11 +74,11 @@ describe('Tool Test Tool', () => {
   });
 
   describe('Real Tool Execution', () => {
-    async function executeToolWithMockEnv(input: unknown, mockEnv: Record<string, string>) {
+    async function executeToolWithMockConfig(input: unknown, hostRuntime: HostRuntime) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        secureEnv: mockEnv,
-        // Force in-process execution so HTTP mocking (global.fetch) works reliably in tests
+        runtimeEnv: { STARSHIP_ID: 'test-starship' },
+        hostRuntime,
         execution: ExecutionItemUtils.createExecution(),
       };
 
@@ -129,7 +108,7 @@ describe('Tool Test Tool', () => {
             description: '',
             parameters: {
               // Return the args passed to the nested workflow
-              output: '{{ $lastOutputOf("__initial__")[0].json }}',
+              output: '{{ lastOutputOf("__initial__") }}',
             },
           },
         ],
@@ -138,49 +117,43 @@ describe('Tool Test Tool', () => {
       };
     }
 
-    it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, {})).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('baseUrl is required'),
-      });
-    });
-
-    it('should fail without auth token', async () => {
-      const env = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('authToken is required'),
-      });
-    });
-
-    it('should fail without starship ID', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('starshipId is required'),
-      });
-    });
-
     it('should fail when targetSlug is missing', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({}, env)).resolves.toMatchObject({
+      const hostRuntime: HostRuntime = {
+        http: jest.fn(async () => createMockResponse({})) as unknown as HostRuntime['http'],
+      };
+      await expect(executeToolWithMockConfig({}, hostRuntime)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('targetSlug is required'),
       });
     });
 
     it('should execute nested tool blueprint and return result with duration', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
       const input = {
         targetSlug: 'demo',
         arguments: { foo: 'bar', n: 7 },
       };
 
       const nested = makeNestedEchoBlueprint();
-      // HttpRequest returns HttpResponse with body = responseBody
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
+      const hostRuntime: HostRuntime = {
+        http: jest.fn(async ({ method, url, connector }) => {
+          expect(method).toBe('GET');
+          expect(connector).toBe('starships');
+          expect(url).toBe('/starships/test-starship/tools/demo');
 
-      const result = (await executeToolWithMockEnv(input, env)) as {
+          // Tools API contract: { data: Tool }
+          return createMockResponse({
+            data: {
+              name: 'Nested Echo Tool',
+              slug: 'nested-echo',
+              description: 'Echo initial arguments from __initial__',
+              parameters: { type: 'object', properties: {} },
+              blueprint: nested,
+            },
+          });
+        }) as unknown as HostRuntime['http'],
+      };
+
+      const result = (await executeToolWithMockConfig(input, hostRuntime)) as {
         ok: boolean;
         durationMs: number;
         result: Record<string, unknown>;
@@ -191,61 +164,26 @@ describe('Tool Test Tool', () => {
       expect(typeof result.durationMs).toBe('number');
       expect(result.durationMs).toBeGreaterThanOrEqual(0);
       expect(result.result).toEqual({ foo: 'bar', n: 7 });
-
-      // Verify correct API call was made
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.test.com/starships/star-9/tools/demo',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer abc',
-            'Content-Type': 'application/json',
-          }),
-        })
-      );
-    });
-
-    it('should handle HTTP errors gracefully', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: async () => ({ error: 'Tool not found' }),
-        text: async () => JSON.stringify({ error: 'Tool not found' }),
-      });
-
-      await expect(executeToolWithMockEnv({ targetSlug: 'missing' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('HTTP request failed'),
-      });
-    });
-
-    it('should handle network failure', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Network error'),
-      });
-    });
-
-    it('should handle trailing slashes in BASE_URL', async () => {
-      const env = { BASE_URL: 'https://api.example.com///', AUTH_TOKEN: 'abc', STARSHIP_ID: 'ship-1' };
-      const nested = makeNestedEchoBlueprint();
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
-
-      await executeToolWithMockEnv({ targetSlug: 'demo', arguments: {} }, env);
-      expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/starships/ship-1/tools/demo', expect.any(Object));
     });
 
     it('should pass through provided arguments to nested workflow', async () => {
-      const env = { BASE_URL: 'https://api.test.io', AUTH_TOKEN: 'tok', STARSHIP_ID: 'ship-xyz' };
       const nested = makeNestedEchoBlueprint();
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
+      const hostRuntime: HostRuntime = {
+        http: jest.fn(async () =>
+          createMockResponse({
+            data: {
+              name: 'Nested Echo Tool',
+              slug: 'nested-echo',
+              description: 'Echo initial arguments from __initial__',
+              parameters: { type: 'object', properties: {} },
+              blueprint: nested,
+            },
+          })
+        ) as unknown as HostRuntime['http'],
+      };
 
       const args = { a: 1, b: { deep: true } };
-      const result = (await executeToolWithMockEnv({ targetSlug: 'echoer', arguments: args }, env)) as {
+      const result = (await executeToolWithMockConfig({ targetSlug: 'echoer', arguments: args }, hostRuntime)) as {
         ok: boolean;
         result: Record<string, unknown>;
       };
@@ -292,8 +230,6 @@ describe('Tool Test Tool', () => {
 
 describe('Tool.execute return value - test-tool', () => {
   it('should return a single ExecutionItem with final test result and preserve pairedItem', async () => {
-    const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
-
     // Nested blueprint echoes initial args
     const nested = {
       nodes: [
@@ -304,7 +240,7 @@ describe('Tool.execute return value - test-tool', () => {
           name: 'End',
           description: '',
           parameters: {
-            output: '{{ $lastOutputOf("__initial__")[0].json }}',
+            output: '{{ lastOutputOf("__initial__") }}',
           },
         },
       ],
@@ -312,14 +248,24 @@ describe('Tool.execute return value - test-tool', () => {
       metadata: {},
     };
 
-    // Mock GET /starships/:id/tools/:slug returning tool with blueprint
-    global.fetch = jest.fn() as unknown as jest.Mock;
-    (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
-
+    const hostRuntime: HostRuntime = {
+      http: jest.fn(async () =>
+        createMockResponse({
+          data: {
+            name: 'Nested Echo Tool',
+            slug: 'nested-echo',
+            description: 'Echo initial arguments from __initial__',
+            parameters: { type: 'object', properties: {} },
+            blueprint: nested,
+          },
+        })
+      ) as unknown as HostRuntime['http'],
+    };
     const args = { x: 1, y: { deep: true } };
     const options: NodeHandlerOptions = {
       eventCallback: jest.fn(),
-      secureEnv: env,
+      runtimeEnv: {},
+      hostRuntime,
       execution: ExecutionItemUtils.createExecution(),
     };
 

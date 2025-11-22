@@ -13,6 +13,7 @@ import type {
   Execution,
   LlmToolCall,
   LlmMessage,
+  EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
@@ -20,11 +21,13 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
+import type { HostRuntime } from '@starships/autopilot';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
+import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 
 // Debug flags
 const DEBUG_TOOLCALLS = false;
@@ -64,6 +67,7 @@ export class ConversationService {
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
+  private connectorRuntimeService!: ConnectorRuntimeService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
@@ -145,6 +149,7 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
+    this.connectorRuntimeService = new ConnectorRuntimeService(this.environmentService);
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
 
@@ -699,19 +704,11 @@ export class ConversationService {
     try {
       // starship already resolved above
 
-      const env = getEnvConfig();
-      const baseUrl = `${env.SERVER_URL}/api/v1`;
-      const rawAuth = ctx?.authorization ?? '';
-      const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
-      const openRouterKey = env.OPENROUTER_API_KEY || '';
-      const starshipEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
-      const secureEnv: Record<string, string> = {
+      const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
-        BASE_URL: baseUrl,
-        ...(authToken ? { AUTH_TOKEN: authToken } : {}),
-        ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
-        ...starshipEnv,
       };
+
+      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);
 
       // Orchestrate sequentially with mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
@@ -765,14 +762,19 @@ export class ConversationService {
 
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
-          secureEnv,
+          runtimeEnv,
+          hostRuntime,
         });
 
         const baselineCount = messages.length;
         // Execute with cancellation controller at top level (depth=0 implied inside Agent)
         // Use ChildProcessRunner directly to capture cancel handle
         const runner = this.defaultRunner;
-        const engineConfig = { eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event), secureEnv } as any;
+        const engineConfig = {
+          eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
+          runtimeEnv,
+          hostRuntime,
+        } as EngineConfig;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
         // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages
@@ -1032,12 +1034,6 @@ export class ConversationService {
   private async generateConversationTitle(starshipId: string, conversationId: string, userContent: string): Promise<string | null> {
     try {
       const env = getEnvConfig();
-      const openRouterKey = env.OPENROUTER_API_KEY || '';
-      if (!openRouterKey) {
-        console.warn('[TITLE] OPENROUTER_API_KEY missing; skipping title generation');
-        return null;
-      }
-
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
@@ -1053,19 +1049,17 @@ export class ConversationService {
         .replace(/\n+/g, ' ')
         .slice(0, 400)}"\n\nReturn only the title text.`;
 
-      // Use autopilot LLM node directly (no runner/engine). Secure env provides API key.
-      const llm = new LLM(
-        {
-          model,
-          messages: [
-            { role: 'system' as const, content: sys },
-            { role: 'user' as const, content: prompt },
-          ],
-          temperature: 0.3,
-          maxTokens: 32,
-        },
-        { secureEnv: { OPEN_ROUTER_KEY: openRouterKey } }
-      );
+      // Use autopilot LLM node directly (no runner/engine).
+      // The LLM node reads OPENROUTER_API_KEY from the host environment; we only pass non-secret config here.
+      const llm = new LLM({
+        model,
+        messages: [
+          { role: 'system' as const, content: sys },
+          { role: 'user' as const, content: prompt },
+        ],
+        temperature: 0.3,
+        maxTokens: 32,
+      });
 
       const items = await llm.execute();
       const res = (items?.[0]?.json || {}) as {
@@ -1425,15 +1419,15 @@ export class ConversationService {
               : [];
             const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
-            // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
+            // Extract reasoning from OpenRouter unified fields (reasoning and reasoning_details)
             const extractReasoning = (node: unknown): string => {
               try {
                 if (!node || typeof node !== 'object') return '';
                 const rec = node as Record<string, unknown>;
                 const parts: string[] = [];
 
-                // Unified fields
-                const raw = (rec.reasoning ?? rec.thinking) as unknown;
+                // Unified reasoning field
+                const raw = rec.reasoning as unknown;
 
                 const appendFromRaw = (r: unknown): void => {
                   if (!r) return;

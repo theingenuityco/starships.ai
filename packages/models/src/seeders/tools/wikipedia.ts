@@ -40,10 +40,7 @@ export const wikipediaTool: ToolParams = {
         type: 'start',
         name: 'Start',
         description: 'Receive Wikipedia query parameters',
-        parameters: {
-          // Pass through the input from Tool node
-          output: '{{ $input() }}',
-        },
+        parameters: {},
       },
       {
         ref: 'prepare_request',
@@ -52,31 +49,21 @@ export const wikipediaTool: ToolParams = {
         description: 'Build the appropriate Wikipedia API URL based on action',
         parameters: {
           code: `
-            // Debug logging to understand input structure
-            // console.log('[WIKIPEDIA TOOL] Raw input:', JSON.stringify(input, null, 2));
-            // console.log('[WIKIPEDIA TOOL] Input type:', typeof input);
-            // console.log('[WIKIPEDIA TOOL] Input keys:', input ? Object.keys(input) : 'null/undefined');
-            // console.log('[WIKIPEDIA TOOL] Check if input.json exists:', input && input.json ? 'YES' : 'NO');
-            // if (input && input.json) {
-            //   console.log('[WIKIPEDIA TOOL] input.json content:', JSON.stringify(input.json));
-            // }
-            
             // Extract and validate input parameters
             // The input comes as a single object with all parameters
-            const params = input;
-            const { 
-              query, 
-              action, 
-              limit = 5, 
-              language = 'en' 
+            const params = ctx.input || {};
+            const {
+              query,
+              action,
+              limit = 5,
+              language = 'en'
             } = params || {};
             
             // console.log('[WIKIPEDIA TOOL] Extracted params:', { query, action, limit, language });
             
             // Input validation
             if (!query || typeof query !== 'string') {
-              // console.error('[WIKIPEDIA TOOL] Validation failed - query:', query, 'type:', typeof query);
-              throw new Error('Query is required and must be a string. Received input: ' + JSON.stringify(input) + ', params: ' + JSON.stringify(params));
+              throw new Error('Query is required and must be a string.');
             }
             
             if (!action || !['search', 'summary', 'content', 'sections'].includes(action)) {
@@ -136,7 +123,9 @@ export const wikipediaTool: ToolParams = {
           `,
           timeout: 5000,
           // Store metadata in state for later nodes using reducers
-          reducers: ["(state, ctx) => ({ ...state, wikipedia_metadata: ctx.$lastOutputOf('prepare_request')[0].json.metadata })"],
+          reducers: [
+            "(state, ctx) => { const prepared = ctx.lastOutputOf('prepare_request') || {}; return { ...state, wikipedia_metadata: prepared.metadata }; }",
+          ],
         },
       },
       {
@@ -145,9 +134,9 @@ export const wikipediaTool: ToolParams = {
         name: 'Fetch from Wikipedia',
         description: 'Execute HTTP request to Wikipedia API',
         parameters: {
-          url: '{{ $lastOutputOf("prepare_request")[0].json.request.url }}',
-          method: '{{ $lastOutputOf("prepare_request")[0].json.request.method }}',
-          headers: '{{ $lastOutputOf("prepare_request")[0].json.request.headers }}',
+          url: '{{ (lastOutputOf("prepare_request") || {}).request?.url }}',
+          method: '{{ (lastOutputOf("prepare_request") || {}).request?.method }}',
+          headers: '{{ (lastOutputOf("prepare_request") || {}).request?.headers }}',
           timeout: 30000,
         },
       },
@@ -159,8 +148,8 @@ export const wikipediaTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const httpResponse = ctx.$input || {};
-              const metadata = (ctx.$state && ctx.$state.wikipedia_metadata) || {};
+              const httpResponse = ctx.input || {};
+              const metadata = (ctx.state && ctx.state.wikipedia_metadata) || {};
               return {
                 httpResponse,
                 metadata: {
@@ -182,7 +171,7 @@ export const wikipediaTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const packed = ctx.$input || {};
+              const packed = ctx.input || {};
               const httpResponse = packed && packed.httpResponse;
               const metadata = packed?.metadata || {};
               const response = httpResponse?.body;
@@ -370,7 +359,7 @@ export const wikipediaTool: ToolParams = {
         name: 'End',
         description: 'Return Wikipedia query results',
         parameters: {
-          output: '{{ $input() }}',
+          output: '{{ input }}',
         },
       },
     ],

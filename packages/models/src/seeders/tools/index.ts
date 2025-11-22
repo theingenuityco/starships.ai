@@ -14,14 +14,9 @@ export { toolOpenToolTemplate } from './open-tool';
 export { toolEditToolTemplate } from './edit-tool';
 export { docsSearchToolTemplate } from './search-docs';
 export { docsGetDocToolTemplate } from './get-doc';
-export { blueprintLintToolTemplate } from './test-tool-blueprint';
 export { toolTestToolTemplate } from './test-tool';
-export { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
-export { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
-export { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
-export { toolRemoveBlueprintNodeToolTemplate } from './remove-tool-blueprint-node';
-export { toolEditBlueprintEdgeToolTemplate } from './edit-tool-blueprint-edge';
-export { toolRemoveBlueprintEdgeToolTemplate } from './remove-tool-blueprint-edge';
+export { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-node';
+export { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 export { agentListToolTemplate } from './list-agent';
 export { agentGetToolTemplate } from './get-agent';
 export { agentOpenToolTemplate } from './open-agent';
@@ -30,6 +25,7 @@ export { agentTestToolTemplate } from './test-agent';
 export { agentAssignToolToolTemplate } from './assign-agent-tool';
 export { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 export { modelsListToolTemplate } from './models-list';
+export { connectorsListToolTemplate } from './list-connectors';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -43,14 +39,9 @@ import { toolOpenToolTemplate } from './open-tool';
 import { toolEditToolTemplate } from './edit-tool';
 import { docsSearchToolTemplate } from './search-docs';
 import { docsGetDocToolTemplate } from './get-doc';
-import { blueprintLintToolTemplate } from './test-tool-blueprint';
 import { toolTestToolTemplate } from './test-tool';
-import { toolAddBlueprintNodeToolTemplate } from './add-tool-blueprint-node';
-import { toolAddBlueprintEdgeToolTemplate } from './add-tool-blueprint-edge';
-import { toolEditBlueprintNodeToolTemplate } from './edit-tool-blueprint-node';
-import { toolRemoveBlueprintNodeToolTemplate } from './remove-tool-blueprint-node';
-import { toolEditBlueprintEdgeToolTemplate } from './edit-tool-blueprint-edge';
-import { toolRemoveBlueprintEdgeToolTemplate } from './remove-tool-blueprint-edge';
+import { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-node';
+import { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 import { agentListToolTemplate } from './list-agent';
 import { agentGetToolTemplate } from './get-agent';
 import { agentOpenToolTemplate } from './open-agent';
@@ -59,6 +50,7 @@ import { agentTestToolTemplate } from './test-agent';
 import { agentAssignToolToolTemplate } from './assign-agent-tool';
 import { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 import { modelsListToolTemplate } from './models-list';
+import { connectorsListToolTemplate } from './list-connectors';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -72,14 +64,9 @@ export const ALL_TOOL_TEMPLATES = [
   toolEditToolTemplate,
   docsSearchToolTemplate,
   docsGetDocToolTemplate,
-  blueprintLintToolTemplate,
   toolTestToolTemplate,
-  toolAddBlueprintNodeToolTemplate,
-  toolAddBlueprintEdgeToolTemplate,
-  toolEditBlueprintNodeToolTemplate,
-  toolRemoveBlueprintNodeToolTemplate,
-  toolEditBlueprintEdgeToolTemplate,
-  toolRemoveBlueprintEdgeToolTemplate,
+  toolModifyBlueprintNodeToolTemplate,
+  toolModifyBlueprintEdgeToolTemplate,
   agentListToolTemplate,
   agentGetToolTemplate,
   agentOpenToolTemplate,
@@ -88,4 +75,5 @@ export const ALL_TOOL_TEMPLATES = [
   agentAssignToolToolTemplate,
   agentUnassignToolToolTemplate,
   modelsListToolTemplate,
+  connectorsListToolTemplate,
 ];

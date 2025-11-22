@@ -85,7 +85,7 @@ const agent = new Agent({
         blueprint: {
           nodes: [
             { ref: "s", type: "start", name: "Start", parameters: {} },
-            { ref: "e", type: "end", name: "End", parameters: { output: '{{ $input() }}' } }
+            { ref: "e", type: "end", name: "End", parameters: { output: '{{ input }}' } }
           ],
           edges: [{ ref: "e1", from: "s", to: "e" }]
         }

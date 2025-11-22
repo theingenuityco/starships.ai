@@ -11,10 +11,10 @@ Specification (authoritative)
 
 ctx surface (prefixed to avoid collisions)
 
-- $input: unwrapped input item
-- $state: execution.state
-- $env(key): secure env lookup
-- $lastOutputOf(ref): latest `ExecutionItem[]` for ref within current execution
+- input: unwrapped input item (`ctx.input`)
+- state: execution.state (`ctx.state`)
+- env(key): host-provided env lookup (in Starships, only `ctx.env('STARSHIP_ID')` is populated; custom env keys are not supported)
+- lastOutputOf(ref): latest output json for ref within current execution (`ctx.lastOutputOf(ref)`)
 - console shim: log/error/warn (scoped)
 
 Security model
@@ -45,7 +45,7 @@ Example (prepare args)
   parameters: {
     code: `
       async function main(ctx) {
-        const data = ctx.$input || {};
+        const data = ctx.input || {};
         return { message: String(data?.message ?? "hello") };
       }
     `,
@@ -62,18 +62,18 @@ Cross-links
 ### Accessing initial tool/workflow arguments
 
 - Directly after `start`:
-  - Connect your Code node immediately after `start` to read tool/workflow arguments via `ctx.$input`.
+  - Connect your Code node immediately after `start` to read tool/workflow arguments via `ctx.input`.
   - Example:
     ```ts
     async function main(ctx) {
-      const args = ctx.$input ?? {};
+      const args = ctx.input ?? {};
       return { message: String(args.content ?? "") };
     }
     ```
 
 - From anywhere in the flow:
-  - You can also access the initial input using `ctx.$lastOutputOf('__initial__')[0]?.json`.
-  - Use this when your Code node is not directly downstream of `start` or when a previous node changed the shape of `$input`.
+  - You can also access the initial input using `ctx.lastOutputOf('__initial__')`.
+  - Use this when your Code node is not directly downstream of `start` or when a previous node changed the shape of `input`.
 
-- Do not use `ctx.$state` for arguments:
-  - Execution state is only mutated by Mutate reducers; initial tool/workflow arguments are not stored in `$state` unless you explicitly put them there.
+- Do not use `ctx.state` for arguments:
+  - Execution state is only mutated by Mutate reducers; initial tool/workflow arguments are not stored in `state` unless you explicitly put them there.

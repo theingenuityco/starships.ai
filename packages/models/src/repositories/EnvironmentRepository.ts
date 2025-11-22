@@ -81,6 +81,7 @@ export class EnvironmentRepository extends BaseRepository {
             starshipId: env.starshipId,
             key: env.key,
             description: env.description,
+            connectorId: env.connectorId,
             createdAt: env.createdAt,
             updatedAt: env.updatedAt,
             createdBy: env.createdBy,
@@ -118,6 +119,7 @@ export class EnvironmentRepository extends BaseRepository {
     value: string;
     description?: string;
     createdBy: string;
+    connectorId?: string;
   }): Promise<EnvironmentModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -129,6 +131,7 @@ export class EnvironmentRepository extends BaseRepository {
           key: data.key,
           encryptedValue,
           description: data.description,
+          connectorId: data.connectorId,
           createdAt: now,
           updatedAt: now,
           createdBy: data.createdBy,

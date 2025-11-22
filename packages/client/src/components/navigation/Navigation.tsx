@@ -117,7 +117,7 @@ export function Navigation(props: NavigationProps) {
       return {
         isOverviewRoute: false,
         isSettingsRoute: false,
-        isEnvironmentSettingsRoute: false,
+        isConnectorsRoute: false,
         isAgentsRoute: false,
         isAgentBuilderRoute: false,
         isToolsRoute: false,
@@ -127,7 +127,7 @@ export function Navigation(props: NavigationProps) {
     return {
       isOverviewRoute: pathname === `/ship/${starshipSlug}`,
       isSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings`),
-      isEnvironmentSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings/environment`),
+      isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
       isToolsRoute: pathname.startsWith(`/ship/${starshipSlug}/tools`),
@@ -135,7 +135,7 @@ export function Navigation(props: NavigationProps) {
     }
   }, [pathname, starshipSlug])
 
-  const { isOverviewRoute, isSettingsRoute, isEnvironmentSettingsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute } = routeChecks
+  const { isOverviewRoute, isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -221,7 +221,9 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
+      ...(isAuthenticated && starshipSlug
+        ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }]
+        : []),
     ],
     [
       isAuthenticated,
@@ -232,7 +234,7 @@ export function Navigation(props: NavigationProps) {
       isToolsRoute,
       isToolBuilderRoute,
       pathname,
-      isEnvironmentSettingsRoute,
+      isConnectorsRoute,
       handleNewConversation,
       starshipData?.id,
     ]

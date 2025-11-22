@@ -252,9 +252,9 @@ Tools are organized into categories based on their primary function:
 
 ---
 
-## Tool Configuration & Environment Variables
+## Tool Configuration, Environment Variables & Connectors
 
-When creating custom tools, you can securely store API keys and configuration using environment variables:
+When creating custom tools, you can securely store API keys and configuration using environment variables. For many third-party APIs, Starships also provides **connectors** that guide you through configuration and automatically manage the relevant env vars:
 
 <div className="my-6">
   <img
@@ -262,10 +262,23 @@ When creating custom tools, you can securely store API keys and configuration us
     alt="Environment variable configuration interface showing secure key-value storage for API credentials"
     className="w-2/3 mx-auto rounded-lg border border-border/20 shadow-lg"
   />
-  <div className="text-sm text-muted-foreground text-center mt-2">Add environment variables for secure API key storage</div>
+  <div className="text-sm text-muted-foreground text-center mt-2">
+    Add environment variables for secure API key storage, or use connectors to populate them automatically
+  </div>
 </div>
 
 Securely store API keys, tokens, and credentials that your custom tools can access. Values are encrypted and follow standard naming conventions (uppercase, letters, numbers, underscores).
+
+Examples:
+
+- LinkedIn tools typically use:
+  - `LINKEDIN_ACCESS_TOKEN`
+  - `LINKEDIN_ORG_ID` (optional)
+- Discord tools often use:
+  - `DISCORD_BOT_TOKEN`
+  - `DISCORD_DEFAULT_CHANNEL_ID` (optional)
+
+You can set these manually or connect providers from the starship settings → Environment & Connectors page; Daedalus will reference these env keys when scaffolding LinkedIn/Discord tools.
 
 <Callout type="info">
   **Ready to Create Custom Tools?** Work with [Daedalus](/agents/daedalus) to build tools tailored to your specific needs through natural

@@ -7,6 +7,7 @@ export { AgentEntity } from './entities/AgentEntity';
 export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
 export { EnvironmentEntity } from './entities/EnvironmentEntity';
+export { ConnectorEntity } from './entities/ConnectorEntity';
 export { MessageEntity } from './entities/MessageEntity';
 export { OAuthAccountEntity } from './entities/OAuthAccountEntity';
 export { OAuthAuthCodeEntity } from './entities/OAuthAuthCodeEntity';
@@ -29,6 +30,7 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 export { AttachmentRepository } from './repositories/AttachmentRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EnvironmentRepository } from './repositories/EnvironmentRepository';
+export { ConnectorRepository } from './repositories/ConnectorRepository';
 export { MessageRepository } from './repositories/MessageRepository';
 export { OAuthAccountRepository } from './repositories/OAuthAccountRepository';
 export { OAuthAuthCodeRepository } from './repositories/OAuthAuthCodeRepository';

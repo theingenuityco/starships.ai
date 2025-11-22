@@ -748,16 +748,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
 
     // Tool-related fragments to monitor (align with ConversationInterface)
-    const toolRelatedFragments = [
-      'open-tool',
-      'edit-tool',
-      'add-tool-blueprint-node',
-      'add-tool-blueprint-edge',
-      'edit-tool-blueprint-node',
-      'remove-tool-blueprint-node',
-      'edit-tool-blueprint-edge',
-      'remove-tool-blueprint-edge',
-    ]
+    const toolRelatedFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
 
     // Process only NEW messages (those after initial count)
     const newMessages = liveMessages.slice(toolNavInitialCountRef.current)

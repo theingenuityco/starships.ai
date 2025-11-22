@@ -19,17 +19,21 @@ let s3Client: S3Client | null = null;
  */
 function getS3Client(): S3Client {
   if (!s3Client) {
-    if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
-      throw new Error('AWS credentials not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.');
+    // Use explicit credentials if provided, otherwise fall back to default credential chain
+    // (EC2 instance role, ECS task role, environment variables, etc.)
+    if (env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY) {
+      s3Client = new S3Client({
+        region: env.AWS_S3_REGION,
+        credentials: {
+          accessKeyId: env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+        },
+      });
+    } else {
+      s3Client = new S3Client({
+        region: env.AWS_S3_REGION,
+      });
     }
-
-    s3Client = new S3Client({
-      region: env.AWS_S3_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      },
-    });
   }
   return s3Client;
 }

@@ -2218,7 +2218,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               aria-label="Attach file"
               title="Attach file (images, PDFs)"
             >
-              <Icon name="plus" className="h-5 w-5" />
+              <Icon name="paperclip" className="h-5 w-5" />
             </button>
 
             {/* Bottom-right Actions: Stop (when streaming) or Send */}

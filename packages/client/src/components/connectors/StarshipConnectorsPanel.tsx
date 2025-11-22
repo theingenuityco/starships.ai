@@ -80,6 +80,144 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     (discord && matchesQuery({ displayName: discord.displayName, description: discord.description })) ||
     (googleDrive && matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description }))
 
+  const renderLinkedInCard = (connectedFirst: boolean) => {
+    if (!linkedin || !matchesQuery({ displayName: linkedin.displayName, description: linkedin.description })) return null
+    const isConnected = linkedinState?.status === 'connected'
+    if (isConnected !== connectedFirst) return null
+
+    return (
+      <Card key={`linkedin-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-3">
+              {CONNECTOR_LOGOS.linkedin && (
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
+                  <Image src={CONNECTOR_LOGOS.linkedin} alt="LinkedIn logo" width={18} height={18} />
+                </div>
+              )}
+              <span className="text-lg">LinkedIn</span>
+              <Badge variant={isConnected ? 'default' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
+                {isConnected ? 'Connected' : 'Not connected'}
+              </Badge>
+            </CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">{linkedin.description}</p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={isConnected ? 'outline' : 'default'}
+              className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
+              onClick={handleLinkedInConnect}
+              disabled={linkedinMutation.isPending}
+            >
+              <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
+              {isConnected ? 'Reconnect' : 'Connect LinkedIn'}
+            </Button>
+            {isConnected && (
+              <Button size="sm" variant="outline" className="min-w-[140px]" onClick={() => handleDisconnect('linkedin')} disabled={disconnectMutation.isPending}>
+                Disconnect
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderDiscordCard = (connectedFirst: boolean) => {
+    if (!discord || !matchesQuery({ displayName: discord.displayName, description: discord.description })) return null
+    const isConnected = discordState?.status === 'connected'
+    if (isConnected !== connectedFirst) return null
+
+    return (
+      <Card key={`discord-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-3">
+              {CONNECTOR_LOGOS.discord && (
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
+                  <Image src={CONNECTOR_LOGOS.discord} alt="Discord logo" width={18} height={18} />
+                </div>
+              )}
+              <span className="text-lg">Discord</span>
+              <Badge variant={isConnected ? 'default' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
+                {isConnected ? 'Connected' : 'Not connected'}
+              </Badge>
+            </CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">{discord.description}</p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={isConnected ? 'outline' : 'default'}
+              className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
+              onClick={handleDiscordConnect}
+              disabled={discordMutation.isPending}
+            >
+              <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
+              {isConnected ? 'Reconnect' : 'Connect Discord'}
+            </Button>
+            {isConnected && (
+              <Button size="sm" variant="outline" className="min-w-[140px]" onClick={() => handleDisconnect('discord')} disabled={disconnectMutation.isPending}>
+                Disconnect
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderGoogleDriveCard = (connectedFirst: boolean) => {
+    if (!googleDrive || !matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description })) return null
+    const isConnected = googleDriveState?.status === 'connected'
+    if (isConnected !== connectedFirst) return null
+
+    return (
+      <Card key={`google-drive-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-3">
+              {CONNECTOR_LOGOS.google_drive && (
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
+                  <Image src={CONNECTOR_LOGOS.google_drive} alt="Google Drive logo" width={18} height={18} />
+                </div>
+              )}
+              <span className="text-lg">Google Drive</span>
+              <Badge variant={isConnected ? 'default' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
+                {isConnected ? 'Connected' : 'Not connected'}
+              </Badge>
+            </CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">{googleDrive.description}</p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={isConnected ? 'outline' : 'default'}
+              className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
+              onClick={handleGoogleDriveConnect}
+              disabled={googleDriveMutation.isPending}
+            >
+              <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
+              {isConnected ? 'Reconnect' : 'Connect Google Drive'}
+            </Button>
+            {isConnected && (
+              <Button size="sm" variant="outline" className="min-w-[140px]" onClick={() => handleDisconnect('google_drive')} disabled={disconnectMutation.isPending}>
+                Disconnect
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Search - match Environment page styling */}
@@ -99,98 +237,15 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
       {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {linkedin && matchesQuery({ displayName: linkedin.displayName, description: linkedin.description }) && (
-          <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3">
-                  {CONNECTOR_LOGOS.linkedin && (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                      <Image src={CONNECTOR_LOGOS.linkedin} alt="LinkedIn logo" width={18} height={18} />
-                    </div>
-                  )}
-                  <span className="text-lg">LinkedIn</span>
-                  <Badge variant={linkedinState?.status === 'connected' ? 'default' : 'outline'}>{linkedinState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
-                </CardTitle>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">{linkedin.description}</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleLinkedInConnect} disabled={linkedinMutation.isPending}>
-                  {linkedinState?.status === 'connected' ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
-                </Button>
-                {linkedinState?.status === 'connected' && (
-                  <Button size="sm" variant="outline" onClick={() => handleDisconnect('linkedin')} disabled={disconnectMutation.isPending}>
-                    Disconnect
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Connected first */}
+        {renderLinkedInCard(true)}
+        {renderDiscordCard(true)}
+        {renderGoogleDriveCard(true)}
 
-        {discord && matchesQuery({ displayName: discord.displayName, description: discord.description }) && (
-          <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3">
-                  {CONNECTOR_LOGOS.discord && (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                      <Image src={CONNECTOR_LOGOS.discord} alt="Discord logo" width={18} height={18} />
-                    </div>
-                  )}
-                  <span className="text-lg">Discord</span>
-                  <Badge variant={discordState?.status === 'connected' ? 'default' : 'outline'}>{discordState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
-                </CardTitle>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">{discord.description}</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleDiscordConnect} disabled={discordMutation.isPending}>
-                  {discordState?.status === 'connected' ? 'Reconnect Discord' : 'Connect Discord'}
-                </Button>
-                {discordState?.status === 'connected' && (
-                  <Button size="sm" variant="outline" onClick={() => handleDisconnect('discord')} disabled={disconnectMutation.isPending}>
-                    Disconnect
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {googleDrive && matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description }) && (
-          <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3">
-                  {CONNECTOR_LOGOS.google_drive && (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                      <Image src={CONNECTOR_LOGOS.google_drive} alt="Google Drive logo" width={18} height={18} />
-                    </div>
-                  )}
-                  <span className="text-lg">Google Drive</span>
-                  <Badge variant={googleDriveState?.status === 'connected' ? 'default' : 'outline'}>{googleDriveState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
-                </CardTitle>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">{googleDrive.description}</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleGoogleDriveConnect} disabled={googleDriveMutation.isPending}>
-                  {googleDriveState?.status === 'connected' ? 'Reconnect Google Drive' : 'Connect Google Drive'}
-                </Button>
-                {googleDriveState?.status === 'connected' && (
-                  <Button size="sm" variant="outline" onClick={() => handleDisconnect('google_drive')} disabled={disconnectMutation.isPending}>
-                    Disconnect
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Then not connected */}
+        {renderLinkedInCard(false)}
+        {renderDiscordCard(false)}
+        {renderGoogleDriveCard(false)}
       </div>
     </div>
   )

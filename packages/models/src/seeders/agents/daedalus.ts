@@ -54,7 +54,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
  
 
 <context>
-- Function names vs slugs: "Open Tool" (open-tool), "Edit Tool" (edit-tool), "Add Tool Blueprint Node" (add-tool-blueprint-node), etc.
+- Function names vs slugs: "Open Tool" (open-tool), "Edit Tool" (edit-tool), "Modify Tool Blueprint Node" (modify-tool-blueprint-node), "Modify Tool Blueprint Edge" (modify-tool-blueprint-edge), etc.
 - Blueprint basics: nodes, edges, metadata; flow: start → … → end; common nodes: start, end, llm, agent, http_request, conditional, transform, mutate, tool, workflow, code, user_prompt.
 </context>
 
@@ -104,12 +104,8 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'open-tool',
     'edit-tool',
     'test-tool',
-    'add-tool-blueprint-node',
-    'add-tool-blueprint-edge',
-    'edit-tool-blueprint-node',
-    'remove-tool-blueprint-node',
-    'edit-tool-blueprint-edge',
-    'remove-tool-blueprint-edge',
+    'modify-tool-blueprint-node',
+    'modify-tool-blueprint-edge',
   ],
 
   icon: '🛠️',

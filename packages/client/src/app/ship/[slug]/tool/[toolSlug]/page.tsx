@@ -138,16 +138,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     if (!conversationId || !liveMessages.length || !toolBuilderRef.current) return
 
     // Eligible tool slug fragments that should drive the Tool Builder
-    const builderToolSlugFragments = [
-      'open-tool',
-      'edit-tool',
-      'add-tool-blueprint-node',
-      'add-tool-blueprint-edge',
-      'edit-tool-blueprint-node',
-      'remove-tool-blueprint-node',
-      'edit-tool-blueprint-edge',
-      'remove-tool-blueprint-edge',
-    ]
+    const builderToolSlugFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
 
     const form = toolBuilderRef.current.getFormData?.()
     if (!form) return
@@ -250,66 +241,68 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       }
 
       switch (toolName) {
-        case 'add-tool-blueprint-node': {
-          const node = normalizeJson(args?.node)
-          if (!node || typeof node !== 'object') break
-          bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== node.ref)
-          bp.nodes.push(node)
-          compose.blueprintChanged = true
-          break
-        }
-        case 'add-tool-blueprint-edge': {
-          const edge = normalizeJson(args?.edge)
-          if (!edge || typeof edge !== 'object') break
-          bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edge.ref)
-          bp.edges.push(edge)
-          compose.blueprintChanged = true
-          break
-        }
-        case 'edit-tool-blueprint-node': {
-          const nodeRef = args?.nodeRef
-          const updates = normalizeJson(args?.updates) || {}
-          if (!nodeRef) break
-          const idx = (bp.nodes || []).findIndex((n: any) => n?.ref === nodeRef)
-          if (idx >= 0) {
-            const cur = { ...(bp.nodes[idx] || {}) }
-            if ('name' in updates) cur.name = updates.name
-            if ('description' in updates) cur.description = updates.description
-            if ('type' in updates) cur.type = updates.type
-            if ('parameters' in updates) cur.parameters = updates.parameters
-            bp.nodes[idx] = cur
+        case 'modify-tool-blueprint-node': {
+          const op = args?.op
+          if (!op || typeof op !== 'string') break
+
+          if (op === 'add') {
+            const node = normalizeJson(args?.node)
+            if (!node || typeof node !== 'object') break
+            bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== node.ref)
+            bp.nodes.push(node)
+            compose.blueprintChanged = true
+          } else if (op === 'edit') {
+            const nodeRef = args?.nodeRef
+            const updates = normalizeJson(args?.updates) || {}
+            if (!nodeRef) break
+            const idx = (bp.nodes || []).findIndex((n: any) => n?.ref === nodeRef)
+            if (idx >= 0) {
+              const cur = { ...(bp.nodes[idx] || {}) }
+              if ('name' in updates) cur.name = updates.name
+              if ('description' in updates) cur.description = updates.description
+              if ('type' in updates) cur.type = updates.type
+              if ('parameters' in updates) cur.parameters = updates.parameters
+              bp.nodes[idx] = cur
+              compose.blueprintChanged = true
+            }
+          } else if (op === 'remove') {
+            const nodeRef = args?.nodeRef
+            if (!nodeRef) break
+            bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== nodeRef)
+            bp.edges = (bp.edges || []).filter((e: any) => e?.from !== nodeRef && e?.to !== nodeRef)
             compose.blueprintChanged = true
           }
           break
         }
-        case 'edit-tool-blueprint-edge': {
-          const edgeRef = args?.edgeRef
-          const updates = normalizeJson(args?.updates) || {}
-          if (!edgeRef) break
-          const idx = (bp.edges || []).findIndex((e: any) => e?.ref === edgeRef)
-          if (idx >= 0) {
-            const cur = { ...(bp.edges[idx] || {}) }
-            if ('from' in updates) cur.from = updates.from
-            if ('to' in updates) cur.to = updates.to
-            if ('condition' in updates) cur.condition = updates.condition
-            bp.edges[idx] = cur
+        case 'modify-tool-blueprint-edge': {
+          const op = args?.op
+          if (!op || typeof op !== 'string') break
+
+          if (op === 'add') {
+            const edge = normalizeJson(args?.edge)
+            if (!edge || typeof edge !== 'object') break
+            bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edge.ref)
+            bp.edges.push(edge)
+            compose.blueprintChanged = true
+          } else if (op === 'edit') {
+            const edgeRef = args?.edgeRef
+            const updates = normalizeJson(args?.updates) || {}
+            if (!edgeRef) break
+            const idx = (bp.edges || []).findIndex((e: any) => e?.ref === edgeRef)
+            if (idx >= 0) {
+              const cur = { ...(bp.edges[idx] || {}) }
+              if ('from' in updates) cur.from = updates.from
+              if ('to' in updates) cur.to = updates.to
+              if ('condition' in updates) cur.condition = updates.condition
+              bp.edges[idx] = cur
+              compose.blueprintChanged = true
+            }
+          } else if (op === 'remove') {
+            const edgeRef = args?.edgeRef
+            if (!edgeRef) break
+            bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edgeRef)
             compose.blueprintChanged = true
           }
-          break
-        }
-        case 'remove-tool-blueprint-node': {
-          const nodeRef = args?.nodeRef
-          if (!nodeRef) break
-          bp.nodes = (bp.nodes || []).filter((n: any) => n?.ref !== nodeRef)
-          bp.edges = (bp.edges || []).filter((e: any) => e?.from !== nodeRef && e?.to !== nodeRef)
-          compose.blueprintChanged = true
-          break
-        }
-        case 'remove-tool-blueprint-edge': {
-          const edgeRef = args?.edgeRef
-          if (!edgeRef) break
-          bp.edges = (bp.edges || []).filter((e: any) => e?.ref !== edgeRef)
-          compose.blueprintChanged = true
           break
         }
       }
@@ -366,16 +359,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     // Only process newly arrived messages
     if (liveMessages.length <= (toolNavInitialCountRef.current as number)) return
 
-    const toolBuilderSlugFragments = [
-      'open-tool',
-      'edit-tool',
-      'add-tool-blueprint-node',
-      'add-tool-blueprint-edge',
-      'edit-tool-blueprint-node',
-      'remove-tool-blueprint-node',
-      'edit-tool-blueprint-edge',
-      'remove-tool-blueprint-edge',
-    ]
+    const toolBuilderSlugFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
 
     const newMessages = (liveMessages as any[]).slice(toolNavInitialCountRef.current as number)
 
@@ -520,16 +504,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         const funcName = toolCall?.function?.name as string
         const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
 
-        const toolToolSlugFragments = [
-          'open-tool',
-          'edit-tool',
-          'add-tool-blueprint-node',
-          'add-tool-blueprint-edge',
-          'edit-tool-blueprint-node',
-          'remove-tool-blueprint-node',
-          'edit-tool-blueprint-edge',
-          'remove-tool-blueprint-edge',
-        ]
+        const toolToolSlugFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
 
         if (!toolToolSlugFragments.some(s => funcNameLc.includes(s))) {
           processedToolResultIdsRef.current.add(id)

@@ -122,15 +122,7 @@ export class ChildProcessRunner implements Runner {
             try {
               type HostHttpRequest = Parameters<HostRuntime['http']>[0];
               const request = (m as { request: HostHttpRequest }).request;
-              console.log('[ChildProcessRunner] host_http received from child', {
-                pid: child.pid,
-                id: m.id,
-                method: request.method,
-                url: request.url,
-                connector: request.connector,
-              });
               const response = await host.http(request);
-              console.log('[ChildProcessRunner] host_http success', { pid: child.pid, id: m.id });
               child.send?.({
                 type: 'host_http_result',
                 id: m.id,
@@ -308,15 +300,7 @@ export class ChildProcessRunner implements Runner {
             try {
               type HostHttpRequest = Parameters<HostRuntime['http']>[0];
               const request = (m as { request: HostHttpRequest }).request;
-              console.log('[ChildProcessRunner] host_http received from child', {
-                pid: child.pid,
-                id: m.id,
-                method: request.method,
-                url: request.url,
-                connector: request.connector,
-              });
               const response = await host.http(request);
-              console.log('[ChildProcessRunner] host_http success', { pid: child.pid, id: m.id });
               child.send?.({
                 type: 'host_http_result',
                 id: m.id,

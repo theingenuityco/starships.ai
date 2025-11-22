@@ -85,13 +85,6 @@ function createHostRuntimeBridge() {
         const id = nextHttpRequestId++;
         pendingHttpRequests.set(id, { resolve, reject });
         const safeRequest = sanitizeForIpc(request);
-        // Debug trace for outbound host HTTP requests from the child process.
-        console.log('[autopilot:child] host_http -> parent', {
-          id,
-          method: safeRequest && safeRequest.method,
-          url: safeRequest && safeRequest.url,
-          connector: safeRequest && safeRequest.connector,
-        });
         safeSend({ type: 'host_http', id, request: safeRequest });
       }),
   };
@@ -111,18 +104,12 @@ process.on('message', async (msg) => {
   if (msg.type === 'host_http_result') {
     const entry = pendingHttpRequests.get(msg.id);
     if (!entry) {
-      // eslint-disable-next-line no-console
-      console.warn('[autopilot:child] host_http_result with unknown id', { id: msg.id });
       return;
     }
     pendingHttpRequests.delete(msg.id);
     if (msg.error) {
-      // eslint-disable-next-line no-console
-      console.error('[autopilot:child] host_http_result error', { id: msg.id, error: msg.error });
       entry.reject(new Error(String(msg.error)));
     } else {
-      // eslint-disable-next-line no-console
-      console.log('[autopilot:child] host_http_result ok', { id: msg.id });
       entry.resolve(msg.response);
     }
     return;

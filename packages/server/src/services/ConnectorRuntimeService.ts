@@ -30,17 +30,6 @@ export class ConnectorRuntimeService {
 
     const hostRuntime: HostRuntime = {
       http: async ({ method, url, headers = {}, body, timeoutMs, connector }) => {
-        // Debug trace for HostRuntime HTTP calls to help diagnose stuck requests.
-        // NOTE: keep logs concise; they are invaluable when HTTP requests appear to hang.
-        // Do not log full bodies to avoid leaking sensitive data.
-        // eslint-disable-next-line no-console
-        console.log('[ConnectorRuntimeService] hostRuntime.http called', {
-          method,
-          url,
-          connector,
-          timeoutMs,
-          starshipId: starship.id,
-        });
         const controller = new AbortController();
         const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
         const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -144,14 +133,6 @@ export class ConnectorRuntimeService {
           // route via connector records instead of direct HTTP.
           // For now we treat all HTTP uniformly and rely on URL/auth headers.
 
-          // eslint-disable-next-line no-console
-          console.log('[ConnectorRuntimeService] hostRuntime.http fetch start', {
-            method: finalMethod,
-            url: finalUrl,
-            connector,
-            timeoutMs: timeout,
-          });
-
           const resp = await fetch(finalUrl, init);
           const contentType = resp.headers.get('content-type') || '';
           let responseBody: unknown;
@@ -177,16 +158,6 @@ export class ConnectorRuntimeService {
             body: responseBody,
             url: resp.url,
           };
-
-          // eslint-disable-next-line no-console
-          console.log('[ConnectorRuntimeService] hostRuntime.http fetch completed', {
-            method: finalMethod,
-            url: resp.url,
-            connector,
-            status: resp.status,
-            statusText: resp.statusText,
-          });
-
           return result;
         } catch (error) {
           const reason =

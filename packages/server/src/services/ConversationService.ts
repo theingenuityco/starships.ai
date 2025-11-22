@@ -713,7 +713,7 @@ export class ConversationService {
       };
 
       const hostRuntime: HostRuntime = {
-        http: async ({ method, url, headers = {}, body, timeoutMs, connectorSlug }) => {
+        http: async ({ method, url, headers = {}, body, timeoutMs, connector }) => {
           const controller = new AbortController();
           const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
           const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -728,7 +728,7 @@ export class ConversationService {
           }
 
           // Connector-aware auth injection
-          if (connectorSlug === 'starships') {
+          if (connector === 'starships') {
             // Ensure Authorization header is present when we have an auth token
             if (authToken) {
               const lowered: Record<string, unknown> = {};
@@ -764,7 +764,7 @@ export class ConversationService {
               }
             }
 
-            // NOTE: connectorSlug is currently a hint; future versions can
+            // NOTE: connector is currently a hint; future versions can
             // route via connector records instead of direct HTTP.
             // For now we treat all HTTP uniformly and rely on URL/auth headers.
 

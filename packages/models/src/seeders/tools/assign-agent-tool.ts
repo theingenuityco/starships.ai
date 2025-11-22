@@ -78,7 +78,7 @@ Returns server response indicating success.
         parameters: {
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
           method: 'GET',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -123,7 +123,7 @@ Returns server response indicating success.
         parameters: {
           url: '{{ "/agents/" + $lastOutputOf("update_tools")[0].json.agentId + "/tools/" + $lastOutputOf("update_tools")[0].json.toolSlug }}',
           method: 'POST',
-          connectorSlug: 'starships',
+          connector: 'starships',
           body: {
             starshipId: '{{ env("STARSHIP_ID") }}'
           },

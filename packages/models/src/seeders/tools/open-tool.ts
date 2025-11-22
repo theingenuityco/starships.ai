@@ -94,7 +94,7 @@ Automatically inferred from agent state (do not pass manually):
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" + ($lastOutputOf("prepare")[0].json.mode === "create" ? "" : "/" + $lastOutputOf("prepare")[0].json.slug) }}',
           method: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? "POST" : "GET" }}',
           body: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? $lastOutputOf("prepare")[0].json.body : undefined }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
         },
       },

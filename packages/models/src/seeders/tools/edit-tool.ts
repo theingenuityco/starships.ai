@@ -105,7 +105,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -144,7 +144,7 @@ Automatically inferred from agent state (do not pass manually):
           url: '{{ "/tools/" + $lastOutputOf("prepare_update")[0].json.toolId }}',
           method: 'PUT',
           body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 10000,
         },
       },

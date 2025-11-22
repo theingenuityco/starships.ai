@@ -68,11 +68,11 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
   body?: Record<string, unknown> | string | null;
 
   /**
-   * Optional connector slug to execute this HTTP request through. When
-   * provided, the host runtime may resolve connector records and inject
+   * Optional connector identifier/slug to execute this HTTP request through.
+   * When provided, the host runtime may resolve connector records and inject
    * secrets/policies before performing the request.
    */
-  connectorSlug?: string;
+  connector?: string;
 
   // Custom properties for convenience
   timeout?: number;

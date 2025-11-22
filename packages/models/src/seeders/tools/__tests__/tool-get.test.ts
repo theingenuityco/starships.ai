@@ -120,9 +120,9 @@ describe('Tool Get Tool', () => {
         },
       };
 
-      const httpMock = jest.fn(async ({ method, url, connectorSlug }) => {
+      const httpMock = jest.fn(async ({ method, url, connector }) => {
         expect(method).toBe('GET');
-        expect(connectorSlug).toBe('starships');
+        expect(connector).toBe('starships');
         expect(url).toBe('/starships/test-starship/tools/calc');
 
         return createMockHttpResponse(apiPayload, {
@@ -185,7 +185,7 @@ describe('Tool Get Tool', () => {
       expect(params.timeout).toBeDefined();
       expect(params.method).toBe('GET');
       expect(params.url).toBe('{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}');
-      expect(params.connectorSlug).toBe('starships');
+      expect((params as any).connector).toBe('starships');
     });
   });
 });

@@ -130,7 +130,7 @@ describe('Tool List Tool', () => {
         expect(params.url).toBeDefined();
         expect(params.method).toBeDefined();
         expect(params.timeout).toBeDefined();
-        expect(params.connectorSlug).toBe('starships');
+        expect(params.connector).toBe('starships');
       }
     });
   });

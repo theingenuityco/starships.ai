@@ -58,7 +58,7 @@ Behavior and limits:
           method: 'GET',
           // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1 and inject auth.
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },

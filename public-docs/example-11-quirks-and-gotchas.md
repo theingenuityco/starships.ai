@@ -27,7 +27,7 @@
 
 ### HTTP body and data flow
 
-- Parameters use stringEvaluationMode: full-only. When you template `parameters.body`, the resolved value is passed directly to the host runtime: strings are sent as-is and objects are JSON-stringified with `Content-Type: application/json`. Prefer passing objects from upstream or literals rather than manually stringifying JSON.
+- Parameters use stringEvaluationMode: full-only. When you template `parameters.body` (for example `{{ $input }}`), the resolved value is passed directly to the host runtime: strings are sent as-is and objects are JSON-stringified with `Content-Type: application/json`. Prefer passing objects from upstream via explicit templates or literals rather than manually stringifying JSON.
 - HttpRequest returns `{ status, statusText, headers, body, url }`. To pass only the payload to the next request, forward `body` via Transform/Code. See Node: HttpRequest.
 - Initial arguments are exposed as `$input` after `start`; from later nodes, use `ctx.$lastOutputOf('__initial__')[0]?.json`. See Node: Start and Node: Code.
 

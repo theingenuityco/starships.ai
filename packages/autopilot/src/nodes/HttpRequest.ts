@@ -39,10 +39,19 @@ export class HttpRequest implements NodeHandler {
       throw new Error('Host runtime http() not available for HttpRequest node');
     }
 
-    // Use input data as body if available and no explicit body set
-    const inputData = ExecutionItemUtils.unwrapSingle(input);
     const method = (this.params.method || 'GET').toUpperCase();
-    const bodyData = this.params.body !== undefined ? this.params.body : inputData;
+    let bodyData: unknown;
+
+    // Body selection rules:
+    // - GET/HEAD => never send a body, even if provided
+    // - Other methods => only use explicitly configured body; upstream input is ignored
+    if (method === 'GET' || method === 'HEAD') {
+      bodyData = undefined;
+    } else if (this.params.body !== undefined) {
+      bodyData = this.params.body;
+    } else {
+      bodyData = undefined;
+    }
 
     // Normalize headers into a plain record
     let headers: Record<string, unknown> = {};

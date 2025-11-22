@@ -10,7 +10,7 @@ export async function up(client: Client): Promise<void> {
       CREATE TABLE IF NOT EXISTS connectors (
         id VARCHAR(255) PRIMARY KEY,
         starship_id VARCHAR(255) NOT NULL REFERENCES starships(id) ON DELETE CASCADE,
-        provider VARCHAR(50) NOT NULL CHECK (provider IN ('linkedin', 'discord')),
+        provider VARCHAR(50) NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'disconnected' CHECK (status IN ('disconnected', 'pending', 'connected', 'error')),
         metadata JSONB DEFAULT '{}'::jsonb,
         last_error TEXT,

@@ -47,7 +47,7 @@ Events (via `eventCallback`)
 - node_started, node_completed, node_failed
 - content_chunk, content_complete (forwarded from LLM)
 - tool_call_detected (forwarded from LLM), tool_started, tool_complete (from Tool)
-- Events include `executionDepth`; Engine redacts known secret values from payloads when possible.
+- Events include `executionDepth`.
 
 Error handling
 
@@ -72,8 +72,7 @@ Edge selection algorithm (detailed)
 Runtime configuration and secrets
 
 - When embedding the Engine directly (SDK usage), hosts may pass non-secret configuration via `Engine({ runtimeEnv })` and expose it however they choose.
-- In the hosted Starships product, workflows only receive a single env value: `env('STARSHIP_ID')`. **Custom env keys are not supported** and are not exposed to templates or Code nodes.
-- Secrets (LLM keys, third-party API tokens, etc.) are used only inside server-side integrations and connectors; workflows never see raw secret values.
+- In the hosted Starships product, workflows only receive a single env-like value in their template context: `env('STARSHIP_ID')`. **Custom env keys are not supported** and are not exposed to templates or Code nodes.
 
 Cross-links
 

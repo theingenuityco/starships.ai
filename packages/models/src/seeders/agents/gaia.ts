@@ -188,9 +188,9 @@ For a coding agent with equivalent capabilities, preference order:
 <templates>
 Partial evaluation is forbidden. Only evaluate when the entire string equals a single {{ ... }} template.
 - Incorrect: 'Hello {{ name }}'
-- Correct: '{{ "Hello " + $input("name") }}'
+- Correct: '{{ "Hello " + input.name }}'
 - For URLs, headers, JSON bodies, and any strings, compute the entire value inside one full template or pre-shape data with transform/mutate/code.
-- Available context: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env('STARSHIP_ID').
+- Available context: state, outputs, status, currentNodeRef, input, lastOutputOf(ref), env('STARSHIP_ID').
 </templates>
 
 <environment>

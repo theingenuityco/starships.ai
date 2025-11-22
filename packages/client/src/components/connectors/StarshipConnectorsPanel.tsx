@@ -75,145 +75,62 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     )
   }
 
-  const linkedin = catalog.find(c => c.provider === 'linkedin')
-  const discord = catalog.find(c => c.provider === 'discord')
-  const googleDrive = catalog.find(c => c.provider === 'google_drive')
+  type ConnectorProviderId = 'linkedin' | 'discord' | 'google_drive'
 
-  const linkedinState = getConnectorState('linkedin')
-  const discordState = getConnectorState('discord')
-  const googleDriveState = getConnectorState('google_drive')
+  const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord', 'google_drive']
 
-  const hasAnyVisibleConnector =
-    (linkedin && matchesQuery({ displayName: linkedin.displayName, description: linkedin.description })) ||
-    (discord && matchesQuery({ displayName: discord.displayName, description: discord.description })) ||
-    (googleDrive && matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description }))
-
-  const renderLinkedInCard = (connectedFirst: boolean) => {
-    if (!linkedin || !matchesQuery({ displayName: linkedin.displayName, description: linkedin.description })) return null
-    const isConnected = linkedinState?.status === 'connected'
-    if (isConnected !== connectedFirst) return null
-
-    return (
-      <Card key={`linkedin-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3">
-              {CONNECTOR_LOGOS.linkedin && (
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={CONNECTOR_LOGOS.linkedin} alt="LinkedIn logo" width={24} height={24} />
-                </div>
-              )}
-              <span className="text-lg">LinkedIn</span>
-              <Badge variant={isConnected ? 'default' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
-                {isConnected ? 'Connected' : 'Not connected'}
-              </Badge>
-            </CardTitle>
-          </div>
-          <p className="text-sm text-muted-foreground mt-2">{linkedin.description}</p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={isConnected ? 'outline' : 'default'}
-              className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
-              onClick={handleLinkedInConnect}
-              disabled={linkedinMutation.isPending}
-            >
-              <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
-              {isConnected ? 'Reconnect' : 'Connect LinkedIn'}
-            </Button>
-            {isConnected && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => openDisconnectConfirm('linkedin')}
-                disabled={disconnectMutation.isPending}
-              >
-                Disconnect
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    )
+  const CONNECTOR_LABELS: Record<ConnectorProviderId, string> = {
+    linkedin: 'LinkedIn',
+    discord: 'Discord',
+    google_drive: 'Google Drive',
   }
 
-  const renderDiscordCard = (connectedFirst: boolean) => {
-    if (!discord || !matchesQuery({ displayName: discord.displayName, description: discord.description })) return null
-    const isConnected = discordState?.status === 'connected'
-    if (isConnected !== connectedFirst) return null
+  const hasAnyVisibleConnector = PROVIDERS.some(provider => {
+    const item = catalog.find(c => c.provider === provider)
+    return item && matchesQuery({ displayName: item.displayName, description: item.description })
+  })
 
-    return (
-      <Card key={`discord-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3">
-              {CONNECTOR_LOGOS.discord && (
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={CONNECTOR_LOGOS.discord} alt="Discord logo" width={24} height={24} />
-                </div>
-              )}
-              <span className="text-lg">Discord</span>
-              <Badge variant={isConnected ? 'default' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
-                {isConnected ? 'Connected' : 'Not connected'}
-              </Badge>
-            </CardTitle>
-          </div>
-          <p className="text-sm text-muted-foreground mt-2">{discord.description}</p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={isConnected ? 'outline' : 'default'}
-              className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
-              onClick={handleDiscordConnect}
-              disabled={discordMutation.isPending}
-            >
-              <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
-              {isConnected ? 'Reconnect' : 'Connect Discord'}
-            </Button>
-            {isConnected && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => openDisconnectConfirm('discord')}
-                disabled={disconnectMutation.isPending}
-              >
-                Disconnect
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    )
+  const handleConnect = (provider: ConnectorProviderId) => {
+    switch (provider) {
+      case 'linkedin':
+        return handleLinkedInConnect()
+      case 'discord':
+        return handleDiscordConnect()
+      case 'google_drive':
+        return handleGoogleDriveConnect()
+    }
   }
 
-  const renderGoogleDriveCard = (connectedFirst: boolean) => {
-    if (!googleDrive || !matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description })) return null
-    const isConnected = googleDriveState?.status === 'connected'
-    if (isConnected !== connectedFirst) return null
+  const renderConnectorCard = (provider: ConnectorProviderId, connectedFirst: boolean) => {
+    const catalogItem = catalog.find(c => c.provider === provider)
+    if (!catalogItem || !matchesQuery({ displayName: catalogItem.displayName, description: catalogItem.description })) {
+      return null
+    }
+
+    const state = getConnectorState(provider)
+    const isConnected = state?.status === 'connected'
+    if (!!isConnected !== connectedFirst) return null
+
+    const label = CONNECTOR_LABELS[provider]
+    const logoSrc = CONNECTOR_LOGOS[provider]
 
     return (
-      <Card key={`google-drive-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
+      <Card key={`${provider}-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
-              {CONNECTOR_LOGOS.google_drive && (
+              {logoSrc && (
                 <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={CONNECTOR_LOGOS.google_drive} alt="Google Drive logo" width={24} height={24} />
+                  <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
                 </div>
               )}
-              <span className="text-lg">Google Drive</span>
+              <span className="text-lg">{label}</span>
               <Badge variant={isConnected ? 'default' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
                 {isConnected ? 'Connected' : 'Not connected'}
               </Badge>
             </CardTitle>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">{googleDrive.description}</p>
+          <p className="text-sm text-muted-foreground mt-2">{catalogItem.description}</p>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
@@ -221,18 +138,18 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               size="sm"
               variant={isConnected ? 'outline' : 'default'}
               className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
-              onClick={handleGoogleDriveConnect}
-              disabled={googleDriveMutation.isPending}
+              onClick={() => handleConnect(provider)}
+              disabled={provider === 'linkedin' ? linkedinMutation.isPending : provider === 'discord' ? discordMutation.isPending : googleDriveMutation.isPending}
             >
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
-              {isConnected ? 'Reconnect' : 'Connect Google Drive'}
+              {isConnected ? 'Reconnect' : `Connect ${label}`}
             </Button>
             {isConnected && (
               <Button
                 size="sm"
                 variant="outline"
                 className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => openDisconnectConfirm('google_drive')}
+                onClick={() => openDisconnectConfirm(provider)}
                 disabled={disconnectMutation.isPending}
               >
                 Disconnect
@@ -264,14 +181,10 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Connected first */}
-        {renderLinkedInCard(true)}
-        {renderDiscordCard(true)}
-        {renderGoogleDriveCard(true)}
+        {PROVIDERS.map(provider => renderConnectorCard(provider, true))}
 
         {/* Then not connected */}
-        {renderLinkedInCard(false)}
-        {renderDiscordCard(false)}
-        {renderGoogleDriveCard(false)}
+        {PROVIDERS.map(provider => renderConnectorCard(provider, false))}
       </div>
 
       <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>

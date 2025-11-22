@@ -95,10 +95,15 @@ Automatically inferred from agent state (do not pass manually):
             async function main(ctx) {
               const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
               const slug = ctx.$input && (ctx.$input).slug;
+              const starshipId = ctx.$env && ctx.$env('STARSHIP_ID');
 
               if (hasName) {
+                if (!starshipId) {
+                  throw new Error('STARSHIP_ID missing');
+                }
                 // Create draft
                 const body = {
+                  starshipId: String(starshipId),
                   name: ctx.$input.name,
                   description: (ctx.$input && (ctx.$input).description) || '',
                   model: (ctx.$input && (ctx.$input).model) || 'openai/gpt-4o-mini',

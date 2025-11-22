@@ -99,10 +99,15 @@ Returns server response indicating success.
 
               const prep = ctx.$lastOutputOf('prepare')[0].json;
               const toolSlug = prep.toolSlug;
+              const starshipId = ctx.$env && ctx.$env('STARSHIP_ID');
+              if (!starshipId) {
+                throw new Error('STARSHIP_ID missing');
+              }
 
               return {
                 agentId: String(agentData.id),
                 toolSlug: String(toolSlug),
+                starshipId: String(starshipId),
                 timeout: 10000
               };
             }
@@ -119,6 +124,9 @@ Returns server response indicating success.
           url: '{{ "/agents/" + $lastOutputOf("update_tools")[0].json.agentId + "/tools/" + $lastOutputOf("update_tools")[0].json.toolSlug }}',
           method: 'POST',
           connectorSlug: 'starships',
+          body: {
+            starshipId: '{{ env("STARSHIP_ID") }}'
+          },
           timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
         },
       },

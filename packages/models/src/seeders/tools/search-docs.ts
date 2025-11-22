@@ -56,7 +56,8 @@ Behavior and limits:
         parameters: {
           method: 'GET',
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
-          url: '/docs?q={{ $lastOutputOf("prepare")[0].json.q }}&limit={{ $lastOutputOf("prepare")[0].json.limit }}',
+          // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
+          url: '{{ (() => { const input = $lastOutputOf("prepare")[0].json || {}; const q = input.q || ""; const limit = input.limit == null ? "" : String(input.limit); const enc = encodeURIComponent; return "/docs?q=" + enc(q) + "&limit=" + enc(limit); })() }}',
           connectorSlug: 'starships',
           timeout: 5000,
         },
@@ -108,7 +109,7 @@ export const docsSearchToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsSearchTool.blueprint,
 
   slug: 'search-docs',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'data',
   exampleUsage: '{ "q": "tools", "limit": 10 } // returns search results; env baseUrl inferred',
   requiresApiKey: false,

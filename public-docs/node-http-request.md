@@ -6,11 +6,12 @@ Specification (authoritative)
 
 - Handler: `packages/autopilot/src/nodes/HttpRequest.ts`
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
-  - url: string (required)
+  - url: string (required) — absolute (`https://...`) or relative (`/path`) when used with connectors
   - method: string (required) — one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
   - headers?: Record<string,string> | Headers | [string, string][]
   - body?: object | string | null
   - timeout?: number (ms; default 30000)
+  - connector?: string (optional) — logical connector name used by the HostRuntime for auth/URL handling; the exact values are defined by the host environment
   - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, connector
 
 Body selection rules
@@ -45,7 +46,9 @@ Error behavior
 
 Validation rules
 
-- url required; must be a valid URL.
+- url required:
+  - If it starts with `http://` or `https://`, it must be a valid absolute URL.
+  - Relative URLs (starting with `/`) are allowed and are normalized by the HostRuntime (for example when using connectors).
 - method required; must be one of the supported methods.
 - timeout (if provided) must be >= 1000ms.
 
@@ -66,10 +69,37 @@ Example (POST JSON)
 }
 ```
 
+### Using connectors
+
+- `connector` is an optional logical name understood by the HostRuntime. It controls how URLs are normalized and how auth headers are injected; the `HttpRequest` node itself just forwards `connector` to the runtime.
+- When `url` is relative (starts with `/`), the HostRuntime will typically prefix it with a base API URL configured in the host environment.
+- If you explicitly set an `Authorization` header in `parameters.headers`, it always takes precedence; connector logic should not override it.
+- The concrete connector names and their behaviors (for example which auth headers they inject or how they normalize URLs) are defined by the host runtime and deployment configuration, not by the Autopilot engine itself.
+
+Example (blueprint using a connector)
+
+```ts
+{
+  ref: "http_call",
+  type: "http_request",
+  name: "Call external service via connector",
+  parameters: {
+    method: "GET",
+    // Relative path; HostRuntime/connector will resolve it against its base API URL
+    url: "/some/resource",
+    // Logical connector name understood by the HostRuntime; may be static or resolved from templates/env
+    connector: "my-connector",
+    timeout: 5000
+  }
+}
+```
+
+If `connector` is omitted or set to an unrecognized string, the request behaves like a normal HTTP call; the HostRuntime may still normalize relative URLs according to its configuration, but no connector-specific auth behavior is guaranteed.
+
 Cross-links
 
 - See Transform for output reshaping after an HTTP call.
-- See Engine for template resolution rules applied to parameters.
+- See Engine for template resolution rules applied to parameters and how HostRuntime is constructed.
 
 ### Notes
 
@@ -77,5 +107,7 @@ Cross-links
   - strings are sent as-is
   - objects are JSON-stringified by the host runtime with `Content-Type: application/json`
   - undefined is omitted
--    Prefer passing objects (either from upstream `$input` via an explicit template, or literals) rather than manually stringifying JSON yourself.
+- Prefer passing objects (either from upstream `$input` via an explicit template, or literals) rather than manually stringifying JSON yourself.
 - When chaining requests, remember HttpRequest returns a wrapper (see Return value shape). If you need only the payload for the next request, forward `body` via a Transform/Code node.
+
+

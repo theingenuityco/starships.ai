@@ -84,6 +84,22 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
+   * Compute a non-overlapping append by trimming any prefix of 'fragment' that
+   * already exists as a suffix of 'base'. This mirrors the ConversationService
+   * behavior to avoid duplicated reasoning/content fragments.
+   */
+  private static computeNonOverlappingAppend(base: string, fragment: string): string {
+    if (!fragment) return '';
+    const maxCheck = Math.min(base.length, fragment.length);
+    for (let k = maxCheck; k > 0; k--) {
+      if (base.endsWith(fragment.slice(0, k))) {
+        return fragment.slice(k);
+      }
+    }
+    return fragment;
+  }
+
+  /**
    * Execute the LLM request with streaming and optional input items
    * Uses OpenAI SDK for reliable streaming and tool call handling
    */
@@ -145,6 +161,12 @@ export class LLM extends BaseNode<LlmParams> {
       }
       if (typeof params.presencePenalty === 'number') {
         requestOptions.presence_penalty = params.presencePenalty;
+      }
+
+      // Pass through OpenRouter/OpenAI unified reasoning configuration when provided
+      if (params.reasoning && typeof params.reasoning === 'object') {
+        // The official OpenAI types do not yet expose the `reasoning` field, so we extend at runtime.
+        (requestOptions as OpenAI.Chat.ChatCompletionCreateParamsStreaming & { reasoning?: unknown }).reasoning = params.reasoning;
       }
 
       // Add function calling support if tools are provided
@@ -506,6 +528,85 @@ export class LLM extends BaseNode<LlmParams> {
         if (choice.delta?.content) {
           const piece = choice.delta.content;
           content += piece;
+        }
+
+        // Accumulate reasoning text from providers that support reasoning-capable models
+        try {
+          const extractReasoning = (node: unknown): string => {
+            if (!node || typeof node !== 'object') return '';
+            const rec = node as Record<string, unknown>;
+            const parts: string[] = [];
+
+            // Unified fields (reasoning / thinking)
+            const raw =
+              (rec as { reasoning?: unknown; thinking?: unknown }).reasoning ??
+              (rec as { reasoning?: unknown; thinking?: unknown }).thinking;
+
+            const appendFromRaw = (r: unknown): void => {
+              if (!r) return;
+              if (typeof r === 'string') {
+                parts.push(r);
+                return;
+              }
+              if (typeof r === 'object' && r !== null) {
+                const obj = r as Record<string, unknown>;
+                if (typeof obj.content === 'string') parts.push(obj.content);
+                const tokens = obj.tokens;
+                if (Array.isArray(tokens)) {
+                  for (const t of tokens as unknown[]) {
+                    if (t && typeof t === 'object') {
+                      const tr = t as Record<string, unknown>;
+                      const text = typeof tr.text === 'string' ? tr.text : '';
+                      const c = typeof tr.content === 'string' ? tr.content : '';
+                      if (text) parts.push(text);
+                      else if (c) parts.push(c);
+                    }
+                  }
+                }
+              }
+              if (Array.isArray(r)) {
+                for (const p of r as unknown[]) {
+                  if (p && typeof p === 'object') {
+                    const pr = p as Record<string, unknown>;
+                    const text = typeof pr.text === 'string' ? pr.text : '';
+                    const c = typeof pr.content === 'string' ? pr.content : '';
+                    if (text) parts.push(text);
+                    else if (c) parts.push(c);
+                  }
+                }
+              }
+            };
+
+            appendFromRaw(raw);
+
+            // OpenRouter unified 'reasoning_details' chunks (if present)
+            const details = (rec as { reasoning_details?: unknown }).reasoning_details;
+            if (Array.isArray(details)) {
+              for (const d of details as unknown[]) {
+                if (d && typeof d === 'object') {
+                  const det = d as Record<string, unknown>;
+                  if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                    parts.push(det.text);
+                  }
+                }
+              }
+            }
+
+            return parts.join('');
+          };
+
+          // Prefer delta-level reasoning; fall back to any message snapshot if present
+          const fromDelta = extractReasoning((choice as unknown as { delta?: unknown }).delta);
+          const fromMessage = extractReasoning((choice as unknown as { message?: unknown }).message);
+          const chunkReasoning = fromDelta || fromMessage;
+          if (chunkReasoning) {
+            const append = LLM.computeNonOverlappingAppend(reasoning, chunkReasoning);
+            if (append) {
+              reasoning += append;
+            }
+          }
+        } catch {
+          // Non-fatal: if reasoning extraction fails, continue without disrupting content/tool streaming
         }
 
         // Handle tool calls - OpenAI SDK properly accumulates these

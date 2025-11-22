@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { CONNECTOR_LOGOS } from '@/lib/connectorLogos'
@@ -23,11 +24,18 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const googleDriveMutation = useStartGoogleDriveOAuth(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | null>(null)
 
   const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive') => connectors.find(connector => connector.provider === provider)
 
-  const handleDisconnect = (provider: 'linkedin' | 'discord' | 'google_drive') => {
-    disconnectMutation.mutate(provider)
+  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive') => {
+    setPendingDisconnect(provider)
+  }
+
+  const handleConfirmDisconnect = () => {
+    if (!pendingDisconnect) return
+    disconnectMutation.mutate(pendingDisconnect)
+    setPendingDisconnect(null)
   }
 
   const handleLinkedInConnect = async () => {
@@ -120,7 +128,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 size="sm"
                 variant="outline"
                 className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => handleDisconnect('linkedin')}
+                onClick={() => openDisconnectConfirm('linkedin')}
                 disabled={disconnectMutation.isPending}
               >
                 Disconnect
@@ -172,7 +180,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 size="sm"
                 variant="outline"
                 className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => handleDisconnect('discord')}
+                onClick={() => openDisconnectConfirm('discord')}
                 disabled={disconnectMutation.isPending}
               >
                 Disconnect
@@ -224,7 +232,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 size="sm"
                 variant="outline"
                 className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => handleDisconnect('google_drive')}
+                onClick={() => openDisconnectConfirm('google_drive')}
                 disabled={disconnectMutation.isPending}
               >
                 Disconnect
@@ -265,6 +273,29 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         {renderDiscordCard(false)}
         {renderGoogleDriveCard(false)}
       </div>
+
+      <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
+            <DialogDescription>
+              {pendingDisconnect
+                ? `If you disconnect ${
+                    pendingDisconnect === 'google_drive' ? 'Google Drive' : pendingDisconnect === 'linkedin' ? 'LinkedIn' : 'Discord'
+                  }, any tools that rely on this connector will stop working until you reconnect.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
+              Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

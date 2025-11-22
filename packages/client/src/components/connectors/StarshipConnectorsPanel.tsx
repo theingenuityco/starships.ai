@@ -125,9 +125,10 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 </div>
               )}
               <span className="text-lg">{label}</span>
-              <Badge variant={isConnected ? 'connected' : 'outline'} className="px-2 py-0.5 text-[10px] leading-tight">
-                {isConnected ? 'Connected' : 'Not connected'}
-              </Badge>
+              <div className="flex items-center gap-1.5 text-[11px] font-medium">
+                <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
+                <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
+              </div>
             </CardTitle>
           </div>
           <p className="text-sm text-muted-foreground mt-2">{catalogItem.description}</p>

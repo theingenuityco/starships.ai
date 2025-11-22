@@ -16,8 +16,9 @@
  * Part 2: Deploy unified blueprint tools to all starships
  * - modify-tool-blueprint-node
  * - modify-tool-blueprint-edge
+ * - list-connectors
  * - Create tools from templates if missing
- * - Assign both tools to Daedalus agent in each starship (when present)
+ * - Assign tools to Daedalus agent in each starship (when present)
  */
 
 import { logger } from '@/helpers/logging';
@@ -42,6 +43,8 @@ interface MigrationStats {
   modifyEdgeDeployed: number;
   modifyNodeAssigned: number;
   modifyEdgeAssigned: number;
+  connectorsListDeployed: number;
+  connectorsListAssigned: number;
   deploymentErrors: number;
 }
 
@@ -174,6 +177,8 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
   modifyEdgeDeployed: number;
   modifyNodeAssigned: number;
   modifyEdgeAssigned: number;
+  connectorsListDeployed: number;
+  connectorsListAssigned: number;
   errors: number;
 }> {
   const stats = {
@@ -181,6 +186,8 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
     modifyEdgeDeployed: 0,
     modifyNodeAssigned: 0,
     modifyEdgeAssigned: 0,
+    connectorsListDeployed: 0,
+    connectorsListAssigned: 0,
     errors: 0,
   };
 
@@ -192,11 +199,13 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
     // Resolve unified templates
     const modifyNodeTemplate = await templateRepo.findBySlug('modify-tool-blueprint-node');
     const modifyEdgeTemplate = await templateRepo.findBySlug('modify-tool-blueprint-edge');
+    const connectorsListTemplate = await templateRepo.findBySlug('list-connectors');
 
-    if (!modifyNodeTemplate || !modifyEdgeTemplate) {
+    if (!modifyNodeTemplate || !modifyEdgeTemplate || !connectorsListTemplate) {
       const missing: string[] = [];
       if (!modifyNodeTemplate) missing.push('modify-tool-blueprint-node');
       if (!modifyEdgeTemplate) missing.push('modify-tool-blueprint-edge');
+      if (!connectorsListTemplate) missing.push('list-connectors');
       logger.warn(`Could not find unified blueprint tool templates: ${missing.join(', ')}`);
       stats.errors++;
       return stats;
@@ -240,6 +249,26 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
         logger.error(
           `Failed to deploy modify-tool-blueprint-edge to starship ${starshipId}`,
           { component: 'migrate-blueprint-tools', operation: 'deployModifyEdge' },
+          error as Error
+        );
+      }
+    }
+
+    // Ensure list-connectors tool exists
+    const hasConnectorsList = existingTools.some((tool) => tool.templateId === connectorsListTemplate.id);
+    let connectorsListTool = existingTools.find((tool) => tool.templateId === connectorsListTemplate.id);
+
+    if (!hasConnectorsList) {
+      try {
+        logger.info(`Deploying list-connectors to starship ${starshipId}`);
+        connectorsListTool = await toolRepo.createFromTemplate('list-connectors', starshipId);
+        stats.connectorsListDeployed++;
+        logger.info(`✅ Deployed list-connectors (${connectorsListTool.id})`);
+      } catch (error) {
+        stats.errors++;
+        logger.error(
+          `Failed to deploy list-connectors to starship ${starshipId}`,
+          { component: 'migrate-blueprint-tools', operation: 'deployListConnectors' },
           error as Error
         );
       }
@@ -291,6 +320,25 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
           logger.error(
             `Failed to assign modify-tool-blueprint-edge to Daedalus agent ${daedalusAgent.id}`,
             { component: 'migrate-blueprint-tools', operation: 'assignModifyEdge' },
+            error as Error
+          );
+        }
+      }
+    }
+
+    // Assign list-connectors if not already assigned
+    if (connectorsListTool) {
+      const isAssigned = assignedTools.some((tool: ToolModel) => tool.id === connectorsListTool!.id);
+      if (!isAssigned) {
+        try {
+          await agentRepo.addToolRelationship(daedalusAgent.id, connectorsListTool.id);
+          stats.connectorsListAssigned++;
+          logger.info(`✅ Assigned list-connectors to Daedalus agent "${daedalusAgent.name}"`);
+        } catch (error) {
+          stats.errors++;
+          logger.error(
+            `Failed to assign list-connectors to Daedalus agent ${daedalusAgent.id}`,
+            { component: 'migrate-blueprint-tools', operation: 'assignListConnectors' },
             error as Error
           );
         }
@@ -362,6 +410,8 @@ export async function migrateBlueprintTools(targetStarshipIds?: string[]): Promi
       modifyEdgeDeployed: 0,
       modifyNodeAssigned: 0,
       modifyEdgeAssigned: 0,
+      connectorsListDeployed: 0,
+      connectorsListAssigned: 0,
       deploymentErrors: 0,
     };
 
@@ -383,6 +433,8 @@ export async function migrateBlueprintTools(targetStarshipIds?: string[]): Promi
       totalStats.modifyEdgeDeployed += deploymentStats.modifyEdgeDeployed;
       totalStats.modifyNodeAssigned += deploymentStats.modifyNodeAssigned;
       totalStats.modifyEdgeAssigned += deploymentStats.modifyEdgeAssigned;
+      totalStats.connectorsListDeployed += deploymentStats.connectorsListDeployed;
+      totalStats.connectorsListAssigned += deploymentStats.connectorsListAssigned;
       totalStats.deploymentErrors += deploymentStats.errors;
 
       totalStats.starshipsProcessed++;
@@ -404,6 +456,8 @@ export async function migrateBlueprintTools(targetStarshipIds?: string[]): Promi
     logger.info(`    - modify-tool-blueprint-edge deployed: ${totalStats.modifyEdgeDeployed}`);
     logger.info(`    - modify-tool-blueprint-node assigned to Daedalus: ${totalStats.modifyNodeAssigned}`);
     logger.info(`    - modify-tool-blueprint-edge assigned to Daedalus: ${totalStats.modifyEdgeAssigned}`);
+      logger.info(`    - list-connectors deployed: ${totalStats.connectorsListDeployed}`);
+      logger.info(`    - list-connectors assigned to Daedalus: ${totalStats.connectorsListAssigned}`);
     logger.info(`    - Errors: ${totalStats.deploymentErrors}`);
     logger.info('═══════════════════════════════════════════════════════════');
 

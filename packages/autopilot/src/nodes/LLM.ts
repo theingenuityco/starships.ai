@@ -10,7 +10,17 @@ import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
-import { Cacheable, CacheableSystemMessage, ContentBlock, LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall, MessageContent } from '@/types/llm';
+import {
+  Cacheable,
+  CacheableSystemMessage,
+  ContentBlock,
+  LLMMessageRole,
+  LLMResponse,
+  LLMUsage,
+  LlmMessage,
+  LlmToolCall,
+  MessageContent,
+} from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -87,9 +97,7 @@ export class LLM extends BaseNode<LlmParams> {
       apiKey = process.env.OPENROUTER_API_KEY ?? null;
     }
     if (!apiKey) {
-      throw this.handleExecutionError(
-        new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY in the host environment.')
-      );
+      throw this.handleExecutionError(new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY in the host environment.'));
     }
 
     try {
@@ -351,10 +359,10 @@ export class LLM extends BaseNode<LlmParams> {
       const role = (typeof obj.role === 'string' ? obj.role : 'user') as LLMMessageRole;
       // Preserve content as-is if it's a string or array (multimodal content blocks)
       // Only stringify if it's neither (fallback for unexpected types)
-      const content: MessageContent = 
-        typeof obj.content === 'string' 
-          ? obj.content 
-          : Array.isArray(obj.content) 
+      const content: MessageContent =
+        typeof obj.content === 'string'
+          ? obj.content
+          : Array.isArray(obj.content)
             ? (obj.content as ContentBlock[])
             : JSON.stringify(obj.content ?? '');
 
@@ -805,6 +813,7 @@ export class LLM extends BaseNode<LlmParams> {
     const modelError = this.validateRequiredField(params.model, 'Model');
     if (modelError) errors.push(modelError);
 
+    // Messages must be an array with at least one entry; upstream-input fallback is not relied on.
     const messagesError = this.validateArrayParameter(params.messages, 'Messages', 1);
     if (messagesError) errors.push(messagesError);
 

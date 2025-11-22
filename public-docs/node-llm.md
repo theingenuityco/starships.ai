@@ -58,7 +58,7 @@ Return value (shape)
 
 Validation rules (strict)
 - model: required
-- messages: array with at least 1 entry OR taken from upstream input (as user content) when omitted
+- messages: array with at least 1 entry (must be explicitly provided or resolve to a non-empty array)
 - tools: must be an array of ToolParams or a template string; other types invalid
 - Parameter ranges enforced:
   - temperature: 0..2
@@ -68,7 +68,6 @@ Validation rules (strict)
   - timeout: >= 1000ms is recommended at call-sites; the node validates minimums where applicable
 
 Edge cases and guarantees
-- When upstream input exists and `messages` is empty/missing, a single user message is synthesized from input (stringified for non-string).
 - `parallel_tool_calls` is set to false to prevent multiple tool calls within a single assistant response.
 - Provider-snapshot toolCalls are respected; arguments snapshot is used as a fallback if delta assembly yields shorter content.
 - Errors are surfaced with descriptive messages; handler throws if API key is missing.

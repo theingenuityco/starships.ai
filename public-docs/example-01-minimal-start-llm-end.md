@@ -4,7 +4,7 @@ Goal: Smallest useful blueprint that streams a model response and returns it via
 
 Requirements
 
-- Secure env must include `OPEN_ROUTER_KEY`.
+- The host environment must provide a valid OpenRouter API key via `OPENROUTER_API_KEY` (for local SDK usage). In hosted Starships, this is wired through the Starships configuration key `OPEN_ROUTER_KEY` and surfaced to the runtime as `OPENROUTER_API_KEY`.
 
 Code
 

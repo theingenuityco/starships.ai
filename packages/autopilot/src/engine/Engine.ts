@@ -127,31 +127,41 @@ export class Engine {
     return items;
   }
 
-  private async executeInlineMutate(reducers: ReducerSpec[], execution: Execution): Promise<ExecutionItem[]> {
-    // Resolve templates at execution time using the current state
-    const resolved = (await this.eval.resolveTemplates({ reducers }, execution, undefined, {
-      stringEvaluationMode: 'full-only',
-    })) as { reducers: ReducerSpec[] };
+  private async executeInlineMutate(reducers: ReducerSpec[], execution: Execution, inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    // Resolve templates at execution time using the current state and the node's output as input
+    const resolved = (await this.eval.resolveTemplates(
+      { reducers },
+      execution,
+      inputItems ? ExecutionItemUtils.unwrapSingle(inputItems) : undefined,
+      {
+        stringEvaluationMode: 'full-only',
+      }
+    )) as { reducers: ReducerSpec[] };
 
     const params = { reducers: resolved.reducers } as unknown as NodeParameters;
     const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, params);
     const handler = await this.createHandler(virtualNode, params, execution);
-    const items = await handler.execute();
+    const items = await handler.execute(inputItems);
     // Record inline mutate result like a normal node
     execution.results.push({ nodeRef: virtualNode.ref, items });
     return items;
   }
 
-  private async executeInlineConditional(conditionExpression: string, execution: Execution): Promise<string> {
-    // Resolve the condition expression at execution time
-    const resolved = (await this.eval.resolveTemplates({ condition: conditionExpression }, execution, undefined, {
-      stringEvaluationMode: 'full-only',
-    })) as { condition?: string };
+  private async executeInlineConditional(conditionExpression: string, execution: Execution, inputItems?: ExecutionItem[]): Promise<string> {
+    // Resolve the condition expression at execution time using the node's output as input
+    const resolved = (await this.eval.resolveTemplates(
+      { condition: conditionExpression },
+      execution,
+      inputItems ? ExecutionItemUtils.unwrapSingle(inputItems) : undefined,
+      {
+        stringEvaluationMode: 'full-only',
+      }
+    )) as { condition?: string };
     const params = { condition: resolved.condition ?? conditionExpression };
 
     const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, params);
     const conditionalHandler = await this.createHandler(virtualNode, params, execution);
-    const conditionalResultItems = await conditionalHandler.execute();
+    const conditionalResultItems = await conditionalHandler.execute(inputItems);
     // Record inline conditional result like a normal node
     execution.results.push({ nodeRef: virtualNode.ref, items: conditionalResultItems });
 
@@ -474,11 +484,11 @@ export class Engine {
         outputItems = await this.executeInlineTransform(inlineParams.transforms, execution, outputItems);
       }
 
-      // Execute inline reducers if present (can use lastOutputOf/current state).
+      // Execute inline reducers if present (can use lastOutputOf/current state and the node's output as $input()).
       // IMPORTANT: Skip when the current node IS the dedicated mutate node to avoid double-processing.
       if (inlineParams?.reducers?.length && currentNode.type !== 'mutate') {
         try {
-          await this.executeInlineMutate(inlineParams.reducers, execution);
+          await this.executeInlineMutate(inlineParams.reducers, execution, outputItems);
         } catch (error) {
           console.error('[ERROR Engine.executeNode] inline_mutations_failed', {
             nodeRef: currentNode.ref,
@@ -493,7 +503,7 @@ export class Engine {
       // Execute inline conditional if present.
       // IMPORTANT: Skip when the current node IS the dedicated conditional node to avoid conflicting edgeCondition.
       if (inlineParams?.condition && currentNode.type !== 'conditional') {
-        const conditionResult = await this.executeInlineConditional(inlineParams.condition, execution);
+        const conditionResult = await this.executeInlineConditional(inlineParams.condition, execution, outputItems);
         const firstItem = outputItems[0];
         if (!firstItem?.json || typeof firstItem.json !== 'object' || !('edgeCondition' in firstItem.json)) {
           outputItems = ExecutionItemUtils.wrapSingle({ edgeCondition: conditionResult });
@@ -659,7 +669,8 @@ export class Engine {
           // Skip child 'blueprint' that looks like a blueprint
           if (k === 'blueprint' && v && typeof v === 'object') {
             const bp = v as Record<string, unknown>;
-            const looksBlueprint = Array.isArray((bp as Record<string, unknown>).nodes) && Array.isArray((bp as Record<string, unknown>).edges);
+            const looksBlueprint =
+              Array.isArray((bp as Record<string, unknown>).nodes) && Array.isArray((bp as Record<string, unknown>).edges);
             if (looksBlueprint) continue;
           }
           collect(v, path ? `${path}.${k}` : k);

@@ -56,7 +56,6 @@ Edge cases and guarantees
 
 - Determinism (modulo external effects).
 - Depth/runner: respects parent-child nesting for isolation.
-- Secure env is propagated; secrets may be redacted in events by Engine.
 
 Example (calculator)
 

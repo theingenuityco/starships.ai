@@ -162,8 +162,8 @@ export class Mutate implements NodeHandler {
       $input: () => inputData,
       $lastOutputOf,
       state: execution?.state || {},
-      config: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
-      configAll: () => ({ ...(runtimeEnv as Record<string, unknown>) }),
+      // Non-secret runtime configuration, aligned with Eval's env helper
+      env: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
       // Utilities and safe builtins
       JSON: JSON,
       Math: Math,

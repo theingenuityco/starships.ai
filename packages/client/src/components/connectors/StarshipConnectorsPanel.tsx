@@ -1,5 +1,6 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
 import {
   useConnectorCatalog,
   useDisconnectConnector,
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -23,6 +24,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const disconnectMutation = useDisconnectConnector(starshipId)
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
   const discordMutation = useStartDiscordOAuth(starshipId)
+
+  const [searchQuery, setSearchQuery] = useState('')
 
   const getConnectorState = (provider: 'linkedin' | 'discord') =>
     connectors.find(connector => connector.provider === provider)
@@ -45,6 +48,17 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     }
   }
 
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+
+  const matchesQuery = useMemo(
+    () =>
+      (entry: { displayName: string; description: string }) =>
+        !normalizedQuery ||
+        entry.displayName.toLowerCase().includes(normalizedQuery) ||
+        entry.description.toLowerCase().includes(normalizedQuery),
+    [normalizedQuery]
+  )
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -59,9 +73,35 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const linkedinState = getConnectorState('linkedin')
   const discordState = getConnectorState('discord')
 
+  const hasAnyVisibleConnector =
+    (linkedin && matchesQuery({ displayName: linkedin.displayName, description: linkedin.description })) ||
+    (discord && matchesQuery({ displayName: discord.displayName, description: discord.description }))
+
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      {linkedin && (
+    <div className="space-y-6">
+      {/* Search - match Environment page styling */}
+      <div className="mb-8 sticky top-6 z-30">
+        <div className="relative max-w-md mb-6 mx-auto">
+          <Icon
+            name="search"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none"
+          />
+          <Input
+            type="text"
+            placeholder="Search connectors..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent text-sm"
+          />
+        </div>
+      </div>
+
+      {!hasAnyVisibleConnector && (
+        <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {linkedin && matchesQuery({ displayName: linkedin.displayName, description: linkedin.description }) && (
         <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -111,9 +151,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             </div>
           </CardContent>
         </Card>
-      )}
+        )}
 
-      {discord && (
+        {discord && matchesQuery({ displayName: discord.displayName, description: discord.description }) && (
         <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -154,7 +194,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             </div>
           </CardContent>
         </Card>
-      )}
+        )}
+      </div>
     </div>
   )
 }

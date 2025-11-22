@@ -141,10 +141,13 @@ Extracts data from input using dot notation:
 
 ### `env(key)`
 
-Access non-secret runtime configuration values provided by the host:
+Access host-provided environment values:
+
+- When embedding the Engine yourself (SDK usage), you may choose how to populate `runtimeConfig` and interpret `env(key)`.
+- In the hosted Starships product, **the only env key exposed to workflows is** `env('STARSHIP_ID')`. Custom env keys are not supported and will be undefined.
 
 ```javascript
-// Single env value
+// Starships host: only STARSHIP_ID is available
 {
   {
     env('STARSHIP_ID');
@@ -236,14 +239,14 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 ### HTTP Requests
 
 ```javascript
-// Dynamic URL construction
+// Dynamic URL construction (host decides base URL; templates see only runtime data)
 {
-  url: "{{ env('KEY') }}/users/{{ $input('userId') }}",
+  url: "/users/{{ $input('userId') }}",
   headers: {
-    "Authorization": "Bearer {{ env('KEY') }}",
     "Content-Type": "application/json"
   },
   body: {
+    "starshipId": "{{ env('STARSHIP_ID') }}",
     "timestamp": "{{ $now() }}",
     "requestId": "{{ $random() }}"
   }

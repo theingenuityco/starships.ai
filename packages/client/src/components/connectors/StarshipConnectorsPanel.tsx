@@ -136,8 +136,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <div className="flex gap-2">
             <Button
               size="sm"
-              variant={isConnected ? 'outline' : 'default'}
-              className={isConnected ? 'min-w-[140px] border-primary text-primary' : 'min-w-[140px]'}
+              variant={isConnected ? 'primaryOutline' : 'default'}
+              className="min-w-[140px]"
               onClick={() => handleConnect(provider)}
               disabled={provider === 'linkedin' ? linkedinMutation.isPending : provider === 'discord' ? discordMutation.isPending : googleDriveMutation.isPending}
             >

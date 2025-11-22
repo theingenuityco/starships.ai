@@ -222,7 +222,7 @@ describe('Echo Tool', () => {
       expect(result.success).toBe(true);
       if (result.result && typeof result.result === 'object') {
         const echoResult = result.result as { message: string };
-        // The template uses $lastOutputOf("__initial__")[0].json.message which would be undefined
+        // The template uses lastOutputOf("__initial__").message which will be undefined when message is missing
         expect(echoResult.message).toBeUndefined();
       }
     });

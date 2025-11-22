@@ -263,6 +263,31 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
           <div className="flex flex-col gap-1 mt-1">
             {edges.map((edge, index) => {
               const uniqueKey = edge?.ref ? `branch-${edge.ref}` : `edge-branch-${index}`
+
+              // Safely render human-readable condition/label text
+              const getBranchLabel = () => {
+                const condition = (edge as any)?.condition
+
+                if (condition === undefined || condition === null || condition === '') {
+                  return edge?.label || `Branch ${index + 1}`
+                }
+
+                if (typeof condition === 'object') {
+                  // Handle simple operator objects like { equals: true }
+                  if ('equals' in condition) {
+                    return String((condition as any).equals)
+                  }
+                  // Fallback to JSON for any other structured condition
+                  try {
+                    return JSON.stringify(condition)
+                  } catch {
+                    return String(condition)
+                  }
+                }
+
+                return String(condition)
+              }
+
               return (
                 <div
                   key={uniqueKey}
@@ -271,7 +296,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                     background: `linear-gradient(135deg, ${colors.handle}${branchPrimaryOpacity} 0%, ${colors.handle}${branchSecondaryOpacity} 100%)`,
                   }}
                 >
-                  <div className="truncate text-center">{edge?.condition || edge?.label || `Branch ${index + 1}`}</div>
+                  <div className="truncate text-center">{getBranchLabel()}</div>
                   {/* Individual output handle for this branch */}
                   <Handle
                     type="source"

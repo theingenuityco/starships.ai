@@ -16,8 +16,6 @@ export const toolOpenTool: ToolParams = {
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- BASE_URL: API server endpoint
-- AUTH_TOKEN: Authentication token
 - STARSHIP_ID: Current starship identifier
 
 ## Response & Behavior
@@ -55,20 +53,14 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-
-              const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
-              const hasSlug = ctx.$input && typeof ctx.$input.slug === 'string' && ctx.$input.slug.trim().length > 0;
+              const input = ctx.input || {};
+              const hasName = typeof input.name === 'string' && input.name.trim().length > 0;
+              const hasSlug = typeof input.slug === 'string' && input.slug.trim().length > 0;
 
               if (hasName) {
                 // Create tool (active by default)
-                const name = ctx.$input.name.trim();
-                const description = (ctx.$input && typeof ctx.$input.description === 'string' ? ctx.$input.description.trim() : '');
+                const name = input.name.trim();
+                const description = (input && typeof input.description === 'string' ? input.description.trim() : '');
                 if (!description) throw new Error('description is required when creating a new tool');
                 const body = {
                   name,
@@ -76,12 +68,7 @@ Automatically inferred from agent state (do not pass manually):
                   status: 'active'
                 };
                 return {
-                  url: baseUrl + '/starships/' + starshipId + '/tools',
-                  method: 'POST',
-                  headers: {
-                    'Authorization': 'Bearer ' + authToken,
-                    'Content-Type': 'application/json'
-                  },
+                  mode: 'create',
                   body,
                   timeout: 10000
                 };
@@ -90,12 +77,8 @@ Automatically inferred from agent state (do not pass manually):
               // Open existing
               if (!hasSlug) throw new Error('slug is required to open an existing tool');
               return {
-                url: baseUrl + '/starships/' + starshipId + '/tools/' + ctx.$input.slug,
-                method: 'GET',
-                headers: {
-                  'Authorization': 'Bearer ' + authToken,
-                  'Content-Type': 'application/json'
-                },
+                mode: 'open',
+                slug: input.slug,
                 timeout: 5000
               };
             }
@@ -109,11 +92,11 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute',
         description: 'Create or fetch tool',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
-          timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" + ((lastOutputOf("prepare") || {}).mode === "create" ? "" : "/" + (lastOutputOf("prepare") || {}).slug) }}',
+          method: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "POST" : "GET" }}',
+          body: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? (lastOutputOf("prepare") || {}).body : undefined }}',
+          connector: 'starships',
+          timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
       },
       {
@@ -122,7 +105,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return tool model (created or fetched)',
         parameters: {
-          output: '{{ $lastOutputOf("http_exec")[0].json }}',
+          output: '{{ lastOutputOf("http_exec") }}',
         },
       },
     ],
@@ -145,7 +128,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolOpenTool.blueprint,
 
   slug: 'open-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage:
     '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',

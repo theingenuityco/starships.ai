@@ -129,17 +129,17 @@ Blueprints use simple expressions to pass data between workflow steps:
 '{{ state.userEmail }}';
 
 // Get results from previous nodes
-"{{ $lastOutputOf('api_call').json }}";
+"{{ lastOutputOf('api_call') }}";
 
 // Use input data
-"{{ $input('message') }}";
+"{{ input.message }}";
 ```
 
 **Common Patterns:**
 
 - **State Variables**: `{{ state.variableName }}` - Access persistent workflow data
-- **Node Results**: `{{ $lastOutputOf('nodeRef') }}` - Get outputs from previous steps
-- **Input Access**: `{{ $input('path') }}` - Extract data from workflow input
+- **Node Results**: `{{ lastOutputOf('nodeRef') }}` - Get outputs from previous steps
+- **Input Access**: `{{ input.path }}` - Extract data from workflow input
 
 <Callout type="info">
   **Deep Integration**: Blueprints are tightly integrated with [agents](/core-concepts/agents) for tool calling and

@@ -2,7 +2,8 @@
  * Autopilot Configuration Manager
  *
  * Central configuration store for the Autopilot system.
- * Credentials are provided via secureEnv at execution time; none are stored here.
+ * Credentials are provided via host-level callbacks at execution time; none
+ * are stored here.
  */
 
 export interface AutopilotConfig {

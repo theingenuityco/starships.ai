@@ -22,7 +22,7 @@ const blueprint = {
       name: 'Respond',
       parameters: { model: 'anthropic/claude-3.5-sonnet', messages: [{ role: 'user', content: 'Hello' }] },
     },
-    { ref: 'end', type: 'end', name: 'Done', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
+    { ref: 'end', type: 'end', name: 'Done', parameters: { output: '{{ lastOutputOf("llm") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 'start', to: 'llm' },

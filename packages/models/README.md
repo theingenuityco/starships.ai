@@ -344,7 +344,6 @@ Comprehensive test coverage for Daedalus's tools with specialized testing utilit
 | **Utility Tools**   | `calculator`       | Mathematical expression evaluation with security validation  |
 |                     | `echo`             | Simple input/output testing and debugging utility            |
 |                     | `get_current_time` | Timezone-aware date/time generation with multiple formats    |
-| **Blueprint Tools** | `test-tool-blueprint` | Autopilot blueprint structure validation and error reporting |
 | **Tool Management** | `open-tool`        | Create or open tool instances via REST API                   |
 |                     | `list-tools`       | List all tools for a starship with lean summaries            |
 |                     | `get-tool`         | Get full tool details by slug                                |

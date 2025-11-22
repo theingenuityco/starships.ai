@@ -6,14 +6,28 @@
 
 import { HttpRequest } from '../HttpRequest';
 import type { HttpRequestParams } from '@/types/node-parameters';
+import type { HostRuntime } from '@/types/node-handler';
+import { ExecutionItem } from '@/types';
 
-// Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+let hostRuntime: HostRuntime;
+let httpMock: jest.Mock;
 
 describe('HttpRequest Node Handler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Default HostRuntime HTTP mock; individual tests can override as needed
+    httpMock = jest.fn(async ({ url, method, headers = {}, body, timeoutMs }) => ({
+      status: 200,
+      statusText: 'OK',
+      headers,
+      body: { echoedUrl: url, echoedMethod: method, body, timeoutMs },
+      url,
+    }));
+
+    hostRuntime = {
+      http: httpMock as HostRuntime['http'],
+    };
   });
 
   describe('Basic HTTP Functionality', () => {
@@ -23,22 +37,15 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/data',
-        headers: mockHeaders,
-        json: async () => ({ success: true, data: 'test data' }),
-        text: async () => '{"success":true,"data":"test data"}',
+        headers: { 'content-type': 'application/json' },
+        body: { success: true, data: 'test data' },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -49,9 +56,9 @@ describe('HttpRequest Node Handler', () => {
         body: { success: true, data: 'test data' },
         url: 'https://api.example.com/data',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/data',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/data',
           method: 'GET',
         })
       );
@@ -70,22 +77,15 @@ describe('HttpRequest Node Handler', () => {
         },
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 201,
         statusText: 'Created',
         url: 'https://api.example.com/submit',
-        headers: mockHeaders,
-        json: async () => ({ id: 123, status: 'created' }),
-        text: async () => '{"id":123,"status":"created"}',
+        headers: { 'content-type': 'application/json' },
+        body: { id: 123, status: 'created' },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -96,17 +96,17 @@ describe('HttpRequest Node Handler', () => {
         body: { id: 123, status: 'created' },
         url: 'https://api.example.com/submit',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/submit',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/submit',
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
+          body: {
             name: 'John Doe',
             email: 'john@example.com',
-          }),
+          },
         })
       );
     });
@@ -121,22 +121,15 @@ describe('HttpRequest Node Handler', () => {
         body: 'plain text data',
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/webhook',
-        headers: mockHeaders,
-        json: async () => ({ received: true }),
-        text: async () => '{"received":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { received: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -147,9 +140,9 @@ describe('HttpRequest Node Handler', () => {
         body: { received: true },
         url: 'https://api.example.com/webhook',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/webhook',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/webhook',
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain',
@@ -170,22 +163,15 @@ describe('HttpRequest Node Handler', () => {
         },
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/secure',
-        headers: mockHeaders,
-        json: async () => ({ authenticated: true }),
-        text: async () => '{"authenticated":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { authenticated: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -196,15 +182,14 @@ describe('HttpRequest Node Handler', () => {
         body: { authenticated: true },
         url: 'https://api.example.com/secure',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/secure',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/secure',
           method: 'GET',
           headers: expect.objectContaining({
             Authorization: 'Bearer token-123',
             'X-API-Key': 'api-key-456',
             'User-Agent': 'Autopilot/1.0',
-            'Content-Type': 'application/json',
           }),
         })
       );
@@ -219,22 +204,15 @@ describe('HttpRequest Node Handler', () => {
         body: { status: 'updated' },
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/resource/123',
-        headers: mockHeaders,
-        json: async () => ({ updated: true }),
-        text: async () => '{"updated":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { updated: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -245,11 +223,11 @@ describe('HttpRequest Node Handler', () => {
         body: { updated: true },
         url: 'https://api.example.com/resource/123',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/resource/123',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/resource/123',
           method: 'PUT',
-          body: JSON.stringify({ status: 'updated' }),
+          body: { status: 'updated' },
         })
       );
     });
@@ -260,22 +238,15 @@ describe('HttpRequest Node Handler', () => {
         method: 'DELETE',
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 204,
         statusText: 'No Content',
         url: 'https://api.example.com/resource/123',
-        headers: mockHeaders,
-        json: async () => null,
-        text: async () => '',
+        headers: { 'content-type': 'application/json' },
+        body: null,
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -286,9 +257,9 @@ describe('HttpRequest Node Handler', () => {
         body: null,
         url: 'https://api.example.com/resource/123',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/resource/123',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/resource/123',
           method: 'DELETE',
         })
       );
@@ -301,22 +272,15 @@ describe('HttpRequest Node Handler', () => {
         body: { name: 'Updated Name' },
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/resource/123',
-        headers: mockHeaders,
-        json: async () => ({ patched: true }),
-        text: async () => '{"patched":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { patched: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -327,11 +291,11 @@ describe('HttpRequest Node Handler', () => {
         body: { patched: true },
         url: 'https://api.example.com/resource/123',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/resource/123',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/resource/123',
           method: 'PATCH',
-          body: JSON.stringify({ name: 'Updated Name' }),
+          body: { name: 'Updated Name' },
         })
       );
     });
@@ -344,24 +308,15 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
-      const mockHeaders = new Map([['content-type', 'text/plain']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('text/plain', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/text',
-        headers: mockHeaders,
-        json: async () => {
-          throw new Error('Not JSON');
-        },
-        text: async () => 'Plain text response',
+        headers: { 'content-type': 'text/plain' },
+        body: 'Plain text response',
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -380,24 +335,15 @@ describe('HttpRequest Node Handler', () => {
         method: 'POST',
       };
 
-      const mockHeaders = new Map([['content-length', '0']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('0', 'content-length', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 204,
         statusText: 'No Content',
         url: 'https://api.example.com/empty',
-        headers: mockHeaders,
-        json: async () => {
-          throw new Error('No content');
-        },
-        text: async () => '',
+        headers: { 'content-length': '0' },
+        body: '',
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -418,25 +364,15 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
-      const mockErrHeaders = new Map([['content-type', 'text/plain']]);
-      mockErrHeaders.forEach = jest.fn((callback) => {
-        callback('text/plain', 'content-type', mockErrHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
+      httpMock.mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
         url: 'https://api.example.com/error',
-        headers: mockErrHeaders,
-        // Non-JSON body for error path
-        text: async () => 'Not Found',
-        json: async () => {
-          throw new Error('No JSON');
-        },
+        headers: { 'content-type': 'text/plain' },
+        body: 'Not Found',
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       await expect(httpRequest.execute()).rejects.toThrow(/HTTP request failed: .*404 .*Not Found/);
     });
 
@@ -446,9 +382,9 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
-      mockFetch.mockRejectedValueOnce(new Error('Network failure'));
+      httpMock.mockRejectedValueOnce(new Error('Network failure'));
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       await expect(httpRequest.execute()).rejects.toThrow('Network failure');
     });
 
@@ -459,21 +395,9 @@ describe('HttpRequest Node Handler', () => {
         timeout: 100, // Very short timeout for quick test
       };
 
-      // Mock fetch to delay longer than timeout
-      mockFetch.mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => {
-              resolve({
-                ok: true,
-                status: 200,
-                json: async () => ({ delayed: true }),
-              });
-            }, 200); // Longer than timeout
-          })
-      );
+      httpMock.mockRejectedValueOnce(new Error('timeout after 100ms'));
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       await expect(httpRequest.execute()).rejects.toThrow('timeout after 100ms');
     }, 2000);
 
@@ -483,9 +407,9 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
-      mockFetch.mockRejectedValueOnce(new TypeError('Invalid URL'));
+      httpMock.mockRejectedValueOnce(new TypeError('Invalid URL'));
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       await expect(httpRequest.execute()).rejects.toThrow('Invalid URL');
     });
   });
@@ -498,23 +422,9 @@ describe('HttpRequest Node Handler', () => {
         timeout: 2000,
       };
 
-      // Mock a slow response
-      mockFetch.mockImplementationOnce(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  ok: true,
-                  status: 200,
-                  json: async () => ({ delayed: true }),
-                }),
-              3000
-            )
-          )
-      );
+      httpMock.mockRejectedValueOnce(new Error('timeout after 2000ms'));
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       await expect(httpRequest.execute()).rejects.toThrow('timeout after 2000ms');
     });
 
@@ -524,22 +434,15 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/default-timeout',
-        headers: mockHeaders,
-        json: async () => ({ success: true }),
-        text: async () => '{"success":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { success: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -550,6 +453,12 @@ describe('HttpRequest Node Handler', () => {
         body: { success: true },
         url: 'https://api.example.com/default-timeout',
       });
+      // Should use default timeout when not specified
+      expect(httpMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeoutMs: 30000,
+        })
+      );
     });
   });
 
@@ -561,22 +470,15 @@ describe('HttpRequest Node Handler', () => {
         body: null,
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/null-body',
-        headers: mockHeaders,
-        json: async () => ({ received: true }),
-        text: async () => '{"received":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { received: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -587,10 +489,6 @@ describe('HttpRequest Node Handler', () => {
         body: { received: true },
         url: 'https://api.example.com/null-body',
       });
-      const fetchCall = mockFetch.mock.calls[0];
-      expect(fetchCall[0]).toBe('https://api.example.com/null-body');
-      expect(fetchCall[1]).toEqual(expect.objectContaining({ method: 'POST' }));
-      expect(fetchCall[1]).not.toHaveProperty('body');
     });
 
     it('should handle complex nested objects in body', async () => {
@@ -615,22 +513,15 @@ describe('HttpRequest Node Handler', () => {
         body: complexBody,
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://api.example.com/complex',
-        headers: mockHeaders,
-        json: async () => ({ processed: true }),
-        text: async () => '{"processed":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { processed: true },
       });
 
-      const httpRequest = new HttpRequest(params);
+      const httpRequest = new HttpRequest(params, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);
@@ -641,11 +532,109 @@ describe('HttpRequest Node Handler', () => {
         body: { processed: true },
         url: 'https://api.example.com/complex',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/complex',
+      expect(httpMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          url: 'https://api.example.com/complex',
           method: 'POST',
-          body: JSON.stringify(complexBody),
+          body: complexBody,
+        })
+      );
+    });
+
+    it('should not use upstream input as implicit body', async () => {
+      const params: HttpRequestParams = {
+        url: 'https://api.example.com/no-body',
+        method: 'POST',
+      };
+
+      httpMock.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/no-body',
+        headers: { 'content-type': 'application/json' },
+        body: { ok: true },
+      });
+
+      const httpRequest = new HttpRequest(params, { hostRuntime });
+      const inputItems = [
+        {
+          json: { fromUpstream: true },
+          pairedItem: { item: 0 },
+        } as ExecutionItem,
+      ];
+
+      const result = await httpRequest.execute(inputItems);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: { ok: true },
+        url: 'https://api.example.com/no-body',
+      });
+      expect(httpMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://api.example.com/no-body',
+          method: 'POST',
+          // Upstream input should NOT be passed as body implicitly
+          body: undefined,
+        })
+      );
+    });
+
+    it('should omit body for GET and HEAD even when body is provided', async () => {
+      const commonBody = { ignored: true };
+
+      const getParams: HttpRequestParams = {
+        url: 'https://api.example.com/get',
+        method: 'GET',
+        body: commonBody,
+      };
+
+      const headParams: HttpRequestParams = {
+        url: 'https://api.example.com/head',
+        method: 'HEAD',
+        body: commonBody,
+      };
+
+      httpMock
+        .mockResolvedValueOnce({
+          status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/get',
+          headers: { 'content-type': 'application/json' },
+          body: { ok: true },
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/head',
+          headers: { 'content-type': 'application/json' },
+          body: { ok: true },
+        });
+
+      const getRequest = new HttpRequest(getParams, { hostRuntime });
+      const headRequest = new HttpRequest(headParams, { hostRuntime });
+
+      await getRequest.execute();
+      await headRequest.execute();
+
+      expect(httpMock).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          url: 'https://api.example.com/get',
+          method: 'GET',
+          body: undefined,
+        })
+      );
+
+      expect(httpMock).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          url: 'https://api.example.com/head',
+          method: 'HEAD',
+          body: undefined,
         })
       );
     });
@@ -691,28 +680,21 @@ describe('HttpRequest Node Handler', () => {
   describe('Real-world Scenarios', () => {
     it('should handle REST API CRUD operations', async () => {
       // CREATE
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        statusText: 'Created',
-        url: 'https://api.example.com/items',
-        headers: mockHeaders,
-        json: async () => ({ id: 1, name: 'Created Item' }),
-        text: async () => '{"id":1,"name":"Created Item"}',
-      });
-
       const createParams: HttpRequestParams = {
         url: 'https://api.example.com/items',
         method: 'POST',
         body: { name: 'New Item' },
       };
 
-      const httpRequest = new HttpRequest(createParams);
+      httpMock.mockResolvedValueOnce({
+        status: 201,
+        statusText: 'Created',
+        url: 'https://api.example.com/items',
+        headers: { 'content-type': 'application/json' },
+        body: { id: 1, name: 'Created Item' },
+      });
+
+      const httpRequest = new HttpRequest(createParams, { hostRuntime });
       const created = await httpRequest.execute();
 
       expect(created).toHaveLength(1);
@@ -740,22 +722,15 @@ describe('HttpRequest Node Handler', () => {
         },
       };
 
-      const mockHeaders = new Map([['content-type', 'application/json']]);
-      mockHeaders.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders);
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      httpMock.mockResolvedValueOnce({
         status: 200,
         statusText: 'OK',
         url: 'https://webhook.example.com/notify',
-        headers: mockHeaders,
-        json: async () => ({ received: true, queued: true }),
-        text: async () => '{"received":true,"queued":true}',
+        headers: { 'content-type': 'application/json' },
+        body: { received: true, queued: true },
       });
 
-      const httpRequest = new HttpRequest(webhookParams);
+      const httpRequest = new HttpRequest(webhookParams, { hostRuntime });
       const result = await httpRequest.execute();
 
       expect(result).toHaveLength(1);

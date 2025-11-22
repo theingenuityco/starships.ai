@@ -7,7 +7,8 @@
 import { Agent, ExecutionItemUtils } from '../index';
 import type { ToolParams } from '../types/node-parameters';
 
-// NOTE: Provide OPEN_ROUTER_KEY via secureEnv at runtime; credentials are not set here anymore.
+// NOTE: Provide LLM credentials via host-level callbacks at runtime; credentials
+// are not set here inside the example.
 
 // Define tool configurations
 const calculatorTool: ToolParams = {

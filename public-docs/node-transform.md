@@ -38,7 +38,7 @@ Example (reshape)
   name: "Pick fields",
   parameters: {
     transforms: [
-      { operation: "add", path: "/title", value: '{{ $input()?.body?.title }}' },
+      { operation: "add", path: "/title", value: '{{ input?.body?.title }}' },
       { operation: "remove", path: "/debug" }
     ]
   }

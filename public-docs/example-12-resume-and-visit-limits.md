@@ -11,7 +11,7 @@ const blueprint = {
   nodes: [
     { ref: 's', type: 'start', name: 'Start', parameters: {} },
     { ref: 'llm', type: 'llm', name: 'AI', parameters: { model: 'anthropic/claude-3.5-sonnet', messages: [{ role: 'user', content: 'Hello' }] } },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("llm") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'llm' },
@@ -19,7 +19,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY! } });
+const engine = new Engine();
 const exec = ExecutionItemUtils.createExecution();
 // First run partially:
 await engine.executeBlueprint(blueprint, exec);

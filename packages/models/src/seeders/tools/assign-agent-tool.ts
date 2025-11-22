@@ -24,8 +24,6 @@ Grant an agent access to a specific tool by its slug. The tool must exist on the
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- **BASE_URL**: API server endpoint
-- **AUTH_TOKEN**: Authentication token
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response
@@ -60,25 +58,13 @@ Returns server response indicating success.
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
-              if (!ctx.$input.agentSlug) throw new Error('agentSlug is required');
-              if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
+              const input = ctx.input || {};
+              if (!input.agentSlug) throw new Error('agentSlug is required');
+              if (!input.toolSlug) throw new Error('toolSlug is required');
 
               return {
-                baseUrl,
-                starshipId,
-                agentSlug: ctx.$input.agentSlug,
-                toolSlug: ctx.$input.toolSlug,
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
+                agentSlug: input.agentSlug,
+                toolSlug: input.toolSlug
               };
             }
           `,
@@ -91,9 +77,9 @@ Returns server response indicating success.
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).agentSlug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -101,27 +87,30 @@ Returns server response indicating success.
         ref: 'update_tools',
         type: 'code',
         name: 'Create Tool Relationship',
-        description: 'POST /agents/:id/tools/:toolSlug with starshipId',
+        description: 'Prepare POST /agents/:id/tools/:toolSlug with starshipId',
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_agent')[0]?.json ?? {};
-              const agentData = fetchResponse.body?.data || fetchResponse.body;
+              const fetchResponse = ctx.lastOutputOf('fetch_agent') || {};
+              const agentData = fetchResponse.body && typeof fetchResponse.body === 'object'
+                ? (fetchResponse.body.data || fetchResponse.body)
+                : fetchResponse.data || fetchResponse;
 
               if (!agentData || !agentData.id) {
                 throw new Error('Failed to fetch agent');
               }
 
-              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const prep = ctx.lastOutputOf('prepare') || {};
               const toolSlug = prep.toolSlug;
+              const starshipId = ctx.env && ctx.env('STARSHIP_ID');
+              if (!starshipId) {
+                throw new Error('STARSHIP_ID missing');
+              }
 
               return {
-                url: String(prep.baseUrl) + '/agents/' + String(agentData.id) + '/tools/' + String(toolSlug),
-                method: 'POST',
-                headers: prep.headers,
-                body: {
-                  starshipId: prep.starshipId
-                },
+                agentId: String(agentData.id),
+                toolSlug: String(toolSlug),
+                starshipId: String(starshipId),
                 timeout: 10000
               };
             }
@@ -135,11 +124,13 @@ Returns server response indicating success.
         name: 'Assign Tool',
         description: 'POST /agents/:id/tools/:toolSlug',
         parameters: {
-          url: '{{ $lastOutputOf("update_tools")[0].json.url }}',
-          method: '{{ $lastOutputOf("update_tools")[0].json.method }}',
-          headers: '{{ $lastOutputOf("update_tools")[0].json.headers }}',
-          body: '{{ $lastOutputOf("update_tools")[0].json.body }}',
-          timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
+          url: '{{ "/agents/" + (lastOutputOf("update_tools") || {}).agentId + "/tools/" + (lastOutputOf("update_tools") || {}).toolSlug }}',
+          method: 'POST',
+          connector: 'starships',
+          body: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+          },
+          timeout: '{{ (lastOutputOf("update_tools") || {}).timeout }}',
         },
       },
       {
@@ -148,7 +139,7 @@ Returns server response indicating success.
         name: 'End',
         description: 'Return updated agent',
         parameters: {
-          output: '{{ $lastOutputOf("http_update")[0].json }}',
+          output: '{{ lastOutputOf("http_update") }}',
         },
       },
     ],
@@ -173,7 +164,7 @@ export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'create
   blueprint: agentAssignToolTool.blueprint,
 
   slug: 'assign-agent-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
   requiresApiKey: false,

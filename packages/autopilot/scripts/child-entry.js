@@ -18,6 +18,35 @@
 let isParentReady = false;
 let eventBuffer = [];
 
+// HostRuntime HTTP bridging
+let nextHttpRequestId = 1;
+const pendingHttpRequests = new Map();
+
+// Sanitize objects before sending over IPC: remove functions and non-cloneable values.
+// This prevents host_http requests from getting stuck when parameters accidentally
+// contain runtime helpers (for example, (path) => this.extractPath(inputData, path)).
+function sanitizeForIpc(value, depth = 0) {
+  if (depth > 8) return undefined;
+  if (value === null || value === undefined) return value;
+  const t = typeof value;
+  if (t === 'function') {
+    return undefined;
+  }
+  if (t !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => sanitizeForIpc(v, depth + 1));
+  }
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const v = value[key];
+    if (typeof v === 'function') continue;
+    out[key] = sanitizeForIpc(v, depth + 1);
+  }
+  return out;
+}
+
 function safeSend(msg) {
   try {
     if (process.send) {
@@ -29,7 +58,9 @@ function safeSend(msg) {
       process.send(msg);
     }
   } catch (e) {
-    // ignore send errors (parent may have exited)
+    // Log send errors to help diagnose stuck host_http requests (e.g., IPC channel closed).
+    // eslint-disable-next-line no-console
+    console.error('[autopilot:child] safeSend error', e);
   }
 }
 
@@ -47,6 +78,18 @@ function flushEventBuffer() {
   }
 }
 
+function createHostRuntimeBridge() {
+  return {
+    http: (request) =>
+      new Promise((resolve, reject) => {
+        const id = nextHttpRequestId++;
+        pendingHttpRequests.set(id, { resolve, reject });
+        const safeRequest = sanitizeForIpc(request);
+        safeSend({ type: 'host_http', id, request: safeRequest });
+      }),
+  };
+}
+
 process.on('message', async (msg) => {
   if (!msg || typeof msg !== 'object') return;
 
@@ -54,6 +97,21 @@ process.on('message', async (msg) => {
   if (msg.type === 'parent_ready') {
     isParentReady = true;
     flushEventBuffer();
+    return;
+  }
+
+  // Handle HostRuntime HTTP results from parent
+  if (msg.type === 'host_http_result') {
+    const entry = pendingHttpRequests.get(msg.id);
+    if (!entry) {
+      return;
+    }
+    pendingHttpRequests.delete(msg.id);
+    if (msg.error) {
+      entry.reject(new Error(String(msg.error)));
+    } else {
+      entry.resolve(msg.response);
+    }
     return;
   }
 
@@ -78,11 +136,12 @@ process.on('message', async (msg) => {
 
     const { Engine } = require('../engine/Engine.js');
 
-    // Bridge event callback to parent
+    // Bridge event callback to parent and hostRuntime HTTP via IPC
     const bridgedConfig = Object.assign({}, config, {
       eventCallback: async (event) => {
         safeSend({ type: 'event', event });
       },
+      hostRuntime: createHostRuntimeBridge(),
     });
 
     const engine = new Engine(bridgedConfig);

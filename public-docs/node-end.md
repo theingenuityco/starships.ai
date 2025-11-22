@@ -30,6 +30,6 @@ Example
   ref: "end",
   type: "end",
   name: "Done",
-  parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' }
+  parameters: { output: '{{ lastOutputOf("llm") }}' }
 }
 ```

@@ -33,8 +33,6 @@ IMPORTANT: Use "List Models" tool first to discover available models before crea
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- BASE_URL: API server endpoint
-- AUTH_TOKEN: Authentication token
 - STARSHIP_ID: Current starship identifier
 
 ## Response & Behavior
@@ -95,48 +93,39 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
-              const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
-              const slug = ctx.$input && (ctx.$input).slug;
+              const input = ctx.input || {};
+              const hasName = typeof input.name === 'string' && input.name.trim().length > 0;
+              const slug = input.slug;
+              const starshipId = ctx.env && ctx.env('STARSHIP_ID');
 
               if (hasName) {
+                if (!starshipId) {
+                  throw new Error('STARSHIP_ID missing');
+                }
                 // Create draft
                 const body = {
-                  name: ctx.$input.name,
-                  description: (ctx.$input && (ctx.$input).description) || '',
-                  model: (ctx.$input && (ctx.$input).model) || 'openai/gpt-4o-mini',
-                  systemPrompt: (ctx.$input && (ctx.$input).systemPrompt) || '',
+                  starshipId: String(starshipId),
+                  name: input.name,
+                  description: (input && input.description) || '',
+                  model: (input && input.model) || 'openai/gpt-4o-mini',
+                  systemPrompt: (input && input.systemPrompt) || '',
                 };
                 
                 // Add optional numeric fields if provided
-                if (typeof (ctx.$input).temperature === 'number') {
-                  body.temperature = (ctx.$input).temperature;
+                if (typeof input.temperature === 'number') {
+                  body.temperature = input.temperature;
                 }
-                if (typeof (ctx.$input).maxTokens === 'number') {
-                  body.maxTokens = (ctx.$input).maxTokens;
+                if (typeof input.maxTokens === 'number') {
+                  body.maxTokens = input.maxTokens;
                 }
-                if (Array.isArray((ctx.$input).previewPrompts)) {
-                  const prompts = (ctx.$input).previewPrompts.filter((p) => typeof p === 'string' && p.trim()).slice(0, 10);
+                if (Array.isArray(input.previewPrompts)) {
+                  const prompts = input.previewPrompts.filter((p) => typeof p === 'string' && p.trim()).slice(0, 10);
                   if (prompts.length > 0) body.previewPrompts = prompts;
                 }
                 
                 return {
-                  url: baseUrl + '/agents',
-                  method: 'POST',
-                  headers: {
-                    'Authorization': 'Bearer ' + String(authToken),
-                    'Content-Type': 'application/json'
-                  },
-                  body: {
-                    ...body,
-                    starshipId
-                  },
+                  mode: 'create',
+                  body,
                   timeout: 10000
                 };
               }
@@ -144,12 +133,8 @@ Automatically inferred from agent state (do not pass manually):
               // Open existing
               if (!slug || typeof slug !== 'string') throw new Error('slug is required to open an agent');
               return {
-                url: baseUrl + '/agents/' + String(slug),
-                method: 'GET',
-                headers: {
-                  'Authorization': 'Bearer ' + String(authToken),
-                  'Content-Type': 'application/json'
-                },
+                mode: 'open',
+                slug: String(slug),
                 timeout: 5000
               };
             }
@@ -163,11 +148,11 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute',
         description: 'Create or fetch agent',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
-          timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
+          url: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "/agents" : "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
+          method: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "POST" : "GET" }}',
+          body: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? (lastOutputOf("prepare") || {}).body : undefined }}',
+          connector: 'starships',
+          timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
       },
       {
@@ -176,7 +161,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return agent model (created or fetched)',
         parameters: {
-          output: '{{ $lastOutputOf("http_exec")[0].json }}',
+          output: '{{ lastOutputOf("http_exec") }}',
         },
       },
     ],
@@ -199,7 +184,7 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentOpenTool.blueprint,
 
   slug: 'open-agent',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',

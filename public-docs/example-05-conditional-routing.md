@@ -17,7 +17,7 @@ const blueprint = {
       parameters: {
         code: `
           async function main(ctx) {
-            const n = Number((ctx.$input && ctx.$input.value) ?? 0);
+            const n = Number((ctx.input && ctx.input.value) ?? 0);
             return { isEven: n % 2 === 0, label: n > 10 ? "big" : "small" };
           }
         `,
@@ -28,14 +28,14 @@ const blueprint = {
       type: 'conditional',
       name: 'Even?',
       parameters: {
-        condition: '{{ $lastOutputOf("compute")?.[0]?.json?.isEven ?? false }}', // yields 'true' or 'false'
+        condition: '{{ lastOutputOf("compute")?.isEven ?? false }}', // yields 'true' or 'false'
       },
     },
     {
       ref: 'cond2',
       type: 'conditional',
       name: 'Size',
-      parameters: { condition: '{{ $lastOutputOf("compute")?.[0]?.json?.label }}' }, // yields 'big' or 'small'
+      parameters: { condition: '{{ lastOutputOf("compute")?.label }}' }, // yields 'big' or 'small'
     },
     { ref: 'even', type: 'end', name: 'Even', parameters: { output: 'even' } },
     { ref: 'odd', type: 'end', name: 'Odd', parameters: { output: 'odd' } },

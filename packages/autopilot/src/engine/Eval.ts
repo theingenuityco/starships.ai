@@ -19,22 +19,45 @@ import type {
  * Evaluation context available to JavaScript expressions
  */
 export interface EvalContext {
+  /**
+   * Current node input value (already unwrapped from ExecutionItem).
+   */
+  input: unknown;
+
+  /**
+   * Shared mutable workflow state.
+   */
   state: ExecutionState;
-  outputs: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Updated to array format
+
+  /**
+   * Chronological list of all node outputs produced so far.
+   */
+  outputs: Array<{ nodeRef: string; items: ExecutionItem[] }>;
+
+  /**
+   * Overall execution status and current node reference.
+   */
   status: ExecutionStatus;
   currentNodeRef?: string;
-  input?: unknown;
 
-  // Helper functions for workflow-specific operations
-  $lastOutputOf: (nodeRef: string) => unknown;
-  $input: (path?: string) => unknown;
+  /**
+   * Last output for the given nodeRef with wrapper removed.
+   *
+   * - If the node produced 0 items: returns undefined
+   * - If it produced 1 item: returns item.json
+   * - If it produced N>1 items: returns an array of item.json
+   */
+  lastOutputOf: (nodeRef: string) => unknown;
 
-  // General-purpose helpers
-  $exists: (value: unknown) => boolean;
+  /**
+   * Non-null / non-undefined check.
+   */
+  exists: (value: unknown) => boolean;
 
-  // Unified env/secret system (uniform naming across eval and code)
+  /**
+   * Non-secret runtime configuration (provided by host).
+   */
   env: (key: string) => unknown;
-  envAll: () => Record<string, unknown>;
 }
 
 /**
@@ -61,7 +84,11 @@ export interface EvalOptions {
 export class Eval {
   private static readonly TEMPLATE_REGEX = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
-  constructor(private readonly secureEnv?: Record<string, string>) {}
+  /**
+   * @param runtimeEnv Non-secret environment values injected by the host.
+   *                   Secrets MUST NOT be passed here.
+   */
+  constructor(private readonly runtimeEnv?: Record<string, unknown>) {}
 
   /**
    * Normalize/sanitize an extracted JS expression before compiling.
@@ -86,43 +113,26 @@ export class Eval {
    * Build evaluation context from execution state
    */
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
-    const context = {
+    const cfg = { ...(this.runtimeEnv ?? {}) };
+
+    const context: EvalContext = {
+      input: inputData,
       state: execution.state,
       outputs: execution.results, // Use array format directly
       status: execution.status,
       currentNodeRef: execution.currentNodeRef,
-      input: inputData,
 
-      // Workflow-specific helper functions
-      // IMPORTANT: Do not mask missing outputs. Surface a descriptive error
-      // so we can pinpoint why a nodeRef is unavailable in the current scope.
-      $lastOutputOf: (nodeRef: string) => {
+      lastOutputOf: (nodeRef: string) => {
+        if (!nodeRef) return undefined;
         const items = this.findLatestNodeResult(execution, nodeRef) as ExecutionItem[] | undefined;
-        if (!items) {
-          // Build small diagnostic to help locate root cause
-          const available = execution.results.map((r) => r.nodeRef);
-          const msg =
-            `No output found for nodeRef="${nodeRef}". ` +
-            `Current node="${execution.currentNodeRef ?? 'unknown'}". ` +
-            `Available outputs: [${available.join(', ')}]. ` +
-            `This typically occurs when a template references a node from a different workflow scope ` +
-            `(e.g., using a nested tool's nodeRef like "lint" from the outer agent), or when the node has not executed yet.`;
-          throw new Error(msg);
-        }
-        return items;
+        if (!items || items.length === 0) return undefined;
+        if (items.length === 1) return items[0]?.json;
+        return items.map((it) => it.json);
       },
-      $input: (path?: string) => this.extractPath(inputData, path),
-
-      // General-purpose helpers
-      $exists: (value: unknown) => value !== undefined && value !== null,
-
-      // Unified env/secret system (uniform naming across eval and code)
+      exists: (value: unknown) => value !== undefined && value !== null,
       env: (key: string) => {
         if (!key || typeof key !== 'string') return undefined;
-        return this.secureEnv?.[key];
-      },
-      envAll: () => {
-        return { ...(this.secureEnv ?? {}) };
+        return cfg[key];
       },
     };
 
@@ -137,27 +147,6 @@ export class Eval {
       }
     }
     return undefined;
-  }
-
-  /**
-   * Extract data from a path using dot notation
-   */
-  private extractPath(data: unknown, path?: string): unknown {
-    if (!path) return data;
-    if (!data || typeof data !== 'object') return undefined;
-
-    const keys = path.split('.');
-    let result: unknown = data;
-
-    for (const key of keys) {
-      if (result && typeof result === 'object' && key in result) {
-        result = (result as Record<string, unknown>)[key];
-      } else {
-        return undefined;
-      }
-    }
-
-    return result;
   }
 
   /**

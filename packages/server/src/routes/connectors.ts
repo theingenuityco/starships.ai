@@ -260,7 +260,7 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     });
 
     const slugOrId = starshipSlug || starshipId;
-    const redirectUrl = `${env.PUBLIC_URL}/ship/${slugOrId}/settings/environment?${redirectParams.toString()}`;
+    const redirectUrl = `${env.PUBLIC_URL}/ship/${slugOrId}/connectors?${redirectParams.toString()}`;
 
     res.redirect(redirectUrl);
   } catch (error) {

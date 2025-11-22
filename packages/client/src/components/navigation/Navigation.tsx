@@ -221,7 +221,9 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: 'key', isActive: isEnvironmentSettingsRoute }] : []),
+      ...(isAuthenticated && starshipSlug
+        ? [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Connectors', icon: 'plug', isActive: isEnvironmentSettingsRoute }]
+        : []),
     ],
     [
       isAuthenticated,

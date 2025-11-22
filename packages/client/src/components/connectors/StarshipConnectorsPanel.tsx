@@ -116,7 +116,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
     return (
       <Card key={`${provider}-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
-        <CardHeader>
+        <CardHeader className="space-y-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
               {logoSrc && (
@@ -124,14 +124,16 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
                 </div>
               )}
-              <span className="text-lg">{label}</span>
-              <div className="flex items-center gap-1.5 text-[11px] font-medium">
-                <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
-                <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
+              <div className="flex h-10 flex-col justify-center">
+                <span className="text-lg leading-tight">{label}</span>
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
+                  <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
+                  <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
+                </div>
               </div>
             </CardTitle>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">{catalogItem.description}</p>
+          <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">

@@ -31,7 +31,8 @@ export const toolTestTool: ToolParams = {
       arguments: {
         type: 'object',
         description: 'Arguments object to pass to the target tool blueprint',
-        properties: {},
+        // Relaxed schema: allow any nested keys/values for arguments
+        additionalProperties: true,
       },
       timeoutMs: { type: 'number', description: 'Optional timeout for the nested run (ms)' },
     },

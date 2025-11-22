@@ -259,8 +259,11 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
       starshipId,
     });
 
-    const slugOrId = starshipSlug || starshipId;
-    const redirectUrl = `${env.PUBLIC_URL}/ship/${slugOrId}/connectors?${redirectParams.toString()}`;
+    if (starshipSlug) {
+      redirectParams.set('starshipSlug', starshipSlug);
+    }
+
+    const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
 
     res.redirect(redirectUrl);
   } catch (error) {

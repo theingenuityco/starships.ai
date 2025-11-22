@@ -207,7 +207,12 @@ const OAuthCallbackSchema = z.object({
 // GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn, Discord)
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
-    const paramsValidation = validateData(z.object({ provider: z.enum(['linkedin', 'discord']) }), req.params, res, 'connector OAuth provider');
+    const paramsValidation = validateData(
+      z.object({ provider: z.enum(['linkedin', 'discord']) }),
+      req.params,
+      res,
+      'connector OAuth provider'
+    );
     if (!paramsValidation) return;
 
     const { provider } = paramsValidation;
@@ -238,8 +243,7 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     } else if (provider === 'discord') {
       const result = await connectorService.completeDiscordOAuth(code, state, {
         guild_id: typeof (req.query as any).guild_id === 'string' ? ((req.query as any).guild_id as string) : undefined,
-        permissions:
-          typeof (req.query as any).permissions === 'string' ? ((req.query as any).permissions as string) : undefined,
+        permissions: typeof (req.query as any).permissions === 'string' ? ((req.query as any).permissions as string) : undefined,
       });
       starshipId = result.starshipId;
       starshipSlug = result.starshipSlug;

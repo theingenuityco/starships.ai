@@ -3,6 +3,10 @@ import type { HostRuntime } from '@starships/autopilot';
 import type { StarshipModel } from '@starships/protocol';
 import type { EnvironmentService } from '@/services/EnvironmentService';
 
+// Connector base URLs for relative paths
+const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com/v2';
+const DISCORD_API_BASE_URL = 'https://discord.com/api';
+
 /**
  * ConnectorRuntimeService
  *
@@ -17,13 +21,16 @@ export class ConnectorRuntimeService {
   /**
    * Create a HostRuntime for a given starship and optional caller auth header.
    *
-   * - Normalizes relative URLs against SERVER_URL/api/v1
+   * - Normalizes relative URLs:
+   *   - connector === 'starships' or undefined => SERVER_URL/api/v1
+   *   - connector === 'linkedin' => LinkedIn API base (LINKEDIN_API_BASE_URL or https://api.linkedin.com/v2)
+   *   - connector === 'discord' => Discord API base (DISCORD_API_BASE_URL or https://discord.com/api)
    * - Injects Starships JWT when connector === 'starships'
    * - Injects LinkedIn access token from managed env when connector === 'linkedin'
    */
   createHostRuntime(starship: StarshipModel, authorizationHeader?: string): HostRuntime {
     const env = getEnvConfig();
-    const baseUrl = `${env.SERVER_URL}/api/v1`;
+    const starshipsBaseUrl = `${env.SERVER_URL}/api/v1`;
 
     const rawAuth = authorizationHeader ?? '';
     const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
@@ -38,8 +45,21 @@ export class ConnectorRuntimeService {
         // we can safely reference finalUrl in both success and error paths.
         let finalUrl = url;
 
-        // Normalize URL: prefix baseUrl for relative paths
+        // Normalize URL: prefix connector-specific base URL for relative paths
         if (finalUrl.startsWith('/')) {
+          let baseUrl: string;
+
+          if (connector === 'linkedin') {
+            // LinkedIn REST API base
+            baseUrl = LINKEDIN_API_BASE_URL;
+          } else if (connector === 'discord') {
+            // Discord HTTP API base
+            baseUrl = DISCORD_API_BASE_URL;
+          } else {
+            // Default: Starships API (tools, docs, etc.)
+            baseUrl = starshipsBaseUrl;
+          }
+
           finalUrl = baseUrl + finalUrl;
         }
 
@@ -82,7 +102,6 @@ export class ConnectorRuntimeService {
           } catch (err) {
             // Surface a clear connector-level error while preserving the original method/URL
             const reason = err instanceof Error ? err.message : 'Unknown LinkedIn connector error';
-            // eslint-disable-next-line no-console
             console.error('[ConnectorRuntimeService] LinkedIn connector error', {
               method,
               url: finalUrl,
@@ -129,6 +148,18 @@ export class ConnectorRuntimeService {
             }
           }
 
+          // Debug log for connector HTTP calls, especially LinkedIn body forwarding.
+          // Safe for dev; consider gating or removing for production if too noisy.
+          const debugBodyPreview =
+            typeof init.body === 'string' ? init.body.slice(0, 500) : init.body === undefined ? undefined : '<non-string-body>';
+          console.info('[ConnectorRuntimeService] outgoing HTTP', {
+            method: finalMethod,
+            url: finalUrl,
+            connector,
+            headers: init.headers,
+            bodyPreview: debugBodyPreview,
+          });
+
           // NOTE: connector is currently a hint; future versions can
           // route via connector records instead of direct HTTP.
           // For now we treat all HTTP uniformly and rely on URL/auth headers.
@@ -166,7 +197,6 @@ export class ConnectorRuntimeService {
               : error instanceof Error
                 ? error.message
                 : 'Unknown error';
-          // eslint-disable-next-line no-console
           console.error('[ConnectorRuntimeService] hostRuntime.http error', {
             method,
             url: finalUrl,

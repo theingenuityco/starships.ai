@@ -54,7 +54,8 @@ Behavior and limits:
         parameters: {
           method: 'GET',
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
-          url: '/docs/{{ $lastOutputOf("validate")[0].json.slug }}',
+          // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
+          url: '{{ "/docs/" + encodeURIComponent($lastOutputOf("validate")[0].json.slug) }}',
           connectorSlug: 'starships',
           timeout: 5000,
         },
@@ -106,7 +107,7 @@ export const docsGetDocToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsGetDocTool.blueprint,
 
   slug: 'get-doc',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'data',
   exampleUsage: '{ "slug": "core-concepts/tools" } // returns markdown content; env baseUrl inferred',
   requiresApiKey: false,

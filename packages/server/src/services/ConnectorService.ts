@@ -159,8 +159,8 @@ export class ConnectorService {
    */
   async startGoogleDriveOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
-    const clientId = (env as any).GOOGLE_DRIVE_CLIENT_ID as string | undefined;
-    const redirectUri = (env as any).GOOGLE_DRIVE_REDIRECT_URL as string | undefined;
+    const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
+    const redirectUri = env.GOOGLE_DRIVE_REDIRECT_URL;
 
     if (!clientId || !redirectUri) {
       throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_REDIRECT_URL.');
@@ -199,9 +199,9 @@ export class ConnectorService {
     stateToken: string
   ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const env = getEnvConfig();
-    const clientId = (env as any).GOOGLE_DRIVE_CLIENT_ID as string | undefined;
-    const clientSecret = (env as any).GOOGLE_DRIVE_CLIENT_SECRET as string | undefined;
-    const redirectUri = (env as any).GOOGLE_DRIVE_REDIRECT_URL as string | undefined;
+    const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
+    const clientSecret = env.GOOGLE_DRIVE_CLIENT_SECRET;
+    const redirectUri = env.GOOGLE_DRIVE_REDIRECT_URL;
 
     if (!clientId || !clientSecret || !redirectUri) {
       throw new Error(

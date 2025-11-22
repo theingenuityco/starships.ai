@@ -74,9 +74,9 @@ Returns server response indicating success.
         ref: 'fetch_agent',
         type: 'http_request',
         name: 'Fetch Agent',
-        description: 'GET /starships/self/agents/:slug',
+        description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

@@ -27,7 +27,7 @@ export const blueprintRemoveEdgeTool: ToolParams = {
               return { toolSlug: ctx.$input.toolSlug, edgeRef: ctx.$input.edgeRef };
             }
           `, timeout: 3000 } },
-      { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/self/tools/:toolSlug', parameters: { url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', connectorSlug: 'starships', timeout: 5000 } },
+      { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/:starshipId/tools/:toolSlug', parameters: { url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', connectorSlug: 'starships', timeout: 5000 } },
       { ref: 'validate', type: 'code', name: 'Validate and Remove Edge', description: 'Remove edge from blueprint', parameters: { code: `
             async function main(ctx) {
               const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};

@@ -130,7 +130,7 @@ export class HttpRequest implements NodeHandler {
     if (this.params.url) {
       const urlValue = this.params.url;
 
-      // When using connectors, relative URLs (e.g. "/starships/self/tools") are valid and
+      // When using connectors, relative URLs (e.g. "/starships/{starshipId}/tools") are valid and
       // should be resolved by the HostRuntime/http connector layer. Only enforce strict
       // URL parsing for absolute URLs with an explicit scheme.
       const isAbsolute = typeof urlValue === 'string' && /^https?:\/\//i.test(urlValue);

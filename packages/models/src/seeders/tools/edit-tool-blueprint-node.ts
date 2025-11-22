@@ -30,7 +30,7 @@ export const blueprintEditNodeTool: ToolParams = {
               return { toolSlug: ctx.$input.toolSlug, nodeRef: ctx.$input.nodeRef, updates: ctx.$input.updates };
             }
           `, timeout: 3000 } },
-      { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/self/tools/:toolSlug', parameters: { url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', connectorSlug: 'starships', timeout: 5000 } },
+      { ref: 'fetch_tool', type: 'http_request', name: 'Fetch Current Tool', description: 'GET /starships/:starshipId/tools/:toolSlug', parameters: { url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}', method: 'GET', connectorSlug: 'starships', timeout: 5000 } },
       { ref: 'validate', type: 'code', name: 'Validate and Edit Node', description: 'Edit node properties with validation', parameters: { code: `
             async function main(ctx) {
               const supportedTypes = ['start','end','llm','code','http_request','conditional','transform','mutate','tool','workflow','user_prompt'];

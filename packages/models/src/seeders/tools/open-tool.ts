@@ -91,7 +91,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute',
         description: 'Create or fetch tool',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? "/starships/self/tools" : "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" + ($lastOutputOf("prepare")[0].json.mode === "create" ? "" : "/" + $lastOutputOf("prepare")[0].json.slug) }}',
           method: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? "POST" : "GET" }}',
           body: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? $lastOutputOf("prepare")[0].json.body : undefined }}',
           connectorSlug: 'starships',

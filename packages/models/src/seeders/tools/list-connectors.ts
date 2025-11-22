@@ -22,11 +22,8 @@ Implicit environment (do not pass as arguments):
 - STARSHIP_ID: derived from the current starship context
 
 Output:
-- Array of connectors with:
-  - provider: connector provider id (e.g., "linkedin", "discord", "starships")
-  - status: "connected" | "pending" | "disconnected" | "error"
-  - managedEnvKeys: [{ key, present }] describing required/optional env keys and whether they are set
-  - lastError: last error message (if any)
+- Simplified string summary of connector statuses, e.g.:
+  - "linkedin: connected\ndiscord: disconnected\nstarships: connected"
 
 Behavior and limits:
 - Read-only and idempotent
@@ -57,7 +54,7 @@ Behavior and limits:
         ref: 'summarize',
         type: 'code',
         name: 'Summarize Connectors',
-        description: 'Normalize ConnectorListResponse into a concise, safe structure for agents',
+        description: 'Normalize ConnectorListResponse into a concise string summary for agents',
         parameters: {
           code: `
             async function main(ctx) {
@@ -74,17 +71,13 @@ Behavior and limits:
 
               const connectors = payload.data.connectors;
 
-              return connectors.map((c) => ({
-                provider: c && c.provider,
-                status: c && c.status,
-                managedEnvKeys: Array.isArray(c && c.managedEnvKeys)
-                  ? c.managedEnvKeys.map((k) => ({
-                      key: k && k.key,
-                      present: !!(k && k.present),
-                    }))
-                  : [],
-                lastError: c && c.lastError,
-              }));
+              const lines = [];
+              for (const c of connectors) {
+                if (!c || !c.provider || !c.status) continue;
+                lines.push(String(c.provider) + ': ' + String(c.status));
+              }
+
+              return lines.join('\\n');
             }
           `,
           timeout: 2000,

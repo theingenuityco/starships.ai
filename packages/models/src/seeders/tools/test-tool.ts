@@ -99,7 +99,14 @@ export const toolTestTool: ToolParams = {
             async function main(ctx) {
               const httpResult = ctx.$lastOutputOf("http_get_tool")[0]?.json ?? {};
               const hasBody = httpResult && typeof httpResult === 'object' && Object.prototype.hasOwnProperty.call(httpResult, 'body');
-              const toolDef = hasBody ? httpResult.body : httpResult;
+              const apiResponse = hasBody ? httpResult.body : httpResult;
+
+              // Server contract: tools route always responds with { data: Tool }
+              if (!apiResponse || typeof apiResponse !== 'object' || !Object.prototype.hasOwnProperty.call(apiResponse, 'data')) {
+                throw new Error('Tool API response missing data field');
+              }
+
+              const toolDef = apiResponse.data;
               
               if (!toolDef || !toolDef.blueprint) {
                 throw new Error('Tool definition missing or invalid blueprint');

@@ -184,7 +184,7 @@ describe('Tool Get Tool', () => {
       expect(params.method).toBeDefined();
       expect(params.timeout).toBeDefined();
       expect(params.method).toBe('GET');
-      expect(params.url).toBe('{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}');
+      expect(params.url).toBe('{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}');
       expect((params as any).connector).toBe('starships');
     });
   });

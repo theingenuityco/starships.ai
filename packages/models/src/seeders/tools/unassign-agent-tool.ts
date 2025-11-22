@@ -76,7 +76,7 @@ Returns server response.
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

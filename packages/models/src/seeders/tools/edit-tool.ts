@@ -101,9 +101,9 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'fetch_tool',
         type: 'http_request',
         name: 'Fetch Tool by Slug',
-        description: 'GET /starships/self/tools/:slug to resolve tool ID',
+        description: 'GET /starships/:starshipId/tools/:slug to resolve tool ID',
         parameters: {
-          url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

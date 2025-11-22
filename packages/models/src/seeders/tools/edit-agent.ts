@@ -132,9 +132,9 @@ Automatically inferred from agent state (do not pass manually):
         ref: 'fetch_agent',
         type: 'http_request',
         name: 'Fetch Agent by Slug',
-        description: 'GET /starships/self/agents/:slug to resolve agent ID',
+        description: 'GET /starships/:starshipId/agents/:slug to resolve agent ID',
         parameters: {
-          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

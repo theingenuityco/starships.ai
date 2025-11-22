@@ -717,7 +717,7 @@ export class ConversationService {
           const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
           const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-          // Normalize URL and apply connector-aware rewriting in the outer scope so
+          // Normalize URL and apply connector-aware auth in the outer scope so
           // we can safely reference finalUrl in both success and error paths.
           let finalUrl = url;
 
@@ -726,14 +726,8 @@ export class ConversationService {
             finalUrl = baseUrl + finalUrl;
           }
 
-          // Connector-aware URL rewriting / auth injection
+          // Connector-aware auth injection
           if (connectorSlug === 'starships') {
-            // Replace /starships/self with /starships/{starship.id}
-            const selfPrefix = '/starships/self';
-            if (url.startsWith(selfPrefix)) {
-              finalUrl = baseUrl + `/starships/${starship.id}${url.slice(selfPrefix.length)}`;
-            }
-
             // Ensure Authorization header is present when we have an auth token
             if (authToken) {
               const lowered: Record<string, unknown> = {};

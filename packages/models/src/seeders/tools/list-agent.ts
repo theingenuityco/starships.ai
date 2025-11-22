@@ -55,7 +55,7 @@ Behavior and limits:
         name: 'List Agents',
         description: 'GET /starships/:starshipId/agents',
         parameters: {
-          url: '/starships/self/agents',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents" }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

@@ -101,7 +101,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute Agent Test',
         description: 'POST /starships/:starshipId/agents/:slug/test',
         parameters: {
-          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.slug + "/test" }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug + "/test" }}',
           method: 'POST',
           body: { input: '{{ $lastOutputOf("prepare")[0].json.input }}' },
           connectorSlug: 'starships',

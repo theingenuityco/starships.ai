@@ -43,8 +43,8 @@ Behavior and limits:
         parameters: {
           method: 'GET',
           // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1, inject auth,
-          // and resolve the current starship.
-          url: '/starships/self/tools',
+          // and use STARSHIP_ID from env.
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" }}',
           connectorSlug: 'starships',
           timeout: 5000,
         },

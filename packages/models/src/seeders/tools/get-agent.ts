@@ -66,7 +66,7 @@ Behavior and limits:
         name: 'Get Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/self/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

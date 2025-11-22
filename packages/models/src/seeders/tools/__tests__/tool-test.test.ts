@@ -77,7 +77,7 @@ describe('Tool Test Tool', () => {
     async function executeToolWithMockConfig(input: unknown, hostRuntime: HostRuntime) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        runtimeEnv: {},
+        runtimeEnv: { STARSHIP_ID: 'test-starship' },
         hostRuntime,
         execution: ExecutionItemUtils.createExecution(),
       };
@@ -138,7 +138,7 @@ describe('Tool Test Tool', () => {
         http: jest.fn(async ({ method, url, connectorSlug }) => {
           expect(method).toBe('GET');
           expect(connectorSlug).toBe('starships');
-          expect(url).toContain('/starships/self/tools/demo');
+          expect(url).toBe('/starships/test-starship/tools/demo');
           return createMockResponse({ blueprint: nested });
         }) as unknown as HostRuntime['http'],
       };

@@ -95,9 +95,9 @@ Returns updated tool with new node in blueprint, or validation errors if additio
         ref: 'fetch_tool',
         type: 'http_request',
         name: 'Fetch Current Tool',
-        description: 'GET /starships/self/tools/:toolSlug',
+        description: 'GET /starships/:starshipId/tools/:toolSlug',
         parameters: {
-          url: '{{ "/starships/self/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
           method: 'GET',
           connectorSlug: 'starships',
           timeout: 5000,

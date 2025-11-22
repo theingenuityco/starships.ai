@@ -7,6 +7,7 @@
 import { HttpRequest } from '../HttpRequest';
 import type { HttpRequestParams } from '@/types/node-parameters';
 import type { HostRuntime } from '@/types/node-handler';
+import { ExecutionItem } from '@/types';
 
 let hostRuntime: HostRuntime;
 let httpMock: jest.Mock;
@@ -559,7 +560,7 @@ describe('HttpRequest Node Handler', () => {
         {
           json: { fromUpstream: true },
           pairedItem: { item: 0 },
-        } as any,
+        } as ExecutionItem,
       ];
 
       const result = await httpRequest.execute(inputItems);

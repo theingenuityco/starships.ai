@@ -83,14 +83,16 @@ export default function HomePage() {
                   </a>
                 </p>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-wrap items-center justify-center md:justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => window.open('/docs', '_blank')}>
                   <Icon name="book" className="w-4 h-4 mr-2" />
                   Documentation
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/wzF7xfjrKv', '_blank')}>
-                  <Icon name="discord" className="w-4 h-4 mr-2" />
-                  Discord
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/privacy">Privacy Policy</Link>
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/terms">Terms &amp; Conditions</Link>
                 </Button>
                 <BackToTop />
               </div>

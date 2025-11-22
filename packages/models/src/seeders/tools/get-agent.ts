@@ -49,7 +49,8 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const slug = ctx.$input && ctx.$input.slug;
+              const input = ctx.input || {};
+              const slug = input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
               return {
@@ -66,7 +67,7 @@ Behavior and limits:
         name: 'Get Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
           method: 'GET',
           connector: 'starships',
           timeout: 5000,
@@ -78,7 +79,7 @@ Behavior and limits:
         name: 'End',
         description: 'Return complete agent details',
         parameters: {
-          output: '{{ $lastOutputOf("http_get")[0].json }}',
+          output: '{{ lastOutputOf("http_get") }}',
         },
       },
     ],

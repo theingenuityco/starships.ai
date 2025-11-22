@@ -38,7 +38,8 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const slug = ctx.$input && typeof ctx.$input.slug === 'string' ? ctx.$input.slug.trim() : '';
+              const input = ctx.input || {};
+              const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
               if (!slug) throw new Error('slug is required');
               return { slug };
             }
@@ -55,7 +56,7 @@ Behavior and limits:
           method: 'GET',
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
           // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
-          url: '{{ "/docs/" + encodeURIComponent($lastOutputOf("validate")[0].json.slug) }}',
+          url: '{{ "/docs/" + encodeURIComponent((lastOutputOf("validate") || {}).slug) }}',
           connector: 'starships',
           timeout: 5000,
         },
@@ -68,7 +69,7 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const raw = ctx.$input;
+              const raw = ctx.input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
               if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
@@ -86,7 +87,7 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("extract")[0].json }}',
+          output: '{{ lastOutputOf("extract") }}',
         },
       },
     ],

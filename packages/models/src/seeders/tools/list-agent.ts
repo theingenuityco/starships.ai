@@ -70,7 +70,7 @@ Behavior and limits:
           code: `
             async function main(ctx) {
               // Input is the HttpResponse from http_list (see HttpRequest node contract)
-              const http = ctx.$input;
+              const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               // Server sendSuccess returns { data: T }, so prefer body.data when present
               const data = body && typeof body === 'object' && Array.isArray(body.data)
@@ -96,7 +96,7 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("summarize")[0].json }}',
+          output: '{{ lastOutputOf("summarize") }}',
         },
       },
     ],

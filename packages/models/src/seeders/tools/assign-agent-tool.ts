@@ -128,7 +128,7 @@ Returns server response indicating success.
           method: 'POST',
           connector: 'starships',
           body: {
-            starshipId: '{{ env("STARSHIP_ID") }}'
+            starshipId: '{{ env("STARSHIP_ID") }}',
           },
           timeout: '{{ (lastOutputOf("update_tools") || {}).timeout }}',
         },

@@ -104,7 +104,7 @@ Automatically inferred from agent state (do not pass manually):
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug + "/test" }}',
           method: 'POST',
           body: { input: '{{ $lastOutputOf("prepare")[0].json.input }}' },
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 60000,
         },
       },

@@ -45,7 +45,7 @@ Behavior and limits:
           // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1, inject auth,
           // and use STARSHIP_ID from env.
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },

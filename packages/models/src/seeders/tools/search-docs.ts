@@ -58,7 +58,7 @@ Behavior and limits:
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
           // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
           url: '{{ (() => { const input = $lastOutputOf("prepare")[0].json || {}; const q = input.q || ""; const limit = input.limit == null ? "" : String(input.limit); const enc = encodeURIComponent; return "/docs?q=" + enc(q) + "&limit=" + enc(limit); })() }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },

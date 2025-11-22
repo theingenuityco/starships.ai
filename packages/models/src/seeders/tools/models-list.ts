@@ -50,7 +50,7 @@ Behavior and limits:
           method: 'GET',
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
           url: '/openrouter/models',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 10000,
         },
       },

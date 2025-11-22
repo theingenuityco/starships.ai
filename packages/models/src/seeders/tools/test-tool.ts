@@ -85,7 +85,7 @@ export const toolTestTool: ToolParams = {
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
           // and use STARSHIP_ID from env.
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },

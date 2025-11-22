@@ -131,7 +131,7 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
         parameters: {
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
           method: 'GET',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -349,7 +349,7 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
           url: '{{ $lastOutputOf("modify_edge")[0].json.toolData?.id ? "/tools/" + $lastOutputOf("modify_edge")[0].json.toolData.id : "" }}',
           method: 'PUT',
           body: '{{ (() => { const result = $lastOutputOf("modify_edge")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 10000,
         },
       },

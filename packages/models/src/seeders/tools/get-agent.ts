@@ -68,7 +68,7 @@ Behavior and limits:
         parameters: {
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
           method: 'GET',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },

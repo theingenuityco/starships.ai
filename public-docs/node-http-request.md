@@ -11,7 +11,7 @@ Specification (authoritative)
   - headers?: Record<string,string> | Headers | [string, string][]
   - body?: object | string | null
   - timeout?: number (ms; default 30000)
-  - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, connectorSlug
+  - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, connector
 
 Body selection rules
 

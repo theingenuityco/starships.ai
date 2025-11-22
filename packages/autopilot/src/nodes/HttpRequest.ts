@@ -72,7 +72,7 @@ export class HttpRequest implements NodeHandler {
       headers,
       body: bodyData ?? undefined,
       timeoutMs,
-      connectorSlug: this.params.connectorSlug,
+      connector: this.params.connector,
     });
 
     const httpResponse: HttpResponse = {

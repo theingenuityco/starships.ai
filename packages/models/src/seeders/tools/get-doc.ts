@@ -56,7 +56,7 @@ Behavior and limits:
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
           // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
           url: '{{ "/docs/" + encodeURIComponent($lastOutputOf("validate")[0].json.slug) }}',
-          connectorSlug: 'starships',
+          connector: 'starships',
           timeout: 5000,
         },
       },

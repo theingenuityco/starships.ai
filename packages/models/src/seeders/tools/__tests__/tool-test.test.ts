@@ -135,9 +135,9 @@ describe('Tool Test Tool', () => {
 
       const nested = makeNestedEchoBlueprint();
       const hostRuntime: HostRuntime = {
-        http: jest.fn(async ({ method, url, connectorSlug }) => {
+        http: jest.fn(async ({ method, url, connector }) => {
           expect(method).toBe('GET');
-          expect(connectorSlug).toBe('starships');
+          expect(connector).toBe('starships');
           expect(url).toBe('/starships/test-starship/tools/demo');
           return createMockResponse({ blueprint: nested });
         }) as unknown as HostRuntime['http'],

@@ -33,7 +33,7 @@ export interface HostRuntime {
    * HTTP execution entrypoint.
    *
    * All HTTP performed by Autopilot nodes should flow through this method.
-   * When connectorSlug is provided, the host may resolve connector records,
+   * When connector is provided, the host may resolve connector records,
    * inject secrets, and apply connector-specific policies before performing
    * the actual request.
    */
@@ -43,7 +43,7 @@ export interface HostRuntime {
     headers?: Record<string, unknown>;
     body?: unknown;
     timeoutMs?: number;
-    connectorSlug?: string;
+    connector?: string;
   }): Promise<{
     status: number;
     statusText: string;

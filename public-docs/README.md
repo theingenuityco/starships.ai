@@ -44,7 +44,7 @@ Conventions in this documentation
 Tips for agents (DSL-only)
 
 - Use the blueprint JSON as-is; do not include imports or code that constructs/executes an engine.
-- When a snippet shows templates like `{{ $lastOutputOf("llm")... }}`, keep them as-is in node `parameters`—the Engine resolves them at execution time.
+- When a snippet shows templates like `{{ lastOutputOf("llm")... }}`, keep them as-is in node `parameters`—the Engine resolves them at execution time.
 - Prefer stable node refs (e.g., "llm", "tool", "e") because examples and templates reference them.
 
 Tips for SDK/Engine users

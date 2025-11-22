@@ -33,13 +33,13 @@ const agent = new Agent({
               parameters: {
                 code: `
                   async function main(ctx) {
-                    const { tz } = ctx.$input || {};
+                    const { tz } = ctx.input || {};
                     return { now: new Date().toLocaleString('en-US', { timeZone: String(tz) }) };
                   }
                 `,
               },
             },
-            { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("code")?.[0]?.json }}' } },
+            { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("code") }}' } },
           ],
           edges: [
             { ref: 'e1', from: 's', to: 'code' },

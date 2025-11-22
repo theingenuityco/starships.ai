@@ -26,13 +26,13 @@ const blueprint = {
       name: 'Pick fields',
       parameters: {
         transforms: [
-          { operation: 'add', path: '/id', value: '{{ $input()?.body?.id }}' },
-          { operation: 'add', path: '/title', value: '{{ $input()?.body?.title }}' },
+          { operation: 'add', path: '/id', value: '{{ input?.body?.id }}' },
+          { operation: 'add', path: '/title', value: '{{ input?.body?.title }}' },
           { operation: 'remove', path: '/debug' },
         ],
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("shape")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("shape") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'http' },

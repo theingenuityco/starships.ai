@@ -17,13 +17,13 @@ const toolEcho = {
       parameters: {
         code: `
           async function main(ctx) {
-            const { text } = ctx.$input || {};
+            const { text } = ctx.input || {};
             return { echoed: String(text ?? "") };
           }
         `,
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("code")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("code") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'code' },
@@ -41,7 +41,7 @@ const blueprint = {
       parameters: {
         url: 'https://jsonplaceholder.typicode.com/posts/1',
         method: 'GET',
-        transforms: [{ operation: 'add', path: '/title', value: '{{ $input()?.body?.title }}' }],
+        transforms: [{ operation: 'add', path: '/title', value: '{{ input?.body?.title }}' }],
       },
     },
     {
@@ -50,7 +50,7 @@ const blueprint = {
       name: 'Summarize',
       parameters: {
         model: 'anthropic/claude-3.5-sonnet',
-        messages: [{ role: 'user', content: 'Summarize: {{ $lastOutputOf("http")?.[0]?.json?.body?.title }}' }],
+        messages: [{ role: 'user', content: 'Summarize: {{ lastOutputOf("http")?.body?.title }}' }],
         tools: [
           {
             name: 'Echo',
@@ -68,7 +68,7 @@ const blueprint = {
       name: 'Tool?',
       parameters: {
         condition:
-          '{{ (() => { const calls=$lastOutputOf("summarize")?.[0]?.json?.choices?.[0]?.message?.toolCalls; return (Array.isArray(calls)&&calls.length>0) ? "call" : "complete"; })() }}',
+          '{{ (() => { const last=lastOutputOf("summarize") || {}; const calls=last?.choices?.[0]?.message?.toolCalls; return (Array.isArray(calls)&&calls.length>0) ? "call" : "complete"; })() }}',
       },
     },
     {
@@ -78,7 +78,8 @@ const blueprint = {
       parameters: {
         code: `
           async function main(ctx) {
-            const c = ctx.$lastOutputOf("summarize")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+            const last = ctx.lastOutputOf("summarize") || {};
+            const c = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
             return typeof c === 'string' ? JSON.parse(c) : (c || {});
           }
         `,
@@ -104,7 +105,7 @@ const blueprint = {
         reducers: [
           `
           (state, ctx) => {
-            const r = ctx.$lastOutputOf("tool")[0]?.json ?? {};
+            const r = ctx.lastOutputOf("tool") ?? {};
             const content = JSON.stringify(r);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', content }];
@@ -126,7 +127,7 @@ const blueprint = {
         ],
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("final")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("final") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'http' },

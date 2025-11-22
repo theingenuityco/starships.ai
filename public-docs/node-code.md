@@ -13,7 +13,7 @@ ctx surface (prefixed to avoid collisions)
 
 - $input: unwrapped input item
 - $state: execution.state
-- $env(key): secure env lookup
+- $env(key): host-provided env lookup (in Starships, only `ctx.$env('STARSHIP_ID')` is populated; custom env keys are not supported)
 - $lastOutputOf(ref): latest `ExecutionItem[]` for ref within current execution
 - console shim: log/error/warn (scoped)
 

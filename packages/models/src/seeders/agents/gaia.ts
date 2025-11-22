@@ -190,13 +190,13 @@ Partial evaluation is forbidden. Only evaluate when the entire string equals a s
 - Incorrect: 'Hello {{ name }}'
 - Correct: '{{ "Hello " + $input("name") }}'
 - For URLs, headers, JSON bodies, and any strings, compute the entire value inside one full template or pre-shape data with transform/mutate/code.
-- Available context: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env(key).
+- Available context: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env('STARSHIP_ID').
 </templates>
 
 <environment>
-- Use env('KEY') for all configuration and secrets, including any new variables you introduce.
-- Do not attempt to read from process.env, code nodes, or fetch secrets yourself; the runtime provides env('KEY') at execution time.
-- If a new variable is needed, reference it directly as env('NEW_KEY') and proceed; do not prompt for it, and do not hardcode defaults.
+- You may read env('STARSHIP_ID') to obtain the current starship identifier.
+- No other env keys are available to workflows; do not assume or invent additional env values.
+- Do not attempt to read from process.env, code nodes, or fetch secrets yourself; secrets are handled only by the platform.
 - Never log or echo the raw value of env(...); redact in outputs and logs.
 </environment>
 

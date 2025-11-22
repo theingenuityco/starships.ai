@@ -21,7 +21,7 @@ Context (`EvalContext`)
   - $lastOutputOf(nodeRef: string): ExecutionItem[] — returns latest items for a nodeRef or throws an error with diagnostics if not found
   - $input(path?: string): unknown — returns input or a path-derived value when provided
   - $exists(value: unknown): boolean
-  - env(key: string): unknown — secure env lookup
+  - env(key: string): unknown — host-provided env lookup (in Starships, only `env('STARSHIP_ID')` is populated; all other keys are undefined)
 
 Notable behaviors
 
@@ -35,7 +35,7 @@ Validation
 
 Security
 
-- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via the provided `env()` helper and does not inherit untrusted globals.
+- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via the provided env helper and does not inherit untrusted globals.
 
 Cross-links
 

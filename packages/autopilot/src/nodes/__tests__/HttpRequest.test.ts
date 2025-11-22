@@ -539,6 +539,104 @@ describe('HttpRequest Node Handler', () => {
         })
       );
     });
+
+    it('should not use upstream input as implicit body', async () => {
+      const params: HttpRequestParams = {
+        url: 'https://api.example.com/no-body',
+        method: 'POST',
+      };
+
+      httpMock.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/no-body',
+        headers: { 'content-type': 'application/json' },
+        body: { ok: true },
+      });
+
+      const httpRequest = new HttpRequest(params, { hostRuntime });
+      const inputItems = [
+        {
+          json: { fromUpstream: true },
+          pairedItem: { item: 0 },
+        } as any,
+      ];
+
+      const result = await httpRequest.execute(inputItems);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: { ok: true },
+        url: 'https://api.example.com/no-body',
+      });
+      expect(httpMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://api.example.com/no-body',
+          method: 'POST',
+          // Upstream input should NOT be passed as body implicitly
+          body: undefined,
+        })
+      );
+    });
+
+    it('should omit body for GET and HEAD even when body is provided', async () => {
+      const commonBody = { ignored: true };
+
+      const getParams: HttpRequestParams = {
+        url: 'https://api.example.com/get',
+        method: 'GET',
+        body: commonBody,
+      };
+
+      const headParams: HttpRequestParams = {
+        url: 'https://api.example.com/head',
+        method: 'HEAD',
+        body: commonBody,
+      };
+
+      httpMock
+        .mockResolvedValueOnce({
+          status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/get',
+          headers: { 'content-type': 'application/json' },
+          body: { ok: true },
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/head',
+          headers: { 'content-type': 'application/json' },
+          body: { ok: true },
+        });
+
+      const getRequest = new HttpRequest(getParams, { hostRuntime });
+      const headRequest = new HttpRequest(headParams, { hostRuntime });
+
+      await getRequest.execute();
+      await headRequest.execute();
+
+      expect(httpMock).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          url: 'https://api.example.com/get',
+          method: 'GET',
+          body: undefined,
+        })
+      );
+
+      expect(httpMock).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          url: 'https://api.example.com/head',
+          method: 'HEAD',
+          body: undefined,
+        })
+      );
+    });
   });
 
   describe('Validation', () => {

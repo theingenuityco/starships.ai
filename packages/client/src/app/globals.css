@@ -672,8 +672,9 @@
   --muted-foreground: 0 0% 65% !important;
   --accent: 0 0% 5% !important;
   --accent-foreground: 0 0% 95% !important;
-  --border: 0 0% 10% !important;
-  --input: 0 0% 10% !important;
+  /* Lighten borders/inputs in dark star theme */
+  --border: 0 0% 18% !important;
+  --input: 0 0% 18% !important;
   --ring: 38 92% 54% !important;
   --destructive: 0 62% 50% !important;
   --destructive-foreground: 0 0% 98% !important;
@@ -717,8 +718,9 @@
   --muted-foreground: 0 0% 45%;
   --accent: 220 14% 96%;
   --accent-foreground: 0 0% 8%;
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
+  /* Lighten borders/inputs in light star theme */
+  --border: 220 13% 94%;
+  --input: 220 13% 94%;
   --ring: 38 92% 50%;
   --radius: 0.5rem;
   --destructive: 0 84% 60%;

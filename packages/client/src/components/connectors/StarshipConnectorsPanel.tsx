@@ -116,7 +116,13 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               {isConnected ? 'Reconnect' : 'Connect LinkedIn'}
             </Button>
             {isConnected && (
-              <Button size="sm" variant="outline" className="min-w-[140px]" onClick={() => handleDisconnect('linkedin')} disabled={disconnectMutation.isPending}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                onClick={() => handleDisconnect('linkedin')}
+                disabled={disconnectMutation.isPending}
+              >
                 Disconnect
               </Button>
             )}
@@ -162,7 +168,13 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               {isConnected ? 'Reconnect' : 'Connect Discord'}
             </Button>
             {isConnected && (
-              <Button size="sm" variant="outline" className="min-w-[140px]" onClick={() => handleDisconnect('discord')} disabled={disconnectMutation.isPending}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                onClick={() => handleDisconnect('discord')}
+                disabled={disconnectMutation.isPending}
+              >
                 Disconnect
               </Button>
             )}
@@ -208,7 +220,13 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               {isConnected ? 'Reconnect' : 'Connect Google Drive'}
             </Button>
             {isConnected && (
-              <Button size="sm" variant="outline" className="min-w-[140px]" onClick={() => handleDisconnect('google_drive')} disabled={disconnectMutation.isPending}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                onClick={() => handleDisconnect('google_drive')}
+                disabled={disconnectMutation.isPending}
+              >
                 Disconnect
               </Button>
             )}

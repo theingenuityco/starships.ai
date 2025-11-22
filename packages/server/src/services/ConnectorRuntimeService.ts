@@ -6,6 +6,7 @@ import type { EnvironmentService } from '@/services/EnvironmentService';
 // Connector base URLs for relative paths
 const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com/v2';
 const DISCORD_API_BASE_URL = 'https://discord.com/api';
+const GOOGLE_DRIVE_API_BASE_URL = 'https://www.googleapis.com';
 
 /**
  * ConnectorRuntimeService
@@ -55,6 +56,9 @@ export class ConnectorRuntimeService {
           } else if (connector === 'discord') {
             // Discord HTTP API base
             baseUrl = DISCORD_API_BASE_URL;
+          } else if (connector === 'google_drive') {
+            // Google Drive REST API base (e.g. /drive/v3/files)
+            baseUrl = GOOGLE_DRIVE_API_BASE_URL;
           } else {
             // Default: Starships API (tools, docs, etc.)
             baseUrl = starshipsBaseUrl;
@@ -125,6 +129,39 @@ export class ConnectorRuntimeService {
                 Authorization: `Bot ${botToken}`,
               };
             }
+          }
+        } else if (connector === 'google_drive') {
+          // Use managed Google Drive connector secret from encrypted environments
+          try {
+            const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
+            const rawToken = decryptedEnv['GOOGLE_DRIVE_ACCESS_TOKEN'];
+            const accessToken = typeof rawToken === 'string' ? rawToken.trim() : '';
+
+            if (accessToken) {
+              const lowered: Record<string, unknown> = {};
+              Object.entries(headers).forEach(([k, v]) => {
+                lowered[k.toLowerCase()] = v;
+              });
+
+              // Only inject if caller hasn't explicitly set an Authorization header
+              if (!lowered['authorization']) {
+                headers = {
+                  ...headers,
+                  Authorization: `Bearer ${accessToken}`,
+                };
+              }
+            }
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : 'Unknown Google Drive connector error';
+            console.error('[ConnectorRuntimeService] Google Drive connector error', {
+              method,
+              url: finalUrl,
+              starshipId: starship.id,
+              error: reason,
+            });
+            throw new Error(
+              `HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> Google Drive connector error: ${reason}`,
+            );
           }
         }
 

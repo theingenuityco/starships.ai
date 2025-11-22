@@ -155,6 +155,143 @@ export class ConnectorService {
   }
 
   /**
+   * Start Google Drive OAuth flow for a starship and return the authorization URL.
+   */
+  async startGoogleDriveOAuth(starshipId: string, userId: string): Promise<string> {
+    const env = getEnvConfig();
+    const clientId = (env as any).GOOGLE_DRIVE_CLIENT_ID as string | undefined;
+    const redirectUri = (env as any).GOOGLE_DRIVE_REDIRECT_URL as string | undefined;
+
+    if (!clientId || !redirectUri) {
+      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_REDIRECT_URL.');
+    }
+
+    const state = await generateOAuthState(true, userId, {
+      starshipId,
+      provider: 'google_drive',
+    });
+
+    // Request typical Drive scopes; adjust to your needs:
+    // - drive.file: per-file access created/opened via the app
+    // - drive.metadata.readonly: read metadata for files
+    const scope = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata.readonly'].join(' ');
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope,
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  /**
+   * Complete Google Drive OAuth flow: validate state, exchange code for token,
+   * store GOOGLE_DRIVE_ACCESS_TOKEN / GOOGLE_DRIVE_REFRESH_TOKEN env vars,
+   * and update connector status/metadata.
+   */
+  async completeGoogleDriveOAuth(
+    code: string,
+    stateToken: string
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+    const env = getEnvConfig();
+    const clientId = (env as any).GOOGLE_DRIVE_CLIENT_ID as string | undefined;
+    const clientSecret = (env as any).GOOGLE_DRIVE_CLIENT_SECRET as string | undefined;
+    const redirectUri = (env as any).GOOGLE_DRIVE_REDIRECT_URL as string | undefined;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error(
+        'Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, and GOOGLE_DRIVE_REDIRECT_URL.'
+      );
+    }
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) {
+      throw new Error('Invalid or expired OAuth state');
+    }
+
+    const { userId, context } = stateValidation;
+    if (!userId) {
+      throw new Error('OAuth state missing user information');
+    }
+
+    const starshipId = (context as any)?.starshipId as string | undefined;
+    const provider = (context as any)?.provider as string | undefined;
+
+    if (!starshipId || provider !== 'google_drive') {
+      throw new Error('OAuth state missing starship context');
+    }
+
+    const tokenParams = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+
+    const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', tokenParams.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    const accessToken = tokenResponse.data.access_token as string | undefined;
+    const refreshToken = tokenResponse.data.refresh_token as string | undefined;
+    const expiresIn = tokenResponse.data.expires_in as number | undefined;
+
+    if (!accessToken) {
+      throw new Error('Failed to obtain Google Drive access token');
+    }
+
+    const metadata: Record<string, unknown> = {
+      provider: 'google_drive',
+      ...(expiresIn ? { expiresIn } : {}),
+      hasRefreshToken: !!refreshToken,
+    };
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'google_drive');
+    const connector =
+      existing ??
+      (await this.connectorRepository.create({
+        starshipId,
+        provider: 'google_drive',
+        status: 'connected',
+        metadata,
+        lastError: undefined,
+      }));
+
+    if (existing) {
+      await this.connectorRepository.update(existing.id, {
+        status: 'connected',
+        metadata: {
+          ...(existing.metadata || {}),
+          ...metadata,
+        },
+        lastError: null,
+      });
+    }
+
+    // Persist env vars for this starship and link them to the connector
+    await this.upsertEnvironmentVariable(starshipId, 'GOOGLE_DRIVE_ACCESS_TOKEN', accessToken, userId, connector.id);
+    if (refreshToken) {
+      await this.upsertEnvironmentVariable(starshipId, 'GOOGLE_DRIVE_REFRESH_TOKEN', refreshToken, userId, connector.id);
+    }
+
+    const starship = await this.starshipRepository.findById(starshipId);
+
+    return {
+      starshipId,
+      starshipSlug: starship?.slug,
+      userId,
+    };
+  }
+
+  /**
    * List connectors for a starship, enriched with managed env key presence.
    */
   async listStarshipConnectors(starshipId: string): Promise<ConnectorListItem[]> {

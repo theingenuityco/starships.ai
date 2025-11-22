@@ -49,7 +49,7 @@ export function useDisconnectConnector(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (provider: 'linkedin' | 'discord'): Promise<void> => {
+    mutationFn: async (provider: 'linkedin' | 'discord' | 'google_drive'): Promise<void> => {
       await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/disconnect`)
     },
     onSuccess: (_, provider) => {

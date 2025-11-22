@@ -38,6 +38,18 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
     docsSlug: '/public-docs/environment#discord-connector',
   },
   {
+    provider: 'google_drive',
+    displayName: 'Google Drive',
+    description: 'Connect a Google Drive account to enable tools that list, read, and write files via the Google Drive API.',
+    authType: 'oauth2',
+    // Google Drive connector expects an access token managed in the starship environment.
+    // You can provision this token via an external OAuth flow and store it as
+    // GOOGLE_DRIVE_ACCESS_TOKEN for now.
+    requiredEnvKeys: ['GOOGLE_DRIVE_ACCESS_TOKEN'],
+    optionalEnvKeys: ['GOOGLE_DRIVE_REFRESH_TOKEN'],
+    docsSlug: '/public-docs/environment#google-drive-connector',
+  },
+  {
     provider: 'starships',
     displayName: 'Starships',
     description:

@@ -11,6 +11,8 @@ const badgeVariants = cva('inline-flex items-center rounded-md border px-2.5 py-
       secondary: 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
       destructive: 'border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80',
       outline: 'text-foreground',
+      // Soft glowing primary chip – matches billing overview / amount selector style
+      connected: 'border-transparent bg-primary/10 text-primary shadow-sm',
     },
   },
   defaultVariants: {

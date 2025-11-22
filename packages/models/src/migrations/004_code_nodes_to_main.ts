@@ -10,7 +10,7 @@ function transformCodeToMain(code: string): { code: string; changed: boolean } {
   // Helper to compile-check a candidate
   const compiles = (candidate: string): boolean => {
     try {
-      // eslint-disable-next-line no-new-func
+       
       new Function('ctx', candidate);
       return true;
     } catch {
@@ -109,7 +109,7 @@ function migrateBlueprint(blueprint: BlueprintLike): { blueprint: BlueprintLike;
           (nodeObj as JsonObject).parameters = params;
           changed = true;
           // Log a warning to aid future cleanup
-          // eslint-disable-next-line no-console
+           
           console.warn(
             `[WARN] Skipping compile check for likely UI literal in node ${(nodeObj as JsonObject).ref ?? '?'} due to template parsing: ${err?.message}`
           );

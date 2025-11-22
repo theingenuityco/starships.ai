@@ -346,9 +346,6 @@ export class ToolTestHelper {
       case 'get_current_time':
         return this.simulateTimeTool(inputObj);
 
-      case 'test-tool-blueprint':
-        return this.simulateBlueprintLintTool(inputObj);
-
       default:
         return { executed: true, input, mockEnv };
     }
@@ -456,95 +453,6 @@ export class ToolTestHelper {
       timezone,
       format,
       timestamp: now.getTime(),
-    };
-  }
-
-  private simulateBlueprintLintTool(input: Record<string, unknown>): unknown {
-    const blueprint = input?.blueprint as { nodes?: unknown[]; edges?: unknown[] };
-
-    if (!blueprint || typeof blueprint !== 'object') {
-      throw new Error('blueprint parameter is required and must be an object with nodes and edges arrays');
-    }
-
-    if (!Array.isArray(blueprint.nodes)) {
-      throw new Error('Blueprint nodes must be an array');
-    }
-
-    if (!Array.isArray(blueprint.edges)) {
-      throw new Error('Blueprint edges must be an array');
-    }
-
-    const issues: string[] = [];
-    const nodeRefs = new Set<string>();
-    const nodeTypes: Record<string, number> = {};
-
-    // Check nodes
-    let hasStart = false;
-    let hasEnd = false;
-
-    for (const node of blueprint.nodes) {
-      if (typeof node !== 'object' || !node) {
-        issues.push('Node entry must be an object');
-        continue;
-      }
-
-      const nodeObj = node as Record<string, unknown>;
-
-      if (!nodeObj.ref || typeof nodeObj.ref !== 'string') {
-        issues.push('Node missing valid "ref" property');
-        continue;
-      }
-
-      if (nodeRefs.has(nodeObj.ref as string)) {
-        issues.push(`Duplicate node ref: ${nodeObj.ref}`);
-      }
-      nodeRefs.add(nodeObj.ref as string);
-
-      const nodeType = nodeObj.type as string;
-      if (!nodeType) {
-        issues.push(`Node ${nodeObj.ref} missing type`);
-      } else {
-        const validTypes = ['start', 'end', 'code', 'http_request', 'llm', 'agent', 'conditional', 'transform', 'mutate', 'tool'];
-        if (!validTypes.includes(nodeType)) {
-          issues.push(`Unsupported node type: ${nodeType}`);
-        }
-
-        nodeTypes[nodeType] = (nodeTypes[nodeType] || 0) + 1;
-
-        if (nodeType === 'start') hasStart = true;
-        if (nodeType === 'end') hasEnd = true;
-      }
-    }
-
-    if (!hasStart) issues.push('Missing start node');
-    if (!hasEnd) issues.push('Missing end node');
-
-    // Check edges
-    for (const edge of blueprint.edges) {
-      if (typeof edge !== 'object' || !edge) {
-        issues.push('Edge entry must be an object');
-        continue;
-      }
-
-      const edgeObj = edge as Record<string, unknown>;
-
-      if (!edgeObj.from || !nodeRefs.has(edgeObj.from as string)) {
-        issues.push(`Edge references unknown node: ${edgeObj.from}`);
-      }
-
-      if (!edgeObj.to || !nodeRefs.has(edgeObj.to as string)) {
-        issues.push(`Edge references unknown node: ${edgeObj.to}`);
-      }
-    }
-
-    return {
-      ok: issues.length === 0,
-      issues,
-      summary: {
-        nodeCount: blueprint.nodes.length,
-        edgeCount: blueprint.edges.length,
-        types: nodeTypes,
-      },
     };
   }
 

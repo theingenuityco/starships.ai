@@ -37,7 +37,6 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 - Env quick ref: Code → ctx.$env('STARSHIP_ID'); Templates → {{ env('STARSHIP_ID') }}; never log/echo secrets; validate required env and fail fast.
 - Templates quick rule: compute the entire value within one {{ ... }}; no concatenation or nested templates; JSON must remain valid.
 - Prefer templates for URLs/headers; use Code node for logic.
-- Do not assume access to arbitrary env; workflows only see STARSHIP_ID.
 - HttpRequest body: do not set \`parameters.body\` via string templates (e.g. "{{ $input }}"); templates stringify. Either omit \`body\` and pass an object from a Code node upstream, or set a literal object.
 - HttpRequest chaining: an HttpRequest returns a wrapper { status, statusText, headers, body, url }. Use Transform/Code to forward only \`body\` to the next HttpRequest if needed.
 - Initial arguments: immediately after \`start\`, read args from \`ctx.$input\`; from later nodes use \`ctx.$lastOutputOf('__initial__')[0]?.json\`. Do not assume args live in \`ctx.$state\`.
@@ -105,7 +104,6 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'open-tool',
     'edit-tool',
     'test-tool',
-    'test-tool-blueprint',
     'add-tool-blueprint-node',
     'add-tool-blueprint-edge',
     'edit-tool-blueprint-node',

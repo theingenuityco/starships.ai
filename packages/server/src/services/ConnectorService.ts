@@ -46,7 +46,10 @@ export class ConnectorService {
       provider: 'linkedin',
     });
 
-    const scope = 'openid profile email w_member_social';
+    // Request the minimal set of scopes needed for posting on behalf of a member:
+    // - w_member_social: create and manage member posts
+    // - openid profile email: basic OIDC identity for the connected member
+    const scope = 'w_member_social openid profile email';
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,

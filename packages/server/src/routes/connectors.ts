@@ -260,14 +260,14 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     const redirectParams = new URLSearchParams({
       connector: provider,
       status: 'success',
-      starshipId,
     });
 
-    if (starshipSlug) {
-      redirectParams.set('starshipSlug', starshipSlug);
-    }
+    const basePath =
+      starshipSlug !== undefined && starshipSlug.length > 0
+        ? `/ship/${encodeURIComponent(starshipSlug)}/connectors`
+        : `/ship/${encodeURIComponent(starshipId)}/connectors`;
 
-    const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
+    const redirectUrl = `${env.PUBLIC_URL}${basePath}?${redirectParams.toString()}`;
 
     res.redirect(redirectUrl);
   } catch (error) {

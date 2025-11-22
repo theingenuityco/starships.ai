@@ -115,6 +115,7 @@ const map: Record<string, ResolvedIcon> = {
   unlink: { type: 'phosphor', component: 'LinkBreak' },
   refresh: { type: 'phosphor', component: 'ArrowClockwise' },
   'rotate-ccw': { type: 'phosphor', component: 'ArrowCounterClockwise' },
+  repeat: { type: 'phosphor', component: 'ArrowsClockwise' },
   archive: { type: 'phosphor', component: 'Archive' },
   package: { type: 'phosphor', component: 'Package' },
   paperclip: { type: 'phosphor', component: 'Paperclip' },

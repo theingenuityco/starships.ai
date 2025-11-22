@@ -58,12 +58,13 @@ Returns server response indicating success.
         parameters: {
           code: `
             async function main(ctx) {
-              if (!ctx.$input.agentSlug) throw new Error('agentSlug is required');
-              if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
+              const input = ctx.input || {};
+              if (!input.agentSlug) throw new Error('agentSlug is required');
+              if (!input.toolSlug) throw new Error('toolSlug is required');
 
               return {
-                agentSlug: ctx.$input.agentSlug,
-                toolSlug: ctx.$input.toolSlug
+                agentSlug: input.agentSlug,
+                toolSlug: input.toolSlug
               };
             }
           `,
@@ -76,7 +77,7 @@ Returns server response indicating success.
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).agentSlug }}',
           method: 'GET',
           connector: 'starships',
           timeout: 5000,
@@ -90,16 +91,18 @@ Returns server response indicating success.
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_agent')[0]?.json ?? {};
-              const agentData = fetchResponse.body?.data || fetchResponse.body;
+              const fetchResponse = ctx.lastOutputOf('fetch_agent') || {};
+              const agentData = fetchResponse.body && typeof fetchResponse.body === 'object'
+                ? (fetchResponse.body.data || fetchResponse.body)
+                : fetchResponse.data || fetchResponse;
 
               if (!agentData || !agentData.id) {
                 throw new Error('Failed to fetch agent');
               }
 
-              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const prep = ctx.lastOutputOf('prepare') || {};
               const toolSlug = prep.toolSlug;
-              const starshipId = ctx.$env && ctx.$env('STARSHIP_ID');
+              const starshipId = ctx.env && ctx.env('STARSHIP_ID');
               if (!starshipId) {
                 throw new Error('STARSHIP_ID missing');
               }
@@ -121,13 +124,13 @@ Returns server response indicating success.
         name: 'Assign Tool',
         description: 'POST /agents/:id/tools/:toolSlug',
         parameters: {
-          url: '{{ "/agents/" + $lastOutputOf("update_tools")[0].json.agentId + "/tools/" + $lastOutputOf("update_tools")[0].json.toolSlug }}',
+          url: '{{ "/agents/" + (lastOutputOf("update_tools") || {}).agentId + "/tools/" + (lastOutputOf("update_tools") || {}).toolSlug }}',
           method: 'POST',
           connector: 'starships',
           body: {
             starshipId: '{{ env("STARSHIP_ID") }}'
           },
-          timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
+          timeout: '{{ (lastOutputOf("update_tools") || {}).timeout }}',
         },
       },
       {
@@ -136,7 +139,7 @@ Returns server response indicating success.
         name: 'End',
         description: 'Return updated agent',
         parameters: {
-          output: '{{ $lastOutputOf("http_update")[0].json }}',
+          output: '{{ lastOutputOf("http_update") }}',
         },
       },
     ],

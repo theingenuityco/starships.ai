@@ -1,7 +1,14 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth } from '@/hooks/useConnectors'
+import {
+  useConnectorCatalog,
+  useDisconnectConnector,
+  useStarshipConnectors,
+  useStartLinkedInOAuth,
+  useStartDiscordOAuth,
+  useStartGoogleDriveOAuth,
+} from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +25,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const disconnectMutation = useDisconnectConnector(starshipId)
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
   const discordMutation = useStartDiscordOAuth(starshipId)
+  const googleDriveMutation = useStartGoogleDriveOAuth(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -41,6 +49,13 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     }
   }
 
+  const handleGoogleDriveConnect = async () => {
+    const result = await googleDriveMutation.mutateAsync()
+    if (result) {
+      window.location.href = result
+    }
+  }
+
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const matchesQuery = useMemo(
@@ -59,13 +74,16 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
   const linkedin = catalog.find(c => c.provider === 'linkedin')
   const discord = catalog.find(c => c.provider === 'discord')
+  const googleDrive = catalog.find(c => c.provider === 'google_drive')
 
   const linkedinState = getConnectorState('linkedin')
   const discordState = getConnectorState('discord')
+  const googleDriveState = getConnectorState('google_drive')
 
   const hasAnyVisibleConnector =
     (linkedin && matchesQuery({ displayName: linkedin.displayName, description: linkedin.description })) ||
-    (discord && matchesQuery({ displayName: discord.displayName, description: discord.description }))
+    (discord && matchesQuery({ displayName: discord.displayName, description: discord.description })) ||
+    (googleDrive && matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description }))
 
   return (
     <div className="space-y-6">
@@ -149,6 +167,46 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 </Button>
                 {discordState?.status === 'connected' && (
                   <Button size="sm" variant="outline" onClick={() => handleDisconnect('discord')} disabled={disconnectMutation.isPending}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {googleDrive && matchesQuery({ displayName: googleDrive.displayName, description: googleDrive.description }) && (
+          <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-lg">Google Drive</span>
+                  <Badge variant={googleDriveState?.status === 'connected' ? 'default' : 'outline'}>
+                    {googleDriveState?.status === 'connected' ? 'Connected' : 'Not connected'}
+                  </Badge>
+                </CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">{googleDrive.description}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-xs text-muted-foreground">
+                <div className="font-medium mb-1">Drive access</div>
+                <p className="mb-2">
+                  Connect a Google account to let tools list, read, and write files in your Drive, according to the scopes granted in
+                  the OAuth flow.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleGoogleDriveConnect} disabled={googleDriveMutation.isPending}>
+                  {googleDriveState?.status === 'connected' ? 'Reconnect Google Drive' : 'Connect Google Drive'}
+                </Button>
+                {googleDriveState?.status === 'connected' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDisconnect('google_drive')}
+                    disabled={disconnectMutation.isPending}
+                  >
                     Disconnect
                   </Button>
                 )}

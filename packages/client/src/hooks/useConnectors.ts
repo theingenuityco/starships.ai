@@ -104,4 +104,21 @@ export function useStartDiscordOAuth(starshipId: string) {
   })
 }
 
+export function useStartGoogleDriveOAuth(starshipId: string) {
+  return useMutation({
+    mutationFn: async (): Promise<string> => {
+      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
+        `/api/v1/starships/${starshipId}/connectors/google_drive/oauth/start`,
+      )
+      return response.data.data.authorizationUrl
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start Google Drive connection'
+      toast.error('Failed to connect Google Drive', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 

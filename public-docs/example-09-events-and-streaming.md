@@ -25,7 +25,7 @@ const blueprint = {
         messages: [{ role: 'user', content: 'Say hello in two short sentences.' }],
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("llm") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'llm' },

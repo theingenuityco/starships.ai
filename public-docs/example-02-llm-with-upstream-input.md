@@ -20,12 +20,12 @@ const blueprint = {
         messages: [
           {
             role: 'user',
-            content: '{{ String($lastOutputOf("__initial__")[0]?.json ?? "") }}',
+            content: '{{ String(input ?? "") }}',
           },
         ],
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("llm") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'llm' },

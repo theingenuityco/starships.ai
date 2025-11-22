@@ -19,7 +19,7 @@ const blueprint = {
         method: 'GET',
         transforms: [
           // Inline: runs AFTER http handler; input is http node output
-          { operation: 'add', path: '/title', value: '{{ $input()?.body?.title }}' },
+          { operation: 'add', path: '/title', value: '{{ input?.body?.title }}' },
         ],
         reducers: [
           `
@@ -30,7 +30,7 @@ const blueprint = {
           }
           `,
         ],
-        condition: '{{ $exists($input()?.body?.id) ? "ok" : "missing" }}',
+        condition: '{{ exists(input?.body?.id) ? "ok" : "missing" }}',
       },
     },
     { ref: 'ok', type: 'end', name: 'OK', parameters: { output: 'ok' } },

@@ -97,11 +97,11 @@ The system uses JavaScript template expressions for dynamic data access:
 
 ```javascript
 // Check for tool calls
-`$exists($lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls)`
+`exists(lastOutputOf("llm_1")?.choices[0].message.toolCalls)`
 // Get tool name
-`{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name }}`
+`{{ lastOutputOf("llm_1")?.choices[0].message.toolCalls[0].function.name }}`
 // Convert tool result to string
-`{{ String($lastOutputOf("tool_1")[0].json) }}`;
+`{{ String(lastOutputOf("tool_1")) }}`;
 ```
 
 ## Usage Examples
@@ -185,12 +185,12 @@ export const sendEmailTool: ToolParams = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: 'Bearer {{ $json.apiKey }}',
-          } as unknown as HeadersInit,
+            Authorization: 'Bearer {{ input.apiKey }}',
+          },
           body: {
-            to: '{{ $json.to }}',
-            subject: '{{ $json.subject }}',
-            body: '{{ $json.body }}',
+            to: '{{ input.to }}',
+            subject: '{{ input.subject }}',
+            body: '{{ input.body }}',
           },
         },
       },
@@ -208,7 +208,7 @@ export const sendEmailTool: ToolParams = {
 Notes:
 
 - No code changes required for new tools. Provide `ToolParams` with a `blueprint`, and include it in the agent’s `tools` array for function calling schema.
-- Pass any configuration/secrets as normal tool arguments (e.g., `apiKey`). The Tool node forwards arguments as the initial input (`$json`) of the blueprint.
+- Pass any configuration/secrets as normal tool arguments (e.g., `apiKey`). The Tool node forwards arguments as the initial `input` of the blueprint.
 
 ## Key Benefits
 
@@ -224,10 +224,10 @@ When authoring tool blueprints that include a `code` node, write code as a modul
 
 ```javascript
 async function main(ctx) {
-  // Access tool arguments via ctx.$input
-  // Access workflow state via ctx.$state
-  // Read prior node output via ctx.$lastOutputOf('node_ref')
-  // In Starships, ctx.$env is reserved; only ctx.$env('STARSHIP_ID') may be present.
+  // Access tool arguments via ctx.input
+  // Access workflow state via ctx.state
+  // Read prior node output via ctx.lastOutputOf('node_ref')
+  // In Starships, ctx.env is reserved; only ctx.env('STARSHIP_ID') may be present.
   return { ok: true };
 }
 ```

@@ -17,13 +17,13 @@ const toolBlueprint = {
       parameters: {
         code: `
           async function main(ctx) {
-            const { a, b } = ctx.$input || {};
+            const { a, b } = ctx.input || {};
             return { sum: Number(a) + Number(b) };
           }
         `,
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("add")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("add") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'add' },
@@ -62,7 +62,7 @@ const blueprint = {
       name: 'Has Tool?',
       parameters: {
         condition:
-          '{{ (() => { const calls = $lastOutputOf("llm")?.[0]?.json?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length>0 ? "call" : "complete"; })() }}',
+          '{{ (() => { const last = lastOutputOf("llm") || {}; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length>0 ? "call" : "complete"; })() }}',
       },
     },
     {
@@ -72,7 +72,7 @@ const blueprint = {
       parameters: {
         code: `
           async function main(ctx) {
-            const last = ctx.$lastOutputOf("llm")[0]?.json;
+            const last = ctx.lastOutputOf("llm") || {};
             const s = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
             return typeof s === 'string' ? JSON.parse(s) : (s || {});
           }
@@ -103,7 +103,7 @@ const blueprint = {
         reducers: [
           `
           (state, ctx) => {
-            const toolResult = ctx.$lastOutputOf("tool")[0]?.json ?? {};
+            const toolResult = ctx.lastOutputOf("tool") ?? {};
             const content = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', content }];
@@ -113,7 +113,7 @@ const blueprint = {
         ],
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("llm") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'llm' },

@@ -62,23 +62,19 @@ Behavior and limits:
           code: `
             async function main(ctx) {
               // Expect the HTTP node to return a response object with { status, headers, body, url }.
-              // The body is typically an ApiResponse<ConnectorListResponse>:
+              // The body MUST be an ApiResponse<ConnectorListResponse>:
               //   { data: { starshipId, connectors: ConnectorListItem[] } }
-              // but we also support bare ConnectorListResponse or bare arrays for flexibility.
               const raw = ctx.$input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
 
-              const isObject = payload && typeof payload === 'object';
-              const inner = isObject && payload.data && typeof payload.data === 'object'
-                ? payload.data
-                : payload;
+              if (!payload || typeof payload !== 'object' || !Array.isArray(payload.data?.connectors)) {
+                throw new Error('Invalid connector response shape: expected { data: { connectors: [] } }');
+              }
 
-              const connectors = inner && typeof inner === 'object' && Array.isArray(inner.connectors)
-                ? inner.connectors
-                : (Array.isArray(inner) ? inner : []);
+              const connectors = payload.data.connectors;
 
-              return (Array.isArray(connectors) ? connectors : []).map((c) => ({
+              return connectors.map((c) => ({
                 provider: c && c.provider,
                 status: c && c.status,
                 managedEnvKeys: Array.isArray(c && c.managedEnvKeys)

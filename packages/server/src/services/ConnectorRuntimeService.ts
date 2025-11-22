@@ -30,6 +30,17 @@ export class ConnectorRuntimeService {
 
     const hostRuntime: HostRuntime = {
       http: async ({ method, url, headers = {}, body, timeoutMs, connector }) => {
+        // Debug trace for HostRuntime HTTP calls to help diagnose stuck requests.
+        // NOTE: keep logs concise; they are invaluable when HTTP requests appear to hang.
+        // Do not log full bodies to avoid leaking sensitive data.
+        // eslint-disable-next-line no-console
+        console.log('[ConnectorRuntimeService] hostRuntime.http called', {
+          method,
+          url,
+          connector,
+          timeoutMs,
+          starshipId: starship.id,
+        });
         const controller = new AbortController();
         const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
         const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -82,6 +93,13 @@ export class ConnectorRuntimeService {
           } catch (err) {
             // Surface a clear connector-level error while preserving the original method/URL
             const reason = err instanceof Error ? err.message : 'Unknown LinkedIn connector error';
+            // eslint-disable-next-line no-console
+            console.error('[ConnectorRuntimeService] LinkedIn connector error', {
+              method,
+              url: finalUrl,
+              starshipId: starship.id,
+              error: reason,
+            });
             throw new Error(`HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> LinkedIn connector error: ${reason}`);
           }
         } else if (connector === 'discord') {
@@ -126,6 +144,14 @@ export class ConnectorRuntimeService {
           // route via connector records instead of direct HTTP.
           // For now we treat all HTTP uniformly and rely on URL/auth headers.
 
+          // eslint-disable-next-line no-console
+          console.log('[ConnectorRuntimeService] hostRuntime.http fetch start', {
+            method: finalMethod,
+            url: finalUrl,
+            connector,
+            timeoutMs: timeout,
+          });
+
           const resp = await fetch(finalUrl, init);
           const contentType = resp.headers.get('content-type') || '';
           let responseBody: unknown;
@@ -144,13 +170,24 @@ export class ConnectorRuntimeService {
             responseHeaders[key] = value;
           });
 
-          return {
+          const result = {
             status: resp.status,
             statusText: resp.statusText,
             headers: responseHeaders,
             body: responseBody,
             url: resp.url,
           };
+
+          // eslint-disable-next-line no-console
+          console.log('[ConnectorRuntimeService] hostRuntime.http fetch completed', {
+            method: finalMethod,
+            url: resp.url,
+            connector,
+            status: resp.status,
+            statusText: resp.statusText,
+          });
+
+          return result;
         } catch (error) {
           const reason =
             controller.signal.aborted && !(error instanceof Error)
@@ -158,6 +195,14 @@ export class ConnectorRuntimeService {
               : error instanceof Error
                 ? error.message
                 : 'Unknown error';
+          // eslint-disable-next-line no-console
+          console.error('[ConnectorRuntimeService] hostRuntime.http error', {
+            method,
+            url: finalUrl,
+            connector,
+            timeoutMs: timeout,
+            reason,
+          });
           throw new Error(`HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> ${reason}`);
         } finally {
           clearTimeout(timeoutId);

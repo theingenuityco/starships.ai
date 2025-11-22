@@ -27,7 +27,6 @@ import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
-import { StarshipsIntegrationService } from '@/services/StarshipsIntegrationService';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 
 // Debug flags
@@ -68,7 +67,6 @@ export class ConversationService {
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
-  private starshipsIntegrationService!: StarshipsIntegrationService;
   private connectorRuntimeService!: ConnectorRuntimeService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
@@ -151,7 +149,6 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
-    this.starshipsIntegrationService = new StarshipsIntegrationService();
     this.connectorRuntimeService = new ConnectorRuntimeService(this.environmentService);
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);

@@ -1,14 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import {
-  useConnectorCatalog,
-  useDisconnectConnector,
-  useStarshipConnectors,
-  useStartLinkedInOAuth,
-  useStartDiscordOAuth,
-  useStartGoogleDriveOAuth,
-} from '@/hooks/useConnectors'
+import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth, useStartGoogleDriveOAuth } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -105,7 +98,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
       {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {linkedin && matchesQuery({ displayName: linkedin.displayName, description: linkedin.description }) && (
           <Card className="frosted-glass-card shadow-frosted-lg border border-border/40">
             <CardHeader>
@@ -113,38 +106,16 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 <CardTitle className="flex items-center gap-3">
                   {CONNECTOR_LOGOS.linkedin && (
                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                      <Image
-                        src={CONNECTOR_LOGOS.linkedin}
-                        alt="LinkedIn logo"
-                        width={18}
-                        height={18}
-                      />
+                      <Image src={CONNECTOR_LOGOS.linkedin} alt="LinkedIn logo" width={18} height={18} />
                     </div>
                   )}
                   <span className="text-lg">LinkedIn</span>
-                  <Badge variant={linkedinState?.status === 'connected' ? 'default' : 'outline'}>
-                    {linkedinState?.status === 'connected' ? 'Connected' : 'Not connected'}
-                  </Badge>
+                  <Badge variant={linkedinState?.status === 'connected' ? 'default' : 'outline'}>{linkedinState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
                 </CardTitle>
               </div>
               <p className="text-sm text-muted-foreground mt-2">{linkedin.description}</p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-xs text-muted-foreground">
-                <div className="font-medium mb-1">Managed environment variables</div>
-                <ul className="list-disc list-inside space-y-1">
-                  {linkedin.requiredEnvKeys.map(key => (
-                    <li key={key}>
-                      <span className="font-mono text-[11px]">{key}</span>
-                    </li>
-                  ))}
-                  {(linkedin.optionalEnvKeys || []).map(key => (
-                    <li key={key}>
-                      <span className="font-mono text-[11px]">{key}</span> <span className="text-muted-foreground">(optional)</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <CardContent>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleLinkedInConnect} disabled={linkedinMutation.isPending}>
                   {linkedinState?.status === 'connected' ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
@@ -166,27 +137,16 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 <CardTitle className="flex items-center gap-3">
                   {CONNECTOR_LOGOS.discord && (
                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                      <Image
-                        src={CONNECTOR_LOGOS.discord}
-                        alt="Discord logo"
-                        width={18}
-                        height={18}
-                      />
+                      <Image src={CONNECTOR_LOGOS.discord} alt="Discord logo" width={18} height={18} />
                     </div>
                   )}
                   <span className="text-lg">Discord</span>
-                  <Badge variant={discordState?.status === 'connected' ? 'default' : 'outline'}>
-                    {discordState?.status === 'connected' ? 'Connected' : 'Not connected'}
-                  </Badge>
+                  <Badge variant={discordState?.status === 'connected' ? 'default' : 'outline'}>{discordState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
                 </CardTitle>
               </div>
               <p className="text-sm text-muted-foreground mt-2">{discord.description}</p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-xs text-muted-foreground">
-                <div className="font-medium mb-1">Bot access</div>
-                <p className="mb-2">Install the Starships bot into your Discord server. The bot can send messages in channels where it has permission.</p>
-              </div>
+            <CardContent>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleDiscordConnect} disabled={discordMutation.isPending}>
                   {discordState?.status === 'connected' ? 'Reconnect Discord' : 'Connect Discord'}
@@ -208,41 +168,22 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 <CardTitle className="flex items-center gap-3">
                   {CONNECTOR_LOGOS.google_drive && (
                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                      <Image
-                        src={CONNECTOR_LOGOS.google_drive}
-                        alt="Google Drive logo"
-                        width={18}
-                        height={18}
-                      />
+                      <Image src={CONNECTOR_LOGOS.google_drive} alt="Google Drive logo" width={18} height={18} />
                     </div>
                   )}
                   <span className="text-lg">Google Drive</span>
-                  <Badge variant={googleDriveState?.status === 'connected' ? 'default' : 'outline'}>
-                    {googleDriveState?.status === 'connected' ? 'Connected' : 'Not connected'}
-                  </Badge>
+                  <Badge variant={googleDriveState?.status === 'connected' ? 'default' : 'outline'}>{googleDriveState?.status === 'connected' ? 'Connected' : 'Not connected'}</Badge>
                 </CardTitle>
               </div>
               <p className="text-sm text-muted-foreground mt-2">{googleDrive.description}</p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-xs text-muted-foreground">
-                <div className="font-medium mb-1">Drive access</div>
-                <p className="mb-2">
-                  Connect a Google account to let tools list, read, and write files in your Drive, according to the scopes granted in
-                  the OAuth flow.
-                </p>
-              </div>
+            <CardContent>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleGoogleDriveConnect} disabled={googleDriveMutation.isPending}>
                   {googleDriveState?.status === 'connected' ? 'Reconnect Google Drive' : 'Connect Google Drive'}
                 </Button>
                 {googleDriveState?.status === 'connected' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDisconnect('google_drive')}
-                    disabled={disconnectMutation.isPending}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handleDisconnect('google_drive')} disabled={disconnectMutation.isPending}>
                     Disconnect
                   </Button>
                 )}

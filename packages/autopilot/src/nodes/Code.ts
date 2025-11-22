@@ -28,7 +28,7 @@ export class Code extends BaseNode<CodeParams> {
 
       // Get execution context for state and other data
       const execution = this.getOptions()?.execution;
-      const runtimeConfig = this.getOptions()?.runtimeConfig || {};
+      const runtimeEnv = this.getOptions()?.runtimeEnv || {};
 
       // Create helpers for ctx
       const $lastOutputOf = (ref: string): ExecutionItem[] => {
@@ -50,10 +50,10 @@ export class Code extends BaseNode<CodeParams> {
       const ctx = {
         $input: inputData,
         $state: execution?.state || {},
-        // Preferred helper: $env (maps to non-secret runtime configuration)
-        $env: (key: string) => (typeof key === 'string' ? (runtimeConfig as Record<string, unknown>)[key] : undefined),
+        // Preferred helper: $env (maps to non-secret runtime environment)
+        $env: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
         // Backwards-compatible alias
-        $config: (key: string) => (typeof key === 'string' ? (runtimeConfig as Record<string, unknown>)[key] : undefined),
+        $config: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),
         $lastOutputOf,
       };
 

@@ -624,17 +624,17 @@ export class AgentService {
         ? testInput // Already in messages format
         : [{ role: 'user', content: testInput }]; // Convert string to message
 
-      // 5. Prepare non-secret runtime configuration
+      // 5. Prepare runtime env (Starships host: only STARSHIP_ID is exposed to workflows)
       const env = getEnvConfig();
       const baseUrl = `${env.SERVER_URL}/api/v1`;
-      const runtimeConfig: Record<string, unknown> = {
+      const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
       };
 
       // 6. Create agent instance and prepare execution
       const agent = new Agent(agentWithTools, {
         eventCallback: onEvent,
-        runtimeConfig,
+        runtimeEnv,
       });
 
       // 7. Execute with runner (same pattern as ConversationService)
@@ -685,7 +685,7 @@ export class AgentService {
 
       await runner.run(blueprint, exec, {
         eventCallback: onEvent,
-        runtimeConfig,
+        runtimeEnv,
       } as any);
 
       console.log('🔍 Post-execution state:', {

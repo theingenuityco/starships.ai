@@ -78,7 +78,7 @@ describe('Tool Get Tool', () => {
     async function executeToolWithMockRuntime(input: unknown, hostRuntime: HostRuntime) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        runtimeConfig: {},
+        runtimeEnv: {},
         hostRuntime,
         execution: ExecutionItemUtils.createExecution(),
       };

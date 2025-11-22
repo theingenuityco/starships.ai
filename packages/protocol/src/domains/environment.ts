@@ -78,7 +78,7 @@ export interface EnvironmentVariableListResponse {
 
 /**
  * Summary of system-level environment variables that are made available to the
- * Autopilot runtime as non-secret configuration (for example via runtimeConfig).
+ * Autopilot runtime as non-secret configuration (for example via runtimeEnv).
  */
 export interface SystemEnvironmentVariableSummary {
   /**

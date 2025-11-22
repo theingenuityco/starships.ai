@@ -57,12 +57,12 @@ export interface NodeHandlerOptions {
   eventCallback?: EventCallback;
   execution?: Execution;
   /**
-   * Non-secret runtime configuration values that may be safely exposed to
+   * Non-secret runtime environment values that may be safely exposed to
    * templates and user-authored code (Code/Mutate). Secrets MUST NOT be
    * placed here; they should only ever flow through server-side connector
    * execution.
    */
-  runtimeConfig?: Record<string, unknown>;
+  runtimeEnv?: Record<string, unknown>;
   /**
    * Host-provided runtime surface for side-effecting operations (HTTP, etc.).
    * This replaces the legacy callConnector hook with a typed interface.

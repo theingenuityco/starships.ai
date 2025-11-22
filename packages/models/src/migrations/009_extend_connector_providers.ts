@@ -1,26 +1,21 @@
 import type { Client } from 'pg';
 
 /**
- * Extend connector providers to include google_drive.
+ * Remove the provider CHECK constraint from connectors.
  *
  * The original connectors table (008_add_starship_connectors) defined a CHECK
  * constraint limiting provider to ('linkedin', 'discord'). This migration
- * updates that constraint to also allow 'google_drive'.
+ * removes that constraint so new providers (like google_drive) do not require
+ * DB changes.
  */
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    // Drop the old CHECK constraint if it exists and recreate it with google_drive
+    // Drop the old CHECK constraint if it exists
     await client.query(`
       ALTER TABLE connectors
       DROP CONSTRAINT IF EXISTS connectors_provider_check
-    `);
-
-    await client.query(`
-      ALTER TABLE connectors
-      ADD CONSTRAINT connectors_provider_check
-      CHECK (provider IN ('linkedin', 'discord', 'google_drive'))
     `);
 
     await client.query('COMMIT');

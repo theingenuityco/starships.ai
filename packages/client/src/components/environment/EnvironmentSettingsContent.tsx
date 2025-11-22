@@ -56,8 +56,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                 <h1 className="text-2xl font-bold">Connectors</h1>
               </div>
               <p className="text-muted-foreground">
-                Connect <strong>{starship.name}</strong> to third-party services like LinkedIn or Discord. Credentials and configuration are managed
-                securely by the platform.
+                Securely connect <strong>{starship.name}</strong> to your external accounts and data sources.
               </p>
             </div>
 

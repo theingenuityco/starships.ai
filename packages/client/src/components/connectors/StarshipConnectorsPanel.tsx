@@ -91,8 +91,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
               {CONNECTOR_LOGOS.linkedin && (
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={CONNECTOR_LOGOS.linkedin} alt="LinkedIn logo" width={18} height={18} />
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
+                  <Image src={CONNECTOR_LOGOS.linkedin} alt="LinkedIn logo" width={24} height={24} />
                 </div>
               )}
               <span className="text-lg">LinkedIn</span>
@@ -143,8 +143,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
               {CONNECTOR_LOGOS.discord && (
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={CONNECTOR_LOGOS.discord} alt="Discord logo" width={18} height={18} />
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
+                  <Image src={CONNECTOR_LOGOS.discord} alt="Discord logo" width={24} height={24} />
                 </div>
               )}
               <span className="text-lg">Discord</span>
@@ -195,8 +195,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
               {CONNECTOR_LOGOS.google_drive && (
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={CONNECTOR_LOGOS.google_drive} alt="Google Drive logo" width={18} height={18} />
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
+                  <Image src={CONNECTOR_LOGOS.google_drive} alt="Google Drive logo" width={24} height={24} />
                 </div>
               )}
               <span className="text-lg">Google Drive</span>

@@ -143,7 +143,7 @@ Extracts data from input using dot notation:
 
 Access host-provided environment values:
 
-- When embedding the Engine yourself (SDK usage), you may choose how to populate `runtimeConfig` and interpret `env(key)`.
+- When embedding the Engine yourself (SDK usage), you may choose how to populate `runtimeEnv` and interpret `env(key)`.
 - In the hosted Starships product, **the only env key exposed to workflows is** `env('STARSHIP_ID')`. Custom env keys are not supported and will be undefined.
 
 ```javascript

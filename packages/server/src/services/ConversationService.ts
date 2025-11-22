@@ -707,7 +707,7 @@ export class ConversationService {
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const rawAuth = ctx?.authorization ?? '';
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
-      const runtimeConfig: Record<string, unknown> = {
+      const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
       };
 
@@ -864,7 +864,7 @@ export class ConversationService {
 
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
-          runtimeConfig,
+          runtimeEnv,
           hostRuntime,
         });
 
@@ -874,7 +874,7 @@ export class ConversationService {
         const runner = this.defaultRunner;
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
-          runtimeConfig,
+          runtimeEnv,
           hostRuntime,
         } as any;
         const blueprint = agent.getCurrentBlueprint();

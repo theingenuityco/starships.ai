@@ -37,7 +37,7 @@ export class Workflow extends BaseNode<WorkflowParams> {
       const engineConfig: EngineConfig = {
         eventCallback: this.options?.eventCallback,
         failOnNodeError: true,
-        runtimeConfig: this.getOptions()?.runtimeConfig,
+        runtimeEnv: this.getOptions()?.runtimeEnv,
         hostRuntime: this.getOptions()?.hostRuntime,
       };
       const depth = execution.depth ?? 0;

@@ -171,7 +171,7 @@ describe('Tool.execute return value - list-tools', () => {
 
     const options: NodeHandlerOptions = {
       eventCallback: jest.fn(),
-      runtimeConfig: {
+      runtimeEnv: {
         STARSHIP_ID: 'test-starship-123',
       },
       hostRuntime,

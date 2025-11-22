@@ -61,10 +61,10 @@ export class Eval {
   private static readonly TEMPLATE_REGEX = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
   /**
-   * @param runtimeConfig Non-secret configuration values injected by the host.
-   *                      Secrets MUST NOT be passed here.
+   * @param runtimeEnv Non-secret environment values injected by the host.
+   *                   Secrets MUST NOT be passed here.
    */
-  constructor(private readonly runtimeConfig?: Record<string, unknown>) {}
+  constructor(private readonly runtimeEnv?: Record<string, unknown>) {}
 
   /**
    * Normalize/sanitize an extracted JS expression before compiling.
@@ -89,7 +89,7 @@ export class Eval {
    * Build evaluation context from execution state
    */
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
-    const cfg = { ...(this.runtimeConfig ?? {}) };
+    const cfg = { ...(this.runtimeEnv ?? {}) };
 
     const context = {
       state: execution.state,

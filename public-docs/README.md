@@ -50,7 +50,7 @@ Tips for agents (DSL-only)
 Tips for SDK/Engine users
 
 - You can paste the Blueprint (DSL) JSON directly into a TypeScript file as `const blueprint = <that JSON>` and run it with `new Engine().executeBlueprint(...)`.
-- Provide any non-secret configuration via `new Engine({ runtimeConfig })` and subscribe to `eventCallback` if you need streaming/events. LLM/API keys are read from the host environment or managed via server-side connectors, not passed through the blueprint.
+- Provide any non-secret configuration via `new Engine({ runtimeEnv })` and subscribe to `eventCallback` if you need streaming/events. LLM/API keys are read from the host environment or managed via server-side connectors, not passed through the blueprint.
 
 Examples
 

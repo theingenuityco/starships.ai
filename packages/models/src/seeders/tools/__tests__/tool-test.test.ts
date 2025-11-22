@@ -77,7 +77,7 @@ describe('Tool Test Tool', () => {
     async function executeToolWithMockConfig(input: unknown, hostRuntime: HostRuntime) {
       const options: NodeHandlerOptions = {
         eventCallback: jest.fn(),
-        runtimeConfig: {},
+        runtimeEnv: {},
         hostRuntime,
         execution: ExecutionItemUtils.createExecution(),
       };
@@ -234,7 +234,7 @@ describe('Tool.execute return value - test-tool', () => {
     const args = { x: 1, y: { deep: true } };
     const options: NodeHandlerOptions = {
       eventCallback: jest.fn(),
-      runtimeConfig: {},
+      runtimeEnv: {},
       hostRuntime,
       execution: ExecutionItemUtils.createExecution(),
     };

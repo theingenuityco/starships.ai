@@ -34,11 +34,11 @@ export interface EngineConfig {
   failOnNodeError?: boolean;
   runner?: Runner;
   /**
-   * Non-secret runtime configuration values that may be safely exposed to
+   * Non-secret runtime environment values that may be safely exposed to
    * templates and user-authored code (Code/Mutate). Secrets MUST NOT be
    * placed here.
    */
-  runtimeConfig?: Record<string, unknown>;
+  runtimeEnv?: Record<string, unknown>;
   hostRuntime?: HostRuntime;
 }
 
@@ -46,15 +46,15 @@ export class Engine {
   private eventCallback?: EventCallback;
   private eval: Eval;
   private failOnNodeError: boolean;
-  private runtimeConfig?: Record<string, unknown>;
+  private runtimeEnv?: Record<string, unknown>;
   private hostRuntime?: HostRuntime;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
-    this.runtimeConfig = config.runtimeConfig;
+    this.runtimeEnv = config.runtimeEnv;
     this.hostRuntime = config.hostRuntime;
-    this.eval = new Eval(this.runtimeConfig);
+    this.eval = new Eval(this.runtimeEnv);
   }
 
   async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
@@ -67,7 +67,7 @@ export class Engine {
     const handlerOptions = {
       eventCallback: this.eventCallback,
       execution: execution,
-      runtimeConfig: this.runtimeConfig,
+      runtimeEnv: this.runtimeEnv,
       hostRuntime: this.hostRuntime,
     } as NodeHandlerOptions;
 

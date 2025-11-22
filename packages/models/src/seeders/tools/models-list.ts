@@ -62,7 +62,7 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const raw = ctx.$input;
+              const raw = ctx.input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
               const isObject = payload && typeof payload === 'object';
@@ -86,7 +86,7 @@ Behavior and limits:
         name: 'End',
         description: 'Return model list',
         parameters: {
-          output: '{{ $lastOutputOf("process")[0].json }}',
+          output: '{{ lastOutputOf("process") }}',
         },
       },
     ],

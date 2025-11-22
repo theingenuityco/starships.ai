@@ -53,13 +53,14 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const hasName = ctx.$input && typeof ctx.$input.name === 'string' && ctx.$input.name.trim().length > 0;
-              const hasSlug = ctx.$input && typeof ctx.$input.slug === 'string' && ctx.$input.slug.trim().length > 0;
+              const input = ctx.input || {};
+              const hasName = typeof input.name === 'string' && input.name.trim().length > 0;
+              const hasSlug = typeof input.slug === 'string' && input.slug.trim().length > 0;
 
               if (hasName) {
                 // Create tool (active by default)
-                const name = ctx.$input.name.trim();
-                const description = (ctx.$input && typeof ctx.$input.description === 'string' ? ctx.$input.description.trim() : '');
+                const name = input.name.trim();
+                const description = (input && typeof input.description === 'string' ? input.description.trim() : '');
                 if (!description) throw new Error('description is required when creating a new tool');
                 const body = {
                   name,
@@ -77,7 +78,7 @@ Automatically inferred from agent state (do not pass manually):
               if (!hasSlug) throw new Error('slug is required to open an existing tool');
               return {
                 mode: 'open',
-                slug: ctx.$input.slug,
+                slug: input.slug,
                 timeout: 5000
               };
             }
@@ -91,11 +92,11 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute',
         description: 'Create or fetch tool',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" + ($lastOutputOf("prepare")[0].json.mode === "create" ? "" : "/" + $lastOutputOf("prepare")[0].json.slug) }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? "POST" : "GET" }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.mode === "create" ? $lastOutputOf("prepare")[0].json.body : undefined }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" + ((lastOutputOf("prepare") || {}).mode === "create" ? "" : "/" + (lastOutputOf("prepare") || {}).slug) }}',
+          method: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "POST" : "GET" }}',
+          body: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? (lastOutputOf("prepare") || {}).body : undefined }}',
           connector: 'starships',
-          timeout: '{{ $lastOutputOf("prepare")[0].json.timeout }}',
+          timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
       },
       {
@@ -104,7 +105,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return tool model (created or fetched)',
         parameters: {
-          output: '{{ $lastOutputOf("http_exec")[0].json }}',
+          output: '{{ lastOutputOf("http_exec") }}',
         },
       },
     ],

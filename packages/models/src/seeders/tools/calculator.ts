@@ -31,7 +31,8 @@ export const calculatorTool: ToolParams = {
           code: `
             async function main(ctx) {
               // Safe mathematical expression evaluation with + - * / and parentheses
-              const expression = ctx.$input.expression;
+              const input = ctx.input || {};
+              const expression = input.expression;
               if (!expression || typeof expression !== 'string') {
                 throw new Error('Expression is required and must be a string');
               }
@@ -166,7 +167,7 @@ export const calculatorTool: ToolParams = {
           timeout: 5000,
         },
       },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ $input() }}' } },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ input }}' } },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'calc_1' },

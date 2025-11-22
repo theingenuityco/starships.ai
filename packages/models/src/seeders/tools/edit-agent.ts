@@ -95,7 +95,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const input = ctx.$input || {};
+              const input = ctx.input || {};
               if (!input.slug) {
                 throw new Error('slug is required');
               }
@@ -134,7 +134,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Fetch Agent by Slug',
         description: 'GET /starships/:starshipId/agents/:slug to resolve agent ID',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
           method: 'GET',
           connector: 'starships',
           timeout: 5000,
@@ -148,14 +148,14 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_agent')[0]?.json ?? {};
+              const fetchResponse = ctx.lastOutputOf('fetch_agent') || {};
               const agentData = fetchResponse.body?.data || fetchResponse.body;
 
               if (!agentData || !agentData.id) {
                 throw new Error('Failed to resolve agent by slug');
               }
 
-              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const prep = ctx.lastOutputOf('prepare') || {};
 
               return {
                 agentId: String(agentData.id),
@@ -172,9 +172,9 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Update Agent',
         description: 'PUT /agents/:id with partial updates',
         parameters: {
-          url: '{{ "/agents/" + $lastOutputOf("prepare_update")[0].json.agentId }}',
+          url: '{{ "/agents/" + (lastOutputOf("prepare_update") || {}).agentId }}',
           method: 'PUT',
-          body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
+          body: '{{ (lastOutputOf("prepare_update") || {}).body }}',
           connector: 'starships',
           timeout: 10000,
         },
@@ -185,7 +185,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return updated agent',
         parameters: {
-          output: '{{ $lastOutputOf("http_update")[0].json }}',
+          output: '{{ lastOutputOf("http_update") }}',
         },
       },
     ],

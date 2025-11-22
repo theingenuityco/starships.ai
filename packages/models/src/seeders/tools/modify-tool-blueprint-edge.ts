@@ -68,7 +68,7 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
         parameters: {
           code: `
             async function main(ctx) {
-              const input = ctx.$input || {};
+              const input = ctx.input || {};
               const op = input.op;
 
               if (!input.toolSlug || typeof input.toolSlug !== 'string') {
@@ -129,7 +129,7 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
         name: 'Fetch Current Tool',
         description: 'GET /starships/:starshipId/tools/:toolSlug',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.toolSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).toolSlug }}',
           method: 'GET',
           connector: 'starships',
           timeout: 5000,
@@ -143,14 +143,14 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const fetchResponse = ctx.lastOutputOf('fetch_tool') || {};
               const toolData = fetchResponse.body?.data || fetchResponse.body;
 
               if (!toolData || !toolData.blueprint) {
                 throw new Error('Tool not found or missing blueprint');
               }
 
-              const payload = ctx.$lastOutputOf('prepare')[0].json;
+              const payload = ctx.lastOutputOf('prepare') || {};
               const op = payload.op;
 
               const blueprint = JSON.parse(JSON.stringify(toolData.blueprint || {}));
@@ -346,9 +346,9 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
         name: 'Update Tool with Modified Blueprint',
         description: 'PUT /tools/:id with updated blueprint',
         parameters: {
-          url: '{{ $lastOutputOf("modify_edge")[0].json.toolData?.id ? "/tools/" + $lastOutputOf("modify_edge")[0].json.toolData.id : "" }}',
+          url: '{{ (lastOutputOf("modify_edge") || {}).toolData?.id ? "/tools/" + (lastOutputOf("modify_edge") || {}).toolData.id : "" }}',
           method: 'PUT',
-          body: '{{ (() => { const result = $lastOutputOf("modify_edge")[0].json; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}',
+          body: '{{ (() => { const result = lastOutputOf("modify_edge") || {}; return result.success ? { blueprint: result.updatedBlueprint } : {}; })() }}',
           connector: 'starships',
           timeout: 10000,
         },
@@ -359,7 +359,7 @@ Returns the updated tool (with modified blueprint) or validation errors if the o
         name: 'End',
         description: 'Return updated tool or validation errors',
         parameters: {
-          output: '{{ $lastOutputOf("update_tool")[0].json }}',
+          output: '{{ lastOutputOf("update_tool") }}',
         },
       },
     ],

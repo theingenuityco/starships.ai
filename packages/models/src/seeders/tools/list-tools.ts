@@ -59,7 +59,7 @@ Behavior and limits:
             async function main(ctx) {
               // Expect the HTTP node to return a response object with { status, headers, body, url }.
               // The body may be a bare array of tools or an object with a data array property.
-              const raw = ctx.$input;
+              const raw = ctx.input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
 
@@ -86,7 +86,7 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("summarize")[0].json }}',
+          output: '{{ lastOutputOf("summarize") }}',
         },
       },
     ],

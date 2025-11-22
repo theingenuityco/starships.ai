@@ -39,7 +39,7 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const input = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input : {};
+              const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
               const q = typeof input.q === 'string' ? input.q : '';
               const limit = typeof input.limit === 'number' ? input.limit : undefined;
               return { q, limit };
@@ -57,7 +57,7 @@ Behavior and limits:
           method: 'GET',
           // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
           // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
-          url: '{{ (() => { const input = $lastOutputOf("prepare")[0].json || {}; const q = input.q || ""; const limit = input.limit == null ? "" : String(input.limit); const enc = encodeURIComponent; return "/docs?q=" + enc(q) + "&limit=" + enc(limit); })() }}',
+          url: '{{ (() => { const input = lastOutputOf("prepare") || {}; const q = input.q || ""; const limit = input.limit == null ? "" : String(input.limit); const enc = encodeURIComponent; return "/docs?q=" + enc(q) + "&limit=" + enc(limit); })() }}',
           connector: 'starships',
           timeout: 5000,
         },
@@ -70,7 +70,7 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const raw = ctx.$input;
+              const raw = ctx.input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
               if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
@@ -88,7 +88,7 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("extract")[0].json }}',
+          output: '{{ lastOutputOf("extract") }}',
         },
       },
     ],

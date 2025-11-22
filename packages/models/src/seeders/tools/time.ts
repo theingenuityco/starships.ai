@@ -37,8 +37,9 @@ export const timeTool: ToolParams = {
           code: `
             async function main(ctx) {
               const now = new Date();
-              const timezone = (ctx.$input && ctx.$input.timezone) || 'UTC';
-              const format = (ctx.$input && ctx.$input.format) || 'ISO';
+              const input = ctx.input || {};
+              const timezone = input.timezone || 'UTC';
+              const format = input.format || 'ISO';
               
               let result;
               
@@ -82,7 +83,7 @@ export const timeTool: ToolParams = {
           timeout: 3000,
         },
       },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ $input() }}' } },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ input }}' } },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'time_1' },

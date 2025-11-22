@@ -38,7 +38,7 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const input = ctx.$input && typeof ctx.$input === 'object' ? ctx.$input : {};
+              const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
               const slug = input.slug;
               if (!slug || typeof slug !== 'string') {
                 throw new Error('slug is required and must be a string');
@@ -57,7 +57,7 @@ Behavior and limits:
         parameters: {
           method: 'GET',
           // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1 and inject auth.
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}',
           connector: 'starships',
           timeout: 5000,
         },
@@ -70,7 +70,7 @@ Behavior and limits:
         parameters: {
           code: `
             async function main(ctx) {
-              const raw = ctx.$input;
+              const raw = ctx.input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
               if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
@@ -88,7 +88,7 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("extract")[0].json }}',
+          output: '{{ lastOutputOf("extract") }}',
         },
       },
     ],

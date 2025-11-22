@@ -73,23 +73,24 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const slug = ctx.$input && ctx.$input.slug;
+              const input = ctx.input || {};
+              const slug = input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
-              if (ctx.$input.input === undefined) {
+              if (input.input === undefined) {
                 throw new Error('input is required for testing');
               }
 
               // Normalize input to messages array format if needed
-              let testInput = ctx.$input.input;
+              let testInput = input.input;
               if (typeof testInput === 'string') {
                 testInput = [{ role: 'user', content: testInput }];
               }
 
-            return {
-              slug,
-              input: testInput
-            };
+              return {
+                slug,
+                input: testInput
+              };
             }
           `,
           timeout: 3000,
@@ -101,9 +102,9 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute Agent Test',
         description: 'POST /starships/:starshipId/agents/:slug/test',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + $lastOutputOf("prepare")[0].json.slug + "/test" }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug + "/test" }}',
           method: 'POST',
-          body: { input: '{{ $lastOutputOf("prepare")[0].json.input }}' },
+          body: { input: '{{ (lastOutputOf("prepare") || {}).input }}' },
           connector: 'starships',
           timeout: 60000,
         },
@@ -116,7 +117,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const http = ctx.$input;
+              const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               const data = (body && typeof body === 'object' && body.data) ? body.data : body;
 
@@ -143,7 +144,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return test result',
         parameters: {
-          output: '{{ $lastOutputOf("format_result")[0].json }}',
+          output: '{{ lastOutputOf("format_result") }}',
         },
       },
     ],

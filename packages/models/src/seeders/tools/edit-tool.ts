@@ -68,7 +68,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const input = ctx.$input || {};
+              const input = ctx.input || {};
               if (!input.slug) {
                 throw new Error('slug is required');
               }
@@ -103,7 +103,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Fetch Tool by Slug',
         description: 'GET /starships/:starshipId/tools/:slug to resolve tool ID',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}',
           method: 'GET',
           connector: 'starships',
           timeout: 5000,
@@ -117,14 +117,14 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const fetchResponse = ctx.lastOutputOf('fetch_tool') || {};
               const toolData = fetchResponse.body?.data || fetchResponse.body;
 
               if (!toolData || !toolData.id) {
                 throw new Error('Failed to resolve tool by slug');
               }
 
-              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const prep = ctx.lastOutputOf('prepare') || {};
 
               return {
                 toolId: String(toolData.id),
@@ -141,9 +141,9 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Update Tool',
         description: 'PUT /tools/:id with partial updates',
         parameters: {
-          url: '{{ "/tools/" + $lastOutputOf("prepare_update")[0].json.toolId }}',
+          url: '{{ "/tools/" + (lastOutputOf("prepare_update") || {}).toolId }}',
           method: 'PUT',
-          body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
+          body: '{{ (lastOutputOf("prepare_update") || {}).body }}',
           connector: 'starships',
           timeout: 10000,
         },
@@ -154,7 +154,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return updated tool',
         parameters: {
-          output: '{{ $lastOutputOf("http_update")[0].json }}',
+          output: '{{ lastOutputOf("http_update") }}',
         },
       },
     ],

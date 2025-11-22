@@ -108,7 +108,7 @@ describe('Tool Test Tool', () => {
             description: '',
             parameters: {
               // Return the args passed to the nested workflow
-              output: '{{ $lastOutputOf("__initial__")[0].json }}',
+              output: '{{ lastOutputOf("__initial__") }}',
             },
           },
         ],
@@ -220,7 +220,7 @@ describe('Tool.execute return value - test-tool', () => {
           name: 'End',
           description: '',
           parameters: {
-            output: '{{ $lastOutputOf("__initial__")[0].json }}',
+            output: '{{ lastOutputOf("__initial__") }}',
           },
         },
       ],

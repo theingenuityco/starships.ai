@@ -456,8 +456,8 @@ export async function migrateBlueprintTools(targetStarshipIds?: string[]): Promi
     logger.info(`    - modify-tool-blueprint-edge deployed: ${totalStats.modifyEdgeDeployed}`);
     logger.info(`    - modify-tool-blueprint-node assigned to Daedalus: ${totalStats.modifyNodeAssigned}`);
     logger.info(`    - modify-tool-blueprint-edge assigned to Daedalus: ${totalStats.modifyEdgeAssigned}`);
-      logger.info(`    - list-connectors deployed: ${totalStats.connectorsListDeployed}`);
-      logger.info(`    - list-connectors assigned to Daedalus: ${totalStats.connectorsListAssigned}`);
+    logger.info(`    - list-connectors deployed: ${totalStats.connectorsListDeployed}`);
+    logger.info(`    - list-connectors assigned to Daedalus: ${totalStats.connectorsListAssigned}`);
     logger.info(`    - Errors: ${totalStats.deploymentErrors}`);
     logger.info('═══════════════════════════════════════════════════════════');
 

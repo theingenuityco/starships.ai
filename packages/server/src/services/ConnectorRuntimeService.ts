@@ -7,6 +7,7 @@ import type { EnvironmentService } from '@/services/EnvironmentService';
 const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com/v2';
 const DISCORD_API_BASE_URL = 'https://discord.com/api';
 const GOOGLE_DRIVE_API_BASE_URL = 'https://www.googleapis.com';
+const GITHUB_API_BASE_URL = 'https://api.github.com';
 
 /**
  * ConnectorRuntimeService
@@ -59,6 +60,9 @@ export class ConnectorRuntimeService {
           } else if (connector === 'google_drive') {
             // Google Drive REST API base (e.g. /drive/v3/files)
             baseUrl = GOOGLE_DRIVE_API_BASE_URL;
+          } else if (connector === 'github') {
+            // GitHub REST API base
+            baseUrl = GITHUB_API_BASE_URL;
           } else {
             // Default: Starships API (tools, docs, etc.)
             baseUrl = starshipsBaseUrl;
@@ -161,6 +165,39 @@ export class ConnectorRuntimeService {
             });
             throw new Error(
               `HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> Google Drive connector error: ${reason}`,
+            );
+          }
+        } else if (connector === 'github') {
+          // Use managed GitHub connector secret from encrypted environments
+          try {
+            const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
+            const rawToken = decryptedEnv['GITHUB_ACCESS_TOKEN'];
+            const accessToken = typeof rawToken === 'string' ? rawToken.trim() : '';
+
+            if (accessToken) {
+              const lowered: Record<string, unknown> = {};
+              Object.entries(headers).forEach(([k, v]) => {
+                lowered[k.toLowerCase()] = v;
+              });
+
+              // Only inject if caller hasn't explicitly set an Authorization header
+              if (!lowered['authorization']) {
+                headers = {
+                  ...headers,
+                  Authorization: `Bearer ${accessToken}`,
+                };
+              }
+            }
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : 'Unknown GitHub connector error';
+            console.error('[ConnectorRuntimeService] GitHub connector error', {
+              method,
+              url: finalUrl,
+              starshipId: starship.id,
+              error: reason,
+            });
+            throw new Error(
+              `HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> GitHub connector error: ${reason}`,
             );
           }
         }

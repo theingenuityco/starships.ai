@@ -11,4 +11,5 @@ export const CONNECTOR_LOGOS: Partial<Record<ConnectorProvider, string>> = {
   linkedin: '/connectors/linkedin.svg',
   discord: '/connectors/discord.svg',
   google_drive: '/connectors/google-drive.svg',
+  github: '/connectors/github.svg',
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth, useStartGoogleDriveOAuth } from '@/hooks/useConnectors'
+import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth, useStartGoogleDriveOAuth, useStartGitHubOAuth } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,13 +22,14 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
   const discordMutation = useStartDiscordOAuth(starshipId)
   const googleDriveMutation = useStartGoogleDriveOAuth(starshipId)
+  const githubMutation = useStartGitHubOAuth(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | null>(null)
+  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | 'github' | null>(null)
 
-  const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive') => connectors.find(connector => connector.provider === provider)
+  const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive' | 'github') => connectors.find(connector => connector.provider === provider)
 
-  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive') => {
+  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive' | 'github') => {
     setPendingDisconnect(provider)
   }
 
@@ -59,6 +60,13 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     }
   }
 
+  const handleGitHubConnect = async () => {
+    const result = await githubMutation.mutateAsync()
+    if (result) {
+      window.location.href = result
+    }
+  }
+
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const matchesQuery = useMemo(
@@ -75,14 +83,15 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     )
   }
 
-  type ConnectorProviderId = 'linkedin' | 'discord' | 'google_drive'
+  type ConnectorProviderId = 'linkedin' | 'discord' | 'google_drive' | 'github'
 
-  const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord', 'google_drive']
+  const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord', 'google_drive', 'github']
 
   const CONNECTOR_LABELS: Record<ConnectorProviderId, string> = {
     linkedin: 'LinkedIn',
     discord: 'Discord',
     google_drive: 'Google Drive',
+    github: 'GitHub',
   }
 
   const hasAnyVisibleConnector = PROVIDERS.some(provider => {
@@ -98,6 +107,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         return handleDiscordConnect()
       case 'google_drive':
         return handleGoogleDriveConnect()
+      case 'github':
+        return handleGitHubConnect()
     }
   }
 
@@ -142,7 +153,15 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               variant={isConnected ? 'primaryOutline' : 'default'}
               className="min-w-[140px]"
               onClick={() => handleConnect(provider)}
-              disabled={provider === 'linkedin' ? linkedinMutation.isPending : provider === 'discord' ? discordMutation.isPending : googleDriveMutation.isPending}
+              disabled={
+                provider === 'linkedin'
+                  ? linkedinMutation.isPending
+                  : provider === 'discord'
+                    ? discordMutation.isPending
+                    : provider === 'google_drive'
+                      ? googleDriveMutation.isPending
+                      : githubMutation.isPending
+              }
             >
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
               {isConnected ? 'Reconnect' : `Connect ${label}`}
@@ -197,7 +216,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             <DialogDescription>
               {pendingDisconnect
                 ? `If you disconnect ${
-                    pendingDisconnect === 'google_drive' ? 'Google Drive' : pendingDisconnect === 'linkedin' ? 'LinkedIn' : 'Discord'
+                    pendingDisconnect === 'google_drive' ? 'Google Drive' : pendingDisconnect === 'linkedin' ? 'LinkedIn' : pendingDisconnect === 'discord' ? 'Discord' : 'GitHub'
                   }, any tools that rely on this connector will stop working until you reconnect.`
                 : null}
             </DialogDescription>

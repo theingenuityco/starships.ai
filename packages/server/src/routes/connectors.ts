@@ -27,7 +27,7 @@ const ApiKeyConnectSchema = z.object({
 
 const ProviderParamSchema = z.object({
   id: IdSchema,
-  provider: z.enum(['linkedin', 'discord', 'google_drive']),
+  provider: z.enum(['linkedin', 'discord', 'google_drive', 'github']),
 });
 
 // GET /connectors/catalog - Static connector catalog
@@ -152,7 +152,7 @@ router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware,
   }
 });
 
-// POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (LinkedIn, Discord, Google Drive)
+// POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (LinkedIn, Discord, Google Drive, GitHub)
 router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
@@ -183,6 +183,8 @@ router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware
       authorizationUrl = await connectorService.startDiscordOAuth(starshipId, userId);
     } else if (provider === 'google_drive') {
       authorizationUrl = await connectorService.startGoogleDriveOAuth(starshipId, userId);
+    } else if (provider === 'github') {
+      authorizationUrl = await connectorService.startGitHubOAuth(starshipId, userId);
     } else {
       sendError(res, 'OPERATION_NOT_ALLOWED', 'OAuth start is not supported for this provider', 400, {
         provider,
@@ -206,10 +208,15 @@ const OAuthCallbackSchema = z.object({
   error: z.string().optional(),
 });
 
-// GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn, Discord, Google Drive)
+// GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn, Discord, Google Drive, GitHub)
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
-    const paramsValidation = validateData(z.object({ provider: z.enum(['linkedin', 'discord', 'google_drive']) }), req.params, res, 'connector OAuth provider');
+    const paramsValidation = validateData(
+      z.object({ provider: z.enum(['linkedin', 'discord', 'google_drive', 'github']) }),
+      req.params,
+      res,
+      'connector OAuth provider'
+    );
     if (!paramsValidation) return;
 
     const { provider } = paramsValidation;
@@ -246,6 +253,10 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
       starshipSlug = result.starshipSlug;
     } else if (provider === 'google_drive') {
       const result = await connectorService.completeGoogleDriveOAuth(code, state);
+      starshipId = result.starshipId;
+      starshipSlug = result.starshipSlug;
+    } else if (provider === 'github') {
+      const result = await connectorService.completeGitHubOAuth(code, state);
       starshipId = result.starshipId;
       starshipSlug = result.starshipSlug;
     } else {

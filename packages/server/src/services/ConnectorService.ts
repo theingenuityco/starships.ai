@@ -292,6 +292,135 @@ export class ConnectorService {
   }
 
   /**
+   * Start GitHub OAuth flow for a starship and return the authorization URL.
+   */
+  async startGitHubOAuth(starshipId: string, userId: string): Promise<string> {
+    const env = getEnvConfig();
+    const clientId = env.GH_OAUTH_CLIENT_ID;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/github/oauth/callback`;
+
+    if (!clientId || !redirectUri) {
+      throw new Error('GitHub OAuth is not configured. Please set GH_OAUTH_CLIENT_ID.');
+    }
+
+    const state = await generateOAuthState(true, userId, {
+      starshipId,
+      provider: 'github',
+    });
+
+    // Request repo and basic user scopes so tools can interact with repositories
+    // and read basic profile data as needed.
+    const scope = 'repo read:user user:email';
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope,
+      state,
+    });
+
+    return `https://github.com/login/oauth/authorize?${params.toString()}`;
+  }
+
+  /**
+   * Complete GitHub OAuth flow: validate state, exchange code for token,
+   * store GITHUB_ACCESS_TOKEN env var, and update connector status/metadata.
+   */
+  async completeGitHubOAuth(
+    code: string,
+    stateToken: string
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+    const env = getEnvConfig();
+    const clientId = env.GH_OAUTH_CLIENT_ID;
+    const clientSecret = env.GH_OAUTH_CLIENT_SECRET;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/github/oauth/callback`;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error('GitHub OAuth is not configured. Please set GH_OAUTH_CLIENT_ID and GH_OAUTH_CLIENT_SECRET.');
+    }
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) {
+      throw new Error('Invalid or expired OAuth state');
+    }
+
+    const { userId, context } = stateValidation;
+    if (!userId) {
+      throw new Error('OAuth state missing user information');
+    }
+
+    const starshipId = (context as any)?.starshipId as string | undefined;
+    const provider = (context as any)?.provider as string | undefined;
+
+    if (!starshipId || provider !== 'github') {
+      throw new Error('OAuth state missing starship context');
+    }
+
+    const tokenResponse = await axios.post(
+      'https://github.com/login/oauth/access_token',
+      {
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'starships.ai/1.0',
+        },
+      }
+    );
+
+    const tokenData = tokenResponse.data as any;
+    const accessToken = tokenData?.access_token as string | undefined;
+
+    if (!accessToken) {
+      throw new Error('Failed to obtain GitHub access token');
+    }
+
+    const metadata: Record<string, unknown> = {
+      provider: 'github',
+      scope: tokenData?.scope,
+      tokenType: tokenData?.token_type,
+    };
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'github');
+    const connector =
+      existing ??
+      (await this.connectorRepository.create({
+        starshipId,
+        provider: 'github',
+        status: 'connected',
+        metadata,
+        lastError: undefined,
+      }));
+
+    if (existing) {
+      await this.connectorRepository.update(existing.id, {
+        status: 'connected',
+        metadata: {
+          ...(existing.metadata || {}),
+          ...metadata,
+        },
+        lastError: null,
+      });
+    }
+
+    // Persist env var for this starship and link it to the connector
+    await this.upsertEnvironmentVariable(starshipId, 'GITHUB_ACCESS_TOKEN', accessToken, userId, connector.id);
+
+    const starship = await this.starshipRepository.findById(starshipId);
+
+    return {
+      starshipId,
+      starshipSlug: starship?.slug,
+      userId,
+    };
+  }
+
+  /**
    * List connectors for a starship, enriched with managed env key presence.
    */
   async listStarshipConnectors(starshipId: string): Promise<ConnectorListItem[]> {

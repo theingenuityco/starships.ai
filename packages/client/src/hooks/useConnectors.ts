@@ -49,7 +49,7 @@ export function useDisconnectConnector(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (provider: 'linkedin' | 'discord' | 'google_drive' | 'github'): Promise<void> => {
+    mutationFn: async (provider: 'linkedin' | 'discord' | 'google_drive'): Promise<void> => {
       await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/disconnect`)
     },
     onSuccess: (_, provider) => {
@@ -120,22 +120,3 @@ export function useStartGoogleDriveOAuth(starshipId: string) {
     },
   })
 }
-
-export function useStartGitHubOAuth(starshipId: string) {
-  return useMutation({
-    mutationFn: async (): Promise<string> => {
-      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
-        `/api/v1/starships/${starshipId}/connectors/github/oauth/start`,
-      )
-      return response.data.data.authorizationUrl
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start GitHub connection'
-      toast.error('Failed to connect GitHub', {
-        description: errorMessage,
-      })
-    },
-  })
-}
-
-

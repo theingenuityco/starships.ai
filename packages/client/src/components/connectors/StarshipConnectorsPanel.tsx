@@ -1,7 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth, useStartGoogleDriveOAuth, useStartGitHubOAuth } from '@/hooks/useConnectors'
+import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth, useStartGoogleDriveOAuth } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,14 +22,14 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
   const discordMutation = useStartDiscordOAuth(starshipId)
   const googleDriveMutation = useStartGoogleDriveOAuth(starshipId)
-  const githubMutation = useStartGitHubOAuth(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | 'github' | null>(null)
+  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | null>(null)
 
-  const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive' | 'github') => connectors.find(connector => connector.provider === provider)
+  const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive') =>
+    connectors.find(connector => connector.provider === provider)
 
-  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive' | 'github') => {
+  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive') => {
     setPendingDisconnect(provider)
   }
 
@@ -55,13 +55,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
   const handleGoogleDriveConnect = async () => {
     const result = await googleDriveMutation.mutateAsync()
-    if (result) {
-      window.location.href = result
-    }
-  }
-
-  const handleGitHubConnect = async () => {
-    const result = await githubMutation.mutateAsync()
     if (result) {
       window.location.href = result
     }
@@ -107,8 +100,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         return handleDiscordConnect()
       case 'google_drive':
         return handleGoogleDriveConnect()
-      case 'github':
-        return handleGitHubConnect()
+      default:
+        // GitHub connector is configured at the app level via GitHub App, no per-starship connect flow.
+        return
     }
   }
 
@@ -116,6 +110,38 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const catalogItem = catalog.find(c => c.provider === provider)
     if (!catalogItem || !matchesQuery({ displayName: catalogItem.displayName, description: catalogItem.description })) {
       return null
+    }
+
+    // GitHub connector is GitHub App–backed and treated as globally configured,
+    // so we don't show per-starship connect/disconnect UI for it.
+    if (provider === 'github') {
+      const label = CONNECTOR_LABELS[provider]
+      const logoSrc = CONNECTOR_LOGOS[provider]
+      if (!connectedFirst) return null
+
+      return (
+        <Card key={`${provider}-static`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
+          <CardHeader className="space-y-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-3">
+                {logoSrc && (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
+                    <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
+                  </div>
+                )}
+                <div className="flex h-10 flex-col justify-center">
+                  <span className="text-lg leading-tight">{label}</span>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-slate-600 dark:text-slate-400">Configured via GitHub App</span>
+                  </div>
+                </div>
+              </CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
+          </CardHeader>
+        </Card>
+      )
     }
 
     const state = getConnectorState(provider)
@@ -158,9 +184,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   ? linkedinMutation.isPending
                   : provider === 'discord'
                     ? discordMutation.isPending
-                    : provider === 'google_drive'
-                      ? googleDriveMutation.isPending
-                      : githubMutation.isPending
+                    : googleDriveMutation.isPending
               }
             >
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
@@ -216,7 +240,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             <DialogDescription>
               {pendingDisconnect
                 ? `If you disconnect ${
-                    pendingDisconnect === 'google_drive' ? 'Google Drive' : pendingDisconnect === 'linkedin' ? 'LinkedIn' : pendingDisconnect === 'discord' ? 'Discord' : 'GitHub'
+                    pendingDisconnect === 'google_drive'
+                      ? 'Google Drive'
+                      : pendingDisconnect === 'linkedin'
+                        ? 'LinkedIn'
+                        : 'Discord'
                   }, any tools that rely on this connector will stop working until you reconnect.`
                 : null}
             </DialogDescription>

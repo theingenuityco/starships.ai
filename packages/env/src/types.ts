@@ -44,6 +44,11 @@ export interface EnvironmentConfig {
   GH_OAUTH_CLIENT_ID?: string;
   GH_OAUTH_CLIENT_SECRET?: string;
 
+  // GitHub App Configuration (used for GitHub connector)
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY_BASE64?: string;
+  GITHUB_INSTALLATION_ID?: string;
+
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;
 

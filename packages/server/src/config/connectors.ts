@@ -53,12 +53,12 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
     provider: 'github',
     displayName: 'GitHub',
     description:
-      'Connect a GitHub account to enable tools that read and write repositories, issues, and pull requests via the GitHub API.',
+      'Connect a GitHub App installation to enable tools that read and write repositories, issues, and pull requests via the GitHub API.',
     authType: 'oauth2',
-    // GitHub connector expects an access token managed in the starship environment.
-    // The token is obtained via the GitHub connector OAuth flow and stored as
-    // GITHUB_ACCESS_TOKEN for the starship.
-    requiredEnvKeys: ['GITHUB_ACCESS_TOKEN'],
+    // GitHub connector uses a GitHub App installation token obtained from
+    // platform-level env (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_BASE64, GITHUB_INSTALLATION_ID).
+    // No per-starship env vars are required.
+    requiredEnvKeys: [],
     optionalEnvKeys: [],
     docsSlug: '/public-docs/environment#github-connector',
   },

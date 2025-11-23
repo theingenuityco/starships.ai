@@ -56,8 +56,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const handleLinkedInConnect = async () => {
     const result = await linkedinMutation.mutateAsync()
     if (result) {
-      // Debug: see where we're redirecting for LinkedIn OAuth
-      console.log('[StarshipConnectorsPanel] Redirecting to LinkedIn OAuth URL:', result)
       window.location.href = result
     }
   }
@@ -65,8 +63,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const handleDiscordConnect = async () => {
     const result = await discordMutation.mutateAsync()
     if (result) {
-      // Debug: see where we're redirecting for Discord OAuth
-      console.log('[StarshipConnectorsPanel] Redirecting to Discord OAuth URL:', result)
       window.location.href = result
     }
   }
@@ -74,8 +70,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const handleGoogleDriveConnect = async () => {
     const result = await googleDriveMutation.mutateAsync()
     if (result) {
-      // Debug: see where we're redirecting for Google Drive OAuth
-      console.log('[StarshipConnectorsPanel] Redirecting to Google Drive OAuth URL:', result)
       window.location.href = result
     }
   }

@@ -1,7 +1,15 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartLinkedInOAuth, useStartDiscordOAuth, useStartGoogleDriveOAuth } from '@/hooks/useConnectors'
+import {
+  useConfigureGitHubConnector,
+  useConnectorCatalog,
+  useDisconnectConnector,
+  useStarshipConnectors,
+  useStartDiscordOAuth,
+  useStartGoogleDriveOAuth,
+  useStartLinkedInOAuth,
+} from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,14 +30,20 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
   const discordMutation = useStartDiscordOAuth(starshipId)
   const googleDriveMutation = useStartGoogleDriveOAuth(starshipId)
+  const githubConfigMutation = useConfigureGitHubConnector(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | null>(null)
+  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | 'github' | null>(null)
+  const [githubDialogOpen, setGithubDialogOpen] = useState(false)
+  const [githubInstallationId, setGithubInstallationId] = useState('')
+  const [githubDefaultOwner, setGithubDefaultOwner] = useState('')
+  const [githubDefaultRepo, setGithubDefaultRepo] = useState('')
 
-  const getConnectorState = (provider: 'linkedin' | 'discord' | 'google_drive') =>
-    connectors.find(connector => connector.provider === provider)
+  type ConnectorProviderId = 'linkedin' | 'discord' | 'google_drive' | 'github'
 
-  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive') => {
+  const getConnectorState = (provider: ConnectorProviderId) => connectors.find(connector => connector.provider === provider)
+
+  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive' | 'github') => {
     setPendingDisconnect(provider)
   }
 
@@ -60,6 +74,25 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     }
   }
 
+  const handleGitHubConnect = () => {
+    const state = getConnectorState('github')
+    const metadata = (state?.metadata || {}) as Record<string, any>
+    setGithubInstallationId(metadata.githubInstallationId || '')
+    setGithubDefaultOwner(metadata.defaultOwner || '')
+    setGithubDefaultRepo(metadata.defaultRepo || '')
+    setGithubDialogOpen(true)
+  }
+
+  const handleGitHubSave = async () => {
+    if (!githubInstallationId.trim()) return
+    await githubConfigMutation.mutateAsync({
+      installationId: githubInstallationId.trim(),
+      defaultOwner: githubDefaultOwner.trim() || undefined,
+      defaultRepo: githubDefaultRepo.trim() || undefined,
+    })
+    setGithubDialogOpen(false)
+  }
+
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const matchesQuery = useMemo(
@@ -75,8 +108,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
       </div>
     )
   }
-
-  type ConnectorProviderId = 'linkedin' | 'discord' | 'google_drive' | 'github'
 
   const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord', 'google_drive', 'github']
 
@@ -100,9 +131,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         return handleDiscordConnect()
       case 'google_drive':
         return handleGoogleDriveConnect()
-      default:
-        // GitHub connector is configured at the app level via GitHub App, no per-starship connect flow.
-        return
+      case 'github':
+        return handleGitHubConnect()
     }
   }
 
@@ -110,38 +140,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const catalogItem = catalog.find(c => c.provider === provider)
     if (!catalogItem || !matchesQuery({ displayName: catalogItem.displayName, description: catalogItem.description })) {
       return null
-    }
-
-    // GitHub connector is GitHub App–backed and treated as globally configured,
-    // so we don't show per-starship connect/disconnect UI for it.
-    if (provider === 'github') {
-      const label = CONNECTOR_LABELS[provider]
-      const logoSrc = CONNECTOR_LOGOS[provider]
-      if (!connectedFirst) return null
-
-      return (
-        <Card key={`${provider}-static`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
-          <CardHeader className="space-y-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-3">
-                {logoSrc && (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
-                    <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
-                  </div>
-                )}
-                <div className="flex h-10 flex-col justify-center">
-                  <span className="text-lg leading-tight">{label}</span>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
-                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    <span className="text-slate-600 dark:text-slate-400">Configured via GitHub App</span>
-                  </div>
-                </div>
-              </CardTitle>
-            </div>
-            <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
-          </CardHeader>
-        </Card>
-      )
     }
 
     const state = getConnectorState(provider)
@@ -184,7 +182,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   ? linkedinMutation.isPending
                   : provider === 'discord'
                     ? discordMutation.isPending
-                    : googleDriveMutation.isPending
+                    : provider === 'google_drive'
+                      ? googleDriveMutation.isPending
+                      : githubConfigMutation.isPending
               }
             >
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
@@ -240,11 +240,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             <DialogDescription>
               {pendingDisconnect
                 ? `If you disconnect ${
-                    pendingDisconnect === 'google_drive'
-                      ? 'Google Drive'
-                      : pendingDisconnect === 'linkedin'
-                        ? 'LinkedIn'
-                        : 'Discord'
+                    pendingDisconnect === 'google_drive' ? 'Google Drive' : pendingDisconnect === 'linkedin' ? 'LinkedIn' : pendingDisconnect === 'discord' ? 'Discord' : 'GitHub'
                   }, any tools that rely on this connector will stop working until you reconnect.`
                 : null}
             </DialogDescription>
@@ -255,6 +251,43 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             </Button>
             <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
               Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={githubDialogOpen} onOpenChange={open => !open && setGithubDialogOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitlePrimitive>Configure GitHub connector</DialogTitlePrimitive>
+            <DialogDescription>Link this starship to a GitHub App installation by providing the installation ID and, optionally, a default owner and repository.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="github-installation-id">
+                Installation ID
+              </label>
+              <Input id="github-installation-id" value={githubInstallationId} onChange={e => setGithubInstallationId(e.target.value)} placeholder="e.g. 12345678" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="github-default-owner">
+                Default owner (optional)
+              </label>
+              <Input id="github-default-owner" value={githubDefaultOwner} onChange={e => setGithubDefaultOwner(e.target.value)} placeholder="e.g. your-org" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="github-default-repo">
+                Default repo (optional)
+              </label>
+              <Input id="github-default-repo" value={githubDefaultRepo} onChange={e => setGithubDefaultRepo(e.target.value)} placeholder="e.g. your-repo" />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setGithubDialogOpen(false)} disabled={githubConfigMutation.isPending}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleGitHubSave} disabled={githubConfigMutation.isPending || !githubInstallationId.trim()}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

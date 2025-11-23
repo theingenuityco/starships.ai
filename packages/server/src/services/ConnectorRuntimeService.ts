@@ -2,6 +2,7 @@ import { getEnvConfig } from '@starships/env';
 import type { HostRuntime } from '@starships/autopilot';
 import type { StarshipModel } from '@starships/protocol';
 import type { EnvironmentService } from '@/services/EnvironmentService';
+import { importPKCS8, SignJWT } from 'jose';
 
 // Connector base URLs for relative paths
 const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com/v2';
@@ -168,28 +169,67 @@ export class ConnectorRuntimeService {
             );
           }
         } else if (connector === 'github') {
-          // Use managed GitHub connector secret from encrypted environments
+          // Use GitHub App installation token derived from platform env
           try {
-            const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
-            const rawToken = decryptedEnv['GITHUB_ACCESS_TOKEN'];
-            const accessToken = typeof rawToken === 'string' ? rawToken.trim() : '';
+            const appId = env.GITHUB_APP_ID?.trim();
+            const privateKeyBase64 = env.GITHUB_APP_PRIVATE_KEY_BASE64?.trim();
+            const installationId = env.GITHUB_INSTALLATION_ID?.trim();
 
-            if (accessToken) {
-              const lowered: Record<string, unknown> = {};
-              Object.entries(headers).forEach(([k, v]) => {
-                lowered[k.toLowerCase()] = v;
-              });
+            if (!appId || !privateKeyBase64 || !installationId) {
+              throw new Error(
+                'GitHub App is not configured. Please set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_BASE64, and GITHUB_INSTALLATION_ID.',
+              );
+            }
 
-              // Only inject if caller hasn't explicitly set an Authorization header
-              if (!lowered['authorization']) {
-                headers = {
-                  ...headers,
-                  Authorization: `Bearer ${accessToken}`,
-                };
-              }
+            const privateKeyPem = Buffer.from(privateKeyBase64, 'base64').toString('utf8');
+            const alg = 'RS256';
+            const key = await importPKCS8(privateKeyPem, alg);
+
+            const now = Math.floor(Date.now() / 1000);
+            const jwt = await new SignJWT({})
+              .setProtectedHeader({ alg })
+              .setIssuedAt(now)
+              .setExpirationTime(now + 600) // 10 minutes
+              .setIssuer(appId)
+              .sign(key);
+
+            const tokenResp = await fetch(
+              `https://api.github.com/app/installations/${installationId}/access_tokens`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${jwt}`,
+                  Accept: 'application/vnd.github+json',
+                  'User-Agent': 'starships.ai/1.0',
+                },
+              },
+            );
+
+            if (!tokenResp.ok) {
+              const text = await tokenResp.text();
+              throw new Error(`Failed to get GitHub App installation token: ${tokenResp.status} ${text}`);
+            }
+
+            const tokenJson = (await tokenResp.json()) as { token?: string };
+            const installationToken = tokenJson.token?.trim();
+
+            if (!installationToken) {
+              throw new Error('GitHub App installation token missing in response');
+            }
+
+            const lowered: Record<string, unknown> = {};
+            Object.entries(headers).forEach(([k, v]) => {
+              lowered[k.toLowerCase()] = v;
+            });
+
+            if (!lowered['authorization']) {
+              headers = {
+                ...headers,
+                Authorization: `Bearer ${installationToken}`,
+              };
             }
           } catch (err) {
-            const reason = err instanceof Error ? err.message : 'Unknown GitHub connector error';
+            const reason = err instanceof Error ? err.message : 'Unknown GitHub App connector error';
             console.error('[ConnectorRuntimeService] GitHub connector error', {
               method,
               url: finalUrl,

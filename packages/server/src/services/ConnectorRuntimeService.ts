@@ -3,6 +3,7 @@ import type { HostRuntime } from '@starships/autopilot';
 import type { StarshipModel } from '@starships/protocol';
 import type { EnvironmentService } from '@/services/EnvironmentService';
 import { importPKCS8, SignJWT } from 'jose';
+import { ConnectorRepository } from '@starships/models';
 
 // Connector base URLs for relative paths
 const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com/v2';
@@ -14,12 +15,16 @@ const GITHUB_API_BASE_URL = 'https://api.github.com';
  * ConnectorRuntimeService
  *
  * Central place for building the Autopilot HostRuntime used by tools that
- * call external services via connectors (Starships, LinkedIn, etc).
+ * call external services via connectors (Starships, LinkedIn, GitHub, etc).
  *
  * This keeps connector-aware HTTP/auth behavior out of ConversationService.
  */
 export class ConnectorRuntimeService {
-  constructor(private readonly environmentService: EnvironmentService) {}
+  private readonly connectorRepository: ConnectorRepository;
+
+  constructor(private readonly environmentService: EnvironmentService) {
+    this.connectorRepository = new ConnectorRepository();
+  }
 
   /**
    * Create a HostRuntime for a given starship and optional caller auth header.
@@ -164,21 +169,25 @@ export class ConnectorRuntimeService {
               starshipId: starship.id,
               error: reason,
             });
-            throw new Error(
-              `HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> Google Drive connector error: ${reason}`,
-            );
+            throw new Error(`HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> Google Drive connector error: ${reason}`);
           }
         } else if (connector === 'github') {
-          // Use GitHub App installation token derived from platform env
+          // Use GitHub App installation token derived from platform env +
+          // per-starship GitHub connector metadata (githubInstallationId).
           try {
             const appId = env.GITHUB_APP_ID?.trim();
             const privateKeyBase64 = env.GITHUB_APP_PRIVATE_KEY_BASE64?.trim();
-            const installationId = env.GITHUB_INSTALLATION_ID?.trim();
+            if (!appId || !privateKeyBase64) {
+              throw new Error('GitHub App is not configured. Please set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY_BASE64.');
+            }
 
-            if (!appId || !privateKeyBase64 || !installationId) {
-              throw new Error(
-                'GitHub App is not configured. Please set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_BASE64, and GITHUB_INSTALLATION_ID.',
-              );
+            const githubConnector = await this.connectorRepository.findByStarshipAndProvider(starship.id, 'github');
+            const githubMetadata = (githubConnector?.metadata || {}) as Record<string, unknown>;
+            const installationIdRaw = githubMetadata.githubInstallationId;
+            const installationId = typeof installationIdRaw === 'string' ? installationIdRaw.trim() : undefined;
+
+            if (!installationId) {
+              throw new Error('GitHub connector is not configured for this starship (missing githubInstallationId).');
             }
 
             const privateKeyPem = Buffer.from(privateKeyBase64, 'base64').toString('utf8');
@@ -193,17 +202,14 @@ export class ConnectorRuntimeService {
               .setIssuer(appId)
               .sign(key);
 
-            const tokenResp = await fetch(
-              `https://api.github.com/app/installations/${installationId}/access_tokens`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${jwt}`,
-                  Accept: 'application/vnd.github+json',
-                  'User-Agent': 'starships.ai/1.0',
-                },
+            const tokenResp = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${jwt}`,
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'starships.ai/1.0',
               },
-            );
+            });
 
             if (!tokenResp.ok) {
               const text = await tokenResp.text();
@@ -236,9 +242,7 @@ export class ConnectorRuntimeService {
               starshipId: starship.id,
               error: reason,
             });
-            throw new Error(
-              `HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> GitHub connector error: ${reason}`,
-            );
+            throw new Error(`HTTP request failed: ${method.toUpperCase()} ${finalUrl} -> GitHub connector error: ${reason}`);
           }
         }
 

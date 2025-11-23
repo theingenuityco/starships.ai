@@ -192,19 +192,14 @@ export class ConnectorService {
    * store GOOGLE_DRIVE_ACCESS_TOKEN / GOOGLE_DRIVE_REFRESH_TOKEN env vars,
    * and update connector status/metadata.
    */
-  async completeGoogleDriveOAuth(
-    code: string,
-    stateToken: string
-  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+  async completeGoogleDriveOAuth(code: string, stateToken: string): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const env = getEnvConfig();
     const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
     const clientSecret = env.GOOGLE_DRIVE_CLIENT_SECRET;
     const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/google_drive/oauth/callback`;
 
     if (!clientId || !clientSecret) {
-      throw new Error(
-        'Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET.'
-      );
+      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -332,9 +327,7 @@ export class ConnectorService {
       // For Starships, treat the connector as always available for the current
       // starship; it reuses the platform's JWT + SERVER_URL and does not
       // require additional managed env vars.
-      // For GitHub, the connector is backed by a GitHub App installation at
-      // the platform level; no per-starship connection is required.
-      const status = entry.provider === 'starships' || entry.provider === 'github' ? 'connected' : 'disconnected';
+      const status = entry.provider === 'starships' ? 'connected' : 'disconnected';
 
       return {
         id: `${starshipId}:${entry.provider}`,
@@ -348,6 +341,52 @@ export class ConnectorService {
         managedEnvKeys,
       };
     });
+  }
+
+  /**
+   * Configure GitHub connector for a starship using a GitHub App installation.
+   * Stores non-secret configuration (installationId, defaults) in connector metadata.
+   */
+  async configureGitHubConnector(
+    starshipId: string,
+    userId: string,
+    payload: { installationId: string; defaultOwner?: string; defaultRepo?: string }
+  ) {
+    const baseMetadata: Record<string, unknown> = {
+      provider: 'github',
+      githubInstallationId: payload.installationId,
+      ...(payload.defaultOwner ? { defaultOwner: payload.defaultOwner } : {}),
+      ...(payload.defaultRepo ? { defaultRepo: payload.defaultRepo } : {}),
+    };
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'github');
+
+    if (!existing) {
+      await this.connectorRepository.create({
+        starshipId,
+        provider: 'github',
+        status: 'connected',
+        metadata: baseMetadata,
+        lastError: undefined,
+      });
+    } else {
+      await this.connectorRepository.update(existing.id, {
+        status: 'connected',
+        metadata: {
+          ...(existing.metadata || {}),
+          ...baseMetadata,
+        },
+        lastError: null,
+      });
+    }
+
+    // No env entries are managed for GitHub App; all auth is via app-level env.
+    const starship = await this.starshipRepository.findById(starshipId);
+    return {
+      starshipId,
+      starshipSlug: starship?.slug,
+      userId,
+    };
   }
 
   /**
@@ -519,9 +558,20 @@ export class ConnectorService {
       return false;
     }
 
+    let newMetadata = existing.metadata || {};
+
+    // For GitHub, also clear per-starship GitHub App configuration stored in metadata.
+    if (provider === 'github') {
+      const current = (newMetadata || {}) as Record<string, unknown>;
+      delete current.githubInstallationId;
+      delete current.defaultOwner;
+      delete current.defaultRepo;
+      newMetadata = current;
+    }
+
     await this.connectorRepository.update(existing.id, {
       status: 'disconnected',
-      metadata: existing.metadata || {},
+      metadata: newMetadata,
       lastError: null,
     });
 

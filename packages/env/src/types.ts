@@ -47,7 +47,6 @@ export interface EnvironmentConfig {
   // GitHub App Configuration (used for GitHub connector)
   GITHUB_APP_ID?: string;
   GITHUB_APP_PRIVATE_KEY_BASE64?: string;
-  GITHUB_INSTALLATION_ID?: string;
 
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;

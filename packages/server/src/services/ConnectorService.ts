@@ -35,10 +35,10 @@ export class ConnectorService {
   async startLinkedInOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
     const clientId = env.LINKEDIN_CLIENT_ID;
-    const redirectUri = env.LINKEDIN_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/linkedin/oauth/callback`;
 
-    if (!clientId || !redirectUri) {
-      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_REDIRECT_URL.');
+    if (!clientId) {
+      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID.');
     }
 
     const state = await generateOAuthState(true, userId, {
@@ -69,12 +69,10 @@ export class ConnectorService {
     const env = getEnvConfig();
     const clientId = env.LINKEDIN_CLIENT_ID;
     const clientSecret = env.LINKEDIN_CLIENT_SECRET;
-    const redirectUri = env.LINKEDIN_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/linkedin/oauth/callback`;
 
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error(
-        'LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, and LINKEDIN_REDIRECT_URL.'
-      );
+    if (!clientId || !clientSecret) {
+      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -160,10 +158,10 @@ export class ConnectorService {
   async startGoogleDriveOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
     const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
-    const redirectUri = env.GOOGLE_DRIVE_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/google_drive/oauth/callback`;
 
-    if (!clientId || !redirectUri) {
-      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_REDIRECT_URL.');
+    if (!clientId) {
+      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID.');
     }
 
     const state = await generateOAuthState(true, userId, {
@@ -201,11 +199,11 @@ export class ConnectorService {
     const env = getEnvConfig();
     const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
     const clientSecret = env.GOOGLE_DRIVE_CLIENT_SECRET;
-    const redirectUri = env.GOOGLE_DRIVE_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/google_drive/oauth/callback`;
 
-    if (!clientId || !clientSecret || !redirectUri) {
+    if (!clientId || !clientSecret) {
       throw new Error(
-        'Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, and GOOGLE_DRIVE_REDIRECT_URL.'
+        'Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET.'
       );
     }
 
@@ -501,10 +499,10 @@ export class ConnectorService {
   async startDiscordOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
     const clientId = env.DISCORD_CLIENT_ID;
-    const redirectUri = env.DISCORD_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/discord/oauth/callback`;
 
-    if (!clientId || !redirectUri) {
-      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_REDIRECT_URL.');
+    if (!clientId) {
+      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID.');
     }
 
     const state = await generateOAuthState(true, userId, {
@@ -542,10 +540,10 @@ export class ConnectorService {
     const env = getEnvConfig();
     const clientId = env.DISCORD_CLIENT_ID;
     const clientSecret = env.DISCORD_CLIENT_SECRET;
-    const redirectUri = env.DISCORD_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/discord/oauth/callback`;
 
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_REDIRECT_URL.');
+    if (!clientId || !clientSecret) {
+      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);

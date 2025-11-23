@@ -41,7 +41,6 @@ export interface EnvironmentConfig {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_DRIVE_CLIENT_ID?: string;
   GOOGLE_DRIVE_CLIENT_SECRET?: string;
-  GOOGLE_DRIVE_REDIRECT_URL?: string;
   GH_OAUTH_CLIENT_ID?: string;
   GH_OAUTH_CLIENT_SECRET?: string;
 
@@ -69,12 +68,10 @@ export interface EnvironmentConfig {
   // LinkedIn OAuth Configuration (optional)
   LINKEDIN_CLIENT_ID?: string;
   LINKEDIN_CLIENT_SECRET?: string;
-  LINKEDIN_REDIRECT_URL?: string;
 
   // Discord Bot OAuth Configuration (optional)
   DISCORD_CLIENT_ID?: string;
   DISCORD_CLIENT_SECRET?: string;
-  DISCORD_REDIRECT_URL?: string;
   DISCORD_BOT_TOKEN?: string;
 
   // AWS S3 Configuration (File Attachments)

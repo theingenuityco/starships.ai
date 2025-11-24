@@ -35,10 +35,10 @@ export class ConnectorService {
   async startLinkedInOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
     const clientId = env.LINKEDIN_CLIENT_ID;
-    const redirectUri = env.LINKEDIN_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/linkedin/oauth/callback`;
 
-    if (!clientId || !redirectUri) {
-      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_REDIRECT_URL.');
+    if (!clientId) {
+      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID.');
     }
 
     const state = await generateOAuthState(true, userId, {
@@ -69,12 +69,10 @@ export class ConnectorService {
     const env = getEnvConfig();
     const clientId = env.LINKEDIN_CLIENT_ID;
     const clientSecret = env.LINKEDIN_CLIENT_SECRET;
-    const redirectUri = env.LINKEDIN_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/linkedin/oauth/callback`;
 
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error(
-        'LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, and LINKEDIN_REDIRECT_URL.'
-      );
+    if (!clientId || !clientSecret) {
+      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -160,10 +158,10 @@ export class ConnectorService {
   async startGoogleDriveOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
     const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
-    const redirectUri = env.GOOGLE_DRIVE_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/google_drive/oauth/callback`;
 
-    if (!clientId || !redirectUri) {
-      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_REDIRECT_URL.');
+    if (!clientId) {
+      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID.');
     }
 
     const state = await generateOAuthState(true, userId, {
@@ -194,19 +192,14 @@ export class ConnectorService {
    * store GOOGLE_DRIVE_ACCESS_TOKEN / GOOGLE_DRIVE_REFRESH_TOKEN env vars,
    * and update connector status/metadata.
    */
-  async completeGoogleDriveOAuth(
-    code: string,
-    stateToken: string
-  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+  async completeGoogleDriveOAuth(code: string, stateToken: string): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const env = getEnvConfig();
     const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
     const clientSecret = env.GOOGLE_DRIVE_CLIENT_SECRET;
-    const redirectUri = env.GOOGLE_DRIVE_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/google_drive/oauth/callback`;
 
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error(
-        'Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, and GOOGLE_DRIVE_REDIRECT_URL.'
-      );
+    if (!clientId || !clientSecret) {
+      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -291,6 +284,9 @@ export class ConnectorService {
     };
   }
 
+  // NOTE: GitHub connector now uses a GitHub App installation token via
+  // ConnectorRuntimeService. There is no per-starship OAuth flow for GitHub.
+
   /**
    * List connectors for a starship, enriched with managed env key presence.
    */
@@ -348,6 +344,52 @@ export class ConnectorService {
   }
 
   /**
+   * Configure GitHub connector for a starship using a GitHub App installation.
+   * Stores non-secret configuration (installationId, defaults) in connector metadata.
+   */
+  async configureGitHubConnector(
+    starshipId: string,
+    userId: string,
+    payload: { installationId: string; defaultOwner?: string; defaultRepo?: string }
+  ) {
+    const baseMetadata: Record<string, unknown> = {
+      provider: 'github',
+      githubInstallationId: payload.installationId,
+      ...(payload.defaultOwner ? { defaultOwner: payload.defaultOwner } : {}),
+      ...(payload.defaultRepo ? { defaultRepo: payload.defaultRepo } : {}),
+    };
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'github');
+
+    if (!existing) {
+      await this.connectorRepository.create({
+        starshipId,
+        provider: 'github',
+        status: 'connected',
+        metadata: baseMetadata,
+        lastError: undefined,
+      });
+    } else {
+      await this.connectorRepository.update(existing.id, {
+        status: 'connected',
+        metadata: {
+          ...(existing.metadata || {}),
+          ...baseMetadata,
+        },
+        lastError: null,
+      });
+    }
+
+    // No env entries are managed for GitHub App; all auth is via app-level env.
+    const starship = await this.starshipRepository.findById(starshipId);
+    return {
+      starshipId,
+      starshipSlug: starship?.slug,
+      userId,
+    };
+  }
+
+  /**
    * Connect a provider using an API key.
    * Currently no connectors use API keys; this method is kept for
    * future providers that may adopt API-key-based flows.
@@ -372,10 +414,10 @@ export class ConnectorService {
   async startDiscordOAuth(starshipId: string, userId: string): Promise<string> {
     const env = getEnvConfig();
     const clientId = env.DISCORD_CLIENT_ID;
-    const redirectUri = env.DISCORD_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/discord/oauth/callback`;
 
-    if (!clientId || !redirectUri) {
-      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_REDIRECT_URL.');
+    if (!clientId) {
+      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID.');
     }
 
     const state = await generateOAuthState(true, userId, {
@@ -413,10 +455,10 @@ export class ConnectorService {
     const env = getEnvConfig();
     const clientId = env.DISCORD_CLIENT_ID;
     const clientSecret = env.DISCORD_CLIENT_SECRET;
-    const redirectUri = env.DISCORD_REDIRECT_URL;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/discord/oauth/callback`;
 
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and DISCORD_REDIRECT_URL.');
+    if (!clientId || !clientSecret) {
+      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -516,9 +558,20 @@ export class ConnectorService {
       return false;
     }
 
+    let newMetadata = existing.metadata || {};
+
+    // For GitHub, also clear per-starship GitHub App configuration stored in metadata.
+    if (provider === 'github') {
+      const current = (newMetadata || {}) as Record<string, unknown>;
+      delete current.githubInstallationId;
+      delete current.defaultOwner;
+      delete current.defaultRepo;
+      newMetadata = current;
+    }
+
     await this.connectorRepository.update(existing.id, {
       status: 'disconnected',
-      metadata: existing.metadata || {},
+      metadata: newMetadata,
       lastError: null,
     });
 

@@ -50,6 +50,20 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
     docsSlug: '/public-docs/environment#google-drive-connector',
   },
   {
+    provider: 'github',
+    displayName: 'GitHub',
+    description:
+      'Connect a GitHub App installation to enable tools that read and write repositories, issues, and pull requests via the GitHub API.',
+    authType: 'oauth2',
+    // GitHub connector uses a GitHub App installation token obtained from
+    // platform-level env (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_BASE64) plus
+    // a per-starship GitHub connector configuration (githubInstallationId).
+    // No per-starship env vars are required; installationId is stored in connector metadata.
+    requiredEnvKeys: [],
+    optionalEnvKeys: [],
+    docsSlug: '/public-docs/environment#github-connector',
+  },
+  {
     provider: 'starships',
     displayName: 'Starships',
     description:

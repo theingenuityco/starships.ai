@@ -25,6 +25,12 @@ const ApiKeyConnectSchema = z.object({
   extraConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
+const GitHubAppConfigSchema = z.object({
+  installationId: z.string().min(1, 'installationId is required'),
+  defaultOwner: z.string().optional(),
+  defaultRepo: z.string().optional(),
+});
+
 const ProviderParamSchema = z.object({
   id: IdSchema,
   provider: z.enum(['linkedin', 'discord', 'google_drive']),
@@ -113,6 +119,48 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
     handleError(error, res, 'connecting connector via API key');
   }
 });
+
+// POST /starships/:id/connectors/github/app-config - Configure GitHub App connector per starship
+router.post(
+  '/starships/:id/connectors/github/app-config',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const paramsValidation = validateData(
+        z.object({ id: IdSchema }),
+        { id: req.params.id },
+        res,
+        'starship parameter',
+      );
+      if (!paramsValidation) return;
+
+      const { id: starshipId } = paramsValidation;
+
+      if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+      const bodyValidation = validateData(
+        GitHubAppConfigSchema,
+        req.body as unknown,
+        res,
+        'GitHub App connector configuration',
+      );
+      if (!bodyValidation) return;
+
+      const connectorService = new ConnectorService();
+      await connectorService.configureGitHubConnector(starshipId, userId, bodyValidation);
+
+      res.status(204).send();
+    } catch (error) {
+      handleError(error, res, 'configuring GitHub connector');
+    }
+  },
+);
 
 // POST /starships/:id/connectors/:provider/disconnect - Disconnect connector
 router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -209,7 +257,12 @@ const OAuthCallbackSchema = z.object({
 // GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn, Discord, Google Drive)
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
-    const paramsValidation = validateData(z.object({ provider: z.enum(['linkedin', 'discord', 'google_drive']) }), req.params, res, 'connector OAuth provider');
+    const paramsValidation = validateData(
+      z.object({ provider: z.enum(['linkedin', 'discord', 'google_drive']) }),
+      req.params,
+      res,
+      'connector OAuth provider'
+    );
     if (!paramsValidation) return;
 
     const { provider } = paramsValidation;

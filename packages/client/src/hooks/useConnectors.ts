@@ -49,7 +49,7 @@ export function useDisconnectConnector(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (provider: 'linkedin' | 'discord' | 'google_drive'): Promise<void> => {
+    mutationFn: async (provider: 'linkedin' | 'discord' | 'google_drive' | 'github'): Promise<void> => {
       await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/disconnect`)
     },
     onSuccess: (_, provider) => {
@@ -121,4 +121,31 @@ export function useStartGoogleDriveOAuth(starshipId: string) {
   })
 }
 
+export function useConfigureGitHubConnector(starshipId: string) {
+  const queryClient = useQueryClient()
 
+  return useMutation({
+    mutationFn: async (payload: {
+      installationId: string
+      defaultOwner?: string
+      defaultRepo?: string
+    }): Promise<void> => {
+      await api.post(`/api/v1/starships/${starshipId}/connectors/github/app-config`, payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId),
+      })
+      toast.success('GitHub connector configured', {
+        description: 'GitHub App installation has been linked to this starship.',
+      })
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.error || error?.message || 'Failed to configure GitHub connector'
+      toast.error('Failed to configure GitHub', {
+        description: errorMessage,
+      })
+    },
+  })
+}

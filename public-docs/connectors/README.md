@@ -1,6 +1,6 @@
 ## Connectors Reference
 
-Connectors let Starships tools and agents talk to third‑party platforms (like LinkedIn, Discord, and Google Drive) via the `http_request` node, with auth handled by the HostRuntime instead of by your blueprints.
+Connectors let Starships tools and agents talk to third‑party platforms (like LinkedIn, Discord, Google Drive, and GitHub) via the `http_request` node, with auth handled by the HostRuntime instead of by your blueprints.
 
 - **How connectors work**
   - A connector’s OAuth or configuration flow stores secrets in encrypted server-side environments.
@@ -17,6 +17,9 @@ Connectors let Starships tools and agents talk to third‑party platforms (like 
   - **Google Drive**
     - Use `connector: "google_drive"` on `http_request` nodes and relative URLs like `"/drive/v3/files"` or `"/upload/drive/v3/files"`.
     - The runtime normalizes URLs against the Google APIs base (`https://www.googleapis.com`) and injects an appropriate bearer token obtained via the Google Drive connector’s OAuth flow.
+  - **GitHub**
+    - Use `connector: "github"` on `http_request` nodes and relative URLs like `"/repos/{owner}/{repo}/issues"` or `"/repos/{owner}/{repo}/contents/{path}"`.
+    - The runtime normalizes URLs against the GitHub API base (`https://api.github.com`) and injects an installation token obtained via the configured GitHub App.
 
 - **Designing connector‑aware tools**
   - Use `http_request` with `connector` and **relative** URLs; let the runtime handle base URLs and auth.

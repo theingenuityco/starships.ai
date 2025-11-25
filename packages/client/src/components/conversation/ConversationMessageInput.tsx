@@ -166,10 +166,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
-    // Block input from the moment user sends until streaming completes (covers pre-stream gap)
-    const isStreamingEffective = Boolean(isSending || preStreamPending || isResponding)
     // Show stop button during pre-stream window and while streaming/responding
     const [preStreamPending, setPreStreamPending] = useState(false)
+    // Block input from the moment user sends until streaming completes (covers pre-stream gap)
+    const isStreamingEffective = Boolean(isSending || preStreamPending || isResponding)
     const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
     const showLoaderRing = Boolean(isAssistantStreaming || isResponding)
 
@@ -286,11 +286,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
-      if (!messageToSend || sending || disabled || isStreamingEffective) return
+      // CRITICAL: Check if already blocked (synchronous ref check first)
+      if (!messageToSend || sending || disabled || isStreamingEffective || streamingRef.current) return
+
+      // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
+      streamingRef.current = true
+      // Then set state (async, but ref already blocks)
+      setSending(true)
+      setPreStreamPending(true)
+
+      // Helper to reset flags if validation fails
+      const resetFlags = () => {
+        setSending(false)
+        setPreStreamPending(false)
+        streamingRef.current = false
+      }
 
       // Enforce presence of a leading @mention chip in the editor
       const mentionAgentInEditor = getLeadingMentionAgentFromEditor(tiptap as any)
       if (!mentionAgentInEditor) {
+        resetFlags()
         toast.error('Mention required', { description: 'Type @ to mention an agent before sending.' })
         return
       }
@@ -313,6 +328,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       // Validation for agent and starship
       if (!effectiveAgent) {
+        resetFlags()
         toast.error('Select an agent', { description: 'Please select an agent to chat.' })
         return
       }
@@ -320,18 +336,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // contentToSend already validated via messageToSend trim
 
       if (!starshipId) {
+        resetFlags()
         toast.error('No starship selected', { description: 'Please select a ship before chatting.' })
         return
       }
 
       if (!userId) {
+        resetFlags()
         toast.error('Authentication required', { description: 'Please sign in to continue.' })
         return
       }
 
       try {
-        setSending(true)
-        setPreStreamPending(true)
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
         if (!currentConversationId) {
@@ -456,6 +472,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setMessage(messageToSend)
         setSending(false)
         setPreStreamPending(false)
+        streamingRef.current = false
       }
     }, [
       message,
@@ -477,27 +494,42 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Handle suggestion clicks
     const handleSuggestionSubmit = useCallback(
       async (suggestionText: string) => {
-        if (!suggestionText || sending || disabled) return
+        // CRITICAL: Check if already blocked (synchronous ref check first)
+        if (!suggestionText || sending || disabled || isStreamingEffective || streamingRef.current) return
+
+        // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
+        streamingRef.current = true
+        // Then set state (async, but ref already blocks)
+        setSending(true)
+        setPreStreamPending(true)
+
+        // Helper to reset flags if validation fails
+        const resetFlags = () => {
+          setSending(false)
+          setPreStreamPending(false)
+          streamingRef.current = false
+        }
 
         // Validation for agent and starship
         if (!selectedAgent) {
+          resetFlags()
           toast.error('Select an agent', { description: 'Please select an agent to chat.' })
           return
         }
 
         if (!starshipId) {
+          resetFlags()
           toast.error('No starship selected', { description: 'Please select a ship before chatting.' })
           return
         }
 
         if (!userId) {
+          resetFlags()
           toast.error('Authentication required', { description: 'Please sign in to continue.' })
           return
         }
 
         try {
-          setSending(true)
-          setPreStreamPending(true)
           // Create conversation if one doesn't exist
           let currentConversationId = conversationId
           if (!currentConversationId) {
@@ -538,6 +570,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
               setPreStreamPending(false)
+              streamingRef.current = false
             })
             .finally(() => {
               setSending(false)
@@ -548,6 +581,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
           setSending(false)
           setPreStreamPending(false)
+          streamingRef.current = false
         }
       },
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]

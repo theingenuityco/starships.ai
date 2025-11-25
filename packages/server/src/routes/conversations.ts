@@ -252,6 +252,7 @@ router.post(
         z.object({
           content: z.string().min(1, 'content is required'),
           agentId: z.string().optional(),
+          attachmentIds: z.array(z.string()).optional(),
           // baselineLength is no longer used on POST (streaming happens over GET SSE)
           baselineLength: z.coerce.number().int().min(0).optional(),
         }),
@@ -262,7 +263,7 @@ router.post(
       if (!bodyValidation) return;
 
       const { conversationId } = paramValidation;
-      const { content, agentId } = bodyValidation;
+      const { content, agentId, attachmentIds } = bodyValidation;
 
       // Preflight billing gate: block when wallet balance is <= 0
       const conversationService = new ConversationService();
@@ -350,6 +351,7 @@ router.post(
             role: 'user',
             messageType: 'user_input',
             ...(agentId && { agentId }),
+            ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
           },
           { authorization: req.headers.authorization as string | undefined }
         )

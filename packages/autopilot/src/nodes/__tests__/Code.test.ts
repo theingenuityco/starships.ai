@@ -7,7 +7,8 @@ describe('Code Node - module-style main(ctx)', () => {
     const params = {
       code: `
         async function main(ctx) {
-          return { sum: (ctx.$input.a || 0) + (ctx.$input.b || 0) };
+          const input = ctx.input || {};
+          return { sum: (input.a || 0) + (input.b || 0) };
         }
       `,
       timeout: 1000,
@@ -96,7 +97,7 @@ describe('Code Node - module-style main(ctx)', () => {
     expect(validation.valid).toBe(false);
   });
 
-  test('ctx.$lastOutputOf returns prior node items', async () => {
+  test('ctx.lastOutputOf returns prior node output json', async () => {
     const exec = ExecutionItemUtils.createExecution();
     exec.results.push({
       nodeRef: 'prev_node',
@@ -107,8 +108,8 @@ describe('Code Node - module-style main(ctx)', () => {
       {
         code: `
           async function main(ctx) {
-            const items = ctx.$lastOutputOf('prev_node');
-            return { count: Array.isArray(items) ? items.length : -1 };
+            const last = ctx.lastOutputOf('prev_node');
+            return { answer: last && typeof last === 'object' ? last.answer : null };
           }
         `,
         timeout: 1000,
@@ -118,7 +119,7 @@ describe('Code Node - module-style main(ctx)', () => {
 
     const out = await node.execute(ExecutionItemUtils.wrapSingle({}));
     const json = ExecutionItemUtils.unwrapSingle(out) as Record<string, unknown>;
-    expect(json.count).toBe(1);
+    expect(json.answer).toBe(42);
   });
 });
 

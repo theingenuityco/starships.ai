@@ -31,7 +31,7 @@ Template expressions use double curly brace syntax:
 // Function calls
 {
   {
-    $lastOutputOf('http_1');
+    lastOutputOf('http_1');
   }
 }
 
@@ -83,88 +83,84 @@ The evaluation context provides access to runtime execution data:
 
 ## Helper Functions
 
-### `$lastOutputOf(nodeRef)`
+### `input`
 
-Retrieves the latest output from a specific node:
-
-```javascript
-// Get HTTP response data
-{
-  {
-    $lastOutputOf('api_call')[0].json;
-  }
-}
-
-// Get LLM response content
-{
-  {
-    $lastOutputOf('llm_1')[0].json.choices[0].message.content;
-  }
-}
-
-// Check if output exists
-{
-  {
-    $exists($lastOutputOf('optional_node'));
-  }
-}
-```
-
-**Error Handling**: Throws descriptive error if nodeRef not found, including available outputs and troubleshooting guidance.
-
-### `$input(path?)`
-
-Extracts data from input using dot notation:
+Represents the current node input value, already unwrapped:
 
 ```javascript
 // Get entire input
 {
   {
-    $input();
+    input;
   }
 }
 
 // Get specific field
 {
   {
-    $input('user.email');
+    input.user.email;
   }
 }
 
 // Nested access
 {
   {
-    $input('metadata.tags');
+    input.metadata.tags;
   }
 }
 ```
 
-### `env(key)` / `envAll()`
+### `lastOutputOf(nodeRef)`
 
-Secure access to environment variables and secrets:
+Retrieves the latest JSON output from a specific node:
+
+- 0 items → `undefined`
+- 1 item → `item.json`
+- N > 1 items → `item.json[]`
 
 ```javascript
-// Single environment variable
+// Get HTTP response data
 {
   {
-    env('API_KEY');
-  }
-}
-{
-  {
-    env('DATABASE_URL');
+    lastOutputOf('api_call');
   }
 }
 
-// All environment variables
+// Get LLM response content
 {
   {
-    envAll();
+    lastOutputOf('llm_1').choices[0].message.content;
+  }
+}
+
+// Check if output exists
+{
+  {
+    exists(lastOutputOf('optional_node'));
   }
 }
 ```
 
-**Security**: Environment access is sandboxed and controlled by the execution context.
+**Error Handling**: Throws descriptive error if nodeRef not found, including available outputs and troubleshooting guidance.
+
+### `env(key)`
+
+Access host-provided environment values:
+
+- When embedding the Engine yourself (SDK usage), you may choose how to populate `runtimeEnv` and interpret `env(key)`.
+- In the hosted Starships product, **the only env key exposed to workflows is** `env('STARSHIP_ID')`. Custom env keys are not supported and will be undefined.
+
+```javascript
+// Starships host: only STARSHIP_ID is available
+{
+  {
+    env('STARSHIP_ID');
+  }
+}
+```
+
+**Security**: Only non-secret configuration values are exposed via `env()`. Secrets
+must be used exclusively inside host-level callbacks (e.g. LLM or connector drivers).
 
 ## String Evaluation Modes
 
@@ -179,7 +175,7 @@ The engine supports two string evaluation modes:
 ```javascript
 // These will be evaluated:
 '{{ state.counter }}'; // → 42
-"{{ $input('name') }}"; // → "Alice"
+"{{ input.name }}"; // → "Alice"
 
 // These will NOT be evaluated (returned as-is):
 'Hello {{ name }}!'; // → "Hello {{ name }}!"
@@ -194,7 +190,7 @@ The engine supports two string evaluation modes:
 ```javascript
 // All of these will be evaluated:
 '{{ state.counter }}'; // → 42
-"Hello {{ $input('name') }}!"; // → "Hello Alice!"
+"Hello {{ input.name }}!"; // → "Hello Alice!"
 "API: {{ env('URL') }}/data"; // → "API: https://api.example.com/data"
 ```
 
@@ -203,7 +199,7 @@ The engine supports two string evaluation modes:
 - Partial templates in full-only contexts
   - Problem: `"Hello {{ name }}"` does not evaluate when the engine uses full-only mode (most parameter and inline contexts).
   - Fix: Make the entire value a single template that returns the final string:
-    - Correct: `"{{ \`Hello \${$input('name')}\` }}"`
+    - Correct: `"{{ \`Hello \${input.name}\` }}"`
 
 - “Nested eval” attempts
   - Problem: Writing `{{ "{{ state.x }}" }}` expecting double evaluation.
@@ -214,7 +210,7 @@ The engine supports two string evaluation modes:
 - Mixing literals with templates for Transform/Conditional
   - Problem: Using partial templates inside `transform.value`, `transform.from`, or `condition`.
   - Fix: Return the desired value with a single expression:
-    - Example (Transform value): `"{{ $input('user.first') + ' ' + $input('user.last') }}"`
+    - Example (Transform value): `"{{ input.user.first + ' ' + input.user.last }}"`
     - Example (Condition): `"{{ state.retryCount < 3 ? 'retry' : 'stop' }}"`
 
 ## Blueprint-Safe Evaluation
@@ -234,7 +230,7 @@ The engine automatically detects and protects blueprint-like objects to prevent 
     nodes: [
       {
         parameters: {
-          url: "{{ $input('endpoint') }}", // Protected from evaluation
+          url: "{{ input.endpoint }}", // Protected from evaluation
         },
       },
     ];
@@ -247,14 +243,14 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 ### HTTP Requests
 
 ```javascript
-// Dynamic URL construction
+// Dynamic URL construction (host decides base URL; templates see only runtime data)
 {
-  url: "{{ env('BASE_URL') }}/users/{{ $input('userId') }}",
+  url: "/users/{{ input.userId }}",
   headers: {
-    "Authorization": "Bearer {{ env('API_TOKEN') }}",
     "Content-Type": "application/json"
   },
   body: {
+    "starshipId": "{{ env('STARSHIP_ID') }}",
     "timestamp": "{{ $now() }}",
     "requestId": "{{ $random() }}"
   }
@@ -267,13 +263,13 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 // Dynamic system prompts
 {
   role: "system",
-  content: "You are {{ $input('persona') }}. Current context: {{ state.context }}"
+  content: "You are {{ input.persona }}. Current context: {{ state.context }}"
 }
 
 // User messages with data
 {
   role: "user",
-  content: "Analyze this data: {{ JSON.stringify($lastOutputOf('data_fetch')[0].json) }}"
+  content: "Analyze this data: {{ JSON.stringify(lastOutputOf('data_fetch')) }}"
 }
 ```
 
@@ -282,14 +278,14 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 ```javascript
 // Conditional node evaluation
 {
-  condition: "{{ state.retryCount < 3 && $exists($lastOutputOf('api_call')[0].error) }}"
+  condition: "{{ state.retryCount < 3 && exists(lastOutputOf('api_call')?.error) }}"
 }
 
 // Edge conditions
 {
   from: "check_status",
   to: "retry_logic",
-  condition: "{{ $lastOutputOf('check_status')[0].json.status === 'failed' }}"
+  condition: "{{ lastOutputOf('check_status')?.status === 'failed' }}"
 }
 ```
 
@@ -312,7 +308,7 @@ The engine automatically detects and protects blueprint-like objects to prevent 
     {
       operation: 'add',
       path: '/state/lastResponse',
-      value: "{{ $lastOutputOf('api_call')[0].json }}",
+      value: "{{ lastOutputOf('api_call') }}",
     },
   ];
 }
@@ -340,7 +336,7 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 // Null coalescing
 {
   {
-    $input('timeout') ?? 5000;
+    input.timeout ?? 5000;
   }
 }
 ```
@@ -368,7 +364,7 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 }
 {
   {
-    Object.values($lastOutputOf('aggregator')[0].json);
+    Object.values(lastOutputOf('aggregator'));
   }
 }
 ```
@@ -379,7 +375,7 @@ The engine automatically detects and protects blueprint-like objects to prevent 
 // Transform API response
 {
   {
-    $lastOutputOf('api_call')[0].json.users.map((user) => ({
+    (lastOutputOf('api_call')?.users ?? []).map((user) => ({
       id: user.user_id,
       name: `${user.first_name} ${user.last_name}`,
       email: user.email_address,
@@ -464,7 +460,7 @@ const result = eval.validateExpression('{{ state.counter + 1 }}');
 }
 {
   {
-    $input('userId');
+    input.userId;
   }
 }
 
@@ -493,14 +489,14 @@ const result = eval.validateExpression('{{ state.counter + 1 }}');
 // Check existence before access
 {
   {
-    $exists($lastOutputOf('optional_step')) ? $lastOutputOf('optional_step')[0].json : null;
+    exists(lastOutputOf('optional_step')) ? lastOutputOf('optional_step') : null;
   }
 }
 
 // Provide fallbacks
 {
   {
-    $input('timeout') || 30000;
+    input.timeout || 30000;
   }
 }
 ```
@@ -544,7 +540,7 @@ const result = eval.validateExpression('{{ state.counter + 1 }}');
       "ref": "fetch_user",
       "type": "http_request",
       "parameters": {
-        "url": "{{ env('API_BASE') }}/users/{{ $input('userId') }}",
+        "url": "{{ env('API_BASE') }}/users/{{ input.userId }}",
         "headers": {
           "Authorization": "Bearer {{ env('API_TOKEN') }}"
         }
@@ -554,14 +550,14 @@ const result = eval.validateExpression('{{ state.counter + 1 }}');
       "ref": "process_user",
       "type": "code",
       "parameters": {
-        "code": "const user = $lastOutputOf('fetch_user')[0].json; return { ...user, processed: true };"
+        "code": "async function main(ctx) { const user = ctx.lastOutputOf('fetch_user') || {}; return { ...user, processed: true }; }"
       }
     },
     {
       "ref": "conditional_check",
       "type": "conditional",
       "parameters": {
-        "condition": "{{ $lastOutputOf('process_user')[0].json.isActive }}"
+        "condition": "{{ lastOutputOf('process_user')?.isActive }}"
       }
     },
     {
@@ -571,8 +567,8 @@ const result = eval.validateExpression('{{ state.counter + 1 }}');
         "url": "{{ env('NOTIFICATION_SERVICE') }}/send",
         "method": "POST",
         "body": {
-          "userId": "{{ $lastOutputOf('process_user')[0].json.id }}",
-          "message": "Welcome {{ $lastOutputOf('process_user')[0].json.name }}!"
+          "userId": "{{ lastOutputOf('process_user')?.id }}",
+          "message": "Welcome {{ lastOutputOf('process_user')?.name }}!"
         }
       }
     }
@@ -585,7 +581,7 @@ const result = eval.validateExpression('{{ state.counter + 1 }}');
       "ref": "e4",
       "from": "conditional_check",
       "to": "send_notification",
-      "condition": "{{ $lastOutputOf('conditional_check')[0].json.result === true }}"
+      "condition": "{{ lastOutputOf('conditional_check')?.result === true }}"
     }
   ]
 }

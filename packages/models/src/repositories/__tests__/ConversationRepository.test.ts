@@ -28,6 +28,7 @@ describe('ConversationRepository', () => {
   // Helper function to create mock conversations
   const createMockConversation = (overrides: Partial<ConversationModel> = {}): ConversationModel => ({
     id: 'conversation-123',
+    starshipId: 'starship-123',
     title: 'Test Conversation',
     status: 'active',
     createdAt: '2024-01-01T00:00:00.000Z',

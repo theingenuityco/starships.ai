@@ -24,8 +24,6 @@ Apply partial updates to any tool by providing its slug. Supports updating indiv
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- **BASE_URL**: API server endpoint
-- **AUTH_TOKEN**: Authentication token
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response & Behavior
@@ -70,14 +68,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
-              const input = ctx.$input || {};
+              const input = ctx.input || {};
               if (!input.slug) {
                 throw new Error('slug is required');
               }
@@ -98,14 +89,8 @@ Automatically inferred from agent state (do not pass manually):
               }
 
               return {
-                baseUrl,
-                starshipId,
                 slug: input.slug,
                 body,
-                headers: {
-                  'Authorization': 'Bearer ' + authToken,
-                  'Content-Type': 'application/json'
-                }
               };
             }
           `,
@@ -118,9 +103,9 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Fetch Tool by Slug',
         description: 'GET /starships/:starshipId/tools/:slug to resolve tool ID',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/tools/" + $lastOutputOf("prepare")[0].json.slug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -132,19 +117,17 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_tool')[0]?.json ?? {};
+              const fetchResponse = ctx.lastOutputOf('fetch_tool') || {};
               const toolData = fetchResponse.body?.data || fetchResponse.body;
 
               if (!toolData || !toolData.id) {
                 throw new Error('Failed to resolve tool by slug');
               }
 
-              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const prep = ctx.lastOutputOf('prepare') || {};
 
               return {
-                url: prep.baseUrl + '/tools/' + toolData.id,
-                method: 'PUT',
-                headers: prep.headers,
+                toolId: String(toolData.id),
                 body: prep.body
               };
             }
@@ -158,10 +141,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Update Tool',
         description: 'PUT /tools/:id with partial updates',
         parameters: {
-          url: '{{ $lastOutputOf("prepare_update")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare_update")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare_update")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare_update")[0].json.body }}',
+          url: '{{ "/tools/" + (lastOutputOf("prepare_update") || {}).toolId }}',
+          method: 'PUT',
+          body: '{{ (lastOutputOf("prepare_update") || {}).body }}',
+          connector: 'starships',
           timeout: 10000,
         },
       },
@@ -171,7 +154,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return updated tool',
         parameters: {
-          output: '{{ $lastOutputOf("http_update")[0].json }}',
+          output: '{{ lastOutputOf("http_update") }}',
         },
       },
     ],
@@ -196,7 +179,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolEditTool.blueprint,
 
   slug: 'edit-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,

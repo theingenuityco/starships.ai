@@ -44,6 +44,7 @@ interface CreateMessageRequest {
   starshipId?: string
   messageType?: 'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error'
   stream?: boolean
+  attachmentIds?: string[]
 }
 
 // Centralized query keys
@@ -978,6 +979,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
         content: data.content,
         agentId: data.agentId,
+        attachmentIds: data.attachmentIds,
       })
       return response.data
     },

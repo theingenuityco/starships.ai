@@ -24,8 +24,6 @@ Revoke an agent's access to a specific tool by its slug.
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- **BASE_URL**: API server endpoint
-- **AUTH_TOKEN**: Authentication token
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response
@@ -60,25 +58,13 @@ Returns server response.
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
-              if (!ctx.$input.agentSlug) throw new Error('agentSlug is required');
-              if (!ctx.$input.toolSlug) throw new Error('toolSlug is required');
+              const input = ctx.input || {};
+              if (!input.agentSlug) throw new Error('agentSlug is required');
+              if (!input.toolSlug) throw new Error('toolSlug is required');
 
               return {
-                baseUrl,
-                starshipId,
-                agentSlug: ctx.$input.agentSlug,
-                toolSlug: ctx.$input.toolSlug,
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
+                agentSlug: input.agentSlug,
+                toolSlug: input.toolSlug
               };
             }
           `,
@@ -91,9 +77,9 @@ Returns server response.
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.baseUrl + "/starships/" + $lastOutputOf("prepare")[0].json.starshipId + "/agents/" + $lastOutputOf("prepare")[0].json.agentSlug }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).agentSlug }}',
           method: 'GET',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -105,23 +91,19 @@ Returns server response.
         parameters: {
           code: `
             async function main(ctx) {
-              const fetchResponse = ctx.$lastOutputOf('fetch_agent')[0]?.json ?? {};
+              const fetchResponse = ctx.lastOutputOf('fetch_agent') || {};
               const agentData = fetchResponse.body?.data || fetchResponse.body;
 
               if (!agentData || !agentData.id) {
                 throw new Error('Failed to fetch agent');
               }
 
-              const prep = ctx.$lastOutputOf('prepare')[0].json;
+              const prep = ctx.lastOutputOf('prepare') || {};
               const toolSlug = prep.toolSlug;
 
-            const url = new URL(String(prep.baseUrl) + '/agents/' + String(agentData.id) + '/tools/' + String(toolSlug));
-              url.searchParams.set('starshipId', String(prep.starshipId));
-
               return {
-                url: url.toString(),
-                method: 'DELETE',
-                headers: prep.headers,
+                agentId: String(agentData.id),
+                toolSlug: String(toolSlug),
                 timeout: 10000
               };
             }
@@ -135,10 +117,10 @@ Returns server response.
         name: 'Unassign Tool',
         description: 'DELETE /agents/:id/tools/:toolSlug',
         parameters: {
-          url: '{{ $lastOutputOf("update_tools")[0].json.url }}',
-          method: '{{ $lastOutputOf("update_tools")[0].json.method }}',
-          headers: '{{ $lastOutputOf("update_tools")[0].json.headers }}',
-          timeout: '{{ $lastOutputOf("update_tools")[0].json.timeout }}',
+          url: '{{ "/agents/" + (lastOutputOf("update_tools") || {}).agentId + "/tools/" + (lastOutputOf("update_tools") || {}).toolSlug }}',
+          method: 'DELETE',
+          connector: 'starships',
+          timeout: '{{ (lastOutputOf("update_tools") || {}).timeout }}',
         },
       },
       {
@@ -147,7 +129,7 @@ Returns server response.
         name: 'End',
         description: 'Return updated agent',
         parameters: {
-          output: '{{ $lastOutputOf("http_update")[0].json }}',
+          output: '{{ lastOutputOf("http_update") }}',
         },
       },
     ],
@@ -172,7 +154,7 @@ export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   blueprint: agentUnassignToolTool.blueprint,
 
   slug: 'unassign-agent-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
   requiresApiKey: false,

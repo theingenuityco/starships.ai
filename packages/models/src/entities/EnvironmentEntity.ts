@@ -35,6 +35,12 @@ export class EnvironmentEntity implements EnvironmentModel {
   description?: string;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  connectorId?: string;
+
+  @Expose()
   @IsISO8601()
   createdAt!: string;
 
@@ -65,6 +71,7 @@ export class EnvironmentEntity implements EnvironmentModel {
         key: dataRecord.key || '',
         encryptedValue: dataRecord.encryptedValue || '',
         description: dataRecord.description,
+        connectorId: dataRecord.connectorId,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         createdBy: dataRecord.createdBy || '',

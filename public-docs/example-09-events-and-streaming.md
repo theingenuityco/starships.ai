@@ -25,7 +25,7 @@ const blueprint = {
         messages: [{ role: 'user', content: 'Say hello in two short sentences.' }],
       },
     },
-    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' } },
+    { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("llm") }}' } },
   ],
   edges: [
     { ref: 'e1', from: 's', to: 'llm' },
@@ -33,7 +33,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ eventCallback, secureEnv: { OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY! } });
+const engine = new Engine({ eventCallback });
 const exec = ExecutionItemUtils.createExecution();
 await engine.executeBlueprint(blueprint, exec);
 

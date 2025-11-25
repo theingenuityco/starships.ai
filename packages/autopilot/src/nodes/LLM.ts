@@ -10,7 +10,17 @@ import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
-import { LLMMessageRole, LLMResponse, LLMUsage, LlmMessage, LlmToolCall } from '@/types/llm';
+import {
+  Cacheable,
+  CacheableSystemMessage,
+  ContentBlock,
+  LLMMessageRole,
+  LLMResponse,
+  LLMUsage,
+  LlmMessage,
+  LlmToolCall,
+  MessageContent,
+} from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
@@ -74,15 +84,36 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
+   * Compute a non-overlapping append by trimming any prefix of 'fragment' that
+   * already exists as a suffix of 'base'. This mirrors the ConversationService
+   * behavior to avoid duplicated reasoning/content fragments.
+   */
+  private static computeNonOverlappingAppend(base: string, fragment: string): string {
+    if (!fragment) return '';
+    const maxCheck = Math.min(base.length, fragment.length);
+    for (let k = maxCheck; k > 0; k--) {
+      if (base.endsWith(fragment.slice(0, k))) {
+        return fragment.slice(k);
+      }
+    }
+    return fragment;
+  }
+
+  /**
    * Execute the LLM request with streaming and optional input items
    * Uses OpenAI SDK for reliable streaming and tool call handling
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    const secureEnv = this.getOptions()?.secureEnv;
-    const apiKey = secureEnv?.OPEN_ROUTER_KEY;
+    let apiKey: string | null = null;
+
+    // TODO: migrate LLM execution behind slug-based callConnector; for now, read
+    // OpenRouter API key directly from process.env in the host environment.
+    if (typeof process !== 'undefined') {
+      apiKey = process.env.OPENROUTER_API_KEY ?? null;
+    }
     if (!apiKey) {
-      throw this.handleExecutionError(new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY").'));
+      throw this.handleExecutionError(new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY in the host environment.'));
     }
 
     try {
@@ -130,6 +161,12 @@ export class LLM extends BaseNode<LlmParams> {
       }
       if (typeof params.presencePenalty === 'number') {
         requestOptions.presence_penalty = params.presencePenalty;
+      }
+
+      // Pass through OpenRouter/OpenAI unified reasoning configuration when provided
+      if (params.reasoning && typeof params.reasoning === 'object') {
+        // The official OpenAI types do not yet expose the `reasoning` field, so we extend at runtime.
+        (requestOptions as OpenAI.Chat.ChatCompletionCreateParamsStreaming & { reasoning?: unknown }).reasoning = params.reasoning;
       }
 
       // Add function calling support if tools are provided
@@ -190,7 +227,7 @@ export class LLM extends BaseNode<LlmParams> {
       //   messages: summarizedMessages,
       // };
 
-      // console.log('>>> REQUEST >>>', JSON.stringify(requestSummary, null, 2));
+      // console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
       // Stream with OpenAI SDK (handles all accumulation reliably)
       const stream = await client.chat.completions.create(requestOptions);
       const llmResponse = await this.processOpenAIStream(stream);
@@ -225,18 +262,34 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
-   * Convert ToolParams to OpenAI function calling format
+   * Convert ToolParams to OpenAI function calling format with caching
+   * Adds cache_control to LAST tool definition (caches all tools as a group)
    * Uses tool.slug as the function name for consistent kebab-case format
    */
-  private convertToOpenAITools(tools: ToolParams[]): OpenAI.Chat.ChatCompletionTool[] {
-    return tools.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.slug,
-        description: tool.description,
-        parameters: tool.parameters as Record<string, unknown>,
-      },
-    }));
+  private convertToOpenAITools(tools: ToolParams[]): Array<OpenAI.Chat.ChatCompletionTool & Cacheable> {
+    if (!Array.isArray(tools) || tools.length === 0) {
+      return [];
+    }
+
+    return tools.map((tool, index) => {
+      const isLastTool = index === tools.length - 1;
+
+      const toolDef: OpenAI.Chat.ChatCompletionTool & Cacheable = {
+        type: 'function' as const,
+        function: {
+          name: tool.slug,
+          description: tool.description,
+          parameters: tool.parameters as Record<string, unknown>,
+        },
+      };
+
+      // Add cache_control to last tool (caches ALL tool definitions)
+      if (isLastTool) {
+        toolDef.cache_control = { type: 'ephemeral' };
+      }
+
+      return toolDef;
+    });
   }
 
   /**
@@ -252,6 +305,11 @@ export class LLM extends BaseNode<LlmParams> {
   private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
+
+    // Helper to get string content (for roles that require string)
+    const getStringContent = (): string => {
+      return typeof contentVal === 'string' ? contentVal : contentVal[0]?.type === 'text' ? contentVal[0].text : '';
+    };
 
     if (role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
       const toolCalls = m.toolCalls.map((tc) => ({
@@ -273,7 +331,7 @@ export class LLM extends BaseNode<LlmParams> {
       }));
       return {
         role: 'assistant',
-        content: contentVal,
+        content: getStringContent(),
         tool_calls: toolCalls,
       } as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
@@ -282,16 +340,30 @@ export class LLM extends BaseNode<LlmParams> {
       const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
       return {
         role: 'tool',
-        content: contentVal,
+        content: getStringContent(),
         tool_call_id: toolCallId,
       } as OpenAI.Chat.ChatCompletionToolMessageParam;
     }
 
+    // SYSTEM MESSAGE: Add caching (universal for all OpenRouter providers)
+    // Note: cache_control is an OpenRouter extension not in OpenAI's types
     if (role === 'system') {
-      return { role: 'system', content: contentVal } as OpenAI.Chat.ChatCompletionSystemMessageParam;
+      const message: CacheableSystemMessage = {
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            text: getStringContent(),
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+      };
+      return message as OpenAI.Chat.ChatCompletionSystemMessageParam;
     }
 
-    // default user
+    // USER MESSAGE: Support multimodal content (images, etc.)
+    // If content is already an array of ContentBlocks, pass directly
+    // OpenAI SDK supports both string and ContentPart[] for user messages
     return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
   }
 
@@ -307,7 +379,14 @@ export class LLM extends BaseNode<LlmParams> {
       const obj = item as Record<string, unknown>;
 
       const role = (typeof obj.role === 'string' ? obj.role : 'user') as LLMMessageRole;
-      const content = typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content ?? '');
+      // Preserve content as-is if it's a string or array (multimodal content blocks)
+      // Only stringify if it's neither (fallback for unexpected types)
+      const content: MessageContent =
+        typeof obj.content === 'string'
+          ? obj.content
+          : Array.isArray(obj.content)
+            ? (obj.content as ContentBlock[])
+            : JSON.stringify(obj.content ?? '');
 
       const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : undefined;
 
@@ -449,6 +528,83 @@ export class LLM extends BaseNode<LlmParams> {
         if (choice.delta?.content) {
           const piece = choice.delta.content;
           content += piece;
+        }
+
+        // Accumulate reasoning text from OpenRouter reasoning-capable models
+        try {
+          const extractReasoning = (node: unknown): string => {
+            if (!node || typeof node !== 'object') return '';
+            const rec = node as Record<string, unknown>;
+            const parts: string[] = [];
+
+            // Unified reasoning field from OpenRouter
+            const raw = (rec as { reasoning?: unknown }).reasoning;
+
+            const appendFromRaw = (r: unknown): void => {
+              if (!r) return;
+              if (typeof r === 'string') {
+                parts.push(r);
+                return;
+              }
+              if (typeof r === 'object' && r !== null) {
+                const obj = r as Record<string, unknown>;
+                if (typeof obj.content === 'string') parts.push(obj.content);
+                const tokens = obj.tokens;
+                if (Array.isArray(tokens)) {
+                  for (const t of tokens as unknown[]) {
+                    if (t && typeof t === 'object') {
+                      const tr = t as Record<string, unknown>;
+                      const text = typeof tr.text === 'string' ? tr.text : '';
+                      const c = typeof tr.content === 'string' ? tr.content : '';
+                      if (text) parts.push(text);
+                      else if (c) parts.push(c);
+                    }
+                  }
+                }
+              }
+              if (Array.isArray(r)) {
+                for (const p of r as unknown[]) {
+                  if (p && typeof p === 'object') {
+                    const pr = p as Record<string, unknown>;
+                    const text = typeof pr.text === 'string' ? pr.text : '';
+                    const c = typeof pr.content === 'string' ? pr.content : '';
+                    if (text) parts.push(text);
+                    else if (c) parts.push(c);
+                  }
+                }
+              }
+            };
+
+            appendFromRaw(raw);
+
+            // OpenRouter unified 'reasoning_details' chunks (if present)
+            const details = (rec as { reasoning_details?: unknown }).reasoning_details;
+            if (Array.isArray(details)) {
+              for (const d of details as unknown[]) {
+                if (d && typeof d === 'object') {
+                  const det = d as Record<string, unknown>;
+                  if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                    parts.push(det.text);
+                  }
+                }
+              }
+            }
+
+            return parts.join('');
+          };
+
+          // Prefer delta-level reasoning; fall back to any message snapshot if present
+          const fromDelta = extractReasoning((choice as unknown as { delta?: unknown }).delta);
+          const fromMessage = extractReasoning((choice as unknown as { message?: unknown }).message);
+          const chunkReasoning = fromDelta || fromMessage;
+          if (chunkReasoning) {
+            const append = LLM.computeNonOverlappingAppend(reasoning, chunkReasoning);
+            if (append) {
+              reasoning += append;
+            }
+          }
+        } catch {
+          // Non-fatal: if reasoning extraction fails, continue without disrupting content/tool streaming
         }
 
         // Handle tool calls - OpenAI SDK properly accumulates these
@@ -756,6 +912,7 @@ export class LLM extends BaseNode<LlmParams> {
     const modelError = this.validateRequiredField(params.model, 'Model');
     if (modelError) errors.push(modelError);
 
+    // Messages must be an array with at least one entry; upstream-input fallback is not relied on.
     const messagesError = this.validateArrayParameter(params.messages, 'Messages', 1);
     if (messagesError) errors.push(messagesError);
 
@@ -767,7 +924,7 @@ export class LLM extends BaseNode<LlmParams> {
       });
     }
 
-    // API key validation moved to runtime via secureEnv only
+    // API key validation moved to runtime via host-level callbacks only
 
     // Parameter range validation using helper methods
     const tempError = this.validateParameterRange(params.temperature, 'Temperature', 0, 2);

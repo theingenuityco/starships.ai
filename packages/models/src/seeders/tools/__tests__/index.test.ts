@@ -18,7 +18,8 @@ describe('Tool Templates Test Suite', () => {
       expect(toolNames).toContain('calculator');
       expect(toolNames).toContain('echo');
       expect(toolNames).toContain('get_current_time');
-      expect(toolNames).toContain('Test Tool Blueprint');
+      // Test Tool template is currently named "Test Tool"
+      expect(toolNames).toContain('Test Tool');
       expect(toolNames).toContain('List Tools');
     });
 
@@ -103,7 +104,8 @@ describe('Tool Templates Test Suite', () => {
       expect(automationTools.length).toBeGreaterThan(0);
 
       const automationNames = automationTools.map((t) => t.name);
-      expect(automationNames).toContain('Test Tool Blueprint');
+      // Test Tool template is currently named "Test Tool"
+      expect(automationNames).toContain('Test Tool');
       expect(automationNames).toContain('List Tools');
     });
 

@@ -7,11 +7,27 @@
 import { Engine } from '@/engine/Engine';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { Blueprint } from '@/types';
+import type { HostRuntime } from '@/types/node-handler';
 import { autopilot } from '@/Autopilot';
 
-// Mock all external dependencies
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+// Mock OpenAI SDK for LLM-based workflows
+jest.mock('openai');
+import OpenAI from 'openai';
+
+let hostRuntime: HostRuntime;
+let httpMock: jest.Mock;
+let mockCreate: jest.Mock;
+
+// Helper to create async iterable streams for OpenAI ChatCompletion chunks
+function createMockStream(chunks: OpenAI.Chat.Completions.ChatCompletionChunk[]) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+    },
+  };
+}
 
 // Console is not mocked to allow debug logging
 
@@ -20,21 +36,33 @@ describe('End-to-End Workflow Execution', () => {
     jest.clearAllMocks();
     autopilot.reset();
 
-    // Default fetch mock with proper structure
-    const mockHeaders = new Map([['content-type', 'application/json']]);
-    mockHeaders.forEach = jest.fn((callback) => {
-      callback('application/json', 'content-type', mockHeaders);
-    });
-
-    mockFetch.mockResolvedValue({
-      ok: true,
+    // Default HostRuntime HTTP mock; individual tests override behavior as needed
+    httpMock = jest.fn(async ({ url, method, headers = {}, body, timeoutMs }) => ({
       status: 200,
       statusText: 'OK',
-      url: 'https://api.example.com/test',
-      headers: mockHeaders,
-      json: async () => ({ success: true }),
-      text: async () => '{"success":true}',
+      headers,
+      body: { ok: true, url, method, body, timeoutMs },
+      url,
+    }));
+
+    hostRuntime = {
+      http: httpMock as HostRuntime['http'],
+    };
+
+    // Default OpenAI client mock for LLM usage (tests customize per-scenario)
+    mockCreate = jest.fn();
+    (OpenAI as jest.MockedClass<typeof OpenAI>).mockImplementation(() => {
+      return {
+        chat: {
+          completions: {
+            create: mockCreate,
+          },
+        },
+      } as unknown as OpenAI;
     });
+
+    // Unless a test explicitly sets it, ensure OPENROUTER_API_KEY is unset
+    delete process.env.OPENROUTER_API_KEY;
   });
 
   afterEach(() => {
@@ -65,10 +93,10 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      // Mock network failure
-      mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
+      // Mock network failure at HostRuntime layer
+      httpMock.mockRejectedValueOnce(new Error('Network timeout'));
 
-      const engine = new Engine({ failOnNodeError: false });
+      const engine = new Engine({ failOnNodeError: false, hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
@@ -106,16 +134,25 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      // Mock LLM API failure
-      mockFetch.mockRejectedValueOnce(new Error('LLM API unavailable'));
+      // Provide API key so we exercise the LLM network path, then mock failure
+      const previousKey = process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+      mockCreate.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
+      const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
 
-      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM');
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM API unavailable');
 
       expect(execution.status).toBe('failed');
-      expect(execution.error?.message).toMatch(/LLM/);
+      expect(execution.error?.message).toMatch(/LLM API unavailable/);
+
+      // Restore previous API key
+      if (previousKey === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = previousKey;
+      }
     });
 
     it('should handle missing credentials gracefully', async () => {
@@ -198,36 +235,23 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      const mockHeaders1 = new Map([['content-type', 'application/json']]);
-      mockHeaders1.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders1);
-      });
-      const mockHeaders2 = new Map([['content-type', 'application/json']]);
-      mockHeaders2.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders2);
-      });
-
-      mockFetch
+      httpMock
         .mockResolvedValueOnce({
-          ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.example.com/init',
-          headers: mockHeaders1,
-          json: async () => ({ initialized: true, session_id: 'TEST-SESSION-123' }),
-          text: async () => '{"initialized":true,"session_id":"TEST-SESSION-123"}',
+          headers: { 'content-type': 'application/json' },
+          body: { initialized: true, session_id: 'TEST-SESSION-123' },
         })
         .mockResolvedValueOnce({
-          ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.example.com/update',
-          headers: mockHeaders2,
-          json: async () => ({ updated: true, status: 'processing' }),
-          text: async () => '{"updated":true,"status":"processing"}',
+          headers: { 'content-type': 'application/json' },
+          body: { updated: true, status: 'processing' },
         });
 
-      const engine = new Engine();
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
       execution.state = { initialized: true };
 
@@ -291,31 +315,8 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      // Mock fast API responses
-      const createMockHeaders = () => {
-        const headers = new Map([['content-type', 'application/json']]);
-        headers.forEach = jest.fn((callback) => {
-          callback('application/json', 'content-type', headers);
-        });
-        return headers;
-      };
-
-      const mockResponses = Array(3)
-        .fill(null)
-        .map((_, i) => ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          url: `https://api.example.com/fast/${i + 1}`,
-          headers: createMockHeaders(),
-          json: async () => ({ api: i + 1, response_time: '10ms' }),
-          text: async () => `{"api":${i + 1},"response_time":"10ms"}`,
-        }));
-
-      mockFetch.mockResolvedValueOnce(mockResponses[0]).mockResolvedValueOnce(mockResponses[1]).mockResolvedValueOnce(mockResponses[2]);
-
       const startTime = Date.now();
-      const engine = new Engine();
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
       const endTime = Date.now();
@@ -362,59 +363,63 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      const mockHeaders1 = new Map([['content-type', 'application/json']]);
-      mockHeaders1.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders1);
+      // Mock HTTP response via HostRuntime
+      httpMock.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/test',
+        headers: { 'content-type': 'application/json' },
+        body: { data: 'test response' },
       });
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          url: 'https://api.example.com/test',
-          headers: mockHeaders1,
-          json: async () => ({ data: 'test response' }),
-          text: async () => '{"data":"test response"}',
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Map([['content-type', 'text/event-stream']]),
-          body: {
-            getReader: () => ({
-              read: jest
-                .fn()
-                .mockResolvedValueOnce({
-                  done: false,
-                  value: new TextEncoder().encode(
-                    'data: {"id":"test-123","choices":[{"index":0,"delta":{"content":"Analysis complete"},"finish_reason":null}]}\n\n'
-                  ),
-                })
-                .mockResolvedValueOnce({
-                  done: false,
-                  value: new TextEncoder().encode('data: [DONE]\n\n'),
-                })
-                .mockResolvedValueOnce({
-                  done: true,
-                  value: undefined,
-                }),
-              releaseLock: jest.fn(),
-            }),
-            [Symbol.asyncIterator]: async function* () {
-              yield new TextEncoder().encode(
-                'data: {"id":"test-123","choices":[{"index":0,"delta":{"content":"Analysis complete"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n'
-              );
+      // Mock LLM streaming via OpenAI SDK
+      const previousKey = process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+      const llmStream = createMockStream([
+        {
+          id: 'test-123',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [
+            {
+              index: 0,
+              delta: { content: 'Analysis complete' },
+              finish_reason: null,
+              logprobs: null,
             },
-          },
-        });
+          ],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 'test-123',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [
+            {
+              index: 0,
+              delta: {},
+              finish_reason: 'stop',
+              logprobs: null,
+            },
+          ],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+      mockCreate.mockResolvedValueOnce(llmStream);
 
       const eventCallback = jest.fn();
 
-      const engine = new Engine({ eventCallback, secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
+      const engine = new Engine({ eventCallback, hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
+
+      // Restore previous API key
+      if (previousKey === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = previousKey;
+      }
 
       // Verify comprehensive event coverage
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'workflow_started' }));
@@ -507,72 +512,52 @@ describe('End-to-End Workflow Execution', () => {
       };
 
       // Mock positive analysis scenario
-      const mockHeaders1 = new Map([['content-type', 'application/json']]);
-      mockHeaders1.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders1);
-      });
-      const mockHeaders2 = new Map([['content-type', 'application/json']]);
-      mockHeaders2.forEach = jest.fn((callback) => {
-        callback('application/json', 'content-type', mockHeaders2);
-      });
-
-      mockFetch
+      httpMock
         .mockResolvedValueOnce({
           // fetch-content
-          ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.content.example.com/posts/123',
-          headers: mockHeaders1,
-          json: async () => ({
+          headers: { 'content-type': 'application/json' },
+          body: {
             post_id: '123',
             content: 'This is a great product! I love using it.',
             author: 'user@example.com',
-          }),
-          text: async () => '{"post_id":"123","content":"This is a great product! I love using it.","author":"user@example.com"}',
-        })
-        .mockResolvedValueOnce({
-          // ai-analysis
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          headers: new Map([['content-type', 'text/event-stream']]),
-          body: {
-            getReader: () => ({
-              read: jest
-                .fn()
-                .mockResolvedValueOnce({
-                  done: false,
-                  value: new TextEncoder().encode(
-                    'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"positive sentiment detected - product review with enthusiastic tone"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":15,"total_tokens":25}}\n\n'
-                  ),
-                })
-                .mockResolvedValueOnce({
-                  done: true,
-                  value: undefined,
-                }),
-              releaseLock: jest.fn(),
-            }),
-            [Symbol.asyncIterator]: async function* () {
-              yield new TextEncoder().encode(
-                'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"positive sentiment detected - product review with enthusiastic tone"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":15,"total_tokens":25}}\n\n'
-              );
-            },
           },
         })
         .mockResolvedValueOnce({
-          // approve-content - Mock Response object properly
-          ok: true,
+          // approve-content
           status: 200,
           statusText: 'OK',
           url: 'https://api.content.example.com/approve',
-          headers: mockHeaders2,
-          json: async () => ({ approved: true, post_id: '123' }),
-          text: async () => '{"approved":true,"post_id":"123"}',
+          headers: { 'content-type': 'application/json' },
+          body: { approved: true, post_id: '123' },
         });
 
-      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
+      // Mock LLM streaming response that contains "positive" in final content
+      const previousKey = process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+      const llmStream = createMockStream([
+        {
+          id: 'test-llm-1',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [
+            {
+              index: 0,
+              delta: {
+                content: 'positive sentiment detected - product review with enthusiastic tone',
+              },
+              finish_reason: 'stop',
+              logprobs: null,
+            },
+          ],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+      mockCreate.mockResolvedValueOnce(llmStream);
+
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 
@@ -583,7 +568,15 @@ describe('End-to-End Workflow Execution', () => {
       expect(executionPath).toContain('approve-content');
       expect(executionPath).not.toContain('flag-review');
 
-      expect(mockFetch).toHaveBeenCalledTimes(3);
+      // fetch-content + approve-content
+      expect(httpMock).toHaveBeenCalledTimes(2);
+
+      // Restore previous API key
+      if (previousKey === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = previousKey;
+      }
     });
 
     it('should handle multi-step data processing pipeline', async () => {
@@ -662,73 +655,53 @@ describe('End-to-End Workflow Execution', () => {
         metadata: { type: 'etl-pipeline' },
       };
 
-      // Mock successful pipeline execution
-      const createMockHeaders = () => {
-        const headers = new Map([['content-type', 'application/json']]);
-        headers.forEach = jest.fn((callback) => {
-          callback('application/json', 'content-type', headers);
-        });
-        return headers;
-      };
-
-      mockFetch
+      // Mock successful pipeline execution via HostRuntime
+      httpMock
         .mockResolvedValueOnce({
           // extract-data
-          ok: true,
           status: 200,
           statusText: 'OK',
-          url: 'https://api.content.example.com/posts/123',
-          headers: createMockHeaders(),
-          json: async () => ({
-            post_id: '123',
-            content: 'This is a great product! I love using it.',
-            author: 'user@example.com',
-          }),
-          text: async () => '{"post_id":"123","content":"This is a great product! I love using it.","author":"user@example.com"}',
+          url: 'https://api.data.example.com/extract',
+          headers: { 'content-type': 'application/json' },
+          body: {
+            rows: 1000,
+          },
         })
         .mockResolvedValueOnce({
           // transform-data
-          ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.data.example.com/transform',
-          headers: createMockHeaders(),
-          json: async () => ({
+          headers: { 'content-type': 'application/json' },
+          body: {
             transformed: true,
             output_records: 1000,
-            transform_time: '1.1s',
-          }),
-          text: async () => '{"transformed":true,"output_records":1000,"transform_time":"1.1s"}',
+          },
         })
         .mockResolvedValueOnce({
           // load-data
-          ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.warehouse.example.com/load',
-          headers: createMockHeaders(),
-          json: async () => ({
+          headers: { 'content-type': 'application/json' },
+          body: {
             loaded: true,
             table: 'analytics_users',
-            load_time: '0.8s',
-          }),
-          text: async () => '{"loaded":true,"table":"analytics_users","load_time":"0.8s"}',
+          },
         })
         .mockResolvedValueOnce({
           // send-notification
-          ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.notifications.example.com/send',
-          headers: createMockHeaders(),
-          json: async () => ({
+          headers: { 'content-type': 'application/json' },
+          body: {
             notification_sent: true,
             recipients: ['admin@example.com'],
-          }),
-          text: async () => '{"notification_sent":true,"recipients":["admin@example.com"]}',
+          },
         });
 
-      const engine = new Engine();
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 
@@ -740,7 +713,7 @@ describe('End-to-End Workflow Execution', () => {
 
       expect(execution.status).toBe('completed');
       expect(execution.results).toHaveLength(7); // start -> extract-data -> validate-data -> transform-data -> load-data -> send-notification -> end
-      expect(mockFetch).toHaveBeenCalledTimes(4); // extract-data, transform-data, load-data, send-notification
+      expect(httpMock).toHaveBeenCalledTimes(4); // extract-data, transform-data, load-data, send-notification
     });
   });
 });

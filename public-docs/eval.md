@@ -16,17 +16,18 @@ Context (`EvalContext`)
 - outputs: `Array<{ nodeRef: string; items: ExecutionItem[] }>` (ordered history)
 - status: `ExecutionStatus`
 - currentNodeRef?: string
-- input?: unknown (the unwrapped input for the current evaluation)
+- input: unknown (the unwrapped input for the current evaluation)
 - Helpers:
-  - $lastOutputOf(nodeRef: string): ExecutionItem[] — returns latest items for a nodeRef or throws an error with diagnostics if not found
-  - $input(path?: string): unknown — returns input or a path-derived value when provided
-  - $exists(value: unknown): boolean
-  - env(key: string): unknown — secure env lookup
-  - envAll(): Record<string, unknown> — full secure env object
+  - lastOutputOf(nodeRef: string): unknown — returns latest output json for a nodeRef:
+    - 0 items → `undefined`
+    - 1 item → `item.json`
+    - N>1 items → `item.json[]`
+  - exists(value: unknown): boolean
+  - env(key: string): unknown — host-provided env lookup (in Starships, only `env('STARSHIP_ID')` is populated; all other keys are undefined)
 
 Notable behaviors
 
-- `$lastOutputOf` throws with a descriptive message when the referenced ref is missing, surfaces common causes like referencing a nodeRef that hasn’t executed yet or referencing across scopes.
+- `lastOutputOf` throws with a descriptive message when the referenced ref is missing, surfaces common causes like referencing a nodeRef that hasn’t executed yet or referencing across scopes.
 - Expressions are sanitized to unescape common JSON-escaped sequences before compiling.
 - Recursion limits apply during traversal for resolution (implementation internal).
 
@@ -36,7 +37,7 @@ Validation
 
 Security
 
-- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via provided helpers (`env`/`envAll`) and does not inherit untrusted globals.
+- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via the provided env helper and does not inherit untrusted globals.
 
 Cross-links
 
@@ -48,7 +49,7 @@ Common mistakes and how to fix them
 - Partial templates in full-only contexts
   - Problem: "Hello {{ name }}" will not evaluate where the engine enforces full-only mode (most parameter and inline contexts). It will be returned literally.
   - Fix: Make the entire value a single template that returns the final string:
-    - Correct: "{{ `Hello ${$input('name')}` }}"
+    - Correct: "{{ `Hello ${input.name}` }}"
 
 - “Nested eval” attempts
   - Problem: Writing {{ "{{ state.x }}" }} expecting a second evaluation pass.
@@ -59,5 +60,5 @@ Common mistakes and how to fix them
 - Mixing literals with templates for Transform/Conditional
   - Problem: Using partial templates inside `transform.value`, `transform.from`, or `condition`.
   - Fix: Use a single expression that returns the final value:
-    - Transform value example: "{{ $input('user.first') + ' ' + $input('user.last') }}"
+    - Transform value example: "{{ input.user.first + ' ' + input.user.last }}"
     - Conditional example: "{{ state.retryCount < 3 ? 'retry' : 'stop' }}"

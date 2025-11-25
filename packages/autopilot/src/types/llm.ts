@@ -43,9 +43,19 @@ export type ReasoningDetail =
       index?: number;
     };
 
+/**
+ * Multimodal content types (OpenRouter/OpenAI compatible)
+ */
+export type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' } }
+  | { type: 'file'; file: { filename: string; file_data: string } }; // OpenRouter PDFs/documents
+
+export type MessageContent = string | ContentBlock[];
+
 export interface LlmMessage {
   role: LLMMessageRole;
-  content: string;
+  content: MessageContent; // Support both string and multimodal content
   // Optional model-provided reasoning/thinking text (for reasoning-capable models)
   reasoning?: string;
   // Optional unified reasoning details (OpenRouter normalized)
@@ -78,4 +88,32 @@ export interface LLMResponse {
     index: number;
   }[];
   usage?: LLMUsage;
+}
+
+/**
+ * Cache control for OpenRouter prompt caching
+ * Used to mark content for caching across requests
+ */
+export interface CacheControl {
+  type: 'ephemeral';
+}
+
+/**
+ * Base interface for anything that can have cache_control
+ */
+export interface Cacheable {
+  cache_control?: CacheControl;
+}
+
+/**
+ * OpenRouter extension: System message with cacheable content
+ * Extends the standard format to support prompt caching
+ */
+export interface CacheableSystemMessage {
+  role: 'system';
+  content: Array<{
+    type: 'text';
+    text: string;
+    cache_control?: CacheControl;
+  }>;
 }

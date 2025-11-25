@@ -16,9 +16,10 @@ interface NavigationItemProps {
   expanded?: boolean
   onClick?: () => void
   special?: boolean
+  onItemClick?: () => void
 }
 
-export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick }: NavigationItemProps) {
   const router = useRouter()
 
   const handleClick = useCallback(
@@ -32,8 +33,10 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
         // Default navigation with slight delay for animation
         setTimeout(() => router.push(href), 160)
       }
+      // Always call onItemClick for mobile close
+      if (onItemClick) onItemClick()
     },
-    [href, router, onClick]
+    [href, router, onClick, onItemClick]
   )
 
   // Create stable icon component that never changes - memoized at component level

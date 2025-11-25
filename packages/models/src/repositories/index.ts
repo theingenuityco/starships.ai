@@ -1,10 +1,12 @@
 export { AgentRepository } from './AgentRepository';
 export { AgentTemplateRepository } from './AgentTemplateRepository';
+export { AttachmentRepository } from './AttachmentRepository';
 export { ConversationRepository } from './ConversationRepository';
 export { EnvironmentRepository } from './EnvironmentRepository';
 export { MessageRepository } from './MessageRepository';
 export { OAuthAccountRepository } from './OAuthAccountRepository';
 export { StarshipRepository } from './StarshipRepository';
+export { ConnectorRepository } from './ConnectorRepository';
 export { ToolRepository } from './ToolRepository';
 export { ToolTemplateRepository } from './ToolTemplateRepository';
 export { UsageRepository } from './UsageRepository';

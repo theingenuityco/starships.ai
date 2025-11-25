@@ -207,6 +207,7 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SENTRY_DSN_SERVER
+            # OAuth (GitHub OAuth App for login)
             - name: GH_OAUTH_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -217,6 +218,17 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GH_OAUTH_CLIENT_SECRET
+            # GitHub App (used for GitHub connector)
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GITHUB_APP_ID
+            - name: GITHUB_APP_PRIVATE_KEY_BASE64
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GITHUB_APP_PRIVATE_KEY_BASE64
             - name: GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -227,6 +239,41 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GOOGLE_CLIENT_SECRET
+            - name: LINKEDIN_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: LINKEDIN_CLIENT_ID
+            - name: LINKEDIN_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: LINKEDIN_CLIENT_SECRET
+            - name: GOOGLE_DRIVE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GOOGLE_DRIVE_CLIENT_ID
+            - name: GOOGLE_DRIVE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GOOGLE_DRIVE_CLIENT_SECRET
+            - name: DISCORD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DISCORD_CLIENT_ID
+            - name: DISCORD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DISCORD_CLIENT_SECRET
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DISCORD_BOT_TOKEN
             - name: EMAIL_FROM_ADDRESS
               valueFrom:
                 secretKeyRef:
@@ -242,6 +289,16 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: AWS_SES_REGION
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_S3_BUCKET
+            - name: AWS_S3_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_S3_REGION
             - name: ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:

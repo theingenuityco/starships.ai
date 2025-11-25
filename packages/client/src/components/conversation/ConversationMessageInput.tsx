@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { InlineHintExtension } from '@/components/conversation/InlineHintExtension'
 import StarterKit from '@tiptap/starter-kit'
@@ -30,6 +30,9 @@ import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useFileUpload, type PendingFile } from '@/hooks/useFileUpload'
+import { generateId } from '@/lib/utils'
+import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -86,6 +89,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
+
+    // File upload state
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+    const [uploadedAttachmentIds, setUploadedAttachmentIds] = useState<string[]>([])
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const attachmentContainerRef = useRef<HTMLDivElement>(null)
+    const [attachmentHeight, setAttachmentHeight] = useState(0)
+    const { uploadFile, uploading: fileUploading } = useFileUpload()
+
+    // Measure attachment container height when files change (use layout effect for immediate measurement)
+    useLayoutEffect(() => {
+      if (attachmentContainerRef.current && pendingFiles.length > 0) {
+        // Small delay to ensure DOM has fully rendered
+        const timer = setTimeout(() => {
+          if (attachmentContainerRef.current) {
+            const height = attachmentContainerRef.current.offsetHeight
+            // Only increase container height if attachments wrap to multiple rows
+            // Single row height is ~40px (pill height), so only add padding if > 48px
+            const SINGLE_ROW_HEIGHT = 48
+            setAttachmentHeight(height > SINGLE_ROW_HEIGHT ? height : 0)
+          }
+        }, 0)
+        return () => clearTimeout(timer)
+      } else {
+        setAttachmentHeight(0)
+      }
+    }, [pendingFiles])
 
     // Provide editor operations without referencing the editor before initialization
     const clearEditorRef = useRef<() => void>(() => {})
@@ -195,6 +225,63 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setSending(false)
       }
     }, [isStreamingEffective, sending])
+
+    // File handling functions
+    const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files || files.length === 0) return
+
+      // Store all selected files in browser memory - don't upload yet!
+      const newPendingFiles: PendingFile[] = Array.from(files).map(file => ({
+        file,
+        id: generateId(),
+        uploading: false,
+        uploaded: false,
+      }))
+
+      setPendingFiles(prev => [...prev, ...newPendingFiles])
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }, [])
+
+    const handlePaste = useCallback((e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      const imageFiles: File[] = []
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault()
+
+        // Store all pasted images in state - don't upload yet!
+        const newPendingFiles: PendingFile[] = imageFiles.map(file => ({
+          file,
+          id: generateId(),
+          uploading: false,
+          uploaded: false,
+        }))
+        setPendingFiles(prev => [...prev, ...newPendingFiles])
+      }
+    }, [])
+
+    const handleRemoveFile = useCallback((fileId: string) => {
+      setPendingFiles(prev => {
+        const file = prev.find(f => f.id === fileId)
+        if (file?.attachmentId) {
+          setUploadedAttachmentIds(ids => ids.filter(id => id !== file.attachmentId))
+        }
+        return prev.filter(f => f.id !== fileId)
+      })
+    }, [])
 
     const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
@@ -314,6 +401,45 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
+        // Upload pending files if any
+        const attachmentIdsToSend: string[] = []
+        if (pendingFiles.length > 0) {
+          for (const pendingFile of pendingFiles) {
+            // Mark as uploading
+            setPendingFiles(prev =>
+              prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: true } : f))
+            )
+
+            try {
+              const attachment = await uploadFile(pendingFile.file, currentConversationId!)
+              if (attachment) {
+                attachmentIdsToSend.push(attachment.id)
+                setPendingFiles(prev =>
+                  prev.map(f =>
+                    f.id === pendingFile.id
+                      ? { ...f, uploading: false, uploaded: true, attachmentId: attachment.id }
+                      : f
+                  )
+                )
+              } else {
+                setPendingFiles(prev =>
+                  prev.map(f =>
+                    f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f
+                  )
+                )
+                toast.error(`Failed to upload ${pendingFile.file.name}`)
+              }
+            } catch (error) {
+              setPendingFiles(prev =>
+                prev.map(f =>
+                  f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f
+                )
+              )
+              toast.error(`Failed to upload ${pendingFile.file.name}`)
+            }
+          }
+        }
+
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
         void sendMessageFn({
           conversationId: currentConversationId!,
@@ -322,6 +448,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           role: 'user',
           starshipId: starshipId!,
           messageType: 'user_input',
+          attachmentIds: attachmentIdsToSend.length > 0 ? attachmentIdsToSend : undefined,
         })
           .catch(error => {
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
@@ -331,6 +458,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
           .finally(() => {
             setSending(false)
+            // Clear attachments after successful send
+            setPendingFiles([])
+            setUploadedAttachmentIds([])
           })
 
         // Exit early to avoid hitting catch/finally paths
@@ -1989,6 +2119,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
           </div>
         )}
+
+        {/* File Attachments Preview - Outside input container in minimal mode */}
+        {minimal && pendingFiles.length > 0 && (
+          <div className="mb-2 px-1">
+            <div className="bg-muted/30 backdrop-blur-sm rounded-lg px-2 py-1.5 border border-border/40">
+              <div className="flex flex-wrap gap-1.5">
+                {pendingFiles.map(file => (
+                  <FileAttachmentPreview
+                    key={file.id}
+                    file={file}
+                    onRemove={() => handleRemoveFile(file.id)}
+                    uploading={file.uploading}
+                    minimal={true}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Input Container with Expandable Overlay */}
         <div
           className={cn(
@@ -2009,15 +2159,70 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onToggle={onToggleOverlay}
             />
           )}
+
           {/* Main Input Section - Text input with bottom-right action */}
           <div className={cn('flex relative', minimal ? 'items-center p-2' : 'items-center p-4')}>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
             {/* Optional left-side controls in expanded mode */}
             {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
-            {/* Text Input (TipTap) */}
-            <div className="flex-1 min-w-0 pr-12 relative z-10" ref={editorContainerRef}>
-              <EditorContent editor={tiptap} />
+            {/* Text Input (TipTap) with attachments */}
+            <div
+              className={cn("flex-1 min-w-0 pr-12 relative z-10")}
+              ref={editorContainerRef}
+              onPaste={handlePaste}
+              style={{
+                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined
+              }}
+            >
+              <div className="max-h-[300px] overflow-y-auto">
+                <EditorContent editor={tiptap} />
+              </div>
+
+              {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
+              {!minimal && pendingFiles.length > 0 && (
+                <div
+                  ref={attachmentContainerRef}
+                  className="absolute bottom-0 left-0 right-0 pr-15"
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {pendingFiles.map(file => (
+                      <FileAttachmentPreview
+                        key={file.id}
+                        file={file}
+                        onRemove={() => handleRemoveFile(file.id)}
+                        uploading={file.uploading}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Attachment Button - Bottom-right, next to send button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || fileUploading}
+              className={cn(
+                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-4 right-14 z-20 p-1.5',
+                'rounded-lg transition-colors',
+                'hover:bg-muted text-muted-foreground hover:text-foreground',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+              aria-label="Attach file"
+              title="Attach file (images, PDFs)"
+            >
+              <Icon name="paperclip" className="h-5 w-5" />
+            </button>
 
             {/* Bottom-right Actions: Stop (when streaming) or Send */}
             <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>

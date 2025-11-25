@@ -6,7 +6,7 @@
  */
 
 import { HttpRequestParams, ValidationResult, ValidationError, ExecutionItem } from '@/types';
-import { NodeHandler } from '@/types/node-handler';
+import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface HttpResponse {
@@ -19,144 +19,99 @@ export interface HttpResponse {
 
 export class HttpRequest implements NodeHandler {
   private params: HttpRequestParams;
+  private options?: NodeHandlerOptions;
 
-  constructor(params: HttpRequestParams) {
+  constructor(params: HttpRequestParams, options?: NodeHandlerOptions) {
     // Store HTTP request parameters with deep copy to avoid mutations
     this.params = {
       ...params,
       headers: params.headers ? { ...params.headers } : undefined,
     };
+    this.options = options;
   }
 
   /**
    * Execute the HTTP request with optional input items
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // Setup headers - convert HeadersInit to Record<string, string>
-    let headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+    const runtime = this.options?.hostRuntime;
+    if (!runtime || typeof runtime.http !== 'function') {
+      throw new Error('Host runtime http() not available for HttpRequest node');
+    }
 
+    const method = (this.params.method || 'GET').toUpperCase();
+    let bodyData: unknown;
+
+    // Body selection rules:
+    // - GET/HEAD => never send a body, even if provided
+    // - Other methods => only use explicitly configured body; upstream input is ignored
+    if (method === 'GET' || method === 'HEAD') {
+      bodyData = undefined;
+    } else if (this.params.body !== undefined) {
+      bodyData = this.params.body;
+    } else {
+      bodyData = undefined;
+    }
+
+    // Normalize headers into a plain record
+    let headers: Record<string, unknown> = {};
     if (this.params.headers) {
       if (this.params.headers instanceof Headers) {
-        // Convert Headers object to Record
+        const tmp: Record<string, string> = {};
         this.params.headers.forEach((value, key) => {
-          headers[key] = value;
+          tmp[key] = value;
         });
+        headers = tmp;
       } else if (Array.isArray(this.params.headers)) {
-        // Convert [string, string][] to Record
+        const tmp: Record<string, string> = {};
         for (const [key, value] of this.params.headers) {
-          headers[key] = value;
+          tmp[key] = value;
         }
+        headers = tmp;
       } else {
-        // It's already a Record<string, string>
-        headers = { ...headers, ...this.params.headers };
+        headers = { ...(this.params.headers as Record<string, unknown>) };
       }
     }
 
-    // Setup timeout with AbortController
-    const controller = new AbortController();
-    const timeout = this.params.timeout || 30000;
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const timeoutMs = this.params.timeout || 30000;
 
-    try {
-      // Use input data as body if available and no explicit body set
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      const method = (this.params.method || 'GET').toUpperCase();
-      const bodyData = this.params.body !== undefined ? this.params.body : inputData;
-      let body: string | undefined = undefined;
+    const response = await runtime.http({
+      method,
+      url: this.params.url,
+      headers,
+      body: bodyData ?? undefined,
+      timeoutMs,
+      connector: this.params.connector,
+    });
 
-      // Do not send a body for GET/HEAD requests
-      if (method !== 'GET' && method !== 'HEAD') {
-        if (bodyData !== undefined) {
-          if (typeof bodyData === 'string') {
-            body = bodyData;
-          } else if (typeof bodyData === 'object' && bodyData !== null) {
-            body = JSON.stringify(bodyData);
-          }
-        }
-      }
+    const httpResponse: HttpResponse = {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      body: response.body,
+      url: response.url,
+    };
 
-      // Build fetch options using all RequestInit properties from params
-      const fetchOptions: RequestInit = {
-        method,
-        headers,
-        ...(body !== undefined ? { body } : {}),
-        signal: controller.signal,
-        mode: this.params.mode,
-        credentials: this.params.credentials,
-        cache: this.params.cache,
-        redirect: this.params.redirect || ('follow' as const),
-        referrer: this.params.referrer,
-        referrerPolicy: this.params.referrerPolicy,
-        integrity: this.params.integrity,
-        keepalive: this.params.keepalive,
-      };
-
-      try {
-        // Execute request with proper error handling
-        const response = await fetch(this.params.url, fetchOptions);
-
-        // Parse response body (even when response.ok is false)
-        let responseBody: unknown;
-        const contentType =
-          response.headers && typeof response.headers.get === 'function' ? response.headers.get('content-type') || '' : '';
-
-        if (contentType.includes('application/json')) {
-          try {
-            responseBody = await response.json();
-          } catch {
-            responseBody = await response.text();
-          }
-        } else {
-          responseBody = await response.text();
-        }
-
-        // Convert headers to object
-        const responseHeaders: Record<string, string> = {};
-        if (response.headers && typeof response.headers.forEach === 'function') {
-          response.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
-          });
-        }
-
-        const httpResponse = {
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
-          body: responseBody,
-          url: response.url,
-        };
-
-        // Fail the workflow on non-2xx responses
-        if (!response.ok) {
-          const snippet =
-            typeof responseBody === 'string'
-              ? responseBody.slice(0, 300)
-              : (() => {
-                  try {
-                    return JSON.stringify(responseBody).slice(0, 300);
-                  } catch {
-                    return '';
-                  }
-                })();
-          throw new Error(
-            `HTTP request failed: ${method} ${this.params.url} -> ${response.status} ${response.statusText}${
-              snippet ? ` | body: ${snippet}` : ''
-            }`
-          );
-        }
-
-        return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
-      } catch (error) {
-        // Network/timeout errors should fail the workflow
-        const reason = controller.signal.aborted ? `timeout after ${timeout}ms` : error instanceof Error ? error.message : 'Unknown error';
-        throw new Error(`HTTP request failed: ${method} ${this.params.url} -> ${reason}`);
-      }
-    } finally {
-      // Always clear timeout to prevent open handles
-      clearTimeout(timeoutId);
+    // Fail the workflow on non-2xx responses
+    if (httpResponse.status < 200 || httpResponse.status >= 300) {
+      const snippet =
+        typeof httpResponse.body === 'string'
+          ? httpResponse.body.slice(0, 300)
+          : (() => {
+              try {
+                return JSON.stringify(httpResponse.body).slice(0, 300);
+              } catch {
+                return '';
+              }
+            })();
+      throw new Error(
+        `HTTP request failed: ${method} ${this.params.url} -> ${httpResponse.status} ${httpResponse.statusText}${
+          snippet ? ` | body: ${snippet}` : ''
+        }`
+      );
     }
+
+    return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
   }
 
   /**
@@ -182,13 +137,23 @@ export class HttpRequest implements NodeHandler {
 
     // URL format validation
     if (this.params.url) {
-      try {
-        new URL(this.params.url);
-      } catch {
-        errors.push({
-          code: 'INVALID_PARAMETERS',
-          message: 'URL format is invalid',
-        });
+      const urlValue = this.params.url;
+
+      // When using connectors, relative URLs (e.g. "/starships/{starshipId}/tools") are valid and
+      // should be resolved by the HostRuntime/http connector layer. Only enforce strict
+      // URL parsing for absolute URLs with an explicit scheme.
+      const isAbsolute = typeof urlValue === 'string' && /^https?:\/\//i.test(urlValue);
+
+      if (isAbsolute) {
+        try {
+          // Validate absolute URL format
+          new URL(urlValue);
+        } catch {
+          errors.push({
+            code: 'INVALID_PARAMETERS',
+            message: 'URL format is invalid',
+          });
+        }
       }
     }
 

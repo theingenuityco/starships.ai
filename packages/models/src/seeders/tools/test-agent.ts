@@ -43,8 +43,6 @@ For simple text input:
 
 ## Environment Dependencies
 Automatically inferred from agent state (do not pass manually):
-- **BASE_URL**: API server endpoint
-- **AUTH_TOKEN**: Authentication token
 - **STARSHIP_ID**: Current starship identifier
 
 ## Response & Behavior
@@ -75,37 +73,24 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('BASE_URL is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('AUTH_TOKEN is required');
-              if (!starshipId) throw new Error('STARSHIP_ID is required');
-
-              const slug = ctx.$input && ctx.$input.slug;
+              const input = ctx.input || {};
+              const slug = input.slug;
               if (!slug || typeof slug !== 'string') throw new Error('slug is required');
 
-              if (ctx.$input.input === undefined) {
+              if (input.input === undefined) {
                 throw new Error('input is required for testing');
               }
 
               // Normalize input to messages array format if needed
-              let testInput = ctx.$input.input;
+              let testInput = input.input;
               if (typeof testInput === 'string') {
                 testInput = [{ role: 'user', content: testInput }];
               }
 
-            return {
-              url: String(baseUrl) + '/starships/' + String(starshipId) + '/agents/' + String(slug) + '/test',
-              method: 'POST',
-              headers: {
-                'Authorization': 'Bearer ' + String(authToken),
-                'Content-Type': 'application/json'
-              },
-              body: {
+              return {
+                slug,
                 input: testInput
-              }
-            };
+              };
             }
           `,
           timeout: 3000,
@@ -117,10 +102,10 @@ Automatically inferred from agent state (do not pass manually):
         name: 'Execute Agent Test',
         description: 'POST /starships/:starshipId/agents/:slug/test',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          body: '{{ $lastOutputOf("prepare")[0].json.body }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug + "/test" }}',
+          method: 'POST',
+          body: { input: '{{ (lastOutputOf("prepare") || {}).input }}' },
+          connector: 'starships',
           timeout: 60000,
         },
       },
@@ -132,7 +117,7 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           code: `
             async function main(ctx) {
-              const http = ctx.$input;
+              const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               const data = (body && typeof body === 'object' && body.data) ? body.data : body;
 
@@ -159,7 +144,7 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return test result',
         parameters: {
-          output: '{{ $lastOutputOf("format_result")[0].json }}',
+          output: '{{ lastOutputOf("format_result") }}',
         },
       },
     ],
@@ -183,7 +168,7 @@ export const agentTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentTestTool.blueprint,
 
   slug: 'test-agent',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Hello" }] } // test with messages\n{ "slug": "analyzer", "input": "Test data" } // test with simple text',

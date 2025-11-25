@@ -89,8 +89,14 @@ export function getEnvConfig(): EnvironmentConfig {
     // OAuth Provider Configuration
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_DRIVE_CLIENT_ID: process.env.GOOGLE_DRIVE_CLIENT_ID,
+    GOOGLE_DRIVE_CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
+
+    // GitHub App Configuration (used for GitHub connector)
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+    GITHUB_APP_PRIVATE_KEY_BASE64: process.env.GITHUB_APP_PRIVATE_KEY_BASE64,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
@@ -112,5 +118,20 @@ export function getEnvConfig(): EnvironmentConfig {
     EMAIL_FROM_ADDRESS: requiredEnvVars.EMAIL_FROM_ADDRESS!,
     EMAIL_FROM_NAME: requiredEnvVars.EMAIL_FROM_NAME!,
     AWS_SES_REGION: requiredEnvVars.AWS_SES_REGION!,
+
+    // LinkedIn OAuth Configuration (optional)
+    LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
+    LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
+
+    // Discord Bot OAuth Configuration (optional)
+    DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+
+    // AWS S3 Configuration (File Attachments) - Optional, feature disabled if not set
+    AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,
+    AWS_S3_REGION: process.env.AWS_S3_REGION,
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   };
 }

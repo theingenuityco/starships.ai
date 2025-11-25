@@ -459,10 +459,12 @@ _Next Milestone: Final test file cleanup and Neo4j script modernization (104 Typ
 The Autopilot `code` node now executes code as a module using a strict entrypoint:
 
 ```javascript
-async function main(ctx) { /* ... */ }
+async function main(ctx) {
+  /* ... */
+}
 ```
 
 - The previous top-level `return` style is removed (no backward compatibility).
-- `ctx` provides: `ctx.$input`, `ctx.$state`, `ctx.$env(key)`, `ctx.$lastOutputOf(ref)`.
+- `ctx` provides: `ctx.input`, `ctx.state`, `ctx.env(key)`, `ctx.lastOutputOf(ref)`.
 - Standard JS globals and `console` are available. Blocked: `setTimeout`, `setInterval`, `require`, `import`, `eval`, `Function`, `process`, `global`, `globalThis`.
 - Update any existing code-node snippets to define `async function main(ctx)` and return from it.

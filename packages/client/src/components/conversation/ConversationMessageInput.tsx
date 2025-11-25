@@ -164,9 +164,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Use streamedQuery-based conversation hook
     const streamCtx = useConversationStreamContextOptional()
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
-    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isFetching } = streamCtx ?? fallbackStream
+    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
-    const isStreamingEffective = Boolean(isAssistantStreaming && isFetching)
+    // Block input from the moment user sends until streaming completes (covers pre-stream gap)
+    const isStreamingEffective = Boolean(isSending || preStreamPending || isResponding)
     // Show stop button during pre-stream window and while streaming/responding
     const [preStreamPending, setPreStreamPending] = useState(false)
     const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
@@ -285,7 +286,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
-      if (!messageToSend || sending || disabled) return
+      if (!messageToSend || sending || disabled || isStreamingEffective) return
 
       // Enforce presence of a leading @mention chip in the editor
       const mentionAgentInEditor = getLeadingMentionAgentFromEditor(tiptap as any)
@@ -406,35 +407,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (pendingFiles.length > 0) {
           for (const pendingFile of pendingFiles) {
             // Mark as uploading
-            setPendingFiles(prev =>
-              prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: true } : f))
-            )
+            setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: true } : f)))
 
             try {
               const attachment = await uploadFile(pendingFile.file, currentConversationId!)
               if (attachment) {
                 attachmentIdsToSend.push(attachment.id)
-                setPendingFiles(prev =>
-                  prev.map(f =>
-                    f.id === pendingFile.id
-                      ? { ...f, uploading: false, uploaded: true, attachmentId: attachment.id }
-                      : f
-                  )
-                )
+                setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: false, uploaded: true, attachmentId: attachment.id } : f)))
               } else {
-                setPendingFiles(prev =>
-                  prev.map(f =>
-                    f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f
-                  )
-                )
+                setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f)))
                 toast.error(`Failed to upload ${pendingFile.file.name}`)
               }
             } catch (error) {
-              setPendingFiles(prev =>
-                prev.map(f =>
-                  f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f
-                )
-              )
+              setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f)))
               toast.error(`Failed to upload ${pendingFile.file.name}`)
             }
           }
@@ -472,7 +457,22 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setSending(false)
         setPreStreamPending(false)
       }
-    }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, onAgentChange, starshipAgents])
+    }, [
+      message,
+      sending,
+      disabled,
+      isStreamingEffective,
+      selectedAgent,
+      userId,
+      conversationId,
+      createConversation,
+      onConversationStart,
+      onMessageSent,
+      sendMessageFn,
+      starshipId,
+      onAgentChange,
+      starshipAgents,
+    ])
 
     // Handle suggestion clicks
     const handleSuggestionSubmit = useCallback(
@@ -1488,6 +1488,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             } catch {}
           }
           if (event.key === 'Enter' && !event.shiftKey) {
+            if (streamingRef.current) {
+              event.preventDefault()
+              return true
+            }
             event.preventDefault()
             handleSubmit()
             return true
@@ -2121,13 +2125,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             <div className="bg-muted/30 backdrop-blur-sm rounded-lg px-2 py-1.5 border border-border/40">
               <div className="flex flex-wrap gap-1.5">
                 {pendingFiles.map(file => (
-                  <FileAttachmentPreview
-                    key={file.id}
-                    file={file}
-                    onRemove={() => handleRemoveFile(file.id)}
-                    uploading={file.uploading}
-                    minimal={true}
-                  />
+                  <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} minimal={true} />
                 ))}
               </div>
             </div>
@@ -2160,25 +2158,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           {/* Main Input Section - Text input with bottom-right action */}
           <div className={cn('flex relative', minimal ? 'items-center p-2' : 'items-center p-4')}>
             {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" onChange={handleFileSelect} className="hidden" />
 
             {/* Optional left-side controls in expanded mode */}
             {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn("flex-1 min-w-0 pr-12 relative z-10")}
+              className={cn('flex-1 min-w-0 pr-12 relative z-10')}
               ref={editorContainerRef}
               onPaste={handlePaste}
               style={{
-                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined
+                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
               }}
             >
               <div className="max-h-[300px] overflow-y-auto">
@@ -2187,18 +2178,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div
-                  ref={attachmentContainerRef}
-                  className="absolute bottom-0 left-0 right-0 pr-15"
-                >
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-15">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
-                      <FileAttachmentPreview
-                        key={file.id}
-                        file={file}
-                        onRemove={() => handleRemoveFile(file.id)}
-                        uploading={file.uploading}
-                      />
+                      <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
                     ))}
                   </div>
                 </div>

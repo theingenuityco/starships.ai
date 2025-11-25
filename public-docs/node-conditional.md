@@ -12,7 +12,7 @@ Specification (authoritative)
 Evaluation rules
 - If condition is string and contains templates, Eval resolves it with access to:
   - state, outputs, status, currentNodeRef, input
-  - helpers: `$lastOutputOf(nodeRef)`, `$input(path?)`, `$exists(value)`, `env(key)`, `envAll()`
+  - helpers: `lastOutputOf(nodeRef)`, `exists(value)`, `env('STARSHIP_ID')` (Starships host only; no other env keys exposed)
 - Result mapping → `edgeCondition`:
   - null/undefined => `edgeCondition` omitted
   - boolean => `'true'` or `'false'`
@@ -39,7 +39,7 @@ Example (tool-call routing)
   type: "conditional",
   name: "Check Tool Calls",
   parameters: {
-    condition: '{{ (() => { const last=$input(); const fr=last?.choices?.[0]?.finishReason; if(fr==="length") return "continue"; const calls=last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls)&&calls.length>0 ? "call_tool" : "complete"; })() }}'
+    condition: '{{ (() => { const last=input; const fr=last?.choices?.[0]?.finishReason; if(fr==="length") return "continue"; const calls=last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls)&&calls.length>0 ? "call_tool" : "complete"; })() }}'
   }
 }
 ```

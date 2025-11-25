@@ -81,10 +81,11 @@ export class Agent implements NodeHandler {
         ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
         ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
         ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+        ...(this.params.reasoning !== undefined && { reasoning: this.params.reasoning }),
         reducers: [
           `
           (state, ctx) => {
-            const msg = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
+            const msg = ctx.lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message ?? {};
             const content = typeof msg.content === 'string' ? msg.content : '';
             const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
             const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;
@@ -122,7 +123,7 @@ export class Agent implements NodeHandler {
       description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
       parameters: {
         condition:
-          '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; const calls = last?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const allowed = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug) && t.blueprint) : false; if (slug) { return allowed ? "call_tool" : "tool_not_allowed"; } if (fr==="tool_calls") { return "tool_not_allowed"; } return Array.isArray(calls) && calls.length > 0 ? "tool_not_allowed" : "complete"; })()}}',
+          '{{(() => { const last = input; const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; const calls = last?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const allowed = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug) && t.blueprint) : false; if (slug) { return allowed ? "call_tool" : "tool_not_allowed"; } if (fr==="tool_calls") { return "tool_not_allowed"; } return Array.isArray(calls) && calls.length > 0 ? "tool_not_allowed" : "complete"; })()}}',
       },
     });
 
@@ -134,7 +135,7 @@ export class Agent implements NodeHandler {
       parameters: {
         code: `
         async function main(ctx) {
-          const last = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json;
+          const last = ctx.lastOutputOf("${llmNodeRef}") || {};
           let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
           if (typeof j === 'string') { try { j = JSON.parse(j); } catch {}
           }
@@ -153,11 +154,11 @@ export class Agent implements NodeHandler {
       description: 'Execute tool',
       ref: toolNodeRef,
       parameters: {
-        name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.name ?? (slug ?? ""); })() }}`,
-        description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.description ?? ("Tool '" + (slug ?? "unknown") + "' not found"); })() }}`,
-        parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-        blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.blueprint; })() }}`,
-        toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+        name: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.name ?? (slug ?? ""); })() }}`,
+        description: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.description ?? ("Tool '" + (slug ?? "unknown") + "' not found"); })() }}`,
+        parameters: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+        blueprint: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.blueprint; })() }}`,
+        toolCallId: `{{ lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
       },
     });
 
@@ -170,8 +171,8 @@ export class Agent implements NodeHandler {
         reducers: [
           `
           (state, ctx) => {
-            const toolCallId = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
-            const toolResult = ctx.$lastOutputOf("${toolNodeRef}")[0]?.json ?? {};
+            const toolCallId = ctx.lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
+            const toolResult = ctx.lastOutputOf("${toolNodeRef}") ?? {};
             const content = (typeof toolResult === 'string') ? toolResult : JSON.stringify(toolResult);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
@@ -191,7 +192,7 @@ export class Agent implements NodeHandler {
         reducers: [
           `
           (state, ctx) => {
-            const last = ctx.$lastOutputOf("${llmNodeRef}")[0]?.json;
+            const last = ctx.lastOutputOf("${llmNodeRef}") || {};
             const slug = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.name ?? 'unknown';
             const toolCallId = last?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
             const next = { ...(state || {}) };
@@ -288,7 +289,8 @@ export class Agent implements NodeHandler {
       const engineConfig: EngineConfig = {
         eventCallback: this.options?.eventCallback,
         failOnNodeError: false,
-        secureEnv: this.options?.secureEnv,
+        runtimeEnv: this.options?.runtimeEnv,
+        hostRuntime: this.options?.hostRuntime,
       };
 
       // Execute using runner chosen by current execution depth

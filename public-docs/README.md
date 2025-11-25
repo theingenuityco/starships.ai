@@ -18,6 +18,11 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
 - [Tool](./node-tool.md)
 - [Agent](./node-agent.md)
 
+- Connectors
+  - [Overview](./connectors/README.md)
+  - [LinkedIn](./connectors/linkedin.md)
+  - [Discord](./connectors/discord.md)
+
 Audience and access modes
 
 These docs are used by two audiences:
@@ -44,13 +49,13 @@ Conventions in this documentation
 Tips for agents (DSL-only)
 
 - Use the blueprint JSON as-is; do not include imports or code that constructs/executes an engine.
-- When a snippet shows templates like `{{ $lastOutputOf("llm")... }}`, keep them as-is in node `parameters`—the Engine resolves them at execution time.
+- When a snippet shows templates like `{{ lastOutputOf("llm")... }}`, keep them as-is in node `parameters`—the Engine resolves them at execution time.
 - Prefer stable node refs (e.g., "llm", "tool", "e") because examples and templates reference them.
 
 Tips for SDK/Engine users
 
 - You can paste the Blueprint (DSL) JSON directly into a TypeScript file as `const blueprint = <that JSON>` and run it with `new Engine().executeBlueprint(...)`.
-- Ensure `secureEnv` is passed when needed (e.g., `OPEN_ROUTER_KEY`) and subscribe to `eventCallback` if you need streaming/events.
+- Provide any non-secret configuration via `new Engine({ runtimeEnv })` and subscribe to `eventCallback` if you need streaming/events. LLM/API keys are read from the host environment or managed via server-side connectors, not passed through the blueprint.
 
 Examples
 

@@ -17,8 +17,6 @@ Inputs:
 - {} (no arguments)
 
 Implicit environment (do not pass as arguments):
-- BASE_URL: derived from agent.state.baseUrl
-- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
 - STARSHIP_ID: derived from agent.state.starshipId
 
 Output:
@@ -39,24 +37,12 @@ Behavior and limits:
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL and headers',
+        description: 'Validate inputs',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-
               return {
-                url: \`\${baseUrl}/starships/\${starshipId}/agents\`,
-                method: 'GET',
-                headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json'
-                }
+                ok: true
               };
             }
           `,
@@ -69,9 +55,9 @@ Behavior and limits:
         name: 'List Agents',
         description: 'GET /starships/:starshipId/agents',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents" }}',
+          method: 'GET',
+          connector: 'starships',
           timeout: 5000,
         },
       },
@@ -84,7 +70,7 @@ Behavior and limits:
           code: `
             async function main(ctx) {
               // Input is the HttpResponse from http_list (see HttpRequest node contract)
-              const http = ctx.$input;
+              const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               // Server sendSuccess returns { data: T }, so prefer body.data when present
               const data = body && typeof body === 'object' && Array.isArray(body.data)
@@ -110,7 +96,7 @@ Behavior and limits:
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("summarize")[0].json }}',
+          output: '{{ lastOutputOf("summarize") }}',
         },
       },
     ],
@@ -131,7 +117,7 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentListTool.blueprint,
 
   slug: 'list-agent',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

@@ -21,21 +21,31 @@ export type MessageType =
   | 'error'
   | 'tool_result';
 
-export interface Message extends LlmMessage {
+export interface Message extends Omit<LlmMessage, 'content'> {
+  // Override content to be string only (client sends string, database stores string)
+  // ContentBlock[] is only built when calling LLM
+  content: string;
   messageType: MessageType;
   // Optional model-provided reasoning/thinking text
   reasoning?: string;
   // Agent tracking fields (assistant messages only)
   agentId?: string;
   agentName?: string;
+  // File attachments (array of attachment IDs)
+  attachmentIds?: string[];
 }
 
 /**
  * Database Message interface - core API contract type
  * Extends Message from autopilot with additional database/persistence fields
+ *
+ * IMPORTANT: content is always stored as string in database (TEXT column).
+ * ContentBlock[] is only built in-memory when calling LLM APIs.
  */
-export interface MessageModel extends Message {
-  // Additional database fields (Message already has id, timestamp, role, content, metadata, agentId, agentName)
+export interface MessageModel extends Omit<Message, 'content'> {
+  // Override content to be string only (database stores TEXT, not JSONB)
+  content: string;
+  // Additional database fields
   id: string;
   createdAt: string;
   updatedAt: string;

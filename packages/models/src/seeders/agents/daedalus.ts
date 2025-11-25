@@ -7,6 +7,7 @@ function createDaedalusDefaultBlueprint(): Blueprint {
   return createDefaultAgentBlueprint({
     name: 'Daedalus',
     model: 'anthropic/claude-sonnet-4.5',
+    reasoningEffort: 'medium',
   });
 }
 
@@ -32,21 +33,22 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 - Open Tool to open: provide slug only.
 - Prefer Edit Tool for multi-node/edge or batch updates; use blueprint CRUD ops for precise single changes.
 - After any blueprint change, run Test Tool Blueprint; fix and retest before proceeding.
-- Before Test Tool, fetch parameters with Get Tool and populate all required fields deterministically.
+- When preparing to use Test Tool, construct a JSON payload that matches its schema: { "targetSlug": "<tool-slug>", "arguments": { ...all required and important fields for the target tool... }, "timeoutMs": 60000 }.
+- Use Get Tool and the target tool's parameter schema to decide which fields belong in the nested arguments object with concrete, type-correct example values (for an addition tool, include numeric a and b inside arguments).
+- When Test Tool returns an error, read the error and toolName fields to understand what went wrong before trying again.
 - Stop when tests pass and the description, parameters, and blueprint are stable.
-- Env quick ref: Code → ctx.$env('KEY'); Templates → {{ env('KEY') }}; never log/echo secrets; validate required env and fail fast.
+- Env quick ref: Code → ctx.$env('STARSHIP_ID'); Templates → {{ env('STARSHIP_ID') }}; never log/echo secrets; validate required env and fail fast.
 - Templates quick rule: compute the entire value within one {{ ... }}; no concatenation or nested templates; JSON must remain valid.
-- Prefer templates for URLs/headers; use Code node for logic; normalize BASE_URL by stripping trailing slashes before concatenation.
-- Use runtime env only (BASE_URL, AUTH_TOKEN, STARSHIP_ID, etc.); never process.env; reference new vars directly (e.g., env('LINKEDIN_API_TOKEN')).
-- HttpRequest body: do not set \`parameters.body\` via string templates (e.g. "{{ $input }}"); templates stringify. Either omit \`body\` and pass an object from a Code node upstream, or set a literal object.
+- Prefer templates for URLs/headers; use Code node for logic.
+- HttpRequest body: full-string templates (e.g. "{{ input }}") return raw values (including objects) and are JSON-encoded once by HttpRequest; prefer this or passing an object from a Code node upstream over partial string templates.
 - HttpRequest chaining: an HttpRequest returns a wrapper { status, statusText, headers, body, url }. Use Transform/Code to forward only \`body\` to the next HttpRequest if needed.
-- Initial arguments: immediately after \`start\`, read args from \`ctx.$input\`; from later nodes use \`ctx.$lastOutputOf('__initial__')[0]?.json\`. Do not assume args live in \`ctx.$state\`.
+- Initial arguments: immediately after \`start\`, read args from \`ctx.input\`; from later nodes use \`ctx.lastOutputOf('__initial__')\`. Do not assume args live in \`ctx.state\`.
 - Prefer fixing data flow/payload shape over replacing HttpRequest with custom fetch unless a handler limitation requires it.
 </instructions>
 
 <constraints>
 - Only call tools available this turn.
-- Use env('KEY') for all configuration and secrets; never log raw secrets.
+- Do not assume or invent env keys; workflows only see STARSHIP_ID.
 - Template rule: evaluate only full-string templates (e.g., '{{ ... }}'); no partials.
 - No nested eval: a single {{ ... }} must compute the final value.
 - Deterministic example inputs; never include secrets unless explicitly required.
@@ -55,7 +57,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
  
 
 <context>
-- Function names vs slugs: "Open Tool" (open-tool), "Edit Tool" (edit-tool), "Add Tool Blueprint Node" (add-tool-blueprint-node), etc.
+- Function names vs slugs: "Open Tool" (open-tool), "Edit Tool" (edit-tool), "Modify Tool Blueprint Node" (modify-tool-blueprint-node), "Modify Tool Blueprint Edge" (modify-tool-blueprint-edge), etc.
 - Blueprint basics: nodes, edges, metadata; flow: start → … → end; common nodes: start, end, llm, agent, http_request, conditional, transform, mutate, tool, workflow, code, user_prompt.
 </context>
 
@@ -88,7 +90,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Daedalus',
   slug: 'daedalus',
-  version: '1.0.1',
+  version: '1.0.2',
   description:
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',
@@ -101,17 +103,13 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'search-docs',
     'get-doc',
     'list-tools',
+    'list-connectors',
     'get-tool',
     'open-tool',
     'edit-tool',
     'test-tool',
-    'test-tool-blueprint',
-    'add-tool-blueprint-node',
-    'add-tool-blueprint-edge',
-    'edit-tool-blueprint-node',
-    'remove-tool-blueprint-node',
-    'edit-tool-blueprint-edge',
-    'remove-tool-blueprint-edge',
+    'modify-tool-blueprint-node',
+    'modify-tool-blueprint-edge',
   ],
 
   icon: '🛠️',

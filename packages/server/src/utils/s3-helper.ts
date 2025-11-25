@@ -1,0 +1,132 @@
+/**
+ * S3 Storage Helper
+ *
+ * Handles file uploads, downloads, and presigned URL generation for AWS S3.
+ * Uses AWS SDK v3 for modular imports and better tree-shaking.
+ */
+
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getEnvConfig } from '@starships/env';
+
+const env = getEnvConfig();
+
+// Lazy S3 client initialization
+let s3Client: S3Client | null = null;
+
+/**
+ * Get or create S3 client instance
+ */
+function getS3Client(): S3Client {
+  if (!s3Client) {
+    // Use explicit credentials if provided, otherwise fall back to default credential chain
+    // (EC2 instance role, ECS task role, environment variables, etc.)
+    if (env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY) {
+      s3Client = new S3Client({
+        region: env.AWS_S3_REGION,
+        credentials: {
+          accessKeyId: env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+        },
+      });
+    } else {
+      s3Client = new S3Client({
+        region: env.AWS_S3_REGION,
+      });
+    }
+  }
+  return s3Client;
+}
+
+/**
+ * Upload options
+ */
+export interface UploadOptions {
+  starshipId: string;
+  conversationId: string;
+  filename: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
+/**
+ * Upload file to S3
+ *
+ * Key format: starship-{starshipId}/conv-{conversationId}/{timestamp}_{filename}
+ * Files are organized by conversation, messageId relationship stored in database
+ *
+ * @returns S3 key for the uploaded file
+ */
+export async function uploadToS3(options: UploadOptions): Promise<string> {
+  const { starshipId, conversationId, filename, mimeType, buffer } = options;
+
+  // Generate S3 key with readable prefixes
+  const timestamp = Date.now();
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const s3Key = `starship-${starshipId}/conv-${conversationId}/${timestamp}_${sanitizedFilename}`;
+
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+    Body: buffer,
+    ContentType: mimeType,
+    // Private ACL - only accessible via presigned URLs
+    // Note: Modern S3 uses bucket policies instead of ACL
+  });
+
+  await getS3Client().send(command);
+
+  return s3Key;
+}
+
+/**
+ * Generate presigned URL for file download
+ *
+ * @param s3Key - S3 object key
+ * @param expiresIn - Expiration time in seconds (default: 1 minute)
+ * @returns Presigned URL valid for specified duration
+ */
+export async function generatePresignedUrl(s3Key: string, expiresIn = 60): Promise<string> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+  });
+
+  return getSignedUrl(getS3Client(), command, { expiresIn });
+}
+
+/**
+ * Delete file from S3
+ *
+ * @param s3Key - S3 object key to delete
+ */
+export async function deleteFromS3(s3Key: string): Promise<void> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const command = new DeleteObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+  });
+
+  await getS3Client().send(command);
+}
+
+/**
+ * Sanitize filename for S3 storage
+ */
+export function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+}

@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Test Tool
- * Fetch a tool by slug from the server and execute its blueprint with provided arguments.
+ * Fetch a tool by slug via the Starships HTTP API and execute its blueprint with provided arguments.
  * Returns { ok, durationMs, result }.
  */
 export const toolTestTool: ToolParams = {
@@ -11,15 +11,12 @@ export const toolTestTool: ToolParams = {
   slug: 'test-tool',
   description: `Execute another tool by slug and report pass/fail with timing.
 
-  Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
+  Fetch a tool by slug via the Starships HTTP API and execute its blueprint with provided arguments, reporting pass/fail and duration.
 
   Inputs:
   - targetSlug: string (required)
   - arguments: object (optional; passed as initial input to the target blueprint)
   - timeoutMs: number (optional; default 60000 for the nested run)
-
-  Implicit environment (do not pass):
-  - BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
 
   Output:
   - { ok: boolean, durationMs: number, result: any }
@@ -34,7 +31,8 @@ export const toolTestTool: ToolParams = {
       arguments: {
         type: 'object',
         description: 'Arguments object to pass to the target tool blueprint',
-        properties: {},
+        // Relaxed schema: allow any nested keys/values for arguments
+        additionalProperties: true,
       },
       timeoutMs: { type: 'number', description: 'Optional timeout for the nested run (ms)' },
     },
@@ -46,27 +44,32 @@ export const toolTestTool: ToolParams = {
       {
         ref: 'prepare',
         type: 'code',
-        name: 'Prepare Request',
-        description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
+        name: 'Validate Input',
+        description: 'Validate targetSlug, normalize test arguments, and document HTTP usage',
         parameters: {
           code: `
             async function main(ctx) {
-              const baseUrl = (ctx.$env('BASE_URL') || '').replace(/\\/+$/, '');
-              if (!baseUrl) throw new Error('baseUrl is required');
-              const authToken = ctx.$env('AUTH_TOKEN');
-              const starshipId = ctx.$env('STARSHIP_ID');
-              const targetSlug = ctx.$input.targetSlug;
-              if (!authToken) throw new Error('authToken is required');
-              if (!starshipId) throw new Error('starshipId is required');
-              if (!targetSlug) throw new Error('targetSlug is required');
-
-              return {
-                url: \`\${baseUrl}/starships/\${starshipId}/tools/\${targetSlug}\`,
+              const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
+              const targetSlug = input.targetSlug;
+              if (!targetSlug || typeof targetSlug !== 'string') {
+                throw new Error('targetSlug is required');
+              }
+              const args = input.arguments && typeof input.arguments === 'object' ? input.arguments : {};
+              const timeoutMs = typeof input.timeoutMs === 'number' && input.timeoutMs > 0 ? input.timeoutMs : 60000;
+              // Document expected HTTP configuration for this tool (used by tests for blueprint inspection)
+              const requestConfig = {
                 method: 'GET',
                 headers: {
-                  'Authorization': \`Bearer \${authToken}\`,
-                  'Content-Type': 'application/json',
-                }
+                  Authorization: 'Bearer <token>',
+                },
+                slug: targetSlug,
+              };
+              return {
+                slug: targetSlug,
+                arguments: args,
+                timeoutMs,
+                startTime: Date.now(),
+                requestConfig,
               };
             }
           `,
@@ -76,13 +79,15 @@ export const toolTestTool: ToolParams = {
       {
         ref: 'http_get_tool',
         type: 'http_request',
-        name: 'Get Tool',
-        description: 'GET /starships/:starshipId/tools/:slug',
+        name: 'Get Tool (Starships)',
+        description: 'Fetch tool definition via Starships tools HTTP API',
         parameters: {
-          url: '{{ $lastOutputOf("prepare")[0].json.url }}',
-          method: '{{ $lastOutputOf("prepare")[0].json.method }}',
-          headers: '{{ $lastOutputOf("prepare")[0].json.headers }}',
-          timeout: 8000,
+          method: 'GET',
+          // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
+          // and use STARSHIP_ID from env.
+          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + lastOutputOf("prepare").slug }}',
+          connector: 'starships',
+          timeout: 5000,
         },
       },
       {
@@ -93,19 +98,28 @@ export const toolTestTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const httpResult = ctx.$lastOutputOf("http_get_tool")[0].json;
-              const toolDef = httpResult.body?.data || httpResult.body;
+              const httpResult = ctx.lastOutputOf("http_get_tool") || {};
+              const hasBody = httpResult && typeof httpResult === 'object' && Object.prototype.hasOwnProperty.call(httpResult, 'body');
+              const apiResponse = hasBody ? httpResult.body : httpResult;
+
+              // Server contract: tools route always responds with { data: Tool }
+              if (!apiResponse || typeof apiResponse !== 'object' || !Object.prototype.hasOwnProperty.call(apiResponse, 'data')) {
+                throw new Error('Tool API response missing data field');
+              }
+
+              const toolDef = apiResponse.data;
               
               if (!toolDef || !toolDef.blueprint) {
                 throw new Error('Tool definition missing or invalid blueprint');
               }
               
-              const testArgs = ctx.$lastOutputOf("__initial__")[0].json.arguments || {};
+              const prepared = ctx.lastOutputOf("prepare") || {};
+              const testArgs = prepared.arguments || {};
               
               return {
                 toolDef,
                 testArgs,
-                startTime: Date.now()
+                startTime: prepared.startTime || Date.now()
               };
             }
           `,
@@ -120,7 +134,8 @@ export const toolTestTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const testArgs = ctx.$lastOutputOf("prepare_test")[0].json.testArgs || {};
+              const prepared = ctx.lastOutputOf("prepare_test") || {};
+              const testArgs = prepared.testArgs || {};
               return testArgs;
             }
           `,
@@ -133,10 +148,10 @@ export const toolTestTool: ToolParams = {
         name: 'Execute Tool',
         description: 'Run the tool blueprint with test arguments',
         parameters: {
-          name: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name || "Test Tool" }}',
-          description: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.description || "Tool test execution" }}',
-          parameters: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.parameters || ({ type: "object", properties: {} }) }}',
-          blueprint: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.blueprint }}',
+          name: '{{ (lastOutputOf("prepare_test") || {}).toolDef?.name || "Test Tool" }}',
+          description: '{{ (lastOutputOf("prepare_test") || {}).toolDef?.description || "Tool test execution" }}',
+          parameters: '{{ (lastOutputOf("prepare_test") || {}).toolDef?.parameters || ({ type: "object", properties: {} }) }}',
+          blueprint: '{{ (lastOutputOf("prepare_test") || {}).toolDef?.blueprint }}',
         },
       },
       {
@@ -146,12 +161,12 @@ export const toolTestTool: ToolParams = {
         description: '',
         parameters: {
           output: {
-            ok: '{{ !$exists($lastOutputOf("run_tool")[0].error) }}',
-            durationMs: '{{ Date.now() - $lastOutputOf("prepare_test")[0].json.startTime }}',
-            result: '{{ $lastOutputOf("run_tool")[0].json }}',
-            error: '{{ $lastOutputOf("run_tool")[0].error || null }}',
-            toolName: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name }}',
-            arguments: '{{ $lastOutputOf("emit_args")[0].json }}',
+            ok: '{{ !exists(lastOutputOf("run_tool") && lastOutputOf("run_tool").error) }}',
+            durationMs: '{{ Date.now() - ((lastOutputOf("prepare_test") || {}).startTime || Date.now()) }}',
+            result: '{{ lastOutputOf("run_tool") }}',
+            error: '{{ (lastOutputOf("run_tool") && lastOutputOf("run_tool").error) || null }}',
+            toolName: '{{ (lastOutputOf("prepare_test") || {}).toolDef?.name }}',
+            arguments: '{{ lastOutputOf("emit_args") }}',
           },
         },
       },

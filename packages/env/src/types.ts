@@ -39,8 +39,14 @@ export interface EnvironmentConfig {
   // OAuth Provider Configuration
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_DRIVE_CLIENT_ID?: string;
+  GOOGLE_DRIVE_CLIENT_SECRET?: string;
   GH_OAUTH_CLIENT_ID?: string;
   GH_OAUTH_CLIENT_SECRET?: string;
+
+  // GitHub App Configuration (used for GitHub connector)
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY_BASE64?: string;
 
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;
@@ -62,4 +68,19 @@ export interface EnvironmentConfig {
   EMAIL_FROM_ADDRESS: string;
   EMAIL_FROM_NAME: string;
   AWS_SES_REGION: string;
+
+  // LinkedIn OAuth Configuration (optional)
+  LINKEDIN_CLIENT_ID?: string;
+  LINKEDIN_CLIENT_SECRET?: string;
+
+  // Discord Bot OAuth Configuration (optional)
+  DISCORD_CLIENT_ID?: string;
+  DISCORD_CLIENT_SECRET?: string;
+  DISCORD_BOT_TOKEN?: string;
+
+  // AWS S3 Configuration (File Attachments)
+  AWS_S3_BUCKET?: string;
+  AWS_S3_REGION?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
 }

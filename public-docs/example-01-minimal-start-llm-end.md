@@ -4,7 +4,7 @@ Goal: Smallest useful blueprint that streams a model response and returns it via
 
 Requirements
 
-- Secure env must include `OPEN_ROUTER_KEY`.
+- The host environment must provide a valid OpenRouter API key via `OPENROUTER_API_KEY` (for local SDK usage). In hosted Starships, this is wired through the Starships configuration key `OPEN_ROUTER_KEY` and surfaced to the runtime as `OPENROUTER_API_KEY`.
 
 Code
 
@@ -27,7 +27,7 @@ const blueprint = {
       ref: 'e',
       type: 'end',
       name: 'Done',
-      parameters: { output: '{{ $lastOutputOf("llm")?.[0]?.json }}' },
+      parameters: { output: '{{ lastOutputOf("llm") }}' },
     },
   ],
   edges: [
@@ -36,7 +36,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY! } });
+const engine = new Engine();
 const exec = ExecutionItemUtils.createExecution();
 const out = await engine.executeBlueprint(blueprint, exec);
 // out[0].json → LLMResponse

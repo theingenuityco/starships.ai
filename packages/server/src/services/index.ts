@@ -6,6 +6,7 @@
 
 // Existing comprehensive services
 export { AgentService } from './AgentService';
+export { AttachmentService } from './AttachmentService';
 export { UserService } from './UserService';
 
 // Core data management services

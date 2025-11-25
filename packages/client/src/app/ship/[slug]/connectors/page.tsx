@@ -1,4 +1,3 @@
-
 import { Metadata } from 'next'
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { EnvironmentSettingsContent } from '@/components/environment/EnvironmentSettingsContent'
@@ -12,12 +11,12 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   return {
-    title: `${slug} Environment Settings | Starships AI`,
-    description: `Environment variable settings for starship ${slug}`,
+    title: `${slug} Connectors | Starships AI`,
+    description: `Connectors for starship ${slug}`,
   }
 }
 
-export default async function EnvironmentSettingsPage({ params }: PageProps) {
+export default async function ConnectorsPage({ params }: PageProps) {
   const { slug } = await params
 
   return (
@@ -26,3 +25,5 @@ export default async function EnvironmentSettingsPage({ params }: PageProps) {
     </JwtAuthGate>
   )
 }
+
+

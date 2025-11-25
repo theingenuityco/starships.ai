@@ -159,49 +159,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
 
-  // Build suggestion cards from agents' preview/example prompts (grouped per agent)
+  // Build suggestion cards from the selected agent's preview/example prompts
   const agentSuggestionCards = useMemo(() => {
-    if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) return []
+    if (!selectedAgent) return []
+    const a: any = selectedAgent as any
+    const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
+    if (!Array.isArray(list)) return []
+    const prompts = (list as string[]).filter(Boolean)
+    return prompts.map((text, idx) => ({
+      id: `${selectedAgent.id}:${idx}`,
+      agent: selectedAgent,
+      text,
+    }))
+  }, [selectedAgent])
 
-    const perAgent: { agent: Agent; prompts: string[] }[] = []
-
-    for (const agent of starshipAgentsData as Agent[]) {
-      const a: any = agent as any
-      const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
-      if (!Array.isArray(list)) continue
-      const prompts = (list as string[]).filter(Boolean).slice(0, 3)
-      if (prompts.length === 0) continue
-      perAgent.push({ agent, prompts })
-    }
-
-    const items: { id: string; agent: Agent; text: string }[] = []
-    const maxPerAgent = 3
-
-    // Interleave prompts so first row uses one suggestion per agent, and additional
-    // suggestions from each agent appear in later rows.
-    for (let idx = 0; idx < maxPerAgent; idx++) {
-      for (const entry of perAgent) {
-        const text = entry.prompts[idx]
-        if (!text) continue
-        items.push({ id: `${entry.agent.id}:${idx}`, agent: entry.agent, text })
-        if (items.length >= 9) break
-      }
-      if (items.length >= 9) break
-    }
-
-    return items
-  }, [starshipAgentsData])
-
-  // For collapsed view, show at most one suggestion per agent
+  // For collapsed view, show only the first few prompts for the selected agent
   const collapsedSuggestionCards = useMemo(() => {
-    const seen = new Set<string>()
-    const result: { id: string; agent: Agent; text: string }[] = []
-    for (const item of agentSuggestionCards) {
-      if (seen.has(item.agent.id)) continue
-      seen.add(item.agent.id)
-      result.push(item)
-    }
-    return result
+    return agentSuggestionCards.slice(0, 4)
   }, [agentSuggestionCards])
 
   // Gate UI by presence of a conversation id; streaming details are handled in context consumers
@@ -537,12 +511,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           // Navigate to tool builder route for tool actions
-          const toolBuilderSlugFragments = [
-            'open-tool',
-            'edit-tool',
-            'modify-tool-blueprint-node',
-            'modify-tool-blueprint-edge',
-          ]
+          const toolBuilderSlugFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
           if (toolBuilderSlugFragments.some(s => toolNameLc.includes(s)) || toolNameLc.includes('tool-blueprint-')) {
             try {
               const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
@@ -953,24 +922,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         </ConversationStreamProvider>
 
         {/* Input Container - Centered on welcome, bottom section during conversation */}
-        <div
-          ref={inputContainerRef}
-          className={cn(
-            'px-6 pb-4 pt-2',
-            !showMessagesArea && 'flex flex-1 items-center justify-center py-4'
-          )}
-        >
-          <div
-            className={cn(
-              'w-full max-w-3xl mx-auto pointer-events-auto opacity-100 relative',
-              !showMessagesArea && 'mt-[-240px]'
-            )}
-            data-message-input
-          >
+        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'flex flex-1 items-center justify-center py-4')}>
+          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-[-240px]')} data-message-input>
             {!showMessagesArea && (
               <div className="mb-4 text-center opacity-100">
                 <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                <p className="text-muted-foreground text-lg font-light">Choose a suggested task below to start collaborating on your project</p>
+                <p className="text-muted-foreground text-lg font-light">Choose a suggested prompt below to start collaborating with your agent</p>
               </div>
             )}
             <ConversationMessageInput
@@ -993,24 +950,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
-            {/* Suggestion cards positioned below the input without shifting it */}
+            {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
             {!showMessagesArea && agentSuggestionCards.length > 0 && (
               <div className="mt-4 absolute inset-x-0 top-full">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested tasks</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
                   {agentSuggestionCards.length > 3 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllSuggestions(v => !v)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
+                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="text-xs font-medium text-primary hover:underline">
                       {showAllSuggestions ? 'Show fewer' : 'Explore all'}
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <ul className="space-y-2">
                   {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
-                    <div key={item.id} className="h-full">
+                    <li key={item.id}>
                       <button
                         type="button"
                         onClick={() => {
@@ -1019,27 +972,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                             messageInputRef.current?.focusInput?.()
                           } catch {}
                         }}
-                        className="group flex h-40 w-full flex-col rounded-xl border bg-card/95 p-4 text-left transition-all duration-150 hover:bg-primary/5 hover:border-primary/40"
+                        className="group flex w-full rounded-2xl border border-border/60 bg-card px-3 py-2 text-left transition-colors hover:bg-primary/5 hover:border-primary/40"
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="line-clamp-3 text-base leading-relaxed text-foreground/95 group-hover:text-primary break-words">
-                            <span className="mr-1 text-lg align-top text-primary/70">“</span>
-                            {item.text}
-                            <span className="ml-1 text-lg align-baseline text-primary/70">”</span>
-                          </p>
-                        </div>
-                        <div className="mt-3 flex items-center gap-2">
-                          <Avatar className="h-7 w-7 flex-shrink-0 ring-[0.5px] ring-border/40 bg-muted flex items-center justify-center">
-                            <AgentAvatar seed={item.agent.name} size={24} rounded />
-                          </Avatar>
-                          <p className="text-xs font-medium text-muted-foreground truncate group-hover:text-foreground">
-                            {item.agent.name}
-                          </p>
-                        </div>
+                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-primary break-words">
+                          <span className="mr-1 text-base align-top text-primary/70">“</span>
+                          {item.text}
+                          <span className="ml-1 text-base align-baseline text-primary/70">”</span>
+                        </p>
                       </button>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </div>

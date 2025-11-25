@@ -626,7 +626,7 @@ export class ConversationService {
     // This works even when conversation doesn't exist yet (first message scenario)
     ConversationService.activeCancellations.set(data.conversationId, () => {
       // Placeholder cancel function - will be replaced by actual runner cancel when workflow starts
-      console.warn('[CONVERSATION] Placeholder cancellation called (should not happen)');
+      // This should never be called, but if it is, it's a no-op
     });
 
     // Now check conversation state (async, but we're already protected by activeCancellations)

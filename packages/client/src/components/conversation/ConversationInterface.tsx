@@ -175,7 +175,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // For collapsed view, show only the first few prompts for the selected agent
   const collapsedSuggestionCards = useMemo(() => {
-    return agentSuggestionCards.slice(0, 4)
+    return agentSuggestionCards.slice(0, 3)
   }, [agentSuggestionCards])
 
   // Gate UI by presence of a conversation id; streaming details are handled in context consumers
@@ -951,13 +951,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
             {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
-            {!showMessagesArea && agentSuggestionCards.length > 0 && (
+            {!showMessagesArea && agentSuggestionCards.length >= 3 && (
               <div className="mt-4 absolute inset-x-0 top-full">
                 <div className="mb-4 flex items-center justify-between">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
                   {agentSuggestionCards.length > 3 && (
-                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="text-xs font-medium text-primary hover:underline">
-                      {showAllSuggestions ? 'Show fewer' : 'Explore all'}
+                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                      {showAllSuggestions ? (
+                        <>
+                          Show fewer
+                          <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
+                        </>
+                      ) : (
+                        <>
+                          Explore all
+                          <Icon name="chevron-down" className="h-3 w-3" />
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -988,7 +998,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           </div>
         </div>
         {/* Extra space after suggestions so the page can scroll past the last card */}
-        {!showMessagesArea && agentSuggestionCards.length > 0 && <div className="h-32" />}
+        {!showMessagesArea && agentSuggestionCards.length >= 3 && <div className="h-32" />}
       </div>
     </div>
   )

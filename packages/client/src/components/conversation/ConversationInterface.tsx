@@ -953,7 +953,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
             {!showMessagesArea && agentSuggestionCards.length > 0 && (
               <div className="mt-4 absolute inset-x-0 top-full">
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
                   {agentSuggestionCards.length > 3 && (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="text-xs font-medium text-primary hover:underline">
@@ -961,7 +961,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                     </button>
                   )}
                 </div>
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
                     <li key={item.id}>
                       <button

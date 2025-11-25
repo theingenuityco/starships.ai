@@ -15,7 +15,7 @@ import type {
   LlmMessage,
   EngineConfig,
 } from '@starships/autopilot';
-import { NotFoundError } from '@starships/errors';
+import { NotFoundError, ConflictError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
@@ -609,6 +609,26 @@ export class ConversationService {
     data: Message & { conversationId: string; attachmentIds?: string[] },
     ctx?: { authorization?: string }
   ): Promise<void> {
+    // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
+    // Check both active cancellation handles and conversation state for robustness
+    const hasActiveCancellation = ConversationService.activeCancellations.has(data.conversationId);
+    const conversationStateCheck = await this.getConversationById(data.conversationId);
+    const turnActive =
+      conversationStateCheck?.state &&
+      typeof conversationStateCheck.state === 'object' &&
+      (conversationStateCheck.state as { turnActive?: boolean }).turnActive === true;
+
+    if (hasActiveCancellation || turnActive) {
+      console.warn('[CONVERSATION] Blocked duplicate message - turn already active', {
+        conversationId: data.conversationId,
+        hasActiveCancellation,
+        turnActive,
+      });
+      throw new ConflictError(
+        'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.'
+      );
+    }
+
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
       conversationId: data.conversationId,

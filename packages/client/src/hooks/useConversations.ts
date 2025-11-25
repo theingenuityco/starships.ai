@@ -992,6 +992,14 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const status = error?.response?.status
       const code = error?.response?.data?.error?.code || error?.response?.data?.code
 
+      if (status === 409 || code === 'CONFLICT') {
+        // Turn already in progress - show friendly message
+        toast.error('Please wait', {
+          description: 'A response is already being generated. Please wait for it to complete before sending another message.',
+        })
+        return
+      }
+
       if (status === 402 || code === 'INSUFFICIENT_FUNDS') {
         // Inject an inline system message into the streamed cache so the user sees it in chat
         const convId = (variables as any)?.conversationId as string | undefined

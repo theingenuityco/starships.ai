@@ -207,8 +207,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       disabledRef.current = disabled
     }, [disabled])
     useEffect(() => {
-      streamingRef.current = isStreamingEffective
-    }, [isStreamingEffective])
+      // Sync ref from state, but preserve manual blocking during pre-stream window
+      // Only sync when streaming is actually active OR when we're in idle state (not pre-stream pending)
+      // This prevents the ref from being reset to false when conversationId changes during first message creation
+      if (isStreamingEffective || !preStreamPending) {
+        streamingRef.current = isStreamingEffective
+      }
+    }, [isStreamingEffective, preStreamPending])
     useEffect(() => {
       sendingRef.current = sending
     }, [sending])

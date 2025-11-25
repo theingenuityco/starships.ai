@@ -81,7 +81,7 @@ export function useCreateConversation() {
       }
     },
     onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to create conversation', {
         description: errorMessage,
       })
@@ -164,8 +164,8 @@ export function useDeleteConversation() {
       }
 
       // SIMPLE FIX: Use simple error sanitization
-      const errorMessage = getSafeErrorMessage(error);
-      
+      const errorMessage = getSafeErrorMessage(error)
+
       toast.error('Failed to delete conversation', {
         description: errorMessage,
       })
@@ -184,15 +184,15 @@ export function useDeleteConversation() {
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(context.starshipId),
         })
       }
-      
+
       // Also invalidate all starship conversation queries as a fallback
       // This ensures UI updates even if starshipId detection failed
       queryClient.invalidateQueries({
         queryKey: CONVERSATION_QUERY_KEYS.all,
-        predicate: (query) => {
+        predicate: query => {
           const key = query.queryKey as string[]
           return key.includes('starship') && key.includes('list')
-        }
+        },
       })
     },
   })
@@ -226,7 +226,7 @@ export function useDeleteMessage() {
         queryKey: CONVERSATION_QUERY_KEYS.all,
       })
 
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to delete message', {
         description: errorMessage,
       })
@@ -277,7 +277,7 @@ export function useUpdateConversationStatus() {
       toast.success(`Conversation ${variables.status} successfully!`)
     },
     onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to update status', {
         description: errorMessage,
       })
@@ -307,26 +307,21 @@ export function useUpdateConversation() {
       })
 
       // Update conversation in all starship conversation lists directly
-      queryClient.setQueriesData(
-        { queryKey: CONVERSATION_QUERY_KEYS.all },
-        (oldData: any) => {
-          if (!oldData || !oldData.conversations) return oldData
-          
-          return {
-            ...oldData,
-            conversations: oldData.conversations.map((conv: any) => 
-              conv.id === variables.conversationId 
-                ? { ...conv, title: updatedConversation.title, updatedAt: updatedConversation.updatedAt }
-                : conv
-            )
-          }
+      queryClient.setQueriesData({ queryKey: CONVERSATION_QUERY_KEYS.all }, (oldData: any) => {
+        if (!oldData || !oldData.conversations) return oldData
+
+        return {
+          ...oldData,
+          conversations: oldData.conversations.map((conv: any) =>
+            conv.id === variables.conversationId ? { ...conv, title: updatedConversation.title, updatedAt: updatedConversation.updatedAt } : conv
+          ),
         }
-      )
+      })
 
       toast.success('Conversation renamed successfully!')
     },
     onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to rename conversation', {
         description: errorMessage,
       })
@@ -360,7 +355,7 @@ export function useConversationStop() {
         // Signal server to persist partials and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
       } catch (error: any) {
-        const msg = getSafeErrorMessage(error);
+        const msg = getSafeErrorMessage(error)
         toast.error('Failed to stop response', { description: msg })
         return
       }
@@ -418,9 +413,12 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   const controller = new AbortController()
 
   // SIMPLE FIX: Auto-cleanup after 5 minutes to prevent resource leaks
-  const timeoutId = setTimeout(() => {
-    controller.abort()
-  }, 5 * 60 * 1000)
+  const timeoutId = setTimeout(
+    () => {
+      controller.abort()
+    },
+    5 * 60 * 1000
+  )
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
   const queue: StreamedChunk[] = []
@@ -448,10 +446,8 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
     queue.length = 0 // Clear queue to prevent memory leaks
   }
 
-  // SIMPLE FIX: Combine signals properly 
-  const combinedSignal = signal ? 
-    AbortSignal.any([signal, controller.signal]) : 
-    controller.signal
+  // SIMPLE FIX: Combine signals properly
+  const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
 
   if (signal?.aborted) {
     cleanup()
@@ -1028,7 +1024,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         return
       }
 
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to send message', { description: errorMessage })
     },
   })

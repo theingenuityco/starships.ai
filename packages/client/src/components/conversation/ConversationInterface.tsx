@@ -950,6 +950,42 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
+            {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
+            {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agents on this starship</p>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                  {starshipAgentsData.map((agent: any) => (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      onClick={() => handleAgentChange(agent)}
+                      className={cn(
+                        'group flex-shrink-0 w-[260px] rounded-3xl border bg-card/80 px-4 py-4 text-left transition-colors hover:bg-primary/5 hover:border-primary/50',
+                        selectedAgent?.id === agent.id ? 'border-primary/60 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.4)]' : 'border-border/60'
+                      )}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-10 w-10 ring-1 ring-border/40 rounded-full">
+                            <AgentAvatar seed={agent.name} size={40} rounded />
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex flex-col gap-0.5">
+                              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary">{agent.name}</p>
+                              {agent.slug && <span className="text-[11px] text-muted-foreground/80 truncate">{agent.slug}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {agent.description && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{agent.description}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
             {!showMessagesArea && agentSuggestionCards.length >= 3 && (
               <div className="mt-4 absolute inset-x-0 top-full">

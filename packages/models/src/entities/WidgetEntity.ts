@@ -7,7 +7,7 @@
 
 import type { WidgetModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsISO8601, IsObject, IsString, Length, validate, ValidationError } from 'class-validator';
 
 export class WidgetEntity implements WidgetModel {
   // Core database fields

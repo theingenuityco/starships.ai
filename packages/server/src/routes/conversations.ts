@@ -76,13 +76,16 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       streamingService.addConnection(conversationId, res, { baseLength });
 
       // Send initial turn state snapshot so clients know if a turn is active after refresh
+      let turnActiveFlag = false;
       try {
         const conversationService = new ConversationService();
         const conversation = await conversationService.getConversationById(conversationId);
         const convState = ((conversation as any)?.state as any) || {};
+        const bufferedState = streamingService.getBufferedTurnActive(conversationId);
+        turnActiveFlag = typeof bufferedState === 'boolean' ? bufferedState : !!convState.turnActive;
         await streamingService.broadcastTurnState(conversationId, {
           conversationId,
-          turnActive: !!convState.turnActive,
+          turnActive: turnActiveFlag,
           lastCompleteAt: convState.lastCompleteAt,
         });
       } catch (err) {
@@ -126,7 +129,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           const minContentPosition = typeof claims.p === 'number' ? claims.p : undefined;
           await streamingService.replayCurrentTurn(conversationId, {
             minContentPosition,
-            skipAssistantShell: replayHasAssistantShell,
+            skipAssistantShell: !turnActiveFlag || replayHasAssistantShell,
+            turnIsActive: turnActiveFlag,
           });
         }
       } else {
@@ -141,7 +145,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         }
 
         // Also replay current turn events to cover race where streaming started just before connect
-        await streamingService.replayCurrentTurn(conversationId);
+        const baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
+        await streamingService.replayCurrentTurn(conversationId, {
+          skipAssistantShell: !turnActiveFlag || baselineHasAssistant,
+          turnIsActive: turnActiveFlag,
+        });
       }
 
       // Connection stays open for live updates via StreamingService

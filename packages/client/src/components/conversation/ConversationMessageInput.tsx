@@ -406,35 +406,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (pendingFiles.length > 0) {
           for (const pendingFile of pendingFiles) {
             // Mark as uploading
-            setPendingFiles(prev =>
-              prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: true } : f))
-            )
+            setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: true } : f)))
 
             try {
               const attachment = await uploadFile(pendingFile.file, currentConversationId!)
               if (attachment) {
                 attachmentIdsToSend.push(attachment.id)
-                setPendingFiles(prev =>
-                  prev.map(f =>
-                    f.id === pendingFile.id
-                      ? { ...f, uploading: false, uploaded: true, attachmentId: attachment.id }
-                      : f
-                  )
-                )
+                setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: false, uploaded: true, attachmentId: attachment.id } : f)))
               } else {
-                setPendingFiles(prev =>
-                  prev.map(f =>
-                    f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f
-                  )
-                )
+                setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f)))
                 toast.error(`Failed to upload ${pendingFile.file.name}`)
               }
             } catch (error) {
-              setPendingFiles(prev =>
-                prev.map(f =>
-                  f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f
-                )
-              )
+              setPendingFiles(prev => prev.map(f => (f.id === pendingFile.id ? { ...f, uploading: false, error: 'Upload failed' } : f)))
               toast.error(`Failed to upload ${pendingFile.file.name}`)
             }
           }
@@ -2077,13 +2061,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             <div className="bg-muted/30 backdrop-blur-sm rounded-lg px-2 py-1.5 border border-border/40">
               <div className="flex flex-wrap gap-1.5">
                 {pendingFiles.map(file => (
-                  <FileAttachmentPreview
-                    key={file.id}
-                    file={file}
-                    onRemove={() => handleRemoveFile(file.id)}
-                    uploading={file.uploading}
-                    minimal={true}
-                  />
+                  <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} minimal={true} />
                 ))}
               </div>
             </div>
@@ -2091,13 +2069,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Input Container with Expandable Overlay */}
-        <div
-          className={cn(
-            'relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm',
-            'focus-within:border-primary/70',
-            disabled && 'opacity-50'
-          )}
-        >
+        <div className={cn('relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm', 'focus-within:border-primary/70', disabled && 'opacity-50')}>
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && (
             <ExpandableMessageOverlay
@@ -2111,27 +2083,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className="flex relative items-center px-3 py-3">
+          <div className={cn('flex relative items-center', minimal ? 'px-2 py-2' : 'px-3 py-3')}>
             {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" onChange={handleFileSelect} className="hidden" />
 
             {/* Optional left-side controls in expanded mode */}
             {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn("flex-1 min-w-0 pr-12 relative z-10")}
+              className={cn('flex-1 min-w-0 pr-12 relative z-10')}
               ref={editorContainerRef}
               onPaste={handlePaste}
               style={{
-                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined
+                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
               }}
             >
               <div className="max-h-[300px] overflow-y-auto">
@@ -2140,18 +2105,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div
-                  ref={attachmentContainerRef}
-                  className="absolute bottom-0 left-0 right-0 pr-15"
-                >
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-15">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
-                      <FileAttachmentPreview
-                        key={file.id}
-                        file={file}
-                        onRemove={() => handleRemoveFile(file.id)}
-                        uploading={file.uploading}
-                      />
+                      <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
                     ))}
                   </div>
                 </div>
@@ -2163,7 +2120,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || fileUploading}
               className={cn(
-                'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5 rounded-lg transition-colors',
+                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
+                'rounded-lg transition-colors',
                 'hover:bg-muted text-muted-foreground hover:text-foreground',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
@@ -2174,7 +2132,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </button>
 
             {/* Right-side Actions: Stop (when streaming) or Send */}
-            <div className="absolute z-20 flex gap-2 top-1/2 -translate-y-1/2 right-3">
+            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-3' : 'bottom-3 right-3')}>
               {shouldShowStop ? (
                 <div className="relative h-8 w-8">
                   <Button

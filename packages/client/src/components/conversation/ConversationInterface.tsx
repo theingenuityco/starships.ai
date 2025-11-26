@@ -983,6 +983,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                       })()}
                     </p>
                   </div>
+                  {starshipSlug && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          router.push(`/ship/${starshipSlug}/agents`)
+                        } catch {}
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      See all agents
+                      <Icon name="chevron-right" className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex gap-3 overflow-x-auto custom-scrollbar">
                   {starshipAgentsData.map((agent: any) => (
@@ -1026,7 +1040,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 <div className="mb-4 flex items-center justify-between">
                   <div className="text-left">
                     <p className="text-sm font-semibold text-foreground">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Pick a prompt to quickly start a conversation with this agent.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Pick a prompt to quickly start a conversation with this agent</p>
                   </div>
                   {agentSuggestionCards.length > 3 && (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">

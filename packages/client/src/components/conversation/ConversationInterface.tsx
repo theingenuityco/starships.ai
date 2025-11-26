@@ -7,7 +7,7 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
 import { ConversationStreamProvider, useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -85,6 +85,7 @@ function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: stri
 
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
+  const { data: authUser } = useAuthUser()
   const router = useRouter()
 
   // Agent and UI state
@@ -174,6 +175,30 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       text,
     }))
   }, [selectedAgent])
+
+  // Starter hero greetings – personalized (first name only), concise, one chosen per mount
+  const displayName = useMemo(() => {
+    const full = authUser?.name?.trim()
+    if (!full) return 'there'
+    const first = full.split(/\s+/)[0]
+    return first || 'there'
+  }, [authUser?.name])
+  const starterGreetings = useMemo(
+    () => [
+      `Hi ${displayName}`,
+      `Ship mode on`,
+      `It's automation time`,
+      `Agents awaiting orders`,
+      `Ideas to agents, ${displayName}`,
+      `Less meetings, more shipping`,
+      `New mission unlocked`,
+      `Let the agents handle it`,
+      `One prompt away from prod`,
+      `Prototype now, refactor later`,
+    ],
+    [displayName]
+  )
+  const starterGreeting = useMemo(() => starterGreetings[Math.floor(Math.random() * starterGreetings.length)] ?? 'What are we building today?', [starterGreetings])
 
   // For collapsed view, show only the first few prompts for the selected agent
   const collapsedSuggestionCards = useMemo(() => {
@@ -924,7 +949,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
         {/* Input Container - Centered on welcome, bottom section during conversation */}
         <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'flex flex-1 items-center justify-center py-4')}>
-          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-[-240px]')} data-message-input>
+          <div className="w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative" style={!showMessagesArea ? { transform: `translateY(-${dockOffsetPx}px)` } : undefined} data-message-input>
+            {!showMessagesArea && (
+              <div className="mb-8 text-center opacity-100">
+                <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
+              </div>
+            )}
             <ConversationMessageInput
               key={inputKey}
               ref={messageInputRef}
@@ -947,35 +977,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             ></ConversationMessageInput>
             {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
             {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
-              <div className="mt-10">
+              <div className="mt-12">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground">Select an agent</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {(() => {
-                        const count = Array.isArray(starshipAgentsData) ? starshipAgentsData.length : 0
-                        const name = starshipData?.name || starshipSlug || 'this starship'
-                        if (count === 0) {
-                          return (
-                            <>
-                              Your starship <span className="font-semibold">{name}</span> has no active agents available to run
-                            </>
-                          )
-                        }
-                        if (count === 1) {
-                          return (
-                            <>
-                              Your starship <span className="font-semibold">{name}</span> has 1 active agent available to run
-                            </>
-                          )
-                        }
-                        return (
-                          <>
-                            Your starship <span className="font-semibold">{name}</span> has {count} active agents available to run
-                          </>
-                        )
-                      })()}
-                    </p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select an agent</p>
                   </div>
                   {starshipSlug && (
                     <button
@@ -1030,11 +1035,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             )}
             {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
             {!showMessagesArea && agentSuggestionCards.length >= 3 && (
-              <div className="mt-10 absolute inset-x-0 top-full">
+              <div className="mt-12 absolute inset-x-0 top-full">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Pick a prompt to quickly start a conversation with this agent</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
                   </div>
                   {agentSuggestionCards.length > 3 && (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">

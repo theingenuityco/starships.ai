@@ -924,7 +924,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'flex flex-1 items-center justify-center py-4')}>
           <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-[-240px]')} data-message-input>
             {!showMessagesArea && (
-              <div className="mb-6 text-center opacity-100">
+              <div className="mb-4 text-center opacity-100">
                 <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
                 <p className="text-muted-foreground text-lg font-light">Choose a suggested prompt below to start collaborating with your agent</p>
               </div>
@@ -951,11 +951,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             ></ConversationMessageInput>
             {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
             {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
-              <div className="mt-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agents on this starship</p>
+              <div className="mt-10">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select an agent deployed on this starship</p>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                <div className="flex gap-3 overflow-x-auto custom-scrollbar">
                   {starshipAgentsData.map((agent: any) => (
                     <button
                       key={agent.id}
@@ -993,8 +993,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             )}
             {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
             {!showMessagesArea && agentSuggestionCards.length >= 3 && (
-              <div className="mt-6 absolute inset-x-0 top-full">
-                <div className="mb-4 flex items-center justify-between">
+              <div className="mt-10 absolute inset-x-0 top-full">
+                <div className="mb-3 flex items-center justify-between">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
                   {agentSuggestionCards.length > 3 && (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">

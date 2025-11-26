@@ -1759,109 +1759,60 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.debug('[MessageInput.ensureLeadingAgentMention] current first paragraph', summary)
         } catch {}
 
-        // Collect all mention nodes across the entire document
-        const allMentions: any[] = []
-        for (let bi = 0; bi < docContent.length; bi++) {
-          const b = docContent[bi]
-          const cont = Array.isArray(b?.content) ? b.content : []
-          for (let ci = 0; ci < cont.length; ci++) {
-            const node = cont[ci]
-            if (node && node.type === 'mention' && node.attrs && node.attrs.id) {
-              allMentions.push(node)
-            }
-          }
-        }
-
-        if (allMentions.length > 0) {
-          // Always prefer the most recently inserted mention anywhere in the doc
-          const desiredMention = allMentions[allMentions.length - 1]
-          // Build remaining content for the first paragraph excluding all mention nodes
-          let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
-
-          // Normalize whitespace: ensure exactly one space after mention, preserve content structure
-          let contentAfterMention: any[] = []
-
-          if (rest.length === 0) {
-            // No content - just one NBSP space
-            contentAfterMention = [{ type: 'text', text: '\u00A0' }]
-          } else {
-            // Find first node with actual content
-            let firstContentIdx = -1
-            for (let i = 0; i < rest.length; i++) {
-              const node = rest[i]
-              if (node && node.type === 'text' && typeof node.text === 'string' && node.text.trim().length > 0) {
-                firstContentIdx = i
-                break
-              } else if (node && node.type !== 'text') {
-                firstContentIdx = i
-                break
-              }
-            }
-
-            if (firstContentIdx === -1) {
-              // Only whitespace
-              contentAfterMention = [{ type: 'text', text: '\u00A0' }]
-            } else {
-              // Get content from first real content onwards
-              const contentNodes = rest.slice(firstContentIdx)
-              const firstNode = contentNodes[0]
-
-              if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
-                // Trim start of first text node, add exactly one NBSP space
-                const updatedFirst = { ...firstNode, text: '\u00A0' + firstNode.text.trimStart() }
-                contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
-              } else {
-                // Non-text first node - add NBSP before it
-                contentAfterMention = [{ type: 'text', text: '\u00A0' }, ...contentNodes]
-              }
-            }
-          }
-
-          const newFirstParagraph = {
-            type: 'paragraph',
-            content: [desiredMention, ...contentAfterMention],
-          }
-
-          // Remove all other mention nodes from the rest of the document
-          const cleanedOtherBlocks = docContent.slice(1).map((blk: any) => {
-            const origContent = Array.isArray(blk?.content) ? blk.content : []
-            const filtered = origContent.filter((n: any) => !(n && n.type === 'mention'))
-            return { ...blk, content: filtered }
-          })
-
-          const newDoc = { type: 'doc', content: [newFirstParagraph, ...cleanedOtherBlocks] }
-          try {
-            const preview = newFirstParagraph.content.slice(0, 3).map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
-            console.debug('[MessageInput.ensureLeadingAgentMention] rebuilding paragraph', preview)
-          } catch {}
-          scheduleSetContent(newDoc)
-
-          // Mark this agent as enforced to prevent re-enforcement
-          lastEnforcedAgentIdRef.current = desiredMention.attrs.id
-
-          // Position cursor after the mention and space
-          setTimeout(() => {
-            try {
-              tiptap?.commands.focus()
-              // Position after mention (1) + space (1) = position 2
-              const newPos = 2
-              tiptap?.commands.setTextSelection(newPos)
-            } catch {}
-          }, 10)
-          return
-        }
-
-        // Otherwise, insert the current agent mention at the very start and ensure no other mentions exist anywhere
+        // Always derive the mention from the current selected agent rather than
+        // reusing whatever mention node happens to be in the document. This keeps
+        // the leading chip in sync when the selected agent changes externally
+        // (e.g. via the "Agents on this starship" cards).
         if (isEditingMentionRef.current) return
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return
 
-        // Always add space after mention
-        const spaceNode = [{ type: 'text', text: '\u00A0' }]
+        // Build remaining content for the first paragraph excluding all mention nodes
+        let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+
+        // Normalize whitespace: ensure exactly one space after mention, preserve content structure
+        let contentAfterMention: any[] = []
+
+        if (rest.length === 0) {
+          // No content - just one NBSP space
+          contentAfterMention = [{ type: 'text', text: '\u00A0' }]
+        } else {
+          // Find first node with actual content
+          let firstContentIdx = -1
+          for (let i = 0; i < rest.length; i++) {
+            const node = rest[i]
+            if (node && node.type === 'text' && typeof node.text === 'string' && node.text.trim().length > 0) {
+              firstContentIdx = i
+              break
+            } else if (node && node.type !== 'text') {
+              firstContentIdx = i
+              break
+            }
+          }
+
+          if (firstContentIdx === -1) {
+            // Only whitespace
+            contentAfterMention = [{ type: 'text', text: '\u00A0' }]
+          } else {
+            // Get content from first real content onwards
+            const contentNodes = rest.slice(firstContentIdx)
+            const firstNode = contentNodes[0]
+
+            if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
+              // Trim start of first text node, add exactly one NBSP space
+              const updatedFirst = { ...firstNode, text: '\u00A0' + firstNode.text.trimStart() }
+              contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
+            } else {
+              // Non-text first node - add NBSP before it
+              contentAfterMention = [{ type: 'text', text: '\u00A0' }, ...contentNodes]
+            }
+          }
+        }
+
         const newFirstParagraph = {
           type: 'paragraph',
-          content: [desiredMention, ...spaceNode, ...blockContent.filter((n: any) => !(n && n.type === 'mention'))],
+          content: [desiredMention, ...contentAfterMention],
         }
         const cleanedOtherBlocks = docContent.slice(1).map((blk: any) => {
           const origContent = Array.isArray(blk?.content) ? blk.content : []
@@ -1881,7 +1832,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           try {
             tiptap?.commands.focus()
             // Position after mention (1) + space (1) = position 2
-            const newPos = 2 + blockContent.length
+            const newPos = 2
             tiptap?.commands.setTextSelection(Math.min(newPos, tiptap?.state.doc.content.size - 1))
           } catch {}
         }, 10)

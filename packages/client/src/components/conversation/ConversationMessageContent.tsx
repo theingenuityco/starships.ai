@@ -203,9 +203,45 @@ export function ConversationMessageContent({
     )
   }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
 
+  const messageContainerRef = useRef<HTMLDivElement>(null)
+
   const handleCopyContent = async () => {
     try {
-      await navigator.clipboard.writeText(displayContent)
+      const container = messageContainerRef.current
+      if (!container) {
+        await navigator.clipboard.writeText(displayContent)
+        toast.success('Message copied to clipboard')
+        return
+      }
+
+      const clone = container.cloneNode(true) as HTMLElement
+      
+      // Convert tables to markdown format (same as individual table copy)
+      clone.querySelectorAll('table').forEach(table => {
+        const rows = Array.from(table.querySelectorAll('tr')).map(tr =>
+          Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').trim())
+        ).filter(row => row.length > 0)
+        
+        if (rows.length === 0) return
+        
+        const numColumns = Math.max(...rows.map(r => r.length), 1)
+        const widths = Array(numColumns).fill(3)
+        rows.forEach(row => row.forEach((cell, i) => {
+          widths[i] = Math.max(widths[i], cell.length)
+        }))
+        
+        const header = '| ' + [...rows[0], ...Array(numColumns - rows[0].length).fill('')].join(' | ') + ' |'
+        const separator = '| ' + widths.map(w => '-'.repeat(w)).join(' | ') + ' |'
+        const dataRows = rows.slice(1).map(row => 
+          '| ' + [...row, ...Array(numColumns - row.length).fill('')].join(' | ') + ' |'
+        )
+        
+        const textNode = document.createTextNode([header, separator, ...dataRows].join('\n') + '\n')
+        table.parentNode?.replaceChild(textNode, table)
+      })
+      
+      const plainText = (clone.textContent || '').trim()
+      await navigator.clipboard.writeText(plainText)
       toast.success('Message copied to clipboard')
     } catch (error) {
       toast.error('Failed to copy message')
@@ -226,9 +262,23 @@ export function ConversationMessageContent({
     }
   }
 
+  const handleCopyTable = async (tableContent: string, tableId: string) => {
+    try {
+      await navigator.clipboard.writeText(tableContent)
+      setCopiedStates(prev => ({ ...prev, [tableId]: true }))
+      toast.success('Table copied to clipboard')
+
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [tableId]: false }))
+      }, 2000)
+    } catch (error) {
+      toast.error('Failed to copy table')
+    }
+  }
+
   // Shared markdown components for consistent rendering across app
   const markdownComponents = useMemo(
-    () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock }),
+    () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock, onCopyTable: handleCopyTable }),
     [theme, enableLinkPreview, messageId, copiedStates]
   )
 
@@ -251,7 +301,7 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div className={cn('relative group w-full', className)}>
+    <div ref={messageContainerRef} className={cn('relative group w-full', className)}>
       {/* Reasoning (thinking) collapsible */}
       {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
@@ -277,13 +327,11 @@ export function ConversationMessageContent({
       {/* Attachments */}
       {attachmentIds && attachmentIds.length > 0 && starshipId && (
         <div className="mb-1 space-y-2">
-          {isLoadingAttachments ? (
-            // Loading state
-            attachmentIds.map((id) => <MessageAttachmentSkeleton key={id} />)
-          ) : (
-            // Render attachments
-            attachments?.map((attachment) => <MessageAttachment key={attachment.id} attachment={attachment} />)
-          )}
+          {isLoadingAttachments
+            ? // Loading state
+              attachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+            : // Render attachments
+              attachments?.map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
         </div>
       )}
 

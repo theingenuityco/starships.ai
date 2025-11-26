@@ -120,7 +120,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           }
 
           // 2) Replay current-turn buffered events (skip 'message' to avoid duplicate persisted messages)
-          await streamingService.replayCurrentTurn(conversationId);
+          const minContentPosition = typeof claims.p === 'number' ? claims.p : undefined;
+          await streamingService.replayCurrentTurn(conversationId, { minContentPosition });
         }
       } else {
         // Send only messages the client may be missing based on their baselineLength hint

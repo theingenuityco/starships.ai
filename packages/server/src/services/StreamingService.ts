@@ -632,7 +632,12 @@ export class StreamingService {
    * Replay buffered events for the current turn only (events that occurred after the last 'complete').
    * Skips 'message' events to avoid duplicating persisted baseline messages.
    */
-  async replayCurrentTurn(streamId: string): Promise<void> {
+  async replayCurrentTurn(
+    streamId: string,
+    opts?: {
+      minContentPosition?: number;
+    }
+  ): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
 
@@ -660,6 +665,11 @@ export class StreamingService {
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history
+          const skip =
+            evt.type === 'delta' && opts?.minContentPosition !== undefined
+              ? this.shouldSkipDelta(evt.payload as Operation, opts)
+              : false;
+          if (skip) continue;
           replayedAny = true;
           switch (evt.type) {
             case 'delta': {
@@ -697,5 +707,35 @@ export class StreamingService {
     } finally {
       this.suppressBuffering = false;
     }
+  }
+
+  private shouldSkipDelta(
+    delta: Operation,
+    opts: {
+      minContentPosition?: number;
+    }
+  ): boolean {
+    if (!delta || typeof delta !== 'object') return false;
+    const path = typeof delta.path === 'string' ? delta.path : '';
+    if (delta.op !== 'add' || !path) return false;
+
+    const value = delta.value as { position?: unknown; content?: unknown };
+    const position = typeof value?.position === 'number' ? value.position : undefined;
+    const content = typeof value?.content === 'string' ? value.content : '';
+
+    // Skip if value metadata missing
+    if (position === undefined || !content) return false;
+
+    const isContentChunk = /\/chunks\/-$/.test(path);
+    if (isContentChunk) {
+      if (typeof opts.minContentPosition === 'number') {
+        const end = position + content.length;
+        if (end <= opts.minContentPosition) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

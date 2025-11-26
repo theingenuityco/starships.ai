@@ -26,6 +26,8 @@ export { agentAssignToolToolTemplate } from './assign-agent-tool';
 export { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 export { modelsListToolTemplate } from './models-list';
 export { connectorsListToolTemplate } from './list-connectors';
+export { createWidgetToolTemplate } from './create-widget';
+export { updateWidgetToolTemplate } from './update-widget';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -51,6 +53,8 @@ import { agentAssignToolToolTemplate } from './assign-agent-tool';
 import { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 import { modelsListToolTemplate } from './models-list';
 import { connectorsListToolTemplate } from './list-connectors';
+import { createWidgetToolTemplate } from './create-widget';
+import { updateWidgetToolTemplate } from './update-widget';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -76,4 +80,6 @@ export const ALL_TOOL_TEMPLATES = [
   agentUnassignToolToolTemplate,
   modelsListToolTemplate,
   connectorsListToolTemplate,
+  createWidgetToolTemplate,
+  updateWidgetToolTemplate,
 ];

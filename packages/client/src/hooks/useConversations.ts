@@ -653,10 +653,15 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
   switch (chunk.type) {
     case 'append': {
       const msg = chunk.message
-      if (msg?.id && acc.some(m => m.id === msg.id)) {
-        return acc
+      const messages = clone(acc)
+      if (msg?.id && messages.some(m => m.id === msg.id)) {
+        return messages
       }
-      return [...acc, { ...msg }]
+      // If a streaming placeholder exists at the end, drop it before appending a persisted assistant message.
+      if (msg?.role === 'assistant' && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (messages[messages.length - 1] as any).streaming) {
+        messages.pop()
+      }
+      return [...messages, { ...msg }]
     }
     case 'replace_whole_assistant': {
       const messages = clone(acc)

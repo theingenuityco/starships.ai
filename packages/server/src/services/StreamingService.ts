@@ -636,6 +636,7 @@ export class StreamingService {
     streamId: string,
     opts?: {
       minContentPosition?: number;
+      skipAssistantShell?: boolean;
     }
   ): Promise<void> {
     const conns = this.connections.get(streamId);
@@ -665,10 +666,7 @@ export class StreamingService {
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history
-          const skip =
-            evt.type === 'delta' && opts?.minContentPosition !== undefined
-              ? this.shouldSkipDelta(evt.payload as Operation, opts)
-              : false;
+          const skip = evt.type === 'delta' ? this.shouldSkipDelta(evt.payload as Operation, opts) : false;
           if (skip) continue;
           replayedAny = true;
           switch (evt.type) {
@@ -711,15 +709,38 @@ export class StreamingService {
 
   private shouldSkipDelta(
     delta: Operation,
-    opts: {
+    opts?: {
       minContentPosition?: number;
+      skipAssistantShell?: boolean;
     }
   ): boolean {
     if (!delta || typeof delta !== 'object') return false;
     const path = typeof delta.path === 'string' ? delta.path : '';
-    if (delta.op !== 'add' || !path) return false;
+    if (!path) return false;
 
-    const value = delta.value as { position?: unknown; content?: unknown };
+    const value =
+      'value' in delta
+        ? ((delta as { value?: { position?: unknown; content?: unknown; role?: unknown; streaming?: unknown } }).value ?? null)
+        : null;
+
+    if (opts?.skipAssistantShell) {
+      const isPlaceholderAdd =
+        delta.op === 'add' &&
+        path === '/messages/-' &&
+        value &&
+        typeof value === 'object' &&
+        (value as { role?: string }).role === 'assistant' &&
+        (value as { streaming?: unknown }).streaming === true;
+      if (isPlaceholderAdd) {
+        return true;
+      }
+      if (/^\/messages\/-1(\/|$)/.test(path)) {
+        return true;
+      }
+    }
+
+    if (delta.op !== 'add') return false;
+
     const position = typeof value?.position === 'number' ? value.position : undefined;
     const content = typeof value?.content === 'string' ? value.content : '';
 
@@ -728,9 +749,10 @@ export class StreamingService {
 
     const isContentChunk = /\/chunks\/-$/.test(path);
     if (isContentChunk) {
-      if (typeof opts.minContentPosition === 'number') {
+      const minContentPosition = opts?.minContentPosition;
+      if (typeof minContentPosition === 'number') {
         const end = position + content.length;
-        if (end <= opts.minContentPosition) {
+        if (end <= minContentPosition) {
           return true;
         }
       }

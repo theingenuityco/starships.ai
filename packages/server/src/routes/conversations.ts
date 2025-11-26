@@ -113,15 +113,21 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             startIdx = idx >= 0 ? idx + 1 : 0;
           }
           const persistedTail = conversationMessages.slice(startIdx);
+          let replayHasAssistantShell = false;
           if (persistedTail.length > 0) {
             for (const message of persistedTail) {
               await streamingService.broadcastMessage(conversationId, message);
             }
+            const lastAssistant = [...persistedTail].reverse().find((msg) => (msg as { role?: string })?.role === 'assistant');
+            replayHasAssistantShell = !!lastAssistant;
           }
 
           // 2) Replay current-turn buffered events (skip 'message' to avoid duplicate persisted messages)
           const minContentPosition = typeof claims.p === 'number' ? claims.p : undefined;
-          await streamingService.replayCurrentTurn(conversationId, { minContentPosition });
+          await streamingService.replayCurrentTurn(conversationId, {
+            minContentPosition,
+            skipAssistantShell: replayHasAssistantShell,
+          });
         }
       } else {
         // Send only messages the client may be missing based on their baselineLength hint

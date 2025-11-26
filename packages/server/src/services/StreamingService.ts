@@ -713,12 +713,12 @@ export class StreamingService {
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history
-          
+
           // If turn is inactive, skip turn_started events to prevent client from thinking turn is active
           if (evt.type === 'turn_started' && opts?.turnIsActive === false) {
             continue;
           }
-          
+
           const skip = evt.type === 'delta' ? this.shouldSkipDelta(evt.payload as Operation, opts) : false;
           if (skip) continue;
           replayedAny = true;
@@ -750,7 +750,7 @@ export class StreamingService {
             }
           }
         }
-        
+
         // If turn is inactive but we didn't replay turn_completed, send a synthetic one
         // to ensure client knows the turn is done
         if (opts?.turnIsActive === false && !hasTurnCompleted) {
@@ -760,7 +760,7 @@ export class StreamingService {
           });
           replayedAny = true;
         }
-        
+
         // If nothing to replay after last 'complete', emit that 'complete' so clients can finalize state
         if (!replayedAny && lastEvt && lastEvt.type === 'complete') {
           this.sendEventToStream(streamId, connection.res, 'complete', lastEvt.payload);

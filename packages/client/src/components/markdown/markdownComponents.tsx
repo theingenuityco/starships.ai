@@ -15,11 +15,11 @@ interface GetMarkdownComponentsOptions {
   messageId?: string
   copiedStates?: Record<string, boolean>
   onCopyCodeBlock?: (code: string, blockId: string) => void
-  onCopyTable?: (tableContent: string, tableId: string) => void
+  onCopyTable?: (tableContent: string, tableId: string, tableHtml?: string) => void
 }
 
 // Helper function to convert table DOM structure to plain text table
-function tableToMarkdown(tableElement: HTMLTableElement): string {
+export function tableToMarkdown(tableElement: HTMLTableElement): string {
   const rows: string[][] = []
   const columnWidths: number[] = []
 
@@ -92,7 +92,7 @@ function TableWithCopy({
   children: React.ReactNode
   messageId: string
   copiedStates?: Record<string, boolean>
-  onCopyTable?: (tableContent: string, tableId: string) => void
+  onCopyTable?: (tableContent: string, tableId: string, tableHtml?: string) => void
 }) {
   const tableRef = useRef<HTMLTableElement>(null)
   const tableIdRef = useRef<string>(`${messageId}-table-${Math.random().toString(36).slice(2, 8)}`)
@@ -102,7 +102,8 @@ function TableWithCopy({
     e.stopPropagation()
     if (tableRef.current && onCopyTable) {
       const markdown = tableToMarkdown(tableRef.current)
-      onCopyTable(markdown, tableIdRef.current)
+      const html = tableRef.current.outerHTML
+      onCopyTable(markdown, tableIdRef.current, html)
     }
   }
 

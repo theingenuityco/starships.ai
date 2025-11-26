@@ -13,7 +13,7 @@ import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
-import { getMarkdownComponents } from '@/components/markdown/markdownComponents'
+import { getMarkdownComponents, tableToMarkdown } from '@/components/markdown/markdownComponents'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -214,34 +214,37 @@ export function ConversationMessageContent({
         return
       }
 
-      const clone = container.cloneNode(true) as HTMLElement
+      const htmlClone = container.cloneNode(true) as HTMLElement
+      const textClone = container.cloneNode(true) as HTMLElement
 
-      // Convert tables to markdown format (same as individual table copy)
-      clone.querySelectorAll('table').forEach(table => {
-        const rows = Array.from(table.querySelectorAll('tr'))
-          .map(tr => Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').trim()))
-          .filter(row => row.length > 0)
+      // Remove UI elements
+      htmlClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
+      textClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
 
-        if (rows.length === 0) return
-
-        const numColumns = Math.max(...rows.map(r => r.length), 1)
-        const widths = Array(numColumns).fill(3)
-        rows.forEach(row =>
-          row.forEach((cell, i) => {
-            widths[i] = Math.max(widths[i], cell.length)
-          })
-        )
-
-        const header = '| ' + [...rows[0], ...Array(numColumns - rows[0].length).fill('')].join(' | ') + ' |'
-        const separator = '| ' + widths.map(w => '-'.repeat(w)).join(' | ') + ' |'
-        const dataRows = rows.slice(1).map(row => '| ' + [...row, ...Array(numColumns - row.length).fill('')].join(' | ') + ' |')
-
-        const textNode = document.createTextNode([header, separator, ...dataRows].join('\n') + '\n')
-        table.parentNode?.replaceChild(textNode, table)
+      // Replace table wrappers with markdown in text clone
+      textClone.querySelectorAll('.table-wrapper').forEach(wrapper => {
+        const table = wrapper.querySelector('table')
+        if (table) {
+          const markdown = tableToMarkdown(table as HTMLTableElement)
+          const textNode = document.createTextNode('\n' + markdown + '\n\n')
+          wrapper.parentNode?.replaceChild(textNode, wrapper)
+        }
       })
 
-      const plainText = (clone.textContent || '').trim()
-      await navigator.clipboard.writeText(plainText)
+      const htmlContent = htmlClone.innerHTML
+      const plainText = (textClone.textContent || '').trim()
+
+      // Copy both HTML and plain text
+      try {
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([htmlContent], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        })
+        await navigator.clipboard.write([clipboardItem])
+      } catch {
+        await navigator.clipboard.writeText(plainText)
+      }
+
       toast.success('Message copied to clipboard')
     } catch (error) {
       toast.error('Failed to copy message')
@@ -262,9 +265,20 @@ export function ConversationMessageContent({
     }
   }
 
-  const handleCopyTable = async (tableContent: string, tableId: string) => {
+  const handleCopyTable = async (tableContent: string, tableId: string, tableHtml?: string) => {
     try {
-      await navigator.clipboard.writeText(tableContent)
+      // If we have HTML, copy both HTML (for rich text editors) and plain text (for plain text editors)
+      if (tableHtml) {
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([tableHtml], { type: 'text/html' }),
+          'text/plain': new Blob([tableContent], { type: 'text/plain' }),
+        })
+        await navigator.clipboard.write([clipboardItem])
+      } else {
+        // Fallback to plain text only
+        await navigator.clipboard.writeText(tableContent)
+      }
+
       setCopiedStates(prev => ({ ...prev, [tableId]: true }))
       toast.success('Table copied to clipboard')
 
@@ -272,7 +286,17 @@ export function ConversationMessageContent({
         setCopiedStates(prev => ({ ...prev, [tableId]: false }))
       }, 2000)
     } catch (error) {
-      toast.error('Failed to copy table')
+      // Fallback to plain text if ClipboardItem API is not supported
+      try {
+        await navigator.clipboard.writeText(tableContent)
+        setCopiedStates(prev => ({ ...prev, [tableId]: true }))
+        toast.success('Table copied to clipboard')
+        setTimeout(() => {
+          setCopiedStates(prev => ({ ...prev, [tableId]: false }))
+        }, 2000)
+      } catch (fallbackError) {
+        toast.error('Failed to copy table')
+      }
     }
   }
 

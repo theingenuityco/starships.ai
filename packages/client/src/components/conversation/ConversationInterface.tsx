@@ -1015,14 +1015,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                       )}
                     >
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-start gap-3">
-                          <Avatar className="h-10 w-10 ring-1 ring-border/40 rounded-full">
-                            <AgentAvatar seed={agent.name} size={40} rounded />
+                        <div className="flex items-end gap-3">
+                          <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full">
+                            <AgentAvatar seed={agent.name} size={32} rounded />
                           </Avatar>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-col gap-[2px]">
                               <p className="text-base font-semibold text-foreground truncate group-hover:text-primary">{agent.name}</p>
-                              {agent.slug && <span className="text-[11px] text-muted-foreground/80 truncate">{agent.slug}</span>}
                             </div>
                           </div>
                         </div>

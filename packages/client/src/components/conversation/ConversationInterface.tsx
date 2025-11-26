@@ -973,8 +973,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                             <AgentAvatar seed={agent.name} size={40} rounded />
                           </Avatar>
                           <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex flex-col gap-0.5">
-                              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary">{agent.name}</p>
+                            <div className="mb-1 flex flex-col gap-[2px]">
+                              <p className="text-base font-semibold text-foreground truncate group-hover:text-primary">{agent.name}</p>
                               {agent.slug && <span className="text-[11px] text-muted-foreground/80 truncate">{agent.slug}</span>}
                             </div>
                           </div>

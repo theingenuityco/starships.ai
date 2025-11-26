@@ -34,6 +34,7 @@ import openrouterRoutes from '@/routes/openrouter';
 import webhooksRoutes from '@/routes/webhooks';
 import docsRoutes from '@/routes/docs';
 import ledgerRoutes from '@/routes/ledger';
+import widgetRoutes from '@/routes/widgets';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -105,6 +106,7 @@ app.use('/api/v1', promoRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
 app.use('/api/v1', ledgerRoutes);
+app.use('/api/v1', widgetRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

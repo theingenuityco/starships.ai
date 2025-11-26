@@ -925,12 +925,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Input Container - Centered on welcome, bottom section during conversation */}
         <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'flex flex-1 items-center justify-center py-4')}>
           <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-[-240px]')} data-message-input>
-            {!showMessagesArea && (
-              <div className="mb-4 text-center opacity-100">
-                <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                <p className="text-muted-foreground text-lg font-light">Choose a suggested prompt below to start collaborating with your agent</p>
-              </div>
-            )}
             <ConversationMessageInput
               key={inputKey}
               ref={messageInputRef}

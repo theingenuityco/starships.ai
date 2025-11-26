@@ -2093,8 +2093,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         {/* Input Container with Expandable Overlay */}
         <div
           className={cn(
-            'relative transition-all overflow-visible bg-card border border-border/60',
-            minimal ? 'rounded-xl shadow-sm' : 'rounded-2xl shadow-sm',
+            'relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm',
             'focus-within:border-primary/70',
             disabled && 'opacity-50'
           )}
@@ -2111,8 +2110,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             />
           )}
 
-          {/* Main Input Section - Text input with bottom-right action */}
-          <div className={cn('flex relative', minimal ? 'items-center p-2' : 'items-center p-4')}>
+          {/* Main Input Section - Text input with right-aligned actions */}
+          <div className="flex relative items-center px-3 py-3">
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -2164,8 +2163,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || fileUploading}
               className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-4 right-14 z-20 p-1.5',
-                'rounded-lg transition-colors',
+                'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5 rounded-lg transition-colors',
                 'hover:bg-muted text-muted-foreground hover:text-foreground',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
@@ -2175,8 +2173,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <Icon name="paperclip" className="h-5 w-5" />
             </button>
 
-            {/* Bottom-right Actions: Stop (when streaming) or Send */}
-            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
+            {/* Right-side Actions: Stop (when streaming) or Send */}
+            <div className="absolute z-20 flex gap-2 top-1/2 -translate-y-1/2 right-3">
               {shouldShowStop ? (
                 <div className="relative h-8 w-8">
                   <Button
@@ -2214,13 +2212,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
           </div>
         </div>
-
-        {/* Agent Indicator - Only show in non-minimal mode */}
-        {!minimal && selectedAgent && (
-          <div className="absolute -top-3 left-4 px-2 py-1 bg-card border border-border/60 text-primary text-xs rounded-full shadow-sm">
-            {isStreamingEffective ? `${selectedAgent.name} is responding...` : sending ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
-          </div>
-        )}
       </div>
     )
   }

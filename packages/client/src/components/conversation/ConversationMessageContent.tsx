@@ -221,18 +221,28 @@ export function ConversationMessageContent({
       htmlClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
       textClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
 
-      // Replace table wrappers with markdown in text clone
-      textClone.querySelectorAll('.table-wrapper').forEach(wrapper => {
-        const table = wrapper.querySelector('table')
-        if (table) {
-          const markdown = tableToMarkdown(table as HTMLTableElement)
-          const textNode = document.createTextNode('\n' + markdown + '\n\n')
-          wrapper.parentNode?.replaceChild(textNode, wrapper)
+      // Build plain text by traversing DOM and converting tables to markdown
+      const extractPlainText = (node: Node): string => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          return node.textContent || ''
         }
-      })
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          return ''
+        }
+        const element = node as HTMLElement
+
+        // Convert table wrapper to markdown (same as individual table copy)
+        if (element.classList?.contains('table-wrapper')) {
+          const table = element.querySelector('table')
+          return table ? '\n' + tableToMarkdown(table as HTMLTableElement) + '\n\n' : ''
+        }
+
+        // Recursively process child nodes
+        return Array.from(node.childNodes).map(extractPlainText).join('')
+      }
 
       const htmlContent = htmlClone.innerHTML
-      const plainText = (textClone.textContent || '').trim()
+      const plainText = extractPlainText(textClone).trim()
 
       // Copy both HTML and plain text
       try {

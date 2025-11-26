@@ -320,18 +320,28 @@ export class AgentService {
     // Get all agents for the starship
     const allAgents = await this.getAgentsByStarship(starshipId);
 
+    // Sort agents by newest first (createdAt desc), then by name for stability
+    const sortedAgents = [...allAgents].sort((a, b) => {
+      const aTs = a?.createdAt ? new Date(a.createdAt as string).getTime() : 0;
+      const bTs = b?.createdAt ? new Date(b.createdAt as string).getTime() : 0;
+      if (aTs !== bTs) return bTs - aTs;
+      const aName = (a?.name || '') as string;
+      const bName = (b?.name || '') as string;
+      return aName.localeCompare(bName);
+    });
+
     // Apply pagination
     const startIndex = (page - 1) * limit;
-    const paginatedAgents = allAgents.slice(startIndex, startIndex + limit);
+    const paginatedAgents = sortedAgents.slice(startIndex, startIndex + limit);
 
     return {
       agents: paginatedAgents,
-      total: allAgents.length,
+      total: sortedAgents.length,
       pagination: {
         page,
         limit,
-        total: allAgents.length,
-        has_next: startIndex + limit < allAgents.length,
+        total: sortedAgents.length,
+        has_next: startIndex + limit < sortedAgents.length,
         has_prev: page > 1,
       },
     };

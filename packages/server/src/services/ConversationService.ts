@@ -614,9 +614,6 @@ export class ConversationService {
     // This catches concurrent requests even when conversation doesn't exist yet
     const hasActiveCancellation = ConversationService.activeCancellations.has(data.conversationId);
     if (hasActiveCancellation) {
-      console.warn('[CONVERSATION] Blocked duplicate message - active cancellation handle exists', {
-        conversationId: data.conversationId,
-      });
       throw new ConflictError(
         'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.'
       );
@@ -639,9 +636,6 @@ export class ConversationService {
     if (turnActive) {
       // Remove placeholder since we're blocking
       ConversationService.activeCancellations.delete(data.conversationId);
-      console.warn('[CONVERSATION] Blocked duplicate message - turn already active in state', {
-        conversationId: data.conversationId,
-      });
       throw new ConflictError(
         'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.'
       );

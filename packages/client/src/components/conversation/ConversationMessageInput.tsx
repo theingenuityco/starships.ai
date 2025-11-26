@@ -543,11 +543,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [leadingMentionAgent, selectedAgent])
 
     const getPlaceholder = () => {
+      // Placeholders are only shown before a conversation exists (starter state).
+      // Once a real conversationId is present (first message sent), we hide the
+      // placeholder for all subsequent forms/states.
+      if (conversationId) return ''
+
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      // In expanded form, guide user to choose an agent explicitly until a leading mention exists
-      if (!minimal && !leadingMentionAgent) {
+      // In expanded starter form, guide user to choose an agent explicitly until a leading mention exists
+      if (!leadingMentionAgent) {
         return 'Type @ to select an agent, then give instructions'
       }
       return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to select an agent, then give instructions'
@@ -1085,7 +1090,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
-    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, leadingMentionAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, leadingMentionAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit, conversationId])
     const placeholderRef = useRef<string>(placeholderText)
     useEffect(() => {
       placeholderRef.current = placeholderText

@@ -67,7 +67,7 @@ router.get('/starships/:starshipId/widgets', jwtAuthMiddleware, async (req: Requ
     const widgetRepo = new WidgetRepository();
     const widgets = await widgetRepo.findByStarshipId(starshipId);
 
-    return sendSuccess(res, { data: widgets });
+    return sendSuccess(res, widgets);
   } catch (error) {
     return handleError(error, res, 'fetch widgets');
   }
@@ -89,7 +89,7 @@ router.get('/widgets/:id', jwtAuthMiddleware, async (req: Request, res: Response
       return sendError(res, 'RESOURCE_NOT_FOUND', 'Widget not found', 404);
     }
 
-    return sendSuccess(res, { data: widget });
+    return sendSuccess(res, widget);
   } catch (error) {
     return handleError(error, res, 'fetch widget');
   }
@@ -116,7 +116,7 @@ router.get('/widgets/slug/:slug', jwtAuthMiddleware, async (req: Request, res: R
       return sendError(res, 'RESOURCE_NOT_FOUND', 'Widget not found', 404);
     }
 
-    return sendSuccess(res, { data: widget });
+    return sendSuccess(res, widget);
   } catch (error) {
     return handleError(error, res, 'fetch widget by slug');
   }
@@ -139,7 +139,7 @@ router.post('/widgets', jwtAuthMiddleware, async (req: Request, res: Response) =
     const widgetRepo = new WidgetRepository();
     const widget = await widgetRepo.create(validated);
 
-    return sendSuccess(res, { data: widget }, 201);
+    return sendSuccess(res, widget, 201);
   } catch (error) {
     return handleError(error, res, 'create widget');
   }
@@ -160,7 +160,7 @@ router.put('/widgets/:id', jwtAuthMiddleware, async (req: Request, res: Response
     const widgetRepo = new WidgetRepository();
     const widget = await widgetRepo.update(idValidated, dataValidated);
 
-    return sendSuccess(res, { data: widget });
+    return sendSuccess(res, widget);
   } catch (error) {
     return handleError(error, res, 'update widget');
   }

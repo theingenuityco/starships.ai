@@ -3,7 +3,6 @@
 import React from 'react'
 import { Cell as RechartsCell, Label as RechartsLabel, Pie as RechartsPie, PieChart as RechartsPieChart } from 'recharts'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ChartContainer,
   ChartLegend,
@@ -12,7 +11,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import { cn } from '@/lib/utils'
 
 import type { ChartWidgetBaseProps, PieSegment } from './types'
 
@@ -50,13 +48,8 @@ export function DonutChart({
   const total = React.useMemo(() => data.reduce((sum, segment) => sum + segment.value, 0), [data])
 
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      <CardHeader className="space-y-1">
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+    <div className={className}>
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
           <RechartsPieChart>
             <RechartsPie
               data={data}
@@ -97,8 +90,7 @@ export function DonutChart({
             {showLegend && <ChartLegend content={<ChartLegendContent />} />}
           </RechartsPieChart>
         </ChartContainer>
-      </CardContent>
-    </Card>
+    </div>
   )
 }
 

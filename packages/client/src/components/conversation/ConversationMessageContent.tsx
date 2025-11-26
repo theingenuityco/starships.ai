@@ -3,7 +3,8 @@
 import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +20,8 @@ import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
+import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
+import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 
 interface StreamChunk {
   content: string
@@ -45,6 +48,32 @@ interface MessageContentProps {
   // Attachments
   attachmentIds?: string[]
   starshipId?: string
+}
+
+// Known widget types from public-docs
+const KNOWN_WIDGET_TYPES = new Set([
+  'StatCard',
+  'DataTable',
+  'MetricGrid',
+  'BarChart',
+  'LineChart',
+  'AreaChart',
+  'PieChart',
+  'DonutChart',
+  'RadarChart',
+  'RadialChart'
+])
+
+// Helper to safely parse JSON
+function tryParseJSON(value: any): any {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  }
+  return value
 }
 
 export function ConversationMessageContent({
@@ -231,6 +260,35 @@ export function ConversationMessageContent({
     () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock }),
     [theme, enableLinkPreview, messageId, copiedStates]
   )
+
+  // Widget detection: Extract widgets from tool results
+  const widgetResults = useMemo(() => {
+    if (!Array.isArray(toolResults) || toolResults.length === 0) return []
+
+    return toolResults
+      .map((toolResult, index) => {
+        // Parse result (might be string or object)
+        const data = tryParseJSON(toolResult.content || toolResult.result)
+
+        // Check if it's a widget result
+        if (!data || typeof data !== 'object') return null
+        if (!data.widgetType || !KNOWN_WIDGET_TYPES.has(data.widgetType)) return null
+        if (!data.props || typeof data.props !== 'object') return null
+
+        // Extract widget info
+        return {
+          id: data.id || `widget-${index}`,
+          widgetType: data.widgetType,
+          props: data.props,
+          name: data.name || 'Untitled Widget',
+          description: data.description,
+          toolName: toolResult.toolName,
+          toolCallId: toolResult.toolCallId,
+          index
+        }
+      })
+      .filter((w): w is NonNullable<typeof w> => w !== null)
+  }, [toolResults])
 
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
@@ -461,6 +519,67 @@ export function ConversationMessageContent({
               </div>
             </CollapsibleContent>
           </Collapsible>
+        </div>
+      )}
+
+      {/* Widget rendering: Display widgets inline when created/updated */}
+      {widgetResults.length > 0 && messageType !== 'tool_result' && (
+        <div className="space-y-4 mt-3 w-full max-w-none">
+          {widgetResults.map((widget) => {
+            // Check if widget creation is pending (tool called but no result yet)
+            const matchingToolCall = normalizedToolCalls.find((tc: any) => {
+              const callId = tc?.id ?? tc?.call_id ?? tc?.toolCallId
+              return callId && String(callId) === widget.toolCallId
+            })
+            const isPending = matchingToolCall && !toolResults?.some((r: any) => {
+              const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+              return rid && String(rid) === widget.toolCallId
+            })
+
+            const isUpdate = widget.toolName?.toLowerCase().includes('update')
+
+            return (
+              <div key={widget.id} className="w-full max-w-none mb-4">
+                {/* Conversational widget header - looks like text */}
+                <div className="text-sm w-full mb-4">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-muted-foreground">
+                      {isUpdate ? 'Updated' : 'Created'}
+                    </span>
+                    <span className="font-medium">{widget.name}</span>
+                  </div>
+                  {widget.description && (
+                    <div className="text-muted-foreground text-xs mt-1">
+                      {widget.description}
+                    </div>
+                  )}
+                </div>
+
+                {/* Widget visualization - minimal styling, full width */}
+                <div className="relative w-full max-w-none overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {isPending ? (
+                    <div className="h-[420px] flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <LoadingSpinner className="w-5 h-5" />
+                        <span className="text-xs text-muted-foreground">
+                          {isUpdate ? 'Updating...' : 'Creating...'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <InlineWidgetRenderer
+                      widget={{
+                        widgetType: widget.widgetType,
+                        props: widget.props
+                      }}
+                      compactMode={true}
+                      className="w-full"
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 

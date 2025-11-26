@@ -3,9 +3,7 @@
 import React from 'react'
 import { PolarAngleAxis as RechartsPolarAngleAxis, RadialBar as RechartsRadialBar, RadialBarChart as RechartsRadialBarChart } from 'recharts'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { cn } from '@/lib/utils'
 
 import type { ChartWidgetBaseProps, RadialSegment } from './types'
 
@@ -71,28 +69,22 @@ export function RadialChart({
   }, [chartData])
 
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      <CardHeader className="space-y-1">
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
-          <RechartsRadialBarChart
-            data={chartData}
-            innerRadius={innerRadius}
-            outerRadius={outerRadius}
-            startAngle={startAngle}
-            endAngle={endAngle}
-          >
-            <RechartsPolarAngleAxis type="number" domain={[0, maxDomain || 1]} tick={false} />
-            <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="label" />} />
-            <RechartsRadialBar background dataKey="value" cornerRadius={6} />
-            {showLegend && <ChartLegend content={<ChartLegendContent nameKey="label" />} />}
-          </RechartsRadialBarChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
+    <div className={className}>
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+        <RechartsRadialBarChart
+          data={chartData}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          startAngle={startAngle}
+          endAngle={endAngle}
+        >
+          <RechartsPolarAngleAxis type="number" domain={[0, maxDomain || 1]} tick={false} />
+          <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="label" />} />
+          <RechartsRadialBar background dataKey="value" cornerRadius={6} />
+          {showLegend && <ChartLegend content={<ChartLegendContent nameKey="label" />} />}
+        </RechartsRadialBarChart>
+      </ChartContainer>
+    </div>
   )
 }
 

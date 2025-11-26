@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Icon from '@/components/primitives/Icon'
@@ -72,16 +71,9 @@ export function DataTable({
   const visibleRows = data.slice(pageStart, pageEnd)
 
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      {(title || description) && (
-        <CardHeader>
-          {title && <CardTitle>{title}</CardTitle>}
-          {description && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
-      )}
-      <CardContent>
-        <div className="space-y-4">
-          <div className="overflow-x-auto rounded-md border">
+    <div className={cn('w-full max-w-none', className)}>
+      <div className="space-y-4">
+          <div className="w-full max-w-none rounded-md border overflow-visible">
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
@@ -151,8 +143,7 @@ export function DataTable({
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+    </div>
   )
 }
 

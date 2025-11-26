@@ -57,12 +57,6 @@ export function MetricGrid({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {(title || description) && (
-        <div className="space-y-1">
-          {title && <h3 className="text-lg font-semibold">{title}</h3>}
-          {description && <p className="text-sm text-muted-foreground">{description}</p>}
-        </div>
-      )}
       <div
         className={cn(
           'grid gap-4',

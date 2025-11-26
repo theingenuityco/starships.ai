@@ -9,7 +9,6 @@ import {
   RadarChart as RechartsRadarChart,
 } from 'recharts'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ChartContainer,
   ChartLegend,
@@ -18,7 +17,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import { cn } from '@/lib/utils'
 
 import type { ChartDataPoint, ChartSeriesConfig, ChartWidgetBaseProps } from './types'
 
@@ -64,13 +62,8 @@ export function RadarChart({
   }, [maxValue])
 
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      <CardHeader className="space-y-1">
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+    <div className={className}>
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
           <RechartsRadarChart data={data} startAngle={startAngle} endAngle={endAngle}>
             {showGrid && <RechartsPolarGrid />}
             <RechartsPolarAngleAxis dataKey={indexKey} />
@@ -88,8 +81,11 @@ export function RadarChart({
             {showLegend && <ChartLegend content={<ChartLegendContent />} />}
           </RechartsRadarChart>
         </ChartContainer>
-      </CardContent>
-    </Card>
+    </div>
   )
 }
+
+
+
+
 

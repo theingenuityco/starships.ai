@@ -7,6 +7,7 @@
 
 import { AgentRepository } from '../repositories/AgentRepository';
 import { ToolRepository } from '../repositories/ToolRepository';
+import type { WidgetRepository } from '../repositories/WidgetRepository';
 
 /**
  * Generate a random suffix for slugs
@@ -108,4 +109,34 @@ export async function generateUniqueToolSlug(baseSlug: string, toolRepository: T
 
   const timestamp = Date.now().toString(36);
   return `${base}-${timestamp}`;
+}
+
+/**
+ * Generate a unique widget slug
+ * Format: widget-{random-suffix}
+ *
+ * @param starshipId - The starship ID to check uniqueness within
+ * @param widgetRepository - Repository instance for checking uniqueness
+ * @returns Promise<string> - Unique widget slug
+ */
+export async function generateUniqueWidgetSlug(starshipId: string, widgetRepository: WidgetRepository): Promise<string> {
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    const randomSuffix = generateRandomSuffix();
+    const candidateSlug = `widget-${randomSuffix}`;
+
+    // Check if slug is unique within the starship
+    const existingWidget = await widgetRepository.findBySlug(candidateSlug, starshipId);
+    if (!existingWidget) {
+      return candidateSlug;
+    }
+
+    attempts++;
+  }
+
+  // Fallback: use timestamp if we can't generate a unique slug
+  const timestamp = Date.now().toString(36);
+  return `widget-${timestamp}`;
 }

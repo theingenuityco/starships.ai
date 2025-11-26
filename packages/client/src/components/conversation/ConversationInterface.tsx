@@ -963,8 +963,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                       type="button"
                       onClick={() => handleAgentChange(agent)}
                       className={cn(
-                        'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/50',
-                        selectedAgent?.id === agent.id ? 'border-primary/60 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.4)]' : 'border-border/60'
+                        'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/60',
+                        selectedAgent?.id === agent.id ? 'border-primary/70 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]' : 'border-border/60'
                       )}
                     >
                       <div className="flex flex-col gap-2">

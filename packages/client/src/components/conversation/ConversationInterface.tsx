@@ -947,9 +947,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           ) : null}
         </ConversationStreamProvider>
 
-        {/* Input Container - Centered on welcome, bottom section during conversation */}
-        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'flex flex-1 items-center justify-center py-4')}>
-          <div className="w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative" style={!showMessagesArea ? { transform: `translateY(-${dockOffsetPx}px)` } : undefined} data-message-input>
+        {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
+        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
+          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
             {!showMessagesArea && (
               <div className="mb-8 text-center opacity-100">
                 <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
@@ -1081,8 +1081,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             )}
           </div>
         </div>
-        {/* Extra space after suggestions so the page can scroll past the last card */}
-        {!showMessagesArea && agentSuggestionCards.length >= 3 && <div className="h-32" />}
+        {/* Extra space at the bottom so the page can scroll past the last card on the welcome view */}
+        {!showMessagesArea && <div className="h-64" />}
       </div>
     </div>
   )

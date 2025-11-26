@@ -266,9 +266,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Track if user explicitly selected an agent to avoid auto-restore overriding it
   const userSelectedAgentRef = useRef(false)
+  // Track source of agent changes to avoid feedback loops between cards and input
+  const agentChangeSourceRef = useRef<'card' | 'input' | null>(null)
 
-  // Memoized agent change handler to prevent AgentSelector from remounting
-  const handleAgentChange = useCallback(
+  // Core agent change handler
+  const baseHandleAgentChange = useCallback(
     (agent: Agent | null) => {
       userSelectedAgentRef.current = true
       setSelectedAgentWithLogging(agent)
@@ -282,8 +284,35 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (agent && currentConversationId) {
         setConversationAgentStore(currentConversationId, agent.id as any, agent.name as any)
       }
+
+      // When selection comes from the agent cards, also update the leading mention in the input
+      if (agent && agentChangeSourceRef.current === 'card') {
+        try {
+          messageInputRef.current?.setLeadingMentionAgent?.(agent as any)
+        } catch {}
+      }
     },
     [currentConversationId, setConversationAgentStore, setSelectedAgentWithLogging]
+  )
+
+  // Agent changes coming from the message input (via @mention)
+  const handleAgentChangeFromInput = useCallback(
+    (agent: Agent | null) => {
+      agentChangeSourceRef.current = 'input'
+      baseHandleAgentChange(agent)
+      agentChangeSourceRef.current = null
+    },
+    [baseHandleAgentChange]
+  )
+
+  // Agent changes coming from the welcome agent cards
+  const handleAgentChangeFromCard = useCallback(
+    (agent: Agent | null) => {
+      agentChangeSourceRef.current = 'card'
+      baseHandleAgentChange(agent)
+      agentChangeSourceRef.current = null
+    },
+    [baseHandleAgentChange]
   )
 
   // Handle conversation start - receive actual database conversation ID
@@ -413,9 +442,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
-    // Set Gaia as default for initial landing page
-    const gaiaAgent = starshipAgentsData.find(a => a.slug?.toLowerCase() === 'gaia' || a.name?.toLowerCase() === 'gaia')
-    const fallback = gaiaAgent || starshipAgentsData[0]
+    // Agents are already sorted on the server (newest first), so use the first as the default
+    const fallback = starshipAgentsData[0]
 
     if (fallback && typeof fallback.id === 'string') {
       // Set flags BEFORE state update to prevent re-runs
@@ -947,7 +975,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               showExpandableOverlay={false}
               isOverlayExpanded={false}
               budgetTokens={budgetTokens}
-              onAgentChange={handleAgentChange}
+              onAgentChange={handleAgentChangeFromInput}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
             {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
@@ -961,7 +989,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                     <button
                       key={agent.id}
                       type="button"
-                      onClick={() => handleAgentChange(agent)}
+                      onClick={() => handleAgentChangeFromCard(agent)}
                       className={cn(
                         'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/40',
                         selectedAgent?.id === agent.id ? 'border-primary/70 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]' : 'border-border/60'

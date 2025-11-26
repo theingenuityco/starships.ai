@@ -629,27 +629,80 @@ export class StreamingService {
   }
 
   /**
+   * Inspect buffered events to determine the latest known turn state for a stream.
+   * Returns true if the buffer indicates an active turn, false if it indicates completion,
+   * or undefined if no turn events have been buffered yet.
+   */
+  getBufferedTurnActive(streamId: string): boolean | undefined {
+    const buffer = this.eventBuffers.get(streamId);
+    if (!buffer || buffer.length === 0) return undefined;
+
+    // Check buffer for turn lifecycle events (turn_state is not buffered, only sent directly)
+    for (let i = buffer.length - 1; i >= 0; i--) {
+      const evt = buffer[i];
+      if (!evt) continue;
+      if (evt.type === 'turn_completed') {
+        return false;
+      }
+      if (evt.type === 'turn_started') {
+        return true;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
    * Replay buffered events for the current turn only (events that occurred after the last 'complete').
    * Skips 'message' events to avoid duplicating persisted baseline messages.
    */
-  async replayCurrentTurn(streamId: string): Promise<void> {
+  async replayCurrentTurn(
+    streamId: string,
+    opts?: {
+      minContentPosition?: number;
+      skipAssistantShell?: boolean;
+      turnIsActive?: boolean;
+    }
+  ): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
 
     const buffer = this.eventBuffers.get(streamId) || [];
     if (buffer.length === 0) return;
 
-    // Find the last 'complete' event; start replay after it
-    let startIdx = -1;
+    // Prefer replaying from the most recent turn_started so that turn lifecycle events
+    // (including turn_completed) are always delivered on resume.
+    let from = 0;
+    let turnStartedIdx = -1;
     for (let i = buffer.length - 1; i >= 0; i--) {
-      if (buffer[i].type === 'complete') {
-        startIdx = i;
+      if (buffer[i].type === 'turn_started') {
+        turnStartedIdx = i;
         break;
       }
     }
+    if (turnStartedIdx >= 0) {
+      from = turnStartedIdx;
+    } else {
+      // Fallback: start after the last 'complete' event to avoid replaying past turns indefinitely.
+      let lastComplete = -1;
+      for (let i = buffer.length - 1; i >= 0; i--) {
+        if (buffer[i].type === 'complete') {
+          lastComplete = i;
+          break;
+        }
+      }
+      from = Math.max(lastComplete + 1, 0);
+      if (from >= buffer.length) return;
+    }
 
-    const from = Math.max(startIdx + 1, 0);
-    if (from >= buffer.length) return;
+    // Check if turn_completed exists in the buffer
+    let hasTurnCompleted = false;
+    for (let i = from; i < buffer.length; i++) {
+      if (buffer[i].type === 'turn_completed') {
+        hasTurnCompleted = true;
+        break;
+      }
+    }
 
     this.suppressBuffering = true;
     try {
@@ -660,6 +713,14 @@ export class StreamingService {
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history
+
+          // If turn is inactive, skip turn_started events to prevent client from thinking turn is active
+          if (evt.type === 'turn_started' && opts?.turnIsActive === false) {
+            continue;
+          }
+
+          const skip = evt.type === 'delta' ? this.shouldSkipDelta(evt.payload as Operation, opts) : false;
+          if (skip) continue;
           replayedAny = true;
           switch (evt.type) {
             case 'delta': {
@@ -689,6 +750,17 @@ export class StreamingService {
             }
           }
         }
+
+        // If turn is inactive but we didn't replay turn_completed, send a synthetic one
+        // to ensure client knows the turn is done
+        if (opts?.turnIsActive === false && !hasTurnCompleted) {
+          this.sendEventToStream(streamId, connection.res, 'turn_completed', {
+            conversationId: streamId,
+            at: new Date().toISOString(),
+          });
+          replayedAny = true;
+        }
+
         // If nothing to replay after last 'complete', emit that 'complete' so clients can finalize state
         if (!replayedAny && lastEvt && lastEvt.type === 'complete') {
           this.sendEventToStream(streamId, connection.res, 'complete', lastEvt.payload);
@@ -697,5 +769,59 @@ export class StreamingService {
     } finally {
       this.suppressBuffering = false;
     }
+  }
+
+  private shouldSkipDelta(
+    delta: Operation,
+    opts?: {
+      minContentPosition?: number;
+      skipAssistantShell?: boolean;
+    }
+  ): boolean {
+    if (!delta || typeof delta !== 'object') return false;
+    const path = typeof delta.path === 'string' ? delta.path : '';
+    if (!path) return false;
+
+    const value =
+      'value' in delta
+        ? ((delta as { value?: { position?: unknown; content?: unknown; role?: unknown; streaming?: unknown } }).value ?? null)
+        : null;
+
+    if (opts?.skipAssistantShell) {
+      const isPlaceholderAdd =
+        delta.op === 'add' &&
+        path === '/messages/-' &&
+        value &&
+        typeof value === 'object' &&
+        (value as { role?: string }).role === 'assistant' &&
+        (value as { streaming?: unknown }).streaming === true;
+      if (isPlaceholderAdd) {
+        return true;
+      }
+      if (/^\/messages\/-1(\/|$)/.test(path)) {
+        return true;
+      }
+    }
+
+    if (delta.op !== 'add') return false;
+
+    const position = typeof value?.position === 'number' ? value.position : undefined;
+    const content = typeof value?.content === 'string' ? value.content : '';
+
+    // Skip if value metadata missing
+    if (position === undefined || !content) return false;
+
+    const isContentChunk = /\/chunks\/-$/.test(path);
+    if (isContentChunk) {
+      const minContentPosition = opts?.minContentPosition;
+      if (typeof minContentPosition === 'number') {
+        const end = position + content.length;
+        if (end <= minContentPosition) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

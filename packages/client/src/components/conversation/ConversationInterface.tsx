@@ -5,12 +5,15 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
-import { useAuth } from '@/hooks/useAuth'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
 import { ConversationStreamProvider, useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
+import { useStarship } from '@/hooks/useStarships'
 import type { Agent } from '@/lib/api'
 import { agentAPI, templateAPI, toolAPI } from '@/lib/api'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
@@ -22,7 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useRouter } from 'next/navigation'
-import { AnimatePresence, motion } from 'motion/react'
+import { cn } from '@/lib/utils'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -82,6 +85,7 @@ function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: stri
 
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
+  const { data: authUser } = useAuthUser()
   const router = useRouter()
 
   // Agent and UI state
@@ -149,12 +153,57 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
+  const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
+  const { data: starshipData } = useStarship(starshipId || '', !!starshipId)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
+
+  // Build suggestion cards from the selected agent's preview/example prompts
+  const agentSuggestionCards = useMemo(() => {
+    if (!selectedAgent) return []
+    const a: any = selectedAgent as any
+    const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
+    if (!Array.isArray(list)) return []
+    const prompts = (list as string[]).filter(Boolean)
+    return prompts.map((text, idx) => ({
+      id: `${selectedAgent.id}:${idx}`,
+      agent: selectedAgent,
+      text,
+    }))
+  }, [selectedAgent])
+
+  // Starter hero greetings – personalized (first name only), concise, one chosen per mount
+  const displayName = useMemo(() => {
+    const full = authUser?.name?.trim()
+    if (!full) return 'there'
+    const first = full.split(/\s+/)[0]
+    return first || 'there'
+  }, [authUser?.name])
+  const starterGreetings = useMemo(
+    () => [
+      `Hi ${displayName}`,
+      `Ship mode on`,
+      `It's automation time`,
+      `Agents awaiting orders`,
+      `Ideas to agents, ${displayName}`,
+      `Less meetings, more shipping`,
+      `New mission unlocked`,
+      `Let the agents handle it`,
+      `One prompt away from prod`,
+      `Prototype now, refactor later`,
+    ],
+    [displayName]
+  )
+  const starterGreeting = useMemo(() => starterGreetings[Math.floor(Math.random() * starterGreetings.length)] ?? 'What are we building today?', [starterGreetings])
+
+  // For collapsed view, show only the first few prompts for the selected agent
+  const collapsedSuggestionCards = useMemo(() => {
+    return agentSuggestionCards.slice(0, 3)
+  }, [agentSuggestionCards])
 
   // Gate UI by presence of a conversation id; streaming details are handled in context consumers
   const showMessagesArea = Boolean(currentConversationId)
@@ -245,7 +294,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track if user explicitly selected an agent to avoid auto-restore overriding it
   const userSelectedAgentRef = useRef(false)
 
-  // Memoized agent change handler to prevent AgentSelector from remounting
+  // Core agent change handler used by both input and cards
   const handleAgentChange = useCallback(
     (agent: Agent | null) => {
       userSelectedAgentRef.current = true
@@ -391,9 +440,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
-    // Set Gaia as default for initial landing page
-    const gaiaAgent = starshipAgentsData.find(a => a.slug?.toLowerCase() === 'gaia' || a.name?.toLowerCase() === 'gaia')
-    const fallback = gaiaAgent || starshipAgentsData[0]
+    // Agents are already sorted on the server (newest first), so use the first as the default
+    const fallback = starshipAgentsData[0]
 
     if (fallback && typeof fallback.id === 'string') {
       // Set flags BEFORE state update to prevent re-runs
@@ -449,67 +497,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     router.push(`/ship/${starshipSlug}/tool/new${q}`)
   }, [router, starshipSlug, externalConversationId])
 
-  // Suggestions: derive example prompts from selected agent (with template fallbacks)
-  const examplePrompts = useMemo(() => {
-    const a: any = selectedAgent as any
-    const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
-    return Array.isArray(list) ? (list as string[]).filter(Boolean) : []
-  }, [selectedAgent])
-
-  const [templatePrompts, setTemplatePrompts] = useState<string[]>([])
-  useEffect(() => {
-    let aborted = false
-    setTemplatePrompts([])
-    const a: any = selectedAgent as any
-    if (!a) return
-    if (examplePrompts.length > 0) return
-    ;(async () => {
-      try {
-        if (a?.id) {
-          const fresh = await agentAPI.getById(a.id)
-          const freshPrompts: string[] = (fresh as any)?.previewPrompts || []
-          if (!aborted && Array.isArray(freshPrompts) && freshPrompts.length > 0) {
-            setTemplatePrompts(freshPrompts.filter(Boolean))
-            return
-          }
-        }
-      } catch {}
-      try {
-        const templateId = a?.templateId
-        if (templateId) {
-          const tpl = await templateAPI.getById(templateId)
-          const previews = (tpl as any)?.previewPrompts || []
-          if (!aborted && Array.isArray(previews) && previews.length > 0) {
-            setTemplatePrompts(previews.filter(Boolean))
-            return
-          }
-        }
-      } catch {}
-    })()
-    return () => {
-      aborted = true
-    }
-  }, [selectedAgent, examplePrompts])
-
-  const suggestionPrompts = useMemo(() => {
-    if (examplePrompts.length > 0) return examplePrompts
-    if (templatePrompts.length > 0) return templatePrompts
-    return []
-  }, [examplePrompts, templatePrompts])
-
-  const getSuggestionIcon = useCallback((text: string): string => {
-    const t = String(text || '').toLowerCase()
-    if (/(fix|bug|debug|error|issue)/.test(t)) return 'bug'
-    if (/(optimi(s|z)e|improve|refactor|performance|speed)/.test(t)) return 'trending-up'
-    if (/(plan|roadmap|strategy|timeline|schedule)/.test(t)) return 'calendar'
-    if (/(research|analy(s|z)e|compare|investigate|explore|search)/.test(t)) return 'search'
-    if (/(write|document|doc|explain|summari(s|z)e)/.test(t)) return 'file-text'
-    if (/(test|qa|verify|validate)/.test(t)) return 'test-tube'
-    if (/(deploy|ship|release|launch)/.test(t)) return 'rocket'
-    if (/(code|implement|build)/.test(t)) return 'code'
-    if (/(design|idea|brainstorm|concept|creative|generate|create|draft)/.test(t)) return 'lightbulb'
-    return 'sparkles'
-  }, [])
+  // Suggestions removed: conversation input no longer shows example prompt chips
 
   // Removed manual agent builder toggle (route-based only)
 
@@ -549,12 +537,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
 
           // Navigate to tool builder route for tool actions
-          const toolBuilderSlugFragments = [
-            'open-tool',
-            'edit-tool',
-            'modify-tool-blueprint-node',
-            'modify-tool-blueprint-edge',
-          ]
+          const toolBuilderSlugFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
           if (toolBuilderSlugFragments.some(s => toolNameLc.includes(s)) || toolNameLc.includes('tool-blueprint-')) {
             try {
               const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
@@ -945,13 +928,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   return (
-    <div className="relative flex flex-col h-screen transition-all duration-500 ease-in-out">
+    <div className="relative flex flex-col h-screen">
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
         {/* Key prop forces provider to remount and create fresh stream when conversation changes */}
         <ConversationStreamProvider key={currentConversationId || 'no-conversation'} conversationId={currentConversationId} starshipId={starshipId}>
-          {/* Messages Area or Welcome Screen */}
+          {/* Messages Area */}
           {showMessagesArea ? (
             <>
               <ConversationSummaryBar conversationId={currentConversationId} starshipId={starshipId} />
@@ -961,21 +944,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               {/* Single place for stream-dependent side-effects to avoid duplicate SSE subscriptions */}
               <StreamSideEffects />
             </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32"></div>
-          )}
+          ) : null}
         </ConversationStreamProvider>
 
-        {/* Floating Input Container - Always bottom-anchored; we animate inner translateY only */}
-        <div ref={inputContainerRef} className="absolute left-0 right-0 bottom-0 p-6 pointer-events-none z-30">
-          <motion.div
-            className="max-w-2xl mx-auto pointer-events-auto opacity-100 relative"
-            data-message-input
-            initial={false}
-            animate={{ y: isInputDocked ? 0 : -dockOffsetPx }}
-            transition={{ type: 'spring', stiffness: 210, damping: 24 }}
-            style={{ willChange: 'transform' }}
-          >
+        {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
+        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
+          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
+            {!showMessagesArea && (
+              <div className="mb-8 text-center opacity-100">
+                <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
+              </div>
+            )}
             <ConversationMessageInput
               key={inputKey}
               ref={messageInputRef}
@@ -986,7 +965,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={false}
               disabled={false}
-              minimal={isInputDocked && !isHeightFrozen}
+              minimal={isInputDocked}
               onFocus={() => {}}
               onBlur={() => {}}
               onToggleOverlay={handleToggleOverlay}
@@ -996,39 +975,114 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
             ></ConversationMessageInput>
-            <AnimatePresence initial={false} mode="wait">
-              {!showMessagesArea && (
-                <motion.div key="welcome-copy" exit={{ opacity: 0, y: -12, transition: { duration: 0.2, ease: 'easeOut' } }} className="absolute inset-x-0 bottom-full mb-6 text-center opacity-100">
-                  <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Let&apos;s Build</h1>
-                  <p className="text-muted-foreground text-lg font-light">Choose an AI agent below to start collaborating on your project</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <AnimatePresence initial={false} mode="wait">
-              {!showMessagesArea && suggestionPrompts.length > 0 && (
-                <motion.div key="suggestions" exit={{ opacity: 0, y: -8, transition: { duration: 0.18, ease: 'easeOut' } }} className="absolute inset-x-0 top-full mt-8 opacity-100">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 pl-2">Suggestions</div>
-                  <div className="space-y-2">
-                    {suggestionPrompts.slice(0, 8).map((text, idx) => (
-                      <button
-                        key={idx}
-                        className="group w-full text-left px-4 py-3 text-sm rounded-xl border border-border/30 hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
-                        onClick={() => messageInputRef.current?.handleSuggestionSubmit?.(text)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Icon name={getSuggestionIcon(text)} className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-muted-foreground group-hover:text-foreground transition-colors">{text}</p>
+            {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
+            {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
+              <div className="mt-12">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-left">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select an agent</p>
+                  </div>
+                  {starshipSlug && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          router.push(`/ship/${starshipSlug}/agents`)
+                        } catch {}
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      See all agents
+                      <Icon name="chevron-right" className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-3 overflow-x-auto custom-scrollbar">
+                  {starshipAgentsData.map((agent: any) => (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      onClick={() => {
+                        // Delegate agent selection + leading mention insertion to the input's
+                        // TipTap-aware helper, which also calls onAgentChange under the hood.
+                        try {
+                          messageInputRef.current?.setLeadingMentionAgent?.(agent as any)
+                        } catch {}
+                      }}
+                      className={cn(
+                        'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/40',
+                        selectedAgent?.id === agent.id ? 'border-primary/70 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]' : 'border-border/60'
+                      )}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-end gap-3">
+                          <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full">
+                            <AgentAvatar seed={agent.name} size={32} rounded />
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex flex-col gap-[2px]">
+                              <p className="text-base font-semibold text-foreground truncate group-hover:text-primary">{agent.name}</p>
+                            </div>
                           </div>
                         </div>
-                      </button>
-                    ))}
+                        {agent.description && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{agent.description}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
+            {!showMessagesArea && agentSuggestionCards.length >= 3 && (
+              <div className="mt-12 absolute inset-x-0 top-full">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-left">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
+                  {agentSuggestionCards.length > 3 && (
+                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                      {showAllSuggestions ? (
+                        <>
+                          Show fewer
+                          <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
+                        </>
+                      ) : (
+                        <>
+                          Explore all
+                          <Icon name="chevron-down" className="h-3 w-3" />
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+                <ul className="space-y-3">
+                  {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
+                            messageInputRef.current?.focusInput?.()
+                          } catch {}
+                        }}
+                        className="group flex w-full rounded-2xl border border-border/60 bg-card px-3 py-2 text-left transition-colors hover:bg-primary/5 hover:border-primary/40"
+                      >
+                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-primary break-words">
+                          <span className="mr-1 text-base align-top text-primary/70">“</span>
+                          {item.text}
+                          <span className="ml-1 text-base align-baseline text-primary/70">”</span>
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
+        {/* Extra space at the bottom so the page can scroll past the last card on the welcome view */}
+        {!showMessagesArea && <div className="h-64" />}
       </div>
     </div>
   )

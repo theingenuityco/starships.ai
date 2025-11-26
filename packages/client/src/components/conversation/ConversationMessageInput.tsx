@@ -598,11 +598,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [leadingMentionAgent, selectedAgent])
 
     const getPlaceholder = () => {
+      // Placeholders are only shown before a conversation exists (starter state).
+      // Once a real conversationId is present (first message sent), we hide the
+      // placeholder for all subsequent forms/states.
+      if (conversationId) return ''
+
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      // In expanded form, guide user to choose an agent explicitly until a leading mention exists
-      if (!minimal && !leadingMentionAgent) {
+      // In expanded starter form, guide user to choose an agent explicitly until a leading mention exists
+      if (!leadingMentionAgent) {
         return 'Type @ to select an agent, then give instructions'
       }
       return promptAgent ? `Ask ${promptAgent.name}... (Shift+Enter for new line)` : 'Type @ to select an agent, then give instructions'
@@ -1140,7 +1145,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
-    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, leadingMentionAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit])
+    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, leadingMentionAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit, conversationId])
     const placeholderRef = useRef<string>(placeholderText)
     useEffect(() => {
       placeholderRef.current = placeholderText
@@ -1802,109 +1807,60 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.debug('[MessageInput.ensureLeadingAgentMention] current first paragraph', summary)
         } catch {}
 
-        // Collect all mention nodes across the entire document
-        const allMentions: any[] = []
-        for (let bi = 0; bi < docContent.length; bi++) {
-          const b = docContent[bi]
-          const cont = Array.isArray(b?.content) ? b.content : []
-          for (let ci = 0; ci < cont.length; ci++) {
-            const node = cont[ci]
-            if (node && node.type === 'mention' && node.attrs && node.attrs.id) {
-              allMentions.push(node)
-            }
-          }
-        }
-
-        if (allMentions.length > 0) {
-          // Always prefer the most recently inserted mention anywhere in the doc
-          const desiredMention = allMentions[allMentions.length - 1]
-          // Build remaining content for the first paragraph excluding all mention nodes
-          let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
-
-          // Normalize whitespace: ensure exactly one space after mention, preserve content structure
-          let contentAfterMention: any[] = []
-
-          if (rest.length === 0) {
-            // No content - just one NBSP space
-            contentAfterMention = [{ type: 'text', text: '\u00A0' }]
-          } else {
-            // Find first node with actual content
-            let firstContentIdx = -1
-            for (let i = 0; i < rest.length; i++) {
-              const node = rest[i]
-              if (node && node.type === 'text' && typeof node.text === 'string' && node.text.trim().length > 0) {
-                firstContentIdx = i
-                break
-              } else if (node && node.type !== 'text') {
-                firstContentIdx = i
-                break
-              }
-            }
-
-            if (firstContentIdx === -1) {
-              // Only whitespace
-              contentAfterMention = [{ type: 'text', text: '\u00A0' }]
-            } else {
-              // Get content from first real content onwards
-              const contentNodes = rest.slice(firstContentIdx)
-              const firstNode = contentNodes[0]
-
-              if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
-                // Trim start of first text node, add exactly one NBSP space
-                const updatedFirst = { ...firstNode, text: '\u00A0' + firstNode.text.trimStart() }
-                contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
-              } else {
-                // Non-text first node - add NBSP before it
-                contentAfterMention = [{ type: 'text', text: '\u00A0' }, ...contentNodes]
-              }
-            }
-          }
-
-          const newFirstParagraph = {
-            type: 'paragraph',
-            content: [desiredMention, ...contentAfterMention],
-          }
-
-          // Remove all other mention nodes from the rest of the document
-          const cleanedOtherBlocks = docContent.slice(1).map((blk: any) => {
-            const origContent = Array.isArray(blk?.content) ? blk.content : []
-            const filtered = origContent.filter((n: any) => !(n && n.type === 'mention'))
-            return { ...blk, content: filtered }
-          })
-
-          const newDoc = { type: 'doc', content: [newFirstParagraph, ...cleanedOtherBlocks] }
-          try {
-            const preview = newFirstParagraph.content.slice(0, 3).map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
-            console.debug('[MessageInput.ensureLeadingAgentMention] rebuilding paragraph', preview)
-          } catch {}
-          scheduleSetContent(newDoc)
-
-          // Mark this agent as enforced to prevent re-enforcement
-          lastEnforcedAgentIdRef.current = desiredMention.attrs.id
-
-          // Position cursor after the mention and space
-          setTimeout(() => {
-            try {
-              tiptap?.commands.focus()
-              // Position after mention (1) + space (1) = position 2
-              const newPos = 2
-              tiptap?.commands.setTextSelection(newPos)
-            } catch {}
-          }, 10)
-          return
-        }
-
-        // Otherwise, insert the current agent mention at the very start and ensure no other mentions exist anywhere
+        // Always derive the mention from the current selected agent rather than
+        // reusing whatever mention node happens to be in the document. This keeps
+        // the leading chip in sync when the selected agent changes externally
+        // (e.g. via the "Agents on this starship" cards).
         if (isEditingMentionRef.current) return
         const currentAgent = currentAgentRef.current
         const desiredMention = buildMentionNodeForAgent(currentAgent)
         if (!desiredMention) return
 
-        // Always add space after mention
-        const spaceNode = [{ type: 'text', text: '\u00A0' }]
+        // Build remaining content for the first paragraph excluding all mention nodes
+        let rest = blockContent.filter((n: any) => !(n && n.type === 'mention'))
+
+        // Normalize whitespace: ensure exactly one space after mention, preserve content structure
+        let contentAfterMention: any[] = []
+
+        if (rest.length === 0) {
+          // No content - just one NBSP space
+          contentAfterMention = [{ type: 'text', text: '\u00A0' }]
+        } else {
+          // Find first node with actual content
+          let firstContentIdx = -1
+          for (let i = 0; i < rest.length; i++) {
+            const node = rest[i]
+            if (node && node.type === 'text' && typeof node.text === 'string' && node.text.trim().length > 0) {
+              firstContentIdx = i
+              break
+            } else if (node && node.type !== 'text') {
+              firstContentIdx = i
+              break
+            }
+          }
+
+          if (firstContentIdx === -1) {
+            // Only whitespace
+            contentAfterMention = [{ type: 'text', text: '\u00A0' }]
+          } else {
+            // Get content from first real content onwards
+            const contentNodes = rest.slice(firstContentIdx)
+            const firstNode = contentNodes[0]
+
+            if (firstNode && firstNode.type === 'text' && typeof firstNode.text === 'string') {
+              // Trim start of first text node, add exactly one NBSP space
+              const updatedFirst = { ...firstNode, text: '\u00A0' + firstNode.text.trimStart() }
+              contentAfterMention = [updatedFirst, ...contentNodes.slice(1)]
+            } else {
+              // Non-text first node - add NBSP before it
+              contentAfterMention = [{ type: 'text', text: '\u00A0' }, ...contentNodes]
+            }
+          }
+        }
+
         const newFirstParagraph = {
           type: 'paragraph',
-          content: [desiredMention, ...spaceNode, ...blockContent.filter((n: any) => !(n && n.type === 'mention'))],
+          content: [desiredMention, ...contentAfterMention],
         }
         const cleanedOtherBlocks = docContent.slice(1).map((blk: any) => {
           const origContent = Array.isArray(blk?.content) ? blk.content : []
@@ -1924,7 +1880,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           try {
             tiptap?.commands.focus()
             // Position after mention (1) + space (1) = position 2
-            const newPos = 2 + blockContent.length
+            const newPos = 2
             tiptap?.commands.setTextSelection(Math.min(newPos, tiptap?.state.doc.content.size - 1))
           } catch {}
         }, 10)
@@ -2029,8 +1985,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   .flat(),
               })
             } catch {}
-            const newParagraph = { type: 'paragraph', content: [desiredMention, prefill, ...rest] }
-            const newDoc = { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
+
+            const hasAfterText = typeof afterText === 'string' && afterText.trim().length > 0
+            const baseContent = hasAfterText ? [desiredMention, prefill] : [desiredMention, prefill, ...rest]
+            const newParagraph = { type: 'paragraph', content: baseContent }
+            // When we have explicit afterText (e.g. clicking a suggestion card), replace the whole doc
+            // so the new suggestion doesn't append to any existing content.
+            const newDoc = hasAfterText ? { type: 'doc', content: [newParagraph] } : { type: 'doc', content: [newParagraph, ...docContent.slice(1)] }
             scheduleSetContent(newDoc)
             lastEnforcedAgentIdRef.current = agent.id
             // Focus and place caret at end to continue typing naturally
@@ -2172,16 +2133,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Input Container with Expandable Overlay */}
-        <div
-          className={cn(
-            'relative transition-all overflow-visible',
-            minimal
-              ? 'frosted-glass-card rounded-xl shadow-frosted-lg focus-within:ring-1 focus-within:ring-primary/15'
-              : 'frosted-glass-card rounded-2xl shadow-frosted-lg focus-within:ring-2 focus-within:ring-primary/20',
-            'focus-within:border-primary/40',
-            disabled && 'opacity-50'
-          )}
-        >
+        <div className={cn('relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm', 'focus-within:border-primary/70', disabled && 'opacity-50')}>
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && (
             <ExpandableMessageOverlay
@@ -2194,8 +2146,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             />
           )}
 
-          {/* Main Input Section - Text input with bottom-right action */}
-          <div className={cn('flex relative', minimal ? 'items-center p-2' : 'items-center p-4')}>
+          {/* Main Input Section - Text input with right-aligned actions */}
+          <div className={cn('flex relative items-center', minimal ? 'px-2 py-2' : 'px-3 py-3')}>
             {/* Hidden file input */}
             <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" onChange={handleFileSelect} className="hidden" />
 
@@ -2232,7 +2184,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || fileUploading}
               className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-4 right-14 z-20 p-1.5',
+                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
                 'rounded-lg transition-colors',
                 'hover:bg-muted text-muted-foreground hover:text-foreground',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -2243,8 +2195,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <Icon name="paperclip" className="h-5 w-5" />
             </button>
 
-            {/* Bottom-right Actions: Stop (when streaming) or Send */}
-            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-4 right-4')}>
+            {/* Right-side Actions: Stop (when streaming) or Send */}
+            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-3' : 'bottom-3 right-3')}>
               {shouldShowStop ? (
                 <div className="relative h-8 w-8">
                   <Button
@@ -2282,13 +2234,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
           </div>
         </div>
-
-        {/* Agent Indicator - Only show in non-minimal mode */}
-        {!minimal && selectedAgent && (
-          <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
-            {isStreamingEffective ? `${selectedAgent.name} is responding...` : sending ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
-          </div>
-        )}
       </div>
     )
   }

@@ -215,31 +215,31 @@ export function ConversationMessageContent({
       }
 
       const clone = container.cloneNode(true) as HTMLElement
-      
+
       // Convert tables to markdown format (same as individual table copy)
       clone.querySelectorAll('table').forEach(table => {
-        const rows = Array.from(table.querySelectorAll('tr')).map(tr =>
-          Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').trim())
-        ).filter(row => row.length > 0)
-        
+        const rows = Array.from(table.querySelectorAll('tr'))
+          .map(tr => Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').trim()))
+          .filter(row => row.length > 0)
+
         if (rows.length === 0) return
-        
+
         const numColumns = Math.max(...rows.map(r => r.length), 1)
         const widths = Array(numColumns).fill(3)
-        rows.forEach(row => row.forEach((cell, i) => {
-          widths[i] = Math.max(widths[i], cell.length)
-        }))
-        
+        rows.forEach(row =>
+          row.forEach((cell, i) => {
+            widths[i] = Math.max(widths[i], cell.length)
+          })
+        )
+
         const header = '| ' + [...rows[0], ...Array(numColumns - rows[0].length).fill('')].join(' | ') + ' |'
         const separator = '| ' + widths.map(w => '-'.repeat(w)).join(' | ') + ' |'
-        const dataRows = rows.slice(1).map(row => 
-          '| ' + [...row, ...Array(numColumns - row.length).fill('')].join(' | ') + ' |'
-        )
-        
+        const dataRows = rows.slice(1).map(row => '| ' + [...row, ...Array(numColumns - row.length).fill('')].join(' | ') + ' |')
+
         const textNode = document.createTextNode([header, separator, ...dataRows].join('\n') + '\n')
         table.parentNode?.replaceChild(textNode, table)
       })
-      
+
       const plainText = (clone.textContent || '').trim()
       await navigator.clipboard.writeText(plainText)
       toast.success('Message copied to clipboard')

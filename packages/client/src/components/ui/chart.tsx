@@ -160,7 +160,7 @@ export function ChartTooltipContent({
   return (
     <div
       className={cn(
-        'border-border/50 bg-background grid min-w-[8rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl',
+        'border-border/50 bg-background grid items-start gap-1.5 rounded-lg border px-3 py-2 text-xs shadow-xl',
         className,
       )}
     >
@@ -190,7 +190,7 @@ export function ChartTooltipContent({
                     ) : (
                       !hideIndicator && (
                         <div
-                          className={cn('shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)', {
+                          className={cn('shrink-0 rounded-[2px]', {
                             'h-2.5 w-2.5': indicator === 'dot',
                             'w-1': indicator === 'line',
                             'w-0 border-[1.5px] border-dashed bg-transparent': indicator === 'dashed',
@@ -198,15 +198,15 @@ export function ChartTooltipContent({
                           })}
                           style={
                             {
-                              '--color-bg': indicatorColor,
-                              '--color-border': indicatorColor,
+                              backgroundColor: indicator !== 'dashed' ? indicatorColor : undefined,
+                              borderColor: indicator === 'dashed' ? indicatorColor : undefined,
                             } as React.CSSProperties
                           }
                         />
                       )
                     )}
                     <div
-                      className={cn('flex flex-1 justify-between leading-none', nestLabel ? 'items-end' : 'items-center')}
+                      className={cn('flex flex-1 justify-between leading-none gap-4', nestLabel ? 'items-end' : 'items-center')}
                     >
                       <div className="grid gap-1.5">
                         {nestLabel ? tooltipLabel : null}
@@ -247,7 +247,7 @@ export function ChartLegendContent({ className, hideIcon = false, payload, verti
   return (
     <div
       className={cn(
-        'flex items-center justify-center gap-4',
+        'flex flex-wrap items-center justify-center gap-x-4 gap-y-2',
         verticalAlign === 'top' ? 'pb-3' : 'pt-3',
         className,
       )}
@@ -259,7 +259,7 @@ export function ChartLegendContent({ className, hideIcon = false, payload, verti
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
           return (
-            <div key={`${item.value}`} className="[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3">
+            <div key={`${item.value}`} className="[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 min-w-0">
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
               ) : (
@@ -270,7 +270,7 @@ export function ChartLegendContent({ className, hideIcon = false, payload, verti
                   }}
                 />
               )}
-              {itemConfig?.label}
+              <span className="truncate">{itemConfig?.label}</span>
             </div>
           )
         })}

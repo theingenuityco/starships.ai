@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Icon } from '@iconify/react'
+import Icon from '@/components/primitives/Icon'
 
 export type DataCellValue = string | number | boolean | null | undefined
 
@@ -86,7 +86,7 @@ export function DataTable({
               <thead className="bg-muted/50">
                 <tr>
                   {columns.map(column => (
-                    <th key={column.key} className="border-b px-4 py-3 text-left text-sm font-medium">
+                    <th key={column.key} className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">
                       {column.label}
                     </th>
                   ))}
@@ -115,7 +115,7 @@ export function DataTable({
                       {columns.map(column => (
                         <td
                           key={`${tableRowIndex}-${column.key}`}
-                          className="px-4 py-3 text-sm text-left"
+                          className="px-4 py-3 text-sm text-left whitespace-normal break-words"
                         >
                           {formatValue(row[column.key], column.format)}
                         </td>
@@ -135,7 +135,7 @@ export function DataTable({
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                 disabled={currentPage === 1}
               >
-                <Icon icon="lucide:chevron-left" className="h-4 w-4" />
+                <Icon name="chevron-left" className="h-4 w-4" />
               </Button>
               <span>
                 Page {currentPage} of {totalPages}
@@ -146,7 +146,7 @@ export function DataTable({
                 onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                 disabled={currentPage === totalPages}
               >
-                <Icon icon="lucide:chevron-right" className="h-4 w-4" />
+                <Icon name="chevron-right" className="h-4 w-4" />
               </Button>
             </div>
           )}

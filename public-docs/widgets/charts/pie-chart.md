@@ -18,14 +18,14 @@ Single-ring composition chart for parts-of-a-whole storytelling. Built atop shad
 | --- | --- | --- |
 | `label` | ✅ | Slice name rendered in the legend/tooltips. |
 | `value` | ✅ | Numeric magnitude. Determines slice angle. |
-| `color` | ⛔ | Optional custom color. Use `var(--chart-N)` tokens or hex codes. If omitted, rely on agent-provided palette or fallback colors. |
+| `color` | ⛔ | **IMPORTANT: Always use hex color codes (e.g., `"#3b82f6"`, `"#ef4444"`)**. Do not use CSS variables like `var(--chart-1)`. |
 
 **Example data array**
 
 ```ts
 [
-  { label: 'Chrome', value: 187, color: 'var(--chart-1)' },
-  { label: 'Safari', value: 200, color: 'var(--chart-2)' }
+  { label: 'Chrome', value: 187, color: '#3b82f6' },
+  { label: 'Safari', value: 200, color: '#8b5cf6' }
 ]
 ```
 
@@ -51,10 +51,10 @@ Single-ring composition chart for parts-of-a-whole storytelling. Built atop shad
     "description": "Week ending Jun 15",
     "showLabels": true,
     "data": [
-      { "label": "Chrome", "value": 187, "color": "var(--chart-1)" },
-      { "label": "Safari", "value": 200, "color": "var(--chart-2)" },
-      { "label": "Firefox", "value": 65, "color": "var(--chart-3)" },
-      { "label": "Other", "value": 48, "color": "var(--chart-4)" }
+      { "label": "Chrome", "value": 187, "color": "#3b82f6" },
+      { "label": "Safari", "value": 200, "color": "#8b5cf6" },
+      { "label": "Firefox", "value": 65, "color": "#06b6d4" },
+      { "label": "Other", "value": 48, "color": "#f59e0b" }
     ]
   }
 }
@@ -62,9 +62,9 @@ Single-ring composition chart for parts-of-a-whole storytelling. Built atop shad
 
 ## Agent Playbook
 
-1. **Keep slices manageable:** Aim for 3–7 categories. If prompts list more, aggregate the smallest slices into “Other” or switch to `BarChart`.
+1. **Keep slices manageable:** Aim for 3–7 categories. If prompts list more, aggregate the smallest slices into "Other" or switch to `BarChart`.
 2. **Percent labels vs. tooltips:** Enable `showLabels` only when slices have enough area (>15%). Otherwise rely on tooltips to show exact percentages and values.
-3. **Color alignment:** Use `var(--chart-*)` tokens described in shadcn’s “Configure Chart Colors in Global CSS” snippet for automatic light/dark support.
+3. **Color strategy: ALWAYS USE HEX COLORS.** Generate visually distinct hex color codes for each data point (e.g., `"#3b82f6"`, `"#8b5cf6"`, `"#06b6d4"`). Never use CSS variables like `var(--chart-1)`. Use a diverse color palette with good contrast.
 4. **Totals belong elsewhere:** Mention overall totals in `description` or pair with a `StatCard` so viewers don’t need to sum values.
 5. **Ordering:** Sort slices descending unless the user demands alphabetical order; it improves readability, especially with `showLabels`.
 6. **Units in tooltips:** If the prompt talks about money or percentages, reflect that in the `description` and optionally customize tooltip display via data formatting.

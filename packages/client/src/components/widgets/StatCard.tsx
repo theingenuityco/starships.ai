@@ -3,7 +3,7 @@
 import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Icon } from '@iconify/react'
+import Icon from '@/components/primitives/Icon'
 
 export interface StatItem {
   label: string
@@ -53,7 +53,7 @@ export function StatCard({ title, stats, description, className }: StatCardProps
               <div className="flex items-center gap-2">
                 {stat.icon && (
                   <Icon
-                    icon={stat.icon}
+                    name={stat.icon}
                     className={cn('w-4 h-4', variantTextStyles[stat.variant || 'default'])}
                   />
                 )}

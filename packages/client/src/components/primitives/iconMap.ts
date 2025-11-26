@@ -19,6 +19,7 @@ const map: Record<string, ResolvedIcon> = {
   search: { type: 'phosphor', component: 'MagnifyingGlass' },
   user: { type: 'phosphor', component: 'User' },
   users: { type: 'phosphor', component: 'Users' },
+  'user-minus': { type: 'phosphor', component: 'UserMinus' },
   settings: { type: 'phosphor', component: 'GearSix' },
   settings2: { type: 'phosphor', component: 'Gear' },
   bot: { type: 'phosphor', component: 'Robot' },
@@ -39,9 +40,12 @@ const map: Record<string, ResolvedIcon> = {
   circle: { type: 'phosphor', component: 'Circle' },
   star: { type: 'phosphor', component: 'Star' },
   stars: { type: 'phosphor', component: 'Stars' },
+  heart: { type: 'phosphor', component: 'Heart' },
   info: { type: 'phosphor', component: 'Info' },
   calendar: { type: 'phosphor', component: 'Calendar' },
   clock: { type: 'phosphor', component: 'Clock' },
+  repeat: { type: 'phosphor', component: 'Repeat' },
+  percent: { type: 'phosphor', component: 'Percent' },
 
   // Navbar / UI common
   store: { type: 'phosphor', component: 'Storefront' },
@@ -82,6 +86,7 @@ const map: Record<string, ResolvedIcon> = {
   fingerprint: { type: 'phosphor', component: 'Fingerprint' },
   bug: { type: 'phosphor', component: 'Bug' },
   database: { type: 'phosphor', component: 'Database' },
+  'hard-drive': { type: 'phosphor', component: 'HardDrive' },
   wifi: { type: 'phosphor', component: 'WifiHigh' },
   'wifi-off': { type: 'phosphor', component: 'WifiSlash' },
 
@@ -108,6 +113,7 @@ const map: Record<string, ResolvedIcon> = {
   'log-in': { type: 'phosphor', component: 'SignIn' },
   'log-out': { type: 'phosphor', component: 'SignOut' },
   'loader-2': { type: 'radix', component: 'ReloadIcon' },
+  'dollar-sign': { type: 'phosphor', component: 'CurrencyDollar' },
   coins: { type: 'phosphor', component: 'Coins' },
   receipt: { type: 'phosphor', component: 'Receipt' },
   'credit-card': { type: 'phosphor', component: 'CreditCard' },

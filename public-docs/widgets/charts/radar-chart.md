@@ -17,7 +17,7 @@ Radar (spider) charts compare multiple metrics across the same axes. This widget
 | Piece | Required? | Description |
 | --- | --- | --- |
 | `indexKey` | ✅ | Field on every datum used by `PolarAngleAxis`. Typical values: `"skill"`, `"metric"`, `"region"`. |
-| `series` | ✅ | Array of `{ dataKey, label, color? }`. Each `dataKey` must exist on every datum. Colors can reference CSS vars like `var(--chart-2)` (per shadcn “Configure Chart Colors in Global CSS”). |
+| `series` | ✅ | Array of `{ dataKey, label, color? }`. Each `dataKey` must exist on every datum. **IMPORTANT: Always use hex color codes (e.g., `"#3b82f6"`)**, not CSS variables. |
 | `data` | ✅ | Array of plain objects. Every object needs `indexKey` plus *all* series `dataKey`s. Numeric values drive the radius. |
 | `maxValue` | ⛔ | Optional cap for the radius axis (e.g., 5, 10, 100). If omitted, Recharts infers max from data. |
 
@@ -57,8 +57,8 @@ Radar (spider) charts compare multiple metrics across the same axes. This widget
     "description": "Self-reported proficiencies",
     "indexKey": "skill",
     "series": [
-      { "dataKey": "alice", "label": "Alice", "color": "var(--chart-1)" },
-      { "dataKey": "bob", "label": "Bob", "color": "var(--chart-2)" }
+      { "dataKey": "alice", "label": "Alice", "color": "#3b82f6" },
+      { "dataKey": "bob", "label": "Bob", "color": "#8b5cf6" }
     ],
     "data": [
       { "skill": "Frontend", "alice": 80, "bob": 60 },
@@ -74,10 +74,10 @@ Radar (spider) charts compare multiple metrics across the same axes. This widget
 
 ## Agent Playbook
 
-1. **Extract consistent axes:** If a prompt lists “Security 4, UX 5, Performance 2”, turn that into `data` entries keyed by `indexKey` (e.g., `metric`) and supply a single series representing the entity.
+1. **Extract consistent axes:** If a prompt lists "Security 4, UX 5, Performance 2", turn that into `data` entries keyed by `indexKey` (e.g., `metric`) and supply a single series representing the entity.
 2. **Multi-entity comparisons:** When comparing people/products, create multiple `series` entries so each contour represents one entity.
-3. **Normalize scales:** If the user mentions “scores out of 10”, set `maxValue: 10` to keep the web edge aligned with the statement.
-4. **Color guidance:** Use palette tokens (`var(--chart-1...5)`) from the shadcn doc for readability across themes. Direct hex values are also fine if the prompt insists on brand colors.
+3. **Normalize scales:** If the user mentions "scores out of 10", set `maxValue: 10` to keep the web edge aligned with the statement.
+4. **Color strategy: ALWAYS USE HEX COLORS.** Generate visually distinct hex color codes for each series (e.g., `"#3b82f6"`, `"#8b5cf6"`, `"#06b6d4"`). Never use CSS variables like `var(--chart-1)`. Use a diverse color palette with good contrast.
 5. **Legend vs. labels:** Keep `showLegend` true unless there’s only one series—the legend communicates which contour is which without cluttering the axes.
 6. **Context paragraph:** Mention the evaluation scale or time period in `description` so end users know what the axes represent.
 

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { Icon } from '@iconify/react'
+import Icon from '@/components/primitives/Icon'
 
 export interface Metric {
   label: string
@@ -26,15 +26,15 @@ export interface MetricGridProps {
 
 const trendConfig = {
   up: {
-    icon: 'lucide:trending-up',
+    icon: 'trending-up',
     color: 'text-green-600 dark:text-green-400',
   },
   down: {
-    icon: 'lucide:trending-down',
+    icon: 'trending-down',
     color: 'text-red-600 dark:text-red-400',
   },
   neutral: {
-    icon: 'lucide:minus',
+    icon: 'minus',
     color: 'text-muted-foreground',
   },
 }
@@ -82,7 +82,7 @@ export function MetricGrid({
             <div className="flex items-center gap-2">
               {metric.icon && (
                 <Icon
-                  icon={metric.icon}
+                  name={metric.icon}
                   className="w-4 h-4 text-muted-foreground"
                 />
               )}
@@ -101,7 +101,7 @@ export function MetricGrid({
             </div>
             {metric.trend && (
               <div className={cn('flex items-center gap-1 text-xs', trendConfig[metric.trend].color)}>
-                <Icon icon={trendConfig[metric.trend].icon} className="w-3 h-3" />
+                <Icon name={trendConfig[metric.trend].icon} className="w-3 h-3" />
                 {metric.trendValue && <span>{metric.trendValue}</span>}
               </div>
             )}

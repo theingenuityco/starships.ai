@@ -17,7 +17,7 @@ Time-series visualization with smooth curves, optional dots, and shadcn/ui toolt
 | Piece | Required? | Description |
 | --- | --- | --- |
 | `indexKey` | ✅ | Field used for the X-axis (dates, categories, etc.). |
-| `series` | ✅ | Array of `{ dataKey, label, color? }`. Each line corresponds to one series entry. |
+| `series` | ✅ | Array of `{ dataKey, label, color? }`. Each line corresponds to one series entry. **IMPORTANT: Always use hex color codes (e.g., `"#3b82f6"`)**, not CSS variables. |
 | `data` | ✅ | Array of objects where every row contains the `indexKey` plus each series `dataKey`. Values must be numeric to plot along Y-axis. |
 | `showDots` | ⛔ | When true (default), renders `dot` + `activeDot` markers. Disable for dense data. |
 
@@ -56,8 +56,8 @@ Time-series visualization with smooth curves, optional dots, and shadcn/ui toolt
     "description": "UTC rolling 7-day average",
     "indexKey": "date",
     "series": [
-      { "dataKey": "desktop", "label": "Desktop", "color": "var(--chart-2)" },
-      { "dataKey": "mobile", "label": "Mobile", "color": "var(--chart-1)" }
+      { "dataKey": "desktop", "label": "Desktop", "color": "#3b82f6" },
+      { "dataKey": "mobile", "label": "Mobile", "color": "#8b5cf6" }
     ],
     "data": [
       { "date": "2024-06-01", "desktop": 222, "mobile": 150 },
@@ -73,11 +73,12 @@ Time-series visualization with smooth curves, optional dots, and shadcn/ui toolt
 
 ## Agent Playbook
 
-1. **Match scale to prompt:** If the user specifies “7-day moving average”, mention it in `description` and ensure data reflects the aggregated values.
+1. **Match scale to prompt:** If the user specifies "7-day moving average", mention it in `description` and ensure data reflects the aggregated values.
 2. **Pre-format labels:** Abbreviate dates or convert units before passing data to the widget (e.g., store `"Apr 12"` or thousands as `value / 1000`).
 3. **Dots vs. density:** Leave `showDots` on for ≤ 30 data points; disable for dense telemetry to reduce noise.
-4. **Latest value callouts:** Pair with a `StatCard` summarizing the final data point or delta to give agents a textual hook.
-5. **Friendly labels:** Tooltips display `series.label`, so keep them human readable (“Mobile Visitors” vs. “mobile”).
+4. **Color strategy: ALWAYS USE HEX COLORS.** Generate visually distinct hex color codes for each series (e.g., `"#3b82f6"`, `"#8b5cf6"`, `"#06b6d4"`). Never use CSS variables like `var(--chart-1)`. Use a diverse color palette with good contrast.
+5. **Latest value callouts:** Pair with a `StatCard` summarizing the final data point or delta to give agents a textual hook.
+6. **Friendly labels:** Tooltips display `series.label`, so keep them human readable ("Mobile Visitors" vs. "mobile").
 6. **Handling missing data:** If prompts include gaps, fill `null` for the missing series key—Recharts will break the line, signaling incomplete data.
 
 ## Relevant TypeScript

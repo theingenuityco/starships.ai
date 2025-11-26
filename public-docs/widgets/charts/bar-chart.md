@@ -17,7 +17,7 @@ A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It
 | Piece | Required? | Description |
 | --- | --- | --- |
 | `indexKey` | ✅ | Property used for the X-axis. Example: `"month"`, `"date"`, `"region"`. |
-| `series` | ✅ | Array of `{ dataKey, label, color? }`. Each `dataKey` must exist on every datum. `color` can be a CSS var (preferred) or raw hex. |
+| `series` | ✅ | Array of `{ dataKey, label, color? }`. Each `dataKey` must exist on every datum. **IMPORTANT: Always use hex color codes (e.g., `"#3b82f6"`)**, not CSS variables. |
 | `data` | ✅ | Array of records. Each record must include the `indexKey` plus all `series.dataKey`s. |
 | `stacked` | ⛔ | When `true`, all bars share `stackId="stack"` to create stacked columns. |
 
@@ -56,8 +56,8 @@ A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It
     "description": "Last 6 months",
     "indexKey": "month",
     "series": [
-      { "dataKey": "desktop", "label": "Desktop", "color": "var(--chart-2)" },
-      { "dataKey": "mobile", "label": "Mobile", "color": "var(--chart-1)" }
+      { "dataKey": "desktop", "label": "Desktop", "color": "#3b82f6" },
+      { "dataKey": "mobile", "label": "Mobile", "color": "#8b5cf6" }
     ],
     "data": [
       { "month": "Jan", "desktop": 186, "mobile": 80 },
@@ -75,10 +75,10 @@ A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It
 
 ## Agent Playbook
 
-1. **Map prompts to `series`:** Whenever a user lists multiple metrics (e.g., “desktop vs mobile”), create one `series` entry per metric so the legend is accurate.
+1. **Map prompts to `series`:** Whenever a user lists multiple metrics (e.g., "desktop vs mobile"), create one `series` entry per metric so the legend is accurate.
 2. **Stack only when needed:** Use `stacked: true` when showing contributions to a total; leave it false for comparisons. This mirrors the shadcn interactive bar example referenced in Context7.
 3. **Format axes smartly:** Pre-format labels in your data (e.g., store `"Jan"` instead of `"January"`) if you need abbreviations or localized strings.
-4. **Honor brand palettes:** Pull colors from `var(--chart-1..5)` for instant theming, or accept custom hex values if the prompt specifies brand colors.
+4. **Color strategy: ALWAYS USE HEX COLORS.** Generate visually distinct hex color codes for each series (e.g., `"#3b82f6"`, `"#8b5cf6"`, `"#06b6d4"`). Never use CSS variables like `var(--chart-1)`. Use a diverse color palette with good contrast.
 5. **Call out units:** Mention measurement units (e.g., “Sessions”, “k USD”) in `description` or include them inside the data labels for clarity.
 6. **Handle long labels:** Shorten or wrap labels before passing data to the widget; legend/tooltips will still provide human-friendly text.
 

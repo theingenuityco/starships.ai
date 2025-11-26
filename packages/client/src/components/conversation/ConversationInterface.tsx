@@ -935,7 +935,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               onToggleToolForm={handleToggleToolBuilder}
               isToolFormOpen={false}
               disabled={false}
-              minimal={isInputDocked && !isHeightFrozen}
+              minimal={isInputDocked}
               onFocus={() => {}}
               onBlur={() => {}}
               onToggleOverlay={handleToggleOverlay}

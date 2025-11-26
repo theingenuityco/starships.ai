@@ -15,7 +15,7 @@ import type {
   LlmMessage,
   EngineConfig,
 } from '@starships/autopilot';
-import { NotFoundError } from '@starships/errors';
+import { NotFoundError, ConflictError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
@@ -609,6 +609,38 @@ export class ConversationService {
     data: Message & { conversationId: string; attachmentIds?: string[] },
     ctx?: { authorization?: string }
   ): Promise<void> {
+    // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
+    // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
+    // This catches concurrent requests even when conversation doesn't exist yet
+    const hasActiveCancellation = ConversationService.activeCancellations.has(data.conversationId);
+    if (hasActiveCancellation) {
+      throw new ConflictError(
+        'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.'
+      );
+    }
+
+    // Add placeholder cancellation handle IMMEDIATELY to block concurrent requests
+    // This works even when conversation doesn't exist yet (first message scenario)
+    ConversationService.activeCancellations.set(data.conversationId, () => {
+      // Placeholder cancel function - will be replaced by actual runner cancel when workflow starts
+      // This should never be called, but if it is, it's a no-op
+    });
+
+    // Now check conversation state (async, but we're already protected by activeCancellations)
+    const conversationStateCheck = await this.getConversationById(data.conversationId).catch(() => null);
+    const turnActive =
+      conversationStateCheck?.state &&
+      typeof conversationStateCheck.state === 'object' &&
+      (conversationStateCheck.state as { turnActive?: boolean }).turnActive === true;
+
+    if (turnActive) {
+      // Remove placeholder since we're blocking
+      ConversationService.activeCancellations.delete(data.conversationId);
+      throw new ConflictError(
+        'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.'
+      );
+    }
+
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
       conversationId: data.conversationId,
@@ -803,7 +835,7 @@ export class ConversationService {
             ConversationService.activeCancellations.delete(data.conversationId);
           }
         } else {
-          // Fallback: no controller available
+          // Fallback: no controller available - keep placeholder to block duplicates until completion
           await runner.run(blueprint, exec, engineConfig as any);
         }
 
@@ -837,6 +869,9 @@ export class ConversationService {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
+      // Clean up placeholder cancellation handle on error
+      ConversationService.activeCancellations.delete(data.conversationId);
+
       if (this.streamingService) {
         await this.streamingService.broadcastError(data.conversationId, {
           streamId: data.conversationId,
@@ -849,6 +884,8 @@ export class ConversationService {
 
       throw error;
     } finally {
+      // Always clean up cancellation handle (placeholder or real) to allow new turns
+      ConversationService.activeCancellations.delete(data.conversationId);
       // Clear attribution and suppression, emit a single completion
       this.currentAgentForConversation.delete(data.conversationId);
       const wasSuppressed = this.suppressCompleteFor.delete(data.conversationId);

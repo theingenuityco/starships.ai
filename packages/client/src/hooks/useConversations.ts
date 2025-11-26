@@ -653,10 +653,15 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
   switch (chunk.type) {
     case 'append': {
       const msg = chunk.message
-      if (msg?.id && acc.some(m => m.id === msg.id)) {
-        return acc
+      const messages = clone(acc)
+      if (msg?.id && messages.some(m => m.id === msg.id)) {
+        return messages
       }
-      return [...acc, { ...msg }]
+      // If a streaming placeholder exists at the end, drop it before appending a persisted assistant message.
+      if (msg?.role === 'assistant' && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (messages[messages.length - 1] as any).streaming) {
+        messages.pop()
+      }
+      return [...messages, { ...msg }]
     }
     case 'replace_whole_assistant': {
       const messages = clone(acc)
@@ -929,6 +934,34 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return false
   }, [chunks])
 
+  // Heuristic: detect if there's already a non-streaming assistant message after the last user message.
+  // This protects against edge cases where turn lifecycle events are missing or out-of-order on reconnect.
+  const hasFinalAssistantAfterLastUser = useMemo(() => {
+    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
+
+    let lastUserIdx = -1
+    for (let i = computedMessages.length - 1; i >= 0; i--) {
+      if (computedMessages[i].role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+    if (lastUserIdx === -1) return false
+
+    for (let i = computedMessages.length - 1; i > lastUserIdx; i--) {
+      const m: any = computedMessages[i]
+      if (!m || m.role !== 'assistant') continue
+      // If any assistant after the last user is still streaming, we are not done yet.
+      if (m.streaming) return false
+      const content = typeof m.content === 'string' ? m.content : ''
+      if (content.trim().length > 0) {
+        return true
+      }
+    }
+
+    return false
+  }, [computedMessages])
+
   // Derived streaming flags - ensure we stop streaming when complete event is received
   const isAssistantStreaming = useMemo(() => {
     if (hasCompleteEvent) return false
@@ -938,8 +971,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
   const isAwaitingAssistant = useMemo(() => {
     if (hasCompleteEvent) return false
+    // If we already have a final assistant message for the last user turn, do not show loader
+    if (hasFinalAssistantAfterLastUser) return false
     return serverTurnActive && !isAssistantStreaming
-  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent])
+  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant

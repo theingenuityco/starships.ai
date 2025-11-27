@@ -44,7 +44,6 @@ const map: Record<string, ResolvedIcon> = {
   info: { type: 'phosphor', component: 'Info' },
   calendar: { type: 'phosphor', component: 'Calendar' },
   clock: { type: 'phosphor', component: 'Clock' },
-  repeat: { type: 'phosphor', component: 'Repeat' },
   percent: { type: 'phosphor', component: 'Percent' },
 
   // Navbar / UI common

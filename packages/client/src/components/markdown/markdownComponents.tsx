@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -15,9 +15,117 @@ interface GetMarkdownComponentsOptions {
   messageId?: string
   copiedStates?: Record<string, boolean>
   onCopyCodeBlock?: (code: string, blockId: string) => void
+  onCopyTable?: (tableContent: string, tableId: string, tableHtml?: string) => void
 }
 
-export function getMarkdownComponents({ theme, enableLinkPreview = true, messageId = 'md', copiedStates = {}, onCopyCodeBlock }: GetMarkdownComponentsOptions) {
+// Helper function to convert table DOM structure to plain text table
+export function tableToMarkdown(tableElement: HTMLTableElement): string {
+  const rows: string[][] = []
+  const columnWidths: number[] = []
+
+  // Extract all rows (from thead and tbody, or just table rows)
+  const allRows = Array.from(tableElement.querySelectorAll('tr'))
+
+  // First pass: extract all cell content as plain text
+  for (const row of allRows) {
+    const cells: string[] = []
+    const cells_elements = Array.from(row.querySelectorAll('th, td'))
+    for (let i = 0; i < cells_elements.length; i++) {
+      const cell = cells_elements[i]
+      // Get plain text content only (no markdown formatting)
+      const plainText = (cell.textContent || (cell as HTMLElement).innerText || '').trim()
+      cells.push(plainText)
+
+      // Track column widths based on plain text length
+      if (!columnWidths[i] || plainText.length > columnWidths[i]) {
+        columnWidths[i] = Math.max(plainText.length, 3) // Minimum 3 for separator
+      }
+    }
+    if (cells.length > 0) {
+      rows.push(cells)
+    }
+  }
+
+  if (rows.length === 0) {
+    return ''
+  }
+
+  // Build plain text table
+  const numColumns = Math.max(...rows.map(r => r.length), 1)
+
+  // Ensure we have widths for all columns
+  while (columnWidths.length < numColumns) {
+    columnWidths.push(3)
+  }
+
+  // Use first row as header
+  const headerRow = rows[0]
+  const paddedHeader = [...headerRow, ...Array(numColumns - headerRow.length).fill('')]
+  let table = '| ' + paddedHeader.map(cell => cell || '').join(' | ') + ' |\n'
+
+  // Separator row with dashes matching column widths
+  const separator = columnWidths
+    .slice(0, numColumns)
+    .map(width => '-'.repeat(Math.max(width, 3)))
+    .join(' | ')
+  table += '| ' + separator + ' |\n'
+
+  // Data rows (skip first row if we have more than one row)
+  if (rows.length > 1) {
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i]
+      const paddedRow = [...row, ...Array(numColumns - row.length).fill('')]
+      table += '| ' + paddedRow.join(' | ') + ' |\n'
+    }
+  }
+
+  return table.trim()
+}
+
+// Table component with copy functionality
+function TableWithCopy({
+  children,
+  messageId,
+  copiedStates,
+  onCopyTable,
+}: {
+  children: React.ReactNode
+  messageId: string
+  copiedStates?: Record<string, boolean>
+  onCopyTable?: (tableContent: string, tableId: string, tableHtml?: string) => void
+}) {
+  const tableRef = useRef<HTMLTableElement>(null)
+  const tableIdRef = useRef<string>(`${messageId}-table-${Math.random().toString(36).slice(2, 8)}`)
+  const hasCopy = typeof onCopyTable === 'function'
+
+  const handleCopyTable = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (tableRef.current && onCopyTable) {
+      const markdown = tableToMarkdown(tableRef.current)
+      const html = tableRef.current.outerHTML
+      onCopyTable(markdown, tableIdRef.current, html)
+    }
+  }
+
+  return (
+    <div className="table-wrapper relative rounded-lg border bg-muted/30 my-2 group/table">
+      {hasCopy && (
+        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/table:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTable}>
+            {copiedStates?.[tableIdRef.current] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
+          </Button>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table ref={tableRef} className="min-w-full border-collapse border border-border rounded-lg">
+          {children}
+        </table>
+      </div>
+    </div>
+  )
+}
+
+export function getMarkdownComponents({ theme, enableLinkPreview = true, messageId = 'md', copiedStates = {}, onCopyCodeBlock, onCopyTable }: GetMarkdownComponentsOptions) {
   return {
     p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
 
@@ -78,9 +186,9 @@ export function getMarkdownComponents({ theme, enableLinkPreview = true, message
     ul: ({ children }: any) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
     ol: ({ children }: any) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
     table: ({ children }: any) => (
-      <div className="overflow-x-auto my-2">
-        <table className="min-w-full border-collapse border border-border rounded-lg">{children}</table>
-      </div>
+      <TableWithCopy messageId={messageId} copiedStates={copiedStates} onCopyTable={onCopyTable}>
+        {children}
+      </TableWithCopy>
     ),
     th: ({ children }: any) => <th className="border border-border bg-muted/50 px-3 py-2 text-left font-medium">{children}</th>,
     td: ({ children }: any) => <td className="border border-border px-3 py-2">{children}</td>,

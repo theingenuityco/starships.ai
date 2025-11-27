@@ -14,7 +14,7 @@ import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
-import { getMarkdownComponents } from '@/components/markdown/markdownComponents'
+import { getMarkdownComponents, tableToMarkdown } from '@/components/markdown/markdownComponents'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -232,9 +232,58 @@ export function ConversationMessageContent({
     )
   }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
 
+  const messageContainerRef = useRef<HTMLDivElement>(null)
+
   const handleCopyContent = async () => {
     try {
-      await navigator.clipboard.writeText(displayContent)
+      const container = messageContainerRef.current
+      if (!container) {
+        await navigator.clipboard.writeText(displayContent)
+        toast.success('Message copied to clipboard')
+        return
+      }
+
+      const htmlClone = container.cloneNode(true) as HTMLElement
+      const textClone = container.cloneNode(true) as HTMLElement
+
+      // Remove UI elements
+      htmlClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
+      textClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
+
+      // Build plain text by traversing DOM and converting tables to markdown
+      const extractPlainText = (node: Node): string => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          return node.textContent || ''
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          return ''
+        }
+        const element = node as HTMLElement
+
+        // Convert table wrapper to markdown (same as individual table copy)
+        if (element.classList?.contains('table-wrapper')) {
+          const table = element.querySelector('table')
+          return table ? '\n' + tableToMarkdown(table as HTMLTableElement) + '\n\n' : ''
+        }
+
+        // Recursively process child nodes
+        return Array.from(node.childNodes).map(extractPlainText).join('')
+      }
+
+      const htmlContent = htmlClone.innerHTML
+      const plainText = extractPlainText(textClone).trim()
+
+      // Copy both HTML and plain text
+      try {
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([htmlContent], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        })
+        await navigator.clipboard.write([clipboardItem])
+      } catch {
+        await navigator.clipboard.writeText(plainText)
+      }
+
       toast.success('Message copied to clipboard')
     } catch (error) {
       toast.error('Failed to copy message')
@@ -255,9 +304,44 @@ export function ConversationMessageContent({
     }
   }
 
+  const handleCopyTable = async (tableContent: string, tableId: string, tableHtml?: string) => {
+    try {
+      // If we have HTML, copy both HTML (for rich text editors) and plain text (for plain text editors)
+      if (tableHtml) {
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([tableHtml], { type: 'text/html' }),
+          'text/plain': new Blob([tableContent], { type: 'text/plain' }),
+        })
+        await navigator.clipboard.write([clipboardItem])
+      } else {
+        // Fallback to plain text only
+        await navigator.clipboard.writeText(tableContent)
+      }
+
+      setCopiedStates(prev => ({ ...prev, [tableId]: true }))
+      toast.success('Table copied to clipboard')
+
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [tableId]: false }))
+      }, 2000)
+    } catch (error) {
+      // Fallback to plain text if ClipboardItem API is not supported
+      try {
+        await navigator.clipboard.writeText(tableContent)
+        setCopiedStates(prev => ({ ...prev, [tableId]: true }))
+        toast.success('Table copied to clipboard')
+        setTimeout(() => {
+          setCopiedStates(prev => ({ ...prev, [tableId]: false }))
+        }, 2000)
+      } catch (fallbackError) {
+        toast.error('Failed to copy table')
+      }
+    }
+  }
+
   // Shared markdown components for consistent rendering across app
   const markdownComponents = useMemo(
-    () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock }),
+    () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock, onCopyTable: handleCopyTable }),
     [theme, enableLinkPreview, messageId, copiedStates]
   )
 
@@ -309,7 +393,7 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div className={cn('relative group w-full', className)}>
+    <div ref={messageContainerRef} className={cn('relative group w-full', className)}>
       {/* Reasoning (thinking) collapsible */}
       {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
@@ -335,13 +419,11 @@ export function ConversationMessageContent({
       {/* Attachments */}
       {attachmentIds && attachmentIds.length > 0 && starshipId && (
         <div className="mb-1 space-y-2">
-          {isLoadingAttachments ? (
-            // Loading state
-            attachmentIds.map((id) => <MessageAttachmentSkeleton key={id} />)
-          ) : (
-            // Render attachments
-            attachments?.map((attachment) => <MessageAttachment key={attachment.id} attachment={attachment} />)
-          )}
+          {isLoadingAttachments
+            ? // Loading state
+              attachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+            : // Render attachments
+              attachments?.map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
         </div>
       )}
 

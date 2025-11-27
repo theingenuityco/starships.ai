@@ -1,9 +1,8 @@
 'use client'
 
 import React from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Icon } from '@iconify/react'
+import Icon from '@/components/primitives/Icon'
 
 export interface StatItem {
   label: string
@@ -35,38 +34,32 @@ const variantTextStyles = {
 
 export function StatCard({ title, stats, description, className }: StatCardProps): React.JSX.Element {
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className={cn(
-                'flex flex-col gap-1 p-4 rounded-lg border',
-                variantStyles[stat.variant || 'default']
+    <div className={className}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {stats.map((stat, index) => (
+          <div
+            key={index}
+            className={cn(
+              'flex flex-col gap-1 p-4 rounded-lg border',
+              variantStyles[stat.variant || 'default']
+            )}
+          >
+            <div className="flex items-center gap-2">
+              {stat.icon && (
+                <Icon
+                  name={stat.icon}
+                  className={cn('w-4 h-4', variantTextStyles[stat.variant || 'default'])}
+                />
               )}
-            >
-              <div className="flex items-center gap-2">
-                {stat.icon && (
-                  <Icon
-                    icon={stat.icon}
-                    className={cn('w-4 h-4', variantTextStyles[stat.variant || 'default'])}
-                  />
-                )}
-                <span className="text-sm text-muted-foreground">{stat.label}</span>
-              </div>
-              <span className={cn('text-2xl font-bold', variantTextStyles[stat.variant || 'default'])}>
-                {stat.value}
-              </span>
+              <span className="text-sm text-muted-foreground">{stat.label}</span>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            <span className={cn('text-2xl font-bold', variantTextStyles[stat.variant || 'default'])}>
+              {stat.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

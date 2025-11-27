@@ -19,11 +19,11 @@ A radial (semi-donut) bar chart for ranking categories while keeping focus on ab
 | `data` | ✅ | Array of `{ label: string; value: number; color?: string }`. Each item renders a single radial bar. |
 | `value` | ✅ | Numeric magnitude. Drives radial length. |
 | `label` | ✅ | Name used in the legend and tooltip. |
-| `color` | ⛔ | Overrides the CSS var-based palette. Use brand hex values or `var(--chart-3)` tokens from shadcn’s color doc. |
+| `color` | ⛔ | **IMPORTANT: Always use hex color codes (e.g., `"#3b82f6"`, `"#ef4444"`)**. Do not use CSS variables like `var(--chart-1)`. |
 
 **Default palette fallback**
 
-If `color` is omitted, the widget cycles through `['var(--chart-1)', … 'var(--chart-5)']`, relying on the CSS variables defined in shadcn’s instructions (“Configure Chart Colors in Global CSS”).
+If `color` is omitted, the widget uses built-in fallback colors.
 
 ## Prop Reference
 
@@ -48,10 +48,10 @@ If `color` is omitted, the widget cycles through `['var(--chart-1)', … 'var(--
     "title": "Top Support Queues",
     "description": "Tickets resolved last week",
     "data": [
-      { "label": "Billing", "value": 142, "color": "var(--chart-1)" },
-      { "label": "Onboarding", "value": 118, "color": "var(--chart-2)" },
-      { "label": "Security", "value": 96, "color": "var(--chart-3)" },
-      { "label": "Integrations", "value": 84, "color": "var(--chart-4)" }
+      { "label": "Billing", "value": 142, "color": "#3b82f6" },
+      { "label": "Onboarding", "value": 118, "color": "#8b5cf6" },
+      { "label": "Security", "value": 96, "color": "#06b6d4" },
+      { "label": "Integrations", "value": 84, "color": "#f59e0b" }
     ],
     "innerRadius": "55%",
     "outerRadius": "95%",
@@ -64,8 +64,8 @@ If `color` is omitted, the widget cycles through `['var(--chart-1)', … 'var(--
 ## Agent Playbook
 
 1. **Ranked data:** Use this widget when the prompt highlights top/bottom performers instead of proportions. Provide explicit numeric `value`s; the legend displays them verbatim.
-2. **Set sweep intentionally:** `startAngle` + `endAngle` determine whether this feels like a KPI gauge (180°) or full radial ranking (360°+). Tie these settings back to the user’s wording (“Create a half-circle progress chart”).
-3. **Color strategy:** Stick with `var(--chart-X)` tokens unless users specify exact hex codes. Aligns with shadcn’s theming guide and adapts to dark mode automatically.
+2. **Set sweep intentionally:** `startAngle` + `endAngle` determine whether this feels like a KPI gauge (180°) or full radial ranking (360°+). Tie these settings back to the user's wording ("Create a half-circle progress chart").
+3. **Color strategy: ALWAYS USE HEX COLORS.** Generate visually distinct hex color codes for each data point (e.g., `"#3b82f6"`, `"#8b5cf6"`, `"#06b6d4"`). Never use CSS variables like `var(--chart-1)`. Use a diverse color palette with good contrast.
 4. **Summaries:** Since radial bars don’t convey totals, mention aggregate context (e.g., “Total tickets resolved: 540”) in `description` or a nearby `StatCard`.
 5. **Limit categories:** 3–6 slices keep legends readable. If a prompt lists many categories, consider switching to `BarChart` or summarizing long tails inside `DataTable`.
 6. **Zero / negative values:** Avoid negative numbers—radial bars are intended for positive magnitudes. If the prompt includes decreases, convert them into absolute values with clarifying text (e.g., “-12% decrease ⇒ value: 12, description clarifies direction”).

@@ -9,7 +9,6 @@ import {
   YAxis as RechartsYAxis,
 } from 'recharts'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ChartContainer,
   ChartLegend,
@@ -18,7 +17,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
-import { cn } from '@/lib/utils'
 
 import type { ChartSeriesConfig, ChartWidgetBaseProps, ChartDataPoint } from './types'
 
@@ -56,13 +54,8 @@ export function AreaChart({
   }, [series])
 
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      <CardHeader className="space-y-1">
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+    <div className={className}>
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
           <RechartsAreaChart accessibilityLayer data={data} margin={{ left: 12, right: 12 }}>
             {showGrid && <RechartsCartesianGrid strokeDasharray="3 3" />}
             <RechartsXAxis
@@ -87,8 +80,11 @@ export function AreaChart({
             ))}
           </RechartsAreaChart>
         </ChartContainer>
-      </CardContent>
-    </Card>
+    </div>
   )
 }
+
+
+
+
 

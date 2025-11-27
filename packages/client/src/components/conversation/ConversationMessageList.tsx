@@ -513,7 +513,7 @@ const MemoizedMessageBubble = memo(
       // AI message: Plain text on the left (no bubble)
       return (
         <div className="flex justify-start">
-          <div className="flex items-start gap-3 max-w-[85%]">
+          <div className="flex items-start gap-3 w-full">
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
               <AgentAvatar seed={agentName} size={32} />
             </div>

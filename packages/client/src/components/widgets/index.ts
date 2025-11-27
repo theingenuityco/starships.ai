@@ -2,6 +2,7 @@ export { StatCard, type StatCardProps, type StatItem } from './StatCard'
 export { DataTable, type DataTableProps, type DataColumn } from './DataTable'
 export { MetricGrid, type MetricGridProps, type Metric } from './MetricGrid'
 export { WidgetRenderer, type WidgetRendererProps, type WidgetConfig } from './WidgetRenderer'
+export { InlineWidgetRenderer, type InlineWidgetRendererProps, type InlineWidgetConfig } from './InlineWidgetRenderer'
 export {
   BarChart,
   type BarChartProps,

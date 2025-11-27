@@ -227,6 +227,65 @@ Simple two-column layout:
 }
 ```
 
+## Supported Icons
+
+The `icon` property supports icon names from the Phosphor icon library. Below are commonly used icons organized by category:
+
+### System & Performance
+- `cpu` - CPU/processor
+- `database` - Database/storage
+- `hard-drive` - Hard drive/disk
+- `wifi` - Network/connectivity
+- `activity` - Activity/metrics
+- `zap` - Lightning/speed/performance
+
+### Users & People
+- `users` - Multiple users
+- `user` - Single user
+- `user-plus` - Add user
+- `user-minus` - Remove user
+
+### Status & Alerts
+- `alert-circle` - Warning/alert (circle)
+- `alert-triangle` - Warning/alert (triangle)
+- `check-circle` - Success/completed
+- `clock` - Time/duration
+- `info` - Information
+- `heart` - Favorite/like/health
+
+### Finance & Commerce
+- `dollar-sign` - Currency/money
+- `coins` - Coins/payments
+- `credit-card` - Credit card/payment method
+- `receipt` - Receipt/transaction
+
+### Charts & Data
+- `trending-up` - Trending up
+- `trending-down` - Trending down
+- `bar-chart` - Bar chart
+- `activity` - Line chart/activity
+- `percent` - Percentage/ratio
+- `repeat` - Recurring/cycle
+
+### Communication
+- `mail` - Email
+- `message-square` - Message/chat
+- `bell` - Notification
+
+### Navigation & Controls
+- `chevron-right` - Next/forward
+- `chevron-left` - Back/previous
+- `arrow-right` - Move right
+- `arrow-left` - Move left
+
+### Files & Code
+- `file` - File/document
+- `folder` - Folder/directory
+- `code` - Code/programming
+- `download` - Download
+
+**Note:** For the complete list of available icons, visit [Phosphor Icons](https://phosphoricons.com). All icon names should be lowercase and use hyphens (e.g., `alert-circle`, `dollar-sign`).
+
 ## Trend Indicators
 
 The `trend` property shows visual indicators:

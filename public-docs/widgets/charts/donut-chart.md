@@ -20,7 +20,7 @@ Donut segments reuse the same `PieSegment` structure as the Pie widget:
 | --- | --- | --- |
 | `label` | ✅ | Slice name (legend + tooltip). |
 | `value` | ✅ | Numeric value; summed to show center total if `showTotal` is true. |
-| `color` | ⛔ | Optional color override. Defaults to whichever CSS variable the agent supplies or fallback palette. |
+| `color` | ⛔ | **IMPORTANT: Always use hex color codes (e.g., `"#3b82f6"`, `"#ef4444"`)**. Do not use CSS variables like `var(--chart-1)`. |
 
 ## Prop Reference
 
@@ -46,10 +46,10 @@ Donut segments reuse the same `PieSegment` structure as the Pie widget:
     "description": "FY25 draft",
     "centerLabel": "Total",
     "data": [
-      { "label": "R&D", "value": 35, "color": "var(--chart-1)" },
-      { "label": "Sales", "value": 30, "color": "var(--chart-2)" },
-      { "label": "Marketing", "value": 20, "color": "var(--chart-3)" },
-      { "label": "Ops", "value": 15, "color": "var(--chart-4)" }
+      { "label": "R&D", "value": 35, "color": "#3b82f6" },
+      { "label": "Sales", "value": 30, "color": "#8b5cf6" },
+      { "label": "Marketing", "value": 20, "color": "#06b6d4" },
+      { "label": "Ops", "value": 15, "color": "#f59e0b" }
     ],
     "innerRadius": "60%"
   }
@@ -58,9 +58,9 @@ Donut segments reuse the same `PieSegment` structure as the Pie widget:
 
 ## Agent Playbook
 
-1. **Center messaging:** Use `centerLabel` + `showTotal` to communicate what the donut represents (“ARR”, “Q4 Budget”). If the total isn’t meaningful, disable `showTotal`.
+1. **Center messaging:** Use `centerLabel` + `showTotal` to communicate what the donut represents ("ARR", "Q4 Budget"). If the total isn't meaningful, disable `showTotal`.
 2. **Slices vs. readability:** Follow the same 3–7 slice guideline as the Pie widget. If prompts mention many small categories, aggregate or switch chart types.
-3. **Color tokens:** Default to shadcn CSS variables (`var(--chart-1)`...) to automatically follow theme colors. This follows the “Configure Chart Colors in Global CSS” snippet from Context7.
+3. **Color strategy: ALWAYS USE HEX COLORS.** Generate visually distinct hex color codes for each data point (e.g., `"#3b82f6"`, `"#8b5cf6"`, `"#06b6d4"`). Never use CSS variables like `var(--chart-1)`. Use a diverse color palette with good contrast.
 4. **Unit clarity:** Mention units in `description` or the center label so the total isn’t ambiguous (e.g., “$” or “hrs”).
 5. **Comparison prompts:** When asked to compare “budget vs spend”, consider combining Donut + `StatCard` to show the variance, since the donut only shows ratios/absolute values.
 6. **Label trade-offs:** Keep `showLegend` true unless there’s only one slice. The legend relays exact values while the center emphasizes totals.

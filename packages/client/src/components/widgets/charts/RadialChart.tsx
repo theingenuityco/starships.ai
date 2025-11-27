@@ -3,14 +3,12 @@
 import React from 'react'
 import { PolarAngleAxis as RechartsPolarAngleAxis, RadialBar as RechartsRadialBar, RadialBarChart as RechartsRadialBarChart } from 'recharts'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { cn } from '@/lib/utils'
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 
 import type { ChartWidgetBaseProps, RadialSegment } from './types'
 
 const DEFAULT_HEIGHT = 320
-const DEFAULT_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
+const DEFAULT_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f59e0b', '#10b981']
 
 export interface RadialChartProps extends ChartWidgetBaseProps {
   data: RadialSegment[]
@@ -45,6 +43,24 @@ export function RadialChart({
     }))
   }, [data])
 
+  const chartConfig = React.useMemo(() => {
+    if (!chartData.length) {
+      return {}
+    }
+
+    // Build config object for ChartContainer to generate CSS variables
+    return chartData.reduce(
+      (config, segment) => {
+        config[segment.label] = {
+          label: segment.label,
+          color: segment.fill,
+        }
+        return config
+      },
+      {} as Record<string, { label: string; color: string }>,
+    )
+  }, [chartData])
+
   const maxDomain = React.useMemo(() => {
     if (!chartData.length) {
       return 0
@@ -53,38 +69,22 @@ export function RadialChart({
   }, [chartData])
 
   return (
-    <Card className={cn('shadow-sm border-border/50', className)}>
-      <CardHeader className="space-y-1">
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={{}} className="w-full" style={{ height }}>
-          <RechartsRadialBarChart
-            data={chartData}
-            innerRadius={innerRadius}
-            outerRadius={outerRadius}
-            startAngle={startAngle}
-            endAngle={endAngle}
-          >
-            <RechartsPolarAngleAxis type="number" domain={[0, maxDomain || 1]} tick={false} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <RechartsRadialBar background dataKey="value" cornerRadius={6} />
-          </RechartsRadialBarChart>
-        </ChartContainer>
-        {showLegend && chartData.length > 0 && (
-          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm">
-            {chartData.map(segment => (
-              <div key={segment.label} className="flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full" style={{ background: segment.fill }} />
-                <span className="text-muted-foreground">{segment.label}</span>
-                <span className="text-foreground font-medium">{segment.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className={className}>
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+        <RechartsRadialBarChart
+          data={chartData}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          startAngle={startAngle}
+          endAngle={endAngle}
+        >
+          <RechartsPolarAngleAxis type="number" domain={[0, maxDomain || 1]} tick={false} />
+          <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="label" />} />
+          <RechartsRadialBar background dataKey="value" cornerRadius={6} />
+          {showLegend && <ChartLegend content={<ChartLegendContent nameKey="label" />} />}
+        </RechartsRadialBarChart>
+      </ChartContainer>
+    </div>
   )
 }
 

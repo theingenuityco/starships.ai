@@ -8,12 +8,38 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 // Allowed MIME types (must match backend validation)
 // Images: Sent as image_url blocks (vision models)
 // PDFs: Sent as file blocks (OpenRouter parses for any model)
+// Text files: Content extracted and appended to message
 const ALLOWED_MIME_TYPES = [
+  // Images
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
+  // Documents
   'application/pdf',
+  // Text files
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'text/html',
+  'text/css',
+  'text/xml',
+  // Application formats
+  'application/json',
+  'application/xml',
+  'application/x-yaml',
+  // Code files
+  'text/javascript',
+  'text/x-python',
+  'text/x-java-source',
+  'text/x-c',
+  'text/x-c++',
+  'application/typescript',
+  'text/x-go',
+  'text/x-rust',
+  'text/x-ruby',
+  'text/x-php',
+  'text/x-swift',
 ] as const
 
 export interface PendingFile {
@@ -37,7 +63,7 @@ export function useUploadAttachment() {
       // Validate MIME type
       if (!ALLOWED_MIME_TYPES.includes(file.type as any)) {
         throw new Error(
-          `File type "${file.type}" not supported. Allowed: Images (JPEG, PNG, GIF, WebP) and PDFs only.`
+          `File type "${file.type}" not supported. Allowed: Images (JPEG, PNG, GIF, WebP), PDFs, and text files (TXT, MD, CSV, JSON, YAML, HTML, CSS, code files, etc.).`
         )
       }
 

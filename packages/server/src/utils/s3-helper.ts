@@ -97,9 +97,14 @@ export async function generatePresignedUrl(s3Key: string, expiresIn = 60): Promi
     throw new Error('AWS_S3_BUCKET not configured');
   }
 
+  // Extract filename from S3 key for download
+  const filename = s3Key.split('/').pop() || 'download';
+
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: s3Key,
+    // Force download instead of preview for all file types
+    ResponseContentDisposition: `attachment; filename="${filename}"`,
   });
 
   return getSignedUrl(getS3Client(), command, { expiresIn });
@@ -122,6 +127,40 @@ export async function deleteFromS3(s3Key: string): Promise<void> {
   });
 
   await getS3Client().send(command);
+}
+
+/**
+ * Fetch text content from S3
+ *
+ * @param s3Key - S3 object key to fetch
+ * @returns Text content as UTF-8 string
+ */
+export async function fetchTextFromS3(s3Key: string): Promise<string> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+  });
+
+  const response = await getS3Client().send(command);
+
+  if (!response.Body) {
+    throw new Error('Empty response from S3');
+  }
+
+  // Convert stream to buffer, then to UTF-8 string
+  const chunks: Uint8Array[] = [];
+  // AWS SDK body is a stream that yields Uint8Array chunks
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  const buffer = Buffer.concat(chunks);
+
+  return buffer.toString('utf-8');
 }
 
 /**

@@ -35,6 +35,19 @@ export function FileAttachmentPreview({ file, onRemove, uploading, uploadProgres
   const getFileIcon = (mimeType: string): string => {
     if (mimeType.startsWith('image/')) return 'image'
     if (mimeType === 'application/pdf') return 'file-text'
+
+    // Text files
+    if (mimeType === 'text/plain' || mimeType === 'text/markdown' || mimeType === 'text/csv') return 'file-text'
+
+    // Code files
+    if (mimeType === 'application/json') return 'braces'
+    if (mimeType === 'application/xml' || mimeType === 'text/xml') return 'code'
+    if (mimeType === 'text/javascript' || mimeType === 'application/typescript') return 'code'
+    if (mimeType.startsWith('text/x-')) return 'code' // Most code files
+    if (mimeType === 'text/html' || mimeType === 'text/css') return 'code'
+    if (mimeType === 'application/x-yaml') return 'file-text'
+
+    // Default
     return 'file'
   }
 

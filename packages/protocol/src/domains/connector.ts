@@ -30,15 +30,22 @@ export interface ConnectorModel {
 // REQUEST/RESPONSE TYPES
 // ============================================================================
 
-export interface ConnectorListItem extends ConnectorModel {
-  managedEnvKeys: {
-    key: string;
-    present: boolean;
-  }[];
+export interface ConnectorListItem {
+  id: string;
+  starshipId: string;
+  provider: ConnectorProvider;
+  status: ConnectorStatus;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+  /**
+   * OAuth scopes requested for this connector (if applicable).
+   * For non-OAuth connectors, this may be an empty array or undefined.
+   */
+  scopes?: string[];
 }
 
 export interface ConnectorListResponse {
-  starshipId: string;
   connectors: ConnectorListItem[];
 }
 

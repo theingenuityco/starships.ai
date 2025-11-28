@@ -2,6 +2,9 @@
 
 What it is: Runs custom JavaScript safely via a constrained function wrapper. Requires `async function main(ctx)`.
 
+> ⚠️ **REQUIRED:** All Code nodes must define an `async function main(ctx) { ... }` entrypoint.  
+> The engine always calls `await main(ctx)`. Code that does not define this function **will not run**.
+
 Specification (authoritative)
 
 - Handler: `packages/autopilot/src/nodes/Code.ts`
@@ -61,19 +64,28 @@ Cross-links
 
 ### Accessing initial tool/workflow arguments
 
-- Directly after `start`:
-  - Connect your Code node immediately after `start` to read tool/workflow arguments via `ctx.input`.
-  - Example:
-    ```ts
-    async function main(ctx) {
-      const args = ctx.input ?? {};
-      return { message: String(args.content ?? "") };
-    }
-    ```
+Use this table to decide how to read arguments and intermediate data:
 
-- From anywhere in the flow:
-  - You can also access the initial input using `ctx.lastOutputOf('__initial__')`.
-  - Use this when your Code node is not directly downstream of `start` or when a previous node changed the shape of `input`.
+| Your node position            | Access pattern                      | Typical use case                              |
+|------------------------------|-------------------------------------|-----------------------------------------------|
+| Directly after `start`       | `ctx.input`                         | First node to process tool/workflow arguments |
+| Anywhere (need original args)| `ctx.lastOutputOf('__initial__')`   | Node far from `start` but needs raw args      |
+| After any upstream node      | `ctx.input`                         | Work with the previous node’s output          |
 
-- Do not use `ctx.state` for arguments:
-  - Execution state is only mutated by Mutate reducers; initial tool/workflow arguments are not stored in `state` unless you explicitly put them there.
+Notes:
+
+- `__initial__` is a synthetic ref that always points to the original tool/workflow input.
+- Do **not** use `ctx.state` for initial arguments unless you explicitly copied them there via a Mutate node.
+
+### When to use Code vs Transform
+
+- **Use Transform** when:
+  - You are doing simple field mapping or reshaping JSON.
+  - JSON Patch operations (`add`, `replace`, `remove`, `copy`, `move`, `test`) are sufficient.
+  - You can express logic as “take `input`, apply a few patches, return the result”.
+- **Use Code** when:
+  - You need branching, loops, or more complex control flow.
+  - You need to call `ctx.lastOutputOf()` for multiple nodes and combine their data.
+  - You want to encapsulate non-trivial logic in JavaScript rather than long template expressions.
+
+You can often start with Transform for simple reshaping, and graduate to a Code node when the number or complexity of transforms becomes hard to read.

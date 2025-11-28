@@ -6,7 +6,8 @@ import { importPKCS8, SignJWT } from 'jose';
 import { ConnectorRepository } from '@starships/models';
 
 // Connector base URLs for relative paths
-const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com/v2';
+// LinkedIn REST APIs are served under /rest; base URL must NOT include a version suffix.
+const LINKEDIN_API_BASE_URL = 'https://api.linkedin.com';
 const DISCORD_API_BASE_URL = 'https://discord.com/api';
 const GOOGLE_DRIVE_API_BASE_URL = 'https://www.googleapis.com';
 const GITHUB_API_BASE_URL = 'https://api.github.com';
@@ -31,7 +32,7 @@ export class ConnectorRuntimeService {
    *
    * - Normalizes relative URLs:
    *   - connector === 'starships' or undefined => SERVER_URL/api/v1
-   *   - connector === 'linkedin' => LinkedIn API base (LINKEDIN_API_BASE_URL or https://api.linkedin.com/v2)
+   *   - connector === 'linkedin' => LinkedIn API base (LINKEDIN_API_BASE_URL or https://api.linkedin.com)
    *   - connector === 'discord' => Discord API base (DISCORD_API_BASE_URL or https://discord.com/api)
    * - Injects Starships JWT when connector === 'starships'
    * - Injects LinkedIn access token from managed env when connector === 'linkedin'
@@ -94,24 +95,39 @@ export class ConnectorRuntimeService {
           }
         } else if (connector === 'linkedin') {
           // Use managed LinkedIn connector secret from encrypted environments
+          // and inject required REST headers (protocol + version) when missing.
           try {
             const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
             const rawToken = decryptedEnv['LINKEDIN_ACCESS_TOKEN'];
             const accessToken = typeof rawToken === 'string' ? rawToken.trim() : '';
 
-            if (accessToken) {
-              const lowered: Record<string, unknown> = {};
-              Object.entries(headers).forEach(([k, v]) => {
-                lowered[k.toLowerCase()] = v;
-              });
+            const lowered: Record<string, unknown> = {};
+            Object.entries(headers).forEach(([k, v]) => {
+              lowered[k.toLowerCase()] = v;
+            });
 
-              // Only inject if caller hasn't explicitly set an Authorization header
-              if (!lowered['authorization']) {
-                headers = {
-                  ...headers,
-                  Authorization: `Bearer ${accessToken}`,
-                };
-              }
+            // Only inject Authorization if caller hasn't explicitly set it
+            if (accessToken && !lowered['authorization']) {
+              headers = {
+                ...headers,
+                Authorization: `Bearer ${accessToken}`,
+              };
+            }
+
+            // Ensure Rest.li protocol version header is present
+            if (!lowered['x-restli-protocol-version']) {
+              headers = {
+                ...headers,
+                'X-RestLi-Protocol-Version': '2.0.0',
+              };
+            }
+
+            // Hardcode LinkedIn API version header unless caller overrides it
+            if (!lowered['linkedin-version']) {
+              headers = {
+                ...headers,
+                'LinkedIn-Version': '202511',
+              };
             }
           } catch (err) {
             // Surface a clear connector-level error while preserving the original method/URL

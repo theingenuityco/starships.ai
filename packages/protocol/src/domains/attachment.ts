@@ -56,9 +56,7 @@ export interface UploadAttachmentRequest {
  * Allowed MIME types (OpenRouter compatible)
  * Images: Sent as image_url blocks (supported by vision models)
  * PDFs: Sent as file blocks (OpenRouter parses and sends to any model)
- *
- * NOTE: Text files (.txt, .csv, .md, .json) not currently supported
- * TODO: Implement Option 2 - read text files and append to message content
+ * Text files: Content extracted and appended to message text
  */
 export const ALLOWED_MIME_TYPES = [
   // Images (via image_url blocks)
@@ -68,6 +66,29 @@ export const ALLOWED_MIME_TYPES = [
   'image/webp',
   // Documents (via file blocks - OpenRouter only supports PDFs)
   'application/pdf',
+  // Text files (extracted and appended to message)
+  'text/plain',           // .txt
+  'text/markdown',        // .md
+  'text/csv',             // .csv
+  'text/html',            // .html
+  'text/css',             // .css
+  'text/xml',             // .xml
+  // Application text formats
+  'application/json',     // .json
+  'application/xml',      // .xml (alternative)
+  'application/x-yaml',   // .yaml, .yml
+  // Code files
+  'text/javascript',      // .js
+  'text/x-python',        // .py
+  'text/x-java-source',   // .java
+  'text/x-c',             // .c
+  'text/x-c++',           // .cpp
+  'application/typescript', // .ts
+  'text/x-go',            // .go
+  'text/x-rust',          // .rs
+  'text/x-ruby',          // .rb
+  'text/x-php',           // .php
+  'text/x-swift',         // .swift
 ] as const;
 
 /**
@@ -75,3 +96,17 @@ export const ALLOWED_MIME_TYPES = [
  */
 export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 export const MAX_IMAGE_DIMENSION = 1568; // Max dimension for optimization
+export const MAX_TEXT_FILE_SIZE = 500 * 1024; // 500KB per text file (to avoid context overflow)
+
+/**
+ * Helper function to check if MIME type is text-based
+ */
+export function isTextFile(mimeType: string): boolean {
+  return (
+    mimeType.startsWith('text/') ||
+    mimeType === 'application/json' ||
+    mimeType === 'application/xml' ||
+    mimeType === 'application/x-yaml' ||
+    mimeType === 'application/typescript'
+  );
+}

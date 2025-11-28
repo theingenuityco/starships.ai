@@ -2149,7 +2149,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           {/* Main Input Section - Text input with right-aligned actions */}
           <div className={cn('flex relative items-center', minimal ? 'px-2 py-2' : 'px-3 py-3')}>
             {/* Hidden file input */}
-            <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" onChange={handleFileSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.css,.js,.ts,.py,.java,.cpp,.c,.go,.rs,.rb,.php,.swift" onChange={handleFileSelect} className="hidden" />
 
             {/* Optional left-side controls in expanded mode */}
             {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}

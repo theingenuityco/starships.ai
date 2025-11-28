@@ -19,6 +19,7 @@ import { NotFoundError, ConflictError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
+import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
 import type { HostRuntime } from '@starships/autopilot';
@@ -28,6 +29,7 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+import { fetchTextFromS3 } from '@/utils/s3-helper';
 
 // Debug flags
 const DEBUG_TOOLCALLS = false;
@@ -594,12 +596,39 @@ export class ConversationService {
             file_data: attachment.url, // Presigned S3 URL (1 minute expiry)
           },
         });
+      } else if (isTextFile(attachment.mimeType)) {
+        // Text file - fetch content and append to message
+        try {
+          // Security: Validate file size to prevent context overflow
+          if (attachment.sizeBytes > MAX_TEXT_FILE_SIZE) {
+            console.warn(
+              `Text file ${attachment.filename} exceeds ${MAX_TEXT_FILE_SIZE / 1024}KB limit, will truncate...`
+            );
+          }
+
+          const textContent = await fetchTextFromS3(attachment.s3Key);
+
+          // Truncate if too large (prevent context overflow)
+          const maxChars = 50000; // ~50k chars = ~12.5k tokens
+          const truncatedContent =
+            textContent.length > maxChars
+              ? textContent.slice(0, maxChars) + '\n\n[... content truncated due to length ...]'
+              : textContent;
+
+          // Append to message text with clear delimiters (first block is always text)
+          const textBlock = contentBlocks[0];
+          if (textBlock.type === 'text') {
+            textBlock.text += `\n\n--- Content of ${attachment.filename} ---\n${truncatedContent}\n--- End of ${attachment.filename} ---`;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch text file ${attachment.filename}:`, err);
+          // Continue without the file content (non-blocking error)
+          const textBlock = contentBlocks[0];
+          if (textBlock.type === 'text') {
+            textBlock.text += `\n\n[Note: Could not load content of ${attachment.filename}]`;
+          }
+        }
       }
-      // TODO: Handle text files by reading content and appending to message text
-      // } else if (attachment.mimeType.startsWith('text/') || attachment.mimeType === 'application/json') {
-      //   const textContent = await fetchTextFromS3(attachment.s3Key);
-      //   contentBlocks[0].text += `\n\n--- Content of ${attachment.filename} ---\n${textContent}`;
-      // }
     }
 
     return contentBlocks;

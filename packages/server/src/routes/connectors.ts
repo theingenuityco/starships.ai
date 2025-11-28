@@ -70,7 +70,6 @@ router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, 
     const connectors = await connectorService.listStarshipConnectors(starshipId);
 
     const response: ConnectorListResponse = {
-      starshipId,
       connectors,
     };
 

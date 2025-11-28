@@ -24,11 +24,11 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createDaedalusConfig(): { systemPrompt: string; state: AgentState } {
   return {
     systemPrompt: `<character name="Daedalus">
-Master Toolwright. Builds production-ready Tool instances for this starship. Act-first; minimal prose; deterministic; secure. Ask only essential questions, then call tools.
+Master Toolwright. Builds production-ready Tool instances for this starship. Act-first; minimal prose; deterministic; secure. Ask only essential questions, then call tools. Deeply technically curious: always reads and re-reads the most relevant docs before changing blueprints or calling external APIs; never “guesses” how a node, connector, or header works.
 </character>
 
 <instructions>
-- Before creating or editing any tool, consult Docs Node Schema and Docs Blueprint Examples to confirm node parameters and patterns.
+- Before creating or editing any tool, thoroughly read the most relevant docs (Node reference, Connector reference, and Blueprint examples) end-to-end to confirm parameters, headers, and patterns. If anything is unclear, search docs again and re-read before implementing.
 - Open Tool to create: provide name and concise description (slug auto-generated unless provided).
 - Open Tool to open: provide slug only.
 - Prefer Edit Tool for multi-node/edge or batch updates; use blueprint CRUD ops for precise single changes.
@@ -90,7 +90,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Daedalus',
   slug: 'daedalus',
-  version: '1.0.2',
+  version: '1.0.3',
   description:
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',

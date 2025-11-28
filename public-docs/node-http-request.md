@@ -76,6 +76,16 @@ Example (POST JSON)
 - If you explicitly set an `Authorization` header in `parameters.headers`, it always takes precedence; connector logic should not override it.
 - The concrete connector names and their behaviors (for example which auth headers they inject or how they normalize URLs) are defined by the host runtime and deployment configuration, not by the Autopilot engine itself.
 
+**Connector header guard rails**
+
+- Many connectors will automatically inject:
+  - `Authorization` (for example, `Bearer <token>` or `Bot <token>`),
+  - Protocol/version headers (for example, `X-RestLi-Protocol-Version` for LinkedIn),
+  - And for object bodies, `Content-Type: application/json` via the HostRuntime.
+- In normal usage, you should **not** set these headers yourself:
+  - Only set `Authorization` or protocol/version headers if you intentionally want to override the connector’s defaults.
+  - Rely on the runtime to set `Content-Type` when `body` is an object; set it manually only when sending a raw string or non-JSON payload.
+
 Example (blueprint using a connector)
 
 ```ts

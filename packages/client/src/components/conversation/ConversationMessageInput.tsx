@@ -676,7 +676,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               aria-selected={idx === active}
               className={cn(
                 'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
-                idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
+                idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-yellow-500/20 dark:hover:bg-yellow-500/30'
               )}
               onMouseEnter={() => onHover(idx)}
               onMouseDown={e => {

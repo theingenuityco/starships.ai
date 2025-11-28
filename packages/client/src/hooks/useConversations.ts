@@ -503,26 +503,30 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             // Stream content chunks
             if (op === 'add' && addChunkRe.test(path)) {
               const v = raw.value || {}
-              push({
+              const chunkData: StreamedChunk = {
                 type: 'append_chunk',
                 which: 'content',
                 content: typeof v.content === 'string' ? v.content : '',
                 position: typeof v.position === 'number' ? v.position : undefined,
                 timestamp: typeof v.timestamp === 'number' ? v.timestamp : Date.now(),
-              })
+              }
+
+              push(chunkData)
               break
             }
 
             // Stream reasoning chunks
             if (op === 'add' && addReasoningChunkRe.test(path)) {
               const v = raw.value || {}
-              push({
+              const chunkData: StreamedChunk = {
                 type: 'append_chunk',
                 which: 'reasoning',
                 content: typeof v.content === 'string' ? v.content : '',
                 position: typeof v.position === 'number' ? v.position : undefined,
                 timestamp: typeof v.timestamp === 'number' ? v.timestamp : Date.now(),
-              })
+              }
+
+              push(chunkData)
               break
             }
 
@@ -721,14 +725,18 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
         const chunks = Array.isArray(target.chunks) ? [...target.chunks] : []
         const nextPosition = typeof chunk.position === 'number' ? chunk.position : chunks.length > 0 ? chunks[chunks.length - 1].position + chunk.content.length : 0
         const nextTimestamp = typeof chunk.timestamp === 'number' ? chunk.timestamp : Date.now()
+
         chunks.push({ content: chunk.content, position: nextPosition, timestamp: nextTimestamp })
+
         target.chunks = chunks
         target.streaming = true
       } else {
         const rChunks = Array.isArray(target.reasoningChunks) ? [...target.reasoningChunks] : []
         const nextPosition = typeof chunk.position === 'number' ? chunk.position : rChunks.length > 0 ? rChunks[rChunks.length - 1].position + chunk.content.length : 0
         const nextTimestamp = typeof chunk.timestamp === 'number' ? chunk.timestamp : Date.now()
+
         rChunks.push({ content: chunk.content, position: nextPosition, timestamp: nextTimestamp })
+
         target.reasoningChunks = rChunks
         target.streaming = true
       }

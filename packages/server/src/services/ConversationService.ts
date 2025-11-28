@@ -107,16 +107,42 @@ export class ConversationService {
    * already exists as a suffix of 'base'. This guards against providers that
    * re-send overlapping chunks (delta + snapshot or resume replays).
    */
+  /**
+   * Remove internal duplicates from a string (e.g., "texttext" -> "text")
+   * Handles the common case where the first half equals the second half
+   */
+  private static removeInternalDuplicates(text: string): string {
+    if (!text || text.length < 2) return text;
+
+    const half = Math.floor(text.length / 2);
+    // Check if first half equals second half (most common duplication pattern)
+    if (text.substring(0, half) === text.substring(half, half * 2)) {
+      return text.substring(0, half) + text.substring(half * 2);
+    }
+
+    return text;
+  }
+
+  /**
+   * Compute non-overlapping append between base and fragment.
+   * Also removes internal duplicates from fragment to handle provider bugs.
+   */
   private static computeNonOverlappingAppend(base: string, fragment: string): string {
     if (!fragment) return '';
-    const maxCheck = Math.min(base.length, fragment.length);
+
+    // Remove internal duplicates from fragment (handles provider bugs)
+    const deduplicatedFragment = ConversationService.removeInternalDuplicates(fragment);
+
+    // Find overlap between base suffix and fragment prefix
+    const maxCheck = Math.min(base.length, deduplicatedFragment.length);
     for (let k = maxCheck; k > 0; k--) {
-      if (base.endsWith(fragment.slice(0, k))) {
-        return fragment.slice(k);
+      if (base.endsWith(deduplicatedFragment.slice(0, k))) {
+        return deduplicatedFragment.slice(k);
       }
     }
-    // No overlap; append entire fragment
-    return fragment;
+
+    // No overlap; append entire deduplicated fragment
+    return deduplicatedFragment;
   }
   // Track last persisted message index to avoid re-persisting on workflow loops
   private lastPersistedIndex: Map<string, number> = new Map();
@@ -1457,13 +1483,32 @@ export class ConversationService {
             const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
             // Extract reasoning from OpenRouter unified fields (reasoning and reasoning_details)
+            // Prefer reasoning_details if both are present to avoid duplicates
             const extractReasoning = (node: unknown): string => {
               try {
                 if (!node || typeof node !== 'object') return '';
                 const rec = node as Record<string, unknown>;
                 const parts: string[] = [];
 
-                // Unified reasoning field
+                // Check if reasoning_details exists first (more structured, preferred)
+                const details = rec.reasoning_details as unknown;
+                if (Array.isArray(details) && details.length > 0) {
+                  // Use reasoning_details if available (preferred source)
+                  for (const d of details as unknown[]) {
+                    if (d && typeof d === 'object') {
+                      const det = d as Record<string, unknown>;
+                      if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                        parts.push(det.text);
+                      }
+                    }
+                  }
+                  // If we got content from reasoning_details, skip the reasoning field to avoid duplicates
+                  if (parts.length > 0) {
+                    return parts.join('');
+                  }
+                }
+
+                // Fallback to unified reasoning field if reasoning_details wasn't available
                 const raw = rec.reasoning as unknown;
 
                 const appendFromRaw = (r: unknown): void => {
@@ -1501,19 +1546,6 @@ export class ConversationService {
                 };
 
                 appendFromRaw(raw);
-
-                // OpenRouter unified 'reasoning_details' chunks
-                const details = rec.reasoning_details as unknown;
-                if (Array.isArray(details)) {
-                  for (const d of details as unknown[]) {
-                    if (d && typeof d === 'object') {
-                      const det = d as Record<string, unknown>;
-                      if (det.type === 'reasoning.text' && typeof det.text === 'string') {
-                        parts.push(det.text);
-                      }
-                    }
-                  }
-                }
 
                 return parts.join('');
               } catch {
@@ -1608,14 +1640,14 @@ export class ConversationService {
               }
 
               if (append) {
-                // CRITICAL FIX: Normalize content FIRST to know the chunk length
+                // Normalize content FIRST to know the chunk length
                 const latestBase = this.streamingContent.get(conversationId) || '';
                 const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
 
                 if (normalized.length === 0) {
                   // Nothing new to append - skip broadcasting
                 } else {
-                  // CRITICAL FIX: Read and increment position in ONE line to ensure atomicity
+                  // Read and increment position in ONE line to ensure atomicity
                   const chunkPosition = this.nextChunkPosition.get(conversationId) || 0;
                   this.nextChunkPosition.set(conversationId, chunkPosition + normalized.length);
 
@@ -1642,7 +1674,6 @@ export class ConversationService {
                     },
                   };
 
-                  // Broadcast
                   await this.streamingService.broadcastDelta(conversationId, chunkDelta);
 
                   // Periodically emit resume token (every ~2s)
@@ -1686,6 +1717,7 @@ export class ConversationService {
 
               if (appendR) {
                 const normalizedR = ConversationService.computeNonOverlappingAppend(currentR, appendR);
+
                 if (normalizedR.length > 0) {
                   const newR = currentR + normalizedR;
                   this.streamingReasoning.set(conversationId, newR);
@@ -2105,6 +2137,26 @@ export class ConversationService {
                 const contentString =
                   typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
 
+                // Prefer accumulated streamingReasoning over state's lm.reasoning
+                // The streamingReasoning has been deduplicated during streaming, while lm.reasoning
+                // may contain duplicates from the LLM provider
+                let finalReasoning: string | undefined = undefined;
+                if (role === 'assistant') {
+                  const accumulatedReasoning = this.streamingReasoning.get(conversationId);
+                  if (accumulatedReasoning && accumulatedReasoning.trim().length > 0) {
+                    // Use accumulated reasoning (already deduplicated)
+                    finalReasoning = accumulatedReasoning;
+                  } else if (typeof lm.reasoning === 'string' && lm.reasoning.length > 0) {
+                    // Fallback to state reasoning, but deduplicate it first
+                    finalReasoning = ConversationService.removeInternalDuplicates(lm.reasoning);
+                  }
+                } else {
+                  // For non-assistant messages, use reasoning as-is (shouldn't have duplicates)
+                  if (typeof lm.reasoning === 'string' && lm.reasoning.length > 0) {
+                    finalReasoning = lm.reasoning;
+                  }
+                }
+
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,
                   role,
@@ -2112,7 +2164,7 @@ export class ConversationService {
                   messageType,
                   ...(toolCallId ? { toolCallId } : {}),
                   ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
-                  ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
+                  ...(finalReasoning ? { reasoning: finalReasoning } : {}),
                   ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
                 });
 

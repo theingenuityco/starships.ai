@@ -117,7 +117,7 @@ export function ConversationMessageContent({
     // Sort chunks by position to ensure correct order
     const sortedChunks = [...chunks].sort((a, b) => a.position - b.position)
 
-    // Build content from chunks
+    // Build content from chunks - chunks are incremental deltas, concatenate in order
     let aggregated = ''
     for (const chunk of sortedChunks) {
       aggregated += chunk.content
@@ -128,16 +128,22 @@ export function ConversationMessageContent({
 
     // After completion, prefer server-finalized content; if missing, fall back to aggregated chunks
     return content && content.trim().length > 0 ? content : aggregated
-  }, [content, chunks, isStreaming])
+  }, [content, chunks, isStreaming, messageId])
 
   const displayReasoning = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
-    if (!hasR) return reasoning || ''
+    if (!hasR) {
+      return reasoning || ''
+    }
+
     const sorted = [...reasoningChunks].sort((a, b) => a.position - b.position)
     let agg = ''
-    for (const rc of sorted) agg += rc.content
+    for (const rc of sorted) {
+      agg += rc.content
+    }
+
     return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
-  }, [reasoning, reasoningChunks, isStreaming])
+  }, [reasoning, reasoningChunks, isStreaming, messageId])
 
   // Determine whether reasoning panel should auto-open.
   // Keep it open only while reasoning-only is streaming; collapse once content OR toolCalls start (and on reload).

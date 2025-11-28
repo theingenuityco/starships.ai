@@ -6,6 +6,42 @@ import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
 
+const LINKEDIN_SCOPES = [
+  // Member-level posting and analytics
+  'r_basicprofile',
+  'w_member_social',
+  'r_member_postAnalytics',
+  'r_member_profileAnalytics',
+  // Organization-level posting and analytics
+  'rw_organization_admin',
+  'r_organization_social',
+  'w_organization_social',
+  'r_organization_social_feed',
+  'r_organization_followers',
+];
+
+const GOOGLE_DRIVE_SCOPES = [
+  // Per-file access created/opened via the app
+  'https://www.googleapis.com/auth/drive.file',
+  // Read metadata for files
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+];
+
+const DISCORD_SCOPES = ['bot', 'applications.commands', 'identify'];
+
+function getProviderScopes(provider: ConnectorProvider): string[] {
+  switch (provider) {
+    case 'linkedin':
+      return LINKEDIN_SCOPES;
+    case 'google_drive':
+      return GOOGLE_DRIVE_SCOPES;
+    case 'discord':
+      return DISCORD_SCOPES;
+    default:
+      return [];
+  }
+}
+
 /**
  * Connector Service - Layer 4
  *
@@ -46,17 +82,18 @@ export class ConnectorService {
       provider: 'linkedin',
     });
 
-    // Request the minimal set of scopes needed for posting on behalf of a member:
-    // - w_member_social: create and manage member posts
-    // - openid profile email: basic OIDC identity for the connected member
-    const scope = 'w_member_social openid profile email';
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       redirect_uri: redirectUri,
       state,
-      scope,
     });
+
+    // Hardcode LinkedIn scopes needed for both member and organization posting + analytics,
+    // restricted to the scopes that are actually available to this LinkedIn app.
+    // rw_organization_admin is required to query organization ACLs and discover org URNs.
+    const scope = LINKEDIN_SCOPES.join(' ');
+    params.set('scope', scope);
 
     return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
   }
@@ -172,7 +209,7 @@ export class ConnectorService {
     // Request typical Drive scopes; adjust to your needs:
     // - drive.file: per-file access created/opened via the app
     // - drive.metadata.readonly: read metadata for files
-    const scope = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata.readonly'].join(' ');
+    const scope = GOOGLE_DRIVE_SCOPES.join(' ');
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -291,13 +328,10 @@ export class ConnectorService {
    * List connectors for a starship, enriched with managed env key presence.
    */
   async listStarshipConnectors(starshipId: string): Promise<ConnectorListItem[]> {
-    const [catalog, connectors, envSummaries] = await Promise.all([
+    const [catalog, connectors] = await Promise.all([
       Promise.resolve(getConnectorCatalog()),
       this.connectorRepository.findByStarship(starshipId),
-      this.environmentService.getEnvironmentVariables(starshipId),
     ]);
-
-    const envKeys = new Set(envSummaries.map((env) => env.key));
     const byProvider = new Map(connectors.map((c) => [c.provider, c]));
 
     const now = new Date().toISOString();
@@ -305,21 +339,16 @@ export class ConnectorService {
     return catalog.map<ConnectorListItem>((entry) => {
       const existing = byProvider.get(entry.provider);
 
-      const managedEnvKeys = [
-        ...entry.requiredEnvKeys.map((key) => ({
-          key,
-          present: envKeys.has(key),
-        })),
-        ...(entry.optionalEnvKeys || []).map((key) => ({
-          key,
-          present: envKeys.has(key),
-        })),
-      ];
-
       if (existing) {
         return {
-          ...existing,
-          managedEnvKeys,
+          id: existing.id,
+          starshipId: existing.starshipId,
+          provider: existing.provider,
+          status: existing.status,
+          lastError: existing.lastError,
+          createdAt: existing.createdAt,
+          updatedAt: existing.updatedAt,
+          scopes: getProviderScopes(entry.provider),
         };
       }
 
@@ -334,11 +363,10 @@ export class ConnectorService {
         starshipId,
         provider: entry.provider,
         status,
-        metadata: {},
         lastError: undefined,
         createdAt: now,
         updatedAt: now,
-        managedEnvKeys,
+        scopes: getProviderScopes(entry.provider),
       };
     });
   }
@@ -429,7 +457,7 @@ export class ConnectorService {
     // Includes: CREATE_INSTANT_INVITE, MANAGE_CHANNELS, VIEW_CHANNEL,
     // SEND_MESSAGES, MANAGE_MESSAGES, MANAGE_ROLES, MANAGE_WEBHOOKS.
     const permissions = '805317649';
-    const scope = 'bot applications.commands identify';
+    const scope = DISCORD_SCOPES.join(' ');
 
     const params = new URLSearchParams({
       client_id: clientId,

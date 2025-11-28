@@ -2,12 +2,10 @@
 
 import Icon from '@/components/primitives/Icon'
 import {
-  useConfigureGitHubConnector,
   useConnectorCatalog,
   useDisconnectConnector,
   useStarshipConnectors,
   useStartDiscordOAuth,
-  useStartGoogleDriveOAuth,
   useStartLinkedInOAuth,
 } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
@@ -29,21 +27,20 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const disconnectMutation = useDisconnectConnector(starshipId)
   const linkedinMutation = useStartLinkedInOAuth(starshipId)
   const discordMutation = useStartDiscordOAuth(starshipId)
-  const googleDriveMutation = useStartGoogleDriveOAuth(starshipId)
-  const githubConfigMutation = useConfigureGitHubConnector(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' | 'google_drive' | 'github' | null>(null)
-  const [githubDialogOpen, setGithubDialogOpen] = useState(false)
-  const [githubInstallationId, setGithubInstallationId] = useState('')
-  const [githubDefaultOwner, setGithubDefaultOwner] = useState('')
-  const [githubDefaultRepo, setGithubDefaultRepo] = useState('')
+  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' /* | 'google_drive' | 'github' */ | null>(null)
+  // GitHub connector configuration temporarily disabled on client
+  // const [githubDialogOpen, setGithubDialogOpen] = useState(false)
+  // const [githubInstallationId, setGithubInstallationId] = useState('')
+  // const [githubDefaultOwner, setGithubDefaultOwner] = useState('')
+  // const [githubDefaultRepo, setGithubDefaultRepo] = useState('')
 
-  type ConnectorProviderId = 'linkedin' | 'discord' | 'google_drive' | 'github'
+  type ConnectorProviderId = 'linkedin' | 'discord' // | 'google_drive' | 'github'
 
   const getConnectorState = (provider: ConnectorProviderId) => connectors.find(connector => connector.provider === provider)
 
-  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' | 'google_drive' | 'github') => {
+  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' /* | 'google_drive' | 'github' */) => {
     setPendingDisconnect(provider)
   }
 
@@ -67,31 +64,32 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     }
   }
 
-  const handleGoogleDriveConnect = async () => {
-    const result = await googleDriveMutation.mutateAsync()
-    if (result) {
-      window.location.href = result
-    }
-  }
-
-  const handleGitHubConnect = () => {
-    const state = getConnectorState('github')
-    const metadata = (state?.metadata || {}) as Record<string, any>
-    setGithubInstallationId(metadata.githubInstallationId || '')
-    setGithubDefaultOwner(metadata.defaultOwner || '')
-    setGithubDefaultRepo(metadata.defaultRepo || '')
-    setGithubDialogOpen(true)
-  }
-
-  const handleGitHubSave = async () => {
-    if (!githubInstallationId.trim()) return
-    await githubConfigMutation.mutateAsync({
-      installationId: githubInstallationId.trim(),
-      defaultOwner: githubDefaultOwner.trim() || undefined,
-      defaultRepo: githubDefaultRepo.trim() || undefined,
-    })
-    setGithubDialogOpen(false)
-  }
+  // Google Drive and GitHub connectors are temporarily disabled on the client
+  // const handleGoogleDriveConnect = async () => {
+  //   const result = await googleDriveMutation.mutateAsync()
+  //   if (result) {
+  //     window.location.href = result
+  //   }
+  // }
+  //
+  // const handleGitHubConnect = () => {
+  //   const state = getConnectorState('github')
+  //   const metadata = (state?.metadata || {}) as Record<string, any>
+  //   setGithubInstallationId(metadata.githubInstallationId || '')
+  //   setGithubDefaultOwner(metadata.defaultOwner || '')
+  //   setGithubDefaultRepo(metadata.defaultRepo || '')
+  //   setGithubDialogOpen(true)
+  // }
+  //
+  // const handleGitHubSave = async () => {
+  //   if (!githubInstallationId.trim()) return
+  //   await githubConfigMutation.mutateAsync({
+  //     installationId: githubInstallationId.trim(),
+  //     defaultOwner: githubDefaultOwner.trim() || undefined,
+  //     defaultRepo: githubDefaultRepo.trim() || undefined,
+  //   })
+  //   setGithubDialogOpen(false)
+  // }
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
@@ -109,13 +107,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     )
   }
 
-  const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord', 'google_drive', 'github']
+  const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord'] // 'google_drive', 'github' temporarily disabled
 
   const CONNECTOR_LABELS: Record<ConnectorProviderId, string> = {
     linkedin: 'LinkedIn',
     discord: 'Discord',
-    google_drive: 'Google Drive',
-    github: 'GitHub',
   }
 
   const hasAnyVisibleConnector = PROVIDERS.some(provider => {
@@ -129,10 +125,10 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         return handleLinkedInConnect()
       case 'discord':
         return handleDiscordConnect()
-      case 'google_drive':
-        return handleGoogleDriveConnect()
-      case 'github':
-        return handleGitHubConnect()
+      // case 'google_drive':
+      //   return handleGoogleDriveConnect()
+      // case 'github':
+      //   return handleGitHubConnect()
     }
   }
 
@@ -177,15 +173,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               variant={isConnected ? 'primaryOutline' : 'default'}
               className="min-w-[140px]"
               onClick={() => handleConnect(provider)}
-              disabled={
-                provider === 'linkedin'
-                  ? linkedinMutation.isPending
-                  : provider === 'discord'
-                    ? discordMutation.isPending
-                    : provider === 'google_drive'
-                      ? googleDriveMutation.isPending
-                      : githubConfigMutation.isPending
-              }
+              disabled={provider === 'linkedin' ? linkedinMutation.isPending : discordMutation.isPending}
             >
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
               {isConnected ? 'Reconnect' : `Connect ${label}`}
@@ -237,13 +225,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
-            <DialogDescription>
-              {pendingDisconnect
-                ? `If you disconnect ${
-                    pendingDisconnect === 'google_drive' ? 'Google Drive' : pendingDisconnect === 'linkedin' ? 'LinkedIn' : pendingDisconnect === 'discord' ? 'Discord' : 'GitHub'
-                  }, any tools that rely on this connector will stop working until you reconnect.`
-                : null}
-            </DialogDescription>
+              <DialogDescription>
+                {pendingDisconnect
+                  ? `If you disconnect ${pendingDisconnect === 'linkedin' ? 'LinkedIn' : 'Discord'}, any tools that rely on this connector will stop working until you reconnect.`
+                  : null}
+              </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>
@@ -256,42 +242,64 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         </DialogContent>
       </Dialog>
 
-      <Dialog open={githubDialogOpen} onOpenChange={open => !open && setGithubDialogOpen(false)}>
+      {/* GitHub connector configuration dialog temporarily disabled */}
+      {/* <Dialog open={githubDialogOpen} onOpenChange={open => !open && setGithubDialogOpen(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Configure GitHub connector</DialogTitlePrimitive>
-            <DialogDescription>Link this starship to a GitHub App installation by providing the installation ID and, optionally, a default owner and repository.</DialogDescription>
+            <DialogDescription>
+              Link this starship to a GitHub App installation by providing the installation ID and, optionally, a default owner and repository.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="github-installation-id">
                 Installation ID
               </label>
-              <Input id="github-installation-id" value={githubInstallationId} onChange={e => setGithubInstallationId(e.target.value)} placeholder="e.g. 12345678" />
+              <Input
+                id="github-installation-id"
+                value={githubInstallationId}
+                onChange={e => setGithubInstallationId(e.target.value)}
+                placeholder="e.g. 12345678"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="github-default-owner">
                 Default owner (optional)
               </label>
-              <Input id="github-default-owner" value={githubDefaultOwner} onChange={e => setGithubDefaultOwner(e.target.value)} placeholder="e.g. your-org" />
+              <Input
+                id="github-default-owner"
+                value={githubDefaultOwner}
+                onChange={e => setGithubDefaultOwner(e.target.value)}
+                placeholder="e.g. your-org"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="github-default-repo">
                 Default repo (optional)
               </label>
-              <Input id="github-default-repo" value={githubDefaultRepo} onChange={e => setGithubDefaultRepo(e.target.value)} placeholder="e.g. your-repo" />
+              <Input
+                id="github-default-repo"
+                value={githubDefaultRepo}
+                onChange={e => setGithubDefaultRepo(e.target.value)}
+                placeholder="e.g. your-repo"
+              />
             </div>
           </div>
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setGithubDialogOpen(false)} disabled={githubConfigMutation.isPending}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleGitHubSave} disabled={githubConfigMutation.isPending || !githubInstallationId.trim()}>
+            <Button
+              type="button"
+              onClick={handleGitHubSave}
+              disabled={githubConfigMutation.isPending || !githubInstallationId.trim()}
+            >
               Save
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
     </div>
   )
 }

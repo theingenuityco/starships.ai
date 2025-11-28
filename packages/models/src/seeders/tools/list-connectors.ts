@@ -8,7 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const connectorsListTool: ToolParams = {
   name: 'List Connectors',
   slug: 'list-connectors',
-  description: `List all connectors configured (or available) for the current starship, including their connection status and required environment variable coverage.
+  description: `List all connectors configured (or available) for the current starship, including their connection status and OAuth scopes (where applicable).
 
 When to use:
 - Before creating or editing tools that rely on third-party services (LinkedIn, Discord, Starships API)
@@ -22,8 +22,8 @@ Implicit environment (do not pass as arguments):
 - STARSHIP_ID: derived from the current starship context
 
 Output:
-- Simplified string summary of connector statuses, e.g.:
-  - "linkedin: connected\ndiscord: disconnected\nstarships: connected"
+- HTTP response payload (ConnectorListResponse) from the Starships API:
+  - { connectors: ConnectorListItem[] }
 
 Behavior and limits:
 - Read-only and idempotent
@@ -53,31 +53,24 @@ Behavior and limits:
       {
         ref: 'summarize',
         type: 'code',
-        name: 'Summarize Connectors',
-        description: 'Normalize ConnectorListResponse into a concise string summary for agents',
+        name: 'Normalize Connector Response',
+        description: 'Unwrap the HTTP ApiResponse and return the ConnectorListResponse payload as-is for agents',
         parameters: {
           code: `
             async function main(ctx) {
               // Expect the HTTP node to return a response object with { status, headers, body, url }.
               // The body MUST be an ApiResponse<ConnectorListResponse>:
-              //   { data: { starshipId, connectors: ConnectorListItem[] } }
+              //   { data: { connectors: ConnectorListItem[] } }
               const raw = ctx.input;
               const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
               const payload = hasBody ? raw.body : raw;
 
-              if (!payload || typeof payload !== 'object' || !Array.isArray(payload.data?.connectors)) {
+              if (!payload || typeof payload !== 'object' || !payload.data || typeof payload.data !== 'object') {
                 throw new Error('Invalid connector response shape: expected { data: { connectors: [] } }');
               }
 
-              const connectors = payload.data.connectors;
-
-              const lines = [];
-              for (const c of connectors) {
-                if (!c || !c.provider || !c.status) continue;
-                lines.push(String(c.provider) + ': ' + String(c.status));
-              }
-
-              return lines.join('\\n');
+              // Return the HTTP response schema's payload (ConnectorListResponse)
+              return payload.data;
             }
           `,
           timeout: 2000,
@@ -109,9 +102,10 @@ export const connectorsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'created
   blueprint: connectorsListTool.blueprint,
 
   slug: 'list-connectors',
-  version: '1.0.0',
+  version: '1.0.2',
   category: 'automation',
-  exampleUsage: '{} // returns array of connectors with provider, status, managedEnvKeys, and lastError (if any); env is inferred',
+  exampleUsage:
+    '{} // returns ConnectorListResponse { connectors[] }, where each connector has provider, status, scopes (if applicable), and lastError (if any); env is inferred',
   requiresApiKey: false,
   configurationFields: [],
 };

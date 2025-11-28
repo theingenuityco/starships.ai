@@ -49,7 +49,7 @@ export function useDisconnectConnector(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (provider: 'linkedin' | 'discord' | 'google_drive' | 'github'): Promise<void> => {
+    mutationFn: async (provider: 'linkedin' | 'discord' /* | 'google_drive' | 'github' */): Promise<void> => {
       await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/disconnect`)
     },
     onSuccess: (_, provider) => {
@@ -105,47 +105,51 @@ export function useStartDiscordOAuth(starshipId: string) {
 }
 
 export function useStartGoogleDriveOAuth(starshipId: string) {
-  return useMutation({
-    mutationFn: async (): Promise<string> => {
-      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
-        `/api/v1/starships/${starshipId}/connectors/google_drive/oauth/start`,
-      )
-      return response.data.data.authorizationUrl
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start Google Drive connection'
-      toast.error('Failed to connect Google Drive', {
-        description: errorMessage,
-      })
-    },
-  })
+  // Google Drive connector temporarily disabled on client
+  // return useMutation({
+  //   mutationFn: async (): Promise<string> => {
+  //     const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
+  //       `/api/v1/starships/${starshipId}/connectors/google_drive/oauth/start`,
+  //     )
+  //     return response.data.data.authorizationUrl
+  //   },
+  //   onError: (error: any) => {
+  //     const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start Google Drive connection'
+  //     toast.error('Failed to connect Google Drive', {
+  //       description: errorMessage,
+  //     })
+  //   },
+  // })
+  throw new Error('Google Drive connector is currently disabled in the client')
 }
 
 export function useConfigureGitHubConnector(starshipId: string) {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (payload: {
-      installationId: string
-      defaultOwner?: string
-      defaultRepo?: string
-    }): Promise<void> => {
-      await api.post(`/api/v1/starships/${starshipId}/connectors/github/app-config`, payload)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId),
-      })
-      toast.success('GitHub connector configured', {
-        description: 'GitHub App installation has been linked to this starship.',
-      })
-    },
-    onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to configure GitHub connector'
-      toast.error('Failed to configure GitHub', {
-        description: errorMessage,
-      })
-    },
-  })
+  // GitHub connector temporarily disabled on client
+  // const queryClient = useQueryClient()
+  //
+  // return useMutation({
+  //   mutationFn: async (payload: {
+  //     installationId: string
+  //     defaultOwner?: string
+  //     defaultRepo?: string
+  //   }): Promise<void> => {
+  //     await api.post(`/api/v1/starships/${starshipId}/connectors/github/app-config`, payload)
+  //   },
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({
+  //       queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId),
+  //     })
+  //     toast.success('GitHub connector configured', {
+  //       description: 'GitHub App installation has been linked to this starship.',
+  //     })
+  //   },
+  //   onError: (error: any) => {
+  //     const errorMessage =
+  //       error?.response?.data?.error || error?.message || 'Failed to configure GitHub connector'
+  //     toast.error('Failed to configure GitHub', {
+  //       description: errorMessage,
+  //     })
+  //   },
+  // })
+  throw new Error('GitHub connector is currently disabled in the client')
 }

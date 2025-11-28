@@ -48,4 +48,15 @@ Cross-links
 - See LLM for details of `finishReason` and `toolCalls`.
 - See Engine for edge selection algorithm and inline condition handling.
 
+### Common mistakes
+
+- **Using an array of conditions on the node**
+  - ❌ `parameters: { conditions: [{ label: "...", condition: "..." }] }`
+  - ✅ `parameters: { condition: "{{ /* expression computing edgeCondition */ }}" }`
+  - The dedicated Conditional node has a single `condition` parameter; per-branch routing is controlled by outgoing edge `condition` values, not an array on the node.
+- **Omitting the condition value**
+  - `condition` must be present (even if it resolves to `undefined`); an empty string is invalid.
+- **Forgetting that edge conditions are strings**
+  - The engine stringifies the result into `edgeCondition` (for example `true` → `"true"`). Outgoing edge `condition` values must match this string.
+
 

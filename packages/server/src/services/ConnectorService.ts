@@ -46,17 +46,30 @@ export class ConnectorService {
       provider: 'linkedin',
     });
 
-    // Request the minimal set of scopes needed for posting on behalf of a member:
-    // - w_member_social: create and manage member posts
-    // - openid profile email: basic OIDC identity for the connected member
-    const scope = 'w_member_social openid profile email';
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       redirect_uri: redirectUri,
       state,
-      scope,
     });
+
+    // Hardcode LinkedIn scopes needed for both member and organization posting + analytics,
+    // restricted to the scopes that are actually available to this LinkedIn app.
+    // rw_organization_admin is required to query organization ACLs and discover org URNs.
+    const scope = [
+      // Member-level posting and analytics
+      'r_basicprofile',
+      'w_member_social',
+      'r_member_postAnalytics',
+      'r_member_profileAnalytics',
+      // Organization-level posting and analytics
+      'rw_organization_admin',
+      'r_organization_social',
+      'w_organization_social',
+      'r_organization_social_feed',
+      'r_organization_followers',
+    ].join(' ');
+    params.set('scope', scope);
 
     return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
   }

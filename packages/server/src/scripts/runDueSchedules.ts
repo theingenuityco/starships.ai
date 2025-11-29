@@ -27,7 +27,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   } finally {
     try {
-      await connection.close();
+      await connection.disconnect();
     } catch (err) {
       console.error('[ScheduleWorker] Failed to close DB connection', err);
     }

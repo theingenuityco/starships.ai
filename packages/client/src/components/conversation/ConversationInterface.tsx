@@ -26,6 +26,7 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { ScheduleConversationModal } from '@/components/conversation/ScheduleConversationModal'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -154,6 +155,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
   const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -974,7 +976,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               budgetTokens={budgetTokens}
               onAgentChange={handleAgentChange}
               starshipSlug={starshipSlug}
-            ></ConversationMessageInput>
+            >
+              {/* Footer area beneath the input: add a lean "Schedule" affordance */}
+              <div className="mt-2 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedAgent) return
+                    setIsScheduleModalOpen(true)
+                  }}
+                  className="inline-flex items-center rounded-full border border-dashed border-border/70 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors"
+                  disabled={!selectedAgent}
+                >
+                  <Icon name="clock" className="mr-1 h-3 w-3" />
+                  {selectedAgent ? 'Schedule this agent' : 'Select an agent to schedule'}
+                </button>
+              </div>
+            </ConversationMessageInput>
             {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
             {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
               <div className="mt-12">
@@ -1080,6 +1098,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
             )}
           </div>
+          <ScheduleConversationModal open={isScheduleModalOpen} onOpenChange={setIsScheduleModalOpen} starshipId={starshipId} agent={selectedAgent} initialPrompt={''} />
         </div>
         {/* Extra space at the bottom so the page can scroll past the last card on the welcome view */}
         {!showMessagesArea && <div className="h-64" />}

@@ -92,6 +92,11 @@
       "cache": false,
       "persistent": true
     },
+    "@starships/server#dev": {
+      "dependsOn": ["@starships/server#build"],
+      "cache": false,
+      "persistent": true
+    },
     "@starships/docs#dev": {
       "cache": false,
       "persistent": true

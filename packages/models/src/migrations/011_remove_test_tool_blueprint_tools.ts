@@ -43,8 +43,6 @@ export async function up(client: Client): Promise<void> {
   }
 }
 
-export async function down(_client: Client): Promise<void> {
+export async function down(): Promise<void> {
   // Irreversible: we cannot recover deleted tools or relationships
 }
-
-

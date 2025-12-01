@@ -190,7 +190,7 @@ export const toolTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolTestTool.blueprint,
 
   slug: 'test-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "targetSlug": "my-tool", "arguments": { ... } } // returns { ok, durationMs, result } (env inferred)',
   requiresApiKey: false,

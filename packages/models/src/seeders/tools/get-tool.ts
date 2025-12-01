@@ -109,7 +109,7 @@ export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | '
   blueprint: toolGetTool.blueprint,
 
   slug: 'get-tool',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage: '{ "slug": "calc" } // returns full tool model; connector infers starship context',
   requiresApiKey: false,

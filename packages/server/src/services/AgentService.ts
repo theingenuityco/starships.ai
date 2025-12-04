@@ -7,19 +7,28 @@
  */
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
+import type { AutopilotEvent, EventCallback, LLMEvent, ToolEvent, ToolParams } from '@starships/autopilot';
 import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
 import {
   AgentRepository,
   AgentTemplateRepository,
   StarshipRepository,
+  UserRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
   MAX_AGENT_MAX_TOKENS,
   MAX_AGENT_TIMEOUT_MS,
   MIN_AGENT_MAX_TOKENS,
   MIN_AGENT_TIMEOUT_MS,
 } from '@starships/models';
+import type {
+  PendingAgentSummary,
+  UserModel,
+  StarshipModel,
+  AgentModel,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+} from '@starships/protocol';
 import { generateUniqueAgentSlug } from '@starships/models';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
@@ -309,7 +318,7 @@ export class AgentService {
     page: number = 1,
     limit: number = 50
   ): Promise<{
-    agents: AgentModel[];
+    agents: PendingAgentSummary[];
     pagination: {
       page: number;
       limit: number;
@@ -324,8 +333,59 @@ export class AgentService {
     const offset = (page - 1) * limit;
     const paginatedAgents = pendingAgents.slice(offset, offset + limit);
 
+    // Enrich with user display name and starship label for admin UX,
+    // while keeping publicationRequestedBy as the underlying user id.
+    const userRepo = new UserRepository();
+    const starshipRepo = new StarshipRepository();
+
+    const enrichedAgents: PendingAgentSummary[] = [];
+
+    for (const agent of paginatedAgents) {
+      let requestedBy: PendingAgentSummary['requestedBy'] | undefined;
+      let requestedByStarship: PendingAgentSummary['requestedByStarship'] | undefined;
+
+      try {
+        if (agent.publicationRequestedBy) {
+          const [user, starship] = await Promise.all([
+            userRepo.findById(agent.publicationRequestedBy as string) as Promise<UserModel | null>,
+            starshipRepo.findById(agent.starshipId) as Promise<StarshipModel | null>,
+          ]);
+
+          if (user) {
+            requestedBy = {
+              id: user.id,
+              name: user.displayName || user.email || user.id,
+              avatar: user.avatar,
+            };
+          } else {
+            requestedBy = {
+              id: agent.publicationRequestedBy,
+            };
+          }
+
+          if (starship) {
+            requestedByStarship = {
+              id: starship.id,
+              name: starship.name || starship.slug,
+              slug: starship.slug,
+            };
+          }
+        }
+      } catch {
+        if (agent.publicationRequestedBy) {
+          requestedBy = { id: agent.publicationRequestedBy };
+        }
+      }
+
+      enrichedAgents.push({
+        agent,
+        requestedBy,
+        requestedByStarship,
+      });
+    }
+
     return {
-      agents: paginatedAgents,
+      agents: enrichedAgents,
       pagination: {
         page,
         limit,
@@ -359,7 +419,17 @@ export class AgentService {
     userId: string,
     page: number = 1,
     limit: number = 50
-  ): Promise<{ agents: AgentModel[]; total: number; pagination: any }> {
+  ): Promise<{
+    agents: AgentModel[];
+    total: number;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  }> {
     // Validate access first
     await this.validateStarshipAccess(starshipId, userId);
 
@@ -558,7 +628,7 @@ export class AgentService {
     agentId: string,
     testInput: string | LlmMessage[],
     starshipId: string,
-    authToken?: string
+    _authToken?: string
   ): Promise<{
     success: boolean;
     agent: string;
@@ -579,29 +649,40 @@ export class AgentService {
     let aggUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 };
     let modelUsedAggregate: string | undefined;
 
+    // Type guards for Autopilot events
+    const isToolEvent = (event: AutopilotEvent): event is ToolEvent =>
+      event.type === 'tool_started' || event.type === 'tool_complete' || event.type === 'tool_call_detected';
+
+    const isLlmEvent = (event: AutopilotEvent): event is LLMEvent => event.type === 'content_chunk' || event.type === 'content_complete';
+
     // Unified event handler to capture content, tools and usage
-    const onEvent = async (event: any) => {
+    const onEvent: EventCallback = async (event) => {
       // Capture tool usage and output during execution
-      if (event?.type === 'tool_started' && event?.data?.name) {
-        const name = String(event.data.name);
+      if (isToolEvent(event) && event.type === 'tool_started' && event.data?.toolName) {
+        const name = String(event.data.toolName);
         if (!toolsUsed.includes(name)) toolsUsed.push(name);
       }
 
-      if (event?.type === 'content_chunk') {
+      if (isLlmEvent(event) && event.type === 'content_chunk' && event.data?.chunk) {
         // Extract content from the chunk structure: event.data.chunk.choices[0].delta.content
-        const chunkContent = event?.data?.chunk?.choices?.[0]?.delta?.content;
-        if (typeof chunkContent === 'string' && chunkContent) {
-          output += chunkContent;
+        const chunk = event.data.chunk as Record<string, unknown>;
+        const choices = chunk.choices as unknown;
+        if (Array.isArray(choices) && choices.length > 0) {
+          const first = choices[0] as Record<string, unknown>;
+          const delta = first.delta as Record<string, unknown> | undefined;
+          const chunkContent = typeof delta?.content === 'string' ? delta.content : undefined;
+          if (chunkContent) {
+            output += chunkContent;
+          }
         }
         // Some providers emit usage on chunks; capture if present
-        const usage = event?.data?.chunk?.usage;
-        const model = event?.data?.chunk?.model;
-        if (usage && typeof usage === 'object') {
-          const u = usage as Record<string, unknown>;
-          const pt = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
-          const ct = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
-          const tt = typeof u.totalTokens === 'number' ? u.totalTokens : pt + ct;
-          const cst = typeof u.cost === 'number' ? u.cost : 0;
+        const usage = event.data.usage;
+        const model = event.data.model;
+        if (usage) {
+          const pt = typeof usage.promptTokens === 'number' ? usage.promptTokens : 0;
+          const ct = typeof usage.completionTokens === 'number' ? usage.completionTokens : 0;
+          const tt = typeof usage.totalTokens === 'number' ? usage.totalTokens : pt + ct;
+          const cst = typeof usage.cost === 'number' ? usage.cost : 0;
           aggUsage.promptTokens += pt;
           aggUsage.completionTokens += ct;
           aggUsage.totalTokens += tt;
@@ -610,19 +691,15 @@ export class AgentService {
         }
       }
 
-      if (event?.type === 'content_complete') {
-        if (event?.data?.reasoning) {
-          reasoning += String(event.data.reasoning);
-        }
+      if (isLlmEvent(event) && event.type === 'content_complete' && event.data) {
         // Persist usage totals for this completion if provided
-        const usage = event?.data?.usage;
-        const model = event?.data?.model;
-        if (usage && typeof usage === 'object') {
-          const u = usage as Record<string, unknown>;
-          const pt = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
-          const ct = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
-          const tt = typeof u.totalTokens === 'number' ? u.totalTokens : pt + ct;
-          const cst = typeof u.cost === 'number' ? u.cost : 0;
+        const usage = event.data.usage;
+        const model = event.data.model;
+        if (usage) {
+          const pt = typeof usage.promptTokens === 'number' ? usage.promptTokens : 0;
+          const ct = typeof usage.completionTokens === 'number' ? usage.completionTokens : 0;
+          const tt = typeof usage.totalTokens === 'number' ? usage.totalTokens : pt + ct;
+          const cst = typeof usage.cost === 'number' ? usage.cost : 0;
           aggUsage.promptTokens += pt;
           aggUsage.completionTokens += ct;
           aggUsage.totalTokens += tt;
@@ -634,7 +711,15 @@ export class AgentService {
       // Keep existing logs in non-production for diagnostics
       try {
         if (process?.env?.NODE_ENV !== 'production') {
-          if (event?.type) console.log('📡 Event received:', event.type, event.data ? Object.keys(event.data) : 'no data');
+          if (event.type) {
+            // data is optional; log keys only when present
+
+            console.log(
+              '📡 Event received:',
+              event.type,
+              'data' in event && event.data ? Object.keys(event.data as Record<string, unknown>) : 'no data'
+            );
+          }
         }
       } catch (err) {
         void err;
@@ -659,9 +744,22 @@ export class AgentService {
         stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array',
       });
 
-      // 2. Get deployed tools for this agent
-      const resolvedTools = await this.getAgentTools(agentModel.id, starshipId);
-      console.log('🔧 Tools resolved:', resolvedTools.length, 'tools found');
+      // 2. Get deployed tools for this agent and convert to ToolParams
+      const resolvedToolsModels = await this.getAgentTools(agentModel.id, starshipId);
+      console.log('🔧 Tools resolved:', resolvedToolsModels.length, 'tools found');
+
+      const resolvedTools: ToolParams[] = resolvedToolsModels
+        .filter((tool) => tool.status !== 'draft' && tool.parameters && tool.blueprint)
+        .map((tool) => ({
+          name: tool.name,
+          slug: tool.slug,
+          description: tool.description,
+          parameters: tool.parameters!,
+          blueprint: tool.blueprint!,
+          ...(tool.transforms && { transforms: tool.transforms }),
+          ...(tool.mutations && { mutations: tool.mutations }),
+          ...(tool.condition && { condition: tool.condition }),
+        }));
 
       // 3. Prepare agent params (same pattern as ConversationService)
       const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
@@ -670,7 +768,7 @@ export class AgentService {
         ...agentModel,
         state: {
           ...baseState,
-          tools: resolvedTools as any, // Tool conversion handled by autopilot
+          tools: resolvedTools,
           starshipId: starshipId,
         },
       };
@@ -682,7 +780,6 @@ export class AgentService {
 
       // 5. Prepare runtime env (Starships host: only STARSHIP_ID is exposed to workflows)
       const env = getEnvConfig();
-      const baseUrl = `${env.SERVER_URL}/api/v1`;
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
       };
@@ -742,7 +839,7 @@ export class AgentService {
       await runner.run(blueprint, exec, {
         eventCallback: onEvent,
         runtimeEnv,
-      } as any);
+      });
 
       console.log('🔍 Post-execution state:', {
         messagesCount: Array.isArray(exec.state.messages) ? exec.state.messages.length : 0,
@@ -833,7 +930,7 @@ export class AgentService {
         executionTime,
         model: agentModel.model,
       };
-    } catch (error: any) {
+    } catch (error) {
       const executionTime = Date.now() - startTime;
 
       return {
@@ -842,7 +939,7 @@ export class AgentService {
         input: testInput,
         toolsUsed,
         executionTime,
-        error: error?.message || 'Unknown error during agent execution',
+        error: error instanceof Error ? error.message : 'Unknown error during agent execution',
       };
     }
   }

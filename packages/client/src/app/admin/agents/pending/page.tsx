@@ -8,19 +8,63 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
-import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication } from '@/hooks/useAdminAgents'
-import type { AgentModel } from '@starships/protocol'
+import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication, type PendingAgentSummary } from '@/hooks/useAdminAgents'
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
+
+interface RequestedByProfileProps {
+  name: string
+  starshipName?: string
+  starshipSlug?: string
+  avatar?: string
+}
+
+function RequestedByProfile({ name, starshipName, starshipSlug, avatar }: RequestedByProfileProps) {
+  const displayStarship = starshipName || starshipSlug
+
+  const isImageUrl = (value?: string | null): boolean => {
+    if (!value || typeof value !== 'string') return false
+    const trimmed = value.trim()
+    return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg bg-gradient-to-r from-muted/30 to-muted/20 border border-border/40 px-2.5 py-2">
+      <div className="w-7 h-7">
+        {avatar && isImageUrl(avatar) ? (
+          <Avatar className="w-7 h-7 rounded-lg">
+            <AvatarImage src={avatar} alt={name} referrerPolicy="no-referrer" crossOrigin="anonymous" />
+            <AvatarFallback className="text-xs">{name.charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
+        ) : (
+          <div className="w-7 h-7 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center">
+            <Icon name="user" className="w-4 h-4 text-primary" />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold text-foreground truncate">{name}</p>
+        {displayStarship && (
+          <div className="flex items-center gap-1.5">
+            <StarshipsLogo width={10} height={10} className="text-muted-foreground flex-shrink-0" />
+            <p className="text-[11px] text-muted-foreground truncate">{displayStarship}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function PendingAgentsPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const limit = 20
 
-  const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<PendingAgentSummary | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   const { data, isLoading, isError, error } = usePendingAgents(page, limit)
@@ -67,8 +111,8 @@ export default function PendingAgentsPage(): React.JSX.Element {
     rejectMutation.mutate(agentId)
   }
 
-  const openAgentDetails = (agent: AgentModel) => {
-    setSelectedAgent(agent)
+  const openAgentDetails = (summary: PendingAgentSummary) => {
+    setSelectedAgent(summary)
     setIsDetailOpen(true)
   }
 
@@ -79,31 +123,31 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
   const handleApproveSelected = () => {
     if (!selectedAgent) return
-    handleApprove(selectedAgent.id)
+    handleApprove(selectedAgent.agent.id)
     closeAgentDetails()
   }
 
   const handleRejectSelected = () => {
     if (!selectedAgent) return
-    handleReject(selectedAgent.id)
+    handleReject(selectedAgent.agent.id)
     closeAgentDetails()
   }
 
   const selectedAgentFormData: AgentFormData | null = selectedAgent
     ? {
-        name: selectedAgent.name,
-        slug: selectedAgent.slug,
-        description: selectedAgent.description || '',
-        category: (selectedAgent as any).category || 'general',
-        model: selectedAgent.model,
-        temperature: (selectedAgent as any).temperature ?? 0.7,
-        maxTokens: (selectedAgent as any).maxTokens ?? 4000,
-        systemPrompt: selectedAgent.systemPrompt || '',
-        previewPrompts: (selectedAgent as any).previewPrompts || [],
-        assignedToolSlugs: (selectedAgent as any).assignedToolSlugs || [],
-        blueprint: selectedAgent.blueprint ? JSON.stringify(selectedAgent.blueprint, null, 2) : '{\n  "nodes": [],\n  "edges": []\n}',
-        timeout: (selectedAgent as any).timeout ?? 30000,
-        icon: (selectedAgent as any).icon || '',
+        name: selectedAgent.agent.name,
+        slug: selectedAgent.agent.slug,
+        description: selectedAgent.agent.description || '',
+        category: (selectedAgent.agent as any).category || 'general',
+        model: selectedAgent.agent.model,
+        temperature: (selectedAgent.agent as any).temperature ?? 0.7,
+        maxTokens: (selectedAgent.agent as any).maxTokens ?? 4000,
+        systemPrompt: selectedAgent.agent.systemPrompt || '',
+        previewPrompts: (selectedAgent.agent as any).previewPrompts || [],
+        assignedToolSlugs: (selectedAgent.agent as any).assignedToolSlugs || [],
+        blueprint: selectedAgent.agent.blueprint ? JSON.stringify(selectedAgent.agent.blueprint, null, 2) : '{\n  "nodes": [],\n  "edges": []\n}',
+        timeout: (selectedAgent.agent as any).timeout ?? 30000,
+        icon: (selectedAgent.agent as any).icon || '',
       }
     : null
 
@@ -157,63 +201,69 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
         {!isLoading && !isError && agents.length > 0 && (
           <div className="grid gap-4">
-            {agents.map(agent => (
-              <Card key={agent.id} className="border border-border/60 hover:border-primary/60 transition-colors">
-                <CardHeader className="flex flex-row items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2">
-                      <span>{agent.name}</span>
-                      {agent.version && (
-                        <Badge variant="outline" className="text-xs font-mono">
-                          v{agent.version}
+            {agents.map(summary => {
+              const agent = summary.agent
+              return (
+                <Card key={agent.id} className="border border-border/60 hover:border-primary/60 transition-colors">
+                  <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <CardTitle className="flex items-center gap-2">
+                        <span>{agent.name}</span>
+                        {agent.version && (
+                          <Badge variant="outline" className="text-xs font-mono">
+                            v{agent.version}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription>{agent.description || 'No description provided.'}</CardDescription>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Icon name="brain" className="h-3 w-3" />
+                          <span className="text-xs font-mono">{agent.model}</span>
                         </Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription>{agent.description || 'No description provided.'}</CardDescription>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <Icon name="brain" className="h-3 w-3" />
-                        <span className="text-xs font-mono">{agent.model}</span>
-                      </Badge>
-                      <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                        <Icon name="clock" className="h-3 w-3" />
-                        <span>Requested</span>
-                        <span className="font-mono">{agent.updatedAt ? new Date(agent.updatedAt as string).toLocaleString() : 'Unknown'}</span>
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        status: {agent.publicationStatus}
-                      </Badge>
-                      {agent.publicationRequestedBy && (
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                          <Icon name="clock" className="h-3 w-3" />
+                          <span>Requested</span>
+                          <span className="font-mono">{agent.updatedAt ? new Date(agent.updatedAt as string).toLocaleString() : 'Unknown'}</span>
+                        </Badge>
                         <Badge variant="outline" className="text-xs">
-                          requested by: <span className="font-mono ml-1">{agent.publicationRequestedBy}</span>
+                          status: {agent.publicationStatus}
                         </Badge>
+                        {summary.requestedBy && (
+                          <RequestedByProfile
+                            name={summary.requestedBy.name || summary.requestedBy.id}
+                            avatar={summary.requestedBy.avatar}
+                            starshipName={summary.requestedByStarship?.name}
+                            starshipSlug={summary.requestedByStarship?.slug}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 min-w-[140px]">
+                      <Button size="sm" variant="outline" className="w-full" disabled={approveMutation.isPending || rejectMutation.isPending} onClick={() => openAgentDetails(summary)}>
+                        <Icon name="eye" className="h-4 w-4 mr-1.5" />
+                        Review details
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Icon name="file-code" className="h-3.5 w-3.5" />
+                        <span className="font-mono break-all">{agent.id}</span>
+                      </div>
+                      {pagination && (
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Page {pagination.page} of {Math.max(1, Math.ceil(pagination.total / pagination.limit || 1))}
+                          </span>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2 min-w-[140px]">
-                    <Button size="sm" variant="outline" className="w-full" disabled={approveMutation.isPending || rejectMutation.isPending} onClick={() => openAgentDetails(agent)}>
-                      <Icon name="eye" className="h-4 w-4 mr-1.5" />
-                      Review details
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Icon name="file-code" className="h-3.5 w-3.5" />
-                      <span className="font-mono break-all">{agent.id}</span>
-                    </div>
-                    {pagination && (
-                      <div className="flex items-center gap-2">
-                        <span>
-                          Page {pagination.page} of {Math.max(1, Math.ceil(pagination.total / pagination.limit || 1))}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
 
@@ -238,14 +288,14 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
         {/* Agent detail modal for approvals */}
         <Dialog open={isDetailOpen} onOpenChange={open => (open ? setIsDetailOpen(true) : closeAgentDetails())}>
-          <DialogContent className="w-full max-w-[1200px] max-h-[90vh]">
+          <DialogContent className="w-full max-w-[1280px] max-h-[98vh]">
             {/* Visually hidden title to satisfy accessibility requirements */}
             <DialogHeader>
               <DialogTitle className="sr-only">Review agent for publication</DialogTitle>
             </DialogHeader>
 
             {selectedAgent && selectedAgentFormData && (
-              <div className="flex flex-col md:flex-row gap-4 h-[75vh] mt-2">
+              <div className="flex flex-col md:flex-row gap-4 h-[80vh] mt-2">
                 {/* Main read-only editor */}
                 <div className="flex-1 min-w-0 border border-border/60 rounded-lg bg-background/80">
                   <div className="h-full overflow-auto px-4">
@@ -257,7 +307,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                       onFieldChange={() => {
                         // no-op in read-only mode
                       }}
-                      starshipId={selectedAgent.starshipId}
+                      starshipId={selectedAgent.agent.starshipId}
                       readOnly
                     />
                   </div>
@@ -275,46 +325,46 @@ export default function PendingAgentsPage(): React.JSX.Element {
                           <span className="text-muted-foreground">Status</span>
                           <span className="flex items-center gap-1">
                             <Icon
-                              name={selectedAgent.publicationStatus === 'published' ? 'check-circle' : selectedAgent.publicationStatus === 'rejected' ? 'x-circle' : 'clock'}
+                              name={selectedAgent.agent.publicationStatus === 'published' ? 'check-circle' : selectedAgent.agent.publicationStatus === 'rejected' ? 'x-circle' : 'clock'}
                               className={cn(
                                 'h-3 w-3',
-                                selectedAgent.publicationStatus === 'published' ? 'text-emerald-600' : selectedAgent.publicationStatus === 'rejected' ? 'text-red-600' : 'text-amber-600'
+                                selectedAgent.agent.publicationStatus === 'published' ? 'text-emerald-600' : selectedAgent.agent.publicationStatus === 'rejected' ? 'text-red-600' : 'text-amber-600'
                               )}
                             />
                             <span
                               className={cn(
                                 'capitalize',
-                                selectedAgent.publicationStatus === 'published' ? 'text-emerald-700' : selectedAgent.publicationStatus === 'rejected' ? 'text-red-700' : 'text-amber-700'
+                                selectedAgent.agent.publicationStatus === 'published' ? 'text-emerald-700' : selectedAgent.agent.publicationStatus === 'rejected' ? 'text-red-700' : 'text-amber-700'
                               )}
                             >
-                              {selectedAgent.publicationStatus.replace('_', ' ')}
+                              {selectedAgent.agent.publicationStatus.replace('_', ' ')}
                             </span>
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">Current version</span>
-                          <span>v{selectedAgent.version || '1.0.0'}</span>
+                          <span>v{selectedAgent.agent.version || '1.0.0'}</span>
                         </div>
-                        {selectedAgent.publicationRequestedVersion && (
+                        {selectedAgent.agent.publicationRequestedVersion && (
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Requested version</span>
                             <span className="flex items-center gap-1">
-                              {selectedAgent.publicationVersionBump && (
+                              {selectedAgent.agent.publicationVersionBump && (
                                 <Badge
                                   variant="outline"
                                   className={cn(
                                     'text-[10px] capitalize px-1.5 py-0 border-[0.5px]',
-                                    selectedAgent.publicationVersionBump === 'patch'
+                                    selectedAgent.agent.publicationVersionBump === 'patch'
                                       ? 'border-slate-400 text-slate-700'
-                                      : selectedAgent.publicationVersionBump === 'minor'
+                                      : selectedAgent.agent.publicationVersionBump === 'minor'
                                         ? 'border-yellow-400 text-yellow-700'
                                         : 'border-red-500 text-red-700'
                                   )}
                                 >
-                                  {selectedAgent.publicationVersionBump}
+                                  {selectedAgent.agent.publicationVersionBump}
                                 </Badge>
                               )}
-                              <span>v{selectedAgent.publicationRequestedVersion}</span>
+                              <span>v{selectedAgent.agent.publicationRequestedVersion}</span>
                             </span>
                           </div>
                         )}
@@ -323,24 +373,27 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
                     <div className="space-y-2 text-xs">
                       <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Request info</p>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Icon name="user" className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-muted-foreground">Requested by</span>
+                      <div className="space-y-2">
+                        <RequestedByProfile
+                          name={selectedAgent.requestedBy?.name || selectedAgent.requestedBy?.id || selectedAgent.agent.publicationRequestedBy || 'Unknown'}
+                          avatar={selectedAgent.requestedBy?.avatar}
+                          starshipName={selectedAgent.requestedByStarship?.name}
+                          starshipSlug={selectedAgent.requestedByStarship?.slug}
+                        />
+                        <div className="flex items-start gap-2">
+                          <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-muted-foreground">Last updated</p>
+                            <p className="font-mono text-[11px]">{selectedAgent.agent.updatedAt ? new Date(selectedAgent.agent.updatedAt as string).toLocaleString() : 'Unknown'}</p>
+                          </div>
                         </div>
-                        <p className="font-mono break-all ml-5">{selectedAgent.publicationRequestedBy || 'Unknown'}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-muted-foreground">Last updated</span>
-                        </div>
-                        <p className="font-mono ml-5">{selectedAgent.updatedAt ? new Date(selectedAgent.updatedAt as string).toLocaleString() : 'Unknown'}</p>
                       </div>
                     </div>
 
                     <div className="space-y-2 text-xs">
                       <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Changelog</p>
                       <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                        {selectedAgent.publicationChangelog || 'No changelog was provided for this request.'}
+                        {selectedAgent.agent.publicationChangelog || 'No changelog was provided for this request.'}
                       </div>
                     </div>
 
@@ -348,7 +401,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                       <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Agent ID</p>
                       <div className="flex items-center gap-2">
                         <Icon name="file-code" className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-mono break-all">{selectedAgent.id}</span>
+                        <span className="font-mono break-all">{selectedAgent.agent.id}</span>
                       </div>
                     </div>
                   </div>

@@ -545,8 +545,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </DialogContent>
       </Dialog>
 
-      {/* Primary actions & publication status - compact banner (styled like navbar, sticky) */}
-      <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
+      {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
+      <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
         {agentId && (
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex flex-wrap items-center gap-2">

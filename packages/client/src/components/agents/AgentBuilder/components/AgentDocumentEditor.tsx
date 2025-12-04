@@ -26,6 +26,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 
+const CATEGORY_DOT_COLORS: Record<string, string> = {
+  general: 'bg-gray-400',
+  automation: 'bg-emerald-400',
+  data: 'bg-purple-400',
+  communication: 'bg-orange-400',
+  coding: 'bg-indigo-400',
+  creative: 'bg-pink-400',
+  analysis: 'bg-cyan-400',
+  support: 'bg-amber-400',
+  utility: 'bg-teal-400',
+}
+
 interface AgentDocumentEditorProps {
   value: AgentFormData
   onChange: (next: AgentFormData) => void
@@ -568,78 +580,82 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Dialog>
 
       {/* Quick selectors */}
-      <div className="space-y-8">
+      <div className="space-y-2">
         {/* Category section */}
-        <div className="border-b border-border/10 pb-6">
-          <div className="flex items-center gap-4 px-3">
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
             </div>
-            <StandardSelect
-              mode="single"
-              aria-label="Change category"
-              disabled={isTemplateAgent || readOnly}
-              value={value.category}
-              options={AGENT_CATEGORIES.map(cat => ({
-                value: cat,
-                label: (
-                  <span className="flex items-center gap-2">
-                    <span className={cn('h-2 w-2 rounded-full', getCategoryColor(cat as any))} />
-                    <span className="capitalize">{cat}</span>
-                  </span>
-                ),
-                keywords: cat,
-              }))}
-              placeholder="Select a category"
-              triggerClassName={cn('min-w-[160px]', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
-              onChange={cat => {
-                onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
-              }}
-            />
+            <div className="w-[260px]">
+              <StandardSelect
+                mode="single"
+                aria-label="Change category"
+                disabled={isTemplateAgent || readOnly}
+                value={value.category}
+                options={AGENT_CATEGORIES.map(cat => ({
+                  value: cat,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <span className={cn('h-2 w-2 rounded-full', CATEGORY_DOT_COLORS[cat] || CATEGORY_DOT_COLORS.general)} />
+                      <span className="capitalize">{cat}</span>
+                    </span>
+                  ),
+                  keywords: cat,
+                }))}
+                placeholder="Select a category"
+                triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
+                onChange={cat => {
+                  onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Model section */}
-        <div className="border-b border-border/10 pb-6">
-          <div className="flex items-center gap-4 px-3">
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
-            <StandardSelect
-              mode="single"
-              aria-label="Select model"
-              disabled={isLoadingModels || isTemplateAgent || readOnly}
-              value={value.model}
-              options={availableModels.map(m => ({
-                value: m,
-                label: <span className="font-mono text-xs">{m}</span>,
-                keywords: m,
-              }))}
-              placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
-              searchPlaceholder="Search models..."
-              emptyLabel={isLoadingModels ? 'Loading models…' : 'No models found.'}
-              triggerClassName="h-7 w-[220px]"
-              onChange={m => {
-                if (typeof m === 'string') {
-                  onFieldChange?.('model', m)
-                }
-              }}
-            />
+            <div className="w-[260px]">
+              <StandardSelect
+                mode="single"
+                aria-label="Select model"
+                disabled={isLoadingModels || isTemplateAgent || readOnly}
+                value={value.model}
+                options={availableModels.map(m => ({
+                  value: m,
+                  label: <span className="font-mono text-xs">{m}</span>,
+                  keywords: m,
+                }))}
+                placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
+                searchPlaceholder="Search models..."
+                emptyLabel={isLoadingModels ? 'Loading models…' : 'No models found.'}
+                triggerClassName="w-full"
+                onChange={m => {
+                  if (typeof m === 'string') {
+                    onFieldChange?.('model', m)
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Tools section */}
-        <div className="pb-6">
-          <div className="flex items-start gap-4 px-3">
+        <div className="pb-2">
+          <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
-            <div className="flex-1">
+            <div className="w-[260px]">
               {isTemplateAgent || readOnly ? (
-                <div className="flex items-center rounded-xl h-7 px-2 border border-border/20 bg-muted/20 opacity-60 cursor-not-allowed">
+                <div className="flex items-center rounded-xl h-7 px-2 border border-border/20 bg-muted/20 opacity-60 cursor-not-allowed w-full">
                   {selectedToolSlugs.length === 0 ? (
                     <span className="text-xs text-muted-foreground">No tools assigned</span>
                   ) : (
@@ -671,7 +687,20 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   placeholder="Select tools"
                   searchPlaceholder="Search tools..."
                   emptyLabel="No tools found."
-                  triggerClassName="flex-1"
+                  triggerClassName="w-full"
+                  renderTriggerLabel={({ selectedOptions }) => {
+                    if (!selectedOptions.length) {
+                      return <span className="text-xs text-muted-foreground">Select tools</span>
+                    }
+                    const values = selectedOptions.map(opt => String(opt.value))
+                    let label: string
+                    if (values.length <= 3) {
+                      label = values.join(', ')
+                    } else {
+                      label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
+                    }
+                    return <span className="text-xs font-mono truncate max-w-full">{label}</span>
+                  }}
                   onOptionToggle={(slug, wasSelected) => {
                     void handleToggleTool(slug, wasSelected)
                   }}
@@ -683,7 +712,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Description */}
-      <Collapsible defaultOpen={true} className="space-y-2">
+      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
         <CollapsibleTrigger className="p-1.5">
           <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
         </CollapsibleTrigger>
@@ -701,7 +730,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Collapsible>
 
       {/* System Prompt */}
-      <Collapsible defaultOpen={true} className="space-y-2">
+      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
         <CollapsibleTrigger className="p-1.5">
           <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
         </CollapsibleTrigger>
@@ -719,7 +748,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Collapsible>
 
       {/* Preview Prompts */}
-      <Collapsible defaultOpen={true} className="space-y-2">
+      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
         <CollapsibleTrigger className="p-1.5">
           <Label className="text-xs font-semibold text-muted-foreground">Preview Prompts</Label>
         </CollapsibleTrigger>
@@ -745,7 +774,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Collapsible>
 
       {/* Blueprint */}
-      <Collapsible defaultOpen={true} className="space-y-2">
+      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
         <CollapsibleTrigger className="p-1.5">
           <Label className="text-xs font-semibold text-muted-foreground">Blueprint</Label>
         </CollapsibleTrigger>
@@ -768,7 +797,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Collapsible>
 
       {/* Advanced options */}
-      <Collapsible defaultOpen={false} className="space-y-2">
+      <Collapsible defaultOpen={false} className="space-y-2 mt-2">
         <CollapsibleTrigger className="p-1.5">
           <Label className="text-xs font-semibold text-muted-foreground">Advanced options</Label>
         </CollapsibleTrigger>

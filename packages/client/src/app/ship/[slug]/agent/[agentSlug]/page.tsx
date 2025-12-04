@@ -828,17 +828,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="flex flex-col items-center px-6 py-8">
-        <div className="w-full max-w-6xl mx-auto space-y-8">
+      <div className="flex flex-col items-center px-6 py-6">
+        <div className="w-full max-w-6xl mx-auto space-y-3">
           {/* Page header - mirrors ship agents/tools overview pages */}
-          <div className="text-center">
-            <div className="flex flex-col items-center justify-center gap-4 mb-5">
+          <div className="text-center mt-10">
+            <div className="flex flex-col items-center justify-center gap-2 mb-2">
               <AgentAvatar seed={headerAgentName} size={80} rounded className="h-20 w-20 rounded-2xl overflow-hidden ring-2 ring-primary/60 shadow-lg bg-background/80" />
               <div className="flex flex-col items-center">
                 <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
               </div>
             </div>
-            <div className="flex items-center justify-center gap-2 mt-2">
+            <div className="flex items-center justify-center gap-2">
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>

@@ -325,7 +325,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const canRequestPublication = !!agentId && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
 
   return (
-    <div className="space-y-4 pt-14 pb-28">
+    <div className="space-y-4 pt-4 pb-20">
       {/* Template Agent Update Banner */}
       {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
         <motion.div
@@ -440,24 +440,70 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </DialogContent>
       </Dialog>
 
-      {/* Publication status & actions */}
-      <div className="space-y-4">
+      {/* Primary actions & publication status - compact banner (styled like navbar) */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm">
         {agentId && (
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-col gap-1 text-xs">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="text-[10px] px-2 py-0.5 flex items-center gap-1">
-                <Icon name="shield-check" className="w-3 h-3" />
-                <span className="uppercase tracking-wide">Publication: {publicationStatus.replace('_', ' ')}</span>
-              </Badge>
-              {publicationStatus === 'pending_approval' && <span className="text-xs text-muted-foreground">Awaiting instance admin approval.</span>}
-              {publicationStatus === 'published' && (
-                <span className="text-xs text-emerald-500 flex items-center gap-1">
-                  <Icon name="check-circle" className="w-3.5 h-3.5" />
-                  Published
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 font-medium',
+                  publicationStatus === 'published'
+                    ? 'text-emerald-500'
+                    : publicationStatus === 'pending_approval'
+                      ? 'text-amber-500'
+                      : publicationStatus === 'rejected'
+                        ? 'text-red-500'
+                        : 'text-muted-foreground'
+                )}
+              >
+                <Icon
+                  name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
+                  className="w-3 h-3"
+                />
+                <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
+              </span>
+              {fullAgent?.version && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
+                  <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
                 </span>
               )}
-              {publicationStatus === 'rejected' && <span className="text-xs text-amber-500">Last request was rejected. Update your agent and request publication again.</span>}
             </div>
+
+            {fullAgent?.updatedAt && (
+              <div className="inline-flex items-center gap-1 text-muted-foreground">
+                <Icon name="clock" className="w-3 h-3" />
+                <span>Last updated {new Date(fullAgent.updatedAt).toLocaleString()}</span>
+              </div>
+            )}
+
+            {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                {publicationStatus === 'pending_approval' && <span>Awaiting instance admin approval.</span>}
+                {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-2">
+            {onCancel && (
+              <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+                Discard
+              </Button>
+            )}
+            {onSave && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  onSave()
+                }}
+              >
+                Save
+              </Button>
+            )}
             {canRequestPublication && (
               <Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={isRequestingPublish} onClick={() => setShowPublishDialog(true)}>
                 <Icon name="rocket-launch" className="w-3.5 h-3.5" />

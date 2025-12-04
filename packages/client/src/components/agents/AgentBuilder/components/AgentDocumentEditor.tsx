@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
@@ -29,6 +29,7 @@ import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
 import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -41,6 +42,7 @@ interface AgentDocumentEditorProps {
 
 export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
+  const queryClient = useQueryClient()
 
   const availableModels = useMemo(() => {
     return openRouterModels?.map(m => m.id) || []
@@ -62,6 +64,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
+
+  // Local loading state for publication request
+  const [isRequestingPublish, setIsRequestingPublish] = useState(false)
 
   // Check if this is a template-based agent (has sourceTemplateId) - these are read-only
   const isTemplateAgent = useMemo(() => {
@@ -169,6 +174,43 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
   }
 
+  const handleRequestPublication = async () => {
+    if (!agentId) return
+    if (!fullAgent) return
+
+    // Prevent duplicate requests when already pending or published
+    if (fullAgent.publicationStatus === 'pending_approval' || fullAgent.publicationStatus === 'published') {
+      return
+    }
+
+    try {
+      setIsRequestingPublish(true)
+      const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(
+        `/api/v1/agents/${agentId}/publish-request`
+      )
+      const updated = res.data.data.agent
+
+      // Update local fullAgent state so UI reflects new status immediately
+      setFullAgent(updated)
+
+      // Update cached agent detail as well
+      queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+
+      toast.success('Publication requested', {
+        description: res.data.data.message || 'Your agent is now pending instance admin approval.',
+      })
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to request publication'
+      toast.error('Failed to request publication', { description: message })
+    } finally {
+      setIsRequestingPublish(false)
+    }
+  }
+
   const handleNameChange = (name: string) => {
     if (isTemplateAgent) {
       toast.error('Cannot modify name', { description: 'Template agents are read-only' })
@@ -258,6 +300,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
     void syncAgent()
   }, [agentId, value, onChange])
+
+  const publicationStatus = fullAgent?.publicationStatus || 'draft'
+  const canRequestPublication =
+    !!agentId && !isTemplateAgent && (publicationStatus === 'draft' || publicationStatus === 'rejected')
 
   return (
     <div className="space-y-4 pt-14 pb-28">
@@ -393,6 +439,45 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
           </div>
         </div>
+
+        {/* Publication status & actions */}
+        {agentId && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-[10px] px-2 py-0.5 flex items-center gap-1">
+                <Icon name="shield-check" className="w-3 h-3" />
+                <span className="uppercase tracking-wide">Publication: {publicationStatus.replace('_', ' ')}</span>
+              </Badge>
+              {publicationStatus === 'pending_approval' && (
+                <span className="text-xs text-muted-foreground">Awaiting instance admin approval.</span>
+              )}
+              {publicationStatus === 'published' && (
+                <span className="text-xs text-emerald-500 flex items-center gap-1">
+                  <Icon name="check-circle" className="w-3.5 h-3.5" />
+                  Published
+                </span>
+              )}
+              {publicationStatus === 'rejected' && (
+                <span className="text-xs text-amber-500">
+                  Last request was rejected. Update your agent and request publication again.
+                </span>
+              )}
+            </div>
+            {canRequestPublication && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={isRequestingPublish}
+                onClick={() => void handleRequestPublication()}
+              >
+                <Icon name="rocket-launch" className="w-3.5 h-3.5" />
+                {isRequestingPublish ? 'Requesting…' : 'Request publication'}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Quick selectors */}

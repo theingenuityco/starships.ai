@@ -8,7 +8,6 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { Input } from '@/components/ui/input'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
-import AgentAvatar from '@/components/animated/AgentAvatar'
 import { ModelSelector } from './ModelSelector'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
@@ -225,13 +224,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     try {
       setIsRequestingPublish(true)
-      const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(
-        `/api/v1/agents/${agentId}/publish-request`,
-        {
-          versionBump,
-          changelog: changelog.trim(),
-        }
-      )
+      const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publish-request`, {
+        versionBump,
+        changelog: changelog.trim(),
+      })
       const updated = res.data.data.agent
 
       // Update local fullAgent state so UI reflects new status immediately
@@ -246,32 +242,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       setShowPublishDialog(false)
       setChangelog('')
     } catch (error: any) {
-      const message =
-        error?.response?.data?.error ||
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to request publication'
+      const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to request publication'
       toast.error('Failed to request publication', { description: message })
     } finally {
       setIsRequestingPublish(false)
-    }
-  }
-
-  const handleNameChange = (name: string) => {
-    if (isTemplateAgent) {
-      toast.error('Cannot modify name', { description: 'Template agents are read-only' })
-      return
-    }
-    const shouldUpdateSlug = !value.slug || value.slug === generatedSlug
-    onFieldChange?.('name', name)
-    if (shouldUpdateSlug) {
-      const slugified = name
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-      onFieldChange?.('slug', slugified)
     }
   }
 
@@ -348,8 +322,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   }, [agentId, value, onChange])
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
-  const canRequestPublication =
-    !!agentId && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
+  const canRequestPublication = !!agentId && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
 
   return (
     <div className="space-y-4 pt-14 pb-28">
@@ -467,26 +440,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </DialogContent>
       </Dialog>
 
-      {/* Title */}
+      {/* Publication status & actions */}
       <div className="space-y-4">
-        <div className="space-y-6">
-          <AgentAvatar seed={value.name} size={64} className="rounded-md overflow-hidden" />
-          <div className="space-y-1">
-            <div className="flex items-baseline gap-3">
-              <input
-                className="flex-1 bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                placeholder="Untitled Agent"
-                value={value.name}
-                onChange={e => handleNameChange(e.target.value)}
-                disabled={isTemplateAgent || readOnly}
-              />
-              {isTemplateAgent && fullAgent?.version && <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>}
-            </div>
-            <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
-          </div>
-        </div>
-
-        {/* Publication status & actions */}
         {agentId && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -494,30 +449,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 <Icon name="shield-check" className="w-3 h-3" />
                 <span className="uppercase tracking-wide">Publication: {publicationStatus.replace('_', ' ')}</span>
               </Badge>
-              {publicationStatus === 'pending_approval' && (
-                <span className="text-xs text-muted-foreground">Awaiting instance admin approval.</span>
-              )}
+              {publicationStatus === 'pending_approval' && <span className="text-xs text-muted-foreground">Awaiting instance admin approval.</span>}
               {publicationStatus === 'published' && (
                 <span className="text-xs text-emerald-500 flex items-center gap-1">
                   <Icon name="check-circle" className="w-3.5 h-3.5" />
                   Published
                 </span>
               )}
-              {publicationStatus === 'rejected' && (
-                <span className="text-xs text-amber-500">
-                  Last request was rejected. Update your agent and request publication again.
-                </span>
-              )}
+              {publicationStatus === 'rejected' && <span className="text-xs text-amber-500">Last request was rejected. Update your agent and request publication again.</span>}
             </div>
             {canRequestPublication && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                disabled={isRequestingPublish}
-                onClick={() => setShowPublishDialog(true)}
-              >
+              <Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={isRequestingPublish} onClick={() => setShowPublishDialog(true)}>
                 <Icon name="rocket-launch" className="w-3.5 h-3.5" />
                 {isRequestingPublish ? 'Requesting…' : 'Request publication'}
               </Button>
@@ -531,9 +473,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Request Publication</DialogTitle>
-            <DialogDescription>
-              Choose how to bump the version of this agent and provide a brief changelog for the instance admin.
-            </DialogDescription>
+            <DialogDescription>Choose how to bump the version of this agent and provide a brief changelog for the instance admin.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -552,14 +492,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <p className="text-xs font-semibold text-muted-foreground">Version bump</p>
               <div className="flex gap-2">
                 {(['patch', 'minor', 'major'] as const).map(bump => (
-                  <Button
-                    key={bump}
-                    type="button"
-                    size="xs"
-                    variant={versionBump === bump ? 'default' : 'outline'}
-                    className="text-xs capitalize"
-                    onClick={() => setVersionBump(bump)}
-                  >
+                  <Button key={bump} type="button" size="sm" variant={versionBump === bump ? 'default' : 'outline'} className="text-xs capitalize h-7 px-3" onClick={() => setVersionBump(bump)}>
                     {bump}
                   </Button>
                 ))}
@@ -577,9 +510,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 value={changelog}
                 onChange={e => setChangelog(e.target.value)}
               />
-              <p className="text-[11px] text-muted-foreground">
-                This will be shown to instance admins when they review your publication request.
-              </p>
+              <p className="text-[11px] text-muted-foreground">This will be shown to instance admins when they review your publication request.</p>
             </div>
           </div>
 
@@ -610,9 +541,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   aria-label="Change category"
                   className={cn(
                     'flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20',
-                    isTemplateAgent || readOnly
-                      ? 'opacity-60 cursor-not-allowed'
-                      : 'cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm'
+                    isTemplateAgent || readOnly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm'
                   )}
                 >
                   <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>

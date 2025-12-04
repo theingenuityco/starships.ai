@@ -829,7 +829,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   return (
     <div className="bg-background min-h-screen">
       <div className="flex flex-col items-center px-6 py-6">
-        <div className="w-full max-w-6xl mx-auto space-y-3">
+        <div className="w-full max-w-6xl mx-auto space-y-0">
           {/* Page header - mirrors ship agents/tools overview pages */}
           <div className="text-center mt-10">
             <div className="flex flex-col items-center justify-center gap-2 mb-2">
@@ -838,7 +838,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
               </div>
             </div>
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 mt-4">
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
@@ -869,7 +869,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             </div>
           </div>
 
-          <div className="relative w-full rounded-2xl bg-background/80 shadow-sm overflow-hidden min-h-[600px]">
+          <div className="relative w-full rounded-2xl bg-background/80 shadow-sm overflow-hidden min-h-[600px] mb-16">
             <AgentCreatedModal
               open={deferredAgentCreate.isOpen}
               names={deferredAgentCreate.createdNames}

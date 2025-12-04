@@ -1,7 +1,7 @@
 'use client'
 
 import api from '@/lib/api'
-import type { AgentModel, ApiResponse } from '@starships/protocol'
+import type { AgentModel, ApiResponse, PendingAgentSummary as ProtocolPendingAgentSummary } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -15,8 +15,21 @@ export interface PaginationMeta {
   has_prev: boolean
 }
 
+export type PendingAgentSummary = ProtocolPendingAgentSummary & {
+  requestedBy?: {
+    id: string
+    name?: string
+    avatar?: string
+  }
+  requestedByStarship?: {
+    id: string
+    name?: string
+    slug?: string
+  }
+}
+
 export interface PendingAgentsResponse {
-  agents: AgentModel[]
+  agents: PendingAgentSummary[]
   pagination: PaginationMeta
 }
 
@@ -32,7 +45,7 @@ export function usePendingAgents(page: number = 1, limit: number = 20) {
   return useQuery({
     queryKey: ADMIN_AGENT_QUERY_KEYS.pending(page, limit),
     queryFn: async (): Promise<PendingAgentsResponse> => {
-      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/admin/agents/pending', {
+      const response: FetchResponse<ApiResponse<PendingAgentSummary[]>> = await api.get('/api/v1/admin/agents/pending', {
         params: { page, limit },
       })
 

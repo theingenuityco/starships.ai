@@ -110,6 +110,24 @@ export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> 
 }
 
 /**
+ * DTO for admin pending agents listing.
+ * Wraps the agent plus denormalized metadata needed only for that view.
+ */
+export interface PendingAgentSummary {
+  agent: AgentModel;
+  requestedBy?: {
+    id: string;
+    name?: string;
+    avatar?: string;
+  };
+  requestedByStarship?: {
+    id: string;
+    name?: string;
+    slug?: string;
+  };
+}
+
+/**
  * Response type for update check
  */
 export interface AgentUpdateCheckResponse {

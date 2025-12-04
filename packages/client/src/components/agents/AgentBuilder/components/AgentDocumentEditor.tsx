@@ -325,7 +325,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const canRequestPublication = !!agentId && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
 
   return (
-    <div className="space-y-4 pt-4 pb-20">
+    <div className="pt-4 pb-20">
       {/* Template Agent Update Banner */}
       {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
         <motion.div
@@ -441,7 +441,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Dialog>
 
       {/* Primary actions & publication status - compact banner (styled like navbar) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
         {agentId && (
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex flex-wrap items-center gap-2">

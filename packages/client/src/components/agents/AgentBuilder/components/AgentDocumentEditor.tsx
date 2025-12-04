@@ -16,13 +16,14 @@ import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisual
 import { StandardSelect } from './StandardSelect'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
-import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
+import type { ToolModel, ApiResponse, AgentModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
 import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 
 const CATEGORY_DOT_COLORS: Record<string, string> = {
@@ -84,6 +85,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('minor')
   const [changelog, setChangelog] = useState('')
+
+  // Autosave state (existing agents only)
+  const [isAutosaving, setIsAutosaving] = useState(false)
+  const [hasSaveError, setHasSaveError] = useState(false)
+
+  // Local input state for adding preview prompts
+  const [newPreviewPrompt, setNewPreviewPrompt] = useState('')
 
   // Check if this is a template-based agent (has sourceTemplateId) - these are read-only
   const isTemplateAgent = useMemo(() => {
@@ -329,7 +337,97 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   }, [agentId, value, onChange])
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
-  const canRequestPublication = !!agentId && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
+  const hasExistingAgent = !!agentId
+  const canRequestPublication = hasExistingAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
+
+  // Autosave agent changes for existing (non-template) agents
+  useEffect(() => {
+    if (!agentId) return
+    if (readOnly) return
+    if (isTemplateAgent) return
+
+    // Build update payload from current form value
+    const buildUpdates = (): UpdateAgentRequest => {
+      let blueprintObj: any | undefined
+      if (value.blueprint && value.blueprint.trim() !== '') {
+        try {
+          blueprintObj = JSON.parse(value.blueprint)
+        } catch {
+          // Leave blueprint undefined if invalid JSON – backend keeps last valid version
+        }
+      }
+
+      const updates: UpdateAgentRequest = {}
+
+      // Only send fields that are valid and non-empty to satisfy backend validation
+      if (value.name && value.name.trim().length > 0) {
+        updates.name = value.name
+      }
+      if (typeof value.description === 'string') {
+        updates.description = value.description
+      }
+      if (value.model && value.model.trim().length > 0) {
+        updates.model = value.model
+      }
+
+      // Clamp numeric fields into valid ranges before sending
+      if (typeof value.temperature === 'number') {
+        const clampedTemp = Math.min(2, Math.max(0, value.temperature))
+        updates.temperature = clampedTemp
+      }
+      if (typeof value.maxTokens === 'number') {
+        const clampedMaxTokens = Math.min(100000, Math.max(1, value.maxTokens))
+        updates.maxTokens = clampedMaxTokens
+      }
+      if (typeof value.timeout === 'number') {
+        const clampedTimeout = Math.min(600000, Math.max(1000, value.timeout))
+        updates.timeout = clampedTimeout
+      }
+
+      if (typeof value.systemPrompt === 'string') {
+        updates.systemPrompt = value.systemPrompt
+      }
+      if (Array.isArray(value.previewPrompts)) {
+        updates.previewPrompts = value.previewPrompts
+      }
+
+      if (blueprintObj) {
+        ;(updates as any).blueprint = blueprintObj
+      }
+      return updates
+    }
+
+    let cancelled = false
+    setHasSaveError(false)
+
+    const timeout = setTimeout(async () => {
+      try {
+        setIsAutosaving(true)
+        const updates = buildUpdates()
+        const res: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
+        const updated = res.data.data
+
+        if (!cancelled && updated) {
+          setFullAgent(updated)
+          // Keep React Query cache in sync for this agent
+          queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setHasSaveError(true)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsAutosaving(false)
+        }
+      }
+    }, 800)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [agentId, value, readOnly, isTemplateAgent, queryClient])
 
   return (
     <div className="pt-4 pb-20">
@@ -447,8 +545,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </DialogContent>
       </Dialog>
 
-      {/* Primary actions & publication status - compact banner (styled like navbar) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
+      {/* Primary actions & publication status - compact banner (styled like navbar, sticky) */}
+      <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
         {agentId && (
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex flex-wrap items-center gap-2">
@@ -495,12 +593,26 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2">
-            {onCancel && (
-              <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-                Discard
+            <Badge variant="outline" className="text-[11px] px-2 py-0 h-6 rounded-full text-muted-foreground border-dashed border-border/60">
+              {isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}
+            </Badge>
+            {hasExistingAgent && (
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5"
+                disabled={isRequestingPublish || !canRequestPublication}
+                onClick={() => {
+                  if (canRequestPublication) {
+                    setShowPublishDialog(true)
+                  }
+                }}
+              >
+                <Icon name="rocket-launch" className="w-3.5 h-3.5" />
+                {isRequestingPublish ? 'Publishing…' : publicationStatus === 'published' ? 'Published' : publicationStatus === 'pending_approval' ? 'Pending approval' : 'Publish'}
               </Button>
             )}
-            {onSave && (
+            {!hasExistingAgent && onSave && (
               <Button
                 type="button"
                 size="sm"
@@ -509,12 +621,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 }}
               >
                 Save
-              </Button>
-            )}
-            {canRequestPublication && (
-              <Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={isRequestingPublish} onClick={() => setShowPublishDialog(true)}>
-                <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                {isRequestingPublish ? 'Requesting…' : 'Request publication'}
               </Button>
             )}
           </div>
@@ -750,118 +856,213 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
       </div>
 
-      {/* Preview Prompts */}
+      {/* Examples (Preview Prompts) */}
       <div className="border-b border-border/10 pb-2 mt-2">
         <div className="flex items-start gap-2 px-3">
           <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
             <Icon name="list-bullet" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Preview Prompts</span>
+            <span className="text-xs font-semibold">Examples</span>
           </div>
           <div className="flex-1">
             <div className="space-y-2">
-              <textarea
-                className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
-                placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
-                value={(value.previewPrompts || []).join('\n')}
-                disabled={isTemplateAgent || readOnly}
-                onChange={e => {
-                  const lines = e.target.value
-                    .split('\n')
-                    .map(s => s.trim())
-                    .filter(Boolean)
-                    .slice(0, 10)
-                  onFieldChange?.('previewPrompts', lines)
-                }}
-              />
-              <div className="text-[10px] text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</div>
+              {isTemplateAgent || readOnly ? (
+                <div className="rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground min-h-[60px]">
+                  {(value.previewPrompts || []).length === 0 ? (
+                    <span className="italic">No preview prompts configured.</span>
+                  ) : (
+                    <ul className="list-disc list-inside space-y-1">
+                      {(value.previewPrompts || []).map((prompt, idx) => (
+                        <li key={idx} className="text-xs">
+                          {prompt}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    {(value.previewPrompts || []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {(value.previewPrompts || []).map((prompt, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <Input
+                              className="text-xs flex-1"
+                              value={prompt}
+                              onChange={e => {
+                                const next = [...(value.previewPrompts || [])]
+                                next[idx] = e.target.value
+                                const cleaned = next
+                                  .map(s => s.trim())
+                                  .filter(Boolean)
+                                  .slice(0, 10)
+                                onFieldChange?.('previewPrompts', cleaned)
+                              }}
+                              placeholder="Example: Help me draft a customer support reply…"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                const next = (value.previewPrompts || []).filter((_, i) => i !== idx)
+                                onFieldChange?.('previewPrompts', next)
+                              }}
+                            >
+                              <Icon name="x" className="w-3 h-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="text-xs flex-1"
+                      placeholder="Add a sample user prompt…"
+                      value={newPreviewPrompt}
+                      onChange={e => setNewPreviewPrompt(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const trimmed = newPreviewPrompt.trim()
+                          const existing = value.previewPrompts || []
+                          if (!trimmed || existing.length >= 10) return
+                          onFieldChange?.('previewPrompts', [...existing, trimmed])
+                          setNewPreviewPrompt('')
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="text-xs"
+                      disabled={!newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
+                      onClick={() => {
+                        const trimmed = newPreviewPrompt.trim()
+                        const existing = value.previewPrompts || []
+                        if (!trimmed || existing.length >= 10) return
+                        onFieldChange?.('previewPrompts', [...existing, trimmed])
+                        setNewPreviewPrompt('')
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </>
+              )}
+              <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                <span>These appear as example prompts in the chat input when this agent is mentioned.</span>
+                <span>
+                  {(value.previewPrompts || []).length}
+                  /10
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Blueprint */}
-      <div className="border-b border-border/10 pb-2 mt-2">
-        <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
-            <Icon name="network" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Blueprint</span>
-          </div>
-          <div className="flex-1">
-            <BlueprintVisualization
-              blueprint={(() => {
-                try {
-                  return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
-                } catch {
-                  return { nodes: [], edges: [] } as any
-                }
-              })()}
-              className="h-[320px]"
-              transparent
-              nodesDraggable={false}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Advanced options */}
-      <div className="border-b border-border/10 pb-2 mt-2">
-        <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+      {/* Advanced options (includes Blueprint) */}
+      <Collapsible defaultOpen={false} className="border-b border-border/10 pb-2 mt-2">
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center gap-2 px-3 py-1.5 text-muted-foreground">
             <Icon name="sliders-horizontal" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Advanced options</span>
+            <span className="text-xs font-semibold flex-1 text-left">Advanced options</span>
           </div>
-          <div className="flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="agent-temperature" className="text-xs font-medium">
-                  Temperature
-                </Label>
-                <Input
-                  id="agent-temperature"
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={value.temperature}
-                  onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
-                  disabled={isTemplateAgent || readOnly}
-                  className="text-xs"
-                />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-4 mt-1">
+            {/* Blueprint first */}
+            <div>
+              <div className="flex items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+                  <Icon name="network" className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Blueprint</span>
+                </div>
+                <div className="flex-1">
+                  <BlueprintVisualization
+                    blueprint={(() => {
+                      try {
+                        return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                      } catch {
+                        return { nodes: [], edges: [] } as any
+                      }
+                    })()}
+                    className="h-[320px]"
+                    transparent
+                    nodesDraggable={false}
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="agent-max-tokens" className="text-xs font-medium">
-                  Max Tokens
-                </Label>
-                <Input
-                  id="agent-max-tokens"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={value.maxTokens}
-                  onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
-                  disabled={isTemplateAgent || readOnly}
-                  className="text-xs"
-                />
+            </div>
+
+            {/* Then numeric advanced controls */}
+            <div className="space-y-2 border-t border-border/10 pt-2">
+              {/* Temperature */}
+              <div className="flex items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                  <span className="text-xs font-semibold">Temperature</span>
+                </div>
+                <div className="w-[260px]">
+                  <Input
+                    id="agent-temperature"
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={value.temperature}
+                    onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
+                    disabled={isTemplateAgent || readOnly}
+                    className="text-xs"
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="agent-timeout" className="text-xs font-medium">
-                  Timeout (ms)
-                </Label>
-                <Input
-                  id="agent-timeout"
-                  type="number"
-                  min="1000"
-                  step="1000"
-                  value={value.timeout}
-                  onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
-                  disabled={isTemplateAgent || readOnly}
-                  className="text-xs"
-                />
+
+              {/* Max Tokens */}
+              <div className="flex items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                  <span className="text-xs font-semibold">Max Tokens</span>
+                </div>
+                <div className="w-[260px]">
+                  <Input
+                    id="agent-max-tokens"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={value.maxTokens}
+                    onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
+                    disabled={isTemplateAgent || readOnly}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Timeout */}
+              <div className="flex items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                  <span className="text-xs font-semibold">Timeout (ms)</span>
+                </div>
+                <div className="w-[260px]">
+                  <Input
+                    id="agent-timeout"
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    value={value.timeout}
+                    onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
+                    disabled={isTemplateAgent || readOnly}
+                    className="text-xs"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
     </div>

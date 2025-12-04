@@ -13,6 +13,7 @@ import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication
 import type { AgentModel } from '@starships/protocol'
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
+import { cn } from '@/lib/utils'
 
 export default function PendingAgentsPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
@@ -263,58 +264,97 @@ export default function PendingAgentsPage(): React.JSX.Element {
                 </div>
 
                 {/* Right aside with meta & actions */}
-                <aside className="w-full md:w-80 shrink-0 space-y-4 border border-border/60 rounded-lg bg-muted/40 p-3">
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="text-[11px]">
-                        {selectedAgent.publicationStatus}
-                      </Badge>
-                      {selectedAgent.publicationRequestedVersion && (
-                        <Badge variant="outline" className="text-[11px]">
-                          requested v{selectedAgent.publicationRequestedVersion}
-                        </Badge>
-                      )}
-                      {selectedAgent.publicationVersionBump && (
-                        <Badge variant="outline" className="text-[11px] capitalize">
-                          {selectedAgent.publicationVersionBump} bump
-                        </Badge>
-                      )}
+                <aside className="w-full md:w-80 shrink-0 flex flex-col h-full border border-border/60 rounded-lg bg-muted/40 p-3">
+                  {/* Scrollable meta content */}
+                  <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+                    {/* Status block */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
+                      <div className="rounded-md border border-border/70 bg-background/70 p-2 space-y-2 text-[11px] font-mono">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Status</span>
+                          <span className="flex items-center gap-1">
+                            <Icon
+                              name={selectedAgent.publicationStatus === 'published' ? 'check-circle' : selectedAgent.publicationStatus === 'rejected' ? 'x-circle' : 'clock'}
+                              className={cn(
+                                'h-3 w-3',
+                                selectedAgent.publicationStatus === 'published' ? 'text-emerald-600' : selectedAgent.publicationStatus === 'rejected' ? 'text-red-600' : 'text-amber-600'
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                'capitalize',
+                                selectedAgent.publicationStatus === 'published' ? 'text-emerald-700' : selectedAgent.publicationStatus === 'rejected' ? 'text-red-700' : 'text-amber-700'
+                              )}
+                            >
+                              {selectedAgent.publicationStatus.replace('_', ' ')}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Current version</span>
+                          <span>v{selectedAgent.version || '1.0.0'}</span>
+                        </div>
+                        {selectedAgent.publicationRequestedVersion && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Requested version</span>
+                            <span className="flex items-center gap-1">
+                              {selectedAgent.publicationVersionBump && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'text-[10px] capitalize px-1.5 py-0 border-[0.5px]',
+                                    selectedAgent.publicationVersionBump === 'patch'
+                                      ? 'border-slate-400 text-slate-700'
+                                      : selectedAgent.publicationVersionBump === 'minor'
+                                        ? 'border-yellow-400 text-yellow-700'
+                                        : 'border-red-500 text-red-700'
+                                  )}
+                                >
+                                  {selectedAgent.publicationVersionBump}
+                                </Badge>
+                              )}
+                              <span>v{selectedAgent.publicationRequestedVersion}</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2 text-xs">
-                    <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Request info</p>
-                    <div className="space-y-1">
+                    <div className="space-y-2 text-xs">
+                      <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Request info</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Icon name="user" className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Requested by</span>
+                        </div>
+                        <p className="font-mono break-all ml-5">{selectedAgent.publicationRequestedBy || 'Unknown'}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Last updated</span>
+                        </div>
+                        <p className="font-mono ml-5">{selectedAgent.updatedAt ? new Date(selectedAgent.updatedAt as string).toLocaleString() : 'Unknown'}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Changelog</p>
+                      <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                        {selectedAgent.publicationChangelog || 'No changelog was provided for this request.'}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Agent ID</p>
                       <div className="flex items-center gap-2">
-                        <Icon name="user" className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Requested by</span>
+                        <Icon name="file-code" className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-mono break-all">{selectedAgent.id}</span>
                       </div>
-                      <p className="font-mono break-all ml-5">{selectedAgent.publicationRequestedBy || 'Unknown'}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Last updated</span>
-                      </div>
-                      <p className="font-mono ml-5">{selectedAgent.updatedAt ? new Date(selectedAgent.updatedAt as string).toLocaleString() : 'Unknown'}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-xs">
-                    <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Changelog</p>
-                    <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                      {selectedAgent.publicationChangelog || 'No changelog was provided for this request.'}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Agent ID</p>
-                    <div className="flex items-center gap-2">
-                      <Icon name="file-code" className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-mono break-all">{selectedAgent.id}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 space-y-2">
+                  {/* Fixed actions at the bottom */}
+                  <div className="pt-2 space-y-2 mt-3">
                     <Button variant="outline" className="w-full" onClick={closeAgentDetails} disabled={approveMutation.isPending || rejectMutation.isPending}>
                       Close
                     </Button>

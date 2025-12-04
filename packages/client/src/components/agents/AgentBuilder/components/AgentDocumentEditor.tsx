@@ -227,8 +227,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!agentId) return
     if (!fullAgent) return
 
-    // Prevent duplicate requests when already pending or published
-    if (fullAgent.publicationStatus === 'pending_approval' || fullAgent.publicationStatus === 'published') {
+    // Prevent duplicate requests when already pending; allow republish for already-published templates
+    if (fullAgent.publicationStatus === 'pending_approval') {
+      return
+    }
+    if (fullAgent.publicationStatus === 'published' && !fullAgent.publishedTemplateId) {
       return
     }
 
@@ -338,7 +341,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
   const hasExistingAgent = !!agentId
-  const canRequestPublication = hasExistingAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
+  const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId
+  const canRequestPublication = hasExistingAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
 
   // Autosave agent changes for existing (non-template) agents
   useEffect(() => {
@@ -593,9 +597,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-[11px] px-2 py-0 h-6 rounded-full text-muted-foreground border-dashed border-border/60">
-              {isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}
-            </Badge>
+            <div className="flex items-center gap-2 text-[11px] font-medium">
+              <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+              <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+            </div>
             {hasExistingAgent && (
               <Button
                 type="button"
@@ -609,7 +614,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 }}
               >
                 <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                {isRequestingPublish ? 'Publishing…' : publicationStatus === 'published' ? 'Published' : publicationStatus === 'pending_approval' ? 'Pending approval' : 'Publish'}
+                {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
               </Button>
             )}
             {!hasExistingAgent && onSave && (

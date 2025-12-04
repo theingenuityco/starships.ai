@@ -580,7 +580,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Dialog>
 
       {/* Quick selectors */}
-      <div className="space-y-2">
+      <div className="space-y-2 mb-2">
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
@@ -712,40 +712,44 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Description */}
-      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className={cn((isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+      <div className="mt-0">
+        <div className="flex items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <Icon name="file-text" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Description</span>
+          </div>
+          <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
             <RichMarkdownEditor
               value={value.description}
               onChange={val => onFieldChange?.('description', val)}
               placeholder="Write a clear description. Markdown supported."
+              className="pl-2"
               noMinHeight
               readOnly={readOnly}
             />
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </div>
 
       {/* System Prompt */}
-      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className={cn((isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+      <div className="mt-0">
+        <div className="flex items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <Icon name="sparkles" className="w-4 h-4" />
+            <span className="text-xs font-semibold">System Prompt</span>
+          </div>
+          <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
             <RichMarkdownEditor
               value={value.systemPrompt}
               onChange={val => onFieldChange?.('systemPrompt', val)}
               placeholder="Define the agent's character, mission, and behavior..."
+              className="pl-2"
               minHeightPx={200}
               readOnly={readOnly}
             />
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </div>
 
       {/* Preview Prompts */}
       <Collapsible defaultOpen={true} className="space-y-2 mt-2">

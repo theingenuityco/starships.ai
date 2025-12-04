@@ -68,6 +68,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Local loading state for publication request
   const [isRequestingPublish, setIsRequestingPublish] = useState(false)
 
+  // Publication dialog state
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('minor')
+  const [changelog, setChangelog] = useState('')
+
   // Check if this is a template-based agent (has sourceTemplateId) - these are read-only
   const isTemplateAgent = useMemo(() => {
     return !!fullAgent?.sourceTemplateId
@@ -174,6 +179,27 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
   }
 
+  const computeNextVersion = (currentVersion: string | undefined, bump: 'patch' | 'minor' | 'major'): string => {
+    const base = currentVersion || '1.0.0'
+    const match = base.match(/^(\d+)\.(\d+)\.(\d+)/)
+    if (!match) return '1.0.0'
+
+    const major = Number(match[1])
+    const minor = Number(match[2])
+    const patch = Number(match[3])
+
+    switch (bump) {
+      case 'patch':
+        return `${major}.${minor}.${patch + 1}`
+      case 'minor':
+        return `${major}.${minor + 1}.0`
+      case 'major':
+        return `${major + 1}.0.0`
+    }
+  }
+
+  const nextVersion = useMemo(() => computeNextVersion(fullAgent?.version, versionBump), [fullAgent?.version, versionBump])
+
   const handleRequestPublication = async () => {
     if (!agentId) return
     if (!fullAgent) return
@@ -183,10 +209,19 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       return
     }
 
+    if (!changelog.trim()) {
+      toast.error('Changelog required', { description: 'Please provide a short changelog describing your changes.' })
+      return
+    }
+
     try {
       setIsRequestingPublish(true)
       const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(
-        `/api/v1/agents/${agentId}/publish-request`
+        `/api/v1/agents/${agentId}/publish-request`,
+        {
+          versionBump,
+          changelog: changelog.trim(),
+        }
       )
       const updated = res.data.data.agent
 
@@ -199,6 +234,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       toast.success('Publication requested', {
         description: res.data.data.message || 'Your agent is now pending instance admin approval.',
       })
+      setShowPublishDialog(false)
+      setChangelog('')
     } catch (error: any) {
       const message =
         error?.response?.data?.error ||
@@ -470,7 +507,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 variant="outline"
                 className="gap-1.5"
                 disabled={isRequestingPublish}
-                onClick={() => void handleRequestPublication()}
+                onClick={() => setShowPublishDialog(true)}
               >
                 <Icon name="rocket-launch" className="w-3.5 h-3.5" />
                 {isRequestingPublish ? 'Requesting…' : 'Request publication'}
@@ -479,6 +516,74 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           </div>
         )}
       </div>
+
+      {/* Publication Request Dialog */}
+      <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Publication</DialogTitle>
+            <DialogDescription>
+              Choose how to bump the version of this agent and provide a brief changelog for the instance admin.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground mb-1">Current version</p>
+                <p className="font-mono font-semibold text-base">v{fullAgent?.version || '1.0.0'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">New version</p>
+                <p className="font-mono font-semibold text-base text-emerald-600">v{nextVersion}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">Version bump</p>
+              <div className="flex gap-2">
+                {(['patch', 'minor', 'major'] as const).map(bump => (
+                  <Button
+                    key={bump}
+                    type="button"
+                    size="xs"
+                    variant={versionBump === bump ? 'default' : 'outline'}
+                    className="text-xs capitalize"
+                    onClick={() => setVersionBump(bump)}
+                  >
+                    {bump}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="publication-changelog" className="text-xs">
+                Changelog
+              </Label>
+              <textarea
+                id="publication-changelog"
+                className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Summarize what changed in this version for reviewers…"
+                value={changelog}
+                onChange={e => setChangelog(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                This will be shown to instance admins when they review your publication request.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPublishDialog(false)} disabled={isRequestingPublish}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleRequestPublication()} disabled={isRequestingPublish}>
+              {isRequestingPublish ? 'Requesting…' : 'Submit for approval'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick selectors */}
       <div className="space-y-8">

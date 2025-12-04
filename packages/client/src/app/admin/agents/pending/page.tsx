@@ -7,13 +7,20 @@ import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication } from '@/hooks/useAdminAgents'
+import type { AgentModel } from '@starships/protocol'
+import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
+import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 
 export default function PendingAgentsPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const limit = 20
+
+  const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   const { data, isLoading, isError, error } = usePendingAgents(page, limit)
   const approveMutation = useApproveAgentPublication()
@@ -58,6 +65,46 @@ export default function PendingAgentsPage(): React.JSX.Element {
   const handleReject = (agentId: string) => {
     rejectMutation.mutate(agentId)
   }
+
+  const openAgentDetails = (agent: AgentModel) => {
+    setSelectedAgent(agent)
+    setIsDetailOpen(true)
+  }
+
+  const closeAgentDetails = () => {
+    setIsDetailOpen(false)
+    setSelectedAgent(null)
+  }
+
+  const handleApproveSelected = () => {
+    if (!selectedAgent) return
+    handleApprove(selectedAgent.id)
+    closeAgentDetails()
+  }
+
+  const handleRejectSelected = () => {
+    if (!selectedAgent) return
+    handleReject(selectedAgent.id)
+    closeAgentDetails()
+  }
+
+  const selectedAgentFormData: AgentFormData | null = selectedAgent
+    ? {
+        name: selectedAgent.name,
+        slug: selectedAgent.slug,
+        description: selectedAgent.description || '',
+        category: (selectedAgent as any).category || 'general',
+        model: selectedAgent.model,
+        temperature: (selectedAgent as any).temperature ?? 0.7,
+        maxTokens: (selectedAgent as any).maxTokens ?? 4000,
+        systemPrompt: selectedAgent.systemPrompt || '',
+        previewPrompts: (selectedAgent as any).previewPrompts || [],
+        assignedToolSlugs: (selectedAgent as any).assignedToolSlugs || [],
+        blueprint: selectedAgent.blueprint ? JSON.stringify(selectedAgent.blueprint, null, 2) : '{\n  "nodes": [],\n  "edges": []\n}',
+        timeout: (selectedAgent as any).timeout ?? 30000,
+        icon: (selectedAgent as any).icon || '',
+      }
+    : null
 
   return (
     <PageLayout title="Agent Publish Approvals" description="Review and approve or reject agents that owners have requested to publish." showHeader className="min-h-screen">
@@ -143,13 +190,9 @@ export default function PendingAgentsPage(): React.JSX.Element {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 min-w-[140px]">
-                    <Button size="sm" className="w-full" disabled={approveMutation.isPending || rejectMutation.isPending} onClick={() => handleApprove(agent.id)}>
-                      <Icon name="check-circle" className="h-4 w-4 mr-1.5" />
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="outline" className="w-full" disabled={approveMutation.isPending || rejectMutation.isPending} onClick={() => handleReject(agent.id)}>
-                      <Icon name="x-circle" className="h-4 w-4 mr-1.5" />
-                      Reject
+                    <Button size="sm" variant="outline" className="w-full" disabled={approveMutation.isPending || rejectMutation.isPending} onClick={() => openAgentDetails(agent)}>
+                      <Icon name="eye" className="h-4 w-4 mr-1.5" />
+                      Review details
                     </Button>
                   </div>
                 </CardHeader>
@@ -191,6 +234,109 @@ export default function PendingAgentsPage(): React.JSX.Element {
             </div>
           </div>
         )}
+
+        {/* Agent detail modal for approvals */}
+        <Dialog open={isDetailOpen} onOpenChange={open => (open ? setIsDetailOpen(true) : closeAgentDetails())}>
+          <DialogContent className="w-full max-w-[1200px] max-h-[90vh]">
+            {/* Visually hidden title to satisfy accessibility requirements */}
+            <DialogHeader>
+              <DialogTitle className="sr-only">Review agent for publication</DialogTitle>
+            </DialogHeader>
+
+            {selectedAgent && selectedAgentFormData && (
+              <div className="flex flex-col md:flex-row gap-4 h-[75vh] mt-2">
+                {/* Main read-only editor */}
+                <div className="flex-1 min-w-0 border border-border/60 rounded-lg bg-background/80">
+                  <div className="h-full overflow-auto px-4">
+                    <AgentDocumentEditor
+                      value={selectedAgentFormData}
+                      onChange={() => {
+                        // no-op in read-only mode
+                      }}
+                      onFieldChange={() => {
+                        // no-op in read-only mode
+                      }}
+                      starshipId={selectedAgent.starshipId}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                {/* Right aside with meta & actions */}
+                <aside className="w-full md:w-80 shrink-0 space-y-4 border border-border/60 rounded-lg bg-muted/40 p-3">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="text-[11px]">
+                        {selectedAgent.publicationStatus}
+                      </Badge>
+                      {selectedAgent.publicationRequestedVersion && (
+                        <Badge variant="outline" className="text-[11px]">
+                          requested v{selectedAgent.publicationRequestedVersion}
+                        </Badge>
+                      )}
+                      {selectedAgent.publicationVersionBump && (
+                        <Badge variant="outline" className="text-[11px] capitalize">
+                          {selectedAgent.publicationVersionBump} bump
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Request info</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Icon name="user" className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Requested by</span>
+                      </div>
+                      <p className="font-mono break-all ml-5">{selectedAgent.publicationRequestedBy || 'Unknown'}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Last updated</span>
+                      </div>
+                      <p className="font-mono ml-5">{selectedAgent.updatedAt ? new Date(selectedAgent.updatedAt as string).toLocaleString() : 'Unknown'}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Changelog</p>
+                    <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                      {selectedAgent.publicationChangelog || 'No changelog was provided for this request.'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Agent ID</p>
+                    <div className="flex items-center gap-2">
+                      <Icon name="file-code" className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-mono break-all">{selectedAgent.id}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 space-y-2">
+                    <Button variant="outline" className="w-full" onClick={closeAgentDetails} disabled={approveMutation.isPending || rejectMutation.isPending}>
+                      Close
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                      onClick={handleRejectSelected}
+                      disabled={approveMutation.isPending || rejectMutation.isPending || !selectedAgent}
+                    >
+                      <Icon name="x-circle" className="h-4 w-4 mr-1.5" />
+                      Reject
+                    </Button>
+                    <Button className="w-full" onClick={handleApproveSelected} disabled={approveMutation.isPending || rejectMutation.isPending || !selectedAgent}>
+                      <Icon name="check-circle" className="h-4 w-4 mr-1.5" />
+                      Approve & publish
+                    </Button>
+                  </div>
+                </aside>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </PageLayout>
   )

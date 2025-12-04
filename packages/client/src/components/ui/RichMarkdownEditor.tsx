@@ -39,9 +39,18 @@ type RichMarkdownEditorProps = {
   className?: string
   minHeightPx?: number
   noMinHeight?: boolean
+  readOnly?: boolean
 }
 
-export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with Markdown…', className, minHeightPx = 200, noMinHeight = false }: RichMarkdownEditorProps) {
+export function RichMarkdownEditor({
+  value,
+  onChange,
+  placeholder = 'Write with Markdown…',
+  className,
+  minHeightPx = 200,
+  noMinHeight = false,
+  readOnly = false,
+}: RichMarkdownEditorProps) {
   const suppressUpdateRef = useRef<boolean>(true)
   const editor = useEditor({
     extensions: [
@@ -59,6 +68,7 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
       }),
     ],
     content: value || '',
+    editable: !readOnly,
     immediatelyRender: false,
     editorProps: {
       attributes: {
@@ -97,9 +107,12 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
 
   if (!editor) return null
 
+  const showMenus = !readOnly
+
   return (
     <div className={cn('bg-transparent rounded-none border-none px-0', className)}>
-      <BubbleMenu editor={editor}>
+      {showMenus && (
+        <BubbleMenu editor={editor}>
         <div className="flex items-center gap-1 rounded-md bg-popover border border-border p-1 shadow-sm">
           <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={cn(editor.isActive('bold') && 'bg-muted')}>
             B
@@ -124,8 +137,10 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
             [ ]
           </Button>
         </div>
-      </BubbleMenu>
-      <FloatingMenu editor={editor} shouldShow={({ editor }: any) => editor.isActive('paragraph') || editor.isActive('heading')}>
+        </BubbleMenu>
+      )}
+      {showMenus && (
+        <FloatingMenu editor={editor} shouldShow={({ editor }: any) => editor.isActive('paragraph') || editor.isActive('heading')}>
         <div className="flex items-center gap-1 rounded-md bg-popover border border-border p-1 shadow-sm">
           <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().setParagraph().run()} className={cn(editor.isActive('paragraph') && 'bg-muted')}>
             P
@@ -175,7 +190,8 @@ export function RichMarkdownEditor({ value, onChange, placeholder = 'Write with 
             Redo
           </Button>
         </div>
-      </FloatingMenu>
+        </FloatingMenu>
+      )}
       <EditorContent editor={editor} className={cn('px-0 py-2 text-sm leading-relaxed')} style={noMinHeight ? undefined : { minHeight: `${minHeightPx}px` }} />
     </div>
   )

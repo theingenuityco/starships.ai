@@ -38,9 +38,15 @@ interface AgentDocumentEditorProps {
   onSave?: () => void
   onCancel?: () => void
   starshipId?: string
+  /**
+   * When true, renders the editor in read-only/inspection mode:
+   * - All form controls are disabled
+   * - No mutations or publish/update actions are triggered
+   */
+  readOnly?: boolean
 }
 
-export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false }: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
   const queryClient = useQueryClient()
 
@@ -148,6 +154,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Toggle tool assignment with optimistic UI and server persistence when possible
   const handleToggleTool = async (slug: string, isSelected: boolean) => {
+    if (readOnly) return
     // Prevent tool changes for template agents
     if (isTemplateAgent) {
       toast.error('Cannot modify tools', { description: 'Template agents are read-only. Use the update button to sync with the latest template version.' })
@@ -167,6 +174,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   }
 
   const handleUpdateFromTemplate = async () => {
+    if (readOnly) return
     if (!agentId) return
 
     try {
@@ -201,6 +209,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const nextVersion = useMemo(() => computeNextVersion(fullAgent?.version, versionBump), [fullAgent?.version, versionBump])
 
   const handleRequestPublication = async () => {
+    if (readOnly) return
     if (!agentId) return
     if (!fullAgent) return
 
@@ -340,12 +349,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
   const canRequestPublication =
-    !!agentId && !isTemplateAgent && (publicationStatus === 'draft' || publicationStatus === 'rejected')
+    !!agentId && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected')
 
   return (
     <div className="space-y-4 pt-14 pb-28">
       {/* Template Agent Update Banner */}
-      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && (
+      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -416,7 +425,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       )}
 
       {/* Update Confirmation Dialog */}
-      <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+      <Dialog open={showUpdateDialog && !readOnly} onOpenChange={setShowUpdateDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Agent</DialogTitle>
@@ -469,7 +478,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 placeholder="Untitled Agent"
                 value={value.name}
                 onChange={e => handleNameChange(e.target.value)}
-                disabled={isTemplateAgent}
+                disabled={isTemplateAgent || readOnly}
               />
               {isTemplateAgent && fullAgent?.version && <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>}
             </div>
@@ -518,7 +527,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Publication Request Dialog */}
-      <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+      <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Request Publication</DialogTitle>
@@ -741,8 +750,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className={cn(isTemplateAgent && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-            <RichMarkdownEditor value={value.description} onChange={val => onFieldChange?.('description', val)} placeholder="Write a clear description. Markdown supported." noMinHeight />
+          <div className={cn((isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+            <RichMarkdownEditor
+              value={value.description}
+              onChange={val => onFieldChange?.('description', val)}
+              placeholder="Write a clear description. Markdown supported."
+              noMinHeight
+              readOnly={readOnly}
+            />
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -753,12 +768,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className={cn(isTemplateAgent && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+          <div className={cn((isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
             <RichMarkdownEditor
               value={value.systemPrompt}
               onChange={val => onFieldChange?.('systemPrompt', val)}
               placeholder="Define the agent's character, mission, and behavior..."
               minHeightPx={200}
+              readOnly={readOnly}
             />
           </div>
         </CollapsibleContent>
@@ -775,7 +791,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
               value={(value.previewPrompts || []).join('\n')}
-              disabled={isTemplateAgent}
+              disabled={isTemplateAgent || readOnly}
               onChange={e => {
                 const lines = e.target.value
                   .split('\n')

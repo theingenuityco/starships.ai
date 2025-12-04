@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useSimpleError } from './useSimpleError'
 import { isValidRedirectUrl } from '@/lib/utils'
 
-export type AuthMethod = 'password' | 'google' | 'github';
+export type AuthMethod = 'password' | 'google' | 'github'
 
 export interface AuthUser {
   id: string
@@ -16,6 +16,12 @@ export interface AuthUser {
   hasPassword: boolean
   authMethods: AuthMethod[]
   primaryAuthMethod: 'password' | 'oauth'
+  /**
+   * Instance-level admin flag from backend.
+   * When true, user can access instance admin views (e.g. publish approvals).
+   * Optional for backward compatibility with older tokens.
+   */
+  isInstanceAdmin?: boolean
 }
 
 interface AuthLoginResponse {
@@ -213,7 +219,6 @@ export function useRegister() {
 
       const data = await response.json()
 
-
       if (!response.ok || !data.data) {
         throw new Error(data.error?.message || 'Registration failed')
       }
@@ -323,7 +328,7 @@ export function useOAuthLogin() {
 // Resend verification mutation
 export function useResendVerification() {
   const { handleError } = useSimpleError()
-  
+
   return useMutation({
     mutationFn: async (email: string) => {
       const response = await fetch('/api/v1/auth/resend-verification', {
@@ -380,7 +385,7 @@ export function useForgotPassword() {
 export function useResetPassword(options?: { onSuccess?: (data: any) => void; onError?: (error: any) => void }) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
       const response = await fetch('/api/v1/auth/reset-password', {
@@ -395,12 +400,12 @@ export function useResetPassword(options?: { onSuccess?: (data: any) => void; on
       }
       return result.data
     },
-    onSuccess: (data) => {
+    onSuccess: data => {
       // SECURITY: Clear authentication state after password reset
       setStoredToken(null)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
       queryClient.clear()
-      
+
       // Don't show toast here - let the login page handle the success message via URL param
       router.push('/login?reset=success')
       options?.onSuccess?.(data)
@@ -523,14 +528,17 @@ export function useAuth() {
   )
 
   // OAuth login function - SECURE code exchange
-  const oauthLogin = useCallback(async (authCode: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      await oauthLoginMutation.mutateAsync({ authCode })
-      return { success: true }
-    } catch (error: any) {
-      return { success: false, error: error.message || 'OAuth login failed' }
-    }
-  }, [oauthLoginMutation])
+  const oauthLogin = useCallback(
+    async (authCode: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        await oauthLoginMutation.mutateAsync({ authCode })
+        return { success: true }
+      } catch (error: any) {
+        return { success: false, error: error.message || 'OAuth login failed' }
+      }
+    },
+    [oauthLoginMutation]
+  )
 
   // Logout function
   const logout = useCallback(async () => {
@@ -548,9 +556,9 @@ export function useAuth() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ newPassword, confirmPassword })
+          body: JSON.stringify({ newPassword, confirmPassword }),
         })
 
         if (!response.ok) {
@@ -607,6 +615,9 @@ export function useAuth() {
     authMethods: user?.authMethods || [],
     primaryAuthMethod: user?.primaryAuthMethod || 'password',
     isOAuthOnly: user?.hasPassword === false && user?.authMethods?.some(m => ['google', 'github'].includes(m)),
+
+    // Instance admin capabilities
+    isInstanceAdmin: !!user?.isInstanceAdmin,
 
     // Compatibility properties for existing components
     userId: syncedUser?.id || user?.id,

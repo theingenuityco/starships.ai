@@ -32,7 +32,7 @@ export function Navigation(props: NavigationProps) {
   const { isMobile = false, isOpen = true, onClose } = props
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, user, userName } = useAuth()
+  const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
@@ -222,8 +222,31 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
       { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && isInstanceAdmin
+        ? [
+            {
+              href: '/admin/agents/pending',
+              label: 'Admin',
+              icon: 'shield-check',
+              isActive: pathname.startsWith('/admin/agents'),
+            } as const,
+          ]
+        : []),
     ],
-    [isAuthenticated, starshipSlug, isOverviewRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, pathname, isConnectorsRoute, handleNewConversation, starshipData?.id]
+    [
+      isAuthenticated,
+      starshipSlug,
+      isOverviewRoute,
+      isAgentsRoute,
+      isAgentBuilderRoute,
+      isToolsRoute,
+      isToolBuilderRoute,
+      pathname,
+      isConnectorsRoute,
+      handleNewConversation,
+      starshipData?.id,
+      isInstanceAdmin,
+    ]
   )
 
   const handleSidebarBackgroundClick = useCallback(

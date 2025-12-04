@@ -6,6 +6,14 @@ import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
 import { compareVersions } from '@/utils/version';
+import {
+  DEFAULT_AGENT_MAX_TOKENS,
+  DEFAULT_AGENT_TIMEOUT_MS,
+  MAX_AGENT_MAX_TOKENS,
+  MAX_AGENT_TIMEOUT_MS,
+  MIN_AGENT_MAX_TOKENS,
+  MIN_AGENT_TIMEOUT_MS,
+} from '@/constants/agentDefaults';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
@@ -35,10 +43,9 @@ export class AgentRepository extends BaseRepository {
         // If agent has a source template, fetch it and populate updateInfo
         if (agent.sourceTemplateId) {
           const connection = this.getConnection();
-          const templateResult = await connection.queryOne<Record<string, unknown>>(
-            'SELECT * FROM agent_templates WHERE id = $1',
-            [agent.sourceTemplateId]
-          );
+          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE id = $1', [
+            agent.sourceTemplateId,
+          ]);
 
           if (templateResult) {
             const template = fromDatabase(AgentTemplateEntity, templateResult);
@@ -70,7 +77,7 @@ export class AgentRepository extends BaseRepository {
         const agents = fromDatabaseArray(AgentEntity, result);
 
         // Collect unique source template IDs
-        const templateIds = [...new Set(agents.filter(a => a.sourceTemplateId).map(a => a.sourceTemplateId))];
+        const templateIds = [...new Set(agents.filter((a) => a.sourceTemplateId).map((a) => a.sourceTemplateId))];
 
         // If there are templates, fetch them in a single query
         if (templateIds.length > 0) {
@@ -168,25 +175,49 @@ export class AgentRepository extends BaseRepository {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { assignedToolSlugs: _, ...dataWithoutToolSlugs } = data;
 
-        // Validate using cleaned data and include starshipId which is required on create
-        await AgentEntity.validate({ ...dataWithoutToolSlugs, starshipId }, 'create');
+        // Normalize numeric fields to sensible, safe defaults before validation
+        const normalizedData: CreateAgentRequest = { ...dataWithoutToolSlugs };
+
+        const hasValidNumber = (value: unknown): value is number =>
+          typeof value === 'number' && !Number.isNaN(value) && Number.isFinite(value);
+
+        // Temperature: clamped by zod/class-validator; defaulting handled at higher layers.
+
+        // maxTokens: clamp to configured bounds, default to shared default if missing/invalid
+        if (hasValidNumber(normalizedData.maxTokens)) {
+          normalizedData.maxTokens = Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, normalizedData.maxTokens));
+        } else {
+          normalizedData.maxTokens = DEFAULT_AGENT_MAX_TOKENS;
+        }
+
+        // timeout (ms): clamp to configured bounds, default to shared default if missing/invalid
+        if (hasValidNumber(normalizedData.timeout)) {
+          normalizedData.timeout = Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, normalizedData.timeout));
+        } else {
+          normalizedData.timeout = DEFAULT_AGENT_TIMEOUT_MS;
+        }
+
+        // Validate using normalized data and include starshipId which is required on create
+        await AgentEntity.validate({ ...normalizedData, starshipId }, 'create');
 
         const now = new Date().toISOString();
 
         // Create agent properties for PostgreSQL
         const agentProps: Omit<AgentModel, 'id'> & { deployedAt: string } = {
           // Core AgentParams fields
-          name: data.name,
-          slug: data.slug || (await generateUniqueAgentSlug((data.name || 'agent').toLowerCase().replace(/\s+/g, '-'), this)), // Ensure non-empty slug
-          description: data.description,
-          model: data.model,
-          temperature: data.temperature,
-          maxTokens: data.maxTokens,
-          timeout: data.timeout,
-          systemPrompt: data.systemPrompt,
-          state: data.state,
-          blueprint: data.blueprint,
-          previewPrompts: data.previewPrompts,
+          name: normalizedData.name,
+          slug:
+            normalizedData.slug ||
+            (await generateUniqueAgentSlug((normalizedData.name || 'agent').toLowerCase().replace(/\s+/g, '-'), this)), // Ensure non-empty slug
+          description: normalizedData.description,
+          model: normalizedData.model,
+          temperature: normalizedData.temperature,
+          maxTokens: normalizedData.maxTokens,
+          timeout: normalizedData.timeout,
+          systemPrompt: normalizedData.systemPrompt,
+          state: normalizedData.state,
+          blueprint: normalizedData.blueprint,
+          previewPrompts: normalizedData.previewPrompts,
 
           // Versioning fields
           version: data.version || '1.0.0',

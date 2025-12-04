@@ -8,7 +8,16 @@
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
 import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, AgentTemplateRepository, StarshipRepository } from '@starships/models';
+import {
+  AgentRepository,
+  AgentTemplateRepository,
+  StarshipRepository,
+  DEFAULT_AGENT_TIMEOUT_MS,
+  MAX_AGENT_MAX_TOKENS,
+  MAX_AGENT_TIMEOUT_MS,
+  MIN_AGENT_MAX_TOKENS,
+  MIN_AGENT_TIMEOUT_MS,
+} from '@starships/models';
 import { generateUniqueAgentSlug } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
@@ -123,7 +132,7 @@ export class AgentService {
       model: data.model,
       temperature: data.temperature,
       maxTokens: data.maxTokens,
-      timeout: data.timeout || 30000,
+      timeout: data.timeout || DEFAULT_AGENT_TIMEOUT_MS,
       systemPrompt: data.systemPrompt,
       state: data.state, // Let Agent class handle state initialization
       blueprint: data.blueprint, // This will be null/undefined to trigger default blueprint generation
@@ -143,7 +152,7 @@ export class AgentService {
       model: data.model,
       temperature: data.temperature,
       maxTokens: data.maxTokens,
-      timeout: data.timeout || 30000,
+      timeout: data.timeout || DEFAULT_AGENT_TIMEOUT_MS,
       blueprint: generatedBlueprint, // Use the blueprint from Agent class (default or provided)
       systemPrompt: data.systemPrompt,
       state: agentState, // Use provided state or default initialization
@@ -910,6 +919,17 @@ export class AgentService {
     const nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
 
     // 2. Determine target template (publishedTemplateId or new template)
+    //    and sanitize numeric fields to satisfy template validation constraints.
+    const safeTemperature = typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : undefined;
+    const safeMaxTokens =
+      typeof agent.maxTokens === 'number' && !Number.isNaN(agent.maxTokens)
+        ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, agent.maxTokens))
+        : undefined;
+    const safeTimeout =
+      typeof agent.timeout === 'number' && !Number.isNaN(agent.timeout)
+        ? Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, agent.timeout))
+        : DEFAULT_AGENT_TIMEOUT_MS;
+
     const templateRepo = new AgentTemplateRepository();
     let targetTemplateId = agent.publishedTemplateId;
 
@@ -929,9 +949,9 @@ export class AgentService {
         description: agent.description,
         category: 'general',
         model: agent.model,
-        temperature: agent.temperature,
-        maxTokens: agent.maxTokens,
-        timeout: agent.timeout,
+        temperature: safeTemperature,
+        maxTokens: safeMaxTokens,
+        timeout: safeTimeout,
         systemPrompt: agent.systemPrompt,
         state: agent.state!,
         blueprint: agent.blueprint!,
@@ -949,9 +969,9 @@ export class AgentService {
         name: agent.name,
         description: agent.description,
         model: agent.model,
-        temperature: agent.temperature,
-        maxTokens: agent.maxTokens,
-        timeout: agent.timeout,
+        temperature: safeTemperature,
+        maxTokens: safeMaxTokens,
+        timeout: safeTimeout,
         systemPrompt: agent.systemPrompt,
         state: agent.state,
         blueprint: agent.blueprint,

@@ -22,6 +22,7 @@ import {
   validate,
   ValidationError,
 } from 'class-validator';
+import { DEFAULT_AGENT_TIMEOUT_MS } from '@/constants/agentDefaults';
 
 /**
  * Custom transformers for the AgentTemplateEntity
@@ -177,7 +178,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
         model: dataRecord.model || '',
         temperature: dataRecord.temperature,
         maxTokens: dataRecord.maxTokens,
-        timeout: dataRecord.timeout ?? 30000,
+        timeout: dataRecord.timeout ?? DEFAULT_AGENT_TIMEOUT_MS,
         systemPrompt: dataRecord.systemPrompt,
         state: dataRecord.state || { messages: [], tools: [] },
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },

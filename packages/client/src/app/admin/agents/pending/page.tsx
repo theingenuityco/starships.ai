@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useAuth } from '@/hooks/useAuth'
 import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication, type PendingAgentSummary } from '@/hooks/useAdminAgents'
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
@@ -380,11 +381,39 @@ export default function PendingAgentsPage(): React.JSX.Element {
                           starshipName={selectedAgent.requestedByStarship?.name}
                           starshipSlug={selectedAgent.requestedByStarship?.slug}
                         />
-                        <div className="flex items-start gap-2">
-                          <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-                          <div>
-                            <p className="text-muted-foreground">Last updated</p>
-                            <p className="font-mono text-[11px]">{selectedAgent.agent.updatedAt ? new Date(selectedAgent.agent.updatedAt as string).toLocaleString() : 'Unknown'}</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="flex items-center gap-1 text-[11px] px-2 py-0.5">
+                            <Icon name="clock" className="h-3 w-3" />
+                            <span>Last updated</span>
+                            <span className="font-mono">{selectedAgent.agent.updatedAt ? new Date(selectedAgent.agent.updatedAt as string).toLocaleString() : 'Unknown'}</span>
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Agent</p>
+                      <div className="space-y-2">
+                        {/* Identity row */}
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative">
+                            <AgentAvatar seed={selectedAgent.agent.name} size={32} rounded className="h-8 w-8 rounded-md overflow-hidden ring-1 ring-border/40 shadow-sm bg-background/80" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-semibold truncate">{selectedAgent.agent.name}</span>
+                            <span className="text-[11px] text-muted-foreground font-mono truncate">{selectedAgent.agent.slug || selectedAgent.agent.id}</span>
+                          </div>
+                        </div>
+
+                        {/* Meta container styled like versions block */}
+                        <div className="rounded-md border border-border/70 bg-background/70 p-2 space-y-2 text-[11px] font-mono">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Agent ID</span>
+                            <span className="break-all text-right">{selectedAgent.agent.id}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Model</span>
+                            <span className="truncate">{selectedAgent.agent.model}</span>
                           </div>
                         </div>
                       </div>
@@ -394,14 +423,6 @@ export default function PendingAgentsPage(): React.JSX.Element {
                       <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Changelog</p>
                       <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
                         {selectedAgent.agent.publicationChangelog || 'No changelog was provided for this request.'}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Agent ID</p>
-                      <div className="flex items-center gap-2">
-                        <Icon name="file-code" className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-mono break-all">{selectedAgent.agent.id}</span>
                       </div>
                     </div>
                   </div>

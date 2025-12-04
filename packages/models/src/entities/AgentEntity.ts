@@ -9,7 +9,20 @@ import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError, IsArray, IsIn } from 'class-validator';
+import {
+  IsISO8601,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+  validate,
+  ValidationError,
+  IsArray,
+  IsIn,
+} from 'class-validator';
 
 export class AgentEntity implements AgentModel {
   // Core database fields
@@ -184,6 +197,8 @@ export class AgentEntity implements AgentModel {
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         version: dataRecord.version || '1.0.0',
         templateSnapshotAt: dataRecord.templateSnapshotAt,
+        // Publication workflow default for creates
+        publicationStatus: dataRecord.publicationStatus || 'draft',
         ...dataRecord,
       });
     } else {

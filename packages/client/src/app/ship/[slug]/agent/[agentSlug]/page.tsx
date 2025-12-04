@@ -869,7 +869,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             </div>
           </div>
 
-          <div className="relative w-full rounded-2xl bg-background/80 shadow-sm overflow-hidden min-h-[600px] mb-16">
+          <div className="relative w-full rounded-2xl bg-background/80 shadow-sm min-h-[600px] mb-16">
             <AgentCreatedModal
               open={deferredAgentCreate.isOpen}
               names={deferredAgentCreate.createdNames}

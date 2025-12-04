@@ -151,6 +151,12 @@ export class UserEntity implements UserModel {
   })
   stripeCustomerId?: string;
 
+  // Instance-level admin flag
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  isInstanceAdmin?: boolean;
+
   // Authentication method tracking
   @Expose()
   @IsBoolean()

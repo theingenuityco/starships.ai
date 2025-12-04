@@ -25,6 +25,13 @@ export interface AuthUser {
   hasPassword: boolean;
   authMethods: AuthMethod[];
   primaryAuthMethod: 'password' | 'oauth';
+
+  /**
+   * Instance-level admin flag.
+   * When true, the user is treated as a global/instance admin with elevated access.
+   * This is optional to preserve backward compatibility for existing tokens/clients.
+   */
+  isInstanceAdmin?: boolean;
 }
 
 // ============================================================================

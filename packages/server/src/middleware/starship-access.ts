@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { StarshipRepository } from '@starships/models';
 import { logger } from '@/utils/logger';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 
 export interface StarshipRequest extends Request {
   starship?: any;
@@ -30,7 +31,7 @@ export async function checkStarshipAccess(req: StarshipRequest, res: Response, n
       return;
     }
 
-    if (starship.ownerId !== userId) {
+    if (starship.ownerId !== userId && !isInstanceAdmin(req.user as any)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }

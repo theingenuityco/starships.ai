@@ -1,6 +1,6 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, getConnection, StarshipRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, getConnection, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
 import { StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
@@ -27,10 +27,12 @@ export interface StarshipWithDetails extends StarshipModel {
 export class StarshipService {
   private starshipRepository: StarshipRepository;
   private agentRepository: AgentRepository;
+  private userRepository: UserRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
+    this.userRepository = new UserRepository();
   }
 
   /**
@@ -233,13 +235,17 @@ export class StarshipService {
    */
   async hasAccess(userId: string, starshipId: string): Promise<boolean> {
     try {
-      const starship = await this.starshipRepository.findById(starshipId);
-      if (!starship) {
+      const [starship, user] = await Promise.all([
+        this.starshipRepository.findById(starshipId),
+        this.userRepository.findById(userId),
+      ]);
+
+      if (!starship || !user) {
         return false;
       }
 
-      // Check if user is the owner
-      if (starship.ownerId === userId) {
+      // Check if user is the owner or instance admin
+      if (starship.ownerId === userId || (user as any).isInstanceAdmin) {
         return true;
       }
 

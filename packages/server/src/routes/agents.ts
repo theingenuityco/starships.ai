@@ -9,6 +9,7 @@ import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentModel } from '@starships/protocol';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { StarshipService } from '@/services/StarshipService';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 
 const router: Router = Router();
 
@@ -37,7 +38,7 @@ const CreateAgentSchema = z.object({
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
-  templateId: z.string().min(1).optional(),
+  sourceTemplateId: z.string().min(1).optional(),
   starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
@@ -52,7 +53,7 @@ const UpdateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  templateId: z.string().min(1).optional(),
+  sourceTemplateId: z.string().min(1).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
   starshipId: z.string().min(1, 'Starship ID is required').optional(),
 });
@@ -372,6 +373,37 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
   }
 });
 
+// POST /agents/:id/publish-request - Request publication (owner or instance admin)
+router.post('/agents/:id/publish-request', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    // Ensure caller owns the agent's starship or is instance admin
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const updated = await agentService.requestPublication(agentId, userId);
+    sendSuccess(res, {
+      message: 'Publication requested successfully',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error requesting agent publication:', error);
+    handleError(error, res, 'requesting agent publication');
+  }
+});
+
 // PUT /agents/:id - Update agent (OpenAPI pattern)
 router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -505,6 +537,85 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
   } catch (error) {
     console.error('[AGENTS] Error testing agent:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to test agent');
+  }
+});
+
+// ============================================================================
+// ADMIN PUBLICATION APPROVAL ROUTES (INSTANCE ADMIN ONLY)
+// ============================================================================
+
+// GET /admin/agents/pending - List agents pending approval
+router.get('/admin/agents/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending agents', 403);
+      return;
+    }
+
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
+
+    const agentService = new AgentService();
+    const result = await agentService.getPendingAgents(queryValidation.page, queryValidation.limit);
+
+    sendSuccess(res, result.agents, 200, { pagination: result.pagination });
+  } catch (error) {
+    console.error('[AGENTS] Error loading pending agents:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load pending agents');
+  }
+});
+
+// POST /admin/agents/:id/approve - Approve pending agent publication
+router.post('/admin/agents/:id/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can approve agents', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.approvePublication(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Agent publication approved',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error approving agent publication:', error);
+    handleError(error, res, 'approving agent publication');
+  }
+});
+
+// POST /admin/agents/:id/reject - Reject pending agent publication
+router.post('/admin/agents/:id/reject', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can reject agents', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.rejectPublication(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Agent publication rejected',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error rejecting agent publication:', error);
+    handleError(error, res, 'rejecting agent publication');
   }
 });
 

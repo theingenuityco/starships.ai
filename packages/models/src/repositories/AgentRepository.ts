@@ -32,12 +32,12 @@ export class AgentRepository extends BaseRepository {
 
         const agent = fromDatabase(AgentEntity, result);
 
-        // If agent has a template, fetch it and populate updateInfo
-        if (agent.templateId) {
+        // If agent has a source template, fetch it and populate updateInfo
+        if (agent.sourceTemplateId) {
           const connection = this.getConnection();
           const templateResult = await connection.queryOne<Record<string, unknown>>(
             'SELECT * FROM agent_templates WHERE id = $1',
-            [agent.templateId]
+            [agent.sourceTemplateId]
           );
 
           if (templateResult) {
@@ -69,8 +69,8 @@ export class AgentRepository extends BaseRepository {
         );
         const agents = fromDatabaseArray(AgentEntity, result);
 
-        // Collect unique template IDs
-        const templateIds = [...new Set(agents.filter(a => a.templateId).map(a => a.templateId))];
+        // Collect unique source template IDs
+        const templateIds = [...new Set(agents.filter(a => a.sourceTemplateId).map(a => a.sourceTemplateId))];
 
         // If there are templates, fetch them in a single query
         if (templateIds.length > 0) {
@@ -87,10 +87,10 @@ export class AgentRepository extends BaseRepository {
             templateMap.set(templateModel.id, templateModel);
           }
 
-          // Populate updateInfo for each agent with a template
+          // Populate updateInfo for each agent with a source template
           for (const agent of agents) {
-            if (agent.templateId) {
-              const template = templateMap.get(agent.templateId);
+            if (agent.sourceTemplateId) {
+              const template = templateMap.get(agent.sourceTemplateId);
               if (template) {
                 const comparison = compareVersions(agent.version, template.version);
                 agent.updateInfo = {
@@ -191,6 +191,12 @@ export class AgentRepository extends BaseRepository {
           // Versioning fields
           version: data.version || '1.0.0',
           templateSnapshotAt: data.templateSnapshotAt,
+
+          // Publication workflow defaults
+          publicationStatus: 'draft',
+          publicationRequestedBy: undefined,
+          publicationApprovedBy: undefined,
+          publicationApprovedAt: undefined,
 
           // PostgreSQL specific fields
           starshipId: starshipId, // Direct foreign key
@@ -348,16 +354,16 @@ export class AgentRepository extends BaseRepository {
           blueprint: customizations?.blueprint || template.blueprint,
           previewPrompts: customizations?.previewPrompts || template.previewPrompts,
           assignedToolSlugs: customizations?.assignedToolSlugs,
-          templateId,
+          sourceTemplateId: template.id,
           version: template.version, // Copy template version
           templateSnapshotAt: now, // Capture snapshot time
         };
 
-        // Create agent with template_id foreign key
+        // Create agent with source_template_id foreign key
         const agentProps = {
           ...agentData,
           starshipId: starshipId,
-          templateId: templateId, // Set template_id foreign key
+          sourceTemplateId: template.id, // Set source_template_id foreign key
           deployedAt: now,
           createdAt: now,
           updatedAt: now,
@@ -387,7 +393,7 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.queryOne<Record<string, unknown>>(
           `SELECT at.* FROM agent_templates at
-           INNER JOIN agents a ON a.template_id = at.id
+           INNER JOIN agents a ON a.source_template_id = at.id
            WHERE a.id = $1`,
           [agentId]
         );
@@ -529,15 +535,15 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('Agent', agentId);
         }
 
-        if (!agent.templateId) {
+        if (!agent.sourceTemplateId) {
           throw new Error('Agent is not linked to a template');
         }
 
         const templateRepo = new AgentTemplateRepository();
-        const template = await templateRepo.findById(agent.templateId);
+        const template = await templateRepo.findById(agent.sourceTemplateId);
 
         if (!template) {
-          this.handleNotFound('AgentTemplate', agent.templateId);
+          this.handleNotFound('AgentTemplate', agent.sourceTemplateId);
         }
 
         // Copy current template data to agent

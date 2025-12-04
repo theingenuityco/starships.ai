@@ -9,7 +9,7 @@ import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError, IsArray } from 'class-validator';
+import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError, IsArray, IsIn } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
   // Core database fields
@@ -36,7 +36,7 @@ export class AgentEntity implements AgentModel {
   @IsOptional()
   @IsString()
   @Length(1, 255)
-  templateId?: string;
+  sourceTemplateId?: string;
 
   // Core AgentParams fields
   @Expose()
@@ -113,6 +113,36 @@ export class AgentEntity implements AgentModel {
   @IsISO8601()
   templateSnapshotAt?: string; // When agent last synced with template
 
+  // Publication workflow fields
+  @Expose()
+  @IsString()
+  @IsIn(['draft', 'pending_approval', 'published', 'rejected'])
+  publicationStatus!: 'draft' | 'pending_approval' | 'published' | 'rejected';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publicationRequestedBy?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publicationApprovedBy?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  publicationApprovedAt?: string;
+
+  // Published template linkage (Agent → Template)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publishedTemplateId?: string;
+
   // Update availability info (computed at runtime, not stored in DB)
   @Expose()
   @IsOptional()
@@ -142,7 +172,7 @@ export class AgentEntity implements AgentModel {
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         // Require starshipId for creation
         starshipId: (dataRecord.starshipId as string) || '',
-        templateId: dataRecord.templateId,
+        sourceTemplateId: dataRecord.sourceTemplateId,
         name: dataRecord.name || '',
         description: dataRecord.description,
         model: dataRecord.model || '',

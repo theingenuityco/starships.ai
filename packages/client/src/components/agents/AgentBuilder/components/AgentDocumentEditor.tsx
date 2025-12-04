@@ -8,17 +8,13 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { Input } from '@/components/ui/input'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
-import { ModelSelector } from './ModelSelector'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { AGENT_CATEGORIES } from '../constants'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { StandardSelect } from './StandardSelect'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
@@ -580,47 +576,27 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild disabled={isTemplateAgent || readOnly}>
-                <div
-                  role="button"
-                  aria-label="Change category"
-                  className={cn(
-                    'flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20',
-                    isTemplateAgent || readOnly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm'
-                  )}
-                >
-                  <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
-                    {getCategoryIcon(value.category)}
-                    <span className="capitalize">{value.category}</span>
-                  </Badge>
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
-                <div className="flex flex-col gap-0">
-                  {AGENT_CATEGORIES.map(cat => {
-                    const isSelected = value.category === cat
-                    return (
-                      <DropdownMenuItem key={cat} className="px-1.5 py-0.5 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
-                        <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
-                          {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'm-0 inline-flex w-auto max-w-max items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
-                              isSelected ? getCategoryColor(cat) : 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
-                            )}
-                          >
-                            {getCategoryIcon(cat)}
-                            <span className="capitalize">{cat}</span>
-                          </Badge>
-                        </div>
-                      </DropdownMenuItem>
-                    )
-                  })}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <StandardSelect
+              mode="single"
+              aria-label="Change category"
+              disabled={isTemplateAgent || readOnly}
+              value={value.category}
+              options={AGENT_CATEGORIES.map(cat => ({
+                value: cat,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <span className={cn('h-2 w-2 rounded-full', getCategoryColor(cat as any))} />
+                    <span className="capitalize">{cat}</span>
+                  </span>
+                ),
+                keywords: cat,
+              }))}
+              placeholder="Select a category"
+              triggerClassName={cn('min-w-[160px]', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
+              onChange={cat => {
+                onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
+              }}
+            />
           </div>
         </div>
 
@@ -631,18 +607,26 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
-            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels || isTemplateAgent || readOnly}>
-              <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
-                <SelectValue placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'} />
-              </SelectTrigger>
-              <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-                {availableModels.map(m => (
-                  <SelectItem key={m} value={m} className="text-xs px-2 py-1">
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StandardSelect
+              mode="single"
+              aria-label="Select model"
+              disabled={isLoadingModels || isTemplateAgent || readOnly}
+              value={value.model}
+              options={availableModels.map(m => ({
+                value: m,
+                label: <span className="font-mono text-xs">{m}</span>,
+                keywords: m,
+              }))}
+              placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
+              searchPlaceholder="Search models..."
+              emptyLabel={isLoadingModels ? 'Loading models…' : 'No models found.'}
+              triggerClassName="h-7 w-[220px]"
+              onChange={m => {
+                if (typeof m === 'string') {
+                  onFieldChange?.('model', m)
+                }
+              }}
+            />
           </div>
         </div>
 
@@ -670,65 +654,28 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   )}
                 </div>
               ) : (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <div
-                      role="button"
-                      aria-label="Select tools"
-                      className="flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20 cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
-                    >
-                      {selectedToolSlugs.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">Select tools</span>
-                      ) : (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {selectedToolSlugs.map(slug => (
-                            <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
-                              <Icon name="wrench" />
-                              <span className="font-mono truncate max-w-[140px]">{slug}</span>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                      <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-[420px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-                    <Command className="bg-transparent">
-                      <CommandInput placeholder="Search tools..." />
-                      <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
-                      <CommandList>
-                        <CommandGroup>
-                          {allToolOptions.map(slug => {
-                            const isSelected = selectedToolSlugs.includes(slug)
-                            return (
-                              <CommandItem
-                                key={slug}
-                                onSelect={() => {
-                                  void handleToggleTool(slug, isSelected)
-                                }}
-                                className="text-xs px-2 py-1"
-                              >
-                                <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
-                                  {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      'm-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
-                                      !isSelected && 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
-                                    )}
-                                  >
-                                    <Icon name="wrench" />
-                                    <span className="font-mono">{slug}</span>
-                                  </Badge>
-                                </div>
-                              </CommandItem>
-                            )
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <StandardSelect
+                  mode="multiple"
+                  aria-label="Select tools"
+                  value={selectedToolSlugs}
+                  options={allToolOptions.map(slug => ({
+                    value: slug,
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <Icon name="wrench" className="w-3 h-3" />
+                        <span className="font-mono text-xs">{slug}</span>
+                      </span>
+                    ),
+                    keywords: slug,
+                  }))}
+                  placeholder="Select tools"
+                  searchPlaceholder="Search tools..."
+                  emptyLabel="No tools found."
+                  triggerClassName="flex-1"
+                  onOptionToggle={(slug, wasSelected) => {
+                    void handleToggleTool(slug, wasSelected)
+                  }}
+                />
               )}
             </div>
           </div>

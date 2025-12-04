@@ -28,7 +28,7 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   // Starship ownership (FK)
   starshipId: string;
   // Optional source template reference (FK)
-  templateId?: string;
+  sourceTemplateId?: string;
   // Optional example prompts surfaced on agents (may be inherited from template)
   previewPrompts?: string[];
   // Versioning fields
@@ -40,6 +40,26 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
     latestVersion: string; // Template's latest version
     templateUpdatedAt?: string; // When template was last updated
   };
+
+  /**
+   * Publication workflow fields
+   *
+   * - draft: default state, only visible to owner
+   * - pending_approval: owner requested publish; waiting for instance admin review
+   * - published: approved by instance admin and visible as a published agent
+   * - rejected: rejected by instance admin (owner can revise and request again)
+   */
+  publicationStatus: 'draft' | 'pending_approval' | 'published' | 'rejected';
+  publicationRequestedBy?: string;
+  publicationApprovedBy?: string;
+  publicationApprovedAt?: string;
+
+  /**
+   * Optional pointer to the template row this agent is published into.
+   * - sourceTemplateId: where the agent was originally created from (source template).
+   * - publishedTemplateId: where this agent is promoted to on publish.
+   */
+  publishedTemplateId?: string;
 }
 
 // ============================================================================
@@ -53,7 +73,7 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   slug?: string; // Optional: if not provided, will be generated
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
   // Optional template reference and prompts
-  templateId?: string;
+  sourceTemplateId?: string;
   previewPrompts?: string[];
   // Versioning fields
   version?: string;
@@ -64,10 +84,15 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  * Request to update an agent
  */
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
-  templateId?: string;
+  sourceTemplateId?: string;
   previewPrompts?: string[];
   version?: string;
   templateSnapshotAt?: string;
+  publicationStatus?: 'draft' | 'pending_approval' | 'published' | 'rejected';
+  publicationRequestedBy?: string;
+  publicationApprovedBy?: string;
+  publicationApprovedAt?: string;
+  publishedTemplateId?: string;
 }
 
 /**

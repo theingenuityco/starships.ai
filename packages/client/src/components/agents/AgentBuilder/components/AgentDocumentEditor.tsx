@@ -63,10 +63,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
 
-  // Check if this is a template-based agent (has templateId) - these are read-only
+  // Check if this is a template-based agent (has sourceTemplateId) - these are read-only
   const isTemplateAgent = useMemo(() => {
-    return !!fullAgent?.templateId
-  }, [fullAgent?.templateId])
+    return !!fullAgent?.sourceTemplateId
+  }, [fullAgent?.sourceTemplateId])
 
   // Update mutation for template agents
   const updateMutation = useUpdateAgentFromTemplate()
@@ -311,8 +311,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     color: 'rgb(139, 92, 246)',
                   }}
                 >
-                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                  v{fullAgent?.updateInfo?.latestVersion}
+                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />v{fullAgent?.updateInfo?.latestVersion}
                 </Badge>
               </div>
             </div>
@@ -354,9 +353,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
 
             <div className="text-sm bg-muted/50 p-4 rounded-lg border">
-              <p className="text-muted-foreground">
-                This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.
-              </p>
+              <p className="text-muted-foreground">This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.</p>
             </div>
 
             {fullAgent?.updateInfo?.templateUpdatedAt && (
@@ -391,9 +388,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 onChange={e => handleNameChange(e.target.value)}
                 disabled={isTemplateAgent}
               />
-              {isTemplateAgent && fullAgent?.version && (
-                <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>
-              )}
+              {isTemplateAgent && fullAgent?.version && <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>}
             </div>
             <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
           </div>
@@ -415,8 +410,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   role="button"
                   aria-label="Change category"
                   className={cn(
-                    "flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20",
-                    isTemplateAgent ? "opacity-60 cursor-not-allowed" : "cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
+                    'flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20',
+                    isTemplateAgent ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm'
                   )}
                 >
                   <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
@@ -489,8 +484,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     role="button"
                     aria-label="Select tools"
                     className={cn(
-                      "flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20",
-                      isTemplateAgent ? "opacity-60 cursor-not-allowed" : "cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
+                      'flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20',
+                      isTemplateAgent ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm'
                     )}
                   >
                     {selectedToolSlugs.length === 0 ? (
@@ -556,7 +551,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className={cn(isTemplateAgent && "opacity-60 pointer-events-none cursor-not-allowed")}>
+          <div className={cn(isTemplateAgent && 'opacity-60 pointer-events-none cursor-not-allowed')}>
             <RichMarkdownEditor value={value.description} onChange={val => onFieldChange?.('description', val)} placeholder="Write a clear description. Markdown supported." noMinHeight />
           </div>
         </CollapsibleContent>
@@ -568,7 +563,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className={cn(isTemplateAgent && "opacity-60 pointer-events-none cursor-not-allowed")}>
+          <div className={cn(isTemplateAgent && 'opacity-60 pointer-events-none cursor-not-allowed')}>
             <RichMarkdownEditor
               value={value.systemPrompt}
               onChange={val => onFieldChange?.('systemPrompt', val)}

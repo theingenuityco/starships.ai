@@ -8,7 +8,7 @@
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
 import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, StarshipRepository } from '@starships/models';
+import { AgentRepository, AgentTemplateRepository, StarshipRepository } from '@starships/models';
 import { generateUniqueAgentSlug } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
@@ -149,7 +149,7 @@ export class AgentService {
       state: agentState, // Use provided state or default initialization
       previewPrompts: data.previewPrompts,
       assignedToolSlugs: data.assignedToolSlugs,
-      templateId: data.templateId,
+      sourceTemplateId: data.sourceTemplateId,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -274,9 +274,46 @@ export class AgentService {
     };
   }> {
     const allAgents = await this.agentRepository.findAll();
-    const total = allAgents.length;
+
+    // Only published agents should appear in the public listing
+    const publishedAgents = allAgents.filter((agent) => agent.publicationStatus === 'published');
+    const total = publishedAgents.length;
     const offset = (page - 1) * limit;
-    const paginatedAgents = allAgents.slice(offset, offset + limit);
+    const paginatedAgents = publishedAgents.slice(offset, offset + limit);
+
+    return {
+      agents: paginatedAgents,
+      pagination: {
+        page,
+        limit,
+        total,
+        has_next: offset + limit < total,
+        has_prev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Get agents that are pending publication approval (instance admin view)
+   */
+  async getPendingAgents(
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{
+    agents: AgentModel[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  }> {
+    const allAgents = await this.agentRepository.findAll();
+    const pendingAgents = allAgents.filter((agent) => agent.publicationStatus === 'pending_approval');
+    const total = pendingAgents.length;
+    const offset = (page - 1) * limit;
+    const paginatedAgents = pendingAgents.slice(offset, offset + limit);
 
     return {
       agents: paginatedAgents,
@@ -817,5 +854,152 @@ export class AgentService {
     }
 
     return await this.agentRepository.updateFromTemplate(agentId);
+  }
+
+  // ============================================================================
+  // PUBLICATION WORKFLOW
+  // ============================================================================
+
+  /**
+   * Request publication for an agent (owner or instance admin)
+   * Moves agent from draft/rejected to pending_approval.
+   */
+  async requestPublication(agentId: string, userId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    if (agent.publicationStatus === 'pending_approval') {
+      throw new ValidationError('Agent is already pending approval');
+    }
+
+    if (agent.publicationStatus === 'published') {
+      throw new ValidationError('Agent is already published');
+    }
+
+    const updated = await this.agentRepository.update(agentId, {
+      publicationStatus: 'pending_approval',
+      publicationRequestedBy: userId,
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Approve publication for an agent (instance admin only)
+   * Moves agent from pending_approval to published, and promotes agent → template.
+   */
+  async approvePublication(agentId: string, adminUserId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    if (agent.publicationStatus !== 'pending_approval') {
+      throw new ValidationError('Agent is not pending approval');
+    }
+
+    // 1. Bump agent version (simple semver minor bump; fallback to 1.0.0)
+    const currentVersion = agent.version || '1.0.0';
+    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+    const nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+
+    // 2. Determine target template (publishedTemplateId or new template)
+    const templateRepo = new AgentTemplateRepository();
+    let targetTemplateId = agent.publishedTemplateId;
+
+    if (targetTemplateId) {
+      const existingTemplate = await templateRepo.findById(targetTemplateId);
+      if (!existingTemplate) {
+        // If the referenced template no longer exists, drop the link and create a new one
+        targetTemplateId = undefined;
+      }
+    }
+
+    if (!targetTemplateId) {
+      // Create a new template from this agent
+      const createdTemplate = await templateRepo.create({
+        name: agent.name,
+        slug: agent.slug,
+        description: agent.description,
+        category: 'general',
+        model: agent.model,
+        temperature: agent.temperature,
+        maxTokens: agent.maxTokens,
+        timeout: agent.timeout,
+        systemPrompt: agent.systemPrompt,
+        state: agent.state!,
+        blueprint: agent.blueprint!,
+        icon: undefined,
+        previewPrompts: agent.previewPrompts,
+        assignedToolSlugs: [], // tools can be managed separately at template level
+      });
+
+      // Align template version with the bumped agent version
+      await templateRepo.update(createdTemplate.id, { version: nextVersion });
+      targetTemplateId = createdTemplate.id;
+    } else {
+      // Update existing template from this agent
+      await templateRepo.update(targetTemplateId, {
+        name: agent.name,
+        description: agent.description,
+        model: agent.model,
+        temperature: agent.temperature,
+        maxTokens: agent.maxTokens,
+        timeout: agent.timeout,
+        systemPrompt: agent.systemPrompt,
+        state: agent.state,
+        blueprint: agent.blueprint,
+        previewPrompts: agent.previewPrompts,
+        version: nextVersion,
+      });
+    }
+
+    // 3. Persist publication metadata on agent
+    const updated = await this.agentRepository.update(agentId, {
+      version: nextVersion,
+      publicationStatus: 'published',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+      publishedTemplateId: targetTemplateId,
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Reject publication for an agent (instance admin only)
+   * Moves agent from pending_approval to rejected.
+   */
+  async rejectPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    if (agent.publicationStatus !== 'pending_approval') {
+      throw new ValidationError('Agent is not pending approval');
+    }
+
+    const updated = await this.agentRepository.update(agentId, {
+      publicationStatus: 'rejected',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return updated;
   }
 }

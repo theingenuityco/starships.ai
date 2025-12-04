@@ -58,14 +58,14 @@ describe('AgentEntity', () => {
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-02T12:00:00.000Z';
       agent.starshipId = 'starship-123';
-      agent.templateId = 'template-456';
+      agent.sourceTemplateId = 'template-456';
       agent.description = 'Test Description';
       agent.systemPrompt = 'You are a helpful assistant';
 
       const serialized = toDatabase(agent);
 
       expect(serialized.starship_id).toBe('starship-123');
-      expect(serialized.template_id).toBe('template-456');
+      expect(serialized.source_template_id).toBe('template-456');
       expect(serialized.description).toBe('Test Description');
       expect(serialized.system_prompt).toBe('You are a helpful assistant');
     });
@@ -108,13 +108,13 @@ describe('AgentEntity', () => {
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
         starshipId: 'starship-123',
-        templateId: 'template-456',
+        sourceTemplateId: 'template-456',
       };
 
       const entity = fromDatabase(AgentEntity, databaseRecord);
 
       expect(entity.starshipId).toBe('starship-123');
-      expect(entity.templateId).toBe('template-456');
+      expect(entity.sourceTemplateId).toBe('template-456');
     });
 
     it('should deserialize array of database records', async () => {

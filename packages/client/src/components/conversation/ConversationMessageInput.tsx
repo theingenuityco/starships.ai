@@ -1186,10 +1186,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
         } catch {}
         try {
-          // Fallback to template prompts when templateId exists
-          const templateId = a?.templateId
-          if (templateId) {
-            const tpl = await templateAPI.getById(templateId)
+          // Fallback to template prompts when a sourceTemplateId exists
+          const sourceTemplateId = a?.sourceTemplateId
+          if (sourceTemplateId) {
+            const tpl = await templateAPI.getById(sourceTemplateId)
             const previews = (tpl as any)?.previewPrompts || []
             if (!aborted && Array.isArray(previews) && previews.length > 0) {
               setTemplatePrompts(previews.filter(Boolean))

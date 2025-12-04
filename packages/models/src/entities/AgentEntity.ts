@@ -157,6 +157,24 @@ export class AgentEntity implements AgentModel {
   @Length(1, 255)
   publishedTemplateId?: string;
 
+  // Additional publication metadata (owner-selected)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @IsIn(['patch', 'minor', 'major'])
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 20)
+  publicationRequestedVersion?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  publicationChangelog?: string;
+
   // Update availability info (computed at runtime, not stored in DB)
   @Expose()
   @IsOptional()

@@ -55,6 +55,17 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   publicationApprovedAt?: string;
 
   /**
+   * Optional publication metadata chosen by the owner when requesting publish.
+   *
+   * - publicationVersionBump: how the owner wants to bump from the current version
+   * - publicationRequestedVersion: the exact target version string (e.g. '1.2.3')
+   * - publicationChangelog: human-readable notes about what changed
+   */
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+  publicationRequestedVersion?: string;
+  publicationChangelog?: string;
+
+  /**
    * Optional pointer to the template row this agent is published into.
    * - sourceTemplateId: where the agent was originally created from (source template).
    * - publishedTemplateId: where this agent is promoted to on publish.
@@ -93,6 +104,9 @@ export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> 
   publicationApprovedBy?: string;
   publicationApprovedAt?: string;
   publishedTemplateId?: string;
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+  publicationRequestedVersion?: string;
+  publicationChangelog?: string;
 }
 
 /**

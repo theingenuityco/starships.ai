@@ -871,9 +871,14 @@ export class AgentService {
 
   /**
    * Request publication for an agent (owner or instance admin)
-   * Moves agent from draft/rejected to pending_approval.
+   * Moves agent from draft/rejected to pending_approval and records
+   * the desired version bump and changelog.
    */
-  async requestPublication(agentId: string, userId: string): Promise<AgentModel> {
+  async requestPublication(
+    agentId: string,
+    userId: string,
+    options: { versionBump: 'patch' | 'minor' | 'major'; changelog: string }
+  ): Promise<AgentModel> {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
@@ -886,10 +891,38 @@ export class AgentService {
     if (agent.publicationStatus === 'published') {
       throw new ValidationError('Agent is already published');
     }
+    // Determine requested version based on current version and bump type
+    const currentVersion = agent.version || '1.0.0';
+    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+    let requestedVersion = currentVersion;
+
+    if (match) {
+      const major = Number(match[1]);
+      const minor = Number(match[2]);
+      const patch = Number(match[3]);
+
+      switch (options.versionBump) {
+        case 'patch':
+          requestedVersion = `${major}.${minor}.${patch + 1}`;
+          break;
+        case 'minor':
+          requestedVersion = `${major}.${minor + 1}.0`;
+          break;
+        case 'major':
+          requestedVersion = `${major + 1}.0.0`;
+          break;
+      }
+    } else {
+      // Fallback for malformed versions
+      requestedVersion = '1.0.0';
+    }
 
     const updated = await this.agentRepository.update(agentId, {
       publicationStatus: 'pending_approval',
       publicationRequestedBy: userId,
+      publicationVersionBump: options.versionBump,
+      publicationRequestedVersion: requestedVersion,
+      publicationChangelog: options.changelog,
     });
 
     if (!updated) {
@@ -913,10 +946,16 @@ export class AgentService {
       throw new ValidationError('Agent is not pending approval');
     }
 
-    // 1. Bump agent version (simple semver minor bump; fallback to 1.0.0)
+    // 1. Determine next version:
+    // - Prefer owner-requested version from publish-request flow
+    // - Fallback to simple minor bump for backwards compatibility
     const currentVersion = agent.version || '1.0.0';
-    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
-    const nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+    let nextVersion = agent.publicationRequestedVersion;
+
+    if (!nextVersion) {
+      const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+      nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+    }
 
     // 2. Determine target template (publishedTemplateId or new template)
     //    and sanitize numeric fields to satisfy template validation constraints.

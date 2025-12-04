@@ -84,6 +84,11 @@ const TestAgentSchema = z.object({
   ]),
 });
 
+const PublishRequestSchema = z.object({
+  versionBump: z.enum(['patch', 'minor', 'major']),
+  changelog: z.string().min(1, 'Changelog is required').max(2000, 'Changelog must be at most 2000 characters'),
+});
+
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -382,6 +387,10 @@ router.post('/agents/:id/publish-request', jwtAuthMiddleware, async (req: Reques
     const { id: agentId } = paramValidation;
     const userId = req.user!.id;
 
+    // Validate publish request body (version bump + changelog)
+    const bodyValidation = validateData(PublishRequestSchema, req.body, res, 'publish request data');
+    if (!bodyValidation) return;
+
     const agentService = new AgentService();
     const agent = await agentService.getAgent(agentId);
     if (!agent) {
@@ -393,7 +402,10 @@ router.post('/agents/:id/publish-request', jwtAuthMiddleware, async (req: Reques
     const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
     if (!hasAccess) return;
 
-    const updated = await agentService.requestPublication(agentId, userId);
+    const updated = await agentService.requestPublication(agentId, userId, {
+      versionBump: bodyValidation.versionBump,
+      changelog: bodyValidation.changelog,
+    });
     sendSuccess(res, {
       message: 'Publication requested successfully',
       agent: updated,

@@ -985,7 +985,9 @@ export class AgentService {
       throw new ValidationError('Agent is already pending approval');
     }
 
-    if (agent.publicationStatus === 'published') {
+    // For agents that have already been promoted into a template (publishedTemplateId),
+    // allow requesting publication again so a new version can be reviewed.
+    if (agent.publicationStatus === 'published' && !agent.publishedTemplateId) {
       throw new ValidationError('Agent is already published');
     }
     // Determine requested version based on current version and bump type

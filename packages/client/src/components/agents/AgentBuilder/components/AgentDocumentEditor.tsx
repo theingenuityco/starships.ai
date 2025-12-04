@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
@@ -579,8 +578,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </DialogContent>
       </Dialog>
 
-      {/* Quick selectors */}
-      <div className="space-y-2 mb-2">
+      {/* Quick selectors + core fields */}
+      <div className="space-y-2 mb-4">
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
@@ -647,7 +646,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </div>
 
         {/* Tools section */}
-        <div className="pb-2">
+        <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="wrench" className="w-4 h-4" />
@@ -709,81 +708,85 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Description */}
-      <div className="mt-0">
-        <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
-            <Icon name="file-text" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Description</span>
-          </div>
-          <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-            <RichMarkdownEditor
-              value={value.description}
-              onChange={val => onFieldChange?.('description', val)}
-              placeholder="Write a clear description. Markdown supported."
-              className="pl-2"
-              noMinHeight
-              readOnly={readOnly}
-            />
+        {/* Description */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+              <Icon name="file-text" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Description</span>
+            </div>
+            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+              <RichMarkdownEditor
+                value={value.description}
+                onChange={val => onFieldChange?.('description', val)}
+                placeholder="Write a clear description. Markdown supported."
+                className="pl-2"
+                noMinHeight
+                readOnly={readOnly}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* System Prompt */}
-      <div className="mt-0">
-        <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
-            <Icon name="sparkles" className="w-4 h-4" />
-            <span className="text-xs font-semibold">System Prompt</span>
-          </div>
-          <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-            <RichMarkdownEditor
-              value={value.systemPrompt}
-              onChange={val => onFieldChange?.('systemPrompt', val)}
-              placeholder="Define the agent's character, mission, and behavior..."
-              className="pl-2"
-              minHeightPx={200}
-              readOnly={readOnly}
-            />
+        {/* System Prompt */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+              <Icon name="sparkles" className="w-4 h-4" />
+              <span className="text-xs font-semibold">System Prompt</span>
+            </div>
+            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+              <RichMarkdownEditor
+                value={value.systemPrompt}
+                onChange={val => onFieldChange?.('systemPrompt', val)}
+                placeholder="Define the agent's character, mission, and behavior..."
+                className="pl-2"
+                minHeightPx={200}
+                readOnly={readOnly}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Preview Prompts */}
-      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Preview Prompts</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-2">
-            <textarea
-              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
-              value={(value.previewPrompts || []).join('\n')}
-              disabled={isTemplateAgent || readOnly}
-              onChange={e => {
-                const lines = e.target.value
-                  .split('\n')
-                  .map(s => s.trim())
-                  .filter(Boolean)
-                  .slice(0, 10)
-                onFieldChange?.('previewPrompts', lines)
-              }}
-            />
-            <div className="text-[10px] text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</div>
+      <div className="border-b border-border/10 pb-2 mt-2">
+        <div className="flex items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <Icon name="list-bullet" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Preview Prompts</span>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+          <div className="flex-1">
+            <div className="space-y-2">
+              <textarea
+                className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
+                placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
+                value={(value.previewPrompts || []).join('\n')}
+                disabled={isTemplateAgent || readOnly}
+                onChange={e => {
+                  const lines = e.target.value
+                    .split('\n')
+                    .map(s => s.trim())
+                    .filter(Boolean)
+                    .slice(0, 10)
+                  onFieldChange?.('previewPrompts', lines)
+                }}
+              />
+              <div className="text-[10px] text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Blueprint */}
-      <Collapsible defaultOpen={true} className="space-y-2 mt-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Blueprint</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-2">
+      <div className="border-b border-border/10 pb-2 mt-2">
+        <div className="flex items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <Icon name="network" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Blueprint</span>
+          </div>
+          <div className="flex-1">
             <BlueprintVisualization
               blueprint={(() => {
                 try {
@@ -797,65 +800,68 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               nodesDraggable={false}
             />
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </div>
 
       {/* Advanced options */}
-      <Collapsible defaultOpen={false} className="space-y-2 mt-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Advanced options</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="agent-temperature" className="text-xs font-medium">
-                Temperature
-              </Label>
-              <Input
-                id="agent-temperature"
-                type="number"
-                min="0"
-                max="2"
-                step="0.1"
-                value={value.temperature}
-                onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
-                disabled={isTemplateAgent || readOnly}
-                className="text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="agent-max-tokens" className="text-xs font-medium">
-                Max Tokens
-              </Label>
-              <Input
-                id="agent-max-tokens"
-                type="number"
-                min="1"
-                step="1"
-                value={value.maxTokens}
-                onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
-                disabled={isTemplateAgent || readOnly}
-                className="text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="agent-timeout" className="text-xs font-medium">
-                Timeout (ms)
-              </Label>
-              <Input
-                id="agent-timeout"
-                type="number"
-                min="1000"
-                step="1000"
-                value={value.timeout}
-                onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
-                disabled={isTemplateAgent || readOnly}
-                className="text-xs"
-              />
+      <div className="border-b border-border/10 pb-2 mt-2">
+        <div className="flex items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <Icon name="sliders-horizontal" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Advanced options</span>
+          </div>
+          <div className="flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="agent-temperature" className="text-xs font-medium">
+                  Temperature
+                </Label>
+                <Input
+                  id="agent-temperature"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={value.temperature}
+                  onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
+                  disabled={isTemplateAgent || readOnly}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="agent-max-tokens" className="text-xs font-medium">
+                  Max Tokens
+                </Label>
+                <Input
+                  id="agent-max-tokens"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={value.maxTokens}
+                  onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
+                  disabled={isTemplateAgent || readOnly}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="agent-timeout" className="text-xs font-medium">
+                  Timeout (ms)
+                </Label>
+                <Input
+                  id="agent-timeout"
+                  type="number"
+                  min="1000"
+                  step="1000"
+                  value={value.timeout}
+                  onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
+                  disabled={isTemplateAgent || readOnly}
+                  className="text-xs"
+                />
+              </div>
             </div>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </div>
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
     </div>

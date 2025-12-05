@@ -76,6 +76,12 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsOptional()
+  @IsString()
+  @IsIn(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
+  category?: string;
+
+  @Expose()
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(2)

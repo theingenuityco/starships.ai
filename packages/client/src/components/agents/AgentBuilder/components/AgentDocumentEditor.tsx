@@ -412,6 +412,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
         if (!value.description && agent.description) onFieldChange?.('description', agent.description)
         if (!value.model && agent.model) onFieldChange?.('model', agent.model)
+        if ((!value.category || value.category === 'general') && (agent as any).category) {
+          onFieldChange?.('category', (agent as any).category as any)
+        }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
@@ -447,6 +450,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       name?: string | null
       description?: string | null
       model?: string | null
+      category?: string | null
       temperature?: number | null
       maxTokens?: number | null
       timeout?: number | null
@@ -461,6 +465,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         name: src.name ?? '',
         description: src.description ?? '',
         model: src.model ?? '',
+        category: src.category ?? 'general',
         temperature: normalizedTemperature,
         maxTokens: src.maxTokens ?? null,
         timeout: src.timeout ?? null,
@@ -476,6 +481,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameName = agentCore.name === templateCore.name
     const sameDescription = agentCore.description === templateCore.description
     const sameModel = agentCore.model === templateCore.model
+    const sameCategory = (agentCore as any).category === (templateCore as any).category
     const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
@@ -490,6 +496,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!sameName) changes.push('Name')
     if (!sameDescription) changes.push('Description')
     if (!sameModel) changes.push('Model')
+    if (!sameCategory) changes.push('Category')
     if (!sameTemperature) changes.push('Temperature')
     if (!sameMaxTokens) changes.push('Max tokens')
     if (!sameTimeout) changes.push('Timeout')
@@ -504,6 +511,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         sameName,
         sameDescription,
         sameModel,
+        sameCategory,
         sameTemperature,
         sameMaxTokens,
         sameTimeout,
@@ -519,7 +527,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       // ignore logging errors
     }
 
-    const differs = !(sameName && sameDescription && sameModel && sameTemperature && sameMaxTokens && sameTimeout && sameSystemPrompt && samePreviewPrompts && sameBlueprint)
+    const differs = !(sameName && sameDescription && sameModel && sameCategory && sameTemperature && sameMaxTokens && sameTimeout && sameSystemPrompt && samePreviewPrompts && sameBlueprint)
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
   }, [fullAgent, publishedTemplate])
@@ -586,6 +594,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         updates.model = value.model
       }
 
+      if (value.category && (fullAgent as any).category !== value.category) {
+        ;(updates as any).category = value.category
+      }
+
       // Clamp numeric fields into valid ranges before sending, and compare to base
       if (typeof value.temperature === 'number') {
         const clampedTemp = Math.min(2, Math.max(0, value.temperature))
@@ -643,12 +655,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     const timeout = setTimeout(async () => {
       try {
-        setIsAutosaving(true)
         const updates = buildUpdates()
         // Skip network call if there are no actual changes
         if (Object.keys(updates).length === 0) {
           return
         }
+        setIsAutosaving(true)
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
         const updated = res.data.data
 

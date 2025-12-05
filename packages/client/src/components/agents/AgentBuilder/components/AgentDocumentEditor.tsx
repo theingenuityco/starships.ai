@@ -1118,58 +1118,43 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
             <div className="w-[260px]">
-              {isTemplateAgent || readOnly ? (
-                <div className="flex items-center rounded-xl h-7 px-2 border border-border/20 bg-muted/20 opacity-60 cursor-not-allowed w-full">
-                  {selectedToolSlugs.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">No tools assigned</span>
-                  ) : (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {selectedToolSlugs.map(slug => (
-                        <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
-                          <Icon name="wrench" />
-                          <span className="font-mono truncate max-w-[140px]">{slug}</span>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <StandardSelect
-                  mode="multiple"
-                  aria-label="Select tools"
-                  value={selectedToolSlugs}
-                  options={allToolOptions.map(slug => ({
-                    value: slug,
-                    label: (
-                      <span className="flex items-center gap-2">
-                        <Icon name="wrench" className="w-3 h-3" />
-                        <span className="font-mono text-xs">{slug}</span>
-                      </span>
-                    ),
-                    keywords: slug,
-                  }))}
-                  placeholder="Select tools"
-                  searchPlaceholder="Search tools..."
-                  emptyLabel="No tools found."
-                  triggerClassName="w-full"
-                  renderTriggerLabel={({ selectedOptions }) => {
-                    if (!selectedOptions.length) {
-                      return <span className="text-xs text-muted-foreground">Select tools</span>
-                    }
-                    const values = selectedOptions.map(opt => String(opt.value))
-                    let label: string
-                    if (values.length <= 3) {
-                      label = values.join(', ')
-                    } else {
-                      label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
-                    }
-                    return <span className="text-xs font-mono truncate max-w-full">{label}</span>
-                  }}
-                  onOptionToggle={(slug, wasSelected) => {
-                    void handleToggleTool(slug, wasSelected)
-                  }}
-                />
-              )}
+              <StandardSelect
+                mode="multiple"
+                aria-label="Select tools"
+                disabled={isTemplateAgent || readOnly}
+                value={selectedToolSlugs}
+                options={allToolOptions.map(slug => ({
+                  value: slug,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <Icon name="wrench" className="w-3 h-3" />
+                      <span className="font-mono text-xs">{slug}</span>
+                    </span>
+                  ),
+                  keywords: slug,
+                }))}
+                placeholder="Select tools"
+                searchPlaceholder="Search tools..."
+                emptyLabel="No tools found."
+                triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
+                renderTriggerLabel={({ selectedOptions }) => {
+                  if (!selectedOptions.length) {
+                    return <span className="text-xs text-muted-foreground">{isTemplateAgent || readOnly ? 'No tools assigned' : 'Select tools'}</span>
+                  }
+                  const values = selectedOptions.map(opt => String(opt.value))
+                  let label: string
+                  if (values.length <= 3) {
+                    label = values.join(', ')
+                  } else {
+                    label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
+                  }
+                  return <span className="text-xs font-mono truncate max-w-full">{label}</span>
+                }}
+                onOptionToggle={(slug, wasSelected) => {
+                  if (isTemplateAgent || readOnly) return
+                  void handleToggleTool(slug, wasSelected)
+                }}
+              />
             </div>
           </div>
         </div>
@@ -1224,95 +1209,82 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           </div>
           <div className="flex-1">
             <div className="space-y-2">
-              {isTemplateAgent || readOnly ? (
-                <div className="rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground min-h-[60px]">
-                  {(value.previewPrompts || []).length === 0 ? (
-                    <span className="italic">No preview prompts configured.</span>
-                  ) : (
-                    <ul className="list-disc list-inside space-y-1">
-                      {(value.previewPrompts || []).map((prompt, idx) => (
-                        <li key={idx} className="text-xs">
-                          {prompt}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-1">
-                    {(value.previewPrompts || []).length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {(value.previewPrompts || []).map((prompt, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <Input
-                              className="text-xs flex-1"
-                              value={prompt}
-                              onChange={e => {
-                                const next = [...(value.previewPrompts || [])]
-                                next[idx] = e.target.value
-                                const cleaned = next
-                                  .map(s => s.trim())
-                                  .filter(Boolean)
-                                  .slice(0, 10)
-                                onFieldChange?.('previewPrompts', cleaned)
-                              }}
-                              placeholder="Example: Help me draft a customer support reply…"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => {
-                                const next = (value.previewPrompts || []).filter((_, i) => i !== idx)
-                                onFieldChange?.('previewPrompts', next)
-                              }}
-                            >
-                              <Icon name="x" className="w-3 h-3" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      className="text-xs flex-1"
-                      placeholder="Add a sample user prompt…"
-                      value={newPreviewPrompt}
-                      onChange={e => setNewPreviewPrompt(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          const trimmed = newPreviewPrompt.trim()
-                          const existing = value.previewPrompts || []
-                          if (!trimmed || existing.length >= 10) return
-                          onFieldChange?.('previewPrompts', [...existing, trimmed])
-                          setNewPreviewPrompt('')
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="text-xs"
-                      disabled={!newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
-                      onClick={() => {
-                        const trimmed = newPreviewPrompt.trim()
-                        const existing = value.previewPrompts || []
-                        if (!trimmed || existing.length >= 10) return
-                        onFieldChange?.('previewPrompts', [...existing, trimmed])
-                        setNewPreviewPrompt('')
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </>
-              )}
+              <div className="space-y-1">
+                {(value.previewPrompts || []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {(value.previewPrompts || []).map((prompt, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <Input
+                          className="text-xs flex-1"
+                          value={prompt}
+                          disabled={isTemplateAgent || readOnly}
+                          onChange={e => {
+                            const next = [...(value.previewPrompts || [])]
+                            next[idx] = e.target.value
+                            const cleaned = next
+                              .map(s => s.trim())
+                              .filter(Boolean)
+                              .slice(0, 10)
+                            onFieldChange?.('previewPrompts', cleaned)
+                          }}
+                          placeholder="Example: Help me draft a customer support reply…"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={isTemplateAgent || readOnly}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            const next = (value.previewPrompts || []).filter((_, i) => i !== idx)
+                            onFieldChange?.('previewPrompts', next)
+                          }}
+                        >
+                          <Icon name="x" className="w-3 h-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  className="text-xs flex-1"
+                  placeholder="Add a sample user prompt…"
+                  value={newPreviewPrompt}
+                  disabled={isTemplateAgent || readOnly}
+                  onChange={e => setNewPreviewPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (isTemplateAgent || readOnly) return
+                      const trimmed = newPreviewPrompt.trim()
+                      const existing = value.previewPrompts || []
+                      if (!trimmed || existing.length >= 10) return
+                      onFieldChange?.('previewPrompts', [...existing, trimmed])
+                      setNewPreviewPrompt('')
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="text-xs"
+                  disabled={isTemplateAgent || readOnly || !newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
+                  onClick={() => {
+                    if (isTemplateAgent || readOnly) return
+                    const trimmed = newPreviewPrompt.trim()
+                    const existing = value.previewPrompts || []
+                    if (!trimmed || existing.length >= 10) return
+                    onFieldChange?.('previewPrompts', [...existing, trimmed])
+                    setNewPreviewPrompt('')
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
               <div className="text-[10px] text-muted-foreground flex items-center justify-between">
                 <span>These appear as example prompts in the chat input when this agent is mentioned.</span>
                 <span>

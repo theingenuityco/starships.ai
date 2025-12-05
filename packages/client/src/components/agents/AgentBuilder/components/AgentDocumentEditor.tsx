@@ -90,7 +90,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Publication dialog state
   const [showPublishDialog, setShowPublishDialog] = useState(false)
-  const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('minor')
+  const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('patch')
   const [changelog, setChangelog] = useState('')
 
   // Autosave state (existing agents only)
@@ -345,7 +345,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
 
       toast.success('Publication requested', {
-        description: res.data.data.message || 'Your agent is now pending instance admin approval.',
+        description: res.data.data.message || 'Your agent is now pending review for publication.',
       })
       setShowPublishDialog(false)
       setChangelog('')
@@ -885,7 +885,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
               {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  {publicationStatus === 'pending_approval' && <span>Awaiting instance admin approval.</span>}
+                  {publicationStatus === 'pending_approval' && <span>Awaiting review for publication.</span>}
                   {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
                 </div>
               )}
@@ -953,8 +953,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Publication</DialogTitle>
-            <DialogDescription>Choose how to bump the version of this agent and provide a brief changelog for the instance admin.</DialogDescription>
+            <DialogTitle>Request for Agent Publication</DialogTitle>
+            <DialogDescription>Choose how to bump the agent’s version and add a brief changelog.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -971,12 +971,49 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground">Version bump</p>
-              <div className="flex gap-2">
-                {(['patch', 'minor', 'major'] as const).map(bump => (
-                  <Button key={bump} type="button" size="sm" variant={versionBump === bump ? 'default' : 'outline'} className="text-xs capitalize h-7 px-3" onClick={() => setVersionBump(bump)}>
-                    {bump}
-                  </Button>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(
+                  [
+                    {
+                      value: 'major' as const,
+                      title: 'Major',
+                      summary: 'Big changes',
+                      description: 'Breaking changes or large updates that may impact users.',
+                    },
+                    {
+                      value: 'minor' as const,
+                      title: 'Minor',
+                      summary: 'New features',
+                      description: 'Adds features in a backwards-compatible way.',
+                    },
+                    {
+                      value: 'patch' as const,
+                      title: 'Patch',
+                      summary: 'Small fixes',
+                      description: 'Tiny adjustments and bug fixes; no breaking changes.',
+                    },
+                  ] as const
+                ).map(option => {
+                  const isSelected = versionBump === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setVersionBump(option.value)}
+                      className={cn(
+                        'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
+                        'hover:bg-muted/60',
+                        isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold">{option.title}</span>
+                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">{option.summary}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">{option.description}</p>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -986,12 +1023,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </Label>
               <textarea
                 id="publication-changelog"
-                className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="Summarize what changed in this version for reviewers…"
                 value={changelog}
                 onChange={e => setChangelog(e.target.value)}
               />
-              <p className="text-[11px] text-muted-foreground">This will be shown to instance admins when they review your publication request.</p>
+              <p className="text-[11px] text-muted-foreground">This will be shown to reviewers when they evaluate your publication request.</p>
             </div>
           </div>
 
@@ -1000,7 +1037,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               Cancel
             </Button>
             <Button onClick={() => void handleRequestPublication()} disabled={isRequestingPublish}>
-              {isRequestingPublish ? 'Requesting…' : 'Submit for approval'}
+              {isRequestingPublish ? 'Submitting…' : 'Submit for review'}
             </Button>
           </DialogFooter>
         </DialogContent>

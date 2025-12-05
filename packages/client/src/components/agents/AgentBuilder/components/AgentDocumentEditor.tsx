@@ -26,7 +26,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const CATEGORY_DOT_COLORS: Record<string, string> = {
   general: 'bg-gray-400',
@@ -81,9 +81,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
   const [showIdentityInBanner, setShowIdentityInBanner] = useState(false)
-
-  // Hover-controlled popover for publishable changes summary
-  const [showPublishChangesPopover, setShowPublishChangesPopover] = useState(false)
 
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
@@ -487,7 +484,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameDescription = agentCore.description === templateCore.description
     const sameModel = agentCore.model === templateCore.model
     const sameCategory = (agentCore as any).category === (templateCore as any).category
-    const sameTemperature = agentCore.temperature === templateCore.temperature
+
+    // Use current form temperature when available so in-progress edits
+    // are reflected in the banner diff (not just the last persisted value).
+    const currentTemperature = typeof value.temperature === 'number' ? value.temperature : agentCore.temperature
+    const sameTemperature = currentTemperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
@@ -556,7 +557,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     )
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate, value.assignedToolSlugs])
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, value.temperature])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
@@ -930,35 +931,23 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
 
             {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
-              <Popover open={showPublishChangesPopover}>
-                <PopoverTrigger
-                  asChild
-                  onMouseEnter={() => setShowPublishChangesPopover(true)}
-                  onMouseLeave={() => setShowPublishChangesPopover(false)}
-                  onFocus={() => setShowPublishChangesPopover(true)}
-                  onBlur={() => setShowPublishChangesPopover(false)}
-                >
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
                     {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
                   </button>
-                </PopoverTrigger>
+                </TooltipTrigger>
                 {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
-                  <PopoverContent
-                    align="end"
-                    side="bottom"
-                    className="max-w-xs p-2 text-xs frosted-glass-card rounded-xl shadow-frosted-lg"
-                    onMouseEnter={() => setShowPublishChangesPopover(true)}
-                    onMouseLeave={() => setShowPublishChangesPopover(false)}
-                  >
+                  <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs frosted-glass-card rounded-xl shadow-frosted-lg">
                     <div className="font-semibold mb-1">Changes since last published version</div>
                     <ul className="list-disc list-inside space-y-0.5">
                       {publishedChangeDetails.map(change => (
                         <li key={change}>{change}</li>
                       ))}
                     </ul>
-                  </PopoverContent>
+                  </TooltipContent>
                 )}
-              </Popover>
+              </Tooltip>
             )}
           </div>
         )}

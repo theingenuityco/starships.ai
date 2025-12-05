@@ -26,6 +26,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const CATEGORY_DOT_COLORS: Record<string, string> = {
   general: 'bg-gray-400',
@@ -80,6 +81,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
   const [showIdentityInBanner, setShowIdentityInBanner] = useState(false)
+
+  // Hover-controlled popover for publishable changes summary
+  const [showPublishChangesPopover, setShowPublishChangesPopover] = useState(false)
 
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
@@ -432,8 +436,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const hasExistingAgent = !!agentId
 
   // Determine if this agent differs from its published template (if any)
-  const differsFromPublishedTemplate = useMemo(() => {
-    if (!fullAgent?.publishedTemplateId || !publishedTemplate) return false
+  const { differsFromPublishedTemplate, publishedChangeDetails } = useMemo(() => {
+    if (!fullAgent?.publishedTemplateId || !publishedTemplate) {
+      return { differsFromPublishedTemplate: false, publishedChangeDetails: [] as string[] }
+    }
 
     const normalizePrompts = (prompts?: string[] | null): string[] => (prompts || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean)
 
@@ -480,6 +486,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const templateBlueprintStr = JSON.stringify(templateCore.blueprint)
     const sameBlueprint = agentBlueprintStr === templateBlueprintStr
 
+    const changes: string[] = []
+    if (!sameName) changes.push('Name')
+    if (!sameDescription) changes.push('Description')
+    if (!sameModel) changes.push('Model')
+    if (!sameTemperature) changes.push('Temperature')
+    if (!sameMaxTokens) changes.push('Max tokens')
+    if (!sameTimeout) changes.push('Timeout')
+    if (!sameSystemPrompt) changes.push('System prompt')
+    if (!samePreviewPrompts) changes.push('Preview prompts')
+    if (!sameBlueprint) changes.push('Blueprint')
+
     try {
       console.debug('[AgentDocEditor] template-diff-debug', {
         agentId: fullAgent.id,
@@ -502,7 +519,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       // ignore logging errors
     }
 
-    return !(sameName && sameDescription && sameModel && sameTemperature && sameMaxTokens && sameTimeout && sameSystemPrompt && samePreviewPrompts && sameBlueprint)
+    const differs = !(sameName && sameDescription && sameModel && sameTemperature && sameMaxTokens && sameTimeout && sameSystemPrompt && samePreviewPrompts && sameBlueprint)
+
+    return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
   }, [fullAgent, publishedTemplate])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
@@ -777,17 +796,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <div className="flex items-center gap-4 text-sm">
             {/* Avatar + name/slug on the far left */}
             {showIdentityInBanner && (
-              <div className="flex items-center gap-2">
-                <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={32} rounded className="h-8 w-8 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
+              <div className="flex items-center gap-3">
+                <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={36} rounded className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
                 <div className="flex flex-col leading-tight min-w-0">
-                  <span className="text-sm font-semibold truncate">{fullAgent?.name || value.name || 'Untitled agent'}</span>
-                  {(fullAgent?.slug || value.slug) && <span className="text-[11px] text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
+                  <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
+                  {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
                 </div>
               </div>
             )}
 
             {/* Text stack to the right of avatar/name */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               {/* Save indicator */}
               <div className="flex items-center gap-1 text-xs font-medium">
                 <div className="w-3 h-3 flex items-center justify-center">
@@ -840,33 +859,68 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         )}
 
         {!readOnly && (
-          <div className="flex flex-wrap items-center gap-2">
-            {hasExistingAgent && (
-              <Button
-                type="button"
-                size="sm"
-                className="gap-1.5"
-                disabled={isRequestingPublish || !canRequestPublication}
-                onClick={() => {
-                  if (canRequestPublication) {
-                    setShowPublishDialog(true)
-                  }
-                }}
-              >
-                <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
-              </Button>
-            )}
-            {!hasExistingAgent && onSave && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  onSave()
-                }}
-              >
-                Save
-              </Button>
+          <div className="flex flex-col gap-1 items-start sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              {hasExistingAgent && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primaryOutline"
+                  className="gap-1.5"
+                  disabled={isRequestingPublish || !canRequestPublication}
+                  onClick={() => {
+                    if (canRequestPublication) {
+                      setShowPublishDialog(true)
+                    }
+                  }}
+                >
+                  <Icon name="rocket-launch" className="w-3.5 h-3.5" />
+                  {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
+                </Button>
+              )}
+              {!hasExistingAgent && onSave && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    onSave()
+                  }}
+                >
+                  Save
+                </Button>
+              )}
+            </div>
+
+            {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
+              <Popover open={showPublishChangesPopover}>
+                <PopoverTrigger
+                  asChild
+                  onMouseEnter={() => setShowPublishChangesPopover(true)}
+                  onMouseLeave={() => setShowPublishChangesPopover(false)}
+                  onFocus={() => setShowPublishChangesPopover(true)}
+                  onBlur={() => setShowPublishChangesPopover(false)}
+                >
+                  <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
+                    {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
+                  </button>
+                </PopoverTrigger>
+                {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
+                  <PopoverContent
+                    align="end"
+                    side="bottom"
+                    className="max-w-xs p-2 text-xs frosted-glass-card rounded-xl shadow-frosted-lg"
+                    onMouseEnter={() => setShowPublishChangesPopover(true)}
+                    onMouseLeave={() => setShowPublishChangesPopover(false)}
+                  >
+                    <div className="font-semibold mb-1">Changes since last published version</div>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {publishedChangeDetails.map(change => (
+                        <li key={change}>{change}</li>
+                      ))}
+                    </ul>
+                  </PopoverContent>
+                )}
+              </Popover>
             )}
           </div>
         )}

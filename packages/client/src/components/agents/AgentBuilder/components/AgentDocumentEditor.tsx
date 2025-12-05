@@ -445,6 +445,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
 
     const normalizePrompts = (prompts?: string[] | null): string[] => (prompts || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean)
+    const normalizeSlugs = (slugs?: string[] | null): string[] =>
+      (slugs || [])
+        .map(s => (typeof s === 'string' ? s.trim() : ''))
+        .filter(Boolean)
+        .sort()
 
     const normalizeCore = (src: {
       name?: string | null
@@ -488,6 +493,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
     const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
 
+    // Tool comparison: compare current assignedToolSlugs in the form against the baseline tools from the template.
+    const currentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
+    const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
+    const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
+
     const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
     const templateBlueprintStr = JSON.stringify(templateCore.blueprint)
     const sameBlueprint = agentBlueprintStr === templateBlueprintStr
@@ -502,6 +512,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!sameTimeout) changes.push('Timeout')
     if (!sameSystemPrompt) changes.push('System prompt')
     if (!samePreviewPrompts) changes.push('Preview prompts')
+    if (!sameTools) changes.push('Tools')
     if (!sameBlueprint) changes.push('Blueprint')
 
     try {
@@ -517,20 +528,35 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         sameTimeout,
         sameSystemPrompt,
         samePreviewPrompts,
+        sameTools,
         sameBlueprint,
         agentPreviewPrompts: agentCore.previewPrompts,
         templatePreviewPrompts: templateCore.previewPrompts,
         agentBlueprintLen: agentBlueprintStr.length,
         templateBlueprintLen: templateBlueprintStr.length,
+        currentTools,
+        baselineTools,
       })
     } catch {
       // ignore logging errors
     }
 
-    const differs = !(sameName && sameDescription && sameModel && sameCategory && sameTemperature && sameMaxTokens && sameTimeout && sameSystemPrompt && samePreviewPrompts && sameBlueprint)
+    const differs = !(
+      sameName &&
+      sameDescription &&
+      sameModel &&
+      sameCategory &&
+      sameTemperature &&
+      sameMaxTokens &&
+      sameTimeout &&
+      sameSystemPrompt &&
+      samePreviewPrompts &&
+      sameTools &&
+      sameBlueprint
+    )
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate])
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)

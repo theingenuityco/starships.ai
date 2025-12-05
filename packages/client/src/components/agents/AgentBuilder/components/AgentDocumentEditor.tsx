@@ -77,6 +77,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
   const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
 
+  // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
+  // It appears only after the main page header scrolls away.
+  const [showIdentityInBanner, setShowIdentityInBanner] = useState(false)
+
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
 
@@ -119,7 +123,41 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
 
-  // No-op: compact header in sticky banner is always shown for existing agents now (simpler and more robust than scroll detection).
+  // Show compact identity in the sticky banner only after the main page header scrolls out of view.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+    const headerEl = document.getElementById('agent-page-header')
+    if (!headerEl) {
+      // Fallback: always show if we can't find the header
+      setShowIdentityInBanner(true)
+      return
+    }
+
+    if (!('IntersectionObserver' in window)) {
+      setShowIdentityInBanner(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        const entry = entries[0]
+        if (!entry) return
+        const isHeaderMostlyVisible = entry.intersectionRatio > 0.2
+        setShowIdentityInBanner(!isHeaderMostlyVisible)
+      },
+      {
+        root: null,
+        threshold: [0, 0.2, 1],
+      }
+    )
+
+    observer.observe(headerEl)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   const formatUpdatedAt = (dateString: string) => {
     if (!dateString) return ''
@@ -738,13 +776,15 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {agentId && (
           <div className="flex items-center gap-4 text-sm">
             {/* Avatar + name/slug on the far left */}
-            <div className="flex items-center gap-2">
-              <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={32} rounded className="h-8 w-8 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
-              <div className="flex flex-col leading-tight min-w-0">
-                <span className="text-sm font-semibold truncate">{fullAgent?.name || value.name || 'Untitled agent'}</span>
-                {(fullAgent?.slug || value.slug) && <span className="text-[11px] text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
+            {showIdentityInBanner && (
+              <div className="flex items-center gap-2">
+                <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={32} rounded className="h-8 w-8 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
+                <div className="flex flex-col leading-tight min-w-0">
+                  <span className="text-sm font-semibold truncate">{fullAgent?.name || value.name || 'Untitled agent'}</span>
+                  {(fullAgent?.slug || value.slug) && <span className="text-[11px] text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Text stack to the right of avatar/name */}
             <div className="flex flex-col gap-1">

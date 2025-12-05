@@ -37,6 +37,7 @@ import { getEnvConfig } from '@starships/env';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
+import isEqual from 'lodash/isEqual';
 
 export interface ConversationRequest {
   agentId: string;
@@ -1033,7 +1034,7 @@ export class AgentService {
       const agentCore = normalizeCore(agent);
       const templateCore = normalizeCore(template);
 
-      const hasDiff = JSON.stringify(agentCore) !== JSON.stringify(templateCore);
+      const hasDiff = !isEqual(agentCore, templateCore);
       if (!hasDiff) {
         throw new ValidationError('Agent has no changes compared to its published template');
       }
@@ -1064,19 +1065,13 @@ export class AgentService {
       requestedVersion = '1.0.0';
     }
 
-    const updated = await this.agentRepository.update(agentId, {
+    return await this.agentRepository.requestPublicationAtomic(agentId, {
       publicationStatus: 'pending_approval',
       publicationRequestedBy: userId,
       publicationVersionBump: options.versionBump,
       publicationRequestedVersion: requestedVersion,
       publicationChangelog: options.changelog,
     });
-
-    if (!updated) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    return updated;
   }
 
   /**

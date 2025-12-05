@@ -14,6 +14,7 @@ import {
   MIN_AGENT_MAX_TOKENS,
   MIN_AGENT_TIMEOUT_MS,
 } from '@/constants/agentDefaults';
+import { ValidationError } from '@starships/errors';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
@@ -611,6 +612,86 @@ export class AgentRepository extends BaseRepository {
       'updateFromTemplate',
       'Agent',
       agentId
+    );
+  }
+
+  /**
+   * Atomically mark an agent as pending publication and persist request metadata.
+   *
+   * Uses SELECT ... FOR UPDATE inside a transaction to prevent concurrent
+   * publication requests from both succeeding when the agent is already pending.
+   */
+  async requestPublicationAtomic(
+    id: string,
+    updates: {
+      publicationStatus: AgentModel['publicationStatus'];
+      publicationRequestedBy: string;
+      publicationVersionBump: 'patch' | 'minor' | 'major';
+      publicationRequestedVersion: string;
+      publicationChangelog: string;
+    }
+  ): Promise<AgentModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        const agent = await connection.transaction<AgentModel | null>(async (client) => {
+          // Lock the agent row to serialize concurrent publication requests
+          const selectRes = await client.query<Record<string, unknown>>('SELECT * FROM agents WHERE id = $1 FOR UPDATE', [id]);
+          const row = selectRes.rows?.[0];
+
+          if (!row) {
+            this.handleNotFound('Agent', id);
+          }
+
+          const currentAgent = fromDatabase(AgentEntity, row as Record<string, unknown>);
+
+          // If another request already moved this agent to pending_approval,
+          // surface the same validation error as the service-level guard.
+          if (currentAgent.publicationStatus === 'pending_approval') {
+            throw new ValidationError('Agent is already pending approval');
+          }
+
+          const updateRes = await client.query<Record<string, unknown>>(
+            `
+            UPDATE agents
+            SET
+              publication_status = $2,
+              publication_requested_by = $3,
+              publication_version_bump = $4,
+              publication_requested_version = $5,
+              publication_changelog = $6,
+              updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [
+              id,
+              updates.publicationStatus,
+              updates.publicationRequestedBy,
+              updates.publicationVersionBump,
+              updates.publicationRequestedVersion,
+              updates.publicationChangelog,
+            ]
+          );
+
+          const updatedRow = updateRes.rows?.[0];
+          if (!updatedRow) {
+            this.handleNotFound('Agent', id);
+          }
+
+          return fromDatabase(AgentEntity, updatedRow as Record<string, unknown>);
+        });
+
+        if (!agent) {
+          this.handleNotFound('Agent', id);
+        }
+
+        return agent;
+      },
+      'requestPublicationAtomic',
+      'Agent',
+      id
     );
   }
 }

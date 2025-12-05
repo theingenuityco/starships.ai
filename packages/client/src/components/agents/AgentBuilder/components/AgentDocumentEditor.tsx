@@ -716,7 +716,16 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
         {agentId && (
           <div className="flex flex-col gap-1 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Save indicator */}
+            <div className="flex items-center gap-1 text-xs font-medium">
+              <div className="w-3 h-3 flex items-center justify-center">
+                <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+              </div>
+              <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+            </div>
+
+            {/* Status & Version */}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
               <span
                 className={cn(
                   'inline-flex items-center gap-1 font-medium',
@@ -742,8 +751,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               )}
             </div>
 
+            {/* Last updated */}
             {fullAgent?.updatedAt && (
-              <div className="inline-flex items-center gap-1 text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 <Icon name="clock" className="w-3 h-3" />
                 <span>Last updated {new Date(fullAgent.updatedAt).toLocaleString()}</span>
               </div>
@@ -760,10 +770,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 text-[11px] font-medium">
-              <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
-              <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
-            </div>
             {hasExistingAgent && (
               <Button
                 type="button"

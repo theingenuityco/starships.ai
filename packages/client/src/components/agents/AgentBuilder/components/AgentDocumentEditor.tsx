@@ -1118,58 +1118,43 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
             <div className="w-[260px]">
-              {isTemplateAgent || readOnly ? (
-                <div className="flex items-center rounded-xl h-7 px-2 border border-border/20 bg-muted/20 opacity-60 cursor-not-allowed w-full">
-                  {selectedToolSlugs.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">No tools assigned</span>
-                  ) : (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {selectedToolSlugs.map(slug => (
-                        <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
-                          <Icon name="wrench" />
-                          <span className="font-mono truncate max-w-[140px]">{slug}</span>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <StandardSelect
-                  mode="multiple"
-                  aria-label="Select tools"
-                  value={selectedToolSlugs}
-                  options={allToolOptions.map(slug => ({
-                    value: slug,
-                    label: (
-                      <span className="flex items-center gap-2">
-                        <Icon name="wrench" className="w-3 h-3" />
-                        <span className="font-mono text-xs">{slug}</span>
-                      </span>
-                    ),
-                    keywords: slug,
-                  }))}
-                  placeholder="Select tools"
-                  searchPlaceholder="Search tools..."
-                  emptyLabel="No tools found."
-                  triggerClassName="w-full"
-                  renderTriggerLabel={({ selectedOptions }) => {
-                    if (!selectedOptions.length) {
-                      return <span className="text-xs text-muted-foreground">Select tools</span>
-                    }
-                    const values = selectedOptions.map(opt => String(opt.value))
-                    let label: string
-                    if (values.length <= 3) {
-                      label = values.join(', ')
-                    } else {
-                      label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
-                    }
-                    return <span className="text-xs font-mono truncate max-w-full">{label}</span>
-                  }}
-                  onOptionToggle={(slug, wasSelected) => {
-                    void handleToggleTool(slug, wasSelected)
-                  }}
-                />
-              )}
+              <StandardSelect
+                mode="multiple"
+                aria-label="Select tools"
+                disabled={isTemplateAgent || readOnly}
+                value={selectedToolSlugs}
+                options={allToolOptions.map(slug => ({
+                  value: slug,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <Icon name="wrench" className="w-3 h-3" />
+                      <span className="font-mono text-xs">{slug}</span>
+                    </span>
+                  ),
+                  keywords: slug,
+                }))}
+                placeholder="Select tools"
+                searchPlaceholder="Search tools..."
+                emptyLabel="No tools found."
+                triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
+                renderTriggerLabel={({ selectedOptions }) => {
+                  if (!selectedOptions.length) {
+                    return <span className="text-xs text-muted-foreground">{isTemplateAgent || readOnly ? 'No tools assigned' : 'Select tools'}</span>
+                  }
+                  const values = selectedOptions.map(opt => String(opt.value))
+                  let label: string
+                  if (values.length <= 3) {
+                    label = values.join(', ')
+                  } else {
+                    label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
+                  }
+                  return <span className="text-xs font-mono truncate max-w-full">{label}</span>
+                }}
+                onOptionToggle={(slug, wasSelected) => {
+                  if (isTemplateAgent || readOnly) return
+                  void handleToggleTool(slug, wasSelected)
+                }}
+              />
             </div>
           </div>
         </div>

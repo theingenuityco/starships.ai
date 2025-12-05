@@ -211,7 +211,7 @@ async function deployNewDocTools(starshipId: string): Promise<{
     const agents = await agentRepo.findByStarship(starshipId);
     const daedalusTemplateId = await findDaedalusTemplateId();
 
-    const daedalusAgent = agents.find((agent) => agent.templateId === daedalusTemplateId);
+    const daedalusAgent = agents.find((agent) => agent.sourceTemplateId === daedalusTemplateId);
 
     if (!daedalusAgent) {
       logger.info(`No Daedalus agent found in starship ${starshipId}`);

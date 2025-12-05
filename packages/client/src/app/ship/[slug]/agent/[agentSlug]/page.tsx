@@ -2,24 +2,28 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
-import { useStarshipBySlug } from '@/hooks/useStarships'
-import api, { agentAPI } from '@/lib/api'
-import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
-import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
-import { AgentSelector } from '@/components/conversation/AgentSelector'
-import { AGENT_QUERY_KEYS, useAgentBySlugOrId, useStarshipAgents } from '@/hooks/useAgents'
 import { useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import type { ApiResponse, AgentModel } from '@starships/protocol'
-import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
-import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
+
+import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
+import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
+import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
+import { AgentSelector } from '@/components/conversation/AgentSelector'
+import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import { useStarshipBySlug } from '@/hooks/useStarships'
+import api, { agentAPI } from '@/lib/api'
+import { AGENT_QUERY_KEYS, useAgentBySlugOrId, useStarshipAgents } from '@/hooks/useAgents'
+import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
-import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
-import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
+import { Badge } from '@/components/ui/badge'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -816,60 +820,113 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }
 
+  const headerAgentName = existingAgent?.name || (selectedAgent as any)?.name || (agentSlug === 'new' ? 'New agent' : String(agentSlug))
+
+  const headerAgentSubtitle = existingAgent?.slug || (selectedAgent as any)?.slug || (agentSlug !== 'new' ? String(agentSlug) : undefined)
+
   if (!starship?.id) return null
 
   return (
-    <div className="relative h-screen w-full">
-      <AgentCreatedModal
-        open={deferredAgentCreate.isOpen}
-        names={deferredAgentCreate.createdNames}
-        onOpenChange={deferredAgentCreate.setIsOpen}
-        onChatWithAgent={deferredAgentCreate.chatWithAgent}
-        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
-        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
-      />
-      <ToolCreatedModal
-        open={deferredToolCreate.isOpen}
-        names={deferredToolCreate.createdNames}
-        onOpenChange={deferredToolCreate.setIsOpen}
-        onOpenTool={deferredToolCreate.openToolInBuilder}
-        slugs={deferredToolCreate.createdSlugs}
-        tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
-        onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
-      />
-      <AgentBuilderView
-        ref={agentBuilderRef}
-        starshipId={starship.id}
-        onCancel={handleCancel}
-        initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
-        errorMessage={agentOpenError || undefined}
-      />
-      {conversationId && (
-        <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
-          <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
-            <div className="max-w-2xl mx-auto pointer-events-auto">
-              <ConversationMessageInput
-                ref={messageInputRef}
-                selectedAgent={selectedAgent}
-                starshipId={starship.id}
-                conversationId={conversationId}
-                isToolFormOpen={true}
-                minimal={true}
-                showExpandableOverlay={true}
-                isOverlayExpanded={isOverlayExpanded}
-                onFocus={() => {
-                  if (!isResponding) setIsOverlayExpanded(true)
-                }}
-                onBlur={() => setIsOverlayExpanded(false)}
-                onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
-                starshipSlug={slug}
-              >
-                <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
-              </ConversationMessageInput>
+    <div className="bg-background min-h-screen">
+      <div className="flex flex-col items-center px-6 py-6">
+        <div className="w-full max-w-6xl mx-auto space-y-0">
+          {/* Page header - mirrors ship agents/tools overview pages */}
+          <div id="agent-page-header" className="text-center mt-10">
+            <div className="flex flex-col items-center justify-center gap-2 mb-2">
+              <AgentAvatar seed={headerAgentName} size={80} rounded className="h-20 w-20 rounded-2xl overflow-hidden ring-2 ring-primary/60 shadow-lg bg-background/80" />
+              <div className="flex flex-col items-center">
+                <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href={`/ship/${slug}`} className="font-mono">
+                      <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
+                        {slug}
+                      </Badge>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href={`/ship/${slug}/agents`}>
+                      <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30 hover:text-foreground">
+                        Agents
+                      </Badge>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>
+                      <Badge variant="outline" className="text-foreground">
+                        {headerAgentSubtitle || (agentSlug === 'new' ? 'new' : 'details')}
+                      </Badge>
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
           </div>
-        </ConversationStreamProvider>
-      )}
+
+          <div className="relative w-full rounded-2xl bg-background/80 shadow-sm min-h-[600px] mb-16">
+            <AgentCreatedModal
+              open={deferredAgentCreate.isOpen}
+              names={deferredAgentCreate.createdNames}
+              onOpenChange={deferredAgentCreate.setIsOpen}
+              onChatWithAgent={deferredAgentCreate.chatWithAgent}
+              onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
+              agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
+            />
+            <ToolCreatedModal
+              open={deferredToolCreate.isOpen}
+              names={deferredToolCreate.createdNames}
+              onOpenChange={deferredToolCreate.setIsOpen}
+              onOpenTool={deferredToolCreate.openToolInBuilder}
+              slugs={deferredToolCreate.createdSlugs}
+              tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
+              onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
+            />
+
+            <div className="relative h-full w-full">
+              <AgentBuilderView
+                ref={agentBuilderRef}
+                starshipId={starship.id}
+                onCancel={handleCancel}
+                initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
+                errorMessage={agentOpenError || undefined}
+              />
+
+              {conversationId && (
+                <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
+                  <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
+                    <div className="max-w-2xl mx-auto pointer-events-auto">
+                      <ConversationMessageInput
+                        ref={messageInputRef}
+                        selectedAgent={selectedAgent}
+                        starshipId={starship.id}
+                        conversationId={conversationId}
+                        isToolFormOpen={true}
+                        minimal={true}
+                        showExpandableOverlay={true}
+                        isOverlayExpanded={isOverlayExpanded}
+                        onFocus={() => {
+                          if (!isResponding) setIsOverlayExpanded(true)
+                        }}
+                        onBlur={() => setIsOverlayExpanded(false)}
+                        onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
+                        starshipSlug={slug}
+                      >
+                        <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
+                      </ConversationMessageInput>
+                    </div>
+                  </div>
+                </ConversationStreamProvider>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

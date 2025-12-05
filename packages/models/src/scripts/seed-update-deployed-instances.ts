@@ -51,19 +51,19 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
   // Process agents
   try {
     const agents = await agentRepo.findByStarship(starshipId);
-    const templateAgents = agents.filter((agent) => agent.templateId);
+    const templateAgents = agents.filter((agent) => agent.sourceTemplateId);
 
     stats.agentsChecked = templateAgents.length;
 
     for (const agent of templateAgents) {
       try {
-        if (!agent.templateId) continue;
+        if (!agent.sourceTemplateId) continue;
 
         // Fetch the template to compare versions
-        const template = await agentTemplateRepo.findById(agent.templateId);
+        const template = await agentTemplateRepo.findById(agent.sourceTemplateId);
 
         if (!template) {
-          logger.warn(`Agent template not found for agent ${agent.id} (templateId: ${agent.templateId})`);
+          logger.warn(`Agent template not found for agent ${agent.id} (sourceTemplateId: ${agent.sourceTemplateId})`);
           continue;
         }
 

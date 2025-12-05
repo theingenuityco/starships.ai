@@ -4,31 +4,41 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
-import AgentAvatar from '@/components/animated/AgentAvatar'
-import { ModelSelector } from './ModelSelector'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { AGENT_CATEGORIES } from '../constants'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { useQuery } from '@tanstack/react-query'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { StandardSelect } from './StandardSelect'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
-import type { ToolModel, ApiResponse, AgentModel } from '@starships/protocol'
+import type { ToolModel, ApiResponse, AgentModel, AgentTemplateModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
 import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const CATEGORY_DOT_COLORS: Record<string, string> = {
+  general: 'bg-gray-400',
+  automation: 'bg-emerald-400',
+  data: 'bg-purple-400',
+  communication: 'bg-orange-400',
+  coding: 'bg-indigo-400',
+  creative: 'bg-pink-400',
+  analysis: 'bg-cyan-400',
+  support: 'bg-amber-400',
+  utility: 'bg-teal-400',
+}
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -37,10 +47,17 @@ interface AgentDocumentEditorProps {
   onSave?: () => void
   onCancel?: () => void
   starshipId?: string
+  /**
+   * When true, renders the editor in read-only/inspection mode:
+   * - All form controls are disabled
+   * - No mutations or publish/update actions are triggered
+   */
+  readOnly?: boolean
 }
 
-export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false }: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
+  const queryClient = useQueryClient()
 
   const availableModels = useMemo(() => {
     return openRouterModels?.map(m => m.id) || []
@@ -59,14 +76,34 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Store full agent data including version info
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
+  const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
+
+  // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
+  // It appears only after the main page header scrolls away.
+  const [showIdentityInBanner, setShowIdentityInBanner] = useState(false)
 
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
 
-  // Check if this is a template-based agent (has templateId) - these are read-only
+  // Local loading state for publication request
+  const [isRequestingPublish, setIsRequestingPublish] = useState(false)
+
+  // Publication dialog state
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('patch')
+  const [changelog, setChangelog] = useState('')
+
+  // Autosave state (existing agents only)
+  const [isAutosaving, setIsAutosaving] = useState(false)
+  const [hasSaveError, setHasSaveError] = useState(false)
+
+  // Local input state for adding preview prompts
+  const [newPreviewPrompt, setNewPreviewPrompt] = useState('')
+
+  // Check if this is a template-based agent (has sourceTemplateId) - these are read-only
   const isTemplateAgent = useMemo(() => {
-    return !!fullAgent?.templateId
-  }, [fullAgent?.templateId])
+    return !!fullAgent?.sourceTemplateId
+  }, [fullAgent?.sourceTemplateId])
 
   // Update mutation for template agents
   const updateMutation = useUpdateAgentFromTemplate()
@@ -86,6 +123,60 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
+
+  // Show compact identity in the sticky banner only after the main page header scrolls out of view.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+    const headerEl = document.getElementById('agent-page-header')
+    if (!headerEl) {
+      // Fallback: always show if we can't find the header
+      setShowIdentityInBanner(true)
+      return
+    }
+
+    if (!('IntersectionObserver' in window)) {
+      setShowIdentityInBanner(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        const entry = entries[0]
+        if (!entry) return
+        const isHeaderMostlyVisible = entry.intersectionRatio > 0.2
+        setShowIdentityInBanner(!isHeaderMostlyVisible)
+      },
+      {
+        root: null,
+        threshold: [0, 0.2, 1],
+      }
+    )
+
+    observer.observe(headerEl)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
+
+  const formatUpdatedAt = (dateString: string) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return ''
+
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
 
   // Resolve current agentId by slug within this starship (if editing existing) - starship-only
   const [agentId, setAgentId] = useState<string | null>(null)
@@ -127,6 +218,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         if (!cancelled) {
           setAgentId(null)
           setFullAgent(null)
+          setPublishedTemplate(null)
         }
       }
     }
@@ -136,8 +228,37 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
   }, [starshipId, value?.slug])
 
+  // Load the published template (if any) for comparison to gate republish in UI.
+  // We bypass the templateAPI cache and fetch fresh data so the diff matches backend behavior.
+  useEffect(() => {
+    let cancelled = false
+    const loadTemplate = async () => {
+      const templateId = fullAgent?.publishedTemplateId
+      if (!templateId) {
+        setPublishedTemplate(null)
+        return
+      }
+      try {
+        const res: FetchResponse<ApiResponse<AgentTemplateModel>> = await api.get(`/api/v1/agent-templates/${templateId}`)
+        const tpl = res.data.data
+        if (!cancelled) {
+          setPublishedTemplate(tpl)
+        }
+      } catch {
+        if (!cancelled) {
+          setPublishedTemplate(null)
+        }
+      }
+    }
+    void loadTemplate()
+    return () => {
+      cancelled = true
+    }
+  }, [fullAgent?.publishedTemplateId])
+
   // Toggle tool assignment with optimistic UI and server persistence when possible
   const handleToggleTool = async (slug: string, isSelected: boolean) => {
+    if (readOnly) return
     // Prevent tool changes for template agents
     if (isTemplateAgent) {
       toast.error('Cannot modify tools', { description: 'Template agents are read-only. Use the update button to sync with the latest template version.' })
@@ -157,6 +278,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   }
 
   const handleUpdateFromTemplate = async () => {
+    if (readOnly) return
     if (!agentId) return
 
     try {
@@ -169,21 +291,69 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     }
   }
 
-  const handleNameChange = (name: string) => {
-    if (isTemplateAgent) {
-      toast.error('Cannot modify name', { description: 'Template agents are read-only' })
+  const computeNextVersion = (currentVersion: string | undefined, bump: 'patch' | 'minor' | 'major'): string => {
+    const base = currentVersion || '1.0.0'
+    const match = base.match(/^(\d+)\.(\d+)\.(\d+)/)
+    if (!match) return '1.0.0'
+
+    const major = Number(match[1])
+    const minor = Number(match[2])
+    const patch = Number(match[3])
+
+    switch (bump) {
+      case 'patch':
+        return `${major}.${minor}.${patch + 1}`
+      case 'minor':
+        return `${major}.${minor + 1}.0`
+      case 'major':
+        return `${major + 1}.0.0`
+    }
+  }
+
+  const nextVersion = useMemo(() => computeNextVersion(fullAgent?.version, versionBump), [fullAgent?.version, versionBump])
+
+  const handleRequestPublication = async () => {
+    if (readOnly) return
+    if (!agentId) return
+    if (!fullAgent) return
+
+    // Prevent duplicate requests when already pending; allow republish for already-published templates
+    if (fullAgent.publicationStatus === 'pending_approval') {
       return
     }
-    const shouldUpdateSlug = !value.slug || value.slug === generatedSlug
-    onFieldChange?.('name', name)
-    if (shouldUpdateSlug) {
-      const slugified = name
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-      onFieldChange?.('slug', slugified)
+    if (fullAgent.publicationStatus === 'published' && !fullAgent.publishedTemplateId) {
+      return
+    }
+
+    if (!changelog.trim()) {
+      toast.error('Changelog required', { description: 'Please provide a short changelog describing your changes.' })
+      return
+    }
+
+    try {
+      setIsRequestingPublish(true)
+      const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publish-request`, {
+        versionBump,
+        changelog: changelog.trim(),
+      })
+      const updated = res.data.data.agent
+
+      // Update local fullAgent state so UI reflects new status immediately
+      setFullAgent(updated)
+
+      // Update cached agent detail as well
+      queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+
+      toast.success('Publication requested', {
+        description: res.data.data.message || 'Your agent is now pending review for publication.',
+      })
+      setShowPublishDialog(false)
+      setChangelog('')
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to request publication'
+      toast.error('Failed to request publication', { description: message })
+    } finally {
+      setIsRequestingPublish(false)
     }
   }
 
@@ -239,6 +409,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
         if (!value.description && agent.description) onFieldChange?.('description', agent.description)
         if (!value.model && agent.model) onFieldChange?.('model', agent.model)
+        if ((!value.category || value.category === 'general') && (agent as any).category) {
+          onFieldChange?.('category', (agent as any).category as any)
+        }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
@@ -259,10 +432,287 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     void syncAgent()
   }, [agentId, value, onChange])
 
+  const publicationStatus = fullAgent?.publicationStatus || 'draft'
+  const hasExistingAgent = !!agentId
+
+  // Determine if this agent differs from its published template (if any)
+  const { differsFromPublishedTemplate, publishedChangeDetails } = useMemo(() => {
+    if (!fullAgent?.publishedTemplateId || !publishedTemplate) {
+      return { differsFromPublishedTemplate: false, publishedChangeDetails: [] as string[] }
+    }
+
+    const normalizePrompts = (prompts?: string[] | null): string[] => (prompts || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean)
+    const normalizeSlugs = (slugs?: string[] | null): string[] =>
+      (slugs || [])
+        .map(s => (typeof s === 'string' ? s.trim() : ''))
+        .filter(Boolean)
+        .sort()
+
+    const normalizeCore = (src: {
+      name?: string | null
+      description?: string | null
+      model?: string | null
+      category?: string | null
+      temperature?: number | null
+      maxTokens?: number | null
+      timeout?: number | null
+      systemPrompt?: string | null
+      blueprint?: unknown
+      previewPrompts?: string[] | null
+    }) => {
+      const blueprint = src.blueprint && typeof src.blueprint === 'object' ? src.blueprint : { nodes: [], edges: [] }
+      // Align with backend defaults: treat missing temperature as DEFAULT_AGENT_TEMPERATURE (0.7)
+      const normalizedTemperature = typeof src.temperature === 'number' ? src.temperature : 0.7
+      return {
+        name: src.name ?? '',
+        description: src.description ?? '',
+        model: src.model ?? '',
+        category: src.category ?? 'general',
+        temperature: normalizedTemperature,
+        maxTokens: src.maxTokens ?? null,
+        timeout: src.timeout ?? null,
+        systemPrompt: src.systemPrompt ?? '',
+        blueprint,
+        previewPrompts: normalizePrompts(src.previewPrompts),
+      }
+    }
+
+    const agentCore = normalizeCore(fullAgent as any)
+    const templateCore = normalizeCore(publishedTemplate as any)
+
+    const sameName = agentCore.name === templateCore.name
+    const sameDescription = agentCore.description === templateCore.description
+    const sameModel = agentCore.model === templateCore.model
+    const sameCategory = (agentCore as any).category === (templateCore as any).category
+    const sameTemperature = agentCore.temperature === templateCore.temperature
+    const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
+    const sameTimeout = agentCore.timeout === templateCore.timeout
+    const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
+    const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
+
+    // Tool comparison: compare current assignedToolSlugs in the form against the baseline tools from the template.
+    const currentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
+    const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
+    const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
+
+    const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
+    const templateBlueprintStr = JSON.stringify(templateCore.blueprint)
+    const sameBlueprint = agentBlueprintStr === templateBlueprintStr
+
+    const changes: string[] = []
+    if (!sameName) changes.push('Name')
+    if (!sameDescription) changes.push('Description')
+    if (!sameModel) changes.push('Model')
+    if (!sameCategory) changes.push('Category')
+    if (!sameTemperature) changes.push('Temperature')
+    if (!sameMaxTokens) changes.push('Max tokens')
+    if (!sameTimeout) changes.push('Timeout')
+    if (!sameSystemPrompt) changes.push('System prompt')
+    if (!samePreviewPrompts) changes.push('Preview prompts')
+    if (!sameTools) changes.push('Tools')
+    if (!sameBlueprint) changes.push('Blueprint')
+
+    try {
+      console.debug('[AgentDocEditor] template-diff-debug', {
+        agentId: fullAgent.id,
+        publishedTemplateId: fullAgent.publishedTemplateId,
+        sameName,
+        sameDescription,
+        sameModel,
+        sameCategory,
+        sameTemperature,
+        sameMaxTokens,
+        sameTimeout,
+        sameSystemPrompt,
+        samePreviewPrompts,
+        sameTools,
+        sameBlueprint,
+        agentPreviewPrompts: agentCore.previewPrompts,
+        templatePreviewPrompts: templateCore.previewPrompts,
+        agentBlueprintLen: agentBlueprintStr.length,
+        templateBlueprintLen: templateBlueprintStr.length,
+        currentTools,
+        baselineTools,
+      })
+    } catch {
+      // ignore logging errors
+    }
+
+    const differs = !(
+      sameName &&
+      sameDescription &&
+      sameModel &&
+      sameCategory &&
+      sameTemperature &&
+      sameMaxTokens &&
+      sameTimeout &&
+      sameSystemPrompt &&
+      samePreviewPrompts &&
+      sameTools &&
+      sameBlueprint
+    )
+
+    return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs])
+
+  const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
+  const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
+
+  // Debug logging for publishability pipeline – helps trace why an agent is (re)publishable
+  useEffect(() => {
+    try {
+      console.debug('[AgentDocEditor] publish-debug', {
+        agentId,
+        fullAgentId: fullAgent?.id,
+        publicationStatus,
+        hasExistingAgent,
+        isTemplateAgent,
+        readOnly,
+        hasPublishedTemplateId: !!fullAgent?.publishedTemplateId,
+        differsFromPublishedTemplate,
+        isRepublishable,
+        canRequestPublication,
+      })
+    } catch {
+      // ignore logging errors
+    }
+  }, [agentId, fullAgent?.id, fullAgent?.publishedTemplateId, publicationStatus, hasExistingAgent, isTemplateAgent, readOnly, differsFromPublishedTemplate, isRepublishable, canRequestPublication])
+
+  // Autosave agent changes for existing (non-template) agents
+  useEffect(() => {
+    if (!agentId) return
+    if (readOnly) return
+    if (isTemplateAgent) return
+    if (!fullAgent) return
+
+    // Build update payload from current form value
+    const buildUpdates = (): UpdateAgentRequest => {
+      let blueprintObj: any | undefined
+      if (value.blueprint && value.blueprint.trim() !== '') {
+        try {
+          blueprintObj = JSON.parse(value.blueprint)
+        } catch {
+          // Leave blueprint undefined if invalid JSON – backend keeps last valid version
+        }
+      }
+
+      const updates: UpdateAgentRequest = {}
+
+      // Only send fields that are actually different from the current persisted agent
+      const base = fullAgent
+
+      if (value.name && value.name.trim().length > 0 && value.name !== base.name) {
+        updates.name = value.name
+      }
+
+      if (typeof value.description === 'string') {
+        const nextDesc = value.description ?? ''
+        const baseDesc = base.description ?? ''
+        if (nextDesc !== baseDesc) {
+          updates.description = nextDesc
+        }
+      }
+
+      if (value.model && value.model.trim().length > 0 && value.model !== base.model) {
+        updates.model = value.model
+      }
+
+      if (value.category && (fullAgent as any).category !== value.category) {
+        ;(updates as any).category = value.category
+      }
+
+      // Clamp numeric fields into valid ranges before sending, and compare to base
+      if (typeof value.temperature === 'number') {
+        const clampedTemp = Math.min(2, Math.max(0, value.temperature))
+        if (base.temperature == null || Number(base.temperature) !== clampedTemp) {
+          updates.temperature = clampedTemp
+        }
+      }
+
+      if (typeof value.maxTokens === 'number') {
+        const clampedMaxTokens = Math.min(100000, Math.max(1, value.maxTokens))
+        if (base.maxTokens == null || Number(base.maxTokens) !== clampedMaxTokens) {
+          updates.maxTokens = clampedMaxTokens
+        }
+      }
+
+      if (typeof value.timeout === 'number') {
+        const clampedTimeout = Math.min(600000, Math.max(1000, value.timeout))
+        if (base.timeout == null || Number(base.timeout) !== clampedTimeout) {
+          updates.timeout = clampedTimeout
+        }
+      }
+
+      if (typeof value.systemPrompt === 'string') {
+        const nextPrompt = value.systemPrompt ?? ''
+        const basePrompt = base.systemPrompt ?? ''
+        if (nextPrompt !== basePrompt) {
+          updates.systemPrompt = nextPrompt
+        }
+      }
+
+      if (Array.isArray(value.previewPrompts)) {
+        const nextPrompts = (value.previewPrompts || []).map(s => s.trim()).filter(Boolean)
+        const basePrompts = (base.previewPrompts || []).map(s => s.trim()).filter(Boolean)
+        const sameLength = nextPrompts.length === basePrompts.length
+        const sameContent = sameLength && nextPrompts.every((p, i) => p === basePrompts[i])
+        if (!sameContent) {
+          updates.previewPrompts = nextPrompts
+        }
+      }
+
+      if (blueprintObj) {
+        const baseBlueprint = base.blueprint ?? { nodes: [], edges: [] }
+        const nextStr = JSON.stringify(blueprintObj)
+        const baseStr = JSON.stringify(baseBlueprint)
+        if (nextStr !== baseStr) {
+          ;(updates as any).blueprint = blueprintObj
+        }
+      }
+
+      return updates
+    }
+
+    let cancelled = false
+    setHasSaveError(false)
+
+    const timeout = setTimeout(async () => {
+      try {
+        const updates = buildUpdates()
+        // Skip network call if there are no actual changes
+        if (Object.keys(updates).length === 0) {
+          return
+        }
+        setIsAutosaving(true)
+        const res: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
+        const updated = res.data.data
+
+        if (!cancelled && updated) {
+          setFullAgent(updated)
+          // Keep React Query cache in sync for this agent
+          queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setHasSaveError(true)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsAutosaving(false)
+        }
+      }
+    }, 800)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [agentId, value, readOnly, isTemplateAgent, queryClient, fullAgent])
+
   return (
-    <div className="space-y-4 pt-14 pb-28">
+    <div className="pt-4 pb-20">
       {/* Template Agent Update Banner */}
-      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && (
+      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -311,8 +761,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     color: 'rgb(139, 92, 246)',
                   }}
                 >
-                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                  v{fullAgent?.updateInfo?.latestVersion}
+                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />v{fullAgent?.updateInfo?.latestVersion}
                 </Badge>
               </div>
             </div>
@@ -334,7 +783,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       )}
 
       {/* Update Confirmation Dialog */}
-      <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+      <Dialog open={showUpdateDialog && !readOnly} onOpenChange={setShowUpdateDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Agent</DialogTitle>
@@ -354,9 +803,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
 
             <div className="text-sm bg-muted/50 p-4 rounded-lg border">
-              <p className="text-muted-foreground">
-                This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.
-              </p>
+              <p className="text-muted-foreground">This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.</p>
             </div>
 
             {fullAgent?.updateInfo?.templateUpdatedAt && (
@@ -378,308 +825,599 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         </DialogContent>
       </Dialog>
 
-      {/* Title */}
-      <div className="space-y-4">
-        <div className="space-y-6">
-          <AgentAvatar seed={value.name} size={64} className="rounded-md overflow-hidden" />
-          <div className="space-y-1">
-            <div className="flex items-baseline gap-3">
-              <input
-                className="flex-1 bg-transparent border-none text-3xl md:text-4xl font-extrabold tracking-tight outline-none focus:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                placeholder="Untitled Agent"
-                value={value.name}
-                onChange={e => handleNameChange(e.target.value)}
-                disabled={isTemplateAgent}
-              />
-              {isTemplateAgent && fullAgent?.version && (
-                <span className="text-sm font-mono text-muted-foreground">v{fullAgent.version}</span>
+      {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
+      <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
+        {agentId && (
+          <div className="flex items-center gap-4 text-sm">
+            {/* Avatar + name/slug on the far left */}
+            {showIdentityInBanner && (
+              <div className="flex items-center gap-3">
+                <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={36} rounded className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
+                <div className="flex flex-col leading-tight min-w-0">
+                  <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
+                  {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
+                </div>
+              </div>
+            )}
+
+            {/* Text stack to the right of avatar/name */}
+            <div className="flex flex-col gap-2">
+              {/* Save indicator */}
+              <div className="flex items-center gap-1 text-xs font-medium">
+                <div className="w-3 h-3 flex items-center justify-center">
+                  <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+                </div>
+                <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+              </div>
+
+              {/* Status, Version & Last updated */}
+              <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 font-medium',
+                    publicationStatus === 'published'
+                      ? 'text-emerald-500'
+                      : publicationStatus === 'pending_approval'
+                        ? 'text-amber-500'
+                        : publicationStatus === 'rejected'
+                          ? 'text-red-500'
+                          : 'text-muted-foreground'
+                  )}
+                >
+                  <Icon
+                    name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
+                    className="w-3 h-3"
+                  />
+                  <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
+                </span>
+                {fullAgent?.version && (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
+                    <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+                  </span>
+                )}
+                {fullAgent?.updatedAt && (
+                  <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                    <Icon name="clock" className="w-3 h-3" />
+                    <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                  </div>
+                )}
+              </div>
+
+              {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  {publicationStatus === 'pending_approval' && <span>Awaiting review for publication.</span>}
+                  {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
+                </div>
               )}
             </div>
-            <div className="text-xs text-muted-foreground font-mono pl-1">/{value.slug || generatedSlug}</div>
           </div>
-        </div>
+        )}
+
+        {!readOnly && (
+          <div className="flex flex-col gap-1 items-start sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              {hasExistingAgent && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primaryOutline"
+                  className="gap-1.5"
+                  disabled={isRequestingPublish || !canRequestPublication}
+                  onClick={() => {
+                    if (canRequestPublication) {
+                      setShowPublishDialog(true)
+                    }
+                  }}
+                >
+                  <Icon name="rocket-launch" className="w-3.5 h-3.5" />
+                  {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
+                </Button>
+              )}
+              {!hasExistingAgent && onSave && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    onSave()
+                  }}
+                >
+                  Save
+                </Button>
+              )}
+            </div>
+
+            {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
+                    {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
+                  </button>
+                </TooltipTrigger>
+                {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
+                  <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
+                    <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                      {publishedChangeDetails.map(change => (
+                        <li key={change}>{change}</li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Quick selectors */}
-      <div className="space-y-8">
+      {/* Publication Request Dialog */}
+      <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Request: Publish to marketplace</DialogTitle>
+            <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to the community marketplace.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground mb-1">Current version</p>
+                <p className="font-mono font-semibold text-base">v{fullAgent?.version || '1.0.0'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">New version</p>
+                <p className="font-mono font-semibold text-base text-emerald-600">v{nextVersion}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">Version bump</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(
+                  [
+                    {
+                      value: 'major' as const,
+                      title: 'Major',
+                      summary: 'Big changes',
+                      description: 'Breaking changes or large updates that may impact users.',
+                    },
+                    {
+                      value: 'minor' as const,
+                      title: 'Minor',
+                      summary: 'New features',
+                      description: 'Adds features in a backwards-compatible way.',
+                    },
+                    {
+                      value: 'patch' as const,
+                      title: 'Patch',
+                      summary: 'Small fixes',
+                      description: 'Tiny adjustments and bug fixes; no breaking changes.',
+                    },
+                  ] as const
+                ).map(option => {
+                  const isSelected = versionBump === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setVersionBump(option.value)}
+                      className={cn(
+                        'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
+                        'hover:bg-muted/60',
+                        isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold">{option.title}</span>
+                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">{option.summary}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="publication-changelog" className="text-xs">
+                Changelog
+              </Label>
+              <textarea
+                id="publication-changelog"
+                className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Summarize what changed in this version for reviewers…"
+                value={changelog}
+                onChange={e => setChangelog(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">This will be shown to reviewers when they evaluate your publication request.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPublishDialog(false)} disabled={isRequestingPublish}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleRequestPublication()} disabled={isRequestingPublish}>
+              {isRequestingPublish ? 'Submitting…' : 'Submit for review'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick selectors + core fields */}
+      <div className="space-y-2 mb-4">
         {/* Category section */}
-        <div className="border-b border-border/10 pb-6">
-          <div className="flex items-center gap-4 px-3">
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild disabled={isTemplateAgent}>
-                <div
-                  role="button"
-                  aria-label="Change category"
-                  className={cn(
-                    "flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20",
-                    isTemplateAgent ? "opacity-60 cursor-not-allowed" : "cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
-                  )}
-                >
-                  <Badge variant="outline" className={cn('m-0 gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3', getCategoryColor(value.category))}>
-                    {getCategoryIcon(value.category)}
-                    <span className="capitalize">{value.category}</span>
-                  </Badge>
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="p-1 w-auto frosted-glass-card rounded-xl shadow-frosted-lg cursor-pointer">
-                <div className="flex flex-col gap-0">
-                  {AGENT_CATEGORIES.map(cat => {
-                    const isSelected = value.category === cat
-                    return (
-                      <DropdownMenuItem key={cat} className="px-1.5 py-0.5 cursor-pointer" onSelect={() => onChange({ ...value, category: cat as any })}>
-                        <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
-                          {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'm-0 inline-flex w-auto max-w-max items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
-                              isSelected ? getCategoryColor(cat) : 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
-                            )}
-                          >
-                            {getCategoryIcon(cat)}
-                            <span className="capitalize">{cat}</span>
-                          </Badge>
-                        </div>
-                      </DropdownMenuItem>
-                    )
-                  })}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="w-[260px]">
+              <StandardSelect
+                mode="single"
+                aria-label="Change category"
+                disabled={isTemplateAgent || readOnly}
+                value={value.category}
+                options={AGENT_CATEGORIES.map(cat => ({
+                  value: cat,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <span className={cn('h-2 w-2 rounded-full', CATEGORY_DOT_COLORS[cat] || CATEGORY_DOT_COLORS.general)} />
+                      <span className="capitalize">{cat}</span>
+                    </span>
+                  ),
+                  keywords: cat,
+                }))}
+                placeholder="Select a category"
+                triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
+                onChange={cat => {
+                  onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Model section */}
-        <div className="border-b border-border/10 pb-6">
-          <div className="flex items-center gap-4 px-3">
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
-            <Select value={value.model} onValueChange={m => onFieldChange?.('model', m)} disabled={isLoadingModels || isTemplateAgent}>
-              <SelectTrigger className="h-7 w-[220px] text-xs rounded-xl">
-                <SelectValue placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'} />
-              </SelectTrigger>
-              <SelectContent className="w-[300px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-                {availableModels.map(m => (
-                  <SelectItem key={m} value={m} className="text-xs px-2 py-1">
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-[260px]">
+              <StandardSelect
+                mode="single"
+                aria-label="Select model"
+                disabled={isLoadingModels || isTemplateAgent || readOnly}
+                value={value.model}
+                options={availableModels.map(m => ({
+                  value: m,
+                  label: <span className="font-mono text-xs">{m}</span>,
+                  keywords: m,
+                }))}
+                placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
+                searchPlaceholder="Search models..."
+                emptyLabel={isLoadingModels ? 'Loading models…' : 'No models found.'}
+                triggerClassName="w-full"
+                onChange={m => {
+                  if (typeof m === 'string') {
+                    onFieldChange?.('model', m)
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Tools section */}
-        <div className="pb-6">
-          <div className="flex items-start gap-4 px-3">
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
-            <div className="flex-1">
-              <Popover>
-                <PopoverTrigger asChild disabled={isTemplateAgent}>
-                  <div
-                    role="button"
-                    aria-label="Select tools"
-                    className={cn(
-                      "flex items-center rounded-xl h-7 px-2 transition-colors border border-border/20",
-                      isTemplateAgent ? "opacity-60 cursor-not-allowed" : "cursor-pointer select-none hover:bg-muted/30 hover:shadow-sm"
-                    )}
-                  >
-                    {selectedToolSlugs.length === 0 ? (
-                      <span className="text-xs text-muted-foreground">Select tools</span>
-                    ) : (
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {selectedToolSlugs.map(slug => (
-                          <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
-                            <Icon name="wrench" />
-                            <span className="font-mono truncate max-w-[140px]">{slug}</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {!isTemplateAgent && <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-2" />}
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-[420px] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
-                  <Command className="bg-transparent">
-                    <CommandInput placeholder="Search tools..." />
-                    <CommandEmpty className="text-xs">No tools found.</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {allToolOptions.map(slug => {
-                          const isSelected = selectedToolSlugs.includes(slug)
-                          return (
-                            <CommandItem
-                              key={slug}
-                              onSelect={() => {
-                                void handleToggleTool(slug, isSelected)
-                              }}
-                              className="text-xs px-2 py-1"
-                            >
-                              <div className={cn('flex items-center', isSelected && 'gap-1.5')}>
-                                {isSelected && <Icon name="check" className="w-3 h-3 text-green-500" />}
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    'm-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] [&>svg]:w-2.5 [&>svg]:h-2.5',
-                                    !isSelected && 'bg-muted/20 text-muted-foreground border-muted-foreground/30'
-                                  )}
-                                >
-                                  <Icon name="wrench" />
-                                  <span className="font-mono">{slug}</span>
-                                </Badge>
-                              </div>
-                            </CommandItem>
-                          )
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div className="w-[260px]">
+              {isTemplateAgent || readOnly ? (
+                <div className="flex items-center rounded-xl h-7 px-2 border border-border/20 bg-muted/20 opacity-60 cursor-not-allowed w-full">
+                  {selectedToolSlugs.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">No tools assigned</span>
+                  ) : (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {selectedToolSlugs.map(slug => (
+                        <Badge key={slug} variant="outline" className="m-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs [&>svg]:w-3 [&>svg]:h-3">
+                          <Icon name="wrench" />
+                          <span className="font-mono truncate max-w-[140px]">{slug}</span>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <StandardSelect
+                  mode="multiple"
+                  aria-label="Select tools"
+                  value={selectedToolSlugs}
+                  options={allToolOptions.map(slug => ({
+                    value: slug,
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <Icon name="wrench" className="w-3 h-3" />
+                        <span className="font-mono text-xs">{slug}</span>
+                      </span>
+                    ),
+                    keywords: slug,
+                  }))}
+                  placeholder="Select tools"
+                  searchPlaceholder="Search tools..."
+                  emptyLabel="No tools found."
+                  triggerClassName="w-full"
+                  renderTriggerLabel={({ selectedOptions }) => {
+                    if (!selectedOptions.length) {
+                      return <span className="text-xs text-muted-foreground">Select tools</span>
+                    }
+                    const values = selectedOptions.map(opt => String(opt.value))
+                    let label: string
+                    if (values.length <= 3) {
+                      label = values.join(', ')
+                    } else {
+                      label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
+                    }
+                    return <span className="text-xs font-mono truncate max-w-full">{label}</span>
+                  }}
+                  onOptionToggle={(slug, wasSelected) => {
+                    void handleToggleTool(slug, wasSelected)
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+              <Icon name="file-text" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Description</span>
+            </div>
+            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+              <RichMarkdownEditor
+                value={value.description}
+                onChange={val => onFieldChange?.('description', val)}
+                placeholder="Write a clear description. Markdown supported."
+                className="pl-2"
+                noMinHeight
+                readOnly={readOnly}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* System Prompt */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+              <Icon name="sparkles" className="w-4 h-4" />
+              <span className="text-xs font-semibold">System Prompt</span>
+            </div>
+            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+              <RichMarkdownEditor
+                value={value.systemPrompt}
+                onChange={val => onFieldChange?.('systemPrompt', val)}
+                placeholder="Define the agent's character, mission, and behavior..."
+                className="pl-2"
+                minHeightPx={200}
+                readOnly={readOnly}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Description */}
-      <Collapsible defaultOpen={true} className="space-y-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className={cn(isTemplateAgent && "opacity-60 pointer-events-none cursor-not-allowed")}>
-            <RichMarkdownEditor value={value.description} onChange={val => onFieldChange?.('description', val)} placeholder="Write a clear description. Markdown supported." noMinHeight />
+      {/* Examples (Preview Prompts) */}
+      <div className="border-b border-border/10 pb-2 mt-2">
+        <div className="flex items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <Icon name="list-bullet" className="w-4 h-4" />
+            <span className="text-xs font-semibold">Examples</span>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* System Prompt */}
-      <Collapsible defaultOpen={true} className="space-y-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">System Prompt</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className={cn(isTemplateAgent && "opacity-60 pointer-events-none cursor-not-allowed")}>
-            <RichMarkdownEditor
-              value={value.systemPrompt}
-              onChange={val => onFieldChange?.('systemPrompt', val)}
-              placeholder="Define the agent's character, mission, and behavior..."
-              minHeightPx={200}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Preview Prompts */}
-      <Collapsible defaultOpen={true} className="space-y-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Preview Prompts</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-2">
-            <textarea
-              className="w-full rounded-md border border-border/40 bg-transparent p-2 text-xs font-mono min-h-[120px] disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
-              value={(value.previewPrompts || []).join('\n')}
-              disabled={isTemplateAgent}
-              onChange={e => {
-                const lines = e.target.value
-                  .split('\n')
-                  .map(s => s.trim())
-                  .filter(Boolean)
-                  .slice(0, 10)
-                onFieldChange?.('previewPrompts', lines)
-              }}
-            />
-            <div className="text-[10px] text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</div>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Blueprint */}
-      <Collapsible defaultOpen={true} className="space-y-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Blueprint</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-2">
-            <BlueprintVisualization
-              blueprint={(() => {
-                try {
-                  return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
-                } catch {
-                  return { nodes: [], edges: [] } as any
-                }
-              })()}
-              className="h-[320px]"
-              transparent
-              nodesDraggable={false}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Advanced options */}
-      <Collapsible defaultOpen={false} className="space-y-2">
-        <CollapsibleTrigger className="p-1.5">
-          <Label className="text-xs font-semibold text-muted-foreground">Advanced options</Label>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="agent-temperature" className="text-xs font-medium">
-                Temperature
-              </Label>
-              <Input
-                id="agent-temperature"
-                type="number"
-                min="0"
-                max="2"
-                step="0.1"
-                value={value.temperature}
-                onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
-                disabled={isTemplateAgent}
-                className="text-xs"
-              />
+          <div className="flex-1">
+            <div className="space-y-2">
+              {isTemplateAgent || readOnly ? (
+                <div className="rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground min-h-[60px]">
+                  {(value.previewPrompts || []).length === 0 ? (
+                    <span className="italic">No preview prompts configured.</span>
+                  ) : (
+                    <ul className="list-disc list-inside space-y-1">
+                      {(value.previewPrompts || []).map((prompt, idx) => (
+                        <li key={idx} className="text-xs">
+                          {prompt}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    {(value.previewPrompts || []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {(value.previewPrompts || []).map((prompt, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <Input
+                              className="text-xs flex-1"
+                              value={prompt}
+                              onChange={e => {
+                                const next = [...(value.previewPrompts || [])]
+                                next[idx] = e.target.value
+                                const cleaned = next
+                                  .map(s => s.trim())
+                                  .filter(Boolean)
+                                  .slice(0, 10)
+                                onFieldChange?.('previewPrompts', cleaned)
+                              }}
+                              placeholder="Example: Help me draft a customer support reply…"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                const next = (value.previewPrompts || []).filter((_, i) => i !== idx)
+                                onFieldChange?.('previewPrompts', next)
+                              }}
+                            >
+                              <Icon name="x" className="w-3 h-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="text-xs flex-1"
+                      placeholder="Add a sample user prompt…"
+                      value={newPreviewPrompt}
+                      onChange={e => setNewPreviewPrompt(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const trimmed = newPreviewPrompt.trim()
+                          const existing = value.previewPrompts || []
+                          if (!trimmed || existing.length >= 10) return
+                          onFieldChange?.('previewPrompts', [...existing, trimmed])
+                          setNewPreviewPrompt('')
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="text-xs"
+                      disabled={!newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
+                      onClick={() => {
+                        const trimmed = newPreviewPrompt.trim()
+                        const existing = value.previewPrompts || []
+                        if (!trimmed || existing.length >= 10) return
+                        onFieldChange?.('previewPrompts', [...existing, trimmed])
+                        setNewPreviewPrompt('')
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </>
+              )}
+              <div className="text-[10px] text-muted-foreground flex items-center justify-between">
+                <span>These appear as example prompts in the chat input when this agent is mentioned.</span>
+                <span>
+                  {(value.previewPrompts || []).length}
+                  /10
+                </span>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="agent-max-tokens" className="text-xs font-medium">
-                Max Tokens
-              </Label>
-              <Input
-                id="agent-max-tokens"
-                type="number"
-                min="1"
-                step="1"
-                value={value.maxTokens}
-                onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
-                disabled={isTemplateAgent}
-                className="text-xs"
-              />
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced options (includes Blueprint) */}
+      <Collapsible defaultOpen={false} className="border-b border-border/10 pb-2 mt-2">
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center gap-2 px-3 py-1.5 text-muted-foreground">
+            <Icon name="sliders-horizontal" className="w-4 h-4" />
+            <span className="text-xs font-semibold flex-1 text-left">Advanced options</span>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-4 mt-1">
+            {/* Blueprint first */}
+            <div>
+              <div className="flex items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+                  <Icon name="network" className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Blueprint</span>
+                </div>
+                <div className="flex-1">
+                  <BlueprintVisualization
+                    blueprint={(() => {
+                      try {
+                        return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                      } catch {
+                        return { nodes: [], edges: [] } as any
+                      }
+                    })()}
+                    className="h-[320px]"
+                    transparent
+                    nodesDraggable={false}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="agent-timeout" className="text-xs font-medium">
-                Timeout (ms)
-              </Label>
-              <Input
-                id="agent-timeout"
-                type="number"
-                min="1000"
-                step="1000"
-                value={value.timeout}
-                onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
-                disabled={isTemplateAgent}
-                className="text-xs"
-              />
+
+            {/* Then numeric advanced controls */}
+            <div className="space-y-2 border-t border-border/10 pt-2">
+              {/* Temperature */}
+              <div className="flex items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                  <span className="text-xs font-semibold">Temperature</span>
+                </div>
+                <div className="w-[260px]">
+                  <Input
+                    id="agent-temperature"
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={value.temperature}
+                    onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
+                    disabled={isTemplateAgent || readOnly}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Max Tokens */}
+              <div className="flex items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                  <span className="text-xs font-semibold">Max Tokens</span>
+                </div>
+                <div className="w-[260px]">
+                  <Input
+                    id="agent-max-tokens"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={value.maxTokens}
+                    onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
+                    disabled={isTemplateAgent || readOnly}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Timeout */}
+              <div className="flex items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                  <span className="text-xs font-semibold">Timeout (ms)</span>
+                </div>
+                <div className="w-[260px]">
+                  <Input
+                    id="agent-timeout"
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    value={value.timeout}
+                    onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
+                    disabled={isTemplateAgent || readOnly}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </CollapsibleContent>

@@ -951,10 +951,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       {/* Publication Request Dialog */}
       <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Request for Agent Publication</DialogTitle>
-            <DialogDescription>Choose how to bump the agent’s version and add a brief changelog.</DialogDescription>
+            <DialogTitle>Request: Publish to marketplace</DialogTitle>
+            <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to the community marketplace.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

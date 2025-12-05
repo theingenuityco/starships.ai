@@ -15,6 +15,7 @@ import {
   StarshipRepository,
   UserRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
+  DEFAULT_AGENT_TEMPERATURE,
   MAX_AGENT_MAX_TOKENS,
   MAX_AGENT_TIMEOUT_MS,
   MIN_AGENT_MAX_TOKENS,
@@ -986,9 +987,56 @@ export class AgentService {
     }
 
     // For agents that have already been promoted into a template (publishedTemplateId),
-    // allow requesting publication again so a new version can be reviewed.
-    if (agent.publicationStatus === 'published' && !agent.publishedTemplateId) {
-      throw new ValidationError('Agent is already published');
+    // allow requesting publication again so a new version can be reviewed – but only
+    // if the agent actually differs from its published template.
+    if (agent.publicationStatus === 'published') {
+      if (!agent.publishedTemplateId) {
+        throw new ValidationError('Agent is already published');
+      }
+
+      const templateRepo = new AgentTemplateRepository();
+      const template = await templateRepo.findById(agent.publishedTemplateId);
+      if (!template) {
+        throw new NotFoundError('AgentTemplate', agent.publishedTemplateId);
+      }
+
+      const normalizePreviewPrompts = (prompts: string[] | undefined | null): string[] =>
+        (prompts || []).map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+
+      const normalizeCore = (src: {
+        name?: string;
+        description?: string | null;
+        model?: string;
+        temperature?: number | null;
+        maxTokens?: number | null;
+        timeout?: number | null;
+        systemPrompt?: string | null;
+        blueprint?: unknown;
+        previewPrompts?: string[] | null;
+      }) => {
+        const blueprint =
+          (src.blueprint as unknown) && typeof src.blueprint === 'object' ? (src.blueprint as unknown) : { nodes: [], edges: [] };
+
+        return {
+          name: src.name ?? '',
+          description: src.description ?? '',
+          model: src.model ?? '',
+          temperature: src.temperature ?? null,
+          maxTokens: src.maxTokens ?? null,
+          timeout: src.timeout ?? null,
+          systemPrompt: src.systemPrompt ?? '',
+          blueprint,
+          previewPrompts: normalizePreviewPrompts(src.previewPrompts),
+        };
+      };
+
+      const agentCore = normalizeCore(agent);
+      const templateCore = normalizeCore(template);
+
+      const hasDiff = JSON.stringify(agentCore) !== JSON.stringify(templateCore);
+      if (!hasDiff) {
+        throw new ValidationError('Agent has no changes compared to its published template');
+      }
     }
     // Determine requested version based on current version and bump type
     const currentVersion = agent.version || '1.0.0';
@@ -1058,7 +1106,8 @@ export class AgentService {
 
     // 2. Determine target template (publishedTemplateId or new template)
     //    and sanitize numeric fields to satisfy template validation constraints.
-    const safeTemperature = typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : undefined;
+    const safeTemperature =
+      typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : DEFAULT_AGENT_TEMPERATURE;
     const safeMaxTokens =
       typeof agent.maxTokens === 'number' && !Number.isNaN(agent.maxTokens)
         ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, agent.maxTokens))

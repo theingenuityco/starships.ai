@@ -7,10 +7,29 @@
  */
 
 import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
+import type { AutopilotEvent, EventCallback, LLMEvent, ToolEvent, ToolParams } from '@starships/autopilot';
 import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, StarshipRepository } from '@starships/models';
+import {
+  AgentRepository,
+  AgentTemplateRepository,
+  StarshipRepository,
+  UserRepository,
+  DEFAULT_AGENT_TIMEOUT_MS,
+  DEFAULT_AGENT_TEMPERATURE,
+  MAX_AGENT_MAX_TOKENS,
+  MAX_AGENT_TIMEOUT_MS,
+  MIN_AGENT_MAX_TOKENS,
+  MIN_AGENT_TIMEOUT_MS,
+} from '@starships/models';
+import type {
+  PendingAgentSummary,
+  UserModel,
+  StarshipModel,
+  AgentModel,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+} from '@starships/protocol';
 import { generateUniqueAgentSlug } from '@starships/models';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
@@ -18,6 +37,7 @@ import { getEnvConfig } from '@starships/env';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
+import isEqual from 'lodash/isEqual';
 
 export interface ConversationRequest {
   agentId: string;
@@ -123,7 +143,7 @@ export class AgentService {
       model: data.model,
       temperature: data.temperature,
       maxTokens: data.maxTokens,
-      timeout: data.timeout || 30000,
+      timeout: data.timeout || DEFAULT_AGENT_TIMEOUT_MS,
       systemPrompt: data.systemPrompt,
       state: data.state, // Let Agent class handle state initialization
       blueprint: data.blueprint, // This will be null/undefined to trigger default blueprint generation
@@ -143,13 +163,13 @@ export class AgentService {
       model: data.model,
       temperature: data.temperature,
       maxTokens: data.maxTokens,
-      timeout: data.timeout || 30000,
+      timeout: data.timeout || DEFAULT_AGENT_TIMEOUT_MS,
       blueprint: generatedBlueprint, // Use the blueprint from Agent class (default or provided)
       systemPrompt: data.systemPrompt,
       state: agentState, // Use provided state or default initialization
       previewPrompts: data.previewPrompts,
       assignedToolSlugs: data.assignedToolSlugs,
-      templateId: data.templateId,
+      sourceTemplateId: data.sourceTemplateId,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -274,12 +294,100 @@ export class AgentService {
     };
   }> {
     const allAgents = await this.agentRepository.findAll();
-    const total = allAgents.length;
+
+    // Only published agents should appear in the public listing
+    const publishedAgents = allAgents.filter((agent) => agent.publicationStatus === 'published');
+    const total = publishedAgents.length;
     const offset = (page - 1) * limit;
-    const paginatedAgents = allAgents.slice(offset, offset + limit);
+    const paginatedAgents = publishedAgents.slice(offset, offset + limit);
 
     return {
       agents: paginatedAgents,
+      pagination: {
+        page,
+        limit,
+        total,
+        has_next: offset + limit < total,
+        has_prev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Get agents that are pending publication approval (instance admin view)
+   */
+  async getPendingAgents(
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{
+    agents: PendingAgentSummary[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  }> {
+    const allAgents = await this.agentRepository.findAll();
+    const pendingAgents = allAgents.filter((agent) => agent.publicationStatus === 'pending_approval');
+    const total = pendingAgents.length;
+    const offset = (page - 1) * limit;
+    const paginatedAgents = pendingAgents.slice(offset, offset + limit);
+
+    // Enrich with user display name and starship label for admin UX,
+    // while keeping publicationRequestedBy as the underlying user id.
+    const userRepo = new UserRepository();
+    const starshipRepo = new StarshipRepository();
+
+    const enrichedAgents: PendingAgentSummary[] = [];
+
+    for (const agent of paginatedAgents) {
+      let requestedBy: PendingAgentSummary['requestedBy'] | undefined;
+      let requestedByStarship: PendingAgentSummary['requestedByStarship'] | undefined;
+
+      try {
+        if (agent.publicationRequestedBy) {
+          const [user, starship] = await Promise.all([
+            userRepo.findById(agent.publicationRequestedBy as string) as Promise<UserModel | null>,
+            starshipRepo.findById(agent.starshipId) as Promise<StarshipModel | null>,
+          ]);
+
+          if (user) {
+            requestedBy = {
+              id: user.id,
+              name: user.displayName || user.email || user.id,
+              avatar: user.avatar,
+            };
+          } else {
+            requestedBy = {
+              id: agent.publicationRequestedBy,
+            };
+          }
+
+          if (starship) {
+            requestedByStarship = {
+              id: starship.id,
+              name: starship.name || starship.slug,
+              slug: starship.slug,
+            };
+          }
+        }
+      } catch {
+        if (agent.publicationRequestedBy) {
+          requestedBy = { id: agent.publicationRequestedBy };
+        }
+      }
+
+      enrichedAgents.push({
+        agent,
+        requestedBy,
+        requestedByStarship,
+      });
+    }
+
+    return {
+      agents: enrichedAgents,
       pagination: {
         page,
         limit,
@@ -313,7 +421,17 @@ export class AgentService {
     userId: string,
     page: number = 1,
     limit: number = 50
-  ): Promise<{ agents: AgentModel[]; total: number; pagination: any }> {
+  ): Promise<{
+    agents: AgentModel[];
+    total: number;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  }> {
     // Validate access first
     await this.validateStarshipAccess(starshipId, userId);
 
@@ -512,7 +630,7 @@ export class AgentService {
     agentId: string,
     testInput: string | LlmMessage[],
     starshipId: string,
-    authToken?: string
+    _authToken?: string
   ): Promise<{
     success: boolean;
     agent: string;
@@ -533,29 +651,40 @@ export class AgentService {
     let aggUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 };
     let modelUsedAggregate: string | undefined;
 
+    // Type guards for Autopilot events
+    const isToolEvent = (event: AutopilotEvent): event is ToolEvent =>
+      event.type === 'tool_started' || event.type === 'tool_complete' || event.type === 'tool_call_detected';
+
+    const isLlmEvent = (event: AutopilotEvent): event is LLMEvent => event.type === 'content_chunk' || event.type === 'content_complete';
+
     // Unified event handler to capture content, tools and usage
-    const onEvent = async (event: any) => {
+    const onEvent: EventCallback = async (event) => {
       // Capture tool usage and output during execution
-      if (event?.type === 'tool_started' && event?.data?.name) {
-        const name = String(event.data.name);
+      if (isToolEvent(event) && event.type === 'tool_started' && event.data?.toolName) {
+        const name = String(event.data.toolName);
         if (!toolsUsed.includes(name)) toolsUsed.push(name);
       }
 
-      if (event?.type === 'content_chunk') {
+      if (isLlmEvent(event) && event.type === 'content_chunk' && event.data?.chunk) {
         // Extract content from the chunk structure: event.data.chunk.choices[0].delta.content
-        const chunkContent = event?.data?.chunk?.choices?.[0]?.delta?.content;
-        if (typeof chunkContent === 'string' && chunkContent) {
-          output += chunkContent;
+        const chunk = event.data.chunk as Record<string, unknown>;
+        const choices = chunk.choices as unknown;
+        if (Array.isArray(choices) && choices.length > 0) {
+          const first = choices[0] as Record<string, unknown>;
+          const delta = first.delta as Record<string, unknown> | undefined;
+          const chunkContent = typeof delta?.content === 'string' ? delta.content : undefined;
+          if (chunkContent) {
+            output += chunkContent;
+          }
         }
         // Some providers emit usage on chunks; capture if present
-        const usage = event?.data?.chunk?.usage;
-        const model = event?.data?.chunk?.model;
-        if (usage && typeof usage === 'object') {
-          const u = usage as Record<string, unknown>;
-          const pt = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
-          const ct = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
-          const tt = typeof u.totalTokens === 'number' ? u.totalTokens : pt + ct;
-          const cst = typeof u.cost === 'number' ? u.cost : 0;
+        const usage = event.data.usage;
+        const model = event.data.model;
+        if (usage) {
+          const pt = typeof usage.promptTokens === 'number' ? usage.promptTokens : 0;
+          const ct = typeof usage.completionTokens === 'number' ? usage.completionTokens : 0;
+          const tt = typeof usage.totalTokens === 'number' ? usage.totalTokens : pt + ct;
+          const cst = typeof usage.cost === 'number' ? usage.cost : 0;
           aggUsage.promptTokens += pt;
           aggUsage.completionTokens += ct;
           aggUsage.totalTokens += tt;
@@ -564,19 +693,15 @@ export class AgentService {
         }
       }
 
-      if (event?.type === 'content_complete') {
-        if (event?.data?.reasoning) {
-          reasoning += String(event.data.reasoning);
-        }
+      if (isLlmEvent(event) && event.type === 'content_complete' && event.data) {
         // Persist usage totals for this completion if provided
-        const usage = event?.data?.usage;
-        const model = event?.data?.model;
-        if (usage && typeof usage === 'object') {
-          const u = usage as Record<string, unknown>;
-          const pt = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
-          const ct = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
-          const tt = typeof u.totalTokens === 'number' ? u.totalTokens : pt + ct;
-          const cst = typeof u.cost === 'number' ? u.cost : 0;
+        const usage = event.data.usage;
+        const model = event.data.model;
+        if (usage) {
+          const pt = typeof usage.promptTokens === 'number' ? usage.promptTokens : 0;
+          const ct = typeof usage.completionTokens === 'number' ? usage.completionTokens : 0;
+          const tt = typeof usage.totalTokens === 'number' ? usage.totalTokens : pt + ct;
+          const cst = typeof usage.cost === 'number' ? usage.cost : 0;
           aggUsage.promptTokens += pt;
           aggUsage.completionTokens += ct;
           aggUsage.totalTokens += tt;
@@ -588,7 +713,15 @@ export class AgentService {
       // Keep existing logs in non-production for diagnostics
       try {
         if (process?.env?.NODE_ENV !== 'production') {
-          if (event?.type) console.log('📡 Event received:', event.type, event.data ? Object.keys(event.data) : 'no data');
+          if (event.type) {
+            // data is optional; log keys only when present
+
+            console.log(
+              '📡 Event received:',
+              event.type,
+              'data' in event && event.data ? Object.keys(event.data as Record<string, unknown>) : 'no data'
+            );
+          }
         }
       } catch (err) {
         void err;
@@ -613,9 +746,22 @@ export class AgentService {
         stateMessages: Array.isArray(agentModel.state?.messages) ? agentModel.state.messages.length : 'not array',
       });
 
-      // 2. Get deployed tools for this agent
-      const resolvedTools = await this.getAgentTools(agentModel.id, starshipId);
-      console.log('🔧 Tools resolved:', resolvedTools.length, 'tools found');
+      // 2. Get deployed tools for this agent and convert to ToolParams
+      const resolvedToolsModels = await this.getAgentTools(agentModel.id, starshipId);
+      console.log('🔧 Tools resolved:', resolvedToolsModels.length, 'tools found');
+
+      const resolvedTools: ToolParams[] = resolvedToolsModels
+        .filter((tool) => tool.status !== 'draft' && tool.parameters && tool.blueprint)
+        .map((tool) => ({
+          name: tool.name,
+          slug: tool.slug,
+          description: tool.description,
+          parameters: tool.parameters!,
+          blueprint: tool.blueprint!,
+          ...(tool.transforms && { transforms: tool.transforms }),
+          ...(tool.mutations && { mutations: tool.mutations }),
+          ...(tool.condition && { condition: tool.condition }),
+        }));
 
       // 3. Prepare agent params (same pattern as ConversationService)
       const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
@@ -624,7 +770,7 @@ export class AgentService {
         ...agentModel,
         state: {
           ...baseState,
-          tools: resolvedTools as any, // Tool conversion handled by autopilot
+          tools: resolvedTools,
           starshipId: starshipId,
         },
       };
@@ -636,7 +782,6 @@ export class AgentService {
 
       // 5. Prepare runtime env (Starships host: only STARSHIP_ID is exposed to workflows)
       const env = getEnvConfig();
-      const baseUrl = `${env.SERVER_URL}/api/v1`;
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
       };
@@ -696,7 +841,7 @@ export class AgentService {
       await runner.run(blueprint, exec, {
         eventCallback: onEvent,
         runtimeEnv,
-      } as any);
+      });
 
       console.log('🔍 Post-execution state:', {
         messagesCount: Array.isArray(exec.state.messages) ? exec.state.messages.length : 0,
@@ -787,7 +932,7 @@ export class AgentService {
         executionTime,
         model: agentModel.model,
       };
-    } catch (error: any) {
+    } catch (error) {
       const executionTime = Date.now() - startTime;
 
       return {
@@ -796,7 +941,7 @@ export class AgentService {
         input: testInput,
         toolsUsed,
         executionTime,
-        error: error?.message || 'Unknown error during agent execution',
+        error: error instanceof Error ? error.message : 'Unknown error during agent execution',
       };
     }
   }
@@ -817,5 +962,246 @@ export class AgentService {
     }
 
     return await this.agentRepository.updateFromTemplate(agentId);
+  }
+
+  // ============================================================================
+  // PUBLICATION WORKFLOW
+  // ============================================================================
+
+  /**
+   * Request publication for an agent (owner or instance admin)
+   * Moves agent from draft/rejected to pending_approval and records
+   * the desired version bump and changelog.
+   */
+  async requestPublication(
+    agentId: string,
+    userId: string,
+    options: { versionBump: 'patch' | 'minor' | 'major'; changelog: string }
+  ): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    if (agent.publicationStatus === 'pending_approval') {
+      throw new ValidationError('Agent is already pending approval');
+    }
+
+    // For agents that have already been promoted into a template (publishedTemplateId),
+    // allow requesting publication again so a new version can be reviewed – but only
+    // if the agent actually differs from its published template.
+    if (agent.publicationStatus === 'published') {
+      if (!agent.publishedTemplateId) {
+        throw new ValidationError('Agent is already published');
+      }
+
+      const templateRepo = new AgentTemplateRepository();
+      const template = await templateRepo.findById(agent.publishedTemplateId);
+      if (!template) {
+        throw new NotFoundError('AgentTemplate', agent.publishedTemplateId);
+      }
+
+      const normalizePreviewPrompts = (prompts: string[] | undefined | null): string[] =>
+        (prompts || []).map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+
+      const normalizeCore = (src: {
+        name?: string;
+        description?: string | null;
+        model?: string;
+        temperature?: number | null;
+        maxTokens?: number | null;
+        timeout?: number | null;
+        systemPrompt?: string | null;
+        blueprint?: unknown;
+        previewPrompts?: string[] | null;
+      }) => {
+        const blueprint =
+          (src.blueprint as unknown) && typeof src.blueprint === 'object' ? (src.blueprint as unknown) : { nodes: [], edges: [] };
+
+        return {
+          name: src.name ?? '',
+          description: src.description ?? '',
+          model: src.model ?? '',
+          temperature: src.temperature ?? null,
+          maxTokens: src.maxTokens ?? null,
+          timeout: src.timeout ?? null,
+          systemPrompt: src.systemPrompt ?? '',
+          blueprint,
+          previewPrompts: normalizePreviewPrompts(src.previewPrompts),
+        };
+      };
+
+      const agentCore = normalizeCore(agent);
+      const templateCore = normalizeCore(template);
+
+      const hasDiff = !isEqual(agentCore, templateCore);
+      if (!hasDiff) {
+        throw new ValidationError('Agent has no changes compared to its published template');
+      }
+    }
+    // Determine requested version based on current version and bump type
+    const currentVersion = agent.version || '1.0.0';
+    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+    let requestedVersion = currentVersion;
+
+    if (match) {
+      const major = Number(match[1]);
+      const minor = Number(match[2]);
+      const patch = Number(match[3]);
+
+      switch (options.versionBump) {
+        case 'patch':
+          requestedVersion = `${major}.${minor}.${patch + 1}`;
+          break;
+        case 'minor':
+          requestedVersion = `${major}.${minor + 1}.0`;
+          break;
+        case 'major':
+          requestedVersion = `${major + 1}.0.0`;
+          break;
+      }
+    } else {
+      // Fallback for malformed versions
+      requestedVersion = '1.0.0';
+    }
+
+    return await this.agentRepository.requestPublicationAtomic(agentId, {
+      publicationStatus: 'pending_approval',
+      publicationRequestedBy: userId,
+      publicationVersionBump: options.versionBump,
+      publicationRequestedVersion: requestedVersion,
+      publicationChangelog: options.changelog,
+    });
+  }
+
+  /**
+   * Approve publication for an agent (instance admin only)
+   * Moves agent from pending_approval to published, and promotes agent → template.
+   */
+  async approvePublication(agentId: string, adminUserId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    if (agent.publicationStatus !== 'pending_approval') {
+      throw new ValidationError('Agent is not pending approval');
+    }
+
+    // 1. Determine next version:
+    // - Prefer owner-requested version from publish-request flow
+    // - Fallback to simple minor bump for backwards compatibility
+    const currentVersion = agent.version || '1.0.0';
+    let nextVersion = agent.publicationRequestedVersion;
+
+    if (!nextVersion) {
+      const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+      nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+    }
+
+    // 2. Determine target template (publishedTemplateId or new template)
+    //    and sanitize numeric fields to satisfy template validation constraints.
+    const safeTemperature =
+      typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : DEFAULT_AGENT_TEMPERATURE;
+    const safeMaxTokens =
+      typeof agent.maxTokens === 'number' && !Number.isNaN(agent.maxTokens)
+        ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, agent.maxTokens))
+        : undefined;
+    const safeTimeout =
+      typeof agent.timeout === 'number' && !Number.isNaN(agent.timeout)
+        ? Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, agent.timeout))
+        : DEFAULT_AGENT_TIMEOUT_MS;
+
+    const templateRepo = new AgentTemplateRepository();
+    let targetTemplateId = agent.publishedTemplateId;
+
+    if (targetTemplateId) {
+      const existingTemplate = await templateRepo.findById(targetTemplateId);
+      if (!existingTemplate) {
+        // If the referenced template no longer exists, drop the link and create a new one
+        targetTemplateId = undefined;
+      }
+    }
+
+    if (!targetTemplateId) {
+      // Create a new template from this agent
+      const createdTemplate = await templateRepo.create({
+        name: agent.name,
+        slug: agent.slug,
+        description: agent.description,
+        category: 'general',
+        model: agent.model,
+        temperature: safeTemperature,
+        maxTokens: safeMaxTokens,
+        timeout: safeTimeout,
+        systemPrompt: agent.systemPrompt,
+        state: agent.state!,
+        blueprint: agent.blueprint!,
+        icon: undefined,
+        previewPrompts: agent.previewPrompts,
+        assignedToolSlugs: [], // tools can be managed separately at template level
+      });
+
+      // Align template version with the bumped agent version
+      await templateRepo.update(createdTemplate.id, { version: nextVersion });
+      targetTemplateId = createdTemplate.id;
+    } else {
+      // Update existing template from this agent
+      await templateRepo.update(targetTemplateId, {
+        name: agent.name,
+        description: agent.description,
+        model: agent.model,
+        temperature: safeTemperature,
+        maxTokens: safeMaxTokens,
+        timeout: safeTimeout,
+        systemPrompt: agent.systemPrompt,
+        state: agent.state,
+        blueprint: agent.blueprint,
+        previewPrompts: agent.previewPrompts,
+        version: nextVersion,
+      });
+    }
+
+    // 3. Persist publication metadata on agent
+    const updated = await this.agentRepository.update(agentId, {
+      version: nextVersion,
+      publicationStatus: 'published',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+      publishedTemplateId: targetTemplateId,
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Reject publication for an agent (instance admin only)
+   * Moves agent from pending_approval to rejected.
+   */
+  async rejectPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    if (agent.publicationStatus !== 'pending_approval') {
+      throw new ValidationError('Agent is not pending approval');
+    }
+
+    const updated = await this.agentRepository.update(agentId, {
+      publicationStatus: 'rejected',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return updated;
   }
 }

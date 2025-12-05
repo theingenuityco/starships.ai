@@ -29,6 +29,14 @@ export interface UserModel {
   // Stripe integration
   stripeCustomerId?: string;
 
+  /**
+   * Instance-level admin flag.
+   * When true, the user is treated as a global/instance admin with elevated access.
+   * This is intentionally optional in the protocol to keep backward compatibility
+   * with older clients and migrations; the backend will default it to false.
+   */
+  isInstanceAdmin?: boolean;
+
   // Authentication method tracking
   hasPassword: boolean;           // Does user have password auth?
   authMethods: AuthMethod[];      // List of auth methods

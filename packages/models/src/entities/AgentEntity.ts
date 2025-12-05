@@ -9,7 +9,21 @@ import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError, IsArray } from 'class-validator';
+import {
+  IsISO8601,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+  validate,
+  ValidationError,
+  IsArray,
+  IsIn,
+} from 'class-validator';
+import { DEFAULT_AGENT_TIMEOUT_MS } from '@/constants/agentDefaults';
 
 export class AgentEntity implements AgentModel {
   // Core database fields
@@ -36,7 +50,7 @@ export class AgentEntity implements AgentModel {
   @IsOptional()
   @IsString()
   @Length(1, 255)
-  templateId?: string;
+  sourceTemplateId?: string;
 
   // Core AgentParams fields
   @Expose()
@@ -59,6 +73,12 @@ export class AgentEntity implements AgentModel {
   @IsString()
   @Length(1, 100)
   model!: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @IsIn(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
+  category?: string;
 
   @Expose()
   @IsOptional()
@@ -113,6 +133,54 @@ export class AgentEntity implements AgentModel {
   @IsISO8601()
   templateSnapshotAt?: string; // When agent last synced with template
 
+  // Publication workflow fields
+  @Expose()
+  @IsString()
+  @IsIn(['draft', 'pending_approval', 'published', 'rejected'])
+  publicationStatus!: 'draft' | 'pending_approval' | 'published' | 'rejected';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publicationRequestedBy?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publicationApprovedBy?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  publicationApprovedAt?: string;
+
+  // Published template linkage (Agent → Template)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publishedTemplateId?: string;
+
+  // Additional publication metadata (owner-selected)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @IsIn(['patch', 'minor', 'major'])
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 20)
+  publicationRequestedVersion?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  publicationChangelog?: string;
+
   // Update availability info (computed at runtime, not stored in DB)
   @Expose()
   @IsOptional()
@@ -142,18 +210,20 @@ export class AgentEntity implements AgentModel {
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         // Require starshipId for creation
         starshipId: (dataRecord.starshipId as string) || '',
-        templateId: dataRecord.templateId,
+        sourceTemplateId: dataRecord.sourceTemplateId,
         name: dataRecord.name || '',
         description: dataRecord.description,
         model: dataRecord.model || '',
         temperature: dataRecord.temperature,
         maxTokens: dataRecord.maxTokens,
-        timeout: dataRecord.timeout ?? 30000,
+        timeout: dataRecord.timeout ?? DEFAULT_AGENT_TIMEOUT_MS,
         systemPrompt: dataRecord.systemPrompt,
         state: dataRecord.state || { messages: [], tools: [] },
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         version: dataRecord.version || '1.0.0',
         templateSnapshotAt: dataRecord.templateSnapshotAt,
+        // Publication workflow default for creates
+        publicationStatus: dataRecord.publicationStatus || 'draft',
         ...dataRecord,
       });
     } else {

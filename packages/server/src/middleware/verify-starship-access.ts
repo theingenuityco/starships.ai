@@ -1,17 +1,17 @@
 import { Response } from 'express';
 import { StarshipService } from '@/services/StarshipService';
+import { UserService } from '@/services/UserService';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { sendError } from '@/utils/responseHelpers';
 
 /**
  * Verifies that a user has access to a starship (ownership check)
  */
-export async function verifyStarshipAccess(
-  starshipId: string,
-  userId: string,
-  res: Response
-): Promise<boolean> {
+export async function verifyStarshipAccess(starshipId: string, userId: string, res: Response): Promise<boolean> {
   const starshipService = new StarshipService();
+  const userService = new UserService();
   const starship = await starshipService.getStarship(starshipId);
+  const user = await userService.getUserById(userId);
 
   if (!starship) {
     sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
@@ -21,7 +21,17 @@ export async function verifyStarshipAccess(
     return false;
   }
 
-  if (starship.ownerId !== userId) {
+  // If the user no longer exists in the system, deny access explicitly
+  if (!user) {
+    sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
+      resource: 'starship',
+      id: starshipId,
+      reason: 'user_not_found',
+    });
+    return false;
+  }
+
+  if (starship.ownerId !== userId && !isInstanceAdmin(user)) {
     sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
       resource: 'starship',
       id: starshipId,
@@ -44,23 +54,29 @@ export async function verifyResourceAccess(
   res: Response
 ): Promise<boolean> {
   const starshipService = new StarshipService();
+  const userService = new UserService();
   const starship = await starshipService.getStarship(resourceStarshipId);
+  const user = await userService.getUserById(userId);
 
   if (!starship) {
-    sendError(
-      res,
-      'RESOURCE_NOT_FOUND',
-      `${resourceType} belongs to non-existent starship`,
-      404,
-      {
-        resource: resourceType,
-        id: resourceId,
-      }
-    );
+    sendError(res, 'RESOURCE_NOT_FOUND', `${resourceType} belongs to non-existent starship`, 404, {
+      resource: resourceType,
+      id: resourceId,
+    });
     return false;
   }
 
-  if (starship.ownerId !== userId) {
+  // If the user no longer exists in the system, deny access explicitly
+  if (!user) {
+    sendError(res, 'ACCESS_DENIED', `Access denied to this ${resourceType}`, 403, {
+      resource: resourceType,
+      id: resourceId,
+      reason: 'user_not_found',
+    });
+    return false;
+  }
+
+  if (starship.ownerId !== userId && !isInstanceAdmin(user)) {
     sendError(res, 'ACCESS_DENIED', `Access denied to this ${resourceType}`, 403, {
       resource: resourceType,
       id: resourceId,
@@ -71,5 +87,3 @@ export async function verifyResourceAccess(
 
   return true;
 }
-
-

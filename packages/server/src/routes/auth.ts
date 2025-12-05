@@ -209,6 +209,8 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         email: user.email,
         name: user.displayName || user.email?.split('@')[0],
         avatar: user.avatar,
+        // Surface instance admin flag without changing other login payload fields
+        isInstanceAdmin: user.isInstanceAdmin || false,
       },
       token,
       isFirstLogin,
@@ -258,6 +260,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       hasPassword: user.hasPassword || false,
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password',
+      isInstanceAdmin: user.isInstanceAdmin || false,
     });
   } catch (error) {
     logger.error('[AUTH] Me endpoint error', {
@@ -807,6 +810,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'oauth',
+        isInstanceAdmin: user.isInstanceAdmin || false,
       },
       token,
       isFirstLogin,

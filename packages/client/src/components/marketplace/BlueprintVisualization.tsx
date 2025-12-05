@@ -1100,6 +1100,10 @@ function BlueprintFlow({
     return containerStyle
   }, [transparent, containerStyle])
 
+  // Treat flows with draggable nodes as fully interactive; previews should not
+  // intercept scroll/zoom so surrounding pages can scroll naturally.
+  const isInteractive = nodesDraggable === true
+
   return (
     <div
       className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg relative ${transparent ? 'bg-transparent' : 'blueprint-container-bg'} ${containerClassName}`}
@@ -1120,13 +1124,13 @@ function BlueprintFlow({
         }}
         nodesDraggable={nodesDraggable}
         nodesConnectable={false}
-        elementsSelectable={true}
-        selectNodesOnDrag={true}
-        zoomOnScroll={true}
-        zoomOnPinch={true}
-        panOnScroll={true}
-        panOnDrag={true}
-        zoomOnDoubleClick={true}
+        elementsSelectable={isInteractive}
+        selectNodesOnDrag={isInteractive}
+        zoomOnScroll={isInteractive}
+        zoomOnPinch={isInteractive}
+        panOnScroll={isInteractive}
+        panOnDrag={isInteractive}
+        zoomOnDoubleClick={isInteractive}
         preventScrolling={false}
         proOptions={{ hideAttribution: true }}
         // Initial viewport is set by programmatic fitView above

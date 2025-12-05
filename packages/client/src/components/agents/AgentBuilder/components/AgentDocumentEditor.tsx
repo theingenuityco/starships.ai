@@ -934,9 +934,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   </button>
                 </TooltipTrigger>
                 {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
-                  <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs frosted-glass-card rounded-xl shadow-frosted-lg">
-                    <div className="font-semibold mb-1">Changes since last published version</div>
-                    <ul className="list-disc list-inside space-y-0.5">
+                  <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
+                    <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
                       {publishedChangeDetails.map(change => (
                         <li key={change}>{change}</li>
                       ))}

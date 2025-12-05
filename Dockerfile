@@ -6,10 +6,12 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Install system dependencies including PostgreSQL
+# Install system dependencies including a pinned PostgreSQL major version
+# We explicitly install PostgreSQL 17 to remain compatible with existing data directories
+# initialized with PostgreSQL 17 (e.g., on persistent volumes in Kubernetes).
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
-    postgresql postgresql-contrib postgresql-client \
+    postgresql17 postgresql17-contrib postgresql17-client \
     supervisor \
     ca-certificates
 
@@ -29,8 +31,8 @@ RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
     chown -R nodejs:node /home/nodejs/.cache && \
     chmod -R 755 /home/nodejs/.cache
 
-# Configure PostgreSQL
-ENV POSTGRES_VERSION=15
+# Configure PostgreSQL (pinned to major version 17)
+ENV POSTGRES_VERSION=17
 ENV PGDATA=/var/lib/postgresql/data
 
 # Install su-exec for user switching and prepare PostgreSQL directories

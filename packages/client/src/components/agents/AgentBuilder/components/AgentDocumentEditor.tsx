@@ -16,7 +16,7 @@ import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisual
 import { StandardSelect } from './StandardSelect'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
-import type { ToolModel, ApiResponse, AgentModel, UpdateAgentRequest } from '@starships/protocol'
+import type { ToolModel, ApiResponse, AgentModel, AgentTemplateModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
@@ -74,6 +74,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Store full agent data including version info
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
+  const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
 
   // Dialog state for update confirmation
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
@@ -157,6 +158,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         if (!cancelled) {
           setAgentId(null)
           setFullAgent(null)
+          setPublishedTemplate(null)
         }
       }
     }
@@ -165,6 +167,34 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       cancelled = true
     }
   }, [starshipId, value?.slug])
+
+  // Load the published template (if any) for comparison to gate republish in UI.
+  // We bypass the templateAPI cache and fetch fresh data so the diff matches backend behavior.
+  useEffect(() => {
+    let cancelled = false
+    const loadTemplate = async () => {
+      const templateId = fullAgent?.publishedTemplateId
+      if (!templateId) {
+        setPublishedTemplate(null)
+        return
+      }
+      try {
+        const res: FetchResponse<ApiResponse<AgentTemplateModel>> = await api.get(`/api/v1/agent-templates/${templateId}`)
+        const tpl = res.data.data
+        if (!cancelled) {
+          setPublishedTemplate(tpl)
+        }
+      } catch {
+        if (!cancelled) {
+          setPublishedTemplate(null)
+        }
+      }
+    }
+    void loadTemplate()
+    return () => {
+      cancelled = true
+    }
+  }, [fullAgent?.publishedTemplateId])
 
   // Toggle tool assignment with optimistic UI and server persistence when possible
   const handleToggleTool = async (slug: string, isSelected: boolean) => {
@@ -341,14 +371,110 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
   const hasExistingAgent = !!agentId
-  const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId
-  const canRequestPublication = hasExistingAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
+
+  // Determine if this agent differs from its published template (if any)
+  const differsFromPublishedTemplate = useMemo(() => {
+    if (!fullAgent?.publishedTemplateId || !publishedTemplate) return false
+
+    const normalizePrompts = (prompts?: string[] | null): string[] => (prompts || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean)
+
+    const normalizeCore = (src: {
+      name?: string | null
+      description?: string | null
+      model?: string | null
+      temperature?: number | null
+      maxTokens?: number | null
+      timeout?: number | null
+      systemPrompt?: string | null
+      blueprint?: unknown
+      previewPrompts?: string[] | null
+    }) => {
+      const blueprint = src.blueprint && typeof src.blueprint === 'object' ? src.blueprint : { nodes: [], edges: [] }
+      // Align with backend defaults: treat missing temperature as DEFAULT_AGENT_TEMPERATURE (0.7)
+      const normalizedTemperature = typeof src.temperature === 'number' ? src.temperature : 0.7
+      return {
+        name: src.name ?? '',
+        description: src.description ?? '',
+        model: src.model ?? '',
+        temperature: normalizedTemperature,
+        maxTokens: src.maxTokens ?? null,
+        timeout: src.timeout ?? null,
+        systemPrompt: src.systemPrompt ?? '',
+        blueprint,
+        previewPrompts: normalizePrompts(src.previewPrompts),
+      }
+    }
+
+    const agentCore = normalizeCore(fullAgent as any)
+    const templateCore = normalizeCore(publishedTemplate as any)
+
+    const sameName = agentCore.name === templateCore.name
+    const sameDescription = agentCore.description === templateCore.description
+    const sameModel = agentCore.model === templateCore.model
+    const sameTemperature = agentCore.temperature === templateCore.temperature
+    const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
+    const sameTimeout = agentCore.timeout === templateCore.timeout
+    const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
+    const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
+
+    const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
+    const templateBlueprintStr = JSON.stringify(templateCore.blueprint)
+    const sameBlueprint = agentBlueprintStr === templateBlueprintStr
+
+    try {
+      console.debug('[AgentDocEditor] template-diff-debug', {
+        agentId: fullAgent.id,
+        publishedTemplateId: fullAgent.publishedTemplateId,
+        sameName,
+        sameDescription,
+        sameModel,
+        sameTemperature,
+        sameMaxTokens,
+        sameTimeout,
+        sameSystemPrompt,
+        samePreviewPrompts,
+        sameBlueprint,
+        agentPreviewPrompts: agentCore.previewPrompts,
+        templatePreviewPrompts: templateCore.previewPrompts,
+        agentBlueprintLen: agentBlueprintStr.length,
+        templateBlueprintLen: templateBlueprintStr.length,
+      })
+    } catch {
+      // ignore logging errors
+    }
+
+    return !(sameName && sameDescription && sameModel && sameTemperature && sameMaxTokens && sameTimeout && sameSystemPrompt && samePreviewPrompts && sameBlueprint)
+  }, [fullAgent, publishedTemplate])
+
+  const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
+  const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
+
+  // Debug logging for publishability pipeline – helps trace why an agent is (re)publishable
+  useEffect(() => {
+    try {
+      console.debug('[AgentDocEditor] publish-debug', {
+        agentId,
+        fullAgentId: fullAgent?.id,
+        publicationStatus,
+        hasExistingAgent,
+        isTemplateAgent,
+        readOnly,
+        hasPublishedTemplateId: !!fullAgent?.publishedTemplateId,
+        differsFromPublishedTemplate,
+        isRepublishable,
+        canRequestPublication,
+      })
+    } catch {
+      // ignore logging errors
+    }
+  }, [agentId, fullAgent?.id, fullAgent?.publishedTemplateId, publicationStatus, hasExistingAgent, isTemplateAgent, readOnly, differsFromPublishedTemplate, isRepublishable, canRequestPublication])
 
   // Autosave agent changes for existing (non-template) agents
   useEffect(() => {
     if (!agentId) return
     if (readOnly) return
     if (isTemplateAgent) return
+    if (!fullAgent) return
 
     // Build update payload from current form value
     const buildUpdates = (): UpdateAgentRequest => {
@@ -363,41 +489,74 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       const updates: UpdateAgentRequest = {}
 
-      // Only send fields that are valid and non-empty to satisfy backend validation
-      if (value.name && value.name.trim().length > 0) {
+      // Only send fields that are actually different from the current persisted agent
+      const base = fullAgent
+
+      if (value.name && value.name.trim().length > 0 && value.name !== base.name) {
         updates.name = value.name
       }
+
       if (typeof value.description === 'string') {
-        updates.description = value.description
+        const nextDesc = value.description ?? ''
+        const baseDesc = base.description ?? ''
+        if (nextDesc !== baseDesc) {
+          updates.description = nextDesc
+        }
       }
-      if (value.model && value.model.trim().length > 0) {
+
+      if (value.model && value.model.trim().length > 0 && value.model !== base.model) {
         updates.model = value.model
       }
 
-      // Clamp numeric fields into valid ranges before sending
+      // Clamp numeric fields into valid ranges before sending, and compare to base
       if (typeof value.temperature === 'number') {
         const clampedTemp = Math.min(2, Math.max(0, value.temperature))
-        updates.temperature = clampedTemp
+        if (base.temperature == null || Number(base.temperature) !== clampedTemp) {
+          updates.temperature = clampedTemp
+        }
       }
+
       if (typeof value.maxTokens === 'number') {
         const clampedMaxTokens = Math.min(100000, Math.max(1, value.maxTokens))
-        updates.maxTokens = clampedMaxTokens
+        if (base.maxTokens == null || Number(base.maxTokens) !== clampedMaxTokens) {
+          updates.maxTokens = clampedMaxTokens
+        }
       }
+
       if (typeof value.timeout === 'number') {
         const clampedTimeout = Math.min(600000, Math.max(1000, value.timeout))
-        updates.timeout = clampedTimeout
+        if (base.timeout == null || Number(base.timeout) !== clampedTimeout) {
+          updates.timeout = clampedTimeout
+        }
       }
 
       if (typeof value.systemPrompt === 'string') {
-        updates.systemPrompt = value.systemPrompt
+        const nextPrompt = value.systemPrompt ?? ''
+        const basePrompt = base.systemPrompt ?? ''
+        if (nextPrompt !== basePrompt) {
+          updates.systemPrompt = nextPrompt
+        }
       }
+
       if (Array.isArray(value.previewPrompts)) {
-        updates.previewPrompts = value.previewPrompts
+        const nextPrompts = (value.previewPrompts || []).map(s => s.trim()).filter(Boolean)
+        const basePrompts = (base.previewPrompts || []).map(s => s.trim()).filter(Boolean)
+        const sameLength = nextPrompts.length === basePrompts.length
+        const sameContent = sameLength && nextPrompts.every((p, i) => p === basePrompts[i])
+        if (!sameContent) {
+          updates.previewPrompts = nextPrompts
+        }
       }
 
       if (blueprintObj) {
-        ;(updates as any).blueprint = blueprintObj
+        const baseBlueprint = base.blueprint ?? { nodes: [], edges: [] }
+        const nextStr = JSON.stringify(blueprintObj)
+        const baseStr = JSON.stringify(baseBlueprint)
+        if (nextStr !== baseStr) {
+          ;(updates as any).blueprint = blueprintObj
+        }
       }
+
       return updates
     }
 
@@ -408,6 +567,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       try {
         setIsAutosaving(true)
         const updates = buildUpdates()
+        // Skip network call if there are no actual changes
+        if (Object.keys(updates).length === 0) {
+          return
+        }
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
         const updated = res.data.data
 
@@ -431,7 +594,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       cancelled = true
       clearTimeout(timeout)
     }
-  }, [agentId, value, readOnly, isTemplateAgent, queryClient])
+  }, [agentId, value, readOnly, isTemplateAgent, queryClient, fullAgent])
 
   return (
     <div className="pt-4 pb-20">

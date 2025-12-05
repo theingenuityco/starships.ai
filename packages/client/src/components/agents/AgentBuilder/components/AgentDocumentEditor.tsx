@@ -484,11 +484,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameDescription = agentCore.description === templateCore.description
     const sameModel = agentCore.model === templateCore.model
     const sameCategory = (agentCore as any).category === (templateCore as any).category
-
-    // Use current form temperature when available so in-progress edits
-    // are reflected in the banner diff (not just the last persisted value).
-    const currentTemperature = typeof value.temperature === 'number' ? value.temperature : agentCore.temperature
-    const sameTemperature = currentTemperature === templateCore.temperature
+    const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
@@ -557,7 +553,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     )
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, value.temperature])
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)

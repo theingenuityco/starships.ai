@@ -118,6 +118,24 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
 
+  const formatUpdatedAt = (dateString: string) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return ''
+
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
   // Resolve current agentId by slug within this starship (if editing existing) - starship-only
   const [agentId, setAgentId] = useState<string | null>(null)
   useEffect(() => {
@@ -755,7 +773,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             {fullAgent?.updatedAt && (
               <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 <Icon name="clock" className="w-3 h-3" />
-                <span>Last updated {new Date(fullAgent.updatedAt).toLocaleString()}</span>
+                <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
               </div>
             )}
 

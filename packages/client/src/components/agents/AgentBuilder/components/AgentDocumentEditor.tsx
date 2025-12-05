@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { StandardSelect } from './StandardSelect'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
@@ -117,6 +118,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
+
+  // No-op: compact header in sticky banner is always shown for existing agents now (simpler and more robust than scroll detection).
 
   const formatUpdatedAt = (dateString: string) => {
     if (!dateString) return ''
@@ -733,56 +736,66 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
       <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
         {agentId && (
-          <div className="flex flex-col gap-1 text-xs">
-            {/* Save indicator */}
-            <div className="flex items-center gap-1 text-xs font-medium">
-              <div className="w-3 h-3 flex items-center justify-center">
-                <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+          <div className="flex items-center gap-4 text-sm">
+            {/* Avatar + name/slug on the far left */}
+            <div className="flex items-center gap-2">
+              <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={32} rounded className="h-8 w-8 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
+              <div className="flex flex-col leading-tight min-w-0">
+                <span className="text-sm font-semibold truncate">{fullAgent?.name || value.name || 'Untitled agent'}</span>
+                {(fullAgent?.slug || value.slug) && <span className="text-[11px] text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
               </div>
-              <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
             </div>
 
-            {/* Status & Version */}
-            <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 font-medium',
-                  publicationStatus === 'published'
-                    ? 'text-emerald-500'
-                    : publicationStatus === 'pending_approval'
-                      ? 'text-amber-500'
-                      : publicationStatus === 'rejected'
-                        ? 'text-red-500'
-                        : 'text-muted-foreground'
-                )}
-              >
-                <Icon
-                  name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
-                  className="w-3 h-3"
-                />
-                <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
-              </span>
-              {fullAgent?.version && (
-                <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
-                  <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+            {/* Text stack to the right of avatar/name */}
+            <div className="flex flex-col gap-1">
+              {/* Save indicator */}
+              <div className="flex items-center gap-1 text-xs font-medium">
+                <div className="w-3 h-3 flex items-center justify-center">
+                  <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+                </div>
+                <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+              </div>
+
+              {/* Status, Version & Last updated */}
+              <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 font-medium',
+                    publicationStatus === 'published'
+                      ? 'text-emerald-500'
+                      : publicationStatus === 'pending_approval'
+                        ? 'text-amber-500'
+                        : publicationStatus === 'rejected'
+                          ? 'text-red-500'
+                          : 'text-muted-foreground'
+                  )}
+                >
+                  <Icon
+                    name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
+                    className="w-3 h-3"
+                  />
+                  <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
                 </span>
+                {fullAgent?.version && (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
+                    <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+                  </span>
+                )}
+                {fullAgent?.updatedAt && (
+                  <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                    <Icon name="clock" className="w-3 h-3" />
+                    <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                  </div>
+                )}
+              </div>
+
+              {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  {publicationStatus === 'pending_approval' && <span>Awaiting instance admin approval.</span>}
+                  {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
+                </div>
               )}
             </div>
-
-            {/* Last updated */}
-            {fullAgent?.updatedAt && (
-              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <Icon name="clock" className="w-3 h-3" />
-                <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
-              </div>
-            )}
-
-            {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                {publicationStatus === 'pending_approval' && <span>Awaiting instance admin approval.</span>}
-                {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
-              </div>
-            )}
           </div>
         )}
 

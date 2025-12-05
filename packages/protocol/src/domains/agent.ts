@@ -25,6 +25,8 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   slug: string;
   createdAt: string;
   updatedAt: string;
+  // Optional categorization (for organizing agents in UI/marketplace)
+  category?: string;
   // Starship ownership (FK)
   starshipId: string;
   // Optional source template reference (FK)
@@ -82,6 +84,8 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   slug?: string; // Optional: if not provided, will be generated
+  // Optional categorization (for organizing agents in UI/marketplace)
+  category?: string;
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
   // Optional template reference and prompts
   sourceTemplateId?: string;
@@ -95,6 +99,8 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  * Request to update an agent
  */
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
+  // Optional categorization (for organizing agents in UI/marketplace)
+  category?: string;
   sourceTemplateId?: string;
   previewPrompts?: string[];
   version?: string;

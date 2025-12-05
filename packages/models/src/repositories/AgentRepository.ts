@@ -203,7 +203,7 @@ export class AgentRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Create agent properties for PostgreSQL
-        const agentProps: any = {
+        const agentProps = {
           // Core AgentParams fields
           name: normalizedData.name,
           slug:
@@ -212,7 +212,7 @@ export class AgentRepository extends BaseRepository {
           description: normalizedData.description,
           model: normalizedData.model,
           // Optional categorization (aligns with templates)
-          category: (normalizedData as any).category || 'general',
+          category: normalizedData.category || 'general',
           temperature: normalizedData.temperature,
           maxTokens: normalizedData.maxTokens,
           timeout: normalizedData.timeout,

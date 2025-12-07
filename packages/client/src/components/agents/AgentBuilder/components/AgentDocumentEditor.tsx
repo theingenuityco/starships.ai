@@ -218,6 +218,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Resolve current agentId by slug within this starship (if editing existing) - starship-only
   const [agentId, setAgentId] = useState<string | null>(null)
+  const [isResolvingAgent, setIsResolvingAgent] = useState<boolean>(false)
   useEffect(() => {
     let cancelled = false
     const safeGet = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
@@ -238,25 +239,38 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       }
     }
     const load = async () => {
-      if (!starshipId || !value?.slug || value.slug === 'new') {
-        console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
-        setAgentId(null)
-        return
+      if (!cancelled) {
+        setIsResolvingAgent(true)
       }
-      const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
-      const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
-      if (result.ok && (result.data as any)?.id) {
-        const agent: any = result.data as any
-        console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
-        if (!cancelled) {
-          setAgentId(agent?.id || null)
-          setFullAgent(agent as AgentModel)
+      try {
+        if (!starshipId || !value?.slug || value.slug === 'new') {
+          console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
+          if (!cancelled) {
+            setAgentId(null)
+            setFullAgent(null)
+            setPublishedTemplate(null)
+          }
+          return
         }
-      } else {
+        const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
+        const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
+        if (result.ok && (result.data as any)?.id) {
+          const agent: any = result.data as any
+          console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
+          if (!cancelled) {
+            setAgentId(agent?.id || null)
+            setFullAgent(agent as AgentModel)
+          }
+        } else {
+          if (!cancelled) {
+            setAgentId(null)
+            setFullAgent(null)
+            setPublishedTemplate(null)
+          }
+        }
+      } finally {
         if (!cancelled) {
-          setAgentId(null)
-          setFullAgent(null)
-          setPublishedTemplate(null)
+          setIsResolvingAgent(false)
         }
       }
     }
@@ -1015,17 +1029,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 >
                   <Icon name="rocket-launch" className="w-3.5 h-3.5" />
                   {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
-                </Button>
-              )}
-              {!hasExistingAgent && onSave && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => {
-                    onSave()
-                  }}
-                >
-                  Save
                 </Button>
               )}
             </div>

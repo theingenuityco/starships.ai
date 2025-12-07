@@ -121,62 +121,62 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   // Helper render function for compact list (flat, but with visual indentation for children)
   const renderCompactConversation = (conversation: ConversationModel, isChild: boolean) => {
-    const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
-    const isActive = conversation.id === currentConversationId
+            const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
+            const isActive = conversation.id === currentConversationId
 
-    return (
-      <div
-        key={conversation.id}
-        className={cn(
-          'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
-          isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
-        )}
+            return (
+              <div
+                key={conversation.id}
+                className={cn(
+                  'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
+                  isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
+                )}
         style={isChild ? { paddingLeft: '1.75rem' } : undefined}
-      >
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-          <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
-          <CompactConversationAgents conversationId={conversation.id} />
-        </div>
-        {/* Delete button - appears on hover */}
-        {onConversationDelete && (
-          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onMouseDown={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  type="button"
-                >
-                  <Icon name="dots-vertical" className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onConversationDelete(conversation.id)
-                  }}
-                >
-                  <Icon name="trash" className="mr-2 h-3 w-3" />
-                  <span className="text-xs">Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
-      </div>
-    )
+              >
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
+                  <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
+                  <CompactConversationAgents conversationId={conversation.id} />
+                </div>
+                {/* Delete button - appears on hover */}
+                {onConversationDelete && (
+                  <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          onMouseDown={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          type="button"
+                        >
+                          <Icon name="dots-vertical" className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onConversationDelete(conversation.id)
+                          }}
+                        >
+                          <Icon name="trash" className="mr-2 h-3 w-3" />
+                          <span className="text-xs">Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+              </div>
+            )
   }
 
   const handleConversationClick = (conversationId: string) => {
@@ -270,44 +270,44 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
                         return (
                           <div key={conversation.id}>
-                            <div
-                              className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                              onClick={() => handleConversationClick(conversation.id)}
-                            >
-                              {/* Conversation Info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
-                                      addSuffix: false,
-                                    })}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
+                          <div
+                            className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                            onClick={() => handleConversationClick(conversation.id)}
+                          >
+                            {/* Conversation Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
+                                    addSuffix: false,
+                                  })}
+                                </span>
                               </div>
+                              <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
+                            </div>
 
-                              {/* Actions Menu */}
-                              {onConversationDelete && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Icon name="dots-vertical" className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      onClick={e => {
-                                        e.stopPropagation()
-                                        onConversationDelete(conversation.id)
-                                      }}
-                                    >
-                                      <Icon name="trash" className="mr-2 h-4 w-4" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                            {/* Actions Menu */}
+                            {onConversationDelete && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Icon name="dots-vertical" className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      onConversationDelete(conversation.id)
+                                    }}
+                                  >
+                                    <Icon name="trash" className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               )}
                             </div>
 

@@ -177,10 +177,11 @@ export class AgentService {
   }
 
   /**
-   * Check if an agent is a system agent (Gaia or Daedalus)
+   * Check if an agent is a system agent (Gaia, Daedalus, Aria)
    */
   private isSystemAgent(agent: AgentModel): boolean {
-    return agent.name === 'Gaia' || agent.name === 'Daedalus';
+    const systemAgentNames = ['Gaia', 'Daedalus', 'Aria'];
+    return systemAgentNames.includes(agent.name);
   }
 
   /**
@@ -739,7 +740,8 @@ export class AgentService {
   async testAgent(
     agentId: string,
     testInput: string | LlmMessage[],
-    starshipId: string
+    starshipId: string,
+    parentConversationId?: string
   ): Promise<{
     success: boolean;
     agent: string;
@@ -1004,9 +1006,10 @@ export class AgentService {
           // Create a lightweight archived conversation to satisfy FK and keep UI uncluttered
           const testConversation = await conversationService.createConversation({
             title: `Agent Test • ${agentModel.name ?? agentModel.slug ?? agentId}`,
-            status: 'archived',
+            status: 'active',
             starshipId,
             agentId: agentModel.id,
+            ...(parentConversationId ? { parentConversationId } : {}),
           });
 
           const usageRow = await usageService.createUsageForTurn({

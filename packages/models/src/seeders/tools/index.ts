@@ -22,6 +22,7 @@ export { agentGetToolTemplate } from './get-agent';
 export { agentOpenToolTemplate } from './open-agent';
 export { agentEditToolTemplate } from './edit-agent';
 export { agentTestToolTemplate } from './test-agent';
+export { agentCallToolTemplate } from './call-agent';
 export { agentAssignToolToolTemplate } from './assign-agent-tool';
 export { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 export { modelsListToolTemplate } from './models-list';
@@ -49,6 +50,7 @@ import { agentGetToolTemplate } from './get-agent';
 import { agentOpenToolTemplate } from './open-agent';
 import { agentEditToolTemplate } from './edit-agent';
 import { agentTestToolTemplate } from './test-agent';
+import { agentCallToolTemplate } from './call-agent';
 import { agentAssignToolToolTemplate } from './assign-agent-tool';
 import { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 import { modelsListToolTemplate } from './models-list';
@@ -76,6 +78,7 @@ export const ALL_TOOL_TEMPLATES = [
   agentOpenToolTemplate,
   agentEditToolTemplate,
   agentTestToolTemplate,
+  agentCallToolTemplate,
   agentAssignToolToolTemplate,
   agentUnassignToolToolTemplate,
   modelsListToolTemplate,

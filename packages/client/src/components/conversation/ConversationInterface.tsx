@@ -511,6 +511,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       const action = (payload as any).__ui_action as string
 
+      // Debug logging for UI actions coming from SSE
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('[ConversationInterface] handleUIPayload', {
+          action,
+          payload,
+          starshipId,
+        })
+      } catch {}
+
       // Builders are route-based now; no in-place form updates
 
       switch (action) {
@@ -522,6 +532,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             }
             if (cid) {
               queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+            }
+          } catch {}
+          break
+        }
+        case 'child_conversation_created': {
+          try {
+            const sid = (payload as any)?.starshipId || starshipId
+            // eslint-disable-next-line no-console
+            console.debug('[ConversationInterface] child_conversation_created – invalidating conversations for starship', {
+              starshipId: sid,
+            })
+            if (sid) {
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
             }
           } catch {}
           break
@@ -667,6 +690,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         } catch {}
       },
     })
+
+    // Consume UI actions emitted over SSE (conversation title updates, child conversations, etc.)
+    useEffect(() => {
+      if (!lastUIAction) return
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('[ConversationInterface] lastUIAction from stream', lastUIAction)
+      } catch {}
+      handleUIPayload(lastUIAction)
+    }, [lastUIAction, handleUIPayload])
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)

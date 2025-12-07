@@ -99,12 +99,20 @@ const TestAgentSchema = z.object({
 const ToolPublishOverrideSchema = z.object({
   toolId: IdSchema,
   versionBump: z.enum(['patch', 'minor', 'major']),
-  changelog: z.string().min(1, 'Changelog is required').max(2000, 'Changelog must be at most 2000 characters'),
+  changelog: z
+    .string()
+    .min(1, 'Changelog is required')
+    .max(2000, 'Changelog must be at most 2000 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
 });
 
 const PublishRequestSchema = z.object({
   versionBump: z.enum(['patch', 'minor', 'major']),
-  changelog: z.string().min(1, 'Changelog is required').max(2000, 'Changelog must be at most 2000 characters'),
+  changelog: z
+    .string()
+    .min(1, 'Changelog is required')
+    .max(2000, 'Changelog must be at most 2000 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
   toolOverrides: z.array(ToolPublishOverrideSchema).optional(),
 });
 

@@ -38,6 +38,7 @@ import { EnvironmentService } from './EnvironmentService';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
+import { isInstanceAdmin } from '../utils/auth-helpers';
 
 export interface ConversationRequest {
   agentId: string;
@@ -1072,6 +1073,20 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
 
+    // Enforce that only the owner of the agent's starship or an instance admin
+    // can request publication. Routes already gate this, but we repeat the
+    // check here for defense-in-depth in case the service is called directly.
+    const userRepo = new UserRepository();
+    const user = (await userRepo.findById(userId)) as UserModel | null;
+    const isAdmin = isInstanceAdmin(user);
+
+    if (!isAdmin) {
+      const starship = await this.starshipRepository.findById(agent.starshipId);
+      if (!starship || starship.ownerId !== userId) {
+        throw new ForbiddenError('You do not have permission to request publication for this agent');
+      }
+    }
+
     if (agent.publicationStatus === 'pending_approval') {
       throw new ValidationError('Agent is already pending approval');
     }
@@ -1188,6 +1203,15 @@ export class AgentService {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate that the caller is an instance admin. The admin routes already
+    // enforce this, but we re-check here to prevent misuse if the service is
+    // ever invoked outside the HTTP layer.
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can approve agent publication');
     }
 
     if (agent.publicationStatus !== 'pending_approval') {
@@ -1391,6 +1415,15 @@ export class AgentService {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate that the caller is an instance admin. The admin routes already
+    // enforce this, but we re-check here to prevent misuse if the service is
+    // ever invoked outside the HTTP layer.
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can reject agent publication');
     }
 
     if (agent.publicationStatus !== 'pending_approval') {

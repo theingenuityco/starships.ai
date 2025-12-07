@@ -952,10 +952,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 )}
               </div>
 
-              {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
+              {publicationStatus === 'rejected' && (
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  {publicationStatus === 'pending_approval' && <span>Awaiting review for publication.</span>}
-                  {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
+                  <span>Last request was rejected. Update your agent and request publication again.</span>
                 </div>
               )}
             </div>

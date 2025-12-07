@@ -393,19 +393,16 @@ export class StreamingService {
         console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
       }
 
-      // Compact large internal payloads before sending to clients to avoid giant SSE events.
-      // This is a presentation-layer normalization only; it does NOT change persisted data.
-      const payload = this.compactSsePayload(event, data);
-      const json = JSON.stringify(payload);
+      const json = JSON.stringify(data);
 
       // Lightweight debug logging to understand SSE payload volume without dumping full data
       // Avoid logging the entire payload to keep logs readable.
       let debugMeta: Record<string, unknown> = {};
-      if (event === 'message' && payload && typeof payload === 'object') {
+      if (event === 'message' && data && typeof data === 'object') {
         debugMeta = {
-          messageId: (payload as { id?: unknown }).id,
-          role: (payload as { role?: unknown }).role,
-          messageType: (payload as { messageType?: unknown }).messageType,
+          messageId: (data as { id?: unknown }).id,
+          role: (data as { role?: unknown }).role,
+          messageType: (data as { messageType?: unknown }).messageType,
         };
       }
       console.debug('[StreamingService] SSE send', {
@@ -845,161 +842,5 @@ export class StreamingService {
     }
 
     return false;
-  }
-
-  /**
-   * Compact SSE payloads to avoid sending extremely large internal objects to clients.
-   * This ONLY affects the streaming representation and never mutates persisted data.
-   */
-  private compactSsePayload(event: string, data: any): any {
-    try {
-      if (!data || typeof data !== 'object') return data;
-
-      // Work on a shallow clone so we never mutate callers' objects
-      const clone = Array.isArray(data) ? [...data] : { ...(data as Record<string, unknown>) };
-
-      // Normalize message events (baseline history & persisted messages)
-      if (event === 'message') {
-        return this.compactMessagePayload(clone);
-      }
-
-      // Normalize ui_action events that may embed large child-conversation payloads
-      if (event === 'ui_action') {
-        return this.compactToolLikeObject(clone);
-      }
-
-      // Normalize delta events where value is a full message object being appended
-      if (event === 'delta' && (clone as any).op === 'add' && (clone as any).value && typeof (clone as any).value === 'object') {
-        const deltaClone = { ...(clone as any) };
-        deltaClone.value = this.compactMessagePayload({ ...(deltaClone.value as Record<string, unknown>) });
-        return deltaClone;
-      }
-
-      return clone;
-    } catch (err) {
-      console.debug('[StreamingService] compactSsePayload failed', {
-        event,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return data;
-    }
-  }
-
-  /**
-   * Compact a single message-like object, focusing on huge tool_result payloads and
-   * assistant messages that embed raw tool JSON in content.
-   */
-  private compactMessagePayload(msg: any): any {
-    try {
-      if (!msg || typeof msg !== 'object') return msg;
-      const out = { ...(msg as Record<string, unknown>) };
-
-      const role = (out as any).role;
-      const messageType = (out as any).messageType;
-
-      const maybeCompactContentJson = (raw: string | undefined | null): string | undefined => {
-        if (typeof raw !== 'string' || raw.length < 5000) return raw;
-        let parsed: any;
-        try {
-          parsed = JSON.parse(raw);
-        } catch {
-          return raw;
-        }
-        const compact = this.compactToolLikeObject(parsed);
-        try {
-          return JSON.stringify(compact);
-        } catch {
-          return raw;
-        }
-      };
-
-      // Tool result messages: content is usually JSON-serialized toolResult
-      if (role === 'tool' && messageType === 'tool_result') {
-        (out as any).content = maybeCompactContentJson((out as any).content);
-        return out;
-      }
-
-      // Some orchestrator agents may stuff tool-style JSON into assistant content.
-      if (role === 'assistant' && messageType === 'agent_response') {
-        (out as any).content = maybeCompactContentJson((out as any).content);
-        return out;
-      }
-
-      return out;
-    } catch {
-      return msg;
-    }
-  }
-
-  /**
-   * Compact a generic tool-like object:
-   * - For call-agent style shapes: trim nested conversation.messages to a small summary
-   * - For HTTP-style shapes: trim large headers and body while keeping key info
-   */
-  private compactToolLikeObject(obj: any): any {
-    try {
-      if (!obj || typeof obj !== 'object') return obj;
-      const out: any = Array.isArray(obj) ? [...obj] : { ...obj };
-
-      // Handle call-agent style: { childConversationId, success, status, result, ... }
-      if (out && typeof out === 'object' && out.result && typeof out.result === 'object') {
-        const res: any = { ...out.result };
-
-        if (res.conversation && typeof res.conversation === 'object') {
-          const conv: any = { ...res.conversation };
-          if (Array.isArray(conv.messages)) {
-            const messages: any[] = conv.messages;
-            const last = messages.length > 0 ? messages[messages.length - 1] : null;
-            conv.messages = {
-              count: messages.length,
-              lastMessageId: last && typeof last === 'object' ? last.id : undefined,
-              lastRole: last && typeof last === 'object' ? last.role : undefined,
-            };
-          }
-          res.conversation = conv;
-        }
-
-        out.result = res;
-      }
-
-      // Handle HTTP-style tool outputs: { status, statusText, headers, body, url }
-      if (out && typeof out === 'object' && typeof out.status === 'number' && (out.body || out.headers)) {
-        // Trim headers to a minimal subset
-        if (out.headers && typeof out.headers === 'object') {
-          const h: Record<string, unknown> = out.headers as Record<string, unknown>;
-          const keep: Record<string, unknown> = {};
-          if (typeof h['content-type'] === 'string') keep['content-type'] = h['content-type'];
-          if (typeof h['x-request-id'] === 'string') keep['x-request-id'] = h['x-request-id'];
-          out.headers = keep;
-        }
-
-        // Compact body.data.conversation similarly
-        if (out.body && typeof out.body === 'object') {
-          const body: any = { ...(out.body as Record<string, unknown>) };
-          if (body.data && typeof body.data === 'object') {
-            const dataObj: any = { ...(body.data as Record<string, unknown>) };
-            if (dataObj.conversation && typeof dataObj.conversation === 'object') {
-              const conv: any = { ...dataObj.conversation };
-              if (Array.isArray(conv.messages)) {
-                const messages: any[] = conv.messages;
-                const last = messages.length > 0 ? messages[messages.length - 1] : null;
-                conv.messages = {
-                  count: messages.length,
-                  lastMessageId: last && typeof last === 'object' ? last.id : undefined,
-                  lastRole: last && typeof last === 'object' ? last.role : undefined,
-                };
-              }
-              dataObj.conversation = conv;
-            }
-            body.data = dataObj;
-          }
-          out.body = body;
-        }
-      }
-
-      return out;
-    } catch {
-      return obj;
-    }
   }
 }

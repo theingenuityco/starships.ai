@@ -22,15 +22,19 @@ import { StarshipRepository } from '@/repositories/StarshipRepository';
  *   created from the same template for that starship).
  * - Agent→Tool relationships are created via AgentRepository.addToolRelationship
  *   using ON CONFLICT DO NOTHING semantics in the junction table.
+ * - To guard against concurrent executions of this migration across multiple app instances,
+ *   we take a per-starship PostgreSQL advisory lock before doing any work for that starship.
+ *   This ensures that only one process at a time can backfill Aria for a given starship,
+ *   so the existence checks above remain reliable.
  *
  * Down migration:
  * - We do NOT delete Aria or its tools on down() to avoid destructive data loss
  *   (agents/tools may have been edited or used by users). Down is therefore a no-op.
  */
 export async function up(client: Client): Promise<void> {
-  // This migration uses repository classes directly instead of the raw client.
-  // Mark the parameter as intentionally unused to satisfy linters.
-  void client;
+  // This migration uses repository classes directly for most operations, but we also
+  // leverage the raw client to acquire per-starship advisory locks to prevent
+  // concurrent duplication when multiple app instances run migrations at the same time.
   const templateRepo = new AgentTemplateRepository();
   const agentRepo = new AgentRepository();
   const toolRepo = new ToolRepository();
@@ -60,6 +64,17 @@ export async function up(client: Client): Promise<void> {
       const starshipId = starship.id;
       if (!starshipId) continue;
 
+      // Serialize backfill work per starship across concurrent migration runners.
+      // We use a best-effort advisory lock keyed by the starship id; if another
+      // process is already backfilling this starship, we will block here until
+      // it finishes and releases the lock.
+      try {
+        await client.query('SELECT pg_advisory_lock(hashtext($1))', [starshipId]);
+      } catch (lockErr) {
+        console.error(`[021_backfill_aria_delegator] Failed to acquire advisory lock for starship ${starshipId}; skipping.`, lockErr);
+        continue;
+      }
+
       // Check if this starship already has an Aria agent created from the Aria template
       const existingAgents = await agentRepo.findByStarship(starshipId);
       const hasAria = existingAgents.some((agent) => {
@@ -72,6 +87,11 @@ export async function up(client: Client): Promise<void> {
         console.log(
           `[021_backfill_aria_delegator] Starship ${starshipId} already has an Aria agent (from template ${ariaTemplate.id}); skipping.`
         );
+        try {
+          await client.query('SELECT pg_advisory_unlock(hashtext($1))', [starshipId]);
+        } catch {
+          // Best-effort unlock; if it fails, the connection will release the lock on transaction/session end.
+        }
         continue;
       }
 
@@ -131,6 +151,13 @@ export async function up(client: Client): Promise<void> {
             );
           }
         }
+      }
+
+      // Release the advisory lock for this starship once all work is done.
+      try {
+        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [starshipId]);
+      } catch (unlockErr) {
+        console.error(`[021_backfill_aria_delegator] Failed to release advisory lock for starship ${starshipId}:`, unlockErr);
       }
     } catch (err) {
       console.error('[021_backfill_aria_delegator] Unexpected error while processing starship during Aria backfill:', err);

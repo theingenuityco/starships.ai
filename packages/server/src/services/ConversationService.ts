@@ -160,6 +160,41 @@ export class ConversationService {
   }
 
   /**
+   * Clear all in-memory, per-conversation streaming/turn state to avoid leaks once
+   * a conversation (or turn) has fully finished. This is safe to call multiple times.
+   */
+  private clearStreamingState(conversationId: string): void {
+    // Per-turn / streaming accumulators
+    this.streamingContent.delete(conversationId);
+    this.streamingToolCalls.delete(conversationId);
+    this.streamingReasoning.delete(conversationId);
+    this.ringBuffer.delete(conversationId);
+    this.latestStreamingUsage.delete(conversationId);
+    this.streamSeq.delete(conversationId);
+    this.snapshotPreferred.delete(conversationId);
+    this.toolCallSeq.delete(conversationId);
+    this.placeholderEmitted.delete(conversationId);
+
+    // Resume / sequencing metadata
+    this.generationId.delete(conversationId);
+    this.accumulatedLength.delete(conversationId);
+    this.nextChunkPosition.delete(conversationId);
+    this.chunkProcessingLock.delete(conversationId);
+    this.lastPersistedIndex.delete(conversationId);
+
+    // Balance guards and suppression flags
+    this.lowBalanceStopTriggered.delete(conversationId);
+    this.lastLowBalanceCheckAt.delete(conversationId);
+    this.suppressCompleteFor.delete(conversationId);
+
+    // Misc per-conversation flags / attribution
+    this.activeStreamPersisted.delete(conversationId);
+    this.assistantPersistedThisTurn.delete(conversationId);
+    this.currentAgentForConversation.delete(conversationId);
+    this.lastToolCallsBroadcastHash.delete(conversationId);
+  }
+
+  /**
    * Extract completed properties from a JSON-like string buffer using partial-json-parser only.
    */
   private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
@@ -400,6 +435,8 @@ export class ConversationService {
       const deleted = await this.conversationRepository.delete(conversationId);
 
       if (deleted) {
+        // Best-effort: clear any in-memory streaming state for this conversation to avoid leaks
+        this.clearStreamingState(conversationId);
         console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
@@ -1090,12 +1127,8 @@ export class ConversationService {
       }
     }
 
-    // Clear accumulators
-    this.streamingContent.delete(conversationId);
-    this.streamingToolCalls.delete(conversationId);
-    this.streamingReasoning.delete(conversationId);
-    // Leave assistantPersistedThisTurn as-is until next workflow_started clears it
-    this.streamSeq.delete(conversationId);
+    // Clear all in-memory state for this conversation's turn now that it has stopped
+    this.clearStreamingState(conversationId);
   }
 
   /**
@@ -2311,10 +2344,7 @@ export class ConversationService {
         }
 
         // Clear streaming trackers now that the workflow turn has fully completed
-        this.streamingContent.delete(conversationId);
-        this.streamingToolCalls.delete(conversationId);
-        this.streamingReasoning.delete(conversationId);
-        this.streamSeq.delete(conversationId);
+        this.clearStreamingState(conversationId);
         break;
       }
 
@@ -2338,6 +2368,8 @@ export class ConversationService {
           value: errorMessage,
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
+        // Best-effort: clear any per-conversation streaming state after a failed workflow
+        this.clearStreamingState(conversationId);
         break;
       }
 

@@ -1779,9 +1779,7 @@ export class ConversationService {
                     let argsObj: unknown = {};
                     if (argsStr) {
                       try {
-                        console.log('argsStr', argsStr);
                         argsObj = parsePartialJSONObject(argsStr);
-                        console.log('argsObj', argsObj);
                       } catch {
                         argsObj = {};
                       }

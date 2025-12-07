@@ -14,6 +14,8 @@ import {
   AgentTemplateRepository,
   StarshipRepository,
   UserRepository,
+  ToolRepository,
+  ToolTemplateRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
   DEFAULT_AGENT_TEMPERATURE,
   MAX_AGENT_MAX_TOKENS,
@@ -1100,7 +1102,8 @@ export class AgentService {
         blueprint: agent.blueprint!,
         icon: undefined,
         previewPrompts: agent.previewPrompts,
-        assignedToolSlugs: [], // tools can be managed separately at template level
+        // Tools will be synchronized below based on the agent's assigned tools
+        assignedToolSlugs: [],
       });
 
       // Align template version with the bumped agent version
@@ -1123,9 +1126,89 @@ export class AgentService {
         previewPrompts: agent.previewPrompts,
         version: nextVersion,
       });
+      // 3a. After creating the template, we will also sync assigned tools below.
     }
 
-    // 3. Persist publication metadata on agent
+    // 3. Sync tools: ensure each assigned tool has a ToolTemplate and propagate
+    //    those tool template slugs onto the AgentTemplate as assignedToolSlugs.
+    if (targetTemplateId) {
+      try {
+        const toolRepo = new ToolRepository();
+        const toolTemplateRepo = new ToolTemplateRepository();
+
+        // Load all tools currently assigned to this agent for its starship
+        const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+
+        const toolTemplateSlugs: string[] = [];
+
+        for (const tool of agentTools) {
+          // Only consider non-draft tools with a complete definition
+          const hasParams =
+            !!tool.parameters &&
+            tool.parameters.type === 'object' &&
+            !!tool.parameters.properties &&
+            Object.keys(tool.parameters.properties).length > 0;
+          const hasBlueprint = !!(
+            tool.blueprint &&
+            typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
+            Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+          );
+
+          if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
+
+          let templateId = tool.templateId;
+          let templateSlug: string | undefined;
+
+          if (templateId) {
+            const existingTemplate = await toolTemplateRepo.findById(templateId);
+            if (existingTemplate) {
+              templateSlug = existingTemplate.slug;
+            } else {
+              // Stale reference – drop it and treat as new template
+              templateId = undefined;
+            }
+          }
+
+          if (!templateId) {
+            // Create a new ToolTemplate from this tool instance
+            const createdTemplate = await toolTemplateRepo.create({
+              name: tool.name,
+              // Use the tool's slug as starting point for template slug
+              slug: tool.slug,
+              description: tool.description,
+              category: 'utility',
+              parameters: tool.parameters!,
+              blueprint: tool.blueprint!,
+              transforms: tool.transforms,
+              mutations: tool.mutations,
+              condition: tool.condition,
+              version: tool.version || '1.0.0',
+            });
+
+            // Link tool back to its new template for future updates
+            await toolRepo.update(tool.id, {
+              templateId: createdTemplate.id,
+              templateSnapshotAt: new Date().toISOString(),
+            });
+
+            templateSlug = createdTemplate.slug;
+          }
+
+          if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {
+            toolTemplateSlugs.push(templateSlug);
+          }
+        }
+
+        if (toolTemplateSlugs.length > 0) {
+          await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
+        }
+      } catch (err) {
+        // Tool synchronization should never block agent publication; log and continue.
+        console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);
+      }
+    }
+
+    // 4. Persist publication metadata on agent
     const updated = await this.agentRepository.update(agentId, {
       version: nextVersion,
       publicationStatus: 'published',

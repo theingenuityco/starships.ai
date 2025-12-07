@@ -84,9 +84,16 @@ const TestAgentSchema = z.object({
   ]),
 });
 
+const ToolPublishOverrideSchema = z.object({
+  toolId: IdSchema,
+  versionBump: z.enum(['patch', 'minor', 'major']),
+  changelog: z.string().min(1, 'Changelog is required').max(2000, 'Changelog must be at most 2000 characters'),
+});
+
 const PublishRequestSchema = z.object({
   versionBump: z.enum(['patch', 'minor', 'major']),
   changelog: z.string().min(1, 'Changelog is required').max(2000, 'Changelog must be at most 2000 characters'),
+  toolOverrides: z.array(ToolPublishOverrideSchema).optional(),
 });
 
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
@@ -405,6 +412,7 @@ router.post('/agents/:id/publish-request', jwtAuthMiddleware, async (req: Reques
     const updated = await agentService.requestPublication(agentId, userId, {
       versionBump: bodyValidation.versionBump,
       changelog: bodyValidation.changelog,
+      toolOverrides: bodyValidation.toolOverrides || [],
     });
     sendSuccess(res, {
       message: 'Publication requested successfully',

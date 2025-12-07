@@ -33,7 +33,6 @@ import { generateUniqueAgentSlug } from '@starships/models';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
-import { getEnvConfig } from '@starships/env';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
@@ -629,8 +628,7 @@ export class AgentService {
   async testAgent(
     agentId: string,
     testInput: string | LlmMessage[],
-    starshipId: string,
-    _authToken?: string
+    starshipId: string
   ): Promise<{
     success: boolean;
     agent: string;
@@ -781,7 +779,6 @@ export class AgentService {
         : [{ role: 'user', content: testInput }]; // Convert string to message
 
       // 5. Prepare runtime env (Starships host: only STARSHIP_ID is exposed to workflows)
-      const env = getEnvConfig();
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
       };
@@ -1014,6 +1011,7 @@ export class AgentService {
         systemPrompt?: string | null;
         blueprint?: unknown;
         previewPrompts?: string[] | null;
+        category?: string | null;
       }) => {
         const blueprint =
           (src.blueprint as unknown) && typeof src.blueprint === 'object' ? (src.blueprint as unknown) : { nodes: [], edges: [] };
@@ -1028,6 +1026,9 @@ export class AgentService {
           systemPrompt: src.systemPrompt ?? '',
           blueprint,
           previewPrompts: normalizePreviewPrompts(src.previewPrompts),
+          // Category is optional for AgentModel but required for AgentTemplateModel;
+          // normalize to empty string when undefined so comparisons are stable.
+          category: src.category ?? '',
         };
       };
 
@@ -1129,7 +1130,8 @@ export class AgentService {
         name: agent.name,
         slug: agent.slug,
         description: agent.description,
-        category: 'general',
+        // Prefer the agent's category when present; fall back to "general"
+        category: agent.category ?? 'general',
         model: agent.model,
         temperature: safeTemperature,
         maxTokens: safeMaxTokens,
@@ -1150,6 +1152,8 @@ export class AgentService {
       await templateRepo.update(targetTemplateId, {
         name: agent.name,
         description: agent.description,
+        // Only update category if the agent has one explicitly set
+        category: agent.category ?? 'general',
         model: agent.model,
         temperature: safeTemperature,
         maxTokens: safeMaxTokens,

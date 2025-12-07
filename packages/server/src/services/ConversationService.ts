@@ -764,6 +764,7 @@ export class ConversationService {
 
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
+        CONVERSATION_ID: data.conversationId,
       };
 
       const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);

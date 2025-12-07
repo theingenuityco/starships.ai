@@ -472,7 +472,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       z.object({
         title: z.string().min(1).max(100).optional(),
         starshipId: IdSchema,
-        agentId: IdSchema.optional(),
+        agentSlug: z.string().min(1).max(255).optional(),
       }),
       req.body,
       res,
@@ -490,18 +490,24 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       return;
     }
 
-    // Authorization: if agentId is provided, verify user owns it and it belongs to the same starship
-    if (bodyValidation.agentId) {
+    // Resolve agent from either agentId or agentSlug, and verify access/ownership
+    let resolvedAgentId: string | undefined;
+    if (bodyValidation.agentSlug) {
       const agentService = new AgentService();
-      const agent = await agentService.getAgent(bodyValidation.agentId);
+      const starshipAgents = await agentService.getAgentsByStarship(bodyValidation.starshipId);
+      const agent = starshipAgents.find((a) => a.slug === bodyValidation.agentSlug) || null;
 
       if (!agent) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+          resource: 'agent',
+          slug: bodyValidation.agentSlug,
+          starshipId: bodyValidation.starshipId,
+        });
         return;
       }
 
       // Verify user owns the agent's starship
-      if (!(await verifyResourceAccess(agent.starshipId, authUserId, 'agent', bodyValidation.agentId, res))) {
+      if (!(await verifyResourceAccess(agent.starshipId, authUserId, 'agent', agent.id, res))) {
         return;
       }
 
@@ -510,10 +516,19 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
         sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
         return;
       }
+
+      resolvedAgentId = agent.id;
     }
 
     const conversationService = new ConversationService();
-    const conversation = await conversationService.createConversation(req.body);
+    // Build payload for conversation creation, normalizing agentId and dropping agentSlug
+    const createPayload = {
+      ...req.body,
+      agentId: resolvedAgentId,
+    };
+    delete (createPayload as any).agentSlug;
+
+    const conversation = await conversationService.createConversation(createPayload);
 
     sendSuccess(res, conversation, 201);
   } catch (error) {

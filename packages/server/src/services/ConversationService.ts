@@ -240,6 +240,7 @@ export class ConversationService {
       status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
+      parentConversationId: data.parentConversationId,
     });
 
     return conversation;

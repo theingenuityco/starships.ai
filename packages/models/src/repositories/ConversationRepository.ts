@@ -34,7 +34,7 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Conversation & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
+  async create(entity: Conversation & { starshipId: string; agentId?: string; parentConversationId?: string }): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -44,6 +44,7 @@ export class ConversationRepository extends BaseRepository {
           title: entity.title,
           status: entity.status || 'active',
           starshipId: entity.starshipId,
+          ...(entity.parentConversationId ? { parentConversationId: entity.parentConversationId } : {}),
           createdAt: now,
           updatedAt: now,
         };

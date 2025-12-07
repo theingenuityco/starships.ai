@@ -35,7 +35,6 @@ function CompactConversationAgents({ conversationId }: { conversationId: string 
 
   const agents = Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []
   if (!agents.length) return null
-
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
   const remaining = agents.length - visibleAgents.length
@@ -76,8 +75,24 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       return title.toLowerCase().includes(searchQuery.toLowerCase())
     }) || []
 
-  // Group conversations by date
-  const groupedConversations = filteredConversations.reduce(
+  // Build parent/child tree: root conversations and their children
+  const roots: ConversationModel[] = []
+  const childrenByParent: Record<string, ConversationModel[]> = {}
+
+  for (const conv of filteredConversations) {
+    const parentId = (conv as any).parentConversationId as string | undefined
+    if (parentId) {
+      if (!childrenByParent[parentId]) {
+        childrenByParent[parentId] = []
+      }
+      childrenByParent[parentId].push(conv)
+    } else {
+      roots.push(conv)
+    }
+  }
+
+  // Group root conversations by date for full view
+  const groupedConversations = roots.reduce(
     (groups, conv) => {
       const date = new Date(conv.createdAt)
       const today = new Date()
@@ -104,6 +119,66 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     {} as Record<string, ConversationModel[]>
   )
 
+  // Helper render function for compact list (flat, but with visual indentation for children)
+  const renderCompactConversation = (conversation: ConversationModel, isChild: boolean) => {
+    const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
+    const isActive = conversation.id === currentConversationId
+
+    return (
+      <div
+        key={conversation.id}
+        className={cn(
+          'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
+          isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
+        )}
+        style={isChild ? { paddingLeft: '1.75rem' } : undefined}
+      >
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
+          <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
+          <CompactConversationAgents conversationId={conversation.id} />
+        </div>
+        {/* Delete button - appears on hover */}
+        {onConversationDelete && (
+          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  type="button"
+                >
+                  <Icon name="dots-vertical" className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onConversationDelete(conversation.id)
+                  }}
+                >
+                  <Icon name="trash" className="mr-2 h-3 w-3" />
+                  <span className="text-xs">Delete</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const handleConversationClick = (conversationId: string) => {
     router.push(`/ship/${slug}/conversations/${conversationId}`)
     onConversationSelect?.(conversationId)
@@ -129,7 +204,6 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       )
     }
 
-    // Flat list without date grouping for compact mode
     return (
       <div className="space-y-0.5">
         {filteredConversations.length === 0 ? (
@@ -138,63 +212,14 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
           </div>
         ) : (
-          filteredConversations.map((conversation: ConversationModel) => {
-            const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
-            const isActive = conversation.id === currentConversationId
-
-            return (
-              <div
-                key={conversation.id}
-                className={cn(
-                  'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
-                  isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
-                )}
-              >
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-                  <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
-                  <CompactConversationAgents conversationId={conversation.id} />
-                </div>
-                {/* Delete button - appears on hover */}
-                {onConversationDelete && (
-                  <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={e => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          onMouseDown={e => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          type="button"
-                        >
-                          <Icon name="dots-vertical" className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={e => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onConversationDelete(conversation.id)
-                          }}
-                        >
-                          <Icon name="trash" className="mr-2 h-3 w-3" />
-                          <span className="text-xs">Delete</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                )}
+          <>
+            {roots.map(root => (
+              <div key={root.id}>
+                {renderCompactConversation(root, false)}
+                {(childrenByParent[root.id] || []).map(child => renderCompactConversation(child, true))}
               </div>
-            )
-          })
+            ))}
+          </>
         )}
       </div>
     )
@@ -241,46 +266,69 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                         const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
                         const isActive = conversation.id === currentConversationId
 
+                        const children = childrenByParent[conversation.id] || []
+
                         return (
-                          <div
-                            key={conversation.id}
-                            className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                            onClick={() => handleConversationClick(conversation.id)}
-                          >
-                            {/* Conversation Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-1">
-                                <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
-                                    addSuffix: false,
-                                  })}
-                                </span>
+                          <div key={conversation.id}>
+                            <div
+                              className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                              onClick={() => handleConversationClick(conversation.id)}
+                            >
+                              {/* Conversation Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
+                                      addSuffix: false,
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
                               </div>
-                              <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
+
+                              {/* Actions Menu */}
+                              {onConversationDelete && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Icon name="dots-vertical" className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        onConversationDelete(conversation.id)
+                                      }}
+                                    >
+                                      <Icon name="trash" className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </div>
 
-                            {/* Actions Menu */}
-                            {onConversationDelete && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Icon name="dots-vertical" className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      onConversationDelete(conversation.id)
-                                    }}
-                                  >
-                                    <Icon name="trash" className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                            {/* Child conversations */}
+                            {children.length > 0 && (
+                              <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
+                                {children.map(child => {
+                                  const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
+                                  const childActive = child.id === currentConversationId
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      className={cn('group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all', 'hover:bg-muted/40', childActive && 'bg-muted/70 shadow-sm')}
+                                      onClick={() => handleConversationClick(child.id)}
+                                    >
+                                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Child</span>
+                                      <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             )}
                           </div>
                         )

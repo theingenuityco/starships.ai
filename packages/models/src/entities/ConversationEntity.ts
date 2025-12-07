@@ -49,6 +49,12 @@ export class ConversationEntity implements ConversationModel {
   @IsObject()
   state?: Record<string, unknown>;
 
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  parentConversationId?: string;
+
   /**
    * Simple validation function using class-validator
    * This replaces the complex ConversationValidation class with a lean solution

@@ -155,6 +155,7 @@ from the message send endpoint so callers can inspect status and results.
           connector: 'starships',
           body: {
             content: '{{ (lastOutputOf("prepare") || {}).content }}',
+            sync: true,
           },
           timeout: 60000,
         },
@@ -215,6 +216,7 @@ from the message send endpoint so callers can inspect status and results.
           connector: 'starships',
           body: {
             content: '{{ (lastOutputOf("prepare") || {}).content }}',
+            sync: true,
           },
           timeout: 60000,
         },
@@ -286,7 +288,7 @@ export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentCallTool.blueprint,
 
   slug: 'call-agent',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',

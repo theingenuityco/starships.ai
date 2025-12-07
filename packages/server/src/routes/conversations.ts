@@ -270,6 +270,8 @@ router.post(
           attachmentIds: z.array(z.string()).optional(),
           // baselineLength is no longer used on POST (streaming happens over GET SSE)
           baselineLength: z.coerce.number().int().min(0).optional(),
+          // When true, wait for the turn to fully complete and return the last message
+          sync: z.boolean().optional(),
         }),
         req.body,
         res,
@@ -278,7 +280,7 @@ router.post(
       if (!bodyValidation) return;
 
       const { conversationId } = paramValidation;
-      const { content, agentId, attachmentIds } = bodyValidation;
+      const { content, agentId, attachmentIds, sync } = bodyValidation;
 
       // Preflight billing gate: block when wallet balance is <= 0
       const conversationService = new ConversationService();
@@ -357,7 +359,41 @@ router.post(
         }
       }
 
-      // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
+      // If sync is requested, wait for the full turn to complete and return the full conversation with messages
+      if (sync) {
+        try {
+          await conversationService.addConversationMessage(
+            {
+              conversationId,
+              content,
+              role: 'user',
+              messageType: 'user_input',
+              ...(agentId && { agentId }),
+              ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
+            },
+            { authorization: req.headers.authorization as string | undefined }
+          );
+
+          const conversationWithFinalState = await conversationService.getConversationById(conversationId);
+          const messages = await conversationService.getConversationMessages(conversationId);
+
+          sendSuccess(
+            res,
+            {
+              status: 'completed',
+              streaming: false,
+              conversationId,
+              conversation: conversationWithFinalState ? { ...conversationWithFinalState, messages } : null,
+            },
+            200
+          );
+        } catch (error) {
+          handleError(error, res, 'processing synchronous conversation message');
+        }
+        return;
+      }
+
+      // Default behavior: fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
       conversationService
         .addConversationMessage(
           {

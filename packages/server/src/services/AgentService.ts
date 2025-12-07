@@ -177,10 +177,11 @@ export class AgentService {
   }
 
   /**
-   * Check if an agent is a system agent (Gaia or Daedalus)
+   * Check if an agent is a system agent (Gaia, Daedalus, Aria)
    */
   private isSystemAgent(agent: AgentModel): boolean {
-    return agent.name === 'Gaia' || agent.name === 'Daedalus';
+    const systemAgentNames = ['Gaia', 'Daedalus', 'Aria'];
+    return systemAgentNames.includes(agent.name);
   }
 
   /**

@@ -12,7 +12,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useAuth } from '@/hooks/useAuth'
-import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication, type PendingAgentSummary } from '@/hooks/useAdminAgents'
+import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication, usePendingAgentTools, type PendingAgentSummary } from '@/hooks/useAdminAgents'
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
@@ -67,6 +67,9 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
   const [selectedAgent, setSelectedAgent] = useState<PendingAgentSummary | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+
+  const selectedAgentId = selectedAgent?.agent.id
+  const { data: pendingTools = [], isLoading: isLoadingTools } = usePendingAgentTools(selectedAgentId)
 
   const { data, isLoading, isError, error } = usePendingAgents(page, limit)
   const approveMutation = useApproveAgentPublication()
@@ -145,6 +148,11 @@ export default function PendingAgentsPage(): React.JSX.Element {
         maxTokens: (selectedAgent.agent as any).maxTokens ?? 4000,
         systemPrompt: selectedAgent.agent.systemPrompt || '',
         previewPrompts: (selectedAgent.agent as any).previewPrompts || [],
+        // Use the denormalized assignedToolSlugs populated by the admin
+        // pending agents API so the preview matches the agent's current
+        // tool assignments. The aside "Tools in this publish" panel
+        // separately shows only the subset of tools that will create or
+        // update templates in this publish.
         assignedToolSlugs: (selectedAgent.agent as any).assignedToolSlugs || [],
         blueprint: selectedAgent.agent.blueprint ? JSON.stringify(selectedAgent.agent.blueprint, null, 2) : '{\n  "nodes": [],\n  "edges": []\n}',
         timeout: (selectedAgent.agent as any).timeout ?? 30000,
@@ -430,6 +438,32 @@ export default function PendingAgentsPage(): React.JSX.Element {
                           <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Changelog</p>
                           <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
                             {selectedAgent.agent.publicationChangelog || 'No changelog was provided for this request.'}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2 text-xs">
+                          <p className="font-semibold text-muted-foreground uppercase tracking-wide text-[11px]">Tools in this publish</p>
+                          <div className="rounded-md border border-border/70 bg-background/60 p-2 max-h-40 overflow-y-auto">
+                            {isLoadingTools && <p className="text-[11px] text-muted-foreground">Loading tools…</p>}
+                            {!isLoadingTools && pendingTools.length === 0 && <p className="text-[11px] text-muted-foreground">No tool changes are included in this publish.</p>}
+                            {!isLoadingTools && pendingTools.length > 0 && (
+                              <ul className="space-y-1.5">
+                                {pendingTools.map(tool => (
+                                  <li key={tool.id} className="flex flex-col gap-0.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-semibold truncate">{tool.name || tool.slug || 'Untitled tool'}</p>
+                                        <p className="text-[11px] text-muted-foreground font-mono truncate">{tool.slug}</p>
+                                      </div>
+                                      <div className="text-right text-[11px] font-mono">
+                                        <div className="uppercase text-[10px] text-muted-foreground mb-0.5">Version</div>
+                                        <div>v{tool.version || '1.0.0'}</div>
+                                      </div>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         </div>
                       </div>

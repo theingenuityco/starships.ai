@@ -78,7 +78,7 @@ export class AgentEntity implements AgentModel {
   @IsOptional()
   @IsString()
   @IsIn(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
-  category?: string;
+  category?: AgentModel['category'];
 
   @Expose()
   @IsOptional()

@@ -14,6 +14,8 @@ import {
   AgentTemplateRepository,
   StarshipRepository,
   UserRepository,
+  ToolRepository,
+  ToolTemplateRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
   DEFAULT_AGENT_TEMPERATURE,
   MAX_AGENT_MAX_TOKENS,
@@ -33,11 +35,10 @@ import { generateUniqueAgentSlug } from '@starships/models';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { EnvironmentService } from './EnvironmentService';
-import { getEnvConfig } from '@starships/env';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
-import isEqual from 'lodash/isEqual';
+import { isInstanceAdmin } from '../utils/auth-helpers';
 
 export interface ConversationRequest {
   agentId: string;
@@ -340,47 +341,89 @@ export class AgentService {
     const userRepo = new UserRepository();
     const starshipRepo = new StarshipRepository();
 
+    // Avoid N+1 queries by preloading the small set of users and starships
+    // referenced by this page of agents.
+    const requestedUserIds = new Set<string>();
+    const starshipIds = new Set<string>();
+
+    for (const agent of paginatedAgents) {
+      if (agent.publicationRequestedBy) {
+        requestedUserIds.add(String(agent.publicationRequestedBy));
+      }
+      if (agent.starshipId) {
+        starshipIds.add(agent.starshipId);
+      }
+    }
+
+    let usersById = new Map<string, UserModel>();
+    let starshipsById = new Map<string, StarshipModel>();
+
+    try {
+      const [allUsers, allStarships] = await Promise.all([userRepo.findAll(), starshipRepo.findAll()]);
+
+      usersById = new Map((allUsers || []).filter((u) => requestedUserIds.has(u.id)).map((u) => [u.id, u]));
+
+      starshipsById = new Map((allStarships || []).filter((s) => starshipIds.has(s.id)).map((s) => [s.id, s]));
+    } catch {
+      // If the bulk preload fails for any reason, we simply fall back
+      // to showing minimal metadata below without blocking the response.
+      usersById = new Map();
+      starshipsById = new Map();
+    }
+
     const enrichedAgents: PendingAgentSummary[] = [];
 
     for (const agent of paginatedAgents) {
       let requestedBy: PendingAgentSummary['requestedBy'] | undefined;
       let requestedByStarship: PendingAgentSummary['requestedByStarship'] | undefined;
+      let assignedToolSlugs: string[] = [];
 
-      try {
-        if (agent.publicationRequestedBy) {
-          const [user, starship] = await Promise.all([
-            userRepo.findById(agent.publicationRequestedBy as string) as Promise<UserModel | null>,
-            starshipRepo.findById(agent.starshipId) as Promise<StarshipModel | null>,
-          ]);
+      if (agent.publicationRequestedBy) {
+        const user = usersById.get(agent.publicationRequestedBy as string) || null;
 
-          if (user) {
-            requestedBy = {
-              id: user.id,
-              name: user.displayName || user.email || user.id,
-              avatar: user.avatar,
-            };
-          } else {
-            requestedBy = {
-              id: agent.publicationRequestedBy,
-            };
-          }
-
-          if (starship) {
-            requestedByStarship = {
-              id: starship.id,
-              name: starship.name || starship.slug,
-              slug: starship.slug,
-            };
-          }
-        }
-      } catch {
-        if (agent.publicationRequestedBy) {
-          requestedBy = { id: agent.publicationRequestedBy };
+        if (user) {
+          requestedBy = {
+            id: user.id,
+            name: user.displayName || user.email || user.id,
+            avatar: user.avatar,
+          };
+        } else {
+          requestedBy = {
+            id: agent.publicationRequestedBy,
+          };
         }
       }
 
+      const starship = starshipsById.get(agent.starshipId) || null;
+      if (starship) {
+        requestedByStarship = {
+          id: starship.id,
+          name: starship.name || starship.slug,
+          slug: starship.slug,
+        };
+      }
+
+      // Resolve assigned tools for this agent so admin review can see
+      // the actual tool slugs attached to the agent, even though the
+      // underlying relationship is stored via the junction table.
+      try {
+        const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+        assignedToolSlugs = (tools || [])
+          .map((t) => t.slug)
+          .filter((slug): slug is string => typeof slug === 'string' && slug.trim().length > 0);
+      } catch {
+        assignedToolSlugs = [];
+      }
+
       enrichedAgents.push({
-        agent,
+        agent: {
+          ...agent,
+          // Provide a denormalized view of assigned tool slugs strictly
+          // for the admin pending agents view. This mirrors the
+          // assignedToolSlugs used in other parts of the app while
+          // keeping the underlying storage relationship-based.
+          assignedToolSlugs,
+        } as AgentModel,
         requestedBy,
         requestedByStarship,
       });
@@ -490,6 +533,73 @@ export class AgentService {
       throw new Error('Access denied to this starship');
     }
     return await this.getAgentTools(agentId, starshipId);
+  }
+
+  /**
+   * Get tools that are pending publication for a given agent (admin view).
+   * This is used on the instance admin approvals screen to surface which
+   * tools will be published/updated alongside the agent.
+   */
+  async getPendingToolsForAgent(agentId: string): Promise<import('@starships/protocol').ToolModel[]> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+
+    // For admin review, mirror the heuristics used in the builder's
+    // AgentPublishModal: only show tools that are either:
+    // - New templates (no templateId yet), or
+    // - Have a newer template version available (template.version !== tool.version),
+    // and which are non-draft with complete params + blueprint.
+    const templateRepo = new ToolTemplateRepository();
+    const templateCache = new Map<string, Awaited<ReturnType<(typeof templateRepo)['findById']>>>();
+
+    const publishTools: import('@starships/protocol').ToolModel[] = [];
+
+    for (const tool of tools) {
+      // Skip draft or incomplete tools
+      if (tool.status === 'draft') continue;
+
+      const hasParams =
+        !!tool.parameters &&
+        tool.parameters.type === 'object' &&
+        !!tool.parameters.properties &&
+        Object.keys(tool.parameters.properties).length > 0;
+
+      const hasBlueprint =
+        !!tool.blueprint &&
+        typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
+        Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes);
+
+      if (!hasParams || !hasBlueprint) continue;
+
+      const isNewTemplate = !tool.templateId;
+      let hasTemplateUpdate = false;
+
+      if (tool.templateId) {
+        let template = templateCache.get(tool.templateId);
+        if (template === undefined) {
+          try {
+            template = await templateRepo.findById(tool.templateId);
+          } catch {
+            template = null;
+          }
+          templateCache.set(tool.templateId, template);
+        }
+
+        if (template && template.version && tool.version && template.version !== tool.version) {
+          hasTemplateUpdate = true;
+        }
+      }
+
+      if (isNewTemplate || hasTemplateUpdate) {
+        publishTools.push(tool);
+      }
+    }
+
+    return publishTools;
   }
 
   /**
@@ -629,8 +739,7 @@ export class AgentService {
   async testAgent(
     agentId: string,
     testInput: string | LlmMessage[],
-    starshipId: string,
-    _authToken?: string
+    starshipId: string
   ): Promise<{
     success: boolean;
     agent: string;
@@ -781,7 +890,6 @@ export class AgentService {
         : [{ role: 'user', content: testInput }]; // Convert string to message
 
       // 5. Prepare runtime env (Starships host: only STARSHIP_ID is exposed to workflows)
-      const env = getEnvConfig();
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starshipId,
       };
@@ -976,11 +1084,29 @@ export class AgentService {
   async requestPublication(
     agentId: string,
     userId: string,
-    options: { versionBump: 'patch' | 'minor' | 'major'; changelog: string }
+    options: {
+      versionBump: 'patch' | 'minor' | 'major';
+      changelog: string;
+      toolOverrides?: { toolId: string; versionBump: 'patch' | 'minor' | 'major'; changelog: string }[];
+    }
   ): Promise<AgentModel> {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
+    }
+
+    // Enforce that only the owner of the agent's starship or an instance admin
+    // can request publication. Routes already gate this, but we repeat the
+    // check here for defense-in-depth in case the service is called directly.
+    const userRepo = new UserRepository();
+    const user = (await userRepo.findById(userId)) as UserModel | null;
+    const isAdmin = isInstanceAdmin(user);
+
+    if (!isAdmin) {
+      const starship = await this.starshipRepository.findById(agent.starshipId);
+      if (!starship || starship.ownerId !== userId) {
+        throw new ForbiddenError('You do not have permission to request publication for this agent');
+      }
     }
 
     if (agent.publicationStatus === 'pending_approval') {
@@ -988,8 +1114,10 @@ export class AgentService {
     }
 
     // For agents that have already been promoted into a template (publishedTemplateId),
-    // allow requesting publication again so a new version can be reviewed – but only
-    // if the agent actually differs from its published template.
+    // allow requesting publication again so a new version can be reviewed.
+    // We intentionally no longer enforce a strict diff check between the agent and its
+    // published template here because important changes (like tool assignments or other
+    // relationships) may not be reflected in the core template fields alone.
     if (agent.publicationStatus === 'published') {
       if (!agent.publishedTemplateId) {
         throw new ValidationError('Agent is already published');
@@ -1000,46 +1128,61 @@ export class AgentService {
       if (!template) {
         throw new NotFoundError('AgentTemplate', agent.publishedTemplateId);
       }
+    }
 
-      const normalizePreviewPrompts = (prompts: string[] | undefined | null): string[] =>
-        (prompts || []).map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+    // Optionally record per-tool publication metadata for this request.
+    const toolOverrides = options.toolOverrides || [];
+    if (toolOverrides.length > 0) {
+      const toolRepo = new ToolRepository();
+      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+      const agentToolIds = new Set(agentTools.map((t) => t.id));
 
-      const normalizeCore = (src: {
-        name?: string;
-        description?: string | null;
-        model?: string;
-        temperature?: number | null;
-        maxTokens?: number | null;
-        timeout?: number | null;
-        systemPrompt?: string | null;
-        blueprint?: unknown;
-        previewPrompts?: string[] | null;
-      }) => {
-        const blueprint =
-          (src.blueprint as unknown) && typeof src.blueprint === 'object' ? (src.blueprint as unknown) : { nodes: [], edges: [] };
+      for (const override of toolOverrides) {
+        try {
+          const tool = await toolRepo.findById(override.toolId);
+          if (!tool) continue;
+          // Ensure the tool belongs to the same starship and is actually assigned to this agent
+          if (tool.starshipId !== agent.starshipId || !agentToolIds.has(tool.id)) continue;
 
-        return {
-          name: src.name ?? '',
-          description: src.description ?? '',
-          model: src.model ?? '',
-          temperature: src.temperature ?? null,
-          maxTokens: src.maxTokens ?? null,
-          timeout: src.timeout ?? null,
-          systemPrompt: src.systemPrompt ?? '',
-          blueprint,
-          previewPrompts: normalizePreviewPrompts(src.previewPrompts),
-        };
-      };
+          const currentToolVersion = tool.version || '1.0.0';
+          const match = currentToolVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+          let requestedToolVersion = currentToolVersion;
 
-      const agentCore = normalizeCore(agent);
-      const templateCore = normalizeCore(template);
+          if (match) {
+            const major = Number(match[1]);
+            const minor = Number(match[2]);
+            const patch = Number(match[3]);
 
-      const hasDiff = !isEqual(agentCore, templateCore);
-      if (!hasDiff) {
-        throw new ValidationError('Agent has no changes compared to its published template');
+            switch (override.versionBump) {
+              case 'patch':
+                requestedToolVersion = `${major}.${minor}.${patch + 1}`;
+                break;
+              case 'minor':
+                requestedToolVersion = `${major}.${minor + 1}.0`;
+                break;
+              case 'major':
+                requestedToolVersion = `${major + 1}.0.0`;
+                break;
+            }
+          } else {
+            requestedToolVersion = '1.0.0';
+          }
+
+          await toolRepo.requestPublicationAtomic(tool.id, {
+            publicationStatus: 'pending_approval',
+            publicationRequestedBy: userId,
+            publicationVersionBump: override.versionBump,
+            publicationRequestedVersion: requestedToolVersion,
+            publicationChangelog: override.changelog,
+          });
+        } catch (err) {
+          // Tool override failures should not block agent publication request; just log.
+          console.error('[AGENT-PUBLICATION] Failed to record tool override for publish request:', err);
+        }
       }
     }
-    // Determine requested version based on current version and bump type
+
+    // Determine requested version for the agent based on current version and bump type
     const currentVersion = agent.version || '1.0.0';
     const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
     let requestedVersion = currentVersion;
@@ -1082,6 +1225,15 @@ export class AgentService {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate that the caller is an instance admin. The admin routes already
+    // enforce this, but we re-check here to prevent misuse if the service is
+    // ever invoked outside the HTTP layer.
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can approve agent publication');
     }
 
     if (agent.publicationStatus !== 'pending_approval') {
@@ -1129,7 +1281,8 @@ export class AgentService {
         name: agent.name,
         slug: agent.slug,
         description: agent.description,
-        category: 'general',
+        // Prefer the agent's category when present; fall back to "general"
+        category: agent.category ?? 'general',
         model: agent.model,
         temperature: safeTemperature,
         maxTokens: safeMaxTokens,
@@ -1139,7 +1292,8 @@ export class AgentService {
         blueprint: agent.blueprint!,
         icon: undefined,
         previewPrompts: agent.previewPrompts,
-        assignedToolSlugs: [], // tools can be managed separately at template level
+        // Tools will be synchronized below based on the agent's assigned tools
+        assignedToolSlugs: [],
       });
 
       // Align template version with the bumped agent version
@@ -1150,6 +1304,8 @@ export class AgentService {
       await templateRepo.update(targetTemplateId, {
         name: agent.name,
         description: agent.description,
+        // Only update category if the agent has one explicitly set
+        category: agent.category ?? 'general',
         model: agent.model,
         temperature: safeTemperature,
         maxTokens: safeMaxTokens,
@@ -1160,9 +1316,104 @@ export class AgentService {
         previewPrompts: agent.previewPrompts,
         version: nextVersion,
       });
+      // 3a. After creating the template, we will also sync assigned tools below.
     }
 
-    // 3. Persist publication metadata on agent
+    // 3. Sync tools: ensure each assigned tool has a ToolTemplate and propagate
+    //    those tool template slugs onto the AgentTemplate as assignedToolSlugs.
+    if (targetTemplateId) {
+      try {
+        const toolRepo = new ToolRepository();
+        const toolTemplateRepo = new ToolTemplateRepository();
+
+        // Load all tools currently assigned to this agent for its starship
+        const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+
+        const toolTemplateSlugs: string[] = [];
+
+        for (const tool of agentTools) {
+          // Only consider non-draft tools with a complete definition
+          const hasParams =
+            !!tool.parameters &&
+            tool.parameters.type === 'object' &&
+            !!tool.parameters.properties &&
+            Object.keys(tool.parameters.properties).length > 0;
+          const hasBlueprint = !!(
+            tool.blueprint &&
+            typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
+            Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+          );
+
+          if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
+
+          let templateId = tool.templateId;
+          let templateSlug: string | undefined;
+
+          // Determine next tool version, honoring any publicationRequestedVersion from the request flow
+          const nextToolVersion = tool.publicationRequestedVersion || tool.version || '1.0.0';
+
+          if (templateId) {
+            const existingTemplate = await toolTemplateRepo.findById(templateId);
+            if (existingTemplate) {
+              // Update existing template from this tool
+              await toolTemplateRepo.update(templateId, {
+                description: tool.description,
+                parameters: tool.parameters,
+                blueprint: tool.blueprint,
+                transforms: tool.transforms,
+                mutations: tool.mutations,
+                condition: tool.condition,
+                version: nextToolVersion,
+              });
+              templateSlug = existingTemplate.slug;
+            } else {
+              // Stale reference – drop it and treat as new template
+              templateId = undefined;
+            }
+          }
+
+          if (!templateId) {
+            // Create a new ToolTemplate from this tool instance
+            const createdTemplate = await toolTemplateRepo.create({
+              name: tool.name,
+              // Use the tool's slug as starting point for template slug
+              slug: tool.slug,
+              description: tool.description,
+              category: 'utility',
+              parameters: tool.parameters!,
+              blueprint: tool.blueprint!,
+              transforms: tool.transforms,
+              mutations: tool.mutations,
+              condition: tool.condition,
+              version: nextToolVersion,
+            });
+
+            templateId = createdTemplate.id;
+            templateSlug = createdTemplate.slug;
+          }
+
+          // Link tool back to its template, bump version and clear publication metadata
+          await toolRepo.update(tool.id, {
+            version: nextToolVersion,
+            templateId,
+            templateSnapshotAt: new Date().toISOString(),
+          });
+
+          if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {
+            toolTemplateSlugs.push(templateSlug);
+          }
+        }
+
+        if (toolTemplateSlugs.length > 0) {
+          await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
+        }
+      } catch (err) {
+        // Tool synchronization should never block agent publication; log and continue.
+        console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);
+      }
+    }
+
+    // 4. Persist publication metadata on agent
     const updated = await this.agentRepository.update(agentId, {
       version: nextVersion,
       publicationStatus: 'published',
@@ -1186,6 +1437,15 @@ export class AgentService {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate that the caller is an instance admin. The admin routes already
+    // enforce this, but we re-check here to prevent misuse if the service is
+    // ever invoked outside the HTTP layer.
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can reject agent publication');
     }
 
     if (agent.publicationStatus !== 'pending_approval') {

@@ -22,11 +22,11 @@ import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
 import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AgentPublishModal } from './AgentPublishModal'
 
 const CATEGORY_DOT_COLORS: Record<string, string> = {
   general: 'bg-gray-400',
@@ -88,10 +88,21 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Local loading state for publication request
   const [isRequestingPublish, setIsRequestingPublish] = useState(false)
 
-  // Publication dialog state
+  // Publication dialog state (agent-level)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('patch')
   const [changelog, setChangelog] = useState('')
+
+  // Optional per-tool publication overrides (keyed by toolId)
+  const [toolOverrides, setToolOverrides] = useState<
+    Record<
+      string,
+      {
+        versionBump: 'patch' | 'minor' | 'major'
+        changelog: string
+      }
+    >
+  >({})
 
   // Autosave state (existing agents only)
   const [isAutosaving, setIsAutosaving] = useState(false)
@@ -122,6 +133,33 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const allToolOptions = useMemo(() => {
     const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
+  }, [starshipTools, selectedToolSlugs])
+
+  // Tools currently assigned to this agent (resolved to full ToolModel objects from starshipTools)
+  const assignedToolsForOverrides: ToolModel[] = useMemo(() => {
+    if (!Array.isArray(starshipTools) || !Array.isArray(selectedToolSlugs)) return []
+    const bySlug = new Map<string, ToolModel>()
+    for (const tool of starshipTools) {
+      if (tool.slug) {
+        bySlug.set(tool.slug, tool)
+      }
+    }
+    const allAssigned = (selectedToolSlugs as string[]).map(slug => bySlug.get(slug)).filter((t): t is ToolModel => !!t)
+
+    // Only show per-tool publish controls for tools that are actually publishable at template level:
+    // - Not draft
+    // - Have complete parameters + blueprint
+    // - Either have no template yet (new tool) or have updateInfo.needsUpdate === true (template has newer version)
+    return allAssigned.filter(tool => {
+      if (tool.status === 'draft') return false
+      const hasParams = !!tool.parameters && tool.parameters.type === 'object' && !!tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+      const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+      if (!hasParams || !hasBlueprint) return false
+
+      const isNewTemplate = !tool.templateId
+      const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
+      return isNewTemplate || hasTemplateUpdate
+    })
   }, [starshipTools, selectedToolSlugs])
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
@@ -180,6 +218,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Resolve current agentId by slug within this starship (if editing existing) - starship-only
   const [agentId, setAgentId] = useState<string | null>(null)
+  const [isResolvingAgent, setIsResolvingAgent] = useState<boolean>(false)
   useEffect(() => {
     let cancelled = false
     const safeGet = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
@@ -200,25 +239,38 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       }
     }
     const load = async () => {
-      if (!starshipId || !value?.slug || value.slug === 'new') {
-        console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
-        setAgentId(null)
-        return
+      if (!cancelled) {
+        setIsResolvingAgent(true)
       }
-      const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
-      const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
-      if (result.ok && (result.data as any)?.id) {
-        const agent: any = result.data as any
-        console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
-        if (!cancelled) {
-          setAgentId(agent?.id || null)
-          setFullAgent(agent as AgentModel)
+      try {
+        if (!starshipId || !value?.slug || value.slug === 'new') {
+          console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
+          if (!cancelled) {
+            setAgentId(null)
+            setFullAgent(null)
+            setPublishedTemplate(null)
+          }
+          return
         }
-      } else {
+        const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
+        const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
+        if (result.ok && (result.data as any)?.id) {
+          const agent: any = result.data as any
+          console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
+          if (!cancelled) {
+            setAgentId(agent?.id || null)
+            setFullAgent(agent as AgentModel)
+          }
+        } else {
+          if (!cancelled) {
+            setAgentId(null)
+            setFullAgent(null)
+            setPublishedTemplate(null)
+          }
+        }
+      } finally {
         if (!cancelled) {
-          setAgentId(null)
-          setFullAgent(null)
-          setPublishedTemplate(null)
+          setIsResolvingAgent(false)
         }
       }
     }
@@ -312,6 +364,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   const nextVersion = useMemo(() => computeNextVersion(fullAgent?.version, versionBump), [fullAgent?.version, versionBump])
 
+  // Publish dialog step state: agent first, then each assigned tool override
+  const publishSteps = useMemo(() => {
+    const toolIds = Array.isArray(assignedToolsForOverrides) ? assignedToolsForOverrides.map(t => t.id) : []
+    return ['agent', ...toolIds]
+  }, [assignedToolsForOverrides])
+  const [activePublishStep, setActivePublishStep] = useState<string>('agent')
+
   const handleRequestPublication = async () => {
     if (readOnly) return
     if (!agentId) return
@@ -335,6 +394,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publish-request`, {
         versionBump,
         changelog: changelog.trim(),
+        toolOverrides: Object.entries(toolOverrides)
+          .filter(([, o]) => !!o.changelog.trim())
+          .map(([toolId, o]) => ({
+            toolId,
+            versionBump: o.versionBump,
+            changelog: o.changelog.trim(),
+          })),
       })
       const updated = res.data.data.agent
 
@@ -349,6 +415,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       })
       setShowPublishDialog(false)
       setChangelog('')
+      setToolOverrides({})
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to request publication'
       toast.error('Failed to request publication', { description: message })
@@ -374,12 +441,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Initial sync of assigned tools for existing agents on load
   const hasSyncedAssignedRef = useRef<boolean>(false)
+  const [agentTools, setAgentTools] = useState<ToolModel[]>([])
   useEffect(() => {
     const syncAssigned = async () => {
       if (!agentId || hasSyncedAssignedRef.current) return
       try {
         const res: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/agents/${agentId}/tools`)
         const tools = res.data.data || []
+        setAgentTools(tools)
         const slugs = Array.from(new Set((tools || []).map(t => t.slug).filter(Boolean))) as string[]
         // Only update if form has no assignments yet to avoid clobbering in-flight edits
         const cur = value.assignedToolSlugs || []
@@ -883,10 +952,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 )}
               </div>
 
-              {(publicationStatus === 'pending_approval' || publicationStatus === 'rejected') && (
+              {publicationStatus === 'rejected' && (
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  {publicationStatus === 'pending_approval' && <span>Awaiting review for publication.</span>}
-                  {publicationStatus === 'rejected' && <span>Last request was rejected. Update your agent and request publication again.</span>}
+                  <span>Last request was rejected. Update your agent and request publication again.</span>
                 </div>
               )}
             </div>
@@ -904,24 +972,62 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   className="gap-1.5"
                   disabled={isRequestingPublish || !canRequestPublication}
                   onClick={() => {
-                    if (canRequestPublication) {
-                      setShowPublishDialog(true)
+                    if (!canRequestPublication) return
+
+                    // Provide a sensible default changelog if none is set yet
+                    if (!changelog.trim()) {
+                      if (!fullAgent?.publishedTemplateId) {
+                        // First-time publish
+                        setChangelog('Initial publication of this agent to the marketplace.')
+                      } else if (publishedChangeDetails.length > 0) {
+                        // Re-publish with detected changes – summarize the changed fields
+                        const summary = publishedChangeDetails.join(', ').toLowerCase()
+                        setChangelog(`Updated ${summary}.`)
+                      } else {
+                        // Fallback when we can't detect specific fields
+                        setChangelog('Minor updates and fixes.')
+                      }
                     }
+
+                    // Provide sensible default changelogs for tools as well, if not already set
+                    if (assignedToolsForOverrides.length > 0) {
+                      setToolOverrides(prev => {
+                        const next = { ...prev }
+                        for (const tool of assignedToolsForOverrides) {
+                          const existing = next[tool.id] || {
+                            versionBump: 'patch' as const,
+                            changelog: '',
+                          }
+                          if (existing.changelog && existing.changelog.trim()) continue
+
+                          const isNewTemplate = !tool.templateId
+                          const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
+
+                          let defaultLog: string
+                          if (isNewTemplate) {
+                            defaultLog = 'Initial publication of this tool for this agent.'
+                          } else if (hasTemplateUpdate) {
+                            defaultLog = 'Synced latest tool definition changes for this agent.'
+                          } else {
+                            defaultLog = 'Minor updates and fixes for this tool.'
+                          }
+
+                          next[tool.id] = {
+                            versionBump: existing.versionBump || 'patch',
+                            changelog: defaultLog,
+                          }
+                        }
+                        return next
+                      })
+                    }
+
+                    // Always start the stepped flow at the agent card
+                    setActivePublishStep('agent')
+                    setShowPublishDialog(true)
                   }}
                 >
                   <Icon name="rocket-launch" className="w-3.5 h-3.5" />
                   {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
-                </Button>
-              )}
-              {!hasExistingAgent && onSave && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => {
-                    onSave()
-                  }}
-                >
-                  Save
                 </Button>
               )}
             </div>
@@ -950,98 +1056,30 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Publication Request Dialog */}
-      <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Request: Publish to marketplace</DialogTitle>
-            <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to the community marketplace.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-1">Current version</p>
-                <p className="font-mono font-semibold text-base">v{fullAgent?.version || '1.0.0'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">New version</p>
-                <p className="font-mono font-semibold text-base text-emerald-600">v{nextVersion}</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground">Version bump</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {(
-                  [
-                    {
-                      value: 'major' as const,
-                      title: 'Major',
-                      summary: 'Big changes',
-                      description: 'Breaking changes or large updates that may impact users.',
-                    },
-                    {
-                      value: 'minor' as const,
-                      title: 'Minor',
-                      summary: 'New features',
-                      description: 'Adds features in a backwards-compatible way.',
-                    },
-                    {
-                      value: 'patch' as const,
-                      title: 'Patch',
-                      summary: 'Small fixes',
-                      description: 'Tiny adjustments and bug fixes; no breaking changes.',
-                    },
-                  ] as const
-                ).map(option => {
-                  const isSelected = versionBump === option.value
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setVersionBump(option.value)}
-                      className={cn(
-                        'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
-                        'hover:bg-muted/60',
-                        isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold">{option.title}</span>
-                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">{option.summary}</span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">{option.description}</p>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="publication-changelog" className="text-xs">
-                Changelog
-              </Label>
-              <textarea
-                id="publication-changelog"
-                className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="Summarize what changed in this version for reviewers…"
-                value={changelog}
-                onChange={e => setChangelog(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">This will be shown to reviewers when they evaluate your publication request.</p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPublishDialog(false)} disabled={isRequestingPublish}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleRequestPublication()} disabled={isRequestingPublish}>
-              {isRequestingPublish ? 'Submitting…' : 'Submit for review'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AgentPublishModal
+        open={showPublishDialog}
+        readOnly={readOnly}
+        onOpenChange={setShowPublishDialog}
+        fullAgent={fullAgent}
+        value={value}
+        differsFromPublishedTemplate={differsFromPublishedTemplate}
+        publishedChangeDetails={publishedChangeDetails}
+        assignedToolsForOverrides={assignedToolsForOverrides}
+        versionBump={versionBump}
+        setVersionBump={setVersionBump}
+        changelog={changelog}
+        setChangelog={setChangelog}
+        toolOverrides={toolOverrides}
+        setToolOverrides={setToolOverrides}
+        publishSteps={publishSteps}
+        activePublishStep={activePublishStep}
+        setActivePublishStep={setActivePublishStep}
+        nextVersion={nextVersion}
+        isRequestingPublish={isRequestingPublish}
+        onSubmit={() => {
+          void handleRequestPublication()
+        }}
+      />
 
       {/* Quick selectors + core fields */}
       <div className="space-y-2 mb-4">

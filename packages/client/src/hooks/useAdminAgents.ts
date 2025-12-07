@@ -1,7 +1,7 @@
 'use client'
 
 import api from '@/lib/api'
-import type { AgentModel, ApiResponse, PendingAgentSummary as ProtocolPendingAgentSummary } from '@starships/protocol'
+import type { AgentModel, ApiResponse, PendingAgentSummary as ProtocolPendingAgentSummary, ToolModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -36,6 +36,7 @@ export interface PendingAgentsResponse {
 export const ADMIN_AGENT_QUERY_KEYS = {
   all: ['admin', 'agents'] as const,
   pending: (page: number, limit: number) => [...ADMIN_AGENT_QUERY_KEYS.all, 'pending', { page, limit }] as const,
+  pendingTools: (agentId: string) => [...ADMIN_AGENT_QUERY_KEYS.all, 'pending-tools', agentId] as const,
 } as const
 
 /**
@@ -59,6 +60,23 @@ export function usePendingAgents(page: number = 1, limit: number = 20) {
       }) as PaginationMeta
 
       return { agents, pagination }
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * Fetch tools that are pending publication for the given agent (instance admin only).
+ * Only tools with publicationStatus === 'pending_approval' are returned.
+ */
+export function usePendingAgentTools(agentId?: string) {
+  return useQuery({
+    queryKey: agentId ? ADMIN_AGENT_QUERY_KEYS.pendingTools(agentId) : [...ADMIN_AGENT_QUERY_KEYS.all, 'pending-tools', 'none'],
+    enabled: !!agentId,
+    queryFn: async (): Promise<ToolModel[]> => {
+      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/admin/agents/${agentId}/tools`)
+      return response.data.data || []
     },
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,

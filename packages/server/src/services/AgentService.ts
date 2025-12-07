@@ -493,6 +493,21 @@ export class AgentService {
   }
 
   /**
+   * Get tools that are pending publication for a given agent (admin view).
+   * This is used on the instance admin approvals screen to surface which
+   * tools will be published/updated alongside the agent.
+   */
+  async getPendingToolsForAgent(agentId: string): Promise<import('@starships/protocol').ToolModel[]> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+    return tools.filter((tool) => tool.publicationStatus === 'pending_approval');
+  }
+
+  /**
    * Assign multiple tools to an agent via relationships (replaces existing assignments)
    */
   async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {

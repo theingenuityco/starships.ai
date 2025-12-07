@@ -27,8 +27,15 @@ const PreviewPromptsSchema = z
 
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
-  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
-  description: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(255, 'Name must be less than 255 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  description: z
+    .string()
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   systemPrompt: z.string().optional(),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']).optional(),
   tags: z.array(z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE })).optional(),
@@ -43,8 +50,16 @@ const CreateAgentSchema = z.object({
 });
 
 const UpdateAgentSchema = z.object({
-  name: z.string().min(1).max(255).optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-  description: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  name: z
+    .string()
+    .min(1)
+    .max(255)
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  description: z
+    .string()
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   systemPrompt: z.string().optional(),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']).optional(),
   tags: z.array(z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE })).optional(),
@@ -543,12 +558,8 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
       return;
     }
 
-    // Extract auth token from request for agent execution
-    const authHeader = req.headers.authorization;
-    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-
     // Execute agent test
-    const testResult = await agentService.testAgent(agent.id, input, starshipId, authToken);
+    const testResult = await agentService.testAgent(agent.id, input, starshipId);
 
     sendSuccess(res, {
       success: testResult.success,
@@ -582,6 +593,28 @@ router.get('/admin/agents/pending', jwtAuthMiddleware, async (req: Request, res:
   } catch (error) {
     console.error('[AGENTS] Error loading pending agents:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load pending agents');
+  }
+});
+
+// GET /admin/agents/:id/tools - List tools pending publication for a specific agent
+router.get('/admin/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending agent tools', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const agentService = new AgentService();
+    const tools = await agentService.getPendingToolsForAgent(agentId);
+
+    sendSuccess(res, tools);
+  } catch (error) {
+    console.error('[AGENTS] Error loading pending agent tools:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load pending agent tools');
   }
 });
 

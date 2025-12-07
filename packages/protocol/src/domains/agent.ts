@@ -7,6 +7,7 @@
 
 // Import autopilot types at the top level
 import type { AgentParams } from '@starships/autopilot';
+import type { TemplateCategory } from '../index';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -26,7 +27,8 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   createdAt: string;
   updatedAt: string;
   // Optional categorization (for organizing agents in UI/marketplace)
-  category?: string;
+  // Kept in sync with the shared TemplateCategory union used by AgentTemplateModel.
+  category?: TemplateCategory;
   // Starship ownership (FK)
   starshipId: string;
   // Optional source template reference (FK)
@@ -85,7 +87,7 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   slug?: string; // Optional: if not provided, will be generated
   // Optional categorization (for organizing agents in UI/marketplace)
-  category?: string;
+  category?: TemplateCategory;
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
   // Optional template reference and prompts
   sourceTemplateId?: string;
@@ -100,7 +102,7 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  */
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
   // Optional categorization (for organizing agents in UI/marketplace)
-  category?: string;
+  category?: TemplateCategory;
   sourceTemplateId?: string;
   previewPrompts?: string[];
   version?: string;

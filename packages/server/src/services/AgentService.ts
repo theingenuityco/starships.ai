@@ -36,7 +36,6 @@ import { EnvironmentService } from './EnvironmentService';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
-import isEqual from 'lodash/isEqual';
 
 export interface ConversationRequest {
   agentId: string;
@@ -985,8 +984,10 @@ export class AgentService {
     }
 
     // For agents that have already been promoted into a template (publishedTemplateId),
-    // allow requesting publication again so a new version can be reviewed – but only
-    // if the agent actually differs from its published template.
+    // allow requesting publication again so a new version can be reviewed.
+    // We intentionally no longer enforce a strict diff check between the agent and its
+    // published template here because important changes (like tool assignments or other
+    // relationships) may not be reflected in the core template fields alone.
     if (agent.publicationStatus === 'published') {
       if (!agent.publishedTemplateId) {
         throw new ValidationError('Agent is already published');
@@ -996,48 +997,6 @@ export class AgentService {
       const template = await templateRepo.findById(agent.publishedTemplateId);
       if (!template) {
         throw new NotFoundError('AgentTemplate', agent.publishedTemplateId);
-      }
-
-      const normalizePreviewPrompts = (prompts: string[] | undefined | null): string[] =>
-        (prompts || []).map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
-
-      const normalizeCore = (src: {
-        name?: string;
-        description?: string | null;
-        model?: string;
-        temperature?: number | null;
-        maxTokens?: number | null;
-        timeout?: number | null;
-        systemPrompt?: string | null;
-        blueprint?: unknown;
-        previewPrompts?: string[] | null;
-        category?: string | null;
-      }) => {
-        const blueprint =
-          (src.blueprint as unknown) && typeof src.blueprint === 'object' ? (src.blueprint as unknown) : { nodes: [], edges: [] };
-
-        return {
-          name: src.name ?? '',
-          description: src.description ?? '',
-          model: src.model ?? '',
-          temperature: src.temperature ?? null,
-          maxTokens: src.maxTokens ?? null,
-          timeout: src.timeout ?? null,
-          systemPrompt: src.systemPrompt ?? '',
-          blueprint,
-          previewPrompts: normalizePreviewPrompts(src.previewPrompts),
-          // Category is optional for AgentModel but required for AgentTemplateModel;
-          // normalize to empty string when undefined so comparisons are stable.
-          category: src.category ?? '',
-        };
-      };
-
-      const agentCore = normalizeCore(agent);
-      const templateCore = normalizeCore(template);
-
-      const hasDiff = !isEqual(agentCore, templateCore);
-      if (!hasDiff) {
-        throw new ValidationError('Agent has no changes compared to its published template');
       }
     }
     // Determine requested version based on current version and bump type

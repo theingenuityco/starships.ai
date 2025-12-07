@@ -226,15 +226,9 @@ export function Navigation(props: NavigationProps) {
         ? [
             {
               href: '/admin/agents/pending',
-              label: 'Agent Approvals',
+              label: 'Admin',
               icon: 'shield-check',
               isActive: pathname.startsWith('/admin/agents'),
-            } as const,
-            {
-              href: '/admin/tools/pending',
-              label: 'Tool Approvals',
-              icon: 'wrench',
-              isActive: pathname.startsWith('/admin/tools'),
             } as const,
           ]
         : []),

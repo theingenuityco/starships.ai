@@ -4,11 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useQueryClient } from '@tanstack/react-query'
-import { fetchStarshipTool, TOOL_QUERY_KEYS, useStarshipTool } from '@/hooks/useTools'
-import api from '@/lib/api'
-import type { FetchResponse } from '@/lib/types'
-import type { ApiResponse, ToolModel } from '@starships/protocol'
+import { fetchStarshipTool, useStarshipTool } from '@/hooks/useTools'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
@@ -21,10 +17,6 @@ import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { ToolUpdateNotification } from '@/components/tools/ToolUpdateNotification'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Textarea } from '@/components/ui/textarea'
-import { toast } from 'sonner'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -35,7 +27,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   const toolBuilderRef = useRef<ToolBuilderViewRef>(null)
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
-  const queryClient = useQueryClient()
   const creationFlowActiveRef = useRef<boolean>(false)
   // Baseline index for processing tool result messages for the current streaming turn
   const toolResultTurnStartIdxRef = useRef<number | null>(null)
@@ -675,55 +666,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
   }
 
-  const [showPublishDialog, setShowPublishDialog] = useState(false)
-  const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('patch')
-  const [changelog, setChangelog] = useState('')
-  const [isRequestingPublish, setIsRequestingPublish] = useState(false)
-
-  const handleRequestPublication = async () => {
-    if (!existingTool) return
-    if (!existingTool.id) return
-
-    if (existingTool.publicationStatus === 'pending_approval') {
-      toast.info('Publication already requested', {
-        description: 'This tool is already pending approval.',
-      })
-      return
-    }
-
-    if (!changelog.trim()) {
-      toast.error('Changelog required', {
-        description: 'Please provide a short changelog describing your changes.',
-      })
-      return
-    }
-
-    try {
-      setIsRequestingPublish(true)
-      const res: FetchResponse<ApiResponse<{ message: string; tool: ToolModel }>> = await api.post(`/api/v1/tools/${existingTool.id}/publish-request`, {
-        versionBump,
-        changelog: changelog.trim(),
-      })
-      const updated = res.data.data.tool
-
-      // Refresh cached tool detail
-      if (starship?.id && updated?.slug) {
-        await queryClient.invalidateQueries({ queryKey: TOOL_QUERY_KEYS.detail(starship.id, updated.slug), exact: true })
-      }
-
-      toast.success('Publication requested', {
-        description: res.data.data.message || 'Your tool is now pending review for publication.',
-      })
-      setShowPublishDialog(false)
-      setChangelog('')
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to request publication'
-      toast.error('Failed to request publication', { description: message })
-    } finally {
-      setIsRequestingPublish(false)
-    }
-  }
-
   if (!starship?.id) return null
 
   return (
@@ -745,22 +687,10 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
         onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
       />
-      {/* Update Notification + Publish button - Floating top right */}
+      {/* Update Notification - Floating top right */}
       {existingTool && (
         <div className="absolute top-6 right-6 z-50">
-          <div className="flex flex-col gap-2 items-end">
-            <ToolUpdateNotification tool={existingTool} />
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-primary/60 text-primary hover:bg-primary/5"
-              onClick={() => setShowPublishDialog(true)}
-              disabled={isRequestingPublish || existingTool.publicationStatus === 'pending_approval'}
-            >
-              <Icon name="shield-check" className="h-4 w-4 mr-1.5" />
-              {existingTool.publicationStatus === 'pending_approval' ? 'Pending approval' : 'Request publish'}
-            </Button>
-          </div>
+          <ToolUpdateNotification tool={existingTool} />
         </div>
       )}
       <ToolBuilderView
@@ -797,60 +727,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
         </ConversationStreamProvider>
       )}
 
-      {/* Publish request dialog */}
-      <Dialog open={showPublishDialog} onOpenChange={open => (open ? setShowPublishDialog(true) : !isRequestingPublish && setShowPublishDialog(false))}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Request tool publication</DialogTitle>
-            <DialogDescription>Choose a version bump and describe what changed in this tool.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Version bump</p>
-              <ToggleGroup
-                type="single"
-                value={versionBump}
-                onValueChange={val => {
-                  if (!val) return
-                  setVersionBump(val as 'patch' | 'minor' | 'major')
-                }}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="patch" className="text-xs px-2 py-1">
-                  Patch
-                </ToggleGroupItem>
-                <ToggleGroupItem value="minor" className="text-xs px-2 py-1">
-                  Minor
-                </ToggleGroupItem>
-                <ToggleGroupItem value="major" className="text-xs px-2 py-1">
-                  Major
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Changelog</p>
-              <Textarea
-                value={changelog}
-                onChange={e => setChangelog(e.target.value)}
-                rows={4}
-                placeholder="Briefly describe what changed in this tool since the last publication."
-                className="text-sm"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowPublishDialog(false)} disabled={isRequestingPublish}>
-              Cancel
-            </Button>
-            <Button onClick={handleRequestPublication} disabled={isRequestingPublish}>
-              {isRequestingPublish ? 'Requesting…' : 'Request publish'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

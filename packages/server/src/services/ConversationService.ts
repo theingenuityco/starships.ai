@@ -160,6 +160,41 @@ export class ConversationService {
   }
 
   /**
+   * Clear all in-memory, per-conversation streaming/turn state to avoid leaks once
+   * a conversation (or turn) has fully finished. This is safe to call multiple times.
+   */
+  private clearStreamingState(conversationId: string): void {
+    // Per-turn / streaming accumulators
+    this.streamingContent.delete(conversationId);
+    this.streamingToolCalls.delete(conversationId);
+    this.streamingReasoning.delete(conversationId);
+    this.ringBuffer.delete(conversationId);
+    this.latestStreamingUsage.delete(conversationId);
+    this.streamSeq.delete(conversationId);
+    this.snapshotPreferred.delete(conversationId);
+    this.toolCallSeq.delete(conversationId);
+    this.placeholderEmitted.delete(conversationId);
+
+    // Resume / sequencing metadata
+    this.generationId.delete(conversationId);
+    this.accumulatedLength.delete(conversationId);
+    this.nextChunkPosition.delete(conversationId);
+    this.chunkProcessingLock.delete(conversationId);
+    this.lastPersistedIndex.delete(conversationId);
+
+    // Balance guards and suppression flags
+    this.lowBalanceStopTriggered.delete(conversationId);
+    this.lastLowBalanceCheckAt.delete(conversationId);
+    this.suppressCompleteFor.delete(conversationId);
+
+    // Misc per-conversation flags / attribution
+    this.activeStreamPersisted.delete(conversationId);
+    this.assistantPersistedThisTurn.delete(conversationId);
+    this.currentAgentForConversation.delete(conversationId);
+    this.lastToolCallsBroadcastHash.delete(conversationId);
+  }
+
+  /**
    * Extract completed properties from a JSON-like string buffer using partial-json-parser only.
    */
   private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
@@ -240,7 +275,37 @@ export class ConversationService {
       status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
+      parentConversationId: data.parentConversationId,
     });
+
+    // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
+    try {
+      if (conversation.parentConversationId && this.streamingService && this.streamingService.isActive(conversation.parentConversationId)) {
+        const payload: any = {
+          __ui_action: 'child_conversation_created',
+          parentConversationId: conversation.parentConversationId,
+          childConversationId: conversation.id,
+          starshipId: conversation.starshipId,
+        };
+        try {
+          console.log('[UI_ACTION] Emitting child_conversation_created', payload);
+        } catch {
+          // logging best-effort only
+        }
+        await this.streamingService.broadcastUIAction(conversation.parentConversationId, payload);
+      }
+    } catch (e) {
+      // Non-fatal: failure to emit UI hint must not break conversation creation
+      try {
+        console.warn('[UI_ACTION] Failed to emit child_conversation_created', {
+          error: e instanceof Error ? e.message : String(e),
+          parentConversationId: conversation.parentConversationId,
+          starshipId: conversation.starshipId,
+        });
+      } catch {
+        // ignore
+      }
+    }
 
     return conversation;
   }
@@ -370,6 +435,8 @@ export class ConversationService {
       const deleted = await this.conversationRepository.delete(conversationId);
 
       if (deleted) {
+        // Best-effort: clear any in-memory streaming state for this conversation to avoid leaks
+        this.clearStreamingState(conversationId);
         console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
@@ -763,6 +830,7 @@ export class ConversationService {
 
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
+        CONVERSATION_ID: data.conversationId,
       };
 
       const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);
@@ -1059,12 +1127,8 @@ export class ConversationService {
       }
     }
 
-    // Clear accumulators
-    this.streamingContent.delete(conversationId);
-    this.streamingToolCalls.delete(conversationId);
-    this.streamingReasoning.delete(conversationId);
-    // Leave assistantPersistedThisTurn as-is until next workflow_started clears it
-    this.streamSeq.delete(conversationId);
+    // Clear all in-memory state for this conversation's turn now that it has stopped
+    this.clearStreamingState(conversationId);
   }
 
   /**
@@ -1777,9 +1841,7 @@ export class ConversationService {
                     let argsObj: unknown = {};
                     if (argsStr) {
                       try {
-                        console.log('argsStr', argsStr);
                         argsObj = parsePartialJSONObject(argsStr);
-                        console.log('argsObj', argsObj);
                       } catch {
                         argsObj = {};
                       }
@@ -2025,24 +2087,19 @@ export class ConversationService {
           }
 
           if (uiPayload && typeof uiPayload.__ui_action === 'string') {
-            // New SSE event: send as 'ui_action' for clean separation
-            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
+            try {
+              console.log('[UI_ACTION] Detected UI payload on node_completed', {
+                conversationId,
+                action: uiPayload.__ui_action,
+                payload: uiPayload,
+              });
+            } catch {
+              // logging best-effort only
+            }
 
-            // Back-compat: also emit a lightweight assistant message containing the UI instruction payload.
-            const now = new Date().toISOString();
-            const uiMessage = {
-              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              role: 'assistant',
-              content: JSON.stringify(uiPayload),
-              messageType: 'agent_response',
-              createdAt: now,
-              updatedAt: now,
-            };
-            await this.streamingService.broadcastDelta(conversationId, {
-              op: 'add',
-              path: '/messages/-',
-              value: uiMessage,
-            });
+            // Emit structured UI event over SSE; modern clients should listen to 'ui_action'
+            // and no longer rely on back-compat assistant messages that duplicate tool_result JSON.
+            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
           }
         } catch (e) {
           console.warn('[STREAMING] UI action detection failed on node_completed:', e);
@@ -2287,10 +2344,7 @@ export class ConversationService {
         }
 
         // Clear streaming trackers now that the workflow turn has fully completed
-        this.streamingContent.delete(conversationId);
-        this.streamingToolCalls.delete(conversationId);
-        this.streamingReasoning.delete(conversationId);
-        this.streamSeq.delete(conversationId);
+        this.clearStreamingState(conversationId);
         break;
       }
 
@@ -2314,6 +2368,8 @@ export class ConversationService {
           value: errorMessage,
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
+        // Best-effort: clear any per-conversation streaming state after a failed workflow
+        this.clearStreamingState(conversationId);
         break;
       }
 

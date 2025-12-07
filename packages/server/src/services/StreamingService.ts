@@ -393,8 +393,27 @@ export class StreamingService {
         console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
       }
 
+      const json = JSON.stringify(data);
+
+      // Lightweight debug logging to understand SSE payload volume without dumping full data
+      // Avoid logging the entire payload to keep logs readable.
+      let debugMeta: Record<string, unknown> = {};
+      if (event === 'message' && data && typeof data === 'object') {
+        debugMeta = {
+          messageId: (data as { id?: unknown }).id,
+          role: (data as { role?: unknown }).role,
+          messageType: (data as { messageType?: unknown }).messageType,
+        };
+      }
+      console.debug('[StreamingService] SSE send', {
+        streamId,
+        event,
+        sizeBytes: Buffer.byteLength(json, 'utf8'),
+        ...debugMeta,
+      });
+
       res.write(`event: ${event}\n`);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.write(`data: ${json}\n\n`);
 
       // Best-effort body flush for environments with compression middleware
       try {

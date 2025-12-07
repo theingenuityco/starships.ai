@@ -94,6 +94,7 @@ const TestAgentSchema = z.object({
       })
     ),
   ]),
+  parentConversationId: z.string().min(1).optional(),
 });
 
 const ToolPublishOverrideSchema = z.object({
@@ -538,7 +539,7 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
     if (!bodyValidation) return;
 
     const { starshipId, slug } = paramValidation;
-    const { input } = bodyValidation;
+    const { input, parentConversationId } = bodyValidation;
     const userId = req.user!.id;
 
     const agentService = new AgentService();
@@ -564,7 +565,7 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
     }
 
     // Execute agent test
-    const testResult = await agentService.testAgent(agent.id, input, starshipId);
+    const testResult = await agentService.testAgent(agent.id, input, starshipId, parentConversationId);
 
     sendSuccess(res, {
       success: testResult.success,

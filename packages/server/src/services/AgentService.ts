@@ -974,7 +974,11 @@ export class AgentService {
   async requestPublication(
     agentId: string,
     userId: string,
-    options: { versionBump: 'patch' | 'minor' | 'major'; changelog: string }
+    options: {
+      versionBump: 'patch' | 'minor' | 'major';
+      changelog: string;
+      toolOverrides?: { toolId: string; versionBump: 'patch' | 'minor' | 'major'; changelog: string }[];
+    }
   ): Promise<AgentModel> {
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
@@ -1001,7 +1005,60 @@ export class AgentService {
         throw new NotFoundError('AgentTemplate', agent.publishedTemplateId);
       }
     }
-    // Determine requested version based on current version and bump type
+
+    // Optionally record per-tool publication metadata for this request.
+    const toolOverrides = options.toolOverrides || [];
+    if (toolOverrides.length > 0) {
+      const toolRepo = new ToolRepository();
+      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+      const agentToolIds = new Set(agentTools.map((t) => t.id));
+
+      for (const override of toolOverrides) {
+        try {
+          const tool = await toolRepo.findById(override.toolId);
+          if (!tool) continue;
+          // Ensure the tool belongs to the same starship and is actually assigned to this agent
+          if (tool.starshipId !== agent.starshipId || !agentToolIds.has(tool.id)) continue;
+
+          const currentToolVersion = tool.version || '1.0.0';
+          const match = currentToolVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+          let requestedToolVersion = currentToolVersion;
+
+          if (match) {
+            const major = Number(match[1]);
+            const minor = Number(match[2]);
+            const patch = Number(match[3]);
+
+            switch (override.versionBump) {
+              case 'patch':
+                requestedToolVersion = `${major}.${minor}.${patch + 1}`;
+                break;
+              case 'minor':
+                requestedToolVersion = `${major}.${minor + 1}.0`;
+                break;
+              case 'major':
+                requestedToolVersion = `${major + 1}.0.0`;
+                break;
+            }
+          } else {
+            requestedToolVersion = '1.0.0';
+          }
+
+          await toolRepo.requestPublicationAtomic(tool.id, {
+            publicationStatus: 'pending_approval',
+            publicationRequestedBy: userId,
+            publicationVersionBump: override.versionBump,
+            publicationRequestedVersion: requestedToolVersion,
+            publicationChangelog: override.changelog,
+          });
+        } catch (err) {
+          // Tool override failures should not block agent publication request; just log.
+          console.error('[AGENT-PUBLICATION] Failed to record tool override for publish request:', err);
+        }
+      }
+    }
+
+    // Determine requested version for the agent based on current version and bump type
     const currentVersion = agent.version || '1.0.0';
     const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
     let requestedVersion = currentVersion;
@@ -1159,9 +1216,22 @@ export class AgentService {
           let templateId = tool.templateId;
           let templateSlug: string | undefined;
 
+          // Determine next tool version, honoring any publicationRequestedVersion from the request flow
+          const nextToolVersion = tool.publicationRequestedVersion || tool.version || '1.0.0';
+
           if (templateId) {
             const existingTemplate = await toolTemplateRepo.findById(templateId);
             if (existingTemplate) {
+              // Update existing template from this tool
+              await toolTemplateRepo.update(templateId, {
+                description: tool.description,
+                parameters: tool.parameters,
+                blueprint: tool.blueprint,
+                transforms: tool.transforms,
+                mutations: tool.mutations,
+                condition: tool.condition,
+                version: nextToolVersion,
+              });
               templateSlug = existingTemplate.slug;
             } else {
               // Stale reference – drop it and treat as new template
@@ -1182,17 +1252,19 @@ export class AgentService {
               transforms: tool.transforms,
               mutations: tool.mutations,
               condition: tool.condition,
-              version: tool.version || '1.0.0',
+              version: nextToolVersion,
             });
 
-            // Link tool back to its new template for future updates
-            await toolRepo.update(tool.id, {
-              templateId: createdTemplate.id,
-              templateSnapshotAt: new Date().toISOString(),
-            });
-
+            templateId = createdTemplate.id;
             templateSlug = createdTemplate.slug;
           }
+
+          // Link tool back to its template, bump version and clear publication metadata
+          await toolRepo.update(tool.id, {
+            version: nextToolVersion,
+            templateId,
+            templateSnapshotAt: new Date().toISOString(),
+          });
 
           if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {
             toolTemplateSlugs.push(templateSlug);

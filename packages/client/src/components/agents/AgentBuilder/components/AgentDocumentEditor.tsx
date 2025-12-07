@@ -88,10 +88,22 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Local loading state for publication request
   const [isRequestingPublish, setIsRequestingPublish] = useState(false)
 
-  // Publication dialog state
+  // Publication dialog state (agent-level)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('patch')
   const [changelog, setChangelog] = useState('')
+
+  // Optional per-tool publication overrides (keyed by toolId)
+  const [toolOverrides, setToolOverrides] = useState<
+    Record<
+      string,
+      {
+        versionBump: 'patch' | 'minor' | 'major'
+        changelog: string
+      }
+    >
+  >({})
+  const [showToolOverrides, setShowToolOverrides] = useState(false)
 
   // Autosave state (existing agents only)
   const [isAutosaving, setIsAutosaving] = useState(false)
@@ -122,6 +134,33 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const allToolOptions = useMemo(() => {
     const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
+  }, [starshipTools, selectedToolSlugs])
+
+  // Tools currently assigned to this agent (resolved to full ToolModel objects from starshipTools)
+  const assignedToolsForOverrides: ToolModel[] = useMemo(() => {
+    if (!Array.isArray(starshipTools) || !Array.isArray(selectedToolSlugs)) return []
+    const bySlug = new Map<string, ToolModel>()
+    for (const tool of starshipTools) {
+      if (tool.slug) {
+        bySlug.set(tool.slug, tool)
+      }
+    }
+    const allAssigned = (selectedToolSlugs as string[]).map(slug => bySlug.get(slug)).filter((t): t is ToolModel => !!t)
+
+    // Only show per-tool publish controls for tools that are actually publishable at template level:
+    // - Not draft
+    // - Have complete parameters + blueprint
+    // - Either have no template yet (new tool) or have updateInfo.needsUpdate === true (template has newer version)
+    return allAssigned.filter(tool => {
+      if (tool.status === 'draft') return false
+      const hasParams = !!tool.parameters && tool.parameters.type === 'object' && !!tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+      const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+      if (!hasParams || !hasBlueprint) return false
+
+      const isNewTemplate = !tool.templateId
+      const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
+      return isNewTemplate || hasTemplateUpdate
+    })
   }, [starshipTools, selectedToolSlugs])
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
@@ -335,6 +374,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publish-request`, {
         versionBump,
         changelog: changelog.trim(),
+        toolOverrides: Object.entries(toolOverrides)
+          .filter(([, o]) => !!o.changelog.trim())
+          .map(([toolId, o]) => ({
+            toolId,
+            versionBump: o.versionBump,
+            changelog: o.changelog.trim(),
+          })),
       })
       const updated = res.data.data.agent
 
@@ -349,6 +395,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       })
       setShowPublishDialog(false)
       setChangelog('')
+      setToolOverrides({})
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to request publication'
       toast.error('Failed to request publication', { description: message })
@@ -374,12 +421,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Initial sync of assigned tools for existing agents on load
   const hasSyncedAssignedRef = useRef<boolean>(false)
+  const [agentTools, setAgentTools] = useState<ToolModel[]>([])
   useEffect(() => {
     const syncAssigned = async () => {
       if (!agentId || hasSyncedAssignedRef.current) return
       try {
         const res: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/agents/${agentId}/tools`)
         const tools = res.data.data || []
+        setAgentTools(tools)
         const slugs = Array.from(new Set((tools || []).map(t => t.slug).filter(Boolean))) as string[]
         // Only update if form has no assignments yet to avoid clobbering in-flight edits
         const cur = value.assignedToolSlugs || []
@@ -951,13 +1000,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       {/* Publication Request Dialog */}
       <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Request: Publish to marketplace</DialogTitle>
             <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to the community marketplace.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground mb-1">Current version</p>
@@ -970,7 +1019,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground">Version bump</p>
+              <p className="text-xs font-semibold text-muted-foreground">Agent version bump</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {(
                   [
@@ -1019,7 +1068,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
             <div className="space-y-2">
               <Label htmlFor="publication-changelog" className="text-xs">
-                Changelog
+                Agent changelog
               </Label>
               <textarea
                 id="publication-changelog"
@@ -1028,8 +1077,83 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 value={changelog}
                 onChange={e => setChangelog(e.target.value)}
               />
-              <p className="text-[11px] text-muted-foreground">This will be shown to reviewers when they evaluate your publication request.</p>
+              <p className="text-[11px] text-muted-foreground">High-level notes about changes to this agent for reviewers.</p>
             </div>
+
+            {/* Optional per-tool overrides (advanced) */}
+            {assignedToolsForOverrides.length > 0 && (
+              <div className="space-y-2 border-t border-border/40 pt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col">
+                    <p className="text-xs font-semibold text-muted-foreground">Tool version bumps (optional)</p>
+                    <span className="text-[11px] text-muted-foreground">Only needed when the tools themselves have changed. Assignment changes are covered by the agent bump above.</span>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setShowToolOverrides(prev => !prev)}>
+                    <Icon name={showToolOverrides ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 mr-1" />
+                    {showToolOverrides ? 'Hide tool details' : 'Configure tool bumps'}
+                  </Button>
+                </div>
+                {showToolOverrides && (
+                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                    {assignedToolsForOverrides.map(tool => {
+                      const override = toolOverrides[tool.id] || { versionBump: 'patch' as const, changelog: '' }
+                      return (
+                        <div key={tool.id} className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{tool.name}</p>
+                              <p className="text-[11px] text-muted-foreground truncate font-mono">{tool.slug}</p>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1">
+                              <Icon name="hash" className="w-3 h-3" />v{tool.version || '1.0.0'}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-start">
+                            <div className="sm:col-span-1">
+                              <p className="text-[11px] text-muted-foreground mb-1">Bump</p>
+                              <div className="flex gap-1">
+                                {(['patch', 'minor', 'major'] as const).map(v => (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    className={cn(
+                                      'flex-1 rounded border px-1 py-0.5 text-[11px]',
+                                      override.versionBump === v ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
+                                    )}
+                                    onClick={() =>
+                                      setToolOverrides(prev => ({
+                                        ...prev,
+                                        [tool.id]: { versionBump: v, changelog: override.changelog },
+                                      }))
+                                    }
+                                  >
+                                    {v}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="sm:col-span-3">
+                              <p className="text-[11px] text-muted-foreground mb-1">Changelog (optional)</p>
+                              <textarea
+                                className="w-full rounded-md border border-border bg-background px-2 py-1 text-[11px] resize-none min-h-[42px]"
+                                placeholder="Notes about changes to this tool…"
+                                value={override.changelog}
+                                onChange={e =>
+                                  setToolOverrides(prev => ({
+                                    ...prev,
+                                    [tool.id]: { versionBump: override.versionBump, changelog: e.target.value },
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>

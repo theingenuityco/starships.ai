@@ -103,7 +103,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       }
     >
   >({})
-  const [showToolOverrides, setShowToolOverrides] = useState(false)
 
   // Autosave state (existing agents only)
   const [isAutosaving, setIsAutosaving] = useState(false)
@@ -953,9 +952,24 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   className="gap-1.5"
                   disabled={isRequestingPublish || !canRequestPublication}
                   onClick={() => {
-                    if (canRequestPublication) {
-                      setShowPublishDialog(true)
+                    if (!canRequestPublication) return
+
+                    // Provide a sensible default changelog if none is set yet
+                    if (!changelog.trim()) {
+                      if (!fullAgent?.publishedTemplateId) {
+                        // First-time publish
+                        setChangelog('Initial publication of this agent to the marketplace.')
+                      } else if (publishedChangeDetails.length > 0) {
+                        // Re-publish with detected changes – summarize the changed fields
+                        const summary = publishedChangeDetails.join(', ').toLowerCase()
+                        setChangelog(`Updated ${summary}.`)
+                      } else {
+                        // Fallback when we can't detect specific fields
+                        setChangelog('Minor updates and fixes.')
+                      }
                     }
+
+                    setShowPublishDialog(true)
                   }}
                 >
                   <Icon name="rocket-launch" className="w-3.5 h-3.5" />
@@ -999,7 +1013,16 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </div>
 
       {/* Publication Request Dialog */}
-      <Dialog open={showPublishDialog && !readOnly} onOpenChange={setShowPublishDialog}>
+      <Dialog
+        open={showPublishDialog && !readOnly}
+        onOpenChange={open => {
+          setShowPublishDialog(open)
+          if (!open) {
+            setChangelog('')
+            setToolOverrides({})
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Request: Publish to marketplace</DialogTitle>
@@ -1007,151 +1030,239 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           </DialogHeader>
 
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-1">Current version</p>
-                <p className="font-mono font-semibold text-base">v{fullAgent?.version || '1.0.0'}</p>
+            {/* Agent change card (identity, version diff, bump, changelog) */}
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-3 space-y-4 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-2 min-w-0">
+                  <AgentAvatar
+                    seed={fullAgent?.name || value.name || value.slug || 'Agent'}
+                    size={32}
+                    rounded
+                    className="h-8 w-8 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background shrink-0"
+                  />
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-xs font-semibold truncate">{fullAgent?.name || value.name || 'Untitled agent'}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono truncate">{fullAgent?.slug || value.slug || 'no-slug'}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm shrink-0">
+                  <div>
+                    <p className="text-muted-foreground mb-1">Current</p>
+                    <p className="font-mono font-semibold text-base">v{fullAgent?.version || '1.0.0'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">New</p>
+                    <p className="font-mono font-semibold text-base text-emerald-600">v{nextVersion}</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-muted-foreground mb-1">New version</p>
-                <p className="font-mono font-semibold text-base text-emerald-600">v{nextVersion}</p>
+
+              {fullAgent?.publishedTemplateId ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground">Agent changes in this publish</p>
+                  {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? (
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-muted-foreground">
+                      {publishedChangeDetails.map(item => (
+                        <li key={item} className="font-medium">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">No detected differences from the last published template.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  <p className="text-xs font-semibold text-muted-foreground">Agent changes in this publish</p>
+                  <p className="text-[11px] text-muted-foreground">First time publishing this agent to the marketplace.</p>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">Agent version bump</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {(
+                    [
+                      {
+                        value: 'major' as const,
+                        title: 'Major',
+                        summary: 'Big changes',
+                        description: 'Breaking changes or large updates that may impact users.',
+                      },
+                      {
+                        value: 'minor' as const,
+                        title: 'Minor',
+                        summary: 'New features',
+                        description: 'Adds features in a backwards-compatible way.',
+                      },
+                      {
+                        value: 'patch' as const,
+                        title: 'Patch',
+                        summary: 'Small fixes',
+                        description: 'Tiny adjustments and bug fixes; no breaking changes.',
+                      },
+                    ] as const
+                  ).map(option => {
+                    const isSelected = versionBump === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setVersionBump(option.value)}
+                        className={cn(
+                          'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
+                          'hover:bg-muted/60',
+                          isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold">{option.title}</span>
+                          <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">{option.summary}</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">{option.description}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">Agent changelog</p>
+                <textarea
+                  id="publication-changelog"
+                  className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Summarize what changed in this version for reviewers…"
+                  value={changelog}
+                  onChange={e => setChangelog(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground mt-0.5">High-level notes about changes to this agent for reviewers.</p>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground">Agent version bump</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {(
-                  [
-                    {
-                      value: 'major' as const,
-                      title: 'Major',
-                      summary: 'Big changes',
-                      description: 'Breaking changes or large updates that may impact users.',
-                    },
-                    {
-                      value: 'minor' as const,
-                      title: 'Minor',
-                      summary: 'New features',
-                      description: 'Adds features in a backwards-compatible way.',
-                    },
-                    {
-                      value: 'patch' as const,
-                      title: 'Patch',
-                      summary: 'Small fixes',
-                      description: 'Tiny adjustments and bug fixes; no breaking changes.',
-                    },
-                  ] as const
-                ).map(option => {
-                  const isSelected = versionBump === option.value
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setVersionBump(option.value)}
-                      className={cn(
-                        'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
-                        'hover:bg-muted/60',
-                        isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold">{option.title}</span>
-                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">{option.summary}</span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">{option.description}</p>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="publication-changelog" className="text-xs">
-                Agent changelog
-              </Label>
-              <textarea
-                id="publication-changelog"
-                className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="Summarize what changed in this version for reviewers…"
-                value={changelog}
-                onChange={e => setChangelog(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">High-level notes about changes to this agent for reviewers.</p>
-            </div>
-
-            {/* Optional per-tool overrides (advanced) */}
+            {/* Tool change cards (only for tools that are actually changing/publishable) */}
             {assignedToolsForOverrides.length > 0 && (
               <div className="space-y-2 border-t border-border/40 pt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex flex-col">
-                    <p className="text-xs font-semibold text-muted-foreground">Tool version bumps (optional)</p>
-                    <span className="text-[11px] text-muted-foreground">Only needed when the tools themselves have changed. Assignment changes are covered by the agent bump above.</span>
-                  </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setShowToolOverrides(prev => !prev)}>
-                    <Icon name={showToolOverrides ? 'chevron-up' : 'chevron-down'} className="w-3 h-3 mr-1" />
-                    {showToolOverrides ? 'Hide tool details' : 'Configure tool bumps'}
-                  </Button>
-                </div>
-                {showToolOverrides && (
-                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
-                    {assignedToolsForOverrides.map(tool => {
-                      const override = toolOverrides[tool.id] || { versionBump: 'patch' as const, changelog: '' }
-                      return (
-                        <div key={tool.id} className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-2 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium truncate">{tool.name}</p>
+                <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                  {assignedToolsForOverrides.map(tool => {
+                    const override = toolOverrides[tool.id] || { versionBump: 'patch' as const, changelog: '' }
+                    const isNewTemplate = !tool.templateId
+                    const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
+                    const changeLabel = isNewTemplate
+                      ? 'New tool will be published for this agent.'
+                      : hasTemplateUpdate
+                        ? 'Tool definition changes will be synced to its template.'
+                        : 'No detected changes vs current template.'
+                    const currentToolVersion = tool.version || '1.0.0'
+                    const nextToolVersion = computeNextVersion(currentToolVersion, override.versionBump)
+
+                    return (
+                      <div key={tool.id} className="rounded-lg border border-border bg-muted/40 px-3 py-3 space-y-4 shadow-sm">
+                        {/* Tool identity + version diff (mirrors agent header) */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <div className="h-8 w-8 rounded-md bg-primary/5 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary shrink-0">
+                              {(tool.name || tool.slug || 'T').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="space-y-0.5 min-w-0">
+                              <p className="text-xs font-semibold truncate">{tool.name}</p>
                               <p className="text-[11px] text-muted-foreground truncate font-mono">{tool.slug}</p>
                             </div>
-                            <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1">
-                              <Icon name="hash" className="w-3 h-3" />v{tool.version || '1.0.0'}
-                            </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-start">
-                            <div className="sm:col-span-1">
-                              <p className="text-[11px] text-muted-foreground mb-1">Bump</p>
-                              <div className="flex gap-1">
-                                {(['patch', 'minor', 'major'] as const).map(v => (
-                                  <button
-                                    key={v}
-                                    type="button"
-                                    className={cn(
-                                      'flex-1 rounded border px-1 py-0.5 text-[11px]',
-                                      override.versionBump === v ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
-                                    )}
-                                    onClick={() =>
-                                      setToolOverrides(prev => ({
-                                        ...prev,
-                                        [tool.id]: { versionBump: v, changelog: override.changelog },
-                                      }))
-                                    }
-                                  >
-                                    {v}
-                                  </button>
-                                ))}
-                              </div>
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm shrink-0">
+                            <div>
+                              <p className="text-muted-foreground mb-1">Current</p>
+                              <p className="font-mono font-semibold text-base">v{currentToolVersion}</p>
                             </div>
-                            <div className="sm:col-span-3">
-                              <p className="text-[11px] text-muted-foreground mb-1">Changelog (optional)</p>
-                              <textarea
-                                className="w-full rounded-md border border-border bg-background px-2 py-1 text-[11px] resize-none min-h-[42px]"
-                                placeholder="Notes about changes to this tool…"
-                                value={override.changelog}
-                                onChange={e =>
-                                  setToolOverrides(prev => ({
-                                    ...prev,
-                                    [tool.id]: { versionBump: override.versionBump, changelog: e.target.value },
-                                  }))
-                                }
-                              />
+                            <div>
+                              <p className="text-muted-foreground mb-1">New</p>
+                              <p className="font-mono font-semibold text-base text-emerald-600">v{nextToolVersion}</p>
                             </div>
+                            {tool.updateInfo?.latestVersion && tool.updateInfo.latestVersion !== tool.version && (
+                              <div className="col-span-2 text-[10px] text-emerald-600 text-right">Template latest: v{tool.updateInfo.latestVersion}</div>
+                            )}
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
+
+                        {/* Tool changes summary (mirrors agent changes section) */}
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-muted-foreground">Tool changes in this publish</p>
+                          <p className="text-[11px] text-muted-foreground">{changeLabel}</p>
+                        </div>
+
+                        {/* Tool version bump (mirrors agent version bump style, but per tool) */}
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-muted-foreground">Tool version bump</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {(
+                              [
+                                {
+                                  value: 'major' as const,
+                                  title: 'Major',
+                                  summary: 'Big changes',
+                                  description: 'Breaking changes or large updates that may impact users.',
+                                },
+                                {
+                                  value: 'minor' as const,
+                                  title: 'Minor',
+                                  summary: 'New features',
+                                  description: 'Adds features in a backwards-compatible way.',
+                                },
+                                {
+                                  value: 'patch' as const,
+                                  title: 'Patch',
+                                  summary: 'Small fixes',
+                                  description: 'Tiny adjustments and bug fixes; no breaking changes.',
+                                },
+                              ] as const
+                            ).map(option => {
+                              const isSelected = override.versionBump === option.value
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() =>
+                                    setToolOverrides(prev => ({
+                                      ...prev,
+                                      [tool.id]: { versionBump: option.value, changelog: override.changelog },
+                                    }))
+                                  }
+                                  className={cn(
+                                    'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
+                                    'hover:bg-muted/60',
+                                    isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-semibold">{option.title}</span>
+                                    <span className="rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">{option.summary}</span>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground leading-snug">{option.description}</p>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Tool changelog (mirrors agent changelog section) */}
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-muted-foreground">Tool changelog</p>
+                          <textarea
+                            className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            placeholder="Notes about changes to this tool for reviewers…"
+                            value={override.changelog}
+                            onChange={e =>
+                              setToolOverrides(prev => ({
+                                ...prev,
+                                [tool.id]: { versionBump: override.versionBump, changelog: e.target.value },
+                              }))
+                            }
+                          />
+                          <p className="text-[11px] text-muted-foreground mt-0.5">High-level notes about changes to this tool for reviewers.</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>

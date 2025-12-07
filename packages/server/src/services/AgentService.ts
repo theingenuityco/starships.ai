@@ -341,6 +341,36 @@ export class AgentService {
     const userRepo = new UserRepository();
     const starshipRepo = new StarshipRepository();
 
+    // Avoid N+1 queries by preloading the small set of users and starships
+    // referenced by this page of agents.
+    const requestedUserIds = new Set<string>();
+    const starshipIds = new Set<string>();
+
+    for (const agent of paginatedAgents) {
+      if (agent.publicationRequestedBy) {
+        requestedUserIds.add(String(agent.publicationRequestedBy));
+      }
+      if (agent.starshipId) {
+        starshipIds.add(agent.starshipId);
+      }
+    }
+
+    let usersById = new Map<string, UserModel>();
+    let starshipsById = new Map<string, StarshipModel>();
+
+    try {
+      const [allUsers, allStarships] = await Promise.all([userRepo.findAll(), starshipRepo.findAll()]);
+
+      usersById = new Map((allUsers || []).filter((u) => requestedUserIds.has(u.id)).map((u) => [u.id, u]));
+
+      starshipsById = new Map((allStarships || []).filter((s) => starshipIds.has(s.id)).map((s) => [s.id, s]));
+    } catch {
+      // If the bulk preload fails for any reason, we simply fall back
+      // to showing minimal metadata below without blocking the response.
+      usersById = new Map();
+      starshipsById = new Map();
+    }
+
     const enrichedAgents: PendingAgentSummary[] = [];
 
     for (const agent of paginatedAgents) {
@@ -348,37 +378,29 @@ export class AgentService {
       let requestedByStarship: PendingAgentSummary['requestedByStarship'] | undefined;
       let assignedToolSlugs: string[] = [];
 
-      try {
-        if (agent.publicationRequestedBy) {
-          const [user, starship] = await Promise.all([
-            userRepo.findById(agent.publicationRequestedBy as string) as Promise<UserModel | null>,
-            starshipRepo.findById(agent.starshipId) as Promise<StarshipModel | null>,
-          ]);
+      if (agent.publicationRequestedBy) {
+        const user = usersById.get(agent.publicationRequestedBy as string) || null;
 
-          if (user) {
-            requestedBy = {
-              id: user.id,
-              name: user.displayName || user.email || user.id,
-              avatar: user.avatar,
-            };
-          } else {
-            requestedBy = {
-              id: agent.publicationRequestedBy,
-            };
-          }
+        if (user) {
+          requestedBy = {
+            id: user.id,
+            name: user.displayName || user.email || user.id,
+            avatar: user.avatar,
+          };
+        } else {
+          requestedBy = {
+            id: agent.publicationRequestedBy,
+          };
+        }
+      }
 
-          if (starship) {
-            requestedByStarship = {
-              id: starship.id,
-              name: starship.name || starship.slug,
-              slug: starship.slug,
-            };
-          }
-        }
-      } catch {
-        if (agent.publicationRequestedBy) {
-          requestedBy = { id: agent.publicationRequestedBy };
-        }
+      const starship = starshipsById.get(agent.starshipId) || null;
+      if (starship) {
+        requestedByStarship = {
+          id: starship.id,
+          name: starship.name || starship.slug,
+          slug: starship.slug,
+        };
       }
 
       // Resolve assigned tools for this agent so admin review can see

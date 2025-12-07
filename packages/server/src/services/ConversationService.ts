@@ -253,7 +253,6 @@ export class ConversationService {
           starshipId: conversation.starshipId,
         };
         try {
-          // eslint-disable-next-line no-console
           console.log('[UI_ACTION] Emitting child_conversation_created', payload);
         } catch {
           // logging best-effort only
@@ -2064,24 +2063,10 @@ export class ConversationService {
             } catch {
               // logging best-effort only
             }
-            // New SSE event: send as 'ui_action' for clean separation
-            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
 
-            // Back-compat: also emit a lightweight assistant message containing the UI instruction payload.
-            const now = new Date().toISOString();
-            const uiMessage = {
-              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              role: 'assistant',
-              content: JSON.stringify(uiPayload),
-              messageType: 'agent_response',
-              createdAt: now,
-              updatedAt: now,
-            };
-            await this.streamingService.broadcastDelta(conversationId, {
-              op: 'add',
-              path: '/messages/-',
-              value: uiMessage,
-            });
+            // Emit structured UI event over SSE; modern clients should listen to 'ui_action'
+            // and no longer rely on back-compat assistant messages that duplicate tool_result JSON.
+            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
           }
         } catch (e) {
           console.warn('[STREAMING] UI action detection failed on node_completed:', e);

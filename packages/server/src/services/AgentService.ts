@@ -345,6 +345,7 @@ export class AgentService {
     for (const agent of paginatedAgents) {
       let requestedBy: PendingAgentSummary['requestedBy'] | undefined;
       let requestedByStarship: PendingAgentSummary['requestedByStarship'] | undefined;
+      let assignedToolSlugs: string[] = [];
 
       try {
         if (agent.publicationRequestedBy) {
@@ -379,8 +380,27 @@ export class AgentService {
         }
       }
 
+      // Resolve assigned tools for this agent so admin review can see
+      // the actual tool slugs attached to the agent, even though the
+      // underlying relationship is stored via the junction table.
+      try {
+        const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+        assignedToolSlugs = (tools || [])
+          .map((t) => t.slug)
+          .filter((slug): slug is string => typeof slug === 'string' && slug.trim().length > 0);
+      } catch {
+        assignedToolSlugs = [];
+      }
+
       enrichedAgents.push({
-        agent,
+        agent: {
+          ...agent,
+          // Provide a denormalized view of assigned tool slugs strictly
+          // for the admin pending agents view. This mirrors the
+          // assignedToolSlugs used in other parts of the app while
+          // keeping the underlying storage relationship-based.
+          assignedToolSlugs,
+        } as AgentModel,
         requestedBy,
         requestedByStarship,
       });
@@ -504,7 +524,59 @@ export class AgentService {
     }
 
     const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-    return tools.filter((tool) => tool.publicationStatus === 'pending_approval');
+
+    // For admin review, mirror the heuristics used in the builder's
+    // AgentPublishModal: only show tools that are either:
+    // - New templates (no templateId yet), or
+    // - Have a newer template version available (template.version !== tool.version),
+    // and which are non-draft with complete params + blueprint.
+    const templateRepo = new ToolTemplateRepository();
+    const templateCache = new Map<string, Awaited<ReturnType<(typeof templateRepo)['findById']>>>();
+
+    const publishTools: import('@starships/protocol').ToolModel[] = [];
+
+    for (const tool of tools) {
+      // Skip draft or incomplete tools
+      if (tool.status === 'draft') continue;
+
+      const hasParams =
+        !!tool.parameters &&
+        tool.parameters.type === 'object' &&
+        !!tool.parameters.properties &&
+        Object.keys(tool.parameters.properties).length > 0;
+
+      const hasBlueprint =
+        !!tool.blueprint &&
+        typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
+        Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes);
+
+      if (!hasParams || !hasBlueprint) continue;
+
+      const isNewTemplate = !tool.templateId;
+      let hasTemplateUpdate = false;
+
+      if (tool.templateId) {
+        let template = templateCache.get(tool.templateId);
+        if (template === undefined) {
+          try {
+            template = await templateRepo.findById(tool.templateId);
+          } catch {
+            template = null;
+          }
+          templateCache.set(tool.templateId, template);
+        }
+
+        if (template && template.version && tool.version && template.version !== tool.version) {
+          hasTemplateUpdate = true;
+        }
+      }
+
+      if (isNewTemplate || hasTemplateUpdate) {
+        publishTools.push(tool);
+      }
+    }
+
+    return publishTools;
   }
 
   /**

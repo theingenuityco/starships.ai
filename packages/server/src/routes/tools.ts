@@ -4,11 +4,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
-import { ToolRepository, ToolTemplateRepository } from '@starships/models';
+import { ToolRepository, ToolTemplateRepository, StarshipRepository, UserRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
 import { sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 
 const router: Router = Router();
 
@@ -48,6 +49,11 @@ const CreateToolSchema = z
       path: ['parameters'],
     }
   );
+
+const PublishRequestSchema = z.object({
+  versionBump: z.enum(['patch', 'minor', 'major']),
+  changelog: z.string().min(1, 'Changelog is required').max(2000, 'Changelog must be at most 2000 characters'),
+});
 
 const CreateToolTemplateSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
@@ -488,6 +494,343 @@ router.post('/tools/:id/update-from-template', jwtAuthMiddleware, async (req: Re
   } catch (error) {
     console.error('[TOOLS] Error updating from template:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool from template');
+  }
+});
+
+// ============================================================================
+// TOOL PUBLICATION WORKFLOW (INSTANCE ADMIN REVIEW)
+// ============================================================================
+
+/**
+ * POST /tools/:id/publish-request - Request publication (owner or instance admin)
+ */
+router.post('/tools/:id/publish-request', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'tool parameter');
+    if (!paramValidation) return;
+
+    const { id: toolId } = paramValidation;
+    const userId = req.user!.id;
+
+    // Validate publish request body (version bump + changelog)
+    const bodyValidation = validateData(PublishRequestSchema, req.body, res, 'publish request data');
+    if (!bodyValidation) return;
+
+    const toolRepository = new ToolRepository();
+    const tool = await toolRepository.findById(toolId);
+    if (!tool) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
+      return;
+    }
+
+    // Ensure caller owns the tool's starship or is instance admin
+    const hasAccess = await verifyResourceAccess(tool.starshipId, userId, 'tool', toolId, res);
+    if (!hasAccess) return;
+
+    if (tool.publicationStatus === 'pending_approval') {
+      sendError(res, 'VALIDATION_ERROR', 'Tool is already pending approval', 400);
+      return;
+    }
+
+    // Determine requested version based on current version and bump type
+    const currentVersion = tool.version || '1.0.0';
+    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+    let requestedVersion = currentVersion;
+
+    if (match) {
+      const major = Number(match[1]);
+      const minor = Number(match[2]);
+      const patch = Number(match[3]);
+
+      switch (bodyValidation.versionBump) {
+        case 'patch':
+          requestedVersion = `${major}.${minor}.${patch + 1}`;
+          break;
+        case 'minor':
+          requestedVersion = `${major}.${minor + 1}.0`;
+          break;
+        case 'major':
+          requestedVersion = `${major + 1}.0.0`;
+          break;
+      }
+    } else {
+      requestedVersion = '1.0.0';
+    }
+
+    const updated = await toolRepository.requestPublicationAtomic(toolId, {
+      publicationStatus: 'pending_approval',
+      publicationRequestedBy: userId,
+      publicationVersionBump: bodyValidation.versionBump,
+      publicationRequestedVersion: requestedVersion,
+      publicationChangelog: bodyValidation.changelog,
+    });
+
+    sendSuccess(res, {
+      message: 'Tool publication requested successfully',
+      tool: updated,
+    });
+  } catch (error) {
+    console.error('[TOOLS] Error requesting tool publication:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to request tool publication');
+  }
+});
+
+// ADMIN PUBLICATION APPROVAL ROUTES (INSTANCE ADMIN ONLY)
+
+// GET /admin/tools/pending - List tools pending approval
+router.get('/admin/tools/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending tools', 403);
+      return;
+    }
+
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
+
+    const toolRepository = new ToolRepository();
+    const tools = await toolRepository.findAll();
+    const pendingTools = tools.filter((tool) => tool.publicationStatus === 'pending_approval');
+    const total = pendingTools.length;
+    const offset = (queryValidation.page - 1) * queryValidation.limit;
+    const paginatedTools = pendingTools.slice(offset, offset + queryValidation.limit);
+
+    // Enrich with user display name and starship label for admin UX,
+    // while keeping publicationRequestedBy as the underlying user id.
+    const userRepo = new UserRepository();
+    const starshipRepo = new StarshipRepository();
+
+    const enrichedTools: Array<{
+      tool: any;
+      requestedBy?: {
+        id: string;
+        name?: string;
+        avatar?: string;
+      };
+      requestedByStarship?: {
+        id: string;
+        name?: string;
+        slug?: string;
+      };
+    }> = [];
+
+    for (const tool of paginatedTools) {
+      let requestedBy: {
+        id: string;
+        name?: string;
+        avatar?: string;
+      } | undefined;
+      let requestedByStarship:
+        | {
+            id: string;
+            name?: string;
+            slug?: string;
+          }
+        | undefined;
+
+      try {
+        if (tool.publicationRequestedBy) {
+          const [user, starship] = await Promise.all([
+            userRepo.findById(tool.publicationRequestedBy as string),
+            starshipRepo.findById(tool.starshipId),
+          ]);
+
+          if (user) {
+            requestedBy = {
+              id: user.id,
+              name: user.displayName || user.email || user.id,
+              avatar: user.avatar,
+            };
+          } else {
+            requestedBy = {
+              id: tool.publicationRequestedBy,
+            };
+          }
+
+          if (starship) {
+            requestedByStarship = {
+              id: starship.id,
+              name: starship.name || starship.slug,
+              slug: starship.slug,
+            };
+          }
+        }
+      } catch {
+        if (tool.publicationRequestedBy) {
+          requestedBy = { id: tool.publicationRequestedBy };
+        }
+      }
+
+      enrichedTools.push({
+        tool,
+        requestedBy,
+        requestedByStarship,
+      });
+    }
+
+    sendSuccess(res, enrichedTools, 200, {
+      pagination: {
+        page: queryValidation.page,
+        limit: queryValidation.limit,
+        total,
+        has_next: offset + queryValidation.limit < total,
+        has_prev: queryValidation.page > 1,
+      },
+    });
+  } catch (error) {
+    console.error('[TOOLS] Error loading pending tools:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load pending tools');
+  }
+});
+
+// POST /admin/tools/:id/approve - Approve pending tool publication
+router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can approve tools', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'tool parameter');
+    if (!paramValidation) return;
+
+    const { id: toolId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const toolRepository = new ToolRepository();
+    const templateRepository = new ToolTemplateRepository();
+
+    const tool = await toolRepository.findById(toolId);
+    if (!tool) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
+      return;
+    }
+
+    if (tool.publicationStatus !== 'pending_approval') {
+      sendError(res, 'VALIDATION_ERROR', 'Tool is not pending approval', 400);
+      return;
+    }
+
+    // Determine next version:
+    // - Prefer owner-requested version from publish-request flow
+    // - Fallback to simple minor bump for backwards compatibility
+    const currentVersion = tool.version || '1.0.0';
+    let nextVersion = tool.publicationRequestedVersion;
+
+    if (!nextVersion) {
+      const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+      nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+    }
+
+    // Determine target template (templateId or new template)
+    let targetTemplateId = tool.templateId;
+
+    if (targetTemplateId) {
+      const existingTemplate = await templateRepository.findById(targetTemplateId);
+      if (!existingTemplate) {
+        // If the referenced template no longer exists, drop the link and create a new one
+        targetTemplateId = undefined;
+      }
+    }
+
+    if (!targetTemplateId) {
+      // Create a new template from this tool
+      const createdTemplate = await templateRepository.create({
+        name: tool.name,
+        slug: tool.slug,
+        description: tool.description,
+        category: 'utility',
+        parameters: tool.parameters!,
+        blueprint: tool.blueprint!,
+        transforms: tool.transforms,
+        mutations: tool.mutations,
+        condition: tool.condition,
+        version: nextVersion,
+      } as any);
+
+      targetTemplateId = createdTemplate.id;
+    } else {
+      // Update existing template from this tool
+      await templateRepository.update(targetTemplateId, {
+        description: tool.description,
+        parameters: tool.parameters,
+        blueprint: tool.blueprint,
+        transforms: tool.transforms,
+        mutations: tool.mutations,
+        condition: tool.condition,
+        version: nextVersion,
+      });
+    }
+
+    // Persist publication metadata on tool
+    const updated = await toolRepository.update(toolId, {
+      version: nextVersion,
+      templateId: targetTemplateId,
+      templateSnapshotAt: new Date().toISOString(),
+      publicationStatus: 'published',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+    } as any);
+
+    if (!updated) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
+      return;
+    }
+
+    sendSuccess(res, {
+      message: 'Tool publication approved',
+      tool: updated,
+    });
+  } catch (error) {
+    console.error('[TOOLS] Error approving tool publication:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to approve tool publication');
+  }
+});
+
+// POST /admin/tools/:id/reject - Reject pending tool publication
+router.post('/admin/tools/:id/reject', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can reject tools', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'tool parameter');
+    if (!paramValidation) return;
+
+    const { id: toolId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const toolRepository = new ToolRepository();
+    const tool = await toolRepository.findById(toolId);
+    if (!tool) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
+      return;
+    }
+
+    if (tool.publicationStatus !== 'pending_approval') {
+      sendError(res, 'VALIDATION_ERROR', 'Tool is not pending approval', 400);
+      return;
+    }
+
+    const updated = await toolRepository.update(toolId, {
+      publicationStatus: 'rejected',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+    } as any);
+
+    if (!updated) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
+      return;
+    }
+
+    sendSuccess(res, {
+      message: 'Tool publication rejected',
+      tool: updated,
+    });
+  } catch (error) {
+    console.error('[TOOLS] Error rejecting tool publication:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to reject tool publication');
   }
 });
 

@@ -91,10 +91,21 @@ Automatically inferred from agent state (do not pass manually):
                 testInput = [{ role: 'user', content: testInput }];
               }
 
+              // Derive parentConversationId from input or environment when available
+              let parentConversationId = input.parentConversationId;
+              try {
+                const fromEnv = ctx.env && ctx.env('CONVERSATION_ID');
+                if (!parentConversationId && fromEnv) {
+                  parentConversationId = String(fromEnv);
+                }
+              } catch (e) {
+                // Ignore env errors; parentConversationId is optional
+              }
+
               return {
                 slug,
                 input: testInput,
-                parentConversationId: input.parentConversationId
+                parentConversationId
               };
             }
           `,
@@ -176,7 +187,7 @@ export const agentTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentTestTool.blueprint,
 
   slug: 'test-agent',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Hello" }] } // test with messages\n{ "slug": "analyzer", "input": "Test data" } // test with simple text',

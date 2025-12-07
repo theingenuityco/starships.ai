@@ -148,6 +148,11 @@ export default function PendingAgentsPage(): React.JSX.Element {
         maxTokens: (selectedAgent.agent as any).maxTokens ?? 4000,
         systemPrompt: selectedAgent.agent.systemPrompt || '',
         previewPrompts: (selectedAgent.agent as any).previewPrompts || [],
+        // Use the denormalized assignedToolSlugs populated by the admin
+        // pending agents API so the preview matches the agent's current
+        // tool assignments. The aside "Tools in this publish" panel
+        // separately shows only the subset of tools that will create or
+        // update templates in this publish.
         assignedToolSlugs: (selectedAgent.agent as any).assignedToolSlugs || [],
         blueprint: selectedAgent.agent.blueprint ? JSON.stringify(selectedAgent.agent.blueprint, null, 2) : '{\n  "nodes": [],\n  "edges": []\n}',
         timeout: (selectedAgent.agent as any).timeout ?? 30000,

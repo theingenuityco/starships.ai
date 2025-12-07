@@ -601,9 +601,7 @@ export class ConversationService {
         try {
           // Security: Validate file size to prevent context overflow
           if (attachment.sizeBytes > MAX_TEXT_FILE_SIZE) {
-            console.warn(
-              `Text file ${attachment.filename} exceeds ${MAX_TEXT_FILE_SIZE / 1024}KB limit, will truncate...`
-            );
+            console.warn(`Text file ${attachment.filename} exceeds ${MAX_TEXT_FILE_SIZE / 1024}KB limit, will truncate...`);
           }
 
           const textContent = await fetchTextFromS3(attachment.s3Key);
@@ -611,9 +609,7 @@ export class ConversationService {
           // Truncate if too large (prevent context overflow)
           const maxChars = 50000; // ~50k chars = ~12.5k tokens
           const truncatedContent =
-            textContent.length > maxChars
-              ? textContent.slice(0, maxChars) + '\n\n[... content truncated due to length ...]'
-              : textContent;
+            textContent.length > maxChars ? textContent.slice(0, maxChars) + '\n\n[... content truncated due to length ...]' : textContent;
 
           // Append to message text with clear delimiters (first block is always text)
           const textBlock = contentBlocks[0];
@@ -771,7 +767,7 @@ export class ConversationService {
 
       const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);
 
-      // Orchestrate sequentially with mention-based handoffs
+      // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
         const agentModel = agentQueue.shift()!;
         if (processedAgents.has(agentModel.id)) {
@@ -826,8 +822,6 @@ export class ConversationService {
           runtimeEnv,
           hostRuntime,
         });
-
-        const baselineCount = messages.length;
         // Execute with cancellation controller at top level (depth=0 implied inside Agent)
         // Use ChildProcessRunner directly to capture cancel handle
         const runner = this.defaultRunner;
@@ -868,29 +862,9 @@ export class ConversationService {
           await runner.run(blueprint, exec, engineConfig as any);
         }
 
-        // Refresh messages after this agent's turn and discover mentions in new assistant messages
-        const after = await this.getConversationMessages(data.conversationId);
-        const newMessages = after.slice(baselineCount);
-        messages = after; // advance baseline
-
-        const combinedAssistantText = newMessages
-          .filter((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.length > 0)
-          .map((m) => m.content)
-          .join('\n');
-
-        // Resolve handoffs against starship agents and auto-link dynamically
-        const handoffTargets = this.extractMentionedAgents(combinedAssistantText, allStarshipAgents);
-        for (const t of handoffTargets) {
-          if (!conversationAgents.find((x) => x.id === t.id)) {
-            await this.conversationRepository.linkToAgent(data.conversationId, t.id);
-            conversationAgents.push(t);
-          }
-        }
-        for (const target of handoffTargets) {
-          if (!processedAgents.has(target.id) && !agentQueue.find((a) => a.id === target.id)) {
-            agentQueue.push(target);
-          }
-        }
+        // Refresh messages after this agent's turn so subsequent agents (if any)
+        // see the updated conversation state, but do not perform mention-based handoffs
+        messages = await this.getConversationMessages(data.conversationId);
       }
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {

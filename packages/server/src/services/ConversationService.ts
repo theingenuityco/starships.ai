@@ -243,6 +243,36 @@ export class ConversationService {
       parentConversationId: data.parentConversationId,
     });
 
+    // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
+    try {
+      if (conversation.parentConversationId && this.streamingService && this.streamingService.isActive(conversation.parentConversationId)) {
+        const payload: any = {
+          __ui_action: 'child_conversation_created',
+          parentConversationId: conversation.parentConversationId,
+          childConversationId: conversation.id,
+          starshipId: conversation.starshipId,
+        };
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[UI_ACTION] Emitting child_conversation_created', payload);
+        } catch {
+          // logging best-effort only
+        }
+        await this.streamingService.broadcastUIAction(conversation.parentConversationId, payload);
+      }
+    } catch (e) {
+      // Non-fatal: failure to emit UI hint must not break conversation creation
+      try {
+        console.warn('[UI_ACTION] Failed to emit child_conversation_created', {
+          error: e instanceof Error ? e.message : String(e),
+          parentConversationId: conversation.parentConversationId,
+          starshipId: conversation.starshipId,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     return conversation;
   }
 
@@ -2025,6 +2055,15 @@ export class ConversationService {
           }
 
           if (uiPayload && typeof uiPayload.__ui_action === 'string') {
+            try {
+              console.log('[UI_ACTION] Detected UI payload on node_completed', {
+                conversationId,
+                action: uiPayload.__ui_action,
+                payload: uiPayload,
+              });
+            } catch {
+              // logging best-effort only
+            }
             // New SSE event: send as 'ui_action' for clean separation
             await this.streamingService.broadcastUIAction(conversationId, uiPayload);
 

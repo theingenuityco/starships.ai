@@ -188,6 +188,30 @@ from the message send endpoint so callers can inspect status and results.
                 // best-effort only
               }
 
+              // Extract parent conversation id from prepare step (if any)
+              let parentConversationId = null;
+              try {
+                const prep = ctx.lastOutputOf && ctx.lastOutputOf('prepare') ? ctx.lastOutputOf('prepare') : null;
+                if (prep && typeof prep === 'object' && typeof prep.parentConversationId === 'string') {
+                  parentConversationId = prep.parentConversationId;
+                }
+              } catch (e) {
+                // optional; parentConversationId is best-effort
+              }
+
+              // Extract starship id from environment (for client-side cache invalidation)
+              let starshipId = null;
+              try {
+                if (ctx.env) {
+                  const sid = ctx.env('STARSHIP_ID');
+                  if (sid) {
+                    starshipId = String(sid);
+                  }
+                }
+              } catch (e) {
+                // ignore env errors
+              }
+
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
@@ -198,7 +222,11 @@ from the message send endpoint so callers can inspect status and results.
                 result: data,
                 message: success
                   ? 'Agent call in new child conversation completed successfully'
-                  : 'Agent call in new child conversation failed'
+                  : 'Agent call in new child conversation failed',
+                // UI hint for clients: let them refresh conversation lists when a child is created
+                __ui_action: 'child_conversation_created',
+                parentConversationId,
+                starshipId,
               };
             }
           `,

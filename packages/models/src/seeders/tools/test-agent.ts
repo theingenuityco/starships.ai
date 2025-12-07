@@ -59,6 +59,10 @@ Automatically inferred from agent state (do not pass manually):
       input: {
         description: 'Test input - messages array or simple text',
       },
+      parentConversationId: {
+        type: 'string',
+        description: 'Optional parent conversation id to link this test as a child conversation',
+      },
     },
     required: ['slug', 'input'],
   },
@@ -89,7 +93,8 @@ Automatically inferred from agent state (do not pass manually):
 
               return {
                 slug,
-                input: testInput
+                input: testInput,
+                parentConversationId: input.parentConversationId
               };
             }
           `,
@@ -104,7 +109,10 @@ Automatically inferred from agent state (do not pass manually):
         parameters: {
           url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug + "/test" }}',
           method: 'POST',
-          body: { input: '{{ (lastOutputOf("prepare") || {}).input }}' },
+          body: {
+            input: '{{ (lastOutputOf("prepare") || {}).input }}',
+            parentConversationId: '{{ (lastOutputOf("prepare") || {}).parentConversationId }}',
+          },
           connector: 'starships',
           timeout: 60000,
         },

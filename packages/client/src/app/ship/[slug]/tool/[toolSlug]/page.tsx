@@ -2,9 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import type { FetchResponse } from '@/lib/types'
+import type { ApiResponse, ToolModel } from '@starships/protocol'
+import api from '@/lib/api'
 import { ToolBuilderView, ToolBuilderViewRef } from '@/components/tools/ToolBuilder'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { fetchStarshipTool, useStarshipTool } from '@/hooks/useTools'
+import { fetchStarshipTool, TOOL_QUERY_KEYS, useStarshipTool } from '@/hooks/useTools'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
@@ -24,6 +28,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   const searchParams = useSearchParams()
 
   const { data: starship } = useStarshipBySlug(slug, true)
+  const queryClient = useQueryClient()
   const toolBuilderRef = useRef<ToolBuilderViewRef>(null)
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
   const routeUpdatedRef = useRef<boolean>(false)
@@ -693,13 +698,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           <ToolUpdateNotification tool={existingTool} />
         </div>
       )}
-      <ToolBuilderView
-        ref={toolBuilderRef}
-        starshipId={starship.id}
-        onCancel={handleCancel}
-        toolId={existingTool?.id}
-        templateId={existingTool?.templateId}
-      />
+      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.templateId} />
       {conversationId && (
         <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
@@ -726,7 +725,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           </div>
         </ConversationStreamProvider>
       )}
-
     </div>
   )
 }

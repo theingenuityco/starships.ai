@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 import { scheduleAPI } from '@/lib/api'
 import type { ScheduleModel, AgentModel } from '@starships/protocol'
 import { useStarshipBySlug, useStarshipAgents } from '@/hooks/useStarships'
+import { ScheduleConversationModal } from '@/components/conversation/ScheduleConversationModal'
+import { Button } from '@/components/ui/button'
 
 type CalendarCell = {
   date: Date
@@ -44,6 +46,11 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
+
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [modalInitialPrompt, setModalInitialPrompt] = useState('')
+  const [modalInitialDate, setModalInitialDate] = useState<string | undefined>(undefined)
+  const [modalInitialTime, setModalInitialTime] = useState<string | undefined>(undefined)
 
   const { data: schedules = [], isLoading: schedulesLoading } = useQuery<ScheduleModel[]>({
     queryKey: ['starship-schedules', starshipId],
@@ -114,6 +121,18 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
       })
       .slice(0, 50)
   }, [schedules])
+
+  const openScheduleModalForDate = useCallback((dateForSchedule?: Date) => {
+    if (dateForSchedule) {
+      const key = formatDateKey(dateForSchedule)
+      setModalInitialDate(key)
+    } else {
+      setModalInitialDate(undefined)
+    }
+    setModalInitialTime(undefined)
+    setModalInitialPrompt('')
+    setScheduleModalOpen(true)
+  }, [])
 
   const handlePrevMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
@@ -191,164 +210,204 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
               </div>
 
               <TabsContent value="schedules">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card className="lg:col-span-2 frosted-glass-card shadow-frosted-lg">
-                    <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <Icon name="calendar" className="h-4 w-4" />
-                          Calendar
-                        </CardTitle>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handlePrevMonth}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                          aria-label="Previous month"
-                        >
-                          <Icon name="chevron-left" className="h-4 w-4" />
-                        </button>
-                        <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
-                        <button
-                          type="button"
-                          onClick={handleNextMonth}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                          aria-label="Next month"
-                        >
-                          <Icon name="chevron-right" className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      {schedulesLoading ? (
-                        <div className="space-y-2">
-                          {[1, 2, 3].map(i => (
-                            <Skeleton key={i} className="h-8 w-full" />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                              <div key={d} className="px-2 py-1 text-center font-medium">
-                                {d}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="grid grid-cols-7 gap-1 text-xs">
-                            {monthCells.map(cell => {
-                              const cellKey = cell.key
-                              const inCurrentMonth = cell.date.getMonth() === currentMonth.getMonth()
-                              const daySchedules = schedulesByDay.get(cellKey) ?? []
-                              const isToday = cellKey === todayKey
-
-                              return (
-                                <div
-                                  key={cell.key}
-                                  className={cn(
-                                    'min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 bg-card/80',
-                                    inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
-                                    isToday && 'ring-1 ring-primary/60 border-primary/60'
-                                  )}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className={cn('text-[11px] font-medium', inCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>{cell.date.getDate()}</span>
-                                    {daySchedules.length > 0 && (
-                                      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-medium">
-                                        {daySchedules.length} run{daySchedules.length > 1 ? 's' : ''}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {daySchedules.slice(0, 3).map(s => {
-                                    const agent = s.agentId ? agentsById.get(s.agentId) : undefined
-                                    const label = agent?.name || 'Agent'
-                                    return (
-                                      <div key={s.id} className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5">
-                                        <span className="font-medium truncate">{label}</span>
-                                        {s.prompt && (
-                                          <span className="text-[10px] text-muted-foreground truncate">
-                                            {String(s.prompt).slice(0, 60)}
-                                            {String(s.prompt).length > 60 ? '…' : ''}
-                                          </span>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
-                                  {daySchedules.length > 3 && <span className="text-[10px] text-muted-foreground mt-0.5">+{daySchedules.length - 3} more</span>}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
+                <div className="flex flex-col gap-4">
                   <Card className="frosted-glass-card shadow-frosted-lg">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Icon name="list-checks" className="h-4 w-4" />
-                        Upcoming runs
+                        <Icon name="clock" className="h-4 w-4" />
+                        Schedule a run
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      {schedulesLoading ? (
-                        <div className="space-y-2">
-                          {[1, 2, 3].map(i => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                          ))}
+                      <div className="flex flex-col md:flex-row md:items-center gap-3">
+                        <p className="flex-1 text-xs text-muted-foreground">Click any day in the calendar below to schedule an agent run on that date, or use the button to open the scheduler.</p>
+                        <div className="flex-none">
+                          <Button type="button" size="sm" onClick={() => openScheduleModalForDate()} disabled={!starshipId}>
+                            <Icon name="plus" className="mr-1.5 h-3.5 w-3.5" />
+                            New schedule
+                          </Button>
                         </div>
-                      ) : allUpcoming.length === 0 ? (
-                        <div className="text-center py-6 text-xs text-muted-foreground">
-                          <p>No upcoming schedules yet.</p>
-                          <p>Use the “Schedule this agent” button from a conversation to create one.</p>
-                        </div>
-                      ) : (
-                        <ScrollArea className="h-[320px] pr-2">
-                          <div className="space-y-2 text-xs">
-                            {allUpcoming.map(s => {
-                              const dt = new Date(s.nextRunAt as unknown as string)
-                              const dateStr = dt.toLocaleDateString(undefined, {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                              })
-                              const timeStr = dt.toLocaleTimeString(undefined, {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                              const agent = s.agentId ? agentsById.get(s.agentId) : undefined
-                              const label = agent?.name || 'Agent'
-                              return (
-                                <div key={s.id} className="rounded-lg border border-border/60 bg-card/80 px-2.5 py-2 flex flex-col gap-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-medium">
-                                        {label.charAt(0).toUpperCase()}
-                                      </span>
-                                      <div className="min-w-0">
-                                        <div className="text-[11px] font-semibold truncate">{label}</div>
-                                        {s.timezone && <div className="text-[10px] text-muted-foreground truncate">{s.timezone}</div>}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-[11px] font-medium">{dateStr}</div>
-                                      <div className="text-[10px] text-muted-foreground">{timeStr}</div>
-                                    </div>
-                                  </div>
-                                  {s.prompt && <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{String(s.prompt)}</div>}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </ScrollArea>
-                      )}
+                      </div>
                     </CardContent>
                   </Card>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Card className="lg:col-span-2 frosted-glass-card shadow-frosted-lg">
+                      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Icon name="calendar" className="h-4 w-4" />
+                            Calendar
+                          </CardTitle>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                            aria-label="Previous month"
+                          >
+                            <Icon name="chevron-left" className="h-4 w-4" />
+                          </button>
+                          <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
+                          <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                            aria-label="Next month"
+                          >
+                            <Icon name="chevron-right" className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {schedulesLoading ? (
+                          <div className="space-y-2">
+                            {[1, 2, 3].map(i => (
+                              <Skeleton key={i} className="h-8 w-full" />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
+                              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                                <div key={d} className="px-2 py-1 text-center font-medium">
+                                  {d}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-7 gap-1 text-xs">
+                              {monthCells.map(cell => {
+                                const cellKey = cell.key
+                                const inCurrentMonth = cell.date.getMonth() === currentMonth.getMonth()
+                                const daySchedules = schedulesByDay.get(cellKey) ?? []
+                                const isToday = cellKey === todayKey
+
+                                return (
+                                  <button
+                                    key={cell.key}
+                                    type="button"
+                                    onClick={() => openScheduleModalForDate(cell.date)}
+                                    className={cn(
+                                      'min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
+                                      inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
+                                      isToday && 'ring-1 ring-primary/60 border-primary/60'
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className={cn('text-[11px] font-medium', inCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>{cell.date.getDate()}</span>
+                                      {daySchedules.length > 0 && (
+                                        <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-medium">
+                                          {daySchedules.length} run{daySchedules.length > 1 ? 's' : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {daySchedules.slice(0, 3).map(s => {
+                                      const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                                      const label = agent?.name || 'Agent'
+                                      return (
+                                        <div key={s.id} className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5">
+                                          <span className="font-medium truncate">{label}</span>
+                                          {s.prompt && (
+                                            <span className="text-[10px] text-muted-foreground truncate">
+                                              {String(s.prompt).slice(0, 60)}
+                                              {String(s.prompt).length > 60 ? '…' : ''}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                    {daySchedules.length > 3 && <span className="text-[10px] text-muted-foreground mt-0.5">+{daySchedules.length - 3} more</span>}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="frosted-glass-card shadow-frosted-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Icon name="list-checks" className="h-4 w-4" />
+                          Upcoming runs
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {schedulesLoading ? (
+                          <div className="space-y-2">
+                            {[1, 2, 3].map(i => (
+                              <Skeleton key={i} className="h-10 w-full" />
+                            ))}
+                          </div>
+                        ) : allUpcoming.length === 0 ? (
+                          <div className="text-center py-6 text-xs text-muted-foreground">
+                            <p>No upcoming schedules yet.</p>
+                            <p>Use the calendar or “New schedule” button above to create one.</p>
+                          </div>
+                        ) : (
+                          <ScrollArea className="h-[320px] pr-2">
+                            <div className="space-y-2 text-xs">
+                              {allUpcoming.map(s => {
+                                const dt = new Date(s.nextRunAt as unknown as string)
+                                const dateStr = dt.toLocaleDateString(undefined, {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })
+                                const timeStr = dt.toLocaleTimeString(undefined, {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                                const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                                const label = agent?.name || 'Agent'
+                                return (
+                                  <div key={s.id} className="rounded-lg border border-border/60 bg-card/80 px-2.5 py-2 flex flex-col gap-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-medium">
+                                          {label.charAt(0).toUpperCase()}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <div className="text-[11px] font-semibold truncate">{label}</div>
+                                          {s.timezone && <div className="text-[10px] text-muted-foreground truncate">{s.timezone}</div>}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-[11px] font-medium">{dateStr}</div>
+                                        <div className="text-[10px] text-muted-foreground">{timeStr}</div>
+                                      </div>
+                                    </div>
+                                    {s.prompt && <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{String(s.prompt)}</div>}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
+            <ScheduleConversationModal
+              open={scheduleModalOpen}
+              onOpenChange={open => {
+                setScheduleModalOpen(open)
+                if (!open) {
+                  setModalInitialPrompt('')
+                  setModalInitialDate(undefined)
+                  setModalInitialTime(undefined)
+                }
+              }}
+              starshipId={starshipId}
+              agents={agents as AgentModel[]}
+              initialPrompt={modalInitialPrompt}
+              initialDate={modalInitialDate}
+              initialTime={modalInitialTime}
+            />
           </div>
         </div>
       </div>

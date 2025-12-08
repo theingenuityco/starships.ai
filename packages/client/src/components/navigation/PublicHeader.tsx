@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { Button } from '@/components/ui/button'
 import { Orbitron } from 'next/font/google'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
@@ -79,6 +80,15 @@ export function PublicHeader(): React.JSX.Element {
               <Icon name="external-link" className="w-3 h-3 opacity-80" />
             </span>
           </a>
+          <Button
+            size="sm"
+            className="ml-1"
+            onClick={() => {
+              router.push('/login')
+            }}
+          >
+            Get started
+          </Button>
         </nav>
 
         {/* Mobile menu toggle */}
@@ -117,6 +127,15 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Docs
               </a>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  router.push('/login')
+                }}
+                className="mt-1 w-full px-3 py-2 rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90"
+              >
+                Get started
+              </button>
             </div>
           )}
         </div>

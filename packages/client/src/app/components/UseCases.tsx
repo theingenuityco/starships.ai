@@ -8,23 +8,23 @@ export default function UseCases() {
     icon: string
   }> = [
     {
-      title: 'Create agents in minutes',
-      desc: 'Use the builder to define name, prompt, model, and settings. Save and iterate quickly.',
+      title: 'Automate customer support workflows',
+      desc: 'Have agents triage, draft, and route tickets by calling your support tools and internal APIs.',
       icon: 'bot',
     },
     {
-      title: 'Create tools that fit your needs',
-      desc: 'Spin up tools with parameters and blueprints, or deploy a template and customize.',
+      title: 'Keep your data and CRM in sync',
+      desc: 'Let agents read from and write to your CRM, helpdesk, or billing systems via tools instead of glue code.',
       icon: 'wrench',
     },
     {
-      title: 'Assign tools to agents',
-      desc: 'Wire tools to agents with one click and keep configs organized inside your starship.',
+      title: 'Ship internal copilots for your team',
+      desc: 'Give teammates an agent that can search docs, answer questions, and call tools to get real work done.',
       icon: 'plug',
     },
     {
-      title: 'Stream tests and iterate live',
-      desc: 'Chat with agents, watch executions stream in real‑time, and refine prompts and blueprints.',
+      title: 'Run recurring operational workflows',
+      desc: 'Use agents to generate reports, trigger checks, and call downstream systems on a schedule or via API.',
       icon: 'activity',
     },
   ]
@@ -34,8 +34,8 @@ export default function UseCases() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Build agents and tools fast</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Design, connect, and iterate on agents and tools in minutes.</p>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">What you can build with Starships</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Ship real automations and copilots that talk to your existing tools, data, and APIs.</p>
         <div className="space-y-10 md:space-y-12">
           {items.map((item, idx) => {
             const isRightAligned = idx % 2 === 1

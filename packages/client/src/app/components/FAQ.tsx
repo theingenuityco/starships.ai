@@ -2,12 +2,20 @@ import { Card } from '@/components/ui/card'
 
 const QA = [
   {
-    q: 'Can I self-host or run Starships locally?',
-    a: 'No. Starships.ai is a fully managed, hosted service. Self-hosting and local deployments are not supported at this time.',
+    q: 'What is Starships in one sentence?',
+    a: 'Starships is a hosted platform for engineers to build and run production-ready AI agents that call your tools, APIs, and workflows using your own model keys.',
+  },
+  {
+    q: 'Who is Starships for?',
+    a: 'Starships is built for product engineers, data teams, and founders who want to ship real AI features into products without maintaining brittle glue code.',
+  },
+  {
+    q: 'What can I build in my first day?',
+    a: 'Most teams start with support triage, internal copilots for docs, analytics or reporting agents, or small back-office automations that call existing APIs and databases.',
   },
   {
     q: 'How do I get access and start?',
-    a: 'Create an account, add your model provider keys in Environment settings, create a starship workspace, then launch your first agent from a template and start a conversation.',
+    a: 'Create an account, add your model provider keys in Environment settings, create a workspace, then launch your first agent from a template and start a conversation.',
   },
   {
     q: 'Which models and providers are supported?',
@@ -15,11 +23,15 @@ const QA = [
   },
   {
     q: 'How do tools work and how do I add custom ones?',
-    a: 'Tools are JSON-schema functions backed by a blueprint workflow. Define name, description, parameters, and blueprint; agents will call them automatically when appropriate. You can test tools and iterate before enabling them.',
+    a: 'Tools are JSON-schema functions backed by a workflow. Define name, description, parameters, and logic; agents will call them automatically when appropriate. You can test tools and iterate before enabling them. See the docs for a full breakdown of tool and workflow node types.',
   },
   {
     q: 'What are agents and workflows?',
-    a: 'Workflows are DAGs composed of nodes (LLM, HTTP, transform, conditional, tool, workflow, code, user_prompt). Agents wrap workflows to manage conversation state, tool calls, and streaming results.',
+    a: 'Agents hold conversation state and decide when to call tools. Workflows describe the steps and logic an agent or tool run goes through. For a detailed, node-by-node view, check the workflows section in the docs.',
+  },
+  {
+    q: 'Can I self-host or run Starships locally?',
+    a: 'No. Starships.ai is a fully managed, hosted service. Self-hosting and local deployments are not supported at this time.',
   },
   {
     q: 'How does Starships handle security and privacy?',

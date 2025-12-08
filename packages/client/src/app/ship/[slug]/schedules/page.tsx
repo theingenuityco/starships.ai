@@ -35,6 +35,32 @@ function formatDateKey(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+function formatHourLabel(hour: number): string {
+  const suffix = hour < 12 ? 'AM' : 'PM'
+  const display = hour % 12 === 0 ? 12 : hour % 12
+  return `${display} ${suffix}`
+}
+
+function startOfWeek(date: Date): Date {
+  const d = startOfDay(date)
+  const weekday = d.getDay() // 0 (Sun) - 6 (Sat)
+  d.setDate(d.getDate() - weekday)
+  return d
+}
+
+function formatWeekLabel(start: Date): string {
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  const startLabel = start.toLocaleDateString(undefined, opts)
+
+  const sameMonth = start.getMonth() === end.getMonth()
+  const endLabel = end.toLocaleDateString(undefined, sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' })
+
+  return `${startLabel} – ${endLabel}, ${start.getFullYear()}`
+}
+
 export default function StarshipSchedulesPage(): React.JSX.Element {
   const router = useRouter()
   const { slug } = useParams<{ slug: string }>()
@@ -42,10 +68,12 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
   const { data: starship } = useStarshipBySlug(slug, true)
   const starshipId = starship?.id || ''
 
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date()))
 
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [modalInitialPrompt, setModalInitialPrompt] = useState('')
@@ -122,14 +150,25 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
       .slice(0, 50)
   }, [schedules])
 
-  const openScheduleModalForDate = useCallback((dateForSchedule?: Date) => {
+  const HOURS = useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
+
+  const weekDays: Date[] = useMemo(() => {
+    const start = currentWeekStart
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      return d
+    })
+  }, [currentWeekStart])
+
+  const openScheduleModalForDate = useCallback((dateForSchedule?: Date, timeForSchedule?: string) => {
     if (dateForSchedule) {
       const key = formatDateKey(dateForSchedule)
       setModalInitialDate(key)
     } else {
       setModalInitialDate(undefined)
     }
-    setModalInitialTime(undefined)
+    setModalInitialTime(timeForSchedule || undefined)
     setModalInitialPrompt('')
     setScheduleModalOpen(true)
   }, [])
@@ -142,7 +181,24 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
   }
 
+  const handlePrevWeek = () => {
+    setCurrentWeekStart(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() - 7)
+      return startOfWeek(d)
+    })
+  }
+
+  const handleNextWeek = () => {
+    setCurrentWeekStart(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() + 7)
+      return startOfWeek(d)
+    })
+  }
+
   const monthLabel = currentMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  const weekLabel = formatWeekLabel(currentWeekStart)
 
   return (
     <PageLayout>
@@ -239,25 +295,65 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                             <Icon name="calendar" className="h-4 w-4" />
                             Calendar
                           </CardTitle>
+                          <div className="ml-2 inline-flex items-center rounded-full bg-muted/60 p-0.5 text-[11px]">
+                            <button
+                              type="button"
+                              className={cn('px-2 py-0.5 rounded-full transition-colors', viewMode === 'month' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+                              onClick={() => setViewMode('month')}
+                            >
+                              Month
+                            </button>
+                            <button
+                              type="button"
+                              className={cn('px-2 py-0.5 rounded-full transition-colors', viewMode === 'week' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+                              onClick={() => setViewMode('week')}
+                            >
+                              Week
+                            </button>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handlePrevMonth}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                            aria-label="Previous month"
-                          >
-                            <Icon name="chevron-left" className="h-4 w-4" />
-                          </button>
-                          <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
-                          <button
-                            type="button"
-                            onClick={handleNextMonth}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                            aria-label="Next month"
-                          >
-                            <Icon name="chevron-right" className="h-4 w-4" />
-                          </button>
+                          {viewMode === 'month' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handlePrevMonth}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                                aria-label="Previous month"
+                              >
+                                <Icon name="chevron-left" className="h-4 w-4" />
+                              </button>
+                              <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
+                              <button
+                                type="button"
+                                onClick={handleNextMonth}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                                aria-label="Next month"
+                              >
+                                <Icon name="chevron-right" className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handlePrevWeek}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                                aria-label="Previous week"
+                              >
+                                <Icon name="chevron-left" className="h-4 w-4" />
+                              </button>
+                              <span className="text-sm font-medium min-w-[160px] text-center">{weekLabel}</span>
+                              <button
+                                type="button"
+                                onClick={handleNextWeek}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                                aria-label="Next week"
+                              >
+                                <Icon name="chevron-right" className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
@@ -267,7 +363,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                               <Skeleton key={i} className="h-8 w-full" />
                             ))}
                           </div>
-                        ) : (
+                        ) : viewMode === 'month' ? (
                           <div className="space-y-3">
                             <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
                               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
@@ -321,6 +417,78 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                   </button>
                                 )
                               })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-1 text-xs text-muted-foreground mb-1">
+                              <div className="px-2 py-1 text-left font-medium">Time</div>
+                              {weekDays.map(day => (
+                                <div key={formatDateKey(day)} className="px-2 py-1 text-center font-medium">
+                                  {day.toLocaleDateString(undefined, { weekday: 'short' })}{' '}
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {day.getMonth() + 1}/{day.getDate()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="max-h-[420px] overflow-y-auto rounded-lg border border-border/40 bg-background/40">
+                              <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] text-xs">
+                                {HOURS.map(hour => {
+                                  const cells: React.ReactNode[] = []
+                                  // Time label column
+                                  cells.push(
+                                    <div key={`time-${hour}`} className="border-t border-border/40 px-1.5 py-1.5 text-[11px] text-muted-foreground sticky left-0 bg-background/80">
+                                      {formatHourLabel(hour)}
+                                    </div>
+                                  )
+                                  // Day columns
+                                  weekDays.forEach(day => {
+                                    const cellKey = formatDateKey(day)
+                                    const daySchedules = (schedulesByDay.get(cellKey) ?? []).filter(s => {
+                                      const dt = new Date(s.nextRunAt as unknown as string)
+                                      return dt.getHours() === hour
+                                    })
+                                    const isToday = cellKey === todayKey && startOfDay(new Date()).getHours() === hour
+                                    cells.push(
+                                      <div
+                                        key={`${cellKey}-${hour}`}
+                                        className={cn(
+                                          'border-t border-l border-border/40 min-h-[40px] px-1.5 py-1 flex flex-col gap-1 bg-card/60',
+                                          'hover:bg-primary/5 hover:border-primary/40 transition-colors',
+                                          isToday && 'ring-1 ring-primary/60 border-primary/60'
+                                        )}
+                                      >
+                                        <button
+                                          type="button"
+                                          onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
+                                          className="w-full text-left text-[10px] text-muted-foreground hover:text-primary"
+                                        >
+                                          {daySchedules.length === 0 ? 'Add' : `${daySchedules.length} run${daySchedules.length > 1 ? 's' : ''}`}
+                                        </button>
+                                        {daySchedules.map(s => {
+                                          const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                                          const label = agent?.name || 'Agent'
+                                          return (
+                                            <button
+                                              key={s.id}
+                                              type="button"
+                                              className="w-full rounded bg-muted/80 px-1 py-0.5 text-left text-[10px] leading-tight hover:bg-muted"
+                                              onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
+                                            >
+                                              <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                <span className="font-medium truncate">{label}</span>
+                                              </div>
+                                              {s.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(s.prompt)}</div>}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                    )
+                                  })
+                                  return cells
+                                })}
+                              </div>
                             </div>
                           </div>
                         )}

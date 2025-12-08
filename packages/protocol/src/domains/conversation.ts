@@ -25,6 +25,7 @@ export interface Conversation {
 export interface ConversationModel extends Conversation {
   id: string;
   starshipId: string;
+  parentConversationId?: string;
   createdAt: string;
   updatedAt?: string;
 }

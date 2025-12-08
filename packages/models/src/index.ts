@@ -65,3 +65,16 @@ export { migrateDocTools } from './scripts/migrate-doc-tools';
 
 // Utilities
 export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';
+
+// Shared agent defaults
+export {
+  MIN_AGENT_TEMPERATURE,
+  MAX_AGENT_TEMPERATURE,
+  DEFAULT_AGENT_TEMPERATURE,
+  MIN_AGENT_MAX_TOKENS,
+  MAX_AGENT_MAX_TOKENS,
+  DEFAULT_AGENT_MAX_TOKENS,
+  MIN_AGENT_TIMEOUT_MS,
+  MAX_AGENT_TIMEOUT_MS,
+  DEFAULT_AGENT_TIMEOUT_MS,
+} from './constants/agentDefaults';

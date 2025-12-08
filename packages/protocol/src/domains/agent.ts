@@ -7,6 +7,7 @@
 
 // Import autopilot types at the top level
 import type { AgentParams } from '@starships/autopilot';
+import type { TemplateCategory } from '../index';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -25,10 +26,13 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   slug: string;
   createdAt: string;
   updatedAt: string;
+  // Optional categorization (for organizing agents in UI/marketplace)
+  // Kept in sync with the shared TemplateCategory union used by AgentTemplateModel.
+  category?: TemplateCategory;
   // Starship ownership (FK)
   starshipId: string;
   // Optional source template reference (FK)
-  templateId?: string;
+  sourceTemplateId?: string;
   // Optional example prompts surfaced on agents (may be inherited from template)
   previewPrompts?: string[];
   // Versioning fields
@@ -40,6 +44,37 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
     latestVersion: string; // Template's latest version
     templateUpdatedAt?: string; // When template was last updated
   };
+
+  /**
+   * Publication workflow fields
+   *
+   * - draft: default state, only visible to owner
+   * - pending_approval: owner requested publish; waiting for instance admin review
+   * - published: approved by instance admin and visible as a published agent
+   * - rejected: rejected by instance admin (owner can revise and request again)
+   */
+  publicationStatus: 'draft' | 'pending_approval' | 'published' | 'rejected';
+  publicationRequestedBy?: string;
+  publicationApprovedBy?: string;
+  publicationApprovedAt?: string;
+
+  /**
+   * Optional publication metadata chosen by the owner when requesting publish.
+   *
+   * - publicationVersionBump: how the owner wants to bump from the current version
+   * - publicationRequestedVersion: the exact target version string (e.g. '1.2.3')
+   * - publicationChangelog: human-readable notes about what changed
+   */
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+  publicationRequestedVersion?: string;
+  publicationChangelog?: string;
+
+  /**
+   * Optional pointer to the template row this agent is published into.
+   * - sourceTemplateId: where the agent was originally created from (source template).
+   * - publishedTemplateId: where this agent is promoted to on publish.
+   */
+  publishedTemplateId?: string;
 }
 
 // ============================================================================
@@ -51,9 +86,11 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   slug?: string; // Optional: if not provided, will be generated
+  // Optional categorization (for organizing agents in UI/marketplace)
+  category?: TemplateCategory;
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
   // Optional template reference and prompts
-  templateId?: string;
+  sourceTemplateId?: string;
   previewPrompts?: string[];
   // Versioning fields
   version?: string;
@@ -64,10 +101,38 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  * Request to update an agent
  */
 export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
-  templateId?: string;
+  // Optional categorization (for organizing agents in UI/marketplace)
+  category?: TemplateCategory;
+  sourceTemplateId?: string;
   previewPrompts?: string[];
   version?: string;
   templateSnapshotAt?: string;
+  publicationStatus?: 'draft' | 'pending_approval' | 'published' | 'rejected';
+  publicationRequestedBy?: string;
+  publicationApprovedBy?: string;
+  publicationApprovedAt?: string;
+  publishedTemplateId?: string;
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+  publicationRequestedVersion?: string;
+  publicationChangelog?: string;
+}
+
+/**
+ * DTO for admin pending agents listing.
+ * Wraps the agent plus denormalized metadata needed only for that view.
+ */
+export interface PendingAgentSummary {
+  agent: AgentModel;
+  requestedBy?: {
+    id: string;
+    name?: string;
+    avatar?: string;
+  };
+  requestedByStarship?: {
+    id: string;
+    name?: string;
+    slug?: string;
+  };
 }
 
 /**

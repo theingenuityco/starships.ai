@@ -23,8 +23,8 @@ interface DeployedAgentCardProps {
 }
 
 export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
-  // Check if this is a template-based agent (has templateId) - these are protected
-  const isTemplateAgent = !!agent.templateId
+  // Check if this is a template-based agent (has sourceTemplateId) - these are protected
+  const isTemplateAgent = !!agent.sourceTemplateId
 
   // Get update info from agent object (populated by API)
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
@@ -192,11 +192,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                 )}
                 {/* Premium update available indicator with subtle animation */}
                 {needsUpdate && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3, ease: 'easeOut' }}
-                  >
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
                     <Badge
                       className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
                       style={{

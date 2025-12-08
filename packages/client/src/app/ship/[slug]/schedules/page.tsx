@@ -433,7 +433,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                 </div>
                               ))}
                             </div>
-                            <div className="max-h-[420px] overflow-y-auto rounded-lg border border-border/40 bg-background/40">
+                            <div className="max-h-[560px] overflow-y-auto rounded-lg border border-border/40 bg-background/40">
                               <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] text-xs">
                                 {HOURS.map(hour => {
                                   const cells: React.ReactNode[] = []
@@ -456,7 +456,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                         key={`${cellKey}-${hour}`}
                                         onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
                                         className={cn(
-                                          'relative border border-border/40 min-h-[40px] px-1.5 py-1 bg-card/60 cursor-pointer overflow-hidden',
+                                          'relative border border-border/40 min-h-[64px] px-1.5 py-1 bg-card/60 cursor-pointer overflow-hidden',
                                           'hover:bg-primary/5 hover:border-primary/40 transition-colors',
                                           isCurrentHourToday && 'bg-sky-500/15 border-sky-500/70 dark:bg-sky-500/20 dark:border-sky-400/80'
                                         )}
@@ -469,7 +469,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                             return (
                                               <div
                                                 key={s.id}
-                                                className="absolute inset-x-0 rounded bg-muted/80 px-1 py-0.5 text-left text-[10px] leading-tight shadow-sm hover:bg-muted/90"
+                                                className="absolute left-1 right-1 rounded-md border border-border/60 bg-card px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm hover:bg-muted"
                                                 style={{ top: offset, zIndex: 10 + idx }}
                                               >
                                                 <div className="flex items-center justify-between gap-1 mb-0.5">

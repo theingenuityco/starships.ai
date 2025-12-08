@@ -1,6 +1,6 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, getConnection, StarshipRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, getConnection, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
 import { StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
@@ -27,10 +27,12 @@ export interface StarshipWithDetails extends StarshipModel {
 export class StarshipService {
   private starshipRepository: StarshipRepository;
   private agentRepository: AgentRepository;
+  private userRepository: UserRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
+    this.userRepository = new UserRepository();
   }
 
   /**
@@ -233,13 +235,14 @@ export class StarshipService {
    */
   async hasAccess(userId: string, starshipId: string): Promise<boolean> {
     try {
-      const starship = await this.starshipRepository.findById(starshipId);
-      if (!starship) {
+      const [starship, user] = await Promise.all([this.starshipRepository.findById(starshipId), this.userRepository.findById(userId)]);
+
+      if (!starship || !user) {
         return false;
       }
 
-      // Check if user is the owner
-      if (starship.ownerId === userId) {
+      // Check if user is the owner or instance admin
+      if (starship.ownerId === userId || (user as any).isInstanceAdmin) {
         return true;
       }
 
@@ -302,15 +305,7 @@ export class StarshipService {
       const toolRepository = new ToolRepository();
 
       // Deploy the host tools that Daedalus needs
-      const defaultToolSlugs = [
-        'search-docs',
-        'get-doc',
-        'list-tools',
-        'get-tool',
-        'open-tool',
-        'edit-tool',
-        'test-tool',
-      ];
+      const defaultToolSlugs = ['search-docs', 'get-doc', 'list-tools', 'get-tool', 'open-tool', 'edit-tool', 'test-tool'];
 
       for (const toolSlug of defaultToolSlugs) {
         try {
@@ -365,10 +360,11 @@ export class StarshipService {
   }
 
   /**
-   * Create initial agents for a new starship: Daedalus (toolwright) and Gaia (agent creator)
+   * Create initial agents for a new starship: Daedalus (toolwright), Gaia (agent creator), and Aria (delegator)
    * - Deploys default tools once
    * - Creates Daedalus if available
    * - Creates Gaia if available
+   * - Creates Aria if available
    * Returns a map of created agents by name when created
    */
   static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, any>> {
@@ -382,9 +378,11 @@ export class StarshipService {
       // Fetch templates relevant to initial agents
       const daedalusTemplates = await templateService.searchTemplates('Daedalus');
       const gaiaTemplates = await templateService.searchTemplates('Gaia');
+      const ariaTemplates = await templateService.searchTemplates('Aria');
 
       const daedalusTemplate = daedalusTemplates.find((t) => t.name === 'Daedalus');
       const gaiaTemplate = gaiaTemplates.find((t) => t.name === 'Gaia');
+      const ariaTemplate = ariaTemplates.find((t) => t.name === 'Aria');
 
       // Create Daedalus if present
       if (daedalusTemplate) {
@@ -408,6 +406,18 @@ export class StarshipService {
         }
       } else {
         console.warn('[STARSHIP-SERVICE] Gaia template not found - skipping Gaia creation');
+      }
+
+      // Create Aria if present
+      if (ariaTemplate) {
+        try {
+          const aria = await templateService.createAgentFromTemplate(ariaTemplate.id, starshipId);
+          created['Aria'] = aria;
+        } catch (err) {
+          console.error('[STARSHIP-SERVICE] Failed to create Aria agent:', err);
+        }
+      } else {
+        console.warn('[STARSHIP-SERVICE] Aria template not found - skipping Aria creation');
       }
 
       return created;

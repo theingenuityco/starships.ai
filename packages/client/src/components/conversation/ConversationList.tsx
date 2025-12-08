@@ -35,7 +35,6 @@ function CompactConversationAgents({ conversationId }: { conversationId: string 
 
   const agents = Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []
   if (!agents.length) return null
-
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
   const remaining = agents.length - visibleAgents.length
@@ -76,8 +75,24 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       return title.toLowerCase().includes(searchQuery.toLowerCase())
     }) || []
 
-  // Group conversations by date
-  const groupedConversations = filteredConversations.reduce(
+  // Build parent/child tree: root conversations and their children
+  const roots: ConversationModel[] = []
+  const childrenByParent: Record<string, ConversationModel[]> = {}
+
+  for (const conv of filteredConversations) {
+    const parentId = (conv as any).parentConversationId as string | undefined
+    if (parentId) {
+      if (!childrenByParent[parentId]) {
+        childrenByParent[parentId] = []
+      }
+      childrenByParent[parentId].push(conv)
+    } else {
+      roots.push(conv)
+    }
+  }
+
+  // Group root conversations by date for full view
+  const groupedConversations = roots.reduce(
     (groups, conv) => {
       const date = new Date(conv.createdAt)
       const today = new Date()
@@ -104,41 +119,8 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     {} as Record<string, ConversationModel[]>
   )
 
-  const handleConversationClick = (conversationId: string) => {
-    router.push(`/ship/${slug}/conversations/${conversationId}`)
-    onConversationSelect?.(conversationId)
-  }
-
-  // Compact mode - inline display without header/search
-  if (compact) {
-    if (isLoading) {
-      return (
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-10 w-full rounded-lg" />
-          ))}
-        </div>
-      )
-    }
-
-    if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center py-8 px-2">
-          <p className="text-muted-foreground text-xs text-center">Failed to load conversations</p>
-        </div>
-      )
-    }
-
-    // Flat list without date grouping for compact mode
-    return (
-      <div className="space-y-0.5">
-        {filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 px-2">
-            <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-            <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
-          </div>
-        ) : (
-          filteredConversations.map((conversation: ConversationModel) => {
+  // Helper render function for compact list (flat, but with visual indentation for children)
+  const renderCompactConversation = (conversation: ConversationModel, isChild: boolean) => {
             const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
             const isActive = conversation.id === currentConversationId
 
@@ -149,6 +131,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                   'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
                   isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
                 )}
+        style={isChild ? { paddingLeft: '1.75rem' } : undefined}
               >
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
                   <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
@@ -194,7 +177,49 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                 )}
               </div>
             )
-          })
+  }
+
+  const handleConversationClick = (conversationId: string) => {
+    router.push(`/ship/${slug}/conversations/${conversationId}`)
+    onConversationSelect?.(conversationId)
+  }
+
+  // Compact mode - inline display without header/search
+  if (compact) {
+    if (isLoading) {
+      return (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-10 w-full rounded-lg" />
+          ))}
+        </div>
+      )
+    }
+
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 px-2">
+          <p className="text-muted-foreground text-xs text-center">Failed to load conversations</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-0.5">
+        {filteredConversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 px-2">
+            <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+            <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
+          </div>
+        ) : (
+          <>
+            {roots.map(root => (
+              <div key={root.id}>
+                {renderCompactConversation(root, false)}
+                {(childrenByParent[root.id] || []).map(child => renderCompactConversation(child, true))}
+              </div>
+            ))}
+          </>
         )}
       </div>
     )
@@ -241,9 +266,11 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                         const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
                         const isActive = conversation.id === currentConversationId
 
+                        const children = childrenByParent[conversation.id] || []
+
                         return (
+                          <div key={conversation.id}>
                           <div
-                            key={conversation.id}
                             className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                             onClick={() => handleConversationClick(conversation.id)}
                           >
@@ -281,6 +308,27 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
+                              )}
+                            </div>
+
+                            {/* Child conversations */}
+                            {children.length > 0 && (
+                              <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
+                                {children.map(child => {
+                                  const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
+                                  const childActive = child.id === currentConversationId
+                                  return (
+                                    <div
+                                      key={child.id}
+                                      className={cn('group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all', 'hover:bg-muted/40', childActive && 'bg-muted/70 shadow-sm')}
+                                      onClick={() => handleConversationClick(child.id)}
+                                    >
+                                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Child</span>
+                                      <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             )}
                           </div>
                         )

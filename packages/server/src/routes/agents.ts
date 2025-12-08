@@ -7,8 +7,10 @@ import { validateData } from '@/utils/validation';
 import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentModel } from '@starships/protocol';
+import type { AuthUser } from '@starships/protocol';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { StarshipService } from '@/services/StarshipService';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 
 const router: Router = Router();
 
@@ -26,8 +28,15 @@ const PreviewPromptsSchema = z
 
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
-  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
-  description: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(255, 'Name must be less than 255 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  description: z
+    .string()
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   systemPrompt: z.string().optional(),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']).optional(),
   tags: z.array(z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE })).optional(),
@@ -37,13 +46,21 @@ const CreateAgentSchema = z.object({
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
-  templateId: z.string().min(1).optional(),
+  sourceTemplateId: z.string().min(1).optional(),
   starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
 const UpdateAgentSchema = z.object({
-  name: z.string().min(1).max(255).optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-  description: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  name: z
+    .string()
+    .min(1)
+    .max(255)
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  description: z
+    .string()
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   systemPrompt: z.string().optional(),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']).optional(),
   tags: z.array(z.string().refine(noXSS, { message: XSS_ERROR_MESSAGE })).optional(),
@@ -52,7 +69,7 @@ const UpdateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  templateId: z.string().min(1).optional(),
+  sourceTemplateId: z.string().min(1).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
   starshipId: z.string().min(1, 'Starship ID is required').optional(),
 });
@@ -63,10 +80,6 @@ const StarshipAssignmentSchema = z.object({
 
 const ToolAssignmentSchema = z.object({
   toolSlugs: z.array(z.string().min(1)).min(1, 'At least one tool slug is required'),
-});
-
-const SingleToolAssignmentSchema = z.object({
-  toolSlug: z.string().min(1, 'Tool slug is required'),
 });
 
 const TestAgentSchema = z.object({
@@ -81,6 +94,27 @@ const TestAgentSchema = z.object({
       })
     ),
   ]),
+  parentConversationId: z.string().min(1).optional(),
+});
+
+const ToolPublishOverrideSchema = z.object({
+  toolId: IdSchema,
+  versionBump: z.enum(['patch', 'minor', 'major']),
+  changelog: z
+    .string()
+    .min(1, 'Changelog is required')
+    .max(2000, 'Changelog must be at most 2000 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+});
+
+const PublishRequestSchema = z.object({
+  versionBump: z.enum(['patch', 'minor', 'major']),
+  changelog: z
+    .string()
+    .min(1, 'Changelog is required')
+    .max(2000, 'Changelog must be at most 2000 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  toolOverrides: z.array(ToolPublishOverrideSchema).optional(),
 });
 
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
@@ -372,6 +406,45 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
   }
 });
 
+// POST /agents/:id/publish-request - Request publication (owner or instance admin)
+router.post('/agents/:id/publish-request', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const userId = req.user!.id;
+
+    // Validate publish request body (version bump + changelog)
+    const bodyValidation = validateData(PublishRequestSchema, req.body, res, 'publish request data');
+    if (!bodyValidation) return;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    // Ensure caller owns the agent's starship or is instance admin
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const updated = await agentService.requestPublication(agentId, userId, {
+      versionBump: bodyValidation.versionBump,
+      changelog: bodyValidation.changelog,
+      toolOverrides: bodyValidation.toolOverrides || [],
+    });
+    sendSuccess(res, {
+      message: 'Publication requested successfully',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error requesting agent publication:', error);
+    handleError(error, res, 'requesting agent publication');
+  }
+});
+
 // PUT /agents/:id - Update agent (OpenAPI pattern)
 router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -407,7 +480,7 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
       if (!hasDestAccess) return;
     }
 
-    const agent = await agentService.updateAgent(id, updates as any);
+    const agent = await agentService.updateAgent(id, updates);
     sendSuccess(res, agent);
   } catch (error) {
     console.error('[AGENTS] Error updating agent:', error);
@@ -466,7 +539,7 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
     if (!bodyValidation) return;
 
     const { starshipId, slug } = paramValidation;
-    const { input } = bodyValidation;
+    const { input, parentConversationId } = bodyValidation;
     const userId = req.user!.id;
 
     const agentService = new AgentService();
@@ -491,12 +564,8 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
       return;
     }
 
-    // Extract auth token from request for agent execution
-    const authHeader = req.headers.authorization;
-    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-
     // Execute agent test
-    const testResult = await agentService.testAgent(agent.id, input, starshipId, authToken);
+    const testResult = await agentService.testAgent(agent.id, input, starshipId, parentConversationId);
 
     sendSuccess(res, {
       success: testResult.success,
@@ -505,6 +574,107 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
   } catch (error) {
     console.error('[AGENTS] Error testing agent:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to test agent');
+  }
+});
+
+// ============================================================================
+// ADMIN PUBLICATION APPROVAL ROUTES (INSTANCE ADMIN ONLY)
+// ============================================================================
+
+// GET /admin/agents/pending - List agents pending approval
+router.get('/admin/agents/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending agents', 403);
+      return;
+    }
+
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
+
+    const agentService = new AgentService();
+    const result = await agentService.getPendingAgents(queryValidation.page, queryValidation.limit);
+
+    sendSuccess(res, result.agents, 200, { pagination: result.pagination });
+  } catch (error) {
+    console.error('[AGENTS] Error loading pending agents:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load pending agents');
+  }
+});
+
+// GET /admin/agents/:id/tools - List tools pending publication for a specific agent
+router.get('/admin/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending agent tools', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const agentService = new AgentService();
+    const tools = await agentService.getPendingToolsForAgent(agentId);
+
+    sendSuccess(res, tools);
+  } catch (error) {
+    console.error('[AGENTS] Error loading pending agent tools:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load pending agent tools');
+  }
+});
+
+// POST /admin/agents/:id/approve - Approve pending agent publication
+router.post('/admin/agents/:id/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can approve agents', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.approvePublication(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Agent publication approved',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error approving agent publication:', error);
+    handleError(error, res, 'approving agent publication');
+  }
+});
+
+// POST /admin/agents/:id/reject - Reject pending agent publication
+router.post('/admin/agents/:id/reject', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can reject agents', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.rejectPublication(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Agent publication rejected',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error rejecting agent publication:', error);
+    handleError(error, res, 'rejecting agent publication');
   }
 });
 

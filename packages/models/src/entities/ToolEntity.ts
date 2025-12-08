@@ -8,7 +8,7 @@
 import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean, IsArray } from 'class-validator';
+import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean, IsArray, IsIn } from 'class-validator';
 
 export class ToolEntity implements ToolModel {
   // Core database fields
@@ -110,6 +110,47 @@ export class ToolEntity implements ToolModel {
   @IsISO8601()
   templateSnapshotAt?: string; // When tool last synced with template
 
+  // Publication workflow fields
+  @Expose()
+  @IsString()
+  @IsIn(['draft', 'pending_approval', 'published', 'rejected'])
+  publicationStatus!: 'draft' | 'pending_approval' | 'published' | 'rejected';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publicationRequestedBy?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publicationApprovedBy?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  publicationApprovedAt?: string;
+
+  // Additional publication metadata (owner-selected)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @IsIn(['patch', 'minor', 'major'])
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 20)
+  publicationRequestedVersion?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  publicationChangelog?: string;
+
   // Update availability info (computed at runtime, not stored in DB)
   @Expose()
   @IsOptional()
@@ -161,6 +202,8 @@ export class ToolEntity implements ToolModel {
         status: status,
         version: dataRecord.version || '1.0.0',
         templateSnapshotAt: dataRecord.templateSnapshotAt,
+        // Publication workflow default for creates
+        publicationStatus: (dataRecord.publicationStatus as ToolModel['publicationStatus']) || 'draft',
         ...dataRecord,
       });
     } else {

@@ -95,6 +95,30 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
     latestVersion: string; // Template's latest version
     templateUpdatedAt?: string; // When template was last updated
   };
+
+  /**
+   * Publication workflow fields (mirror AgentModel)
+   *
+   * - draft: default state, only visible to owner
+   * - pending_approval: owner requested publish; waiting for instance admin review
+   * - published: approved by instance admin and visible as a published template-backed tool
+   * - rejected: rejected by instance admin (owner can revise and request again)
+   */
+  publicationStatus: 'draft' | 'pending_approval' | 'published' | 'rejected';
+  publicationRequestedBy?: string;
+  publicationApprovedBy?: string;
+  publicationApprovedAt?: string;
+
+  /**
+   * Optional publication metadata chosen by the owner when requesting publish.
+   *
+   * - publicationVersionBump: how the owner wants to bump from the current version
+   * - publicationRequestedVersion: the exact target version string (e.g. '1.2.3')
+   * - publicationChangelog: human-readable notes about what changed
+   */
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+  publicationRequestedVersion?: string;
+  publicationChangelog?: string;
 }
 
 // ============================================================================
@@ -173,6 +197,24 @@ export interface ToolUpdateResponse {
   templateSnapshotAt?: string;
   updatedAt: string;
   message: string;
+}
+
+/**
+ * DTO for admin pending tools listing.
+ * Wraps the tool plus denormalized metadata needed only for that view.
+ */
+export interface PendingToolSummary {
+  tool: ToolModel;
+  requestedBy?: {
+    id: string;
+    name?: string;
+    avatar?: string;
+  };
+  requestedByStarship?: {
+    id: string;
+    name?: string;
+    slug?: string;
+  };
 }
 
 // ============================================================================

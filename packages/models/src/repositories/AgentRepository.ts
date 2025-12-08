@@ -6,6 +6,15 @@ import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
 import { compareVersions } from '@/utils/version';
+import {
+  DEFAULT_AGENT_MAX_TOKENS,
+  DEFAULT_AGENT_TIMEOUT_MS,
+  MAX_AGENT_MAX_TOKENS,
+  MAX_AGENT_TIMEOUT_MS,
+  MIN_AGENT_MAX_TOKENS,
+  MIN_AGENT_TIMEOUT_MS,
+} from '@/constants/agentDefaults';
+import { ValidationError } from '@starships/errors';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
@@ -32,13 +41,12 @@ export class AgentRepository extends BaseRepository {
 
         const agent = fromDatabase(AgentEntity, result);
 
-        // If agent has a template, fetch it and populate updateInfo
-        if (agent.templateId) {
+        // If agent has a source template, fetch it and populate updateInfo
+        if (agent.sourceTemplateId) {
           const connection = this.getConnection();
-          const templateResult = await connection.queryOne<Record<string, unknown>>(
-            'SELECT * FROM agent_templates WHERE id = $1',
-            [agent.templateId]
-          );
+          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE id = $1', [
+            agent.sourceTemplateId,
+          ]);
 
           if (templateResult) {
             const template = fromDatabase(AgentTemplateEntity, templateResult);
@@ -69,8 +77,8 @@ export class AgentRepository extends BaseRepository {
         );
         const agents = fromDatabaseArray(AgentEntity, result);
 
-        // Collect unique template IDs
-        const templateIds = [...new Set(agents.filter(a => a.templateId).map(a => a.templateId))];
+        // Collect unique source template IDs
+        const templateIds = [...new Set(agents.filter((a) => a.sourceTemplateId).map((a) => a.sourceTemplateId))];
 
         // If there are templates, fetch them in a single query
         if (templateIds.length > 0) {
@@ -87,10 +95,10 @@ export class AgentRepository extends BaseRepository {
             templateMap.set(templateModel.id, templateModel);
           }
 
-          // Populate updateInfo for each agent with a template
+          // Populate updateInfo for each agent with a source template
           for (const agent of agents) {
-            if (agent.templateId) {
-              const template = templateMap.get(agent.templateId);
+            if (agent.sourceTemplateId) {
+              const template = templateMap.get(agent.sourceTemplateId);
               if (template) {
                 const comparison = compareVersions(agent.version, template.version);
                 agent.updateInfo = {
@@ -168,29 +176,61 @@ export class AgentRepository extends BaseRepository {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { assignedToolSlugs: _, ...dataWithoutToolSlugs } = data;
 
-        // Validate using cleaned data and include starshipId which is required on create
-        await AgentEntity.validate({ ...dataWithoutToolSlugs, starshipId }, 'create');
+        // Normalize numeric fields to sensible, safe defaults before validation
+        const normalizedData: CreateAgentRequest = { ...dataWithoutToolSlugs };
+
+        const hasValidNumber = (value: unknown): value is number =>
+          typeof value === 'number' && !Number.isNaN(value) && Number.isFinite(value);
+
+        // Temperature: clamped by zod/class-validator; defaulting handled at higher layers.
+
+        // maxTokens: clamp to configured bounds, default to shared default if missing/invalid
+        if (hasValidNumber(normalizedData.maxTokens)) {
+          normalizedData.maxTokens = Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, normalizedData.maxTokens));
+        } else {
+          normalizedData.maxTokens = DEFAULT_AGENT_MAX_TOKENS;
+        }
+
+        // timeout (ms): clamp to configured bounds, default to shared default if missing/invalid
+        if (hasValidNumber(normalizedData.timeout)) {
+          normalizedData.timeout = Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, normalizedData.timeout));
+        } else {
+          normalizedData.timeout = DEFAULT_AGENT_TIMEOUT_MS;
+        }
+
+        // Validate using normalized data and include starshipId which is required on create
+        await AgentEntity.validate({ ...normalizedData, starshipId }, 'create');
 
         const now = new Date().toISOString();
 
         // Create agent properties for PostgreSQL
-        const agentProps: Omit<AgentModel, 'id'> & { deployedAt: string } = {
+        const agentProps = {
           // Core AgentParams fields
-          name: data.name,
-          slug: data.slug || (await generateUniqueAgentSlug((data.name || 'agent').toLowerCase().replace(/\s+/g, '-'), this)), // Ensure non-empty slug
-          description: data.description,
-          model: data.model,
-          temperature: data.temperature,
-          maxTokens: data.maxTokens,
-          timeout: data.timeout,
-          systemPrompt: data.systemPrompt,
-          state: data.state,
-          blueprint: data.blueprint,
-          previewPrompts: data.previewPrompts,
+          name: normalizedData.name,
+          slug:
+            normalizedData.slug ||
+            (await generateUniqueAgentSlug((normalizedData.name || 'agent').toLowerCase().replace(/\s+/g, '-'), this)), // Ensure non-empty slug
+          description: normalizedData.description,
+          model: normalizedData.model,
+          // Optional categorization (aligns with templates)
+          category: normalizedData.category || 'general',
+          temperature: normalizedData.temperature,
+          maxTokens: normalizedData.maxTokens,
+          timeout: normalizedData.timeout,
+          systemPrompt: normalizedData.systemPrompt,
+          state: normalizedData.state,
+          blueprint: normalizedData.blueprint,
+          previewPrompts: normalizedData.previewPrompts,
 
           // Versioning fields
           version: data.version || '1.0.0',
           templateSnapshotAt: data.templateSnapshotAt,
+
+          // Publication workflow defaults
+          publicationStatus: 'draft',
+          publicationRequestedBy: undefined,
+          publicationApprovedBy: undefined,
+          publicationApprovedAt: undefined,
 
           // PostgreSQL specific fields
           starshipId: starshipId, // Direct foreign key
@@ -348,16 +388,16 @@ export class AgentRepository extends BaseRepository {
           blueprint: customizations?.blueprint || template.blueprint,
           previewPrompts: customizations?.previewPrompts || template.previewPrompts,
           assignedToolSlugs: customizations?.assignedToolSlugs,
-          templateId,
+          sourceTemplateId: template.id,
           version: template.version, // Copy template version
           templateSnapshotAt: now, // Capture snapshot time
         };
 
-        // Create agent with template_id foreign key
+        // Create agent with source_template_id foreign key
         const agentProps = {
           ...agentData,
           starshipId: starshipId,
-          templateId: templateId, // Set template_id foreign key
+          sourceTemplateId: template.id, // Set source_template_id foreign key
           deployedAt: now,
           createdAt: now,
           updatedAt: now,
@@ -387,7 +427,7 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.queryOne<Record<string, unknown>>(
           `SELECT at.* FROM agent_templates at
-           INNER JOIN agents a ON a.template_id = at.id
+           INNER JOIN agents a ON a.source_template_id = at.id
            WHERE a.id = $1`,
           [agentId]
         );
@@ -529,15 +569,15 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('Agent', agentId);
         }
 
-        if (!agent.templateId) {
+        if (!agent.sourceTemplateId) {
           throw new Error('Agent is not linked to a template');
         }
 
         const templateRepo = new AgentTemplateRepository();
-        const template = await templateRepo.findById(agent.templateId);
+        const template = await templateRepo.findById(agent.sourceTemplateId);
 
         if (!template) {
-          this.handleNotFound('AgentTemplate', agent.templateId);
+          this.handleNotFound('AgentTemplate', agent.sourceTemplateId);
         }
 
         // Copy current template data to agent
@@ -572,6 +612,86 @@ export class AgentRepository extends BaseRepository {
       'updateFromTemplate',
       'Agent',
       agentId
+    );
+  }
+
+  /**
+   * Atomically mark an agent as pending publication and persist request metadata.
+   *
+   * Uses SELECT ... FOR UPDATE inside a transaction to prevent concurrent
+   * publication requests from both succeeding when the agent is already pending.
+   */
+  async requestPublicationAtomic(
+    id: string,
+    updates: {
+      publicationStatus: AgentModel['publicationStatus'];
+      publicationRequestedBy: string;
+      publicationVersionBump: 'patch' | 'minor' | 'major';
+      publicationRequestedVersion: string;
+      publicationChangelog: string;
+    }
+  ): Promise<AgentModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        const agent = await connection.transaction<AgentModel | null>(async (client) => {
+          // Lock the agent row to serialize concurrent publication requests
+          const selectRes = await client.query<Record<string, unknown>>('SELECT * FROM agents WHERE id = $1 FOR UPDATE', [id]);
+          const row = selectRes.rows?.[0];
+
+          if (!row) {
+            this.handleNotFound('Agent', id);
+          }
+
+          const currentAgent = fromDatabase(AgentEntity, row as Record<string, unknown>);
+
+          // If another request already moved this agent to pending_approval,
+          // surface the same validation error as the service-level guard.
+          if (currentAgent.publicationStatus === 'pending_approval') {
+            throw new ValidationError('Agent is already pending approval');
+          }
+
+          const updateRes = await client.query<Record<string, unknown>>(
+            `
+            UPDATE agents
+            SET
+              publication_status = $2,
+              publication_requested_by = $3,
+              publication_version_bump = $4,
+              publication_requested_version = $5,
+              publication_changelog = $6,
+              updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [
+              id,
+              updates.publicationStatus,
+              updates.publicationRequestedBy,
+              updates.publicationVersionBump,
+              updates.publicationRequestedVersion,
+              updates.publicationChangelog,
+            ]
+          );
+
+          const updatedRow = updateRes.rows?.[0];
+          if (!updatedRow) {
+            this.handleNotFound('Agent', id);
+          }
+
+          return fromDatabase(AgentEntity, updatedRow as Record<string, unknown>);
+        });
+
+        if (!agent) {
+          this.handleNotFound('Agent', id);
+        }
+
+        return agent;
+      },
+      'requestPublicationAtomic',
+      'Agent',
+      id
     );
   }
 }

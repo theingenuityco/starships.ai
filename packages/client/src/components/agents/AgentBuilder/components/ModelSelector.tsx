@@ -3,8 +3,8 @@
 
 import React from 'react'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
+import { StandardSelect } from './StandardSelect'
 
 interface ModelSelectorProps {
   selectedModel: string
@@ -19,18 +19,30 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onM
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium">Model</Label>
-      <Select value={selectedModel} onValueChange={onModelChange} disabled={isLoading}>
-        <SelectTrigger className="text-xs">
-          <SelectValue placeholder={isLoading ? "Loading models..." : "Select a model"} />
-        </SelectTrigger>
-        <SelectContent>
-          {models.map(model => (
-            <SelectItem key={model} value={model} className="text-xs">
-              {model}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <StandardSelect
+        mode="single"
+        aria-label="Select model"
+        disabled={isLoading}
+        value={selectedModel}
+        options={models.map(model => ({ value: model }))}
+        placeholder={isLoading ? 'Loading models...' : 'Select a model'}
+        searchPlaceholder="Search models..."
+        emptyLabel={isLoading ? 'Loading models…' : 'No models found.'}
+        renderTriggerLabel={({ selectedOptions }) => {
+          const selected = selectedOptions[0]?.value || selectedModel
+          if (!selected) {
+            return <span className="text-xs text-muted-foreground">{isLoading ? 'Loading models...' : 'Select a model'}</span>
+          }
+          return (
+            <span className="text-xs font-mono truncate max-w-full">
+              {selected}
+            </span>
+          )
+        }}
+        onChange={m => {
+          if (typeof m === 'string') onModelChange(m)
+        }}
+      />
     </div>
   )
 }

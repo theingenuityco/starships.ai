@@ -56,6 +56,14 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = new StreamingService();
 
+      // Debug: log incoming SSE request context
+      console.info('[ROUTE] /conversations/:id/messages SSE requested', {
+        conversationId,
+        query: req.query,
+        accept: req.get('Accept'),
+        streamFlag: req.query.stream,
+      });
+
       // Server-driven resume via query param (avoid custom headers)
       const resumeToken = typeof (req.query as any).resumeToken === 'string' ? (req.query as any).resumeToken : '';
 
@@ -71,6 +79,13 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Use the larger of client hint and server truth to avoid undercounting
       const baseLength = Math.max(clientBase, serverCount);
+
+      console.info('[ROUTE] SSE baseline resolved', {
+        conversationId,
+        clientBase,
+        serverCount,
+        baseLength,
+      });
 
       // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
@@ -99,10 +114,25 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // Verify token; fall back to baseline on failure
         const svc = ResumeTokenService.getInstance();
         const claims = svc.verify(resumeToken);
+
+        console.info('[ROUTE] SSE resume requested', {
+          conversationId,
+          hasClaims: !!claims,
+          claimsConversationId: claims?.c,
+          claimsMessageId: claims?.m,
+        });
+
         if (!claims || claims.c !== conversationId) {
           // Invalid token; use baseline mode
           const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
           const messagesToSend = conversationMessages.slice(startIndexForSend);
+
+          console.info('[ROUTE] SSE resume fallback to baseline', {
+            conversationId,
+            startIndexForSend,
+            messagesToSend: messagesToSend.length,
+          });
+
           if (messagesToSend.length > 0) {
             for (const message of messagesToSend) {
               await streamingService.broadcastMessage(conversationId, message);
@@ -118,6 +148,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           const persistedTail = conversationMessages.slice(startIdx);
           let replayHasAssistantShell = false;
           if (persistedTail.length > 0) {
+            console.info('[ROUTE] SSE resume persisted tail', {
+              conversationId,
+              startIdx,
+              persistedTail: persistedTail.length,
+            });
+
             for (const message of persistedTail) {
               await streamingService.broadcastMessage(conversationId, message);
             }
@@ -137,6 +173,14 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // Send only messages the client may be missing based on their baselineLength hint
         const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
         const messagesToSend = conversationMessages.slice(startIndexForSend);
+
+        console.info('[ROUTE] SSE baseline snapshot send', {
+          conversationId,
+          clientBase,
+          serverCount,
+          startIndexForSend,
+          messagesToSend: messagesToSend.length,
+        });
 
         if (messagesToSend.length > 0) {
           for (const message of messagesToSend) {
@@ -270,6 +314,8 @@ router.post(
           attachmentIds: z.array(z.string()).optional(),
           // baselineLength is no longer used on POST (streaming happens over GET SSE)
           baselineLength: z.coerce.number().int().min(0).optional(),
+          // When true, wait for the turn to fully complete and return the last message
+          sync: z.boolean().optional(),
         }),
         req.body,
         res,
@@ -278,7 +324,7 @@ router.post(
       if (!bodyValidation) return;
 
       const { conversationId } = paramValidation;
-      const { content, agentId, attachmentIds } = bodyValidation;
+      const { content, agentId, attachmentIds, sync } = bodyValidation;
 
       // Preflight billing gate: block when wallet balance is <= 0
       const conversationService = new ConversationService();
@@ -357,7 +403,41 @@ router.post(
         }
       }
 
-      // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
+      // If sync is requested, wait for the full turn to complete and return the full conversation with messages
+      if (sync) {
+        try {
+          await conversationService.addConversationMessage(
+            {
+              conversationId,
+              content,
+              role: 'user',
+              messageType: 'user_input',
+              ...(agentId && { agentId }),
+              ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
+            },
+            { authorization: req.headers.authorization as string | undefined }
+          );
+
+          const conversationWithFinalState = await conversationService.getConversationById(conversationId);
+          const messages = await conversationService.getConversationMessages(conversationId);
+
+          sendSuccess(
+            res,
+            {
+              status: 'completed',
+              streaming: false,
+              conversationId,
+              conversation: conversationWithFinalState ? { ...conversationWithFinalState, messages } : null,
+            },
+            200
+          );
+        } catch (error) {
+          handleError(error, res, 'processing synchronous conversation message');
+        }
+        return;
+      }
+
+      // Default behavior: fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
       conversationService
         .addConversationMessage(
           {
@@ -472,7 +552,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       z.object({
         title: z.string().min(1).max(100).optional(),
         starshipId: IdSchema,
-        agentId: IdSchema.optional(),
+        agentSlug: z.string().min(1).max(255).optional(),
       }),
       req.body,
       res,
@@ -490,18 +570,24 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       return;
     }
 
-    // Authorization: if agentId is provided, verify user owns it and it belongs to the same starship
-    if (bodyValidation.agentId) {
+    // Resolve agent from either agentId or agentSlug, and verify access/ownership
+    let resolvedAgentId: string | undefined;
+    if (bodyValidation.agentSlug) {
       const agentService = new AgentService();
-      const agent = await agentService.getAgent(bodyValidation.agentId);
+      const starshipAgents = await agentService.getAgentsByStarship(bodyValidation.starshipId);
+      const agent = starshipAgents.find((a) => a.slug === bodyValidation.agentSlug) || null;
 
       if (!agent) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+          resource: 'agent',
+          slug: bodyValidation.agentSlug,
+          starshipId: bodyValidation.starshipId,
+        });
         return;
       }
 
       // Verify user owns the agent's starship
-      if (!(await verifyResourceAccess(agent.starshipId, authUserId, 'agent', bodyValidation.agentId, res))) {
+      if (!(await verifyResourceAccess(agent.starshipId, authUserId, 'agent', agent.id, res))) {
         return;
       }
 
@@ -510,10 +596,19 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
         sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
         return;
       }
+
+      resolvedAgentId = agent.id;
     }
 
     const conversationService = new ConversationService();
-    const conversation = await conversationService.createConversation(req.body);
+    // Build payload for conversation creation, normalizing agentId and dropping agentSlug
+    const createPayload = {
+      ...req.body,
+      agentId: resolvedAgentId,
+    };
+    delete (createPayload as any).agentSlug;
+
+    const conversation = await conversationService.createConversation(createPayload);
 
     sendSuccess(res, conversation, 201);
   } catch (error) {

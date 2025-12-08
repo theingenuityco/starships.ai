@@ -439,7 +439,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                   const cells: React.ReactNode[] = []
                                   // Time label column
                                   cells.push(
-                                    <div key={`time-${hour}`} className="border-t border-border/40 px-1.5 py-1.5 text-[11px] text-muted-foreground sticky left-0 bg-background/80">
+                                    <div key={`time-${hour}`} className="border border-border/40 px-1.5 py-1.5 text-[11px] text-muted-foreground sticky left-0 bg-background/80">
                                       {formatHourLabel(hour)}
                                     </div>
                                   )
@@ -456,17 +456,22 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                         key={`${cellKey}-${hour}`}
                                         onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
                                         className={cn(
-                                          'border-t border-l border-border/40 min-h-[40px] px-1.5 py-1 flex flex-col gap-1 bg-card/60 cursor-pointer',
+                                          'relative border border-border/40 min-h-[40px] px-1.5 py-1 bg-card/60 cursor-pointer overflow-hidden',
                                           'hover:bg-primary/5 hover:border-primary/40 transition-colors',
                                           isCurrentHourToday && 'bg-sky-500/15 border-sky-500/70 dark:bg-sky-500/20 dark:border-sky-400/80'
                                         )}
                                       >
                                         {daySchedules.length > 0 &&
-                                          daySchedules.map(s => {
+                                          daySchedules.map((s, idx) => {
                                             const agent = s.agentId ? agentsById.get(s.agentId) : undefined
                                             const label = agent?.name || 'Agent'
+                                            const offset = idx * 4
                                             return (
-                                              <div key={s.id} className="w-full rounded bg-muted/80 px-1 py-0.5 text-left text-[10px] leading-tight hover:bg-muted/90">
+                                              <div
+                                                key={s.id}
+                                                className="absolute inset-x-0 rounded bg-muted/80 px-1 py-0.5 text-left text-[10px] leading-tight shadow-sm hover:bg-muted/90"
+                                                style={{ top: offset, zIndex: 10 + idx }}
+                                              >
                                                 <div className="flex items-center justify-between gap-1 mb-0.5">
                                                   <span className="font-medium truncate">{label}</span>
                                                 </div>

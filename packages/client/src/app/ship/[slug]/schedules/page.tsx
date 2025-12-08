@@ -68,7 +68,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
   const { data: starship } = useStarshipBySlug(slug, true)
   const starshipId = starship?.id || ''
 
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('week')
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -453,36 +453,26 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                     cells.push(
                                       <div
                                         key={`${cellKey}-${hour}`}
+                                        onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
                                         className={cn(
-                                          'border-t border-l border-border/40 min-h-[40px] px-1.5 py-1 flex flex-col gap-1 bg-card/60',
+                                          'border-t border-l border-border/40 min-h-[40px] px-1.5 py-1 flex flex-col gap-1 bg-card/60 cursor-pointer',
                                           'hover:bg-primary/5 hover:border-primary/40 transition-colors',
                                           isToday && 'ring-1 ring-primary/60 border-primary/60'
                                         )}
                                       >
-                                        <button
-                                          type="button"
-                                          onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
-                                          className="w-full text-left text-[10px] text-muted-foreground hover:text-primary"
-                                        >
-                                          {daySchedules.length === 0 ? 'Add' : `${daySchedules.length} run${daySchedules.length > 1 ? 's' : ''}`}
-                                        </button>
-                                        {daySchedules.map(s => {
-                                          const agent = s.agentId ? agentsById.get(s.agentId) : undefined
-                                          const label = agent?.name || 'Agent'
-                                          return (
-                                            <button
-                                              key={s.id}
-                                              type="button"
-                                              className="w-full rounded bg-muted/80 px-1 py-0.5 text-left text-[10px] leading-tight hover:bg-muted"
-                                              onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
-                                            >
-                                              <div className="flex items-center justify-between gap-1 mb-0.5">
-                                                <span className="font-medium truncate">{label}</span>
+                                        {daySchedules.length > 0 &&
+                                          daySchedules.map(s => {
+                                            const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                                            const label = agent?.name || 'Agent'
+                                            return (
+                                              <div key={s.id} className="w-full rounded bg-muted/80 px-1 py-0.5 text-left text-[10px] leading-tight hover:bg-muted/90">
+                                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                  <span className="font-medium truncate">{label}</span>
+                                                </div>
+                                                {s.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(s.prompt)}</div>}
                                               </div>
-                                              {s.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(s.prompt)}</div>}
-                                            </button>
-                                          )
-                                        })}
+                                            )
+                                          })}
                                       </div>
                                     )
                                   })

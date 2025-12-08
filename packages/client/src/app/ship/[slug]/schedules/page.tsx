@@ -100,7 +100,8 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
     return map
   }, [agents])
 
-  const todayKey = formatDateKey(startOfDay(new Date()))
+  const now = new Date()
+  const todayKey = formatDateKey(startOfDay(now))
 
   const monthCells: CalendarCell[] = useMemo(() => {
     const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
@@ -449,7 +450,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                       const dt = new Date(s.nextRunAt as unknown as string)
                                       return dt.getHours() === hour
                                     })
-                                    const isToday = cellKey === todayKey && startOfDay(new Date()).getHours() === hour
+                                    const isCurrentHourToday = cellKey === todayKey && hour === now.getHours()
                                     cells.push(
                                       <div
                                         key={`${cellKey}-${hour}`}
@@ -457,7 +458,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                         className={cn(
                                           'border-t border-l border-border/40 min-h-[40px] px-1.5 py-1 flex flex-col gap-1 bg-card/60 cursor-pointer',
                                           'hover:bg-primary/5 hover:border-primary/40 transition-colors',
-                                          isToday && 'ring-1 ring-primary/60 border-primary/60'
+                                          isCurrentHourToday && 'bg-sky-500/15 border-sky-500/70 dark:bg-sky-500/20 dark:border-sky-400/80'
                                         )}
                                       >
                                         {daySchedules.length > 0 &&

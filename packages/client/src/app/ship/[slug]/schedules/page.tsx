@@ -385,7 +385,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                 >
                                                   {isTop && (
                                                     <>
-                                                      <div className="flex items-center gap-1 mb-0.5">
+                                                      <div className="flex items-center gap-1 mb-1">
                                                         <Avatar className="h-4 w-4 ring-1 ring-border/40">
                                                           <AgentAvatar seed={latestAgent?.name || latestLabel} size={16} rounded />
                                                         </Avatar>
@@ -410,7 +410,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                   key={sched.id}
                                                   className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden"
                                                 >
-                                                  <div className="flex items-center gap-1 mb-0.5">
+                                                  <div className="flex items-center gap-1 mb-1">
                                                     <Avatar className="h-4 w-4 ring-1 ring-border/40">
                                                       <AgentAvatar seed={agent?.name || label} size={16} rounded />
                                                     </Avatar>
@@ -510,7 +510,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                   >
                                                     {isTop && (
                                                       <>
-                                                        <div className="flex items-center gap-1 mb-0.5">
+                                                        <div className="flex items-center gap-1 mb-1">
                                                           <Avatar className="h-4 w-4 ring-1 ring-border/40">
                                                             <AgentAvatar seed={agent?.name || label} size={16} rounded />
                                                           </Avatar>
@@ -538,7 +538,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                 key={s.id}
                                                 className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm overflow-hidden"
                                               >
-                                                <div className="flex items-center gap-1 mb-0.5">
+                                                <div className="flex items-center gap-1 mb-1">
                                                   <Avatar className="h-4 w-4 ring-1 ring-border/40">
                                                     <AgentAvatar seed={agent?.name || label} size={16} rounded />
                                                   </Avatar>

@@ -31,6 +31,8 @@ export class ScheduleService {
     nextRunAt: string;
     isActive: boolean;
     isRecurring?: boolean;
+    endsAt?: string | null;
+    maxOccurrences?: number | null;
   }): Promise<ScheduleModel> {
     return this.repo.create(data);
   }
@@ -123,6 +125,10 @@ export class ScheduleService {
           lastRunConversationId: conversation.id,
         };
 
+        // Increment run count for both one-shot and recurring schedules.
+        const previousRunCount = typeof claimed.runCount === 'number' ? claimed.runCount : 0;
+        const newRunCount = previousRunCount + 1;
+
         if (claimed.isRecurring) {
           try {
             const interval = CronExpressionParser.parse(claimed.cronExpression, {
@@ -131,11 +137,35 @@ export class ScheduleService {
             });
             const rawNext = interval.next();
             const nextDate = new Date(rawNext.toString());
-            updates = {
-              ...updates,
-              nextRunAt: nextDate.toISOString(),
-              isActive: true,
-            };
+
+            let shouldContinue = true;
+
+            // Apply max-occurrence cap if present.
+            if (typeof claimed.maxOccurrences === 'number' && claimed.maxOccurrences > 0 && newRunCount >= claimed.maxOccurrences) {
+              shouldContinue = false;
+            }
+
+            // Apply end date boundary if present (stop once the *next* run would be after endsAt).
+            if (shouldContinue && claimed.endsAt) {
+              const endsAtDate = new Date(claimed.endsAt);
+              if (!Number.isNaN(endsAtDate.getTime()) && nextDate > endsAtDate) {
+                shouldContinue = false;
+              }
+            }
+
+            if (shouldContinue) {
+              updates = {
+                ...updates,
+                nextRunAt: nextDate.toISOString(),
+                isActive: true,
+              };
+            } else {
+              // Do not set a new nextRunAt; leave schedule inactive so it stops recurring.
+              updates = {
+                ...updates,
+                isActive: false,
+              };
+            }
           } catch (e: unknown) {
             // If cron parsing fails, fall back to one-shot semantics:
             // keep the schedule deactivated and log the error.
@@ -146,6 +176,12 @@ export class ScheduleService {
             });
           }
         }
+
+        // Persist updated run count.
+        updates = {
+          ...updates,
+          runCount: newRunCount,
+        };
 
         // Best-effort linkage for idempotency/debugging and recurrence updates.
         await this.repo.update(claimed.id, updates);

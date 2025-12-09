@@ -37,7 +37,7 @@ const CreateScheduleSchema = z.object({
   isActive: z.boolean().default(true),
   isRecurring: z.boolean().optional(),
   endsAt: z.string().datetime().nullable().optional(),
-  maxOccurrences: z.number().int().positive().optional(),
+  maxOccurrences: z.number().int().positive().nullable().optional(),
 });
 
 const UpdateScheduleSchema = z.object({
@@ -60,7 +60,7 @@ router.post('/starships/:starshipId/schedules', jwtAuthMiddleware, async (req: R
     const params = z.object({ starshipId: IdSchema }).parse(req.params);
     const body = CreateScheduleSchema.parse(req.body);
 
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -97,7 +97,7 @@ router.get('/starships/:starshipId/schedules', jwtAuthMiddleware, async (req: Re
   try {
     const params = z.object({ starshipId: IdSchema }).parse(req.params);
 
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -123,7 +123,7 @@ router.patch('/schedules/:scheduleId', jwtAuthMiddleware, async (req: Request, r
     const params = z.object({ scheduleId: IdSchema }).parse(req.params);
     const updates = UpdateScheduleSchema.parse(req.body);
 
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -159,7 +159,7 @@ router.delete('/schedules/:scheduleId', jwtAuthMiddleware, async (req: Request, 
   try {
     const params = z.object({ scheduleId: IdSchema }).parse(req.params);
 
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;

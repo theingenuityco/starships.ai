@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query'
 
 import Icon from '@/components/primitives/Icon'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -235,241 +234,218 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">See when your agents are scheduled to run.</p>
             </div>
 
-            <Tabs
-              value="schedules"
-              onValueChange={value => {
-                if (value === 'ship') router.push(`/ship/${slug}`)
-                else if (value === 'agents') router.push(`/ship/${slug}/agents`)
-                else if (value === 'tools') router.push(`/ship/${slug}/tools`)
-                else if (value === 'schedules') router.push(`/ship/${slug}/schedules`)
-              }}
-              className="space-y-6"
-            >
-              <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="ship" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="rocket" className="h-4 w-4" />
-                    <span>Ship</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="head-circuit" className="h-4 w-4" />
-                    <span>Agents</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="wrench" className="h-4 w-4" />
-                    <span>Tools</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="schedules" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="clock" className="h-4 w-4" />
-                    <span>Schedules</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4">
+                <Card className="frosted-glass-card shadow-frosted-lg">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Icon name="clock" className="h-4 w-4" />
+                      Schedule a run
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3">
+                      <p className="flex-1 text-xs text-muted-foreground">Click any day in the calendar below to schedule an agent run on that date, or use the button to open the scheduler.</p>
+                      <div className="flex-none">
+                        <Button type="button" size="sm" onClick={() => openScheduleModalForDate()} disabled={!starshipId}>
+                          <Icon name="plus" className="mr-1.5 h-3.5 w-3.5" />
+                          New schedule
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <TabsContent value="schedules">
-                <div className="flex flex-col gap-4">
-                  <Card className="frosted-glass-card shadow-frosted-lg">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <Card className="lg:col-span-2 frosted-glass-card shadow-frosted-lg">
                     <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Icon name="clock" className="h-4 w-4" />
-                        Schedule a run
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex flex-col md:flex-row md:items-center gap-3">
-                        <p className="flex-1 text-xs text-muted-foreground">Click any day in the calendar below to schedule an agent run on that date, or use the button to open the scheduler.</p>
-                        <div className="flex-none">
-                          <Button type="button" size="sm" onClick={() => openScheduleModalForDate()} disabled={!starshipId}>
-                            <Icon name="plus" className="mr-1.5 h-3.5 w-3.5" />
-                            New schedule
-                          </Button>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Icon name="calendar" className="h-4 w-4" />
+                          Calendar
+                        </CardTitle>
+                        <div className="ml-2 inline-flex items-center rounded-full bg-muted/60 p-0.5 text-[11px]">
+                          <button
+                            type="button"
+                            className={cn('px-2 py-0.5 rounded-full transition-colors', viewMode === 'month' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+                            onClick={() => setViewMode('month')}
+                          >
+                            Month
+                          </button>
+                          <button
+                            type="button"
+                            className={cn('px-2 py-0.5 rounded-full transition-colors', viewMode === 'week' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+                            onClick={() => setViewMode('week')}
+                          >
+                            Week
+                          </button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <Card className="lg:col-span-2 frosted-glass-card shadow-frosted-lg">
-                      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Icon name="calendar" className="h-4 w-4" />
-                            Calendar
-                          </CardTitle>
-                          <div className="ml-2 inline-flex items-center rounded-full bg-muted/60 p-0.5 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        {viewMode === 'month' ? (
+                          <>
                             <button
                               type="button"
-                              className={cn('px-2 py-0.5 rounded-full transition-colors', viewMode === 'month' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
-                              onClick={() => setViewMode('month')}
+                              onClick={handlePrevMonth}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                              aria-label="Previous month"
                             >
-                              Month
+                              <Icon name="chevron-left" className="h-4 w-4" />
                             </button>
+                            <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
                             <button
                               type="button"
-                              className={cn('px-2 py-0.5 rounded-full transition-colors', viewMode === 'week' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
-                              onClick={() => setViewMode('week')}
+                              onClick={handleNextMonth}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                              aria-label="Next month"
                             >
-                              Week
+                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
-                          </div>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handlePrevWeek}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                              aria-label="Previous week"
+                            >
+                              <Icon name="chevron-left" className="h-4 w-4" />
+                            </button>
+                            <span className="text-sm font-medium min-w-[160px] text-center">{weekLabel}</span>
+                            <button
+                              type="button"
+                              onClick={handleNextWeek}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
+                              aria-label="Next week"
+                            >
+                              <Icon name="chevron-right" className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {schedulesLoading ? (
+                        <div className="space-y-2">
+                          {[1, 2, 3].map(i => (
+                            <Skeleton key={i} className="h-8 w-full" />
+                          ))}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {viewMode === 'month' ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={handlePrevMonth}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                                aria-label="Previous month"
-                              >
-                                <Icon name="chevron-left" className="h-4 w-4" />
-                              </button>
-                              <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
-                              <button
-                                type="button"
-                                onClick={handleNextMonth}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                                aria-label="Next month"
-                              >
-                                <Icon name="chevron-right" className="h-4 w-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={handlePrevWeek}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                                aria-label="Previous week"
-                              >
-                                <Icon name="chevron-left" className="h-4 w-4" />
-                              </button>
-                              <span className="text-sm font-medium min-w-[160px] text-center">{weekLabel}</span>
-                              <button
-                                type="button"
-                                onClick={handleNextWeek}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background hover:bg-muted transition-colors"
-                                aria-label="Next week"
-                              >
-                                <Icon name="chevron-right" className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        {schedulesLoading ? (
-                          <div className="space-y-2">
-                            {[1, 2, 3].map(i => (
-                              <Skeleton key={i} className="h-8 w-full" />
+                      ) : viewMode === 'month' ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                              <div key={d} className="px-2 py-1 text-center font-medium">
+                                {d}
+                              </div>
                             ))}
                           </div>
-                        ) : viewMode === 'month' ? (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
-                              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                                <div key={d} className="px-2 py-1 text-center font-medium">
-                                  {d}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="grid grid-cols-7 gap-1 text-xs">
-                              {monthCells.map(cell => {
-                                const cellKey = cell.key
-                                const inCurrentMonth = cell.date.getMonth() === currentMonth.getMonth()
-                                const daySchedules = schedulesByDay.get(cellKey) ?? []
-                                const isToday = cellKey === todayKey
+                          <div className="grid grid-cols-7 gap-1 text-xs">
+                            {monthCells.map(cell => {
+                              const cellKey = cell.key
+                              const inCurrentMonth = cell.date.getMonth() === currentMonth.getMonth()
+                              const daySchedules = schedulesByDay.get(cellKey) ?? []
+                              const isToday = cellKey === todayKey
 
-                                return (
-                                  <button
-                                    key={cell.key}
-                                    type="button"
-                                    onClick={() => openScheduleModalForDate(cell.date)}
-                                    className={cn(
-                                      'min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
-                                      inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
-                                      isToday && 'ring-1 ring-primary/60 border-primary/60'
+                              return (
+                                <button
+                                  key={cell.key}
+                                  type="button"
+                                  onClick={() => openScheduleModalForDate(cell.date)}
+                                  className={cn(
+                                    'min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
+                                    inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
+                                    isToday && 'ring-1 ring-primary/60 border-primary/60'
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className={cn('text-[11px] font-medium', inCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>{cell.date.getDate()}</span>
+                                    {daySchedules.length > 0 && (
+                                      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-medium">
+                                        {daySchedules.length} run{daySchedules.length > 1 ? 's' : ''}
+                                      </span>
                                     )}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className={cn('text-[11px] font-medium', inCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>{cell.date.getDate()}</span>
-                                      {daySchedules.length > 0 && (
-                                        <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-medium">
-                                          {daySchedules.length} run{daySchedules.length > 1 ? 's' : ''}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {daySchedules.slice(0, 3).map(s => {
-                                      const agent = s.agentId ? agentsById.get(s.agentId) : undefined
-                                      const label = agent?.name || 'Agent'
-                                      return (
-                                        <div key={s.id} className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5">
-                                          <span className="font-medium truncate">{label}</span>
-                                          {s.prompt && (
-                                            <span className="text-[10px] text-muted-foreground truncate">
-                                              {String(s.prompt).slice(0, 60)}
-                                              {String(s.prompt).length > 60 ? '…' : ''}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )
-                                    })}
-                                    {daySchedules.length > 3 && <span className="text-[10px] text-muted-foreground mt-0.5">+{daySchedules.length - 3} more</span>}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-1 text-xs text-muted-foreground mb-1">
-                              <div className="px-2 py-1 text-left font-medium">Time</div>
-                              {weekDays.map(day => (
-                                <div key={formatDateKey(day)} className="px-2 py-1 text-center font-medium">
-                                  {day.toLocaleDateString(undefined, { weekday: 'short' })}{' '}
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {day.getMonth() + 1}/{day.getDate()}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="max-h-[560px] overflow-y-auto rounded-lg border border-border/40 bg-background/40">
-                              <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] text-xs">
-                                {HOURS.map(hour => {
-                                  const cells: React.ReactNode[] = []
-                                  // Time label column
-                                  cells.push(
-                                    <div key={`time-${hour}`} className="border border-border/40 px-1.5 py-1.5 text-[11px] text-muted-foreground sticky left-0 bg-background/80">
-                                      {formatHourLabel(hour)}
-                                    </div>
-                                  )
-                                  // Day columns
-                                  weekDays.forEach(day => {
-                                    const cellKey = formatDateKey(day)
-                                    const daySchedules = (schedulesByDay.get(cellKey) ?? []).filter(s => {
-                                      const dt = new Date(s.nextRunAt as unknown as string)
-                                      return dt.getHours() === hour
-                                    })
-                                    const isCurrentHourToday = cellKey === todayKey && hour === now.getHours()
-                                    cells.push(
-                                      <div
-                                        key={`${cellKey}-${hour}`}
-                                        onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
-                                        className={cn(
-                                          'relative border border-border/40 min-h-[64px] px-1.5 py-1 bg-card/60 cursor-pointer overflow-hidden',
-                                          'hover:bg-primary/5 hover:border-primary/40 transition-colors',
-                                          isCurrentHourToday && 'bg-sky-500/15 border-sky-500/70 dark:bg-sky-500/20 dark:border-sky-400/80'
+                                  </div>
+                                  {daySchedules.slice(0, 3).map(s => {
+                                    const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                                    const label = agent?.name || 'Agent'
+                                    return (
+                                      <div key={s.id} className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5">
+                                        <span className="font-medium truncate">{label}</span>
+                                        {s.prompt && (
+                                          <span className="text-[10px] text-muted-foreground truncate">
+                                            {String(s.prompt).slice(0, 60)}
+                                            {String(s.prompt).length > 60 ? '…' : ''}
+                                          </span>
                                         )}
-                                      >
-                                        {daySchedules.length > 0 &&
-                                          daySchedules.map((s, idx) => {
+                                      </div>
+                                    )
+                                  })}
+                                  {daySchedules.length > 3 && <span className="text-[10px] text-muted-foreground mt-0.5">+{daySchedules.length - 3} more</span>}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-1 text-xs text-muted-foreground mb-1">
+                            <div className="px-2 py-1 text-left font-medium">Time</div>
+                            {weekDays.map(day => (
+                              <div key={formatDateKey(day)} className="px-2 py-1 text-center font-medium">
+                                {day.toLocaleDateString(undefined, { weekday: 'short' })}{' '}
+                                <span className="text-[10px] text-muted-foreground">
+                                  {day.getMonth() + 1}/{day.getDate()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="max-h-[560px] overflow-y-auto rounded-lg border border-border/40 bg-background/40">
+                            <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] text-xs">
+                              {HOURS.map(hour => {
+                                const cells: React.ReactNode[] = []
+                                // Time label column
+                                cells.push(
+                                  <div key={`time-${hour}`} className="border border-border/40 px-1.5 py-1.5 text-[11px] text-muted-foreground sticky left-0 bg-background/80">
+                                    {formatHourLabel(hour)}
+                                  </div>
+                                )
+                                // Day columns
+                                weekDays.forEach(day => {
+                                  const cellKey = formatDateKey(day)
+                                  const daySchedules = (schedulesByDay.get(cellKey) ?? []).filter(s => {
+                                    const dt = new Date(s.nextRunAt as unknown as string)
+                                    return dt.getHours() === hour
+                                  })
+                                  const isCurrentHourToday = cellKey === todayKey && hour === now.getHours()
+                                  const sortedDaySchedules = daySchedules.slice().sort((a, b) => {
+                                    const ta = new Date(a.nextRunAt as unknown as string).getTime()
+                                    const tb = new Date(b.nextRunAt as unknown as string).getTime()
+                                    return ta - tb
+                                  })
+
+                                  cells.push(
+                                    <div
+                                      key={`${cellKey}-${hour}`}
+                                      onClick={() => openScheduleModalForDate(day, `${String(hour).padStart(2, '0')}:00`)}
+                                      className={cn(
+                                        'group relative border border-border/40 min-h-[64px] px-1.5 py-1 bg-card/60 cursor-pointer overflow-hidden',
+                                        'hover:bg-primary/5 hover:border-primary/40 transition-colors',
+                                        isCurrentHourToday && 'bg-sky-500/15 border-sky-500/70 dark:bg-sky-500/20 dark:border-sky-400/80'
+                                      )}
+                                    >
+                                      {/* Collapsed stacked view */}
+                                      {sortedDaySchedules.length > 0 && (
+                                        <div className="pointer-events-none group-hover:hidden">
+                                          {sortedDaySchedules.map((s, idx) => {
                                             const agent = s.agentId ? agentsById.get(s.agentId) : undefined
                                             const label = agent?.name || 'Agent'
                                             const offset = idx * 4
                                             return (
                                               <div
                                                 key={s.id}
-                                                className="absolute left-1 right-1 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm hover:bg-muted/90"
+                                                className="absolute left-1 right-1 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm"
                                                 style={{ top: offset, zIndex: 10 + idx }}
                                               >
                                                 <div className="flex items-center justify-between gap-1 mb-0.5">
@@ -479,83 +455,102 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                               </div>
                                             )
                                           })}
-                                      </div>
-                                    )
-                                  })
-                                  return cells
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="frosted-glass-card shadow-frosted-lg">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <Icon name="list-checks" className="h-4 w-4" />
-                          Upcoming runs
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        {schedulesLoading ? (
-                          <div className="space-y-2">
-                            {[1, 2, 3].map(i => (
-                              <Skeleton key={i} className="h-10 w-full" />
-                            ))}
-                          </div>
-                        ) : allUpcoming.length === 0 ? (
-                          <div className="text-center py-6 text-xs text-muted-foreground">
-                            <p>No upcoming schedules yet.</p>
-                            <p>Use the calendar or “New schedule” button above to create one.</p>
-                          </div>
-                        ) : (
-                          <ScrollArea className="h-[320px] pr-2">
-                            <div className="space-y-2 text-xs">
-                              {allUpcoming.map(s => {
-                                const dt = new Date(s.nextRunAt as unknown as string)
-                                const dateStr = dt.toLocaleDateString(undefined, {
-                                  weekday: 'short',
-                                  month: 'short',
-                                  day: 'numeric',
-                                })
-                                const timeStr = dt.toLocaleTimeString(undefined, {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                                const agent = s.agentId ? agentsById.get(s.agentId) : undefined
-                                const label = agent?.name || 'Agent'
-                                return (
-                                  <div key={s.id} className="rounded-lg border border-border/60 bg-card/80 px-2.5 py-2 flex flex-col gap-1">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-medium">
-                                          {label.charAt(0).toUpperCase()}
-                                        </span>
-                                        <div className="min-w-0">
-                                          <div className="text-[11px] font-semibold truncate">{label}</div>
-                                          {s.timezone && <div className="text-[10px] text-muted-foreground truncate">{s.timezone}</div>}
                                         </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <div className="text-[11px] font-medium">{dateStr}</div>
-                                        <div className="text-[10px] text-muted-foreground">{timeStr}</div>
-                                      </div>
+                                      )}
+
+                                      {/* Expanded ordered list on hover */}
+                                      {sortedDaySchedules.length > 0 && (
+                                        <div className="hidden group-hover:flex flex-col gap-1 h-full">
+                                          {sortedDaySchedules.map(s => {
+                                            const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                                            const label = agent?.name || 'Agent'
+                                            return (
+                                              <div key={s.id} className="w-full rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm">
+                                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                  <span className="font-medium truncate">{label}</span>
+                                                </div>
+                                                {s.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(s.prompt)}</div>}
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
                                     </div>
-                                    {s.prompt && <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{String(s.prompt)}</div>}
-                                  </div>
-                                )
+                                  )
+                                })
+                                return cells
                               })}
                             </div>
-                          </ScrollArea>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="frosted-glass-card shadow-frosted-lg">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Icon name="list-checks" className="h-4 w-4" />
+                        Upcoming runs
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {schedulesLoading ? (
+                        <div className="space-y-2">
+                          {[1, 2, 3].map(i => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                          ))}
+                        </div>
+                      ) : allUpcoming.length === 0 ? (
+                        <div className="text-center py-6 text-xs text-muted-foreground">
+                          <p>No upcoming schedules yet.</p>
+                          <p>Use the calendar or “New schedule” button above to create one.</p>
+                        </div>
+                      ) : (
+                        <ScrollArea className="h-[320px] pr-2">
+                          <div className="space-y-2 text-xs">
+                            {allUpcoming.map(s => {
+                              const dt = new Date(s.nextRunAt as unknown as string)
+                              const dateStr = dt.toLocaleDateString(undefined, {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                              const timeStr = dt.toLocaleTimeString(undefined, {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                              const agent = s.agentId ? agentsById.get(s.agentId) : undefined
+                              const label = agent?.name || 'Agent'
+                              return (
+                                <div key={s.id} className="rounded-lg border border-border/60 bg-card/80 px-2.5 py-2 flex flex-col gap-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-medium">
+                                        {label.charAt(0).toUpperCase()}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <div className="text-[11px] font-semibold truncate">{label}</div>
+                                        {s.timezone && <div className="text-[10px] text-muted-foreground truncate">{s.timezone}</div>}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-[11px] font-medium">{dateStr}</div>
+                                      <div className="text-[10px] text-muted-foreground">{timeStr}</div>
+                                    </div>
+                                  </div>
+                                  {s.prompt && <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{String(s.prompt)}</div>}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
             <ScheduleConversationModal
               open={scheduleModalOpen}
               onOpenChange={open => {

@@ -3,6 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { scheduleAPI } from '@/lib/api'
 import type { Agent } from '@/lib/api'
 import { toast } from 'sonner'
@@ -55,6 +58,8 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
   const weeklyLabel = parsedLocalDate ? `Weekly on ${parsedLocalDate.toLocaleDateString(undefined, { weekday: 'long' })}` : 'Weekly'
   const monthlyLabel = parsedLocalDate ? `Monthly on day ${parsedLocalDate.getDate()}` : 'Monthly on this day'
   const yearlyLabel = parsedLocalDate ? `Annually on ${parsedLocalDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}` : 'Annually'
+
+  const selectedAgent = agents.find(a => a.id === agentId) || null
 
   const handleSubmit = async () => {
     if (!agentId) {
@@ -216,20 +221,38 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="schedule-agent">Agent</Label>
-            <select
-              id="schedule-agent"
-              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={agentId}
-              onChange={e => setAgentId(e.target.value)}
-              disabled={submitting || agents.length === 0}
-            >
-              <option value="">Select an agent…</option>
-              {agents.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+            <Select value={agentId} onValueChange={value => setAgentId(value)} disabled={submitting || agents.length === 0}>
+              <SelectTrigger id="schedule-agent" className="w-full sm:max-w-sm">
+                {selectedAgent ? (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Avatar className="h-6 w-6 ring-1 ring-border/40 flex-shrink-0">
+                      <AgentAvatar seed={selectedAgent.name} size={24} rounded />
+                    </Avatar>
+                    <div className="flex flex-col min-w-0 flex-1 items-start text-left">
+                      <span className="text-sm font-medium truncate">{selectedAgent.name}</span>
+                      {selectedAgent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch]">{selectedAgent.description}</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">{agents.length === 0 ? 'No agents available' : 'Select an agent'}</span>
+                )}
+              </SelectTrigger>
+              <SelectContent className="w-[var(--radix-select-trigger-width)] max-h-64">
+                {agents.map(agent => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar className="h-6 w-6 ring-1 ring-border/40">
+                        <AgentAvatar seed={agent.name} size={24} rounded />
+                      </Avatar>
+                      <div className="flex flex-col min-w-0 flex-1 items-start text-left">
+                        <span className="text-sm font-medium truncate">{agent.name}</span>
+                        {agent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch]">{agent.description}</span>}
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {agents.length === 0 && <p className="text-xs text-muted-foreground">No agents available on this starship yet.</p>}
           </div>
           <div className="space-y-2">

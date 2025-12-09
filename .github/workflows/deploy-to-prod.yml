@@ -66,6 +66,7 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/prod/08-autopilot-runner-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/09-autopilot-runner-service.yaml
+          kubectl apply --dry-run=client -f k8s/prod/10-schedule-worker-cronjob.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
@@ -79,6 +80,7 @@ jobs:
           kubectl apply -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/prod/08-autopilot-runner-deployment.yaml
           kubectl apply -f k8s/prod/09-autopilot-runner-service.yaml
+          kubectl apply -f k8s/prod/10-schedule-worker-cronjob.yaml
           echo "✅ Applied manifests to prod cluster."
 
       - name: Update secrets

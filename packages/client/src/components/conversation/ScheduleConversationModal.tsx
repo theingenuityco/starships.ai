@@ -419,26 +419,32 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                   <label className="inline-flex items-center gap-2">
                     <input type="radio" className="h-3 w-3" checked={endCondition === 'on_date'} onChange={() => setEndCondition('on_date')} disabled={submitting} />
                     <span>On date</span>
-                    {endCondition === 'on_date' && <Input type="date" className="ml-3 h-7 w-40 text-xs" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={submitting} />}
                   </label>
                   <label className="inline-flex items-center gap-2">
                     <input type="radio" className="h-3 w-3" checked={endCondition === 'after_occurrences'} onChange={() => setEndCondition('after_occurrences')} disabled={submitting} />
                     <span>After</span>
-                    {endCondition === 'after_occurrences' && (
-                      <>
-                        <Input
-                          type="number"
-                          min={1}
-                          className="ml-2 h-7 w-16 text-xs"
-                          value={Number.isFinite(endOccurrences) ? endOccurrences : 1}
-                          onChange={e => setEndOccurrences(Number(e.target.value) || 1)}
-                          disabled={submitting}
-                        />
-                        <span className="ml-1">occurrences</span>
-                      </>
-                    )}
                   </label>
                 </div>
+                {endCondition === 'on_date' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">End date</span>
+                    <Input type="date" className="h-7 w-40 text-xs" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={submitting} />
+                  </div>
+                )}
+                {endCondition === 'after_occurrences' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">End after</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      className="h-7 w-16 text-xs"
+                      value={Number.isFinite(endOccurrences) ? endOccurrences : 1}
+                      onChange={e => setEndOccurrences(Number(e.target.value) || 1)}
+                      disabled={submitting}
+                    />
+                    <span className="text-muted-foreground">occurrences</span>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">Repeating schedules will stop automatically when they reach this end condition.</p>
               </div>
             )}

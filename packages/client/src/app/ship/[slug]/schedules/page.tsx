@@ -67,7 +67,7 @@ function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, 
   const occurrences: Date[] = []
   if (!sched?.nextRunAt) return occurrences
 
-  const first = new Date(sched.nextRunAt as unknown as string)
+  const first = new Date(sched.nextRunAt)
   if (Number.isNaN(first.getTime())) return occurrences
 
   // Always include the stored nextRunAt if it is in range
@@ -89,8 +89,15 @@ function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, 
     // and stop as soon as we pass rangeEnd.
     // NOTE: Our UI recurrence patterns only create at most one run per day,
     // so this remains safe for calendar views.
+    const MAX_ITERATIONS = 1000
+    let iterations = 0
+
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      if (iterations++ >= MAX_ITERATIONS) {
+        break
+      }
+
       const rawNext = interval.next()
       const next = new Date(rawNext.toString())
       if (next > rangeEnd) break
@@ -213,10 +220,10 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
   const allUpcoming = useMemo(() => {
     const now = new Date()
     return [...schedules]
-      .filter(s => s.nextRunAt && new Date(s.nextRunAt as unknown as string).getTime() >= now.getTime())
+      .filter(s => s.nextRunAt && new Date(s.nextRunAt).getTime() >= now.getTime())
       .sort((a, b) => {
-        const da = new Date(a.nextRunAt as unknown as string).getTime()
-        const db = new Date(b.nextRunAt as unknown as string).getTime()
+        const da = new Date(a.nextRunAt).getTime()
+        const db = new Date(b.nextRunAt).getTime()
         return da - db
       })
       .slice(0, 50)
@@ -422,8 +429,8 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                   {daySchedules.length > 0 &&
                                     (() => {
                                       const sortedDaySchedules = daySchedules.slice().sort((a, b) => {
-                                        const ta = new Date(a.nextRunAt as unknown as string).getTime()
-                                        const tb = new Date(b.nextRunAt as unknown as string).getTime()
+                                        const ta = new Date(a.nextRunAt).getTime()
+                                        const tb = new Date(b.nextRunAt).getTime()
                                         return ta - tb
                                       })
                                       const latest = sortedDaySchedules[sortedDaySchedules.length - 1]
@@ -526,13 +533,13 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                 weekDays.forEach(day => {
                                   const cellKey = formatDateKey(day)
                                   const daySchedules = (schedulesByDay.get(cellKey) ?? []).filter(s => {
-                                    const dt = new Date(s.nextRunAt as unknown as string)
+                                    const dt = new Date(s.nextRunAt)
                                     return dt.getHours() === hour
                                   })
                                   const isCurrentHourToday = cellKey === todayKey && hour === now.getHours()
                                   const sortedDaySchedules = daySchedules.slice().sort((a, b) => {
-                                    const ta = new Date(a.nextRunAt as unknown as string).getTime()
-                                    const tb = new Date(b.nextRunAt as unknown as string).getTime()
+                                    const ta = new Date(a.nextRunAt).getTime()
+                                    const tb = new Date(b.nextRunAt).getTime()
                                     return ta - tb
                                   })
 
@@ -655,7 +662,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                         <ScrollArea className="h-[320px]">
                           <div className="space-y-2 text-xs">
                             {allUpcoming.map(s => {
-                              const dt = new Date(s.nextRunAt as unknown as string)
+                              const dt = new Date(s.nextRunAt)
                               const dateStr = dt.toLocaleDateString(undefined, {
                                 weekday: 'short',
                                 month: 'short',

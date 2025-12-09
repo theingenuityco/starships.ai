@@ -256,10 +256,12 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
             {agents.length === 0 && <p className="text-xs text-muted-foreground">No agents available on this starship yet.</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="schedule-prompt">Prompt</Label>
+            <Label htmlFor="schedule-prompt" className="block">
+              Prompt
+            </Label>
             <textarea
               id="schedule-prompt"
-              className="min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+              className="min-h-[96px] w-full sm:max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               disabled={submitting}

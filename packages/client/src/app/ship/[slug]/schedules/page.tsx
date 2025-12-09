@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { cn } from '@/lib/utils'
 import { scheduleAPI } from '@/lib/api'
 import type { ScheduleModel, AgentModel } from '@starships/protocol'
@@ -351,8 +353,13 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                     const agent = s.agentId ? agentsById.get(s.agentId) : undefined
                                     const label = agent?.name || 'Agent'
                                     return (
-                                      <div key={s.id} className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5">
-                                        <span className="font-medium truncate">{label}</span>
+                                      <div key={s.id} className="h-14 rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5 overflow-hidden">
+                                        <div className="flex items-center gap-1">
+                                          <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                            <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                          </Avatar>
+                                          <span className="font-medium truncate">{label}</span>
+                                        </div>
                                         {s.prompt && (
                                           <span className="text-[10px] text-muted-foreground truncate">
                                             {String(s.prompt).slice(0, 60)}
@@ -425,10 +432,13 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                             return (
                                               <div
                                                 key={s.id}
-                                                className="absolute left-1 right-1 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm"
+                                                className="absolute left-1 right-1 h-14 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm overflow-hidden"
                                                 style={{ top: offset, zIndex: 10 + idx }}
                                               >
-                                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                <div className="flex items-center gap-1 mb-0.5">
+                                                  <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                                    <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                                  </Avatar>
                                                   <span className="font-medium truncate">{label}</span>
                                                 </div>
                                                 {s.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(s.prompt)}</div>}
@@ -445,8 +455,14 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                             const agent = s.agentId ? agentsById.get(s.agentId) : undefined
                                             const label = agent?.name || 'Agent'
                                             return (
-                                              <div key={s.id} className="w-full rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm">
-                                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                              <div
+                                                key={s.id}
+                                                className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm overflow-hidden"
+                                              >
+                                                <div className="flex items-center gap-1 mb-0.5">
+                                                  <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                                    <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                                  </Avatar>
                                                   <span className="font-medium truncate">{label}</span>
                                                 </div>
                                                 {s.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(s.prompt)}</div>}

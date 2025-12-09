@@ -48,6 +48,7 @@ export class ScheduleRepository extends BaseRepository {
     timezone: string;
     nextRunAt: string;
     isActive: boolean;
+    isRecurring?: boolean;
   }): Promise<ScheduleModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -61,6 +62,7 @@ export class ScheduleRepository extends BaseRepository {
           timezone: data.timezone,
           nextRunAt: data.nextRunAt,
           isActive: data.isActive,
+          isRecurring: typeof data.isRecurring === 'boolean' ? data.isRecurring : false,
           lastRunAt: null,
           lastRunConversationId: null,
           createdAt: now,
@@ -172,5 +174,3 @@ export class ScheduleRepository extends BaseRepository {
 }
 
 export default ScheduleRepository;
-
-

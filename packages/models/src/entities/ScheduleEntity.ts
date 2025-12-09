@@ -7,16 +7,7 @@
 
 import type { ScheduleModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import {
-  IsBoolean,
-  IsISO8601,
-  IsOptional,
-  IsString,
-  Length,
-  MaxLength,
-  validate,
-  ValidationError,
-} from 'class-validator';
+import { IsBoolean, IsISO8601, IsOptional, IsString, Length, MaxLength, validate, ValidationError } from 'class-validator';
 
 export class ScheduleEntity implements ScheduleModel {
   @Expose()
@@ -56,6 +47,10 @@ export class ScheduleEntity implements ScheduleModel {
   @Expose()
   @IsBoolean()
   isActive!: boolean;
+
+  @Expose()
+  @IsBoolean()
+  isRecurring!: boolean;
 
   @Expose()
   @IsOptional()
@@ -99,6 +94,7 @@ export class ScheduleEntity implements ScheduleModel {
         timezone: dataRecord.timezone || 'UTC',
         nextRunAt: dataRecord.nextRunAt || now,
         isActive: typeof dataRecord.isActive === 'boolean' ? dataRecord.isActive : true,
+        isRecurring: typeof dataRecord.isRecurring === 'boolean' ? dataRecord.isRecurring : false,
         lastRunAt: dataRecord.lastRunAt ?? null,
         lastRunConversationId: dataRecord.lastRunConversationId ?? null,
         createdAt: dataRecord.createdAt || now,
@@ -123,5 +119,3 @@ export class ScheduleEntity implements ScheduleModel {
 }
 
 export default ScheduleEntity;
-
-

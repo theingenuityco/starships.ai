@@ -19,6 +19,14 @@ export interface ScheduleModel {
   timezone: string;
   nextRunAt: string;
   isActive: boolean;
+  /**
+   * Whether this schedule should automatically compute a new nextRunAt
+   * after each run (recurring schedule) or behave as a one-shot.
+   *
+   * For backwards compatibility, older rows may have this unset at the
+   * database level; application code should treat missing/undefined as false.
+   */
+  isRecurring: boolean;
   lastRunAt?: string | null;
   lastRunConversationId?: string | null;
   createdAt: string;
@@ -37,6 +45,11 @@ export interface CreateScheduleRequest {
   timezone: string;
   nextRunAt: string;
   isActive: boolean;
+  /**
+   * When true, the schedule will compute a new nextRunAt after each run
+   * based on cronExpression; when false (or omitted), it will be one-shot.
+   */
+  isRecurring?: boolean;
 }
 
 /**
@@ -48,6 +61,5 @@ export interface UpdateScheduleRequest {
   timezone?: string;
   nextRunAt?: string;
   isActive?: boolean;
+  isRecurring?: boolean;
 }
-
-

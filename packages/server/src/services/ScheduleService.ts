@@ -1,7 +1,7 @@
 import { ScheduleRepository } from '@starships/models';
-import type { ScheduleModel } from '@starships/protocol';
+import type { Message, ScheduleModel } from '@starships/protocol';
 import { ConversationService } from '@/services/ConversationService';
-import parser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 
 /**
  * ScheduleService
@@ -108,16 +108,15 @@ export class ScheduleService {
         });
 
         // Use the same pipeline as user messages; no auth context for system-initiated runs.
-        await this.conversationService.addConversationMessage(
-          {
-            conversationId: conversation.id,
-            content: claimed.prompt,
-            role: 'user',
-            messageType: 'user_input',
-            agentId: claimed.agentId,
-          } as any,
-          {}
-        );
+        const scheduledMessage: Message & { conversationId: string } = {
+          conversationId: conversation.id,
+          content: claimed.prompt,
+          role: 'user',
+          messageType: 'user_input',
+          agentId: claimed.agentId,
+        };
+
+        await this.conversationService.addConversationMessage(scheduledMessage, {});
 
         // Compute recurrence, if enabled.
         let updates: Partial<ScheduleModel> = {
@@ -126,17 +125,18 @@ export class ScheduleService {
 
         if (claimed.isRecurring) {
           try {
-            const interval = parser.parseExpression(claimed.cronExpression, {
+            const interval = CronExpressionParser.parse(claimed.cronExpression, {
               currentDate: now,
               tz: 'UTC',
             });
-            const next = interval.next();
+            const rawNext = interval.next();
+            const nextDate = new Date(rawNext.toString());
             updates = {
               ...updates,
-              nextRunAt: next.toISOString(),
+              nextRunAt: nextDate.toISOString(),
               isActive: true,
             };
-          } catch (e) {
+          } catch (e: unknown) {
             // If cron parsing fails, fall back to one-shot semantics:
             // keep the schedule deactivated and log the error.
             console.error('[ScheduleService] Failed to compute nextRunAt for recurring schedule', {

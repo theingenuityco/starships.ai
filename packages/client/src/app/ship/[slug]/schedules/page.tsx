@@ -69,7 +69,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
   const { data: starship } = useStarshipBySlug(slug, true)
   const starshipId = starship?.id || ''
 
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('week')
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -336,7 +336,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                   type="button"
                                   onClick={() => openScheduleModalForDate(cell.date)}
                                   className={cn(
-                                    'relative group min-h-[80px] rounded-lg border p-2 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
+                                    'relative group min-h-[104px] rounded-lg border p-2 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
                                     inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
                                     isToday && 'ring-1 ring-primary/60 border-primary/60'
                                   )}

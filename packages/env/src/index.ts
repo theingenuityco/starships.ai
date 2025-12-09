@@ -22,7 +22,9 @@ export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_DOCS_PORT = 3001;
   const DEFAULT_PROXY_PORT = 8080;
 
-  // Validate critical environment variables for production safety
+  // Validate critical environment variables for production safety.
+  // Only core infrastructure is enforced here; optional integrations
+  // (like email/S3) are validated in their respective services.
   const requiredEnvVars = {
     PUBLIC_URL: process.env.PUBLIC_URL,
     CLIENT_URL: process.env.CLIENT_URL,
@@ -32,10 +34,6 @@ export function getEnvConfig(): EnvironmentConfig {
     POSTGRES_USER: process.env.POSTGRES_USER,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
-    // Email Service Configuration (required for email verification)
-    EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,
-    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
-    AWS_SES_REGION: process.env.AWS_SES_REGION,
   };
 
   // Check for missing required environment variables

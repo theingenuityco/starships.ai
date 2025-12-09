@@ -236,9 +236,9 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
 
             <div className="space-y-6">
               <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card className="lg:col-span-2 frosted-glass-card shadow-frosted-lg">
-                    <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-6">
+                  <Card className="frosted-glass-card shadow-frosted-lg">
+                    <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
                           <Icon name="calendar" className="h-4 w-4" />
@@ -305,7 +305,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-0">
+                    <CardContent className="px-2 pb-2 pt-1.5">
                       {schedulesLoading ? (
                         <div className="space-y-2">
                           {[1, 2, 3].map(i => (
@@ -468,13 +468,13 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                   </Card>
 
                   <Card className="frosted-glass-card shadow-frosted-lg">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="p-4 pb-2">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
                         <Icon name="list-checks" className="h-4 w-4" />
                         Upcoming runs
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-0">
+                    <CardContent className="p-2">
                       {schedulesLoading ? (
                         <div className="space-y-2">
                           {[1, 2, 3].map(i => (
@@ -487,7 +487,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                           <p>Use the calendar or “New schedule” button above to create one.</p>
                         </div>
                       ) : (
-                        <ScrollArea className="h-[320px] pr-2">
+                        <ScrollArea className="h-[320px]">
                           <div className="space-y-2 text-xs">
                             {allUpcoming.map(s => {
                               const dt = new Date(s.nextRunAt as unknown as string)

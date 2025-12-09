@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { CronExpressionParser } from 'cron-parser';
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
@@ -11,10 +12,26 @@ import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 const router: Router = Router();
 const scheduleService = new ScheduleService();
 
+const CronExpressionStringSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .superRefine((value, ctx) => {
+    try {
+      CronExpressionParser.parse(value);
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid cron expression',
+        path: ['cronExpression'],
+      });
+    }
+  });
+
 const CreateScheduleSchema = z.object({
   agentId: IdSchema,
   prompt: z.string().min(1).max(10000),
-  cronExpression: z.string().min(1).max(255),
+  cronExpression: CronExpressionStringSchema,
   timezone: z.string().min(1).max(255),
   nextRunAt: z.string().datetime(),
   isActive: z.boolean().default(true),
@@ -25,7 +42,7 @@ const CreateScheduleSchema = z.object({
 
 const UpdateScheduleSchema = z.object({
   prompt: z.string().min(1).max(10000).optional(),
-  cronExpression: z.string().min(1).max(255).optional(),
+  cronExpression: CronExpressionStringSchema.optional(),
   timezone: z.string().min(1).max(255).optional(),
   nextRunAt: z.string().datetime().optional(),
   isActive: z.boolean().optional(),

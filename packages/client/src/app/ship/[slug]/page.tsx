@@ -96,6 +96,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                 if (value === 'ship') router.push(`/ship/${slug}`)
                 else if (value === 'agents') router.push(`/ship/${slug}/agents`)
                 else if (value === 'tools') router.push(`/ship/${slug}/tools`)
+                else if (value === 'schedules') router.push(`/ship/${slug}/schedules`)
               }}
               className="space-y-6"
             >
@@ -112,6 +113,10 @@ export default function StarshipOverviewPage(): React.JSX.Element {
                   <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="wrench" className="h-4 w-4" />
                     <span>Tools</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="schedules" className="gap-2 rounded-xl px-3 py-1">
+                    <Icon name="clock" className="h-4 w-4" />
+                    <span>Schedules</span>
                   </TabsTrigger>
                 </TabsList>
               </div>

@@ -122,6 +122,7 @@ export function Navigation(props: NavigationProps) {
         isAgentBuilderRoute: false,
         isToolsRoute: false,
         isToolBuilderRoute: false,
+        isSchedulesRoute: false,
       }
     }
     return {
@@ -132,10 +133,11 @@ export function Navigation(props: NavigationProps) {
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
       isToolsRoute: pathname.startsWith(`/ship/${starshipSlug}/tools`),
       isToolBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/tool/`),
+      isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
     }
   }, [pathname, starshipSlug])
 
-  const { isOverviewRoute, isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute } = routeChecks
+  const { isOverviewRoute, isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -220,6 +222,7 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
       { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
       ...(isAuthenticated && isInstanceAdmin
@@ -242,6 +245,7 @@ export function Navigation(props: NavigationProps) {
       isToolsRoute,
       isToolBuilderRoute,
       pathname,
+      isSchedulesRoute,
       isConnectorsRoute,
       handleNewConversation,
       starshipData?.id,

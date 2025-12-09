@@ -343,6 +343,9 @@ import {
   UpdateAgentRequest,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
+  type ScheduleModel,
+  type CreateScheduleRequest,
+  type UpdateScheduleRequest,
 } from '@starships/protocol'
 
 // Re-export types for use in other client components
@@ -525,6 +528,28 @@ export const agentAPI = {
   getAgentsWithUpdates: async (starshipId: string): Promise<Agent[]> => {
     const data = await api.get(`/api/v1/starships/${starshipId}/agents/with-updates`).then(res => extractResponseData<Agent[]>(res))
     return data
+  },
+}
+
+export const scheduleAPI = {
+  create: async (payload: CreateScheduleRequest): Promise<ScheduleModel> => {
+    const { starshipId, ...body } = payload
+    const res = await api.post(`/api/v1/starships/${starshipId}/schedules`, body)
+    return extractResponseData<ScheduleModel>(res as FetchResponse<ApiResponse<ScheduleModel>>)
+  },
+
+  listByStarship: async (starshipId: string): Promise<ScheduleModel[]> => {
+    const res = await api.get(`/api/v1/starships/${starshipId}/schedules`)
+    return extractResponseData<ScheduleModel[]>(res as FetchResponse<ApiResponse<ScheduleModel[]>>)
+  },
+
+  update: async (scheduleId: string, updates: UpdateScheduleRequest): Promise<ScheduleModel> => {
+    const res = await api.patch(`/api/v1/schedules/${scheduleId}`, updates)
+    return extractResponseData<ScheduleModel>(res as FetchResponse<ApiResponse<ScheduleModel>>)
+  },
+
+  deactivate: async (scheduleId: string): Promise<void> => {
+    await api.delete(`/api/v1/schedules/${scheduleId}`)
   },
 }
 

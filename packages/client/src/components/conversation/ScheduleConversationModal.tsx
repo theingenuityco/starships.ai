@@ -222,15 +222,15 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
           <div className="space-y-2">
             <Label htmlFor="schedule-agent">Agent</Label>
             <Select value={agentId} onValueChange={value => setAgentId(value)} disabled={submitting || agents.length === 0}>
-              <SelectTrigger id="schedule-agent" className="w-full sm:max-w-sm">
+              <SelectTrigger id="schedule-agent" className="w-full sm:max-w-sm h-11 py-3">
                 {selectedAgent ? (
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Avatar className="h-6 w-6 ring-1 ring-border/40 flex-shrink-0">
-                      <AgentAvatar seed={selectedAgent.name} size={24} rounded />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-8 w-8 ring-1 ring-border/40 flex-shrink-0">
+                      <AgentAvatar seed={selectedAgent.name} size={32} rounded />
                     </Avatar>
                     <div className="flex flex-col min-w-0 flex-1 items-start text-left">
-                      <span className="text-sm font-medium truncate">{selectedAgent.name}</span>
-                      {selectedAgent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch]">{selectedAgent.description}</span>}
+                      <span className="text-sm font-medium truncate leading-tight">{selectedAgent.name}</span>
+                      {selectedAgent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch] leading-tight">{selectedAgent.description}</span>}
                     </div>
                   </div>
                 ) : (
@@ -240,13 +240,13 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
               <SelectContent className="w-[var(--radix-select-trigger-width)] max-h-64">
                 {agents.map(agent => (
                   <SelectItem key={agent.id} value={agent.id}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Avatar className="h-6 w-6 ring-1 ring-border/40">
-                        <AgentAvatar seed={agent.name} size={24} rounded />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-8 w-8 ring-1 ring-border/40">
+                        <AgentAvatar seed={agent.name} size={32} rounded />
                       </Avatar>
                       <div className="flex flex-col min-w-0 flex-1 items-start text-left">
-                        <span className="text-sm font-medium truncate">{agent.name}</span>
-                        {agent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch]">{agent.description}</span>}
+                        <span className="text-sm font-medium truncate leading-tight">{agent.name}</span>
+                        {agent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch] leading-tight">{agent.description}</span>}
                       </div>
                     </div>
                   </SelectItem>

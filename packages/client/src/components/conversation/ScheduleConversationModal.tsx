@@ -25,6 +25,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
   const [date, setDate] = useState(initialDate || '')
   const [time, setTime] = useState(initialTime || '')
   const [agentId, setAgentId] = useState(initialAgentId || (agents[0]?.id ?? ''))
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly'>('none')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
       setPrompt(initialPrompt)
       setDate(initialDate || '')
       setTime(initialTime || '')
+      setRecurrence('none')
 
       if (initialAgentId) {
         setAgentId(initialAgentId)
@@ -70,9 +72,33 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
       }
 
       const nextRunAt = localDateTime.toISOString()
+      const minute = localDateTime.getUTCMinutes()
+      const hour = localDateTime.getUTCHours()
 
-      // MVP: one-shot schedule; use a simple cron that matches the minute
-      const cronExpression = `${localDateTime.getUTCMinutes()} ${localDateTime.getUTCHours()} * * *`
+      let cronExpression: string
+      let isRecurring = false
+
+      switch (recurrence) {
+        case 'daily':
+          // Every day at this UTC time
+          cronExpression = `${minute} ${hour} * * *`
+          isRecurring = true
+          break
+        case 'weekly': {
+          // Every week on the same weekday at this UTC time
+          // JavaScript: 0 (Sun) - 6 (Sat) -> cron day-of-week 0-6
+          const dayOfWeek = localDateTime.getUTCDay()
+          cronExpression = `${minute} ${hour} * * ${dayOfWeek}`
+          isRecurring = true
+          break
+        }
+        case 'none':
+        default:
+          // One-shot: still store a concrete cron for debugging, but do not repeat.
+          cronExpression = `${minute} ${hour} * * *`
+          isRecurring = false
+          break
+      }
 
       await scheduleAPI.create({
         starshipId,
@@ -82,6 +108,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         nextRunAt,
         isActive: true,
+        isRecurring,
       })
 
       try {
@@ -143,6 +170,21 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
               <Label htmlFor="schedule-time">Time</Label>
               <Input id="schedule-time" type="time" value={time} onChange={e => setTime(e.target.value)} disabled={submitting} />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="schedule-recurrence">Repeat</Label>
+            <select
+              id="schedule-recurrence"
+              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={recurrence}
+              onChange={e => setRecurrence(e.target.value as 'none' | 'daily' | 'weekly')}
+              disabled={submitting}
+            >
+              <option value="none">Does not repeat</option>
+              <option value="daily">Every day</option>
+              <option value="weekly">Every week</option>
+            </select>
+            <p className="text-xs text-muted-foreground">Repeating schedules will run again automatically according to the selected pattern.</p>
           </div>
         </div>
         <DialogFooter>

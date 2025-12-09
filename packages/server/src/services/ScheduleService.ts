@@ -1,6 +1,7 @@
 import { ScheduleRepository } from '@starships/models';
 import type { ScheduleModel } from '@starships/protocol';
 import { ConversationService } from '@/services/ConversationService';
+import parser from 'cron-parser';
 
 /**
  * ScheduleService
@@ -29,6 +30,7 @@ export class ScheduleService {
     timezone: string;
     nextRunAt: string;
     isActive: boolean;
+    isRecurring?: boolean;
   }): Promise<ScheduleModel> {
     return this.repo.create(data);
   }
@@ -57,8 +59,12 @@ export class ScheduleService {
    *   - Isolates failures per-schedule so one bad row doesn't block others.
    *
    * NOTE: MVP semantics are "one-shot": each schedule runs once and is deactivated.
-   * Recurring behavior can be added later by computing a new nextRunAt instead
-   * of deactivating the schedule.
+   *
+   * Recurring behavior:
+   * - When schedule.isRecurring is true, we compute a new nextRunAt from the
+   *   cronExpression and reactivate the schedule after each run.
+   * - For now we interpret cron expressions in UTC; the stored timezone is
+   *   preserved for future, more advanced semantics.
    */
   async runDueSchedules(options?: {
     now?: Date;
@@ -113,10 +119,36 @@ export class ScheduleService {
           {}
         );
 
-        // Best-effort linkage for idempotency/debugging.
-        await this.repo.update(claimed.id, {
+        // Compute recurrence, if enabled.
+        let updates: Partial<ScheduleModel> = {
           lastRunConversationId: conversation.id,
-        });
+        };
+
+        if (claimed.isRecurring) {
+          try {
+            const interval = parser.parseExpression(claimed.cronExpression, {
+              currentDate: now,
+              tz: 'UTC',
+            });
+            const next = interval.next();
+            updates = {
+              ...updates,
+              nextRunAt: next.toISOString(),
+              isActive: true,
+            };
+          } catch (e) {
+            // If cron parsing fails, fall back to one-shot semantics:
+            // keep the schedule deactivated and log the error.
+            console.error('[ScheduleService] Failed to compute nextRunAt for recurring schedule', {
+              scheduleId: claimed.id,
+              cronExpression: claimed.cronExpression,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
+        // Best-effort linkage for idempotency/debugging and recurrence updates.
+        await this.repo.update(claimed.id, updates);
 
         perStarshipCounts.set(claimed.starshipId, currentCount + 1);
         processed += 1;
@@ -135,5 +167,3 @@ export class ScheduleService {
 }
 
 export default ScheduleService;
-
-

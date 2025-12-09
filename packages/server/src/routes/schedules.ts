@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CronExpressionParser } from 'cron-parser';
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
+import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { IdSchema } from '@/schemas/common';
 import { ScheduleService } from '@/services/ScheduleService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -123,19 +123,19 @@ router.patch('/schedules/:scheduleId', jwtAuthMiddleware, async (req: Request, r
     const params = z.object({ scheduleId: IdSchema }).parse(req.params);
     const updates = UpdateScheduleSchema.parse(req.body);
 
-    const existing = await scheduleService.getScheduleById(params.scheduleId);
-    if (!existing) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Schedule not found', 404);
-      return;
-    }
-
     const authUserId = (req as any).user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
 
-    if (!(await verifyStarshipAccess(existing.starshipId, authUserId, res))) {
+    const existing = await scheduleService.getScheduleById(params.scheduleId);
+    if (!existing) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Schedule not found', 404);
+      return;
+    }
+
+    if (!(await verifyResourceAccess(existing.starshipId, authUserId, 'schedule', existing.id, res))) {
       return;
     }
 
@@ -159,19 +159,19 @@ router.delete('/schedules/:scheduleId', jwtAuthMiddleware, async (req: Request, 
   try {
     const params = z.object({ scheduleId: IdSchema }).parse(req.params);
 
-    const existing = await scheduleService.getScheduleById(params.scheduleId);
-    if (!existing) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Schedule not found', 404);
-      return;
-    }
-
     const authUserId = (req as any).user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
 
-    if (!(await verifyStarshipAccess(existing.starshipId, authUserId, res))) {
+    const existing = await scheduleService.getScheduleById(params.scheduleId);
+    if (!existing) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Schedule not found', 404);
+      return;
+    }
+
+    if (!(await verifyResourceAccess(existing.starshipId, authUserId, 'schedule', existing.id, res))) {
       return;
     }
 

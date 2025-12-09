@@ -8,8 +8,8 @@ metadata:
     component: schedule-worker
     environment: production
 spec:
-  # Run every minute; adjust for production needs
-  schedule: '*/1 * * * *'
+  # Run every 5 minutes; adjust for production needs
+  schedule: '*/5 * * * *'
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   concurrencyPolicy: Forbid
@@ -108,5 +108,3 @@ spec:
                 - -lc
                 - |
                   cd /app && pnpm --filter @starships/server run schedule:run
-
-

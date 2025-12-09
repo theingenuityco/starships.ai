@@ -9,6 +9,7 @@
     "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc --build && tsc-alias -p tsconfig.json",
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "schedule:run": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/runDueSchedules.ts",
+    "schedule:run:loop": "while true; do pnpm run schedule:run; sleep 300; done",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "jest"

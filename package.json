@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev",
+    "dev:with-schedules": "concurrently -n dev,cron \"pnpm dev\" \"pnpm --filter @starships/server run schedule:run:loop\"",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
@@ -52,7 +53,8 @@
     "semantic-release": "^24.2.7",
     "ts-node": "^10.9.2",
     "turbo": "^2.5.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "concurrently": "^9.2.1"
   },
   "pnpm": {
     "overrides": {

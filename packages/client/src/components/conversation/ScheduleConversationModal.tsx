@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { scheduleAPI } from '@/lib/api'
@@ -362,22 +362,22 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                     <Input
                       type="number"
                       min={1}
-                      className="w-16"
+                      className="h-7 w-28 text-xs"
                       value={Number.isFinite(customInterval) ? customInterval : 1}
                       onChange={e => setCustomInterval(Number(e.target.value) || 1)}
                       disabled={submitting}
                     />
-                    <select
-                      className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      value={customUnit}
-                      onChange={e => setCustomUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
-                      disabled={submitting}
-                    >
-                      <option value="day">day</option>
-                      <option value="week">week</option>
-                      <option value="month">month</option>
-                      <option value="year">year</option>
-                    </select>
+                    <Select value={customUnit} onValueChange={value => setCustomUnit(value as 'day' | 'week' | 'month' | 'year')} disabled={submitting}>
+                      <SelectTrigger className="h-7 w-28 px-2 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">day</SelectItem>
+                        <SelectItem value="week">week</SelectItem>
+                        <SelectItem value="month">month</SelectItem>
+                        <SelectItem value="year">year</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

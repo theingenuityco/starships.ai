@@ -63,7 +63,7 @@ function formatWeekLabel(start: Date): string {
   return `${startLabel} – ${endLabel}, ${start.getFullYear()}`
 }
 
-function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, rangeEnd: Date, maxOccurrences = 32): Date[] {
+function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, rangeEnd: Date): Date[] {
   const occurrences: Date[] = []
   if (!sched?.nextRunAt) return occurrences
 
@@ -85,7 +85,12 @@ function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, 
       tz: sched.timezone || 'UTC',
     })
 
-    for (let i = 0; i < maxOccurrences; i++) {
+    // Generate all occurrences within [rangeStart, rangeEnd]
+    // and stop as soon as we pass rangeEnd.
+    // NOTE: Our UI recurrence patterns only create at most one run per day,
+    // so this remains safe for calendar views.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
       const rawNext = interval.next()
       const next = new Date(rawNext.toString())
       if (next > rangeEnd) break

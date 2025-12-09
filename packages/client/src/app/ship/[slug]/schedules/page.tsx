@@ -336,7 +336,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                   type="button"
                                   onClick={() => openScheduleModalForDate(cell.date)}
                                   className={cn(
-                                    'min-h-[80px] rounded-lg border p-2 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
+                                    'relative group min-h-[80px] rounded-lg border p-2 flex flex-col gap-1 bg-card/80 text-left hover:border-primary/60 hover:bg-primary/5 transition-colors',
                                     inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
                                     isToday && 'ring-1 ring-primary/60 border-primary/60'
                                   )}
@@ -349,27 +349,81 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                       </span>
                                     )}
                                   </div>
-                                  {daySchedules.slice(0, 3).map(s => {
-                                    const agent = s.agentId ? agentsById.get(s.agentId) : undefined
-                                    const label = agent?.name || 'Agent'
-                                    return (
-                                      <div key={s.id} className="h-14 rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-tight flex flex-col gap-0.5 overflow-hidden">
-                                        <div className="flex items-center gap-1">
-                                          <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                            <AgentAvatar seed={agent?.name || label} size={16} rounded />
-                                          </Avatar>
-                                          <span className="font-medium truncate">{label}</span>
+                                  {daySchedules.length > 0 &&
+                                    (() => {
+                                      const sortedDaySchedules = daySchedules.slice().sort((a, b) => {
+                                        const ta = new Date(a.nextRunAt as unknown as string).getTime()
+                                        const tb = new Date(b.nextRunAt as unknown as string).getTime()
+                                        return ta - tb
+                                      })
+                                      const latest = sortedDaySchedules[sortedDaySchedules.length - 1]
+                                      const latestAgent = latest.agentId ? agentsById.get(latest.agentId) : undefined
+                                      const latestLabel = latestAgent?.name || 'Agent'
+                                      const extraCount = sortedDaySchedules.length - 1
+                                      const stackLayers = Math.min(sortedDaySchedules.length, 3)
+
+                                      return (
+                                        <div className="relative mt-1 min-h-[56px]">
+                                          {/* Collapsed stacked view */}
+                                          <div className="pointer-events-none group-hover:hidden">
+                                            {Array.from({ length: stackLayers }).map((_, i) => {
+                                              const isTop = i === stackLayers - 1
+                                              const depth = stackLayers - 1 - i
+                                              const offsetY = depth * 3
+                                              const offsetX = depth * 2
+                                              const zIndex = 10 + i
+                                              const transform = isTop ? 'translate(0, 0)' : `translate(${offsetX}px, ${offsetY}px)`
+
+                                              return (
+                                                <div
+                                                  key={i}
+                                                  className={cn(
+                                                    'absolute inset-x-0 h-14 rounded-md px-1.5 py-0.5 text-[10px] leading-tight overflow-hidden transition-transform',
+                                                    isTop ? 'border border-border/60 bg-muted shadow-sm' : 'border border-border/40 bg-muted/80 shadow-sm'
+                                                  )}
+                                                  style={{ top: 0, zIndex, transform }}
+                                                >
+                                                  {isTop && (
+                                                    <>
+                                                      <div className="flex items-center gap-1 mb-0.5">
+                                                        <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                                          <AgentAvatar seed={latestAgent?.name || latestLabel} size={16} rounded />
+                                                        </Avatar>
+                                                        <span className="font-medium truncate">{latestLabel}</span>
+                                                        {extraCount > 0 && <span className="ml-auto text-[9px] text-muted-foreground">+{extraCount}</span>}
+                                                      </div>
+                                                      {latest.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(latest.prompt)}</div>}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+
+                                          {/* Expanded ordered list on hover */}
+                                          <div className="hidden group-hover:flex flex-col gap-1 h-full">
+                                            {sortedDaySchedules.map(sched => {
+                                              const agent = sched.agentId ? agentsById.get(sched.agentId) : undefined
+                                              const label = agent?.name || 'Agent'
+                                              return (
+                                                <div
+                                                  key={sched.id}
+                                                  className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden"
+                                                >
+                                                  <div className="flex items-center gap-1 mb-0.5">
+                                                    <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                                      <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                                    </Avatar>
+                                                    <span className="font-medium truncate">{label}</span>
+                                                  </div>
+                                                  {sched.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(sched.prompt)}</div>}
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
                                         </div>
-                                        {s.prompt && (
-                                          <span className="text-[10px] text-muted-foreground truncate">
-                                            {String(s.prompt).slice(0, 60)}
-                                            {String(s.prompt).length > 60 ? '…' : ''}
-                                          </span>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
-                                  {daySchedules.length > 3 && <span className="text-[10px] text-muted-foreground mt-0.5">+{daySchedules.length - 3} more</span>}
+                                      )
+                                    })()}
                                 </button>
                               )
                             })}

@@ -65,9 +65,9 @@ export interface EnvironmentConfig {
   RUNNER_AUTH_TOKEN?: string;
 
   // Email Service Configuration (Amazon SES)
-  EMAIL_FROM_ADDRESS: string;
-  EMAIL_FROM_NAME: string;
-  AWS_SES_REGION: string;
+  EMAIL_FROM_ADDRESS?: string;
+  EMAIL_FROM_NAME?: string;
+  AWS_SES_REGION?: string;
 
   // LinkedIn OAuth Configuration (optional)
   LINKEDIN_CLIENT_ID?: string;

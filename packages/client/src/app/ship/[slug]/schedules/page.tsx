@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
+import { CronExpressionParser } from 'cron-parser'
 
 import Icon from '@/components/primitives/Icon'
 import { PageLayout } from '@/components/layout/PageLayout'
@@ -60,6 +61,44 @@ function formatWeekLabel(start: Date): string {
   const endLabel = end.toLocaleDateString(undefined, sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' })
 
   return `${startLabel} – ${endLabel}, ${start.getFullYear()}`
+}
+
+function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, rangeEnd: Date, maxOccurrences = 32): Date[] {
+  const occurrences: Date[] = []
+  if (!sched?.nextRunAt) return occurrences
+
+  const first = new Date(sched.nextRunAt as unknown as string)
+  if (Number.isNaN(first.getTime())) return occurrences
+
+  // Always include the stored nextRunAt if it is in range
+  if (first >= rangeStart && first <= rangeEnd) {
+    occurrences.push(first)
+  }
+
+  if (!sched.isRecurring) {
+    return occurrences
+  }
+
+  try {
+    const interval = CronExpressionParser.parse(sched.cronExpression, {
+      currentDate: first,
+      tz: sched.timezone || 'UTC',
+    })
+
+    for (let i = 0; i < maxOccurrences; i++) {
+      const rawNext = interval.next()
+      const next = new Date(rawNext.toString())
+      if (next > rangeEnd) break
+      if (next >= rangeStart) {
+        occurrences.push(next)
+      }
+    }
+  } catch {
+    // If cron parsing fails, fall back to showing only the stored nextRunAt
+    return occurrences
+  }
+
+  return occurrences
 }
 
 export default function StarshipSchedulesPage(): React.JSX.Element {
@@ -128,17 +167,43 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
 
   const schedulesByDay = useMemo(() => {
     const map = new Map<string, ScheduleModel[]>()
-    for (const sched of schedules) {
-      if (!sched?.nextRunAt) continue
-      const dt = new Date(sched.nextRunAt as unknown as string)
-      if (Number.isNaN(dt.getTime())) continue
-      const key = formatDateKey(dt)
-      const arr = map.get(key) ?? []
-      arr.push(sched)
-      map.set(key, arr)
+
+    if (!schedules.length) return map
+
+    let rangeStart: Date
+    let rangeEnd: Date
+
+    if (viewMode === 'month') {
+      const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+      const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
+
+      const startWeekday = monthStart.getDay()
+      rangeStart = new Date(monthStart)
+      rangeStart.setDate(monthStart.getDate() - startWeekday)
+
+      const endWeekday = monthEnd.getDay()
+      rangeEnd = new Date(monthEnd)
+      rangeEnd.setDate(monthEnd.getDate() + (6 - endWeekday))
+    } else {
+      rangeStart = startOfWeek(currentWeekStart)
+      rangeEnd = new Date(rangeStart)
+      rangeEnd.setDate(rangeStart.getDate() + 6)
     }
+
+    for (const sched of schedules) {
+      const occs = generateOccurrencesForSchedule(sched, rangeStart, rangeEnd)
+      for (const dt of occs) {
+        const key = formatDateKey(dt)
+        const arr = map.get(key) ?? []
+        // clone schedule with this occurrence's nextRunAt for ordering/labeling
+        const instance: ScheduleModel = { ...sched, nextRunAt: dt.toISOString() }
+        arr.push(instance)
+        map.set(key, arr)
+      }
+    }
+
     return map
-  }, [schedules])
+  }, [schedules, viewMode, currentMonth, currentWeekStart])
 
   const allUpcoming = useMemo(() => {
     const now = new Date()
@@ -407,7 +472,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                               const label = agent?.name || 'Agent'
                                               return (
                                                 <div
-                                                  key={sched.id}
+                                                  key={`${sched.id}-${sched.nextRunAt}`}
                                                   className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden"
                                                 >
                                                   <div className="flex items-center gap-1 mb-1">
@@ -535,7 +600,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                             const label = agent?.name || 'Agent'
                                             return (
                                               <div
-                                                key={s.id}
+                                                key={`${s.id}-${s.nextRunAt}`}
                                                 className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm overflow-hidden"
                                               >
                                                 <div className="flex items-center gap-1 mb-1">

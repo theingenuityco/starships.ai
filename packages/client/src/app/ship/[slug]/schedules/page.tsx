@@ -469,7 +469,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                             return (
                                               <div
                                                 key={s.id}
-                                                className="absolute left-1 right-1 rounded-md border border-border/60 bg-card px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm hover:bg-muted"
+                                                className="absolute left-1 right-1 rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[10px] leading-tight shadow-sm hover:bg-muted/90"
                                                 style={{ top: offset, zIndex: 10 + idx }}
                                               >
                                                 <div className="flex items-center justify-between gap-1 mb-0.5">

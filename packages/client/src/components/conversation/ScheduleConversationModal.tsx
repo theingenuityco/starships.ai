@@ -246,7 +246,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                       </Avatar>
                       <div className="flex flex-col min-w-0 flex-1 items-start text-left">
                         <span className="text-sm font-medium truncate leading-tight">{agent.name}</span>
-                        {agent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch] leading-tight">{agent.description}</span>}
+                        {agent.description && <span className="text-[11px] text-muted-foreground leading-tight line-clamp-2 break-words">{agent.description}</span>}
                       </div>
                     </div>
                   </SelectItem>

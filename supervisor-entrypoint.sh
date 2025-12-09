@@ -27,9 +27,7 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
         # Initialize PostgreSQL cluster as postgres user
         su-exec postgres initdb -D "$PGDATA"
         
-        # Configure PostgreSQL
-        echo "listen_addresses = '*'" >> "$PGDATA/postgresql.conf"
-        echo "port = 5432" >> "$PGDATA/postgresql.conf"
+        # Base PostgreSQL configuration for new clusters
         echo "max_connections = 100" >> "$PGDATA/postgresql.conf"
         echo "shared_buffers = 128MB" >> "$PGDATA/postgresql.conf"
         echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
@@ -39,6 +37,12 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
     else
         echo "PostgreSQL data directory already initialized."
     fi
+
+    # Ensure PostgreSQL listens on all interfaces and the expected port
+    # This is idempotent and also fixes previously-initialized clusters
+    echo "Ensuring PostgreSQL listens on 0.0.0.0:5432..."
+    echo "listen_addresses = '*'" >> "$PGDATA/postgresql.conf"
+    echo "port = 5432" >> "$PGDATA/postgresql.conf"
     
     # Always check and create database if it doesn't exist (even on restart)
     # This handles cases where volume was partially initialized

@@ -23,6 +23,7 @@ interface ScheduleConversationModalProps {
 }
 
 type RecurrenceOption = 'none' | 'daily' | 'weekly' | 'weekdays' | 'weekends' | 'monthly' | 'yearly' | 'custom'
+type EndCondition = 'never' | 'on_date' | 'after_occurrences'
 
 export function ScheduleConversationModal({ open, onOpenChange, starshipId, agents, initialPrompt, initialDate, initialTime, initialAgentId }: ScheduleConversationModalProps) {
   const queryClient = useQueryClient()
@@ -35,6 +36,10 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
   const [customUnit, setCustomUnit] = useState<'day' | 'week' | 'month' | 'year'>('week')
   const [customWeekdays, setCustomWeekdays] = useState<number[]>([])
   const [submitting, setSubmitting] = useState(false)
+
+  const [endCondition, setEndCondition] = useState<EndCondition>('never')
+  const [endDate, setEndDate] = useState<string>('')
+  const [endOccurrences, setEndOccurrences] = useState<number>(10)
 
   useEffect(() => {
     if (open) {
@@ -68,6 +73,9 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
       setCustomInterval(1)
       setCustomUnit('week')
       setCustomWeekdays([])
+      setEndCondition('never')
+      setEndDate('')
+      setEndOccurrences(10)
 
       if (initialAgentId) {
         setAgentId(initialAgentId)
@@ -209,6 +217,32 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
           break
       }
 
+      // Compute optional end conditions for recurring schedules.
+      let endsAt: string | null | undefined = null
+      let maxOccurrences: number | null | undefined = null
+
+      if (isRecurring) {
+        if (endCondition === 'on_date') {
+          if (!endDate) {
+            toast.error('End date is required for recurring schedules')
+            return
+          }
+          const endLocal = new Date(`${endDate}T23:59:59`)
+          if (Number.isNaN(endLocal.getTime())) {
+            toast.error('Invalid end date')
+            return
+          }
+          endsAt = endLocal.toISOString()
+        } else if (endCondition === 'after_occurrences') {
+          const n = Math.max(1, Math.floor(endOccurrences || 0))
+          if (!Number.isFinite(n) || n < 1) {
+            toast.error('Number of occurrences must be at least 1')
+            return
+          }
+          maxOccurrences = n
+        }
+      }
+
       await scheduleAPI.create({
         starshipId,
         agentId: agent.id,
@@ -218,6 +252,8 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
         nextRunAt,
         isActive: true,
         isRecurring,
+        endsAt,
+        maxOccurrences,
       })
 
       try {
@@ -370,11 +406,42 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                     </div>
                   </div>
                 )}
-
-                <p className="text-xs text-muted-foreground">Custom recurrences currently continue indefinitely (no end date or occurrence limit).</p>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">Repeating schedules will run again automatically according to the selected pattern.</p>
+            {recurrence !== 'none' && (
+              <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/40 p-3">
+                <Label className="text-xs font-medium">Ends</Label>
+                <div className="flex flex-col gap-1 text-xs">
+                  <label className="inline-flex items-center gap-2">
+                    <input type="radio" className="h-3 w-3" checked={endCondition === 'never'} onChange={() => setEndCondition('never')} disabled={submitting} />
+                    <span>Never</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input type="radio" className="h-3 w-3" checked={endCondition === 'on_date'} onChange={() => setEndCondition('on_date')} disabled={submitting} />
+                    <span>On date</span>
+                    {endCondition === 'on_date' && <Input type="date" className="ml-3 h-7 w-40 text-xs" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={submitting} />}
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input type="radio" className="h-3 w-3" checked={endCondition === 'after_occurrences'} onChange={() => setEndCondition('after_occurrences')} disabled={submitting} />
+                    <span>After</span>
+                    {endCondition === 'after_occurrences' && (
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="ml-2 h-7 w-16 text-xs"
+                          value={Number.isFinite(endOccurrences) ? endOccurrences : 1}
+                          onChange={e => setEndOccurrences(Number(e.target.value) || 1)}
+                          disabled={submitting}
+                        />
+                        <span className="ml-1">occurrences</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">Repeating schedules will stop automatically when they reach this end condition.</p>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>

@@ -49,6 +49,8 @@ export class ScheduleRepository extends BaseRepository {
     nextRunAt: string;
     isActive: boolean;
     isRecurring?: boolean;
+    endsAt?: string | null;
+    maxOccurrences?: number | null;
   }): Promise<ScheduleModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -63,6 +65,9 @@ export class ScheduleRepository extends BaseRepository {
           nextRunAt: data.nextRunAt,
           isActive: data.isActive,
           isRecurring: typeof data.isRecurring === 'boolean' ? data.isRecurring : false,
+          endsAt: data.endsAt ?? null,
+          maxOccurrences: data.maxOccurrences ?? null,
+          runCount: 0,
           lastRunAt: null,
           lastRunConversationId: null,
           createdAt: now,

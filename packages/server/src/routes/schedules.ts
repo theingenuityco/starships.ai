@@ -19,6 +19,8 @@ const CreateScheduleSchema = z.object({
   nextRunAt: z.string().datetime(),
   isActive: z.boolean().default(true),
   isRecurring: z.boolean().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  maxOccurrences: z.number().int().positive().optional(),
 });
 
 const UpdateScheduleSchema = z.object({
@@ -28,6 +30,8 @@ const UpdateScheduleSchema = z.object({
   nextRunAt: z.string().datetime().optional(),
   isActive: z.boolean().optional(),
   isRecurring: z.boolean().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  maxOccurrences: z.number().int().positive().nullable().optional(),
 });
 
 /**
@@ -58,6 +62,8 @@ router.post('/starships/:starshipId/schedules', jwtAuthMiddleware, async (req: R
       nextRunAt: body.nextRunAt,
       isActive: body.isActive,
       isRecurring: body.isRecurring ?? false,
+      endsAt: body.endsAt ?? null,
+      maxOccurrences: body.maxOccurrences ?? null,
     });
 
     sendSuccess(res, schedule, 201);

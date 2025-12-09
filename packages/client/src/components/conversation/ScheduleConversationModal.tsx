@@ -40,7 +40,30 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
     if (open) {
       setPrompt(initialPrompt)
       setDate(initialDate || '')
-      setTime(initialTime || '')
+      // Prefer an explicit initialTime when provided (e.g. from clicking a specific hour slot),
+      // otherwise default to the next sensible local time slot.
+      if (initialTime) {
+        setTime(initialTime)
+      } else {
+        const now = new Date()
+        let hour = now.getHours()
+        const minutes = now.getMinutes()
+
+        // Snap to next half-hour slot
+        let minuteSlot = 0
+        if (minutes === 0) {
+          minuteSlot = 0
+        } else if (minutes <= 30) {
+          minuteSlot = 30
+        } else {
+          hour = (hour + 1) % 24
+          minuteSlot = 0
+        }
+
+        const hh = String(hour).padStart(2, '0')
+        const mm = String(minuteSlot).padStart(2, '0')
+        setTime(`${hh}:${mm}`)
+      }
       setRecurrence('none')
       setCustomInterval(1)
       setCustomUnit('week')

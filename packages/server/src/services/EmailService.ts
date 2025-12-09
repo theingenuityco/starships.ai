@@ -10,14 +10,30 @@ import { getEnvConfig } from '@starships/env';
 import { logger } from '@/utils/logger';
 
 export class EmailService {
-  private sesClient: SESClient;
+  private sesClient: SESClient | null;
   private env: ReturnType<typeof getEnvConfig>;
+  private isConfigured: boolean;
 
   constructor() {
     // Follow exact UserService constructor pattern (no parameters)
     this.env = getEnvConfig();
+
+    const hasEmailConfig = Boolean(this.env.EMAIL_FROM_ADDRESS && this.env.EMAIL_FROM_NAME && this.env.AWS_SES_REGION);
+
+    if (!hasEmailConfig) {
+      this.isConfigured = false;
+      this.sesClient = null;
+      logger.warn('[EmailService] Email configuration is incomplete; email sending is disabled.', {
+        EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
+        EMAIL_FROM_NAME: this.env.EMAIL_FROM_NAME,
+        AWS_SES_REGION: this.env.AWS_SES_REGION,
+      });
+      return;
+    }
+
+    this.isConfigured = true;
     this.sesClient = new SESClient({
-      region: this.env.AWS_SES_REGION,
+      region: this.env.AWS_SES_REGION as string,
     });
   }
 
@@ -26,12 +42,7 @@ export class EmailService {
    * Security: Prevents HTML injection in email templates
    */
   private escapeHtml(unsafe: string): string {
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+    return unsafe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
   /**
@@ -39,6 +50,15 @@ export class EmailService {
    * Business logic: Email template generation and delivery
    */
   async sendVerificationEmail(email: string, token: string, displayName?: string): Promise<void> {
+    if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
+      logger.error('[EmailService] Attempted to send verification email but configuration is missing.', {
+        EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
+        EMAIL_FROM_NAME: this.env.EMAIL_FROM_NAME,
+        AWS_SES_REGION: this.env.AWS_SES_REGION,
+      });
+      throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
+    }
+
     const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/verify-email?token=${token}`;
 
     const command = new SendEmailCommand({
@@ -70,6 +90,15 @@ export class EmailService {
    * Business logic: Password reset email template generation and delivery
    */
   async sendPasswordResetEmail(email: string, token: string, displayName?: string): Promise<void> {
+    if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
+      logger.error('[EmailService] Attempted to send password reset email but configuration is missing.', {
+        EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
+        EMAIL_FROM_NAME: this.env.EMAIL_FROM_NAME,
+        AWS_SES_REGION: this.env.AWS_SES_REGION,
+      });
+      throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
+    }
+
     const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
 
     const command = new SendEmailCommand({
@@ -101,6 +130,15 @@ export class EmailService {
    * Business logic: Email change verification template generation and delivery
    */
   async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string, displayName?: string): Promise<void> {
+    if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
+      logger.error('[EmailService] Attempted to send email change verification email but configuration is missing.', {
+        EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
+        EMAIL_FROM_NAME: this.env.EMAIL_FROM_NAME,
+        AWS_SES_REGION: this.env.AWS_SES_REGION,
+      });
+      throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
+    }
+
     const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
 
     const command = new SendEmailCommand({

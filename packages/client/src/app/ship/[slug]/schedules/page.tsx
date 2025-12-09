@@ -236,26 +236,6 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
 
             <div className="space-y-6">
               <div className="flex flex-col gap-4">
-                <Card className="frosted-glass-card shadow-frosted-lg">
-                  <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Icon name="clock" className="h-4 w-4" />
-                      Schedule a run
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex flex-col md:flex-row md:items-center gap-3">
-                      <p className="flex-1 text-xs text-muted-foreground">Click any day in the calendar below to schedule an agent run on that date, or use the button to open the scheduler.</p>
-                      <div className="flex-none">
-                        <Button type="button" size="sm" onClick={() => openScheduleModalForDate()} disabled={!starshipId}>
-                          <Icon name="plus" className="mr-1.5 h-3.5 w-3.5" />
-                          New schedule
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <Card className="lg:col-span-2 frosted-glass-card shadow-frosted-lg">
                     <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">

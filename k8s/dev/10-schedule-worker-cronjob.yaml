@@ -8,8 +8,8 @@ metadata:
     component: schedule-worker
     environment: dev
 spec:
-  # Run every minute; adjust if you want a different granularity
-  schedule: '*/1 * * * *'
+  # Run every 5 minutes; adjust if you want a different granularity
+  schedule: '*/5 * * * *'
   successfulJobsHistoryLimit: 2
   failedJobsHistoryLimit: 2
   concurrencyPolicy: Forbid
@@ -106,5 +106,3 @@ spec:
                 - -lc
                 - |
                   cd /app && pnpm --filter @starships/server run schedule:run
-
-

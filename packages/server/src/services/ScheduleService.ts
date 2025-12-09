@@ -133,7 +133,7 @@ export class ScheduleService {
           try {
             const interval = CronExpressionParser.parse(claimed.cronExpression, {
               currentDate: now,
-              tz: 'UTC',
+              tz: claimed.timezone || 'UTC',
             });
             const rawNext = interval.next();
             const nextDate = new Date(rawNext.toString());

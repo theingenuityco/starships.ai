@@ -129,7 +129,6 @@ jobs:
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION }}
           AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET }}
           AWS_S3_REGION: ${{ vars.AWS_S3_REGION }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
@@ -174,7 +173,6 @@ jobs:
             --from-literal=AWS_SES_REGION="$AWS_SES_REGION" \
             --from-literal=AWS_S3_BUCKET="$AWS_S3_BUCKET" \
             --from-literal=AWS_S3_REGION="$AWS_S3_REGION" \
-            --from-literal=REDIS_URL="$REDIS_URL" \
             -n ${{ env.NAMESPACE }}
 
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true

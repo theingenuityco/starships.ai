@@ -133,7 +133,10 @@ export function getEnvConfig(): EnvironmentConfig {
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
 
-    // Redis / Queueing Configuration
-    REDIS_URL: process.env.REDIS_URL,
+    // Redis / Queueing Configuration (optional; required only for scheduler/worker)
+    REDIS_HOST: process.env.REDIS_HOST,
+    REDIS_PORT: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : undefined,
+    REDIS_DB: process.env.REDIS_DB ? parseInt(process.env.REDIS_DB, 10) : undefined,
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
   };
 }

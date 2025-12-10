@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: starships-prod
+  labels:
+    app: redis
+    environment: production
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+    environment: production
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: starships-prod
+  labels:
+    app: redis
+    environment: production
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      environment: production
+  template:
+    metadata:
+      labels:
+        app: redis
+        environment: production
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '1000m'
+              memory: '1Gi'
+          args:
+            - '--appendonly'
+            - 'yes'
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 10Gi
+

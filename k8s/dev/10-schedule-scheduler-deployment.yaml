@@ -104,11 +104,10 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: OPENROUTER_API_KEY
-            - name: REDIS_URL
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: REDIS_URL
+            - name: REDIS_HOST
+              value: 'redis'
+            - name: REDIS_PORT
+              value: '6379'
             - name: SCHEDULE_POLL_INTERVAL_MS
               value: '300000'
           command:
@@ -116,4 +115,3 @@ spec:
             - -lc
             - |
               cd /app && pnpm --filter @starships/server run schedule:scheduler
-

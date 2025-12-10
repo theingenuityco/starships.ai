@@ -106,6 +106,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/dev/08-autopilot-runner-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/09-autopilot-runner-service.yaml
+          # Ensure Redis is defined before scheduler/worker Deployments
+          kubectl apply --dry-run=client -f k8s/dev/12-redis-statefulset.yaml
           kubectl apply --dry-run=client -f k8s/dev/10-schedule-scheduler-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/11-schedule-worker-deployment.yaml
           echo "✅ Kubernetes manifests validated successfully."
@@ -122,6 +124,8 @@ jobs:
           kubectl apply -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/dev/08-autopilot-runner-deployment.yaml
           kubectl apply -f k8s/dev/09-autopilot-runner-service.yaml
+          # Ensure Redis is created before scheduling components
+          kubectl apply -f k8s/dev/12-redis-statefulset.yaml
           kubectl apply -f k8s/dev/10-schedule-scheduler-deployment.yaml
           kubectl apply -f k8s/dev/11-schedule-worker-deployment.yaml
           echo "✅ Applied manifests to dev cluster."

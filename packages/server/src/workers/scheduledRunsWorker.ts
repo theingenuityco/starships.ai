@@ -3,7 +3,12 @@ import { getEnvConfig } from '@starships/env';
 import { createConnection } from '@starships/models';
 import { Worker } from 'bullmq';
 import { ConversationService } from '@/services/ConversationService';
-import { getScheduledRunsQueue, SCHEDULED_RUNS_QUEUE_NAME, type ScheduledRunJobData } from '@/queues/scheduledRunsQueue';
+import {
+  getRedisConnection,
+  getScheduledRunsQueue,
+  SCHEDULED_RUNS_QUEUE_NAME,
+  type ScheduledRunJobData,
+} from '@/queues/scheduledRunsQueue';
 
 async function main(): Promise<void> {
   const env = getEnvConfig();
@@ -33,7 +38,7 @@ async function main(): Promise<void> {
 
   const worker = new Worker<ScheduledRunJobData>(
     SCHEDULED_RUNS_QUEUE_NAME,
-    async job => {
+    async (job) => {
       const { scheduleId, starshipId, agentId, prompt } = job.data;
 
       console.log('[ScheduledRunsWorker] Processing scheduled run job', {
@@ -69,9 +74,7 @@ async function main(): Promise<void> {
       });
     },
     {
-      connection: {
-        url: env.REDIS_URL as string,
-      },
+      connection: getRedisConnection(),
       prefix: 'starships',
     }
   );
@@ -85,7 +88,7 @@ async function main(): Promise<void> {
     });
   });
 
-  worker.on('error', err => {
+  worker.on('error', (err) => {
     console.error('[ScheduledRunsWorker] Worker error', {
       error: err instanceof Error ? err.message : String(err),
     });
@@ -113,8 +116,7 @@ async function main(): Promise<void> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
-main().catch(err => {
+main().catch((err) => {
   console.error('[ScheduledRunsWorker] Fatal error during startup', err);
   process.exit(1);
 });
-

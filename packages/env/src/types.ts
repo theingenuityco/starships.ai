@@ -95,5 +95,8 @@ export interface EnvironmentConfig {
   AWS_SECRET_ACCESS_KEY?: string;
 
   // Redis / Queueing Configuration
-  REDIS_URL?: string;
+  REDIS_HOST?: string;
+  REDIS_PORT?: number;
+  REDIS_DB?: number;
+  REDIS_PASSWORD?: string;
 }

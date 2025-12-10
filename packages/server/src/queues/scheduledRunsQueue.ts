@@ -13,16 +13,31 @@ export interface ScheduledRunJobData {
 
 let queueInstance: Queue<ScheduledRunJobData> | null = null;
 
-function getRedisConnection() {
+export function getRedisConnection() {
   const env = getEnvConfig();
 
-  if (!env.REDIS_URL) {
-    throw new Error('[ScheduledRunsQueue] REDIS_URL is not configured. Please set REDIS_URL in the environment to enable scheduling.');
+  if (!env.REDIS_HOST) {
+    throw new Error(
+      '[ScheduledRunsQueue] REDIS_HOST is not configured. Please set REDIS_HOST and REDIS_PORT (and optionally REDIS_DB, REDIS_PASSWORD).'
+    );
   }
 
-  return {
-    url: env.REDIS_URL,
+  const port = typeof env.REDIS_PORT === 'number' && !Number.isNaN(env.REDIS_PORT) ? env.REDIS_PORT : 6379;
+
+  const connection: Record<string, unknown> = {
+    host: env.REDIS_HOST,
+    port,
   };
+
+  if (typeof env.REDIS_DB === 'number' && !Number.isNaN(env.REDIS_DB)) {
+    connection.db = env.REDIS_DB;
+  }
+
+  if (env.REDIS_PASSWORD) {
+    connection.password = env.REDIS_PASSWORD;
+  }
+
+  return connection;
 }
 
 export function getScheduledRunsQueue(): Queue<ScheduledRunJobData> {

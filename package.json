@@ -32,7 +32,10 @@
     "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:18 || echo 'Container may already exist. Use postgres:reset to recreate.'",
     "postgres:reset": "docker stop starships-postgres 2>/dev/null || true && docker rm starships-postgres 2>/dev/null || true && echo 'PostgreSQL container cleaned up. Use postgres:install to recreate.'",
     "postgres:shell": "docker exec -it starships-postgres psql -U postgres -d starships || echo 'Container not running. Use postgres:start first.'",
-    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'"
+    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'",
+    "redis:install": "docker run -d --name starships-redis -p 6379:6379 redis:7-alpine || echo 'Container may already exist. Use redis:reset to recreate.'",
+    "redis:reset": "docker stop starships-redis 2>/dev/null || true && docker rm starships-redis 2>/dev/null || true && echo 'Redis container cleaned up. Use redis:install to recreate.'",
+    "redis:shell": "docker exec -it starships-redis redis-cli || echo 'Container not running. Use redis:install first.'"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

@@ -46,19 +46,29 @@ spec:
             - -c
             - |
               set -e
+
+              # If the new volume already contains an initialized cluster, do nothing
               if [ -f /new/data/pgdata/postgresql.conf ] && [ -f /new/data/pgdata/PG_VERSION ]; then
                 echo "New Postgres data already initialized; skipping migration."
                 exit 0
               fi
 
-              if [ ! -d /old ] || [ -z "$(ls -A /old 2>/dev/null)" ]; then
-                echo "No existing Postgres data found on old volume; skipping migration."
+              # The old fat-container StatefulSet stored Postgres data under the 'postgres'
+              # subPath on the shared PVC, so the actual cluster lives at:
+              #   /old/postgres/pgdata
+              if [ ! -d /old/postgres/pgdata ] || \
+                 [ ! -f /old/postgres/pgdata/postgresql.conf ] || \
+                 [ ! -f /old/postgres/pgdata/PG_VERSION ]; then
+                echo "No existing Postgres cluster found at /old/postgres/pgdata; skipping migration."
                 exit 0
               fi
 
               echo "Copying existing Postgres data from old volume to new volume..."
               mkdir -p /new/data
-              cp -a /old/. /new/data/.
+              # Copy ONLY the 'postgres' subdirectory so that on the new PVC the cluster
+              # ends up at /postgres/pgdata, which maps to /var/lib/postgresql/data/pgdata
+              # in the postgres container.
+              cp -a /old/postgres/. /new/data/.
               echo "Postgres data copy complete."
           volumeMounts:
             - name: old-postgres-data

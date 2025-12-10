@@ -64,17 +64,6 @@ spec:
               mountPath: /app/packages/docs/.source
               subPath: docs-source
 
-        - name: init-starships-data
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              mkdir -p /mnt/postgresql /mnt/app-data/sessions || true
-          volumeMounts:
-            - name: starships-data
-              mountPath: /mnt
-
       containers:
         - name: starships
           image: 'ghcr.io/theingenuityco/starships.ai:latest' # Update via CI/CD
@@ -166,8 +155,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: POSTGRES_SSL
-            - name: PGDATA
-              value: '/var/lib/postgresql/data/pgdata'
 
             # LLM Providers
             - name: OPENAI_API_KEY

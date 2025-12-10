@@ -46,7 +46,7 @@ spec:
             - -c
             - |
               set -e
-              if [ -f /new/data/pgdata/postgresql.conf ]; then
+              if [ -f /new/data/pgdata/postgresql.conf ] && [ -f /new/data/pgdata/PG_VERSION ]; then
                 echo "New Postgres data already initialized; skipping migration."
                 exit 0
               fi
@@ -64,7 +64,7 @@ spec:
             - name: old-postgres-data
               mountPath: /old
             - name: postgres-data
-              mountPath: /new
+              mountPath: /new/data
               subPath: postgres
       containers:
         - name: postgres
@@ -95,7 +95,7 @@ spec:
               name: postgres
           volumeMounts:
             - name: postgres-data
-              mountPath: /var/lib/postgresql
+              mountPath: /var/lib/postgresql/data
               subPath: postgres
           resources:
             requests:

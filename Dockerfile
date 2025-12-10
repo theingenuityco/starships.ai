@@ -52,12 +52,15 @@ ARG CACHE_BUST=1
 RUN echo "Cache bust: ${CACHE_BUST}"
 
 # Build the application with secrets mounted (not stored in layers)
-# Secrets are only available during this RUN command, not in the final image
+# Secrets are only available during this RUN command, not in the final image.
+# After building, ensure that the runtime user (nodejs) owns the application
+# files so that processes like the docs server can write generated artifacts.
 RUN --mount=type=secret,id=stripe_secret_key \
     --mount=type=secret,id=stripe_publishable_key \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
     STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
-    pnpm run build
+    pnpm run build && \
+    chown -R nodejs:node /app
 
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker && \

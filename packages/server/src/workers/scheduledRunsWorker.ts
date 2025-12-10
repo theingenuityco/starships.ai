@@ -122,7 +122,6 @@ async function main(): Promise<void> {
   process.on('SIGINT', shutdown);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
 main().catch((err) => {
   console.error('[ScheduledRunsWorker] Fatal error during startup', err);
   process.exit(1);

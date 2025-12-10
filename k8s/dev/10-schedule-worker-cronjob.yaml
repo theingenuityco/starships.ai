@@ -101,6 +101,11 @@ spec:
                     secretKeyRef:
                       name: starships-secrets
                       key: POSTGRES_SSL
+                - name: OPENROUTER_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: starships-secrets
+                      key: OPENROUTER_API_KEY
               command:
                 - /bin/sh
                 - -lc

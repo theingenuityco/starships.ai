@@ -103,6 +103,11 @@ spec:
                       key: POSTGRES_SSL
                 - name: PGDATA
                   value: '/var/lib/postgresql/data/pgdata'
+                - name: OPENROUTER_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: starships-secrets
+                      key: OPENROUTER_API_KEY
               command:
                 - /bin/sh
                 - -lc

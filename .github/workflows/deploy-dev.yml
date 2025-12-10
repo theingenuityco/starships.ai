@@ -261,14 +261,14 @@ jobs:
         if: steps.check-image.outputs.image_exists == 'true'
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
-          kubectl set image statefulset/starships-app \
+          kubectl set image deployment/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
             -n ${{ env.NAMESPACE }}
             # Only force restart for 'latest' tag to avoid unnecessary downtime
           if [ "${{ steps.get-image.outputs.image_tag }}" = "latest" ]; then
-            kubectl rollout restart statefulset/starships-app -n ${{ env.NAMESPACE }}
+            kubectl rollout restart deployment/starships-app -n ${{ env.NAMESPACE }}
           fi
-          kubectl rollout status statefulset/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 
       - name: Verify deployment
@@ -276,5 +276,5 @@ jobs:
         run: |
           kubectl get pods -n ${{ env.NAMESPACE }}
           kubectl get pv,pvc -n ${{ env.NAMESPACE }} || true
-          kubectl logs -n ${{ env.NAMESPACE }} statefulset/starships-app --tail=30 || true
+          kubectl logs -n ${{ env.NAMESPACE }} deployment/starships-app --tail=30 || true
           echo "✅ Verification complete."

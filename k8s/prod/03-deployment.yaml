@@ -58,9 +58,6 @@ spec:
               echo "✅ Permissions fixed"
           volumeMounts:
             - name: starships-data
-              mountPath: /var/lib/postgresql
-              subPath: postgres
-            - name: starships-data
               mountPath: /app/data
               subPath: app-data
             - name: starships-data

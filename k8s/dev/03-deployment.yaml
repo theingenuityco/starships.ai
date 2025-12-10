@@ -52,9 +52,6 @@ spec:
               echo "✅ Permissions fixed for /app/packages/docs"
           volumeMounts:
             - name: starships-data
-              mountPath: /var/lib/postgresql
-              subPath: postgres
-            - name: starships-data
               mountPath: /app/data
               subPath: app-data
             - name: starships-data
@@ -312,8 +309,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: ENCRYPTION_KEY
-            - name: PGDATA
-              value: '/var/lib/postgresql/data/pgdata'
 
           readinessProbe:
             httpGet:

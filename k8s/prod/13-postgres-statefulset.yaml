@@ -38,6 +38,34 @@ spec:
         app: postgres
         environment: production
     spec:
+      initContainers:
+        - name: migrate-postgres-data
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              if [ -f /new/data/pgdata/postgresql.conf ]; then
+                echo "New Postgres data already initialized; skipping migration."
+                exit 0
+              fi
+
+              if [ ! -d /old ] || [ -z "$(ls -A /old 2>/dev/null)" ]; then
+                echo "No existing Postgres data found on old volume; skipping migration."
+                exit 0
+              fi
+
+              echo "Copying existing Postgres data from old volume to new volume..."
+              mkdir -p /new
+              cp -a /old/. /new/.
+              echo "Postgres data copy complete."
+          volumeMounts:
+            - name: old-postgres-data
+              mountPath: /old
+            - name: postgres-data
+              mountPath: /new
+              subPath: postgres
       containers:
         - name: postgres
           image: postgres:17-alpine
@@ -76,21 +104,18 @@ spec:
             limits:
               cpu: '2000m'
               memory: '4Gi'
-      # Reuse the existing StatefulSet PVC that already holds the PostgreSQL data.
-      # NOTE: This PVC is created by the starships-app StatefulSet as:
-      #       starships-data-starships-app-0
-      # We mount only the "postgres" subPath, which already contains the PGDATA directory.
       volumes:
-        - name: postgres-data
+        # Old PVC from starships-app; used only for one-time data migration
+        - name: old-postgres-data
           persistentVolumeClaim:
             claimName: starships-data-starships-app-0
-      # Ensure the PostgreSQL pod is scheduled on the same node as the starships-app pod,
-      # because the PVC uses ReadWriteOnce (EBS gp3).
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchLabels:
-                  app: starships-ai
-                  environment: production
-              topologyKey: kubernetes.io/hostname
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 30Gi

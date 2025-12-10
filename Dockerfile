@@ -1,6 +1,8 @@
 # ==========================================
-# Starships.ai - All-in-One Fat Container
-# Contains: Frontend + Backend + PostgreSQL Database
+# Starships.ai - Application Container
+# Contains: Frontend + Backend
+# (Optionally runs embedded PostgreSQL when POSTGRES_EXTERNAL_HOST is unset;
+#  in Kubernetes we use an external Postgres StatefulSet.)
 # ==========================================
 
 FROM node:20-alpine

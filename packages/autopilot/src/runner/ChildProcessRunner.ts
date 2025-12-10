@@ -80,6 +80,11 @@ export class ChildProcessRunner implements Runner {
     return await new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
       let settled = false;
       let killTimer: ReturnType<typeof setTimeout> | undefined;
+      // Track completion of all eventCallback calls so we can wait for them
+      // before resolving/rejecting the outer promise. This prevents races where
+      // callers tear down shared resources (like DB pools) while callbacks
+      // are still running.
+      let lastEventPromise: Promise<void> = Promise.resolve();
 
       const cleanup = () => {
         if (killTimer) {
@@ -146,31 +151,48 @@ export class ChildProcessRunner implements Runner {
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-            await Promise.resolve(cb(msg.event)).catch((err: unknown) => {
-              // Log and continue so a bad callback doesn't break execution
-              console.error('[ChildProcessRunner] eventCallback error:', err);
-            });
+            // Chain callbacks so we can wait for all of them on completion.
+            lastEventPromise = lastEventPromise
+              .then(() => Promise.resolve(cb(msg.event)))
+              .catch((err: unknown) => {
+                // Log and continue so a bad callback doesn't break execution
+                console.error('[ChildProcessRunner] eventCallback error:', err);
+              });
           } else if (msg.type === 'done') {
             if (settled) return;
             settled = true;
-            cleanup();
-            resolvePromise(msg.result);
-            try {
-              child.disconnect();
-            } catch {
-              // ignore
-            }
+            // Ensure all prior eventCallbacks have finished before resolving.
+            lastEventPromise
+              .catch(() => {
+                // Errors already logged above; nothing more to do here.
+              })
+              .finally(() => {
+                cleanup();
+                resolvePromise(msg.result);
+                try {
+                  child.disconnect();
+                } catch {
+                  // ignore
+                }
+              });
           } else if (msg.type === 'error') {
             if (settled) return;
             settled = true;
-            cleanup();
-            const e = new Error(msg.error?.message ?? 'Child runner error');
-            rejectPromise(e);
-            try {
-              child.disconnect();
-            } catch {
-              // ignore
-            }
+            // Ensure all prior eventCallbacks have finished before rejecting.
+            lastEventPromise
+              .catch(() => {
+                // Errors already logged above; nothing more to do here.
+              })
+              .finally(() => {
+                cleanup();
+                const e = new Error(msg.error?.message ?? 'Child runner error');
+                rejectPromise(e);
+                try {
+                  child.disconnect();
+                } catch {
+                  // ignore
+                }
+              });
           }
         } catch (err) {
           console.error('[ChildProcessRunner] message handler error (run)', err);
@@ -259,6 +281,11 @@ export class ChildProcessRunner implements Runner {
 
     let settled = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
+    // Track completion of all eventCallback calls so we can wait for them
+    // before resolving/rejecting the outer promise. This prevents races where
+    // callers tear down shared resources (like DB pools) while callbacks
+    // are still running.
+    let lastEventPromise: Promise<void> = Promise.resolve();
 
     const cleanup = () => {
       if (killTimer) {
@@ -324,31 +351,48 @@ export class ChildProcessRunner implements Runner {
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-            await Promise.resolve(cb(msg.event)).catch((err: unknown) => {
-              // Log and continue so a bad callback doesn't break execution
-              console.error('[ChildProcessRunner] eventCallback error:', err);
-            });
+            // Chain callbacks so we can wait for all of them on completion.
+            lastEventPromise = lastEventPromise
+              .then(() => Promise.resolve(cb(msg.event)))
+              .catch((err: unknown) => {
+                // Log and continue so a bad callback doesn't break execution
+                console.error('[ChildProcessRunner] eventCallback error:', err);
+              });
           } else if (msg.type === 'done') {
             if (settled) return;
             settled = true;
-            cleanup();
-            resolvePromise(msg.result);
-            try {
-              child.disconnect();
-            } catch {
-              // ignore
-            }
+            // Ensure all prior eventCallbacks have finished before resolving.
+            lastEventPromise
+              .catch(() => {
+                // Errors already logged above; nothing more to do here.
+              })
+              .finally(() => {
+                cleanup();
+                resolvePromise(msg.result);
+                try {
+                  child.disconnect();
+                } catch {
+                  // ignore
+                }
+              });
           } else if (msg.type === 'error') {
             if (settled) return;
             settled = true;
-            cleanup();
-            const e = new Error(msg.error?.message ?? 'Child runner error');
-            rejectPromise(e);
-            try {
-              child.disconnect();
-            } catch {
-              // ignore
-            }
+            // Ensure all prior eventCallbacks have finished before rejecting.
+            lastEventPromise
+              .catch(() => {
+                // Errors already logged above; nothing more to do here.
+              })
+              .finally(() => {
+                cleanup();
+                const e = new Error(msg.error?.message ?? 'Child runner error');
+                rejectPromise(e);
+                try {
+                  child.disconnect();
+                } catch {
+                  // ignore
+                }
+              });
           }
         } catch (err) {
           console.error('[ChildProcessRunner] message handler error (runWithController)', err);

@@ -188,6 +188,7 @@ jobs:
             --from-literal=REDIS_HOST="$REDIS_HOST" \
             --from-literal=REDIS_PORT="$REDIS_PORT" \
             --from-literal=REDIS_DB="$REDIS_DB" \
+            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
             -n ${{ env.NAMESPACE }}
 
           # Redis auth secret

@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # All-in-One Container: Frontend + Backend + PostgreSQL (configurable)
+  # Application container: Frontend + Backend (uses external PostgreSQL)
   starships:
     image: ghcr.io/theingenuityco/starships.ai:latest
     container_name: starships-all-in-one
@@ -9,7 +9,6 @@ services:
     ports:
       - '3000:3000' # Frontend (Next.js)
       - '4000:4000' # Backend (Express)
-      - '5432:5432' # PostgreSQL (only if using internal PostgreSQL)
     environment:
       # Core Configuration
       NODE_ENV: production
@@ -22,17 +21,10 @@ services:
       CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
       SERVER_URL: ${SERVER_URL:-http://localhost:4000}
 
-      # PostgreSQL Configuration - Choose ONE of the following options:
+      # PostgreSQL Configuration (external database)
+      POSTGRES_HOST: ${POSTGRES_HOST:-localhost}
 
-      # Option 1: Use INTERNAL PostgreSQL (default - runs PostgreSQL inside container)
-      # Leave POSTGRES_EXTERNAL_HOST unset or empty
-      POSTGRES_HOST: ${POSTGRES_HOST:-localhost} # Will be auto-set if using internal
-      # Option 2: Use EXTERNAL PostgreSQL (e.g., AWS RDS, Google Cloud SQL)
-      # Uncomment and set the following to use external PostgreSQL:
-      # POSTGRES_EXTERNAL_HOST: your-postgres-host.com
-      # POSTGRES_PORT: 5432
-
-      # PostgreSQL Credentials (for both internal and external)
+      # PostgreSQL Credentials
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -73,9 +65,6 @@ services:
       # Application data
       - starships-data:/app/data
 
-      # PostgreSQL data (only used if internal PostgreSQL is active)
-      - postgres-data:/var/lib/postgresql/data
-
       # Cache for faster restarts
       - node-modules:/app/node_modules
       - client-next-cache:/app/packages/client/.next
@@ -94,10 +83,6 @@ services:
 volumes:
   # Application volumes
   starships-data:
-    driver: local
-
-  # PostgreSQL volumes (only used with internal PostgreSQL)
-  postgres-data:
     driver: local
 
   # Cache volumes

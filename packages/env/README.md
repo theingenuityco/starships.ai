@@ -43,10 +43,10 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 
 ### Database Configuration
 
-- `POSTGRES_HOST` (string) - PostgreSQL host, defaults to 'localhost'
+- `POSTGRES_HOST` (string) - PostgreSQL host, defaults to `'postgres'` (the in-cluster Service name; override to `'localhost'` for local development)
 - `POSTGRES_PORT` (number) - PostgreSQL port, defaults to 5432
 - `POSTGRES_USER` (string) - PostgreSQL username, defaults to 'postgres'
-- `POSTGRES_PASSWORD` (string) - PostgreSQL password, defaults to 'password'
+- `POSTGRES_PASSWORD` (string) - PostgreSQL password (required, no default)
 - `POSTGRES_DATABASE` (string) - PostgreSQL database name, defaults to 'starships'
 - `POSTGRES_SSL` (boolean) - PostgreSQL SSL connection, defaults to false
 

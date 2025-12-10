@@ -186,6 +186,14 @@ jobs:
           REDIS_HOST="${REDIS_HOST:-redis}"
           REDIS_PORT="${REDIS_PORT:-6379}"
 
+          # Provide sane defaults for PostgreSQL so only password (and optionally host)
+          # need to be explicitly configured for most environments.
+          POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
+          POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+          POSTGRES_USER="${POSTGRES_USER:-postgres}"
+          POSTGRES_DATABASE="${POSTGRES_DATABASE:-starships}"
+          POSTGRES_SSL="${POSTGRES_SSL:-false}"
+
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
             --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \

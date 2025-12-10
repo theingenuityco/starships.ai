@@ -30,10 +30,9 @@ export function getEnvConfig(): EnvironmentConfig {
     CLIENT_URL: process.env.CLIENT_URL,
     SERVER_URL: process.env.SERVER_URL,
     DOCS_URL: process.env.DOCS_URL,
-    POSTGRES_HOST: process.env.POSTGRES_HOST,
-    POSTGRES_USER: process.env.POSTGRES_USER,
+    // For PostgreSQL we provide sensible defaults for host/port/user/database.
+    // The password is the only truly required value.
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
-    POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
   };
 
   // Check for missing required environment variables
@@ -48,6 +47,15 @@ export function getEnvConfig(): EnvironmentConfig {
   // Optional runner defaults: prefer explicit RUNNER_URL if provided; otherwise localhost with default port
   const defaultRunnerPort = process.env.RUNNER_PORT ? parseInt(process.env.RUNNER_PORT, 10) : 50051;
   const resolvedRunnerUrl = process.env.RUNNER_URL || `http://localhost:${defaultRunnerPort}`;
+
+  // PostgreSQL defaults to match our Kubernetes/docker-compose setup:
+  // - Service name "postgres" inside the cluster
+  // - Default port/user/database aligned with the official image
+  const resolvedPostgresHost = process.env.POSTGRES_HOST || 'postgres';
+  const resolvedPostgresPort = process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT, 10) : 5432;
+  const resolvedPostgresUser = process.env.POSTGRES_USER || 'postgres';
+  const resolvedPostgresDatabase = process.env.POSTGRES_DATABASE || 'starships';
+  const resolvedPostgresSSL = process.env.POSTGRES_SSL === 'true';
 
   return {
     // Server Configuration
@@ -64,13 +72,13 @@ export function getEnvConfig(): EnvironmentConfig {
     SERVER_URL: requiredEnvVars.SERVER_URL!,
     DOCS_URL: requiredEnvVars.DOCS_URL!,
 
-    // PostgreSQL Database Configuration - Required, no localhost fallbacks
-    POSTGRES_HOST: requiredEnvVars.POSTGRES_HOST!,
-    POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-    POSTGRES_USER: requiredEnvVars.POSTGRES_USER!,
+    // PostgreSQL Database Configuration
+    POSTGRES_HOST: resolvedPostgresHost,
+    POSTGRES_PORT: resolvedPostgresPort,
+    POSTGRES_USER: resolvedPostgresUser,
     POSTGRES_PASSWORD: requiredEnvVars.POSTGRES_PASSWORD!,
-    POSTGRES_DATABASE: requiredEnvVars.POSTGRES_DATABASE!,
-    POSTGRES_SSL: process.env.POSTGRES_SSL === 'true',
+    POSTGRES_DATABASE: resolvedPostgresDatabase,
+    POSTGRES_SSL: resolvedPostgresSSL,
 
     // LLM Provider Configuration
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,

@@ -4,13 +4,13 @@ metadata:
   name: postgres-nodeport
   namespace: starships-prod
   labels:
-  app: postgres
-  purpose: metabase-access
+    app: postgres
+    purpose: metabase-access
 spec:
   type: NodePort
   selector:
-  app: postgres
-  environment: production
+    app: postgres
+    environment: production
   ports:
     - name: postgresql
       port: 5432

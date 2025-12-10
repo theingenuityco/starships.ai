@@ -66,7 +66,7 @@ validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
 
 // Initialize PostgreSQL database connection
 // Prefer POSTGRES_INTERNAL_HOST (when set) for in-pod PostgreSQL (fat container)
-// while allowing external workers (like the schedule CronJob) to use POSTGRES_HOST.
+// while allowing external workers (like the scheduler/worker Deployments) to use POSTGRES_HOST.
 const dbConnection = createConnection({
   host: config.POSTGRES_INTERNAL_HOST || config.POSTGRES_HOST,
   port: config.POSTGRES_PORT,

@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev",
+    "dev:with-schedule": "concurrently -n web,scheduler,worker -c \"cyan,magenta,green\" \"pnpm dev\" \"pnpm --filter @starships/server run schedule:scheduler\" \"pnpm --filter @starships/server run schedule:worker\"",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
@@ -32,7 +33,10 @@
     "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:18 || echo 'Container may already exist. Use postgres:reset to recreate.'",
     "postgres:reset": "docker stop starships-postgres 2>/dev/null || true && docker rm starships-postgres 2>/dev/null || true && echo 'PostgreSQL container cleaned up. Use postgres:install to recreate.'",
     "postgres:shell": "docker exec -it starships-postgres psql -U postgres -d starships || echo 'Container not running. Use postgres:start first.'",
-    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'"
+    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'",
+    "redis:install": "docker run -d --name starships-redis -p 6379:6379 redis:7-alpine || echo 'Container may already exist. Use redis:reset to recreate.'",
+    "redis:reset": "docker stop starships-redis 2>/dev/null || true && docker rm starships-redis 2>/dev/null || true && echo 'Redis container cleaned up. Use redis:install to recreate.'",
+    "redis:shell": "docker exec -it starships-redis redis-cli || echo 'Container not running. Use redis:install first.'"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -49,6 +53,7 @@
     "eslint-config-prettier": "^10.1.5",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
+    "concurrently": "^9.1.2",
     "semantic-release": "^24.2.7",
     "ts-node": "^10.9.2",
     "turbo": "^2.5.4",

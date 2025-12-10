@@ -23,8 +23,8 @@ export interface EnvironmentConfig {
    * fat-container StatefulSet (which runs Postgres in the same pod).
    *
    * When set, application code can prefer this value (typically "localhost")
-   * instead of POSTGRES_HOST, while external workers (like the schedule
-   * CronJob) continue to use POSTGRES_HOST which should point at the
+   * instead of POSTGRES_HOST, while external workers (like the scheduler/worker
+   * Deployments) continue to use POSTGRES_HOST which should point at the
    * Kubernetes Service DNS.
    */
   POSTGRES_INTERNAL_HOST?: string;
@@ -93,4 +93,10 @@ export interface EnvironmentConfig {
   AWS_S3_REGION?: string;
   AWS_ACCESS_KEY_ID?: string;
   AWS_SECRET_ACCESS_KEY?: string;
+
+  // Redis / Queueing Configuration
+  REDIS_HOST?: string;
+  REDIS_PORT?: number;
+  REDIS_DB?: number;
+  REDIS_PASSWORD?: string;
 }

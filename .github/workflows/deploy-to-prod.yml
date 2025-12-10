@@ -66,7 +66,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/prod/08-autopilot-runner-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/09-autopilot-runner-service.yaml
-          # Ensure Redis is defined before scheduler/worker Deployments
+          # Ensure Postgres and Redis are defined before scheduler/worker Deployments
+          kubectl apply --dry-run=client -f k8s/prod/13-postgres-statefulset.yaml
           kubectl apply --dry-run=client -f k8s/prod/12-redis-statefulset.yaml
           kubectl apply --dry-run=client -f k8s/prod/10-schedule-scheduler-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/11-schedule-worker-deployment.yaml
@@ -83,7 +84,8 @@ jobs:
           kubectl apply -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/prod/08-autopilot-runner-deployment.yaml
           kubectl apply -f k8s/prod/09-autopilot-runner-service.yaml
-          # Ensure Redis is created before scheduling components
+          # Ensure Postgres and Redis are created before scheduling components
+          kubectl apply -f k8s/prod/13-postgres-statefulset.yaml
           kubectl apply -f k8s/prod/12-redis-statefulset.yaml
           kubectl apply -f k8s/prod/10-schedule-scheduler-deployment.yaml
           kubectl apply -f k8s/prod/11-schedule-worker-deployment.yaml

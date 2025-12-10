@@ -40,6 +40,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: RUNNER_AUTH_TOKEN
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: OPENROUTER_API_KEY
           resources:
             requests:
               cpu: '250m'

@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: starships-dev
+  labels:
+    app: redis
+    environment: dev
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+    environment: dev
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: starships-dev
+  labels:
+    app: redis
+    environment: dev
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      environment: dev
+  template:
+    metadata:
+      labels:
+        app: redis
+        environment: dev
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_PASSWORD
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: '50m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          command:
+            - sh
+            - -c
+            - |
+              if [ -z "$REDIS_PASSWORD" ]; then
+                echo "ERROR: REDIS_PASSWORD not set"; exit 1;
+              fi
+              exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 5Gi

@@ -66,7 +66,10 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/prod/08-autopilot-runner-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/09-autopilot-runner-service.yaml
-          kubectl apply --dry-run=client -f k8s/prod/10-schedule-worker-cronjob.yaml
+          # Ensure Redis is defined before scheduler/worker Deployments
+          kubectl apply --dry-run=client -f k8s/prod/12-redis-statefulset.yaml
+          kubectl apply --dry-run=client -f k8s/prod/10-schedule-scheduler-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/prod/11-schedule-worker-deployment.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
@@ -80,7 +83,10 @@ jobs:
           kubectl apply -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/prod/08-autopilot-runner-deployment.yaml
           kubectl apply -f k8s/prod/09-autopilot-runner-service.yaml
-          kubectl apply -f k8s/prod/10-schedule-worker-cronjob.yaml
+          # Ensure Redis is created before scheduling components
+          kubectl apply -f k8s/prod/12-redis-statefulset.yaml
+          kubectl apply -f k8s/prod/10-schedule-scheduler-deployment.yaml
+          kubectl apply -f k8s/prod/11-schedule-worker-deployment.yaml
           echo "✅ Applied manifests to prod cluster."
 
       - name: Update secrets
@@ -127,7 +133,15 @@ jobs:
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION }}
           AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET }}
           AWS_S3_REGION: ${{ vars.AWS_S3_REGION }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_DB: ${{ secrets.REDIS_DB }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
+          # Provide sane defaults for internal Redis if overrides are not set
+          REDIS_HOST="${REDIS_HOST:-redis}"
+          REDIS_PORT="${REDIS_PORT:-6379}"
+
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
             --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
@@ -171,6 +185,15 @@ jobs:
             --from-literal=AWS_SES_REGION="$AWS_SES_REGION" \
             --from-literal=AWS_S3_BUCKET="$AWS_S3_BUCKET" \
             --from-literal=AWS_S3_REGION="$AWS_S3_REGION" \
+            --from-literal=REDIS_HOST="$REDIS_HOST" \
+            --from-literal=REDIS_PORT="$REDIS_PORT" \
+            --from-literal=REDIS_DB="$REDIS_DB" \
+            -n ${{ env.NAMESPACE }}
+
+          # Redis auth secret
+          kubectl delete secret redis-auth -n ${{ env.NAMESPACE }} --ignore-not-found=true
+          kubectl create secret generic redis-auth \
+            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
             -n ${{ env.NAMESPACE }}
 
           kubectl delete secret ghcr-pull-secret -n ${{ env.NAMESPACE }} --ignore-not-found=true

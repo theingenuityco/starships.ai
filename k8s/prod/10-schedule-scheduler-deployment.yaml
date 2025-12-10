@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starships-schedule-scheduler
+  namespace: starships-prod
+  labels:
+    app: starships-ai
+    component: schedule-scheduler
+    environment: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: starships-ai
+      component: schedule-scheduler
+      environment: production
+  template:
+    metadata:
+      labels:
+        app: starships-ai
+        component: schedule-scheduler
+        environment: production
+    spec:
+      restartPolicy: Always
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: schedule-scheduler
+          image: ghcr.io/theingenuityco/starships.ai:latest
+          imagePullPolicy: Always
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: AUTOPILOT_RUNNER
+              value: 'remote'
+            - name: RUNNER_URL
+              value: 'http://autopilot-runner.starships-prod.svc.cluster.local:50051'
+            - name: RUNNER_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: RUNNER_AUTH_TOKEN
+            - name: SKIP_BUILD
+              value: 'true'
+            - name: SKIP_INSTALL
+              value: 'true'
+            - name: PUBLIC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: PUBLIC_URL
+            - name: CLIENT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: CLIENT_URL
+            - name: SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SERVER_URL
+            - name: DOCS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DOCS_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: JWT_SECRET
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_DATABASE
+            - name: POSTGRES_SSL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_SSL
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: OPENROUTER_API_KEY
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_PORT
+            - name: REDIS_DB
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_DB
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_PASSWORD
+            - name: SCHEDULE_POLL_INTERVAL_MS
+              value: '300000'
+          command:
+            - /bin/sh
+            - -lc
+            - |
+              cd /app && pnpm --filter @starships/server run schedule:scheduler

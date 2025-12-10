@@ -42,6 +42,12 @@ spec:
         - name: redis
           image: redis:7-alpine
           imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: REDIS_PASSWORD
           ports:
             - containerPort: 6379
               name: redis
@@ -55,9 +61,14 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
-          args:
-            - '--appendonly'
-            - 'yes'
+          command:
+            - sh
+            - -c
+            - |
+              if [ -z "$REDIS_PASSWORD" ]; then
+                echo "ERROR: REDIS_PASSWORD not set"; exit 1;
+              fi
+              exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"
   volumeClaimTemplates:
     - metadata:
         name: redis-data
@@ -68,4 +79,3 @@ spec:
         resources:
           requests:
             storage: 5Gi
-

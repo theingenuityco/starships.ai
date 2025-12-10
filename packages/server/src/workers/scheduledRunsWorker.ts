@@ -4,6 +4,7 @@ import { createConnection } from '@starships/models';
 import { Worker } from 'bullmq';
 import { ConversationService } from '@/services/ConversationService';
 import {
+  closeScheduledRunsQueue,
   getRedisConnection,
   getScheduledRunsQueue,
   SCHEDULED_RUNS_QUEUE_NAME,
@@ -100,6 +101,12 @@ async function main(): Promise<void> {
       await worker.close();
     } catch (err) {
       console.error('[ScheduledRunsWorker] Failed to close worker', err);
+    }
+
+    try {
+      await closeScheduledRunsQueue();
+    } catch (err) {
+      console.error('[ScheduledRunsWorker] Failed to close scheduled runs queue', err);
     }
 
     try {

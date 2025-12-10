@@ -8,7 +8,6 @@
     "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/index.ts",
     "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc --build && tsc-alias -p tsconfig.json",
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
-    "schedule:run": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/runDueSchedules.ts",
     "schedule:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduledRunsWorker.ts",
     "schedule:scheduler": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduleScheduler.ts",
     "type-check": "tsc --noEmit",

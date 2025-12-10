@@ -37,7 +37,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 - Use Get Tool and the target tool's parameter schema to decide which fields belong in the nested arguments object with concrete, type-correct example values (for an addition tool, include numeric a and b inside arguments).
 - When Test Tool returns an error, read the error and toolName fields to understand what went wrong before trying again.
 - Stop when tests pass and the description, parameters, and blueprint are stable.
-- Env quick ref: Code → ctx.$env('STARSHIP_ID'); Templates → {{ env('STARSHIP_ID') }}; never log/echo secrets; validate required env and fail fast.
+- Env quick ref: Code → ctx.env('STARSHIP_ID'); Templates → {{ env('STARSHIP_ID') }}; never log/echo secrets; validate required env and fail fast.
 - Templates quick rule: compute the entire value within one {{ ... }}; no concatenation or nested templates; JSON must remain valid.
 - Prefer templates for URLs/headers; use Code node for logic.
 - HttpRequest body: full-string templates (e.g. "{{ input }}") return raw values (including objects) and are JSON-encoded once by HttpRequest; prefer this or passing an object from a Code node upstream over partial string templates.

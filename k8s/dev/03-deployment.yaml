@@ -127,16 +127,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: POSTGRES_HOST
-            # Tell the fat container to use an external PostgreSQL instance
-            # (the dedicated postgres StatefulSet) instead of running Postgres
-            # inside this pod. The value itself is not used by the app logic;
-            # it is only used by supervisor-entrypoint.sh to decide whether
-            # to start the internal PostgreSQL process.
-            - name: POSTGRES_EXTERNAL_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: POSTGRES_HOST
             - name: POSTGRES_PORT
               valueFrom:
                 secretKeyRef:

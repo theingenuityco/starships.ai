@@ -66,6 +66,7 @@ export function getEnvConfig(): EnvironmentConfig {
 
     // PostgreSQL Database Configuration - Required, no localhost fallbacks
     POSTGRES_HOST: requiredEnvVars.POSTGRES_HOST!,
+    POSTGRES_INTERNAL_HOST: process.env.POSTGRES_INTERNAL_HOST,
     POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
     POSTGRES_USER: requiredEnvVars.POSTGRES_USER!,
     POSTGRES_PASSWORD: requiredEnvVars.POSTGRES_PASSWORD!,

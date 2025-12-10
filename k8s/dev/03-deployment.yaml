@@ -127,6 +127,12 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: JWT_SECRET
+            # Internal PostgreSQL host override for the fat container.
+            # The main StatefulSet runs PostgreSQL in the same pod, so it should
+            # connect via localhost, while external workers (e.g. CronJobs)
+            # continue to use POSTGRES_HOST which points at the Service DNS.
+            - name: POSTGRES_INTERNAL_HOST
+              value: 'localhost'
             - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:

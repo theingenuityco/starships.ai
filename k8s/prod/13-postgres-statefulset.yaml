@@ -57,8 +57,8 @@ spec:
               fi
 
               echo "Copying existing Postgres data from old volume to new volume..."
-              mkdir -p /new
-              cp -a /old/. /new/.
+              mkdir -p /new/data
+              cp -a /old/. /new/data/.
               echo "Postgres data copy complete."
           volumeMounts:
             - name: old-postgres-data

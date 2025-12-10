@@ -13,7 +13,7 @@ spec:
     environment: production
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: starships-app
   namespace: starships-prod
@@ -21,10 +21,9 @@ metadata:
     app: starships-ai
     environment: production
 spec:
-  serviceName: starships-app-headless
   replicas: 1 # Single replica (proven in dev)
   revisionHistoryLimit: 5
-  updateStrategy:
+  strategy:
     type: RollingUpdate
   selector:
     matchLabels:
@@ -43,26 +42,6 @@ spec:
 
       imagePullSecrets:
         - name: ghcr-pull-secret
-
-      # Init containers (from dev)
-      initContainers:
-        - name: fix-permissions
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              echo "🔧 Fixing permissions..."
-              mkdir -p /app/packages/docs/.source
-              chmod -R 777 /app/packages/docs || true
-              echo "✅ Permissions fixed"
-          volumeMounts:
-            - name: starships-data
-              mountPath: /app/data
-              subPath: app-data
-            - name: starships-data
-              mountPath: /app/packages/docs/.source
-              subPath: docs-source
 
       containers:
         - name: starships
@@ -348,25 +327,3 @@ spec:
             timeoutSeconds: 3
             failureThreshold: 30 # 5 minutes max
 
-          # Volume mounts (same as dev)
-          volumeMounts:
-            - name: starships-data
-              mountPath: /app/data
-              subPath: app-data
-            - name: starships-data
-              mountPath: /app/packages/docs/.source
-              subPath: docs-source
-
-  # Volume claim templates (StatefulSet feature)
-  volumeClaimTemplates:
-    - metadata:
-        name: starships-data
-        labels:
-          app: starships-ai
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        storageClassName: gp3
-        resources:
-          requests:
-            storage: 30Gi

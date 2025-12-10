@@ -49,25 +49,25 @@ spec:
 
               # If the new volume already contains an initialized cluster, do nothing
               if [ -f /new/data/pgdata/postgresql.conf ] && [ -f /new/data/pgdata/PG_VERSION ]; then
-                echo \"New Postgres data already initialized; skipping migration.\"
+                echo "New Postgres data already initialized; skipping migration."
                 exit 0
               fi
 
-              echo \"Scanning /old for existing Postgres cluster...\"
-              OLD_PG_VERSION_PATH=\"$(find /old -maxdepth 5 -type f -name PG_VERSION | head -n 1 || true)\"
+              echo "Scanning /old for existing Postgres cluster..."
+              OLD_PG_VERSION_PATH=$(find /old -maxdepth 6 -type f -name PG_VERSION | head -n 1 || true)
 
-              if [ -z \"${OLD_PG_VERSION_PATH}\" ]; then
-                echo \"No existing Postgres cluster found under /old; skipping migration.\"
+              if [ -z "$OLD_PG_VERSION_PATH" ]; then
+                echo "No existing Postgres cluster found under /old; skipping migration."
                 exit 0
               fi
 
-              OLD_CLUSTER_DIR=\"$(dirname \"${OLD_PG_VERSION_PATH}\")\"
-              echo \"Found existing Postgres cluster at ${OLD_CLUSTER_DIR}\"
+              OLD_CLUSTER_DIR=$(dirname "$OLD_PG_VERSION_PATH")
+              echo "Found existing Postgres cluster at $OLD_CLUSTER_DIR"
 
-              echo \"Copying existing Postgres data from old volume to new volume...\"
+              echo "Copying existing Postgres data from old volume to new volume..."
               mkdir -p /new/data/pgdata
-              cp -a \"${OLD_CLUSTER_DIR}/.\" /new/data/pgdata/.
-              echo \"Postgres data copy complete.\"
+              cp -a "$OLD_CLUSTER_DIR/." /new/data/pgdata/.
+              echo "Postgres data copy complete."
           volumeMounts:
             - name: old-postgres-data
               mountPath: /old

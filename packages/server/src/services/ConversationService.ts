@@ -3,7 +3,7 @@ import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM, RunnerFactory } from '@starships/autopilot';
 import type {
   ToolParams,
   AgentParams,
@@ -22,7 +22,7 @@ import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
-import type { HostRuntime } from '@starships/autopilot';
+import type { HostRuntime, Runner } from '@starships/autopilot';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
@@ -129,7 +129,7 @@ export class ConversationService {
   // Track which agent is currently producing streamed content for a conversation (for attribution)
   private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
   // Default runner for non-streaming paths (child process)
-  private defaultRunner!: ChildProcessRunner;
+  private defaultRunner!: Runner;
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -152,8 +152,15 @@ export class ConversationService {
     this.billingService = new BillingService();
     this.walletService = new WalletService();
     this.connectorRuntimeService = new ConnectorRuntimeService(this.environmentService);
-    // Choose default runner (child process) with proper limits
-    this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
+    // Choose default runner based on AUTOPILOT_RUNNER:
+    // - 'remote' -> RemoteRunner via RunnerFactory (uses autopilot.setRunnerConfig)
+    // - anything else -> ChildProcessRunner with local process isolation and limits
+    const mode = process.env.AUTOPILOT_RUNNER || 'child';
+    if (mode === 'remote') {
+      this.defaultRunner = RunnerFactory.getTopLevelRunner(0);
+    } else {
+      this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
+    }
 
     ConversationService.instance = this;
     return this;

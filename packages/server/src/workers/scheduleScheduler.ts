@@ -1,9 +1,18 @@
+import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import { createConnection } from '@starships/models';
 import { ScheduleService } from '@/services/ScheduleService';
 
 async function main(): Promise<void> {
   const env = getEnvConfig();
+
+  // Configure remote runner for Autopilot when using AUTOPILOT_RUNNER=remote,
+  // so any ConversationService instances (used by ScheduleService) can safely
+  // construct a RemoteRunner if needed.
+  autopilot.setRunnerConfig({
+    url: env.RUNNER_URL,
+    token: env.RUNNER_AUTH_TOKEN,
+  });
 
   const connection = createConnection({
     host: env.POSTGRES_HOST,
@@ -50,10 +59,8 @@ async function main(): Promise<void> {
   };
 
   // Kick off immediately, then on interval.
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   tick();
   const interval = setInterval(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     tick();
   }, intervalMs);
 
@@ -74,9 +81,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', shutdown);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-main().catch(err => {
+main().catch((err) => {
   console.error('[ScheduleScheduler] Fatal error during startup', err);
   process.exit(1);
 });
-

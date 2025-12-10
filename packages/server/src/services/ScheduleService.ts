@@ -1,6 +1,5 @@
 import { ScheduleRepository } from '@starships/models';
 import type { ScheduleModel } from '@starships/protocol';
-import { ConversationService } from '@/services/ConversationService';
 import { CronExpressionParser } from 'cron-parser';
 import { getScheduledRunsQueue, type ScheduledRunJobData } from '@/queues/scheduledRunsQueue';
 
@@ -12,7 +11,6 @@ import { getScheduledRunsQueue, type ScheduledRunJobData } from '@/queues/schedu
  */
 export class ScheduleService {
   private readonly repo: ScheduleRepository;
-  private readonly conversationService: ConversationService;
 
   // Hardening defaults
   private readonly defaultBatchSize = 50;
@@ -20,7 +18,6 @@ export class ScheduleService {
 
   constructor() {
     this.repo = new ScheduleRepository();
-    this.conversationService = new ConversationService();
   }
 
   async createSchedule(data: {

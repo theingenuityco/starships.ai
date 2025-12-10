@@ -56,206 +56,7 @@ function isChildMessage(msg: unknown): msg is ChildMessage {
 export class ChildProcessRunner implements Runner {
   constructor(private readonly options?: ChildProcessRunnerOptions) {}
 
-  async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
-    const childEntry = resolve(__dirname, '../scripts/child-entry.js');
-
-    const execArgv: string[] = [];
-    const memoryLimitMB = this.options?.memoryLimitMB;
-    if (typeof memoryLimitMB === 'number' && Number.isFinite(memoryLimitMB) && memoryLimitMB > 0) {
-      execArgv.push(`--max-old-space-size=${Math.floor(memoryLimitMB)}`);
-    }
-    if (this.options?.nodeExecArgv?.length) {
-      execArgv.push(...this.options.nodeExecArgv);
-    }
-
-    const stdio: StdioOptions = this.options?.stdioInherit ? 'inherit' : ['ignore', 'pipe', 'pipe', 'ipc'];
-
-    const child: ChildProcess = fork(childEntry, [], {
-      stdio,
-      execArgv,
-      env: { ...process.env, ...(this.options?.env ?? {}) },
-      serialization: 'advanced',
-    });
-
-    return await new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
-      let settled = false;
-      let killTimer: ReturnType<typeof setTimeout> | undefined;
-      // Track completion of all eventCallback calls so we can wait for them
-      // before resolving/rejecting the outer promise. This prevents races where
-      // callers tear down shared resources (like DB pools) while callbacks
-      // are still running.
-      let lastEventPromise: Promise<void> = Promise.resolve();
-
-      const cleanup = () => {
-        if (killTimer) {
-          clearTimeout(killTimer);
-          killTimer = undefined;
-        }
-        child.removeAllListeners('message');
-        child.removeAllListeners('exit');
-        child.removeAllListeners('error');
-        if (!this.options?.stdioInherit && child.stdout) child.stdout.removeAllListeners('data');
-        if (!this.options?.stdioInherit && child.stderr) child.stderr.removeAllListeners('data');
-      };
-
-      // Forward logs when piping
-      if (!this.options?.stdioInherit) {
-        child.stdout?.on('data', (chunk: Buffer) => {
-          process.stdout.write(`[autopilot:child ${child.pid}] ${chunk.toString()}`);
-        });
-        child.stderr?.on('data', (chunk: Buffer) => {
-          process.stderr.write(`[autopilot:child ${child.pid}] ${chunk.toString()}`);
-        });
-      }
-
-      // Bridge events and hostRuntime HTTP back to caller
-      child.on('message', async (msg: unknown) => {
-        try {
-          const m = msg as { type?: unknown; [key: string]: unknown };
-
-          // HostRuntime HTTP bridge: child -> parent
-          if (m && typeof m === 'object' && m.type === 'host_http') {
-            const host = config?.hostRuntime;
-            if (!host || typeof host.http !== 'function') {
-              child.send?.({
-                type: 'host_http_result',
-                id: m.id,
-                error: 'Host runtime http() not available in parent process',
-              });
-              return;
-            }
-            try {
-              type HostHttpRequest = Parameters<HostRuntime['http']>[0];
-              const request = (m as { request: HostHttpRequest }).request;
-              const response = await host.http(request);
-              child.send?.({
-                type: 'host_http_result',
-                id: m.id,
-                response,
-              });
-            } catch (err) {
-              console.error('[ChildProcessRunner] host_http error', {
-                pid: child.pid,
-                id: m.id,
-                error: err instanceof Error ? err.message : String(err),
-              });
-              child.send?.({
-                type: 'host_http_result',
-                id: m.id,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
-            return;
-          }
-
-          if (!isChildMessage(msg)) return;
-          if (msg.type === 'event' && config?.eventCallback) {
-            const cb = config.eventCallback as (e: unknown) => Promise<void> | void;
-            // Chain callbacks so we can wait for all of them on completion.
-            lastEventPromise = lastEventPromise
-              .then(() => Promise.resolve(cb(msg.event)))
-              .catch((err: unknown) => {
-                // Log and continue so a bad callback doesn't break execution
-                console.error('[ChildProcessRunner] eventCallback error:', err);
-              });
-          } else if (msg.type === 'done') {
-            if (settled) return;
-            settled = true;
-            // Ensure all prior eventCallbacks have finished before resolving.
-            lastEventPromise
-              .catch(() => {
-                // Errors already logged above; nothing more to do here.
-              })
-              .finally(() => {
-                cleanup();
-                resolvePromise(msg.result);
-                try {
-                  child.disconnect();
-                } catch {
-                  // ignore
-                }
-              });
-          } else if (msg.type === 'error') {
-            if (settled) return;
-            settled = true;
-            // Ensure all prior eventCallbacks have finished before rejecting.
-            lastEventPromise
-              .catch(() => {
-                // Errors already logged above; nothing more to do here.
-              })
-              .finally(() => {
-                cleanup();
-                const e = new Error(msg.error?.message ?? 'Child runner error');
-                rejectPromise(e);
-                try {
-                  child.disconnect();
-                } catch {
-                  // ignore
-                }
-              });
-          }
-        } catch (err) {
-          console.error('[ChildProcessRunner] message handler error (run)', err);
-        }
-      });
-
-      child.once('error', (err) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        rejectPromise(err);
-      });
-
-      child.once('exit', (code, signal) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        rejectPromise(new Error(`Child exited before completion (code=${code}, signal=${signal ?? 'none'})`));
-      });
-
-      const timeoutMs = this.options?.timeoutMs ?? 0;
-      if (timeoutMs > 0) {
-        killTimer = setTimeout(() => {
-          if (settled) return;
-          try {
-            // Default is SIGTERM when no signal is provided
-            child.kill();
-          } catch {
-            // ignore
-          }
-          const grace = Math.max(0, this.options?.killGraceMs ?? 1000);
-          setTimeout(() => {
-            try {
-              child.kill('SIGKILL');
-            } catch {
-              // ignore
-            }
-          }, grace);
-        }, timeoutMs);
-      }
-
-      // Prepare safe config (functions cannot cross the IPC boundary)
-      const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined } : undefined;
-
-      const autopilotCredentials = {
-        openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined,
-      };
-
-      // Signal parent is ready to receive events (prevents race condition)
-      child.send({ type: 'parent_ready' });
-
-      // Kick off work
-      child.send({
-        type: 'start',
-        payload: { blueprint, execution, config: safeConfig, autopilotCredentials },
-      });
-    });
-  }
-
-  /**
-   * Execute with cancellation controller returned to caller.
-   */
-  runWithController(
+  private createChildRunner(
     blueprint: Blueprint,
     execution: Execution,
     config?: EngineConfig
@@ -395,7 +196,7 @@ export class ChildProcessRunner implements Runner {
               });
           }
         } catch (err) {
-          console.error('[ChildProcessRunner] message handler error (runWithController)', err);
+          console.error('[ChildProcessRunner] message handler error (run)', err);
         }
       });
 
@@ -418,12 +219,14 @@ export class ChildProcessRunner implements Runner {
         killTimer = setTimeout(() => {
           if (settled) return;
           try {
+            // Default is SIGTERM when no signal is provided
             child.kill();
           } catch {
             // ignore
           }
           const grace = Math.max(0, this.options?.killGraceMs ?? 1000);
           setTimeout(() => {
+            if (settled) return;
             try {
               child.kill('SIGKILL');
             } catch {
@@ -456,5 +259,21 @@ export class ChildProcessRunner implements Runner {
     };
 
     return { promise, cancel };
+  }
+
+  async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
+    const { promise } = this.createChildRunner(blueprint, execution, config);
+    return await promise;
+  }
+
+  /**
+   * Execute with cancellation controller returned to caller.
+   */
+  runWithController(
+    blueprint: Blueprint,
+    execution: Execution,
+    config?: EngineConfig
+  ): { promise: Promise<ExecutionItem[]>; cancel: () => void } {
+    return this.createChildRunner(blueprint, execution, config);
   }
 }

@@ -90,8 +90,6 @@ spec:
               name: docs
             - containerPort: 4000
               name: backend
-            - containerPort: 5432
-              name: postgres
 
           env:
             # Core Settings
@@ -141,14 +139,17 @@ spec:
                   key: JWT_SECRET
 
             # PostgreSQL
-            # Internal PostgreSQL host override for the fat container.
-            # The main StatefulSet runs PostgreSQL in the same pod, so it should
-            # connect via localhost, while external workers (e.g. scheduler/worker
-            # Deployments) continue to use POSTGRES_HOST which points at the
-            # Service DNS.
-            - name: POSTGRES_INTERNAL_HOST
-              value: 'localhost'
             - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_HOST
+            # Tell the fat container to use an external PostgreSQL instance
+            # (the dedicated postgres StatefulSet) instead of running Postgres
+            # inside this pod. The value itself is not used by the app logic;
+            # it is only used by supervisor-entrypoint.sh to decide whether
+            # to start the internal PostgreSQL process.
+            - name: POSTGRES_EXTERNAL_HOST
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
@@ -375,9 +376,6 @@ spec:
 
           # Volume mounts (same as dev)
           volumeMounts:
-            - name: starships-data
-              mountPath: /var/lib/postgresql
-              subPath: postgres
             - name: starships-data
               mountPath: /app/data
               subPath: app-data

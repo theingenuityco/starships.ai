@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: starships-dev
+  labels:
+    app: postgres
+    environment: dev
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+    environment: dev
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: starships-dev
+  labels:
+    app: postgres
+    environment: dev
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+      environment: dev
+  template:
+    metadata:
+      labels:
+        app: postgres
+        environment: dev
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            # Use the same credentials and database name as the application
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_DATABASE
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTGRES_PASSWORD
+            # Ensure PGDATA matches the in-container path used by the fat container
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+              subPath: postgres
+          resources:
+            requests:
+              cpu: '250m'
+              memory: '512Mi'
+            limits:
+              cpu: '1000m'
+              memory: '2Gi'
+      # Reuse the existing StatefulSet PVC that already holds the PostgreSQL data.
+      # NOTE: This PVC is created by the starships-app StatefulSet as:
+      #       starships-data-starships-app-0
+      # We mount only the "postgres" subPath, which already contains the PGDATA directory.
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: starships-data-starships-app-0
+      # Ensure the PostgreSQL pod is scheduled on the same node as the starships-app pod,
+      # because the PVC uses ReadWriteOnce (EBS gp3).
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: starships-ai
+                  environment: dev
+              topologyKey: kubernetes.io/hostname

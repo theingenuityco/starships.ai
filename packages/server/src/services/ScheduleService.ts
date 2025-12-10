@@ -1,7 +1,8 @@
 import { ScheduleRepository } from '@starships/models';
-import type { Message, ScheduleModel } from '@starships/protocol';
+import type { ScheduleModel } from '@starships/protocol';
 import { ConversationService } from '@/services/ConversationService';
 import { CronExpressionParser } from 'cron-parser';
+import { getScheduledRunsQueue, type ScheduledRunJobData } from '@/queues/scheduledRunsQueue';
 
 /**
  * ScheduleService
@@ -60,7 +61,11 @@ export class ScheduleService {
    *   - Applies per-starship caps to avoid draining a single wallet.
    *   - Isolates failures per-schedule so one bad row doesn't block others.
    *
-   * NOTE: MVP semantics are "one-shot": each schedule runs once and is deactivated.
+   * Queue-based execution:
+   * - Instead of executing schedules inline, this method now enqueues jobs onto
+   *   the Redis-backed "scheduled-runs" queue.
+   * - A separate worker process consumes those jobs and materializes them as
+   *   conversations/messages.
    *
    * Recurring behavior:
    * - When schedule.isRecurring is true, we compute a new nextRunAt from the
@@ -76,6 +81,8 @@ export class ScheduleService {
     const now = options?.now ?? new Date();
     const batchSize = options?.batchSize ?? this.defaultBatchSize;
     const perStarshipLimit = options?.perStarshipLimit ?? this.defaultPerStarshipLimit;
+
+    const queue = getScheduledRunsQueue();
 
     const due = await this.repo.findDue(now, batchSize);
     if (!due.length) {
@@ -101,29 +108,27 @@ export class ScheduleService {
           continue;
         }
 
-        // Materialize as a new conversation + first message.
-        const conversation = await this.conversationService.createConversation({
-          title: `Scheduled – ${claimed.id}`,
-          status: 'active',
+        // Enqueue a job for the worker to materialize the scheduled run.
+        const jobData: ScheduledRunJobData = {
+          scheduleId: claimed.id,
           starshipId: claimed.starshipId,
           agentId: claimed.agentId,
+          prompt: claimed.prompt,
+          timezone: claimed.timezone,
+        };
+
+        await queue.add('scheduled-run', jobData, {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 30_000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
         });
 
-        // Use the same pipeline as user messages; no auth context for system-initiated runs.
-        const scheduledMessage: Message & { conversationId: string } = {
-          conversationId: conversation.id,
-          content: claimed.prompt,
-          role: 'user',
-          messageType: 'user_input',
-          agentId: claimed.agentId,
-        };
-
-        await this.conversationService.addConversationMessage(scheduledMessage, {});
-
         // Compute recurrence, if enabled.
-        let updates: Partial<ScheduleModel> = {
-          lastRunConversationId: conversation.id,
-        };
+        let updates: Partial<ScheduleModel> = {};
 
         // Increment run count for both one-shot and recurring schedules.
         const previousRunCount = typeof claimed.runCount === 'number' ? claimed.runCount : 0;

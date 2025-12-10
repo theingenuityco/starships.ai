@@ -64,11 +64,8 @@ const PORT = config.SERVER_PORT || 3001;
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
 // Note: NEXT_PUBLIC_API_URL validation is handled by client config
 
-// Initialize PostgreSQL database connection
-// Prefer POSTGRES_INTERNAL_HOST (when set) for in-pod PostgreSQL (fat container)
-// while allowing external workers (like the scheduler/worker Deployments) to use POSTGRES_HOST.
 const dbConnection = createConnection({
-  host: config.POSTGRES_INTERNAL_HOST || config.POSTGRES_HOST,
+  host: config.POSTGRES_HOST,
   port: config.POSTGRES_PORT,
   user: config.POSTGRES_USER,
   password: config.POSTGRES_PASSWORD,

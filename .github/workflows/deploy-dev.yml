@@ -106,7 +106,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/dev/08-autopilot-runner-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/09-autopilot-runner-service.yaml
-          # Ensure Redis is defined before scheduler/worker Deployments
+          # Ensure Postgres and Redis are defined before scheduler/worker Deployments
+          kubectl apply --dry-run=client -f k8s/dev/13-postgres-statefulset.yaml
           kubectl apply --dry-run=client -f k8s/dev/12-redis-statefulset.yaml
           kubectl apply --dry-run=client -f k8s/dev/10-schedule-scheduler-deployment.yaml
           kubectl apply --dry-run=client -f k8s/dev/11-schedule-worker-deployment.yaml
@@ -124,7 +125,8 @@ jobs:
           kubectl apply -f k8s/dev/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/dev/08-autopilot-runner-deployment.yaml
           kubectl apply -f k8s/dev/09-autopilot-runner-service.yaml
-          # Ensure Redis is created before scheduling components
+          # Ensure Postgres and Redis are created before scheduling components
+          kubectl apply -f k8s/dev/13-postgres-statefulset.yaml
           kubectl apply -f k8s/dev/12-redis-statefulset.yaml
           kubectl apply -f k8s/dev/10-schedule-scheduler-deployment.yaml
           kubectl apply -f k8s/dev/11-schedule-worker-deployment.yaml
@@ -183,6 +185,14 @@ jobs:
           # Provide sane defaults for internal Redis if overrides are not set
           REDIS_HOST="${REDIS_HOST:-redis}"
           REDIS_PORT="${REDIS_PORT:-6379}"
+
+          # Provide sane defaults for PostgreSQL so only password (and optionally host)
+          # need to be explicitly configured for most environments.
+          POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
+          POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+          POSTGRES_USER="${POSTGRES_USER:-postgres}"
+          POSTGRES_DATABASE="${POSTGRES_DATABASE:-starships}"
+          POSTGRES_SSL="${POSTGRES_SSL:-false}"
 
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
@@ -251,14 +261,14 @@ jobs:
         if: steps.check-image.outputs.image_exists == 'true'
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
-          kubectl set image statefulset/starships-app \
+          kubectl set image deployment/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
             -n ${{ env.NAMESPACE }}
             # Only force restart for 'latest' tag to avoid unnecessary downtime
           if [ "${{ steps.get-image.outputs.image_tag }}" = "latest" ]; then
-            kubectl rollout restart statefulset/starships-app -n ${{ env.NAMESPACE }}
+            kubectl rollout restart deployment/starships-app -n ${{ env.NAMESPACE }}
           fi
-          kubectl rollout status statefulset/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 
       - name: Verify deployment
@@ -266,5 +276,5 @@ jobs:
         run: |
           kubectl get pods -n ${{ env.NAMESPACE }}
           kubectl get pv,pvc -n ${{ env.NAMESPACE }} || true
-          kubectl logs -n ${{ env.NAMESPACE }} statefulset/starships-app --tail=30 || true
+          kubectl logs -n ${{ env.NAMESPACE }} deployment/starships-app --tail=30 || true
           echo "✅ Verification complete."

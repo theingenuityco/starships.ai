@@ -26,54 +26,33 @@ export STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
 export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-}"
 
 # Check if POSTGRES_HOST is already set (from K8s secrets, docker-compose, or environment)
-if [ -n "$POSTGRES_HOST" ]; then
-    echo "Using PostgreSQL host from environment: $POSTGRES_HOST"
-    
-    # Check if it's localhost - then we need to start internal PostgreSQL
-    if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
-        echo "PostgreSQL host points to localhost, starting internal PostgreSQL..."
-        
-        # Check if supervisor is managing PostgreSQL (when running with supervisor)
-        if [ -f /var/run/supervisord.pid ]; then
-            echo "PostgreSQL is managed by supervisor"
-        else
-            echo "Starting PostgreSQL manually..."
-            # Ensure PostgreSQL runtime directory exists (only when not using supervisor)
-            mkdir -p /run/postgresql /var/log/postgresql
-            chown -R postgres:postgres /run/postgresql /var/log/postgresql
-            chmod 775 /run/postgresql
-            # Start PostgreSQL in background if not using supervisor
-            su postgres -c "pg_ctl start -D ${PGDATA:-/var/lib/postgresql/data}" || true
-        fi
-        
-        # Use configured port or default
-        POSTGRES_CHECK_PORT=${POSTGRES_PORT:-5432}
-        
-        # Wait for internal PostgreSQL to be ready
-        echo "Waiting for internal PostgreSQL to start on port $POSTGRES_CHECK_PORT..."
-        max_attempts=30
-        attempt=0
-        while [ $attempt -lt $max_attempts ]; do
-            if nc -z localhost "$POSTGRES_CHECK_PORT" 2>/dev/null; then
-                echo "Internal PostgreSQL is ready!"
-                break
-            fi
-            attempt=$((attempt + 1))
-            echo "Waiting for PostgreSQL... (attempt $attempt/$max_attempts)"
-            sleep 2
-        done
-        
-        if [ $attempt -eq $max_attempts ]; then
-            echo "Internal PostgreSQL failed to start after $max_attempts attempts"
-            exit 1
-        fi
-    else
-        echo "PostgreSQL host points to external service: $POSTGRES_HOST"
-        echo "Skipping internal PostgreSQL startup..."
-    fi
-else
+if [ -z "$POSTGRES_HOST" ]; then
     echo "ERROR: POSTGRES_HOST environment variable is not set!"
     echo "Please set POSTGRES_HOST in your environment or deployment configuration."
+    exit 1
+fi
+
+echo "Using PostgreSQL host from environment: $POSTGRES_HOST"
+
+# Use configured port or default
+POSTGRES_CHECK_PORT=${POSTGRES_PORT:-5432}
+
+# Wait for PostgreSQL (external) to be ready
+echo "Waiting for PostgreSQL at $POSTGRES_HOST:$POSTGRES_CHECK_PORT..."
+max_attempts=30
+attempt=0
+while [ $attempt -lt $max_attempts ]; do
+    if nc -z "$POSTGRES_HOST" "$POSTGRES_CHECK_PORT" 2>/dev/null; then
+        echo "PostgreSQL is ready!"
+        break
+    fi
+    attempt=$((attempt + 1))
+    echo "Waiting for PostgreSQL... (attempt $attempt/$max_attempts)"
+    sleep 2
+done
+
+if [ $attempt -eq $max_attempts ]; then
+    echo "PostgreSQL failed to become ready after $max_attempts attempts"
     exit 1
 fi
 
@@ -134,13 +113,6 @@ elif [ -n "$NEXT_PUBLIC_API_URL" ]; then
 else
     # No hardcoded fallback - must be configured
     echo "  - Backend service starting..."
-fi
-
-# Check if PostgreSQL is running locally
-if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
-    # Use configured port or default
-    POSTGRES_PORT_DISPLAY=${POSTGRES_PORT:-5432}
-    echo "  - PostgreSQL at: $POSTGRES_HOST:$POSTGRES_PORT_DISPLAY"
 fi
 
 # Ensure pnpm is available before starting concurrent processes

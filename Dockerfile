@@ -1,17 +1,13 @@
 # ==========================================
-# Starships.ai - All-in-One Fat Container
-# Contains: Frontend + Backend + PostgreSQL Database
+# Starships.ai - Application Container
+# Contains: Frontend + Backend (no embedded PostgreSQL)
 # ==========================================
 
 FROM node:20-alpine
 WORKDIR /app
 
-# Install system dependencies including a pinned PostgreSQL major version
-# We explicitly install PostgreSQL 17 to remain compatible with existing data directories
-# initialized with PostgreSQL 17 (e.g., on persistent volumes in Kubernetes).
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
-    postgresql17 postgresql17-contrib postgresql17-client \
     supervisor \
     ca-certificates
 
@@ -30,19 +26,6 @@ RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
     mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
     chown -R nodejs:node /home/nodejs/.cache && \
     chmod -R 755 /home/nodejs/.cache
-
-# Configure PostgreSQL (pinned to major version 17)
-ENV POSTGRES_VERSION=17
-ENV PGDATA=/var/lib/postgresql/data
-
-# Install su-exec for user switching and prepare PostgreSQL directories
-# PostgreSQL will be initialized at runtime by supervisor-entrypoint.sh
-# This allows proper volume mount support without overwriting initialization
-RUN apk add --no-cache su-exec && \
-    mkdir -p /var/lib/postgresql/data /run/postgresql /var/log/postgresql && \
-    chown -R postgres:postgres /var/lib/postgresql /run/postgresql /var/log/postgresql && \
-    chmod 700 /var/lib/postgresql/data && \
-    chmod 775 /run/postgresql
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
@@ -80,17 +63,15 @@ RUN --mount=type=secret,id=stripe_secret_key \
 RUN mkdir -p data/sessions data/starships data/docker && \
     chown -R nodejs:node data
 
-# Supervisor config will be created dynamically by supervisor-entrypoint.sh
-# based on whether POSTGRES_EXTERNAL_HOST is set
+# Supervisor config will be created by supervisor-entrypoint.sh
 
-# Expose all ports
-EXPOSE 3000 3001 4000 5432
+# Expose application ports
+EXPOSE 3000 3001 4000
 
-# Health check for all services
+# Health check for frontend and backend
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000 && \
-      wget --no-verbose --tries=1 --spider http://localhost:4000/api/v1/health && \
-      pg_isready -h localhost -p 5432
+      wget --no-verbose --tries=1 --spider http://localhost:4000/api/v1/health
 
 # Start supervisor to manage all services
 CMD ["/app/supervisor-entrypoint.sh"]

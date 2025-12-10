@@ -18,16 +18,6 @@ export interface EnvironmentConfig {
 
   // PostgreSQL Database Configuration
   POSTGRES_HOST: string;
-  /**
-   * Optional override for internal PostgreSQL host used by the main
-   * fat-container StatefulSet (which runs Postgres in the same pod).
-   *
-   * When set, application code can prefer this value (typically "localhost")
-   * instead of POSTGRES_HOST, while external workers (like the scheduler/worker
-   * Deployments) continue to use POSTGRES_HOST which should point at the
-   * Kubernetes Service DNS.
-   */
-  POSTGRES_INTERNAL_HOST?: string;
   POSTGRES_PORT: number;
   POSTGRES_USER: string;
   POSTGRES_PASSWORD: string;

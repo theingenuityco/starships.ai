@@ -122,7 +122,7 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: redis-auth
+                  name: starships-secrets
                   key: REDIS_PASSWORD
             - name: SCHEDULE_POLL_INTERVAL_MS
               value: '300000'

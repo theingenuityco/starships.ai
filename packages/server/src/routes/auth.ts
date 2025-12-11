@@ -10,7 +10,7 @@ import { ServiceFactory } from '@/services/ServiceFactory';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
-import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema } from '@/schemas/common';
+import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema, IdSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
@@ -22,6 +22,8 @@ import { z } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
+import { AgentService } from '@/services/AgentService';
+import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -79,6 +81,12 @@ const ResetPasswordSchema = z
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   });
+
+// Zod schema for issuing agent-scoped tokens
+const AgentTokenSchema = z.object({
+  agentId: IdSchema,
+  starshipId: IdSchema,
+});
 
 /**
  * Register new user
@@ -288,6 +296,50 @@ router.post('/auth/logout', (req: Request, res: Response): void => {
   // With JWT, logout is primarily handled client-side by removing the token
   // Server-side logout would require a token blacklist, which adds complexity
   sendSuccess(res, { message: 'Logged out successfully' });
+});
+
+/**
+ * Issue a user+agent-scoped JWT for acting via a specific agent on a starship.
+ * POST /auth/token/agent
+ */
+router.post('/auth/token/agent', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const body = validateData(AgentTokenSchema, req.body, res, 'agent token request');
+    if (!body) return;
+
+    const { agentId, starshipId } = body;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    if (agent.starshipId !== starshipId) {
+      sendError(res, 'ACCESS_DENIED', 'Agent does not belong to the specified starship', 403);
+      return;
+    }
+
+    // Ensure the user has access to this agent/starship
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const user = req.user as UserModel;
+    const token = await generateJWT({
+      id: user.id,
+      email: user.email,
+      name: user.displayName || user.email?.split('@')[0],
+      agentId: agent.id,
+      starshipId: agent.starshipId,
+    });
+
+    sendSuccess(res, { token }, 200);
+  } catch (error) {
+    handleError(error, res, 'issuing agent-scoped token');
+  }
 });
 
 // ============================================================================

@@ -4,18 +4,39 @@ import { ConversationService } from '@/services/ConversationService';
 import { StreamingService } from '@/services/StreamingService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
-import { getEnvConfig } from '@starships/env';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
 
 const router: Router = Router();
+
+const INTERNAL_SCHEDULE_HEADER = 'x-internal-schedule-token';
+
+function isInternalScheduleRequest(req: Request): boolean {
+  const expected = process.env.SCHEDULE_WORKER_TOKEN;
+  if (!expected) return false;
+  const header = req.headers[INTERNAL_SCHEDULE_HEADER] as string | string[] | undefined;
+  if (!header) return false;
+  if (Array.isArray(header)) {
+    return header.includes(expected);
+  }
+  return header === expected;
+}
+
+const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  if (isInternalScheduleRequest(req)) {
+    // Internal scheduler calls are authenticated via shared secret header and do not
+    // need a user context; starship/agent consistency is enforced at schedule creation.
+    return next();
+  }
+  return jwtAuthMiddleware(req, res, next);
+};
 
 // Using standard pagination schema for consistency
 
@@ -31,7 +52,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     const { conversationId } = paramValidation;
 
     // Authorization: verify user has access to this conversation's starship
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -65,12 +86,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       });
 
       // Server-driven resume via query param (avoid custom headers)
-      const resumeToken = typeof (req.query as any).resumeToken === 'string' ? (req.query as any).resumeToken : '';
+      const resumeToken = typeof req.query.resumeToken === 'string' ? req.query.resumeToken : '';
 
       // Determine a reliable baseline:
       // - client hint (query.baselineLength) if provided
       // - server truth (current messages count)
-      const clientBase = Number((req.query as any).baselineLength ?? 0) || 0;
+      const clientBase = Number(req.query.baselineLength ?? 0) || 0;
 
       // Fetch existing messages first to compute server-side count
       const conversationService = new ConversationService();
@@ -277,7 +298,7 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
     }
 
     // Authorization: verify user has access to this conversation
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -299,7 +320,7 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
 router.post(
   '/conversations/:conversationId/messages',
   rateLimiters.messaging,
-  jwtAuthMiddleware,
+  scheduleOrJwtAuth,
   async (req: Request, res: Response): Promise<void> => {
     try {
       // Validate conversationId parameter
@@ -326,6 +347,8 @@ router.post(
       const { conversationId } = paramValidation;
       const { content, agentId, attachmentIds, sync } = bodyValidation;
 
+      const isInternal = isInternalScheduleRequest(req);
+
       // Preflight billing gate: block when wallet balance is <= 0
       const conversationService = new ConversationService();
 
@@ -339,14 +362,16 @@ router.post(
         return;
       }
 
-      // Authorization: verify user has access to this conversation
-      const authUserId = (req as any).user?.id as string | undefined;
-      if (!authUserId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-      if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
-        return;
+      // Authorization: verify user has access to this conversation (external callers only)
+      const authUserId = req.user?.id as string | undefined;
+      if (!isInternal) {
+        if (!authUserId) {
+          sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+          return;
+        }
+        if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+          return;
+        }
       }
 
       // Resolve starship and wallet, then enforce non-zero balance
@@ -382,7 +407,7 @@ router.post(
       }
 
       // Authorization: if agentId is provided, verify user owns it and it belongs to the conversation's starship
-      if (agentId) {
+      if (agentId && !isInternal) {
         const agentService = new AgentService();
         const agent = await agentService.getAgent(agentId);
 
@@ -392,7 +417,7 @@ router.post(
         }
 
         // Verify user owns the agent's starship
-        if (!(await verifyResourceAccess(agent.starshipId, authUserId, 'agent', agentId, res))) {
+        if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agentId, res))) {
           return;
         }
 
@@ -486,7 +511,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     }
 
     // Authorization: verify user has access to this conversation
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -518,7 +543,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     const { page, limit } = paginationValidation;
 
     // Authorization: verify user owns this starship
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -545,7 +570,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
 /**
  * POST /conversations - Create new conversation
  */
-router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate request body
     const bodyValidation = validateData(
@@ -553,6 +578,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
         title: z.string().min(1).max(100).optional(),
         starshipId: IdSchema,
         agentSlug: z.string().min(1).max(255).optional(),
+        agentId: IdSchema.optional(),
       }),
       req.body,
       res,
@@ -560,19 +586,23 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     );
     if (!bodyValidation) return;
 
-    // Authorization: verify user owns the target starship
-    const authUserId = (req as any).user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    if (!(await verifyStarshipAccess(bodyValidation.starshipId, authUserId, res))) {
-      return;
+    const isInternal = isInternalScheduleRequest(req);
+
+    // Authorization: verify user owns the target starship (external callers only)
+    const authUserId = req.user?.id as string | undefined;
+    if (!isInternal) {
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+      if (!(await verifyStarshipAccess(bodyValidation.starshipId, authUserId, res))) {
+        return;
+      }
     }
 
     // Resolve agent from either agentId or agentSlug, and verify access/ownership
     let resolvedAgentId: string | undefined;
-    if (bodyValidation.agentSlug) {
+    if (!isInternal && bodyValidation.agentSlug) {
       const agentService = new AgentService();
       const starshipAgents = await agentService.getAgentsByStarship(bodyValidation.starshipId);
       const agent = starshipAgents.find((a) => a.slug === bodyValidation.agentSlug) || null;
@@ -587,7 +617,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       }
 
       // Verify user owns the agent's starship
-      if (!(await verifyResourceAccess(agent.starshipId, authUserId, 'agent', agent.id, res))) {
+      if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agent.id, res))) {
         return;
       }
 
@@ -604,7 +634,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     // Build payload for conversation creation, normalizing agentId and dropping agentSlug
     const createPayload = {
       ...req.body,
-      agentId: resolvedAgentId,
+      agentId: resolvedAgentId ?? bodyValidation.agentId,
     };
     delete (createPayload as any).agentSlug;
 
@@ -651,7 +681,7 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
     }
 
     // Authorization: verify user has access to this conversation
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -703,7 +733,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     }
 
     // Authorization: verify user has access to this conversation
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -759,7 +789,7 @@ router.patch('/conversations/:conversationId', jwtAuthMiddleware, async (req: Re
     }
 
     // Authorization: verify user has access to this conversation
-    const authUserId = (req as any).user?.id as string | undefined;
+    const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;

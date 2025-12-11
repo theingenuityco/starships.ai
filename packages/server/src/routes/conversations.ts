@@ -66,7 +66,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       });
       return;
     }
-    if (!(await verifyResourceAccess((convAuth as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess(convAuth.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -116,7 +116,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       try {
         const conversationService = new ConversationService();
         const conversation = await conversationService.getConversationById(conversationId);
-        const convState = ((conversation as any)?.state as any) || {};
+        const convState = conversation?.state || {};
         const bufferedState = streamingService.getBufferedTurnActive(conversationId);
         turnActiveFlag = typeof bufferedState === 'boolean' ? bufferedState : !!convState.turnActive;
         await streamingService.broadcastTurnState(conversationId, {
@@ -163,7 +163,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           // 1) Replay persisted messages beyond last persisted id in token (claims.m)
           let startIdx = 0;
           if (claims.m && claims.m !== '0') {
-            const idx = conversationMessages.findIndex((m) => String((m as any).id) === String(claims.m));
+            const idx = conversationMessages.findIndex((m) => String(m.id) === String(claims.m));
             startIdx = idx >= 0 ? idx + 1 : 0;
           }
           const persistedTail = conversationMessages.slice(startIdx);
@@ -256,7 +256,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const participants = agents.map((agent) => agent.id);
 
       // Structure response to match client expectations
-      const state = ((conversation as any)?.state as any) || {};
+      const state = conversation?.state || {};
       const responseData = {
         conversationId,
         messages,
@@ -303,7 +303,7 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((exists as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess(exists.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -369,7 +369,7 @@ router.post(
           sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
           return;
         }
-        if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+        if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
           return;
         }
       }
@@ -516,7 +516,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -636,7 +636,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       ...req.body,
       agentId: resolvedAgentId ?? bodyValidation.agentId,
     };
-    delete (createPayload as any).agentSlug;
+    delete createPayload.agentSlug;
 
     const conversation = await conversationService.createConversation(createPayload);
 
@@ -686,7 +686,7 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -738,7 +738,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 
@@ -794,7 +794,7 @@ router.patch('/conversations/:conversationId', jwtAuthMiddleware, async (req: Re
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    if (!(await verifyResourceAccess((conversation as any).starshipId, authUserId, 'conversation', conversationId, res))) {
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
 

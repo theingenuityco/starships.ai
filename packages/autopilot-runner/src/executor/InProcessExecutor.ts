@@ -1,5 +1,6 @@
 import { Executor, ExecuteInput } from './Executor';
 import { Engine } from '@starships/autopilot';
+import { createRunnerHostRuntime } from '../hostRuntime/RunnerHostRuntime';
 
 export class InProcessExecutor implements Executor {
   async execute(input: ExecuteInput): Promise<unknown> {
@@ -7,8 +8,11 @@ export class InProcessExecutor implements Executor {
     const execution = JSON.parse(input.executionJson || '{}');
     const config = JSON.parse(input.configJson || '{}');
 
+    const hostRuntime = createRunnerHostRuntime();
+
     const engine = new Engine({
       ...(config || {}),
+      hostRuntime,
       eventCallback: input.onEvent
         ? async (event: unknown) => {
             try {

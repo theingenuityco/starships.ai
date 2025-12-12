@@ -5,6 +5,7 @@
  */
 
 import { Execution, NodeParameters, ValidationResult, ExecutionItem } from '@/types';
+import type { ToolParams } from './node-parameters';
 import { EventCallback } from '@/types/events';
 
 /**
@@ -21,12 +22,32 @@ export interface NodeHandler {
 }
 
 /**
+ * Host-level LLM request description.
+ *
+ * The LLM node passes a provider-agnostic request object to the host, which is
+ * responsible for talking to the actual LLM provider (OpenRouter, OpenAI, etc.)
+ * and returning a streaming response. The streaming chunks are then normalized
+ * and converted into an LLMResponse by the LLM node.
+ */
+export interface LlmHostRequest {
+  model: string;
+  messages: unknown[];
+  tools?: ToolParams[];
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  reasoning?: unknown;
+}
+
+/**
  * HostRuntime
  *
  * Typed surface provided by the embedding host/server to perform side-effecting
- * operations (HTTP, etc.). Workflows never talk to the network directly; they
- * delegate via this interface so the host can own secrets, policies, and
- * observability.
+ * operations (HTTP, LLM calls, etc.). Workflows never talk to the network
+ * directly; they delegate via this interface so the host can own secrets,
+ * provider configuration, policies, and observability.
  */
 export interface HostRuntime {
   /**
@@ -51,6 +72,20 @@ export interface HostRuntime {
     body: unknown;
     url: string;
   }>;
+
+  /**
+   * LLM execution entrypoint.
+   *
+   * The host is responsible for:
+   * - Selecting the concrete provider (OpenRouter, OpenAI, Anthropic, etc.)
+   * - Reading any required credentials (API keys) from its own environment
+   * - Performing the actual network calls
+   *
+   * It must return an AsyncIterable of provider-native streaming chunks; the
+   * LLM node will normalize these chunks and emit Autopilot streaming events,
+   * then accumulate a final LLMResponse.
+   */
+  llm?(request: LlmHostRequest): Promise<AsyncIterable<unknown>>;
 }
 
 export interface NodeHandlerOptions {

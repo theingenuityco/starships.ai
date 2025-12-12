@@ -21,7 +21,6 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
-import { getEnvConfig } from '@starships/env';
 import type { HostRuntime, Runner } from '@starships/autopilot';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
@@ -30,9 +29,6 @@ import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
-
-// Debug flags
-const DEBUG_TOOLCALLS = false;
 
 /**
  * Autopilot child process configuration
@@ -1149,7 +1145,6 @@ export class ConversationService {
    */
   private async generateConversationTitle(starshipId: string, conversationId: string, userContent: string): Promise<string | null> {
     try {
-      const env = getEnvConfig();
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
@@ -1165,17 +1160,31 @@ export class ConversationService {
         .replace(/\n+/g, ' ')
         .slice(0, 400)}"\n\nReturn only the title text.`;
 
-      // Use autopilot LLM node directly (no runner/engine).
-      // The LLM node reads OPENROUTER_API_KEY from the host environment; we only pass non-secret config here.
-      const llm = new LLM({
-        model,
-        messages: [
-          { role: 'system' as const, content: sys },
-          { role: 'user' as const, content: prompt },
-        ],
-        temperature: 0.3,
-        maxTokens: 32,
-      });
+      // Use autopilot LLM node directly (no runner/engine), delegating provider
+      // configuration and credentials to the HostRuntime implementation.
+      const starship = await this.getConversationStarship(conversationId);
+      if (!starship) {
+        console.warn('[TITLE] Starship not found for conversation; skipping title generation', {
+          starshipId,
+          conversationId,
+        });
+        return null;
+      }
+
+      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship);
+
+      const llm = new LLM(
+        {
+          model,
+          messages: [
+            { role: 'system' as const, content: sys },
+            { role: 'user' as const, content: prompt },
+          ],
+          temperature: 0.3,
+          maxTokens: 32,
+        },
+        { hostRuntime }
+      );
 
       const items = await llm.execute();
       const res = (items?.[0]?.json || {}) as {

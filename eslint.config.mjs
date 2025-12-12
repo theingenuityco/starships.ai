@@ -26,6 +26,8 @@ export const sharedConfig = [
     },
 
     rules: {
+      // Let TypeScript handle undefined identifiers; disable core no-undef for TS files.
+      'no-undef': 'off',
       ...typescriptEslint.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',

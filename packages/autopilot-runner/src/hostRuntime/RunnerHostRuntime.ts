@@ -20,26 +20,38 @@ export function createRunnerHostRuntime(): HostRuntime {
 
     try {
       const finalMethod = method.toUpperCase();
-      const init: { [key: string]: unknown } = {
+      const init: RequestInit = {
         method: finalMethod,
-        headers: headers as Record<string, string>,
+        headers: headers as RequestInit['headers'],
         signal: controller.signal,
       };
 
       if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
-        if (typeof body === 'string') {
-          init.body = body;
-        } else if (body && typeof body === 'object') {
-          init.body = JSON.stringify(body);
-          init.headers = {
-            'content-type': 'application/json',
-            ...(init.headers as Record<string, string>),
-          };
+        let bodyInit: RequestInit['body'];
+
+        if (
+          typeof body === 'string' ||
+          (typeof Blob !== 'undefined' && body instanceof Blob) ||
+          (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
+          (typeof FormData !== 'undefined' && body instanceof FormData) ||
+          body instanceof ArrayBuffer ||
+          ArrayBuffer.isView(body as ArrayBufferLike)
+        ) {
+          bodyInit = body as RequestInit['body'];
+        } else {
+          bodyInit = JSON.stringify(body) as RequestInit['body'];
+          const currentHeaders = new Headers(init.headers as RequestInit['headers']);
+          if (!currentHeaders.has('content-type')) {
+            currentHeaders.set('content-type', 'application/json');
+          }
+          init.headers = currentHeaders;
         }
+
+        init.body = bodyInit;
       }
 
-      const resp: { [key: string]: any } = await (globalThis as any).fetch(url, init);
-      const contentType = resp.headers?.get?.('content-type') || '';
+      const resp: Response = await fetch(url, init);
+      const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;
 
       if (contentType.includes('application/json')) {
@@ -52,12 +64,10 @@ export function createRunnerHostRuntime(): HostRuntime {
         responseBody = await resp.text();
       }
 
-      const responseHeaders: Record<string, unknown> = {};
-      if (resp.headers && typeof resp.headers.forEach === 'function') {
-        resp.headers.forEach((value: string, key: string) => {
-          responseHeaders[key] = value;
-        });
-      }
+      const responseHeaders: Record<string, string> = {};
+      resp.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
 
       return {
         status: resp.status,
@@ -115,7 +125,7 @@ export function createRunnerHostRuntime(): HostRuntime {
     // Tools are currently passed as-is; this can be extended to convert
     // ToolParams into provider-native tool definitions when needed.
     if (Array.isArray(request.tools) && request.tools.length > 0) {
-      (openaiRequest as any).tools = request.tools;
+      openaiRequest.tools = request.tools as unknown as OpenAI.Chat.ChatCompletionTool[];
     }
 
     const stream = await client.chat.completions.create(openaiRequest);

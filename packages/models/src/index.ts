@@ -32,6 +32,7 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 export { AttachmentRepository } from './repositories/AttachmentRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EnvironmentRepository } from './repositories/EnvironmentRepository';
+export { ConnectorProviderRepository } from './repositories/ConnectorProviderRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';
 export { MessageRepository } from './repositories/MessageRepository';
 export { OAuthAccountRepository } from './repositories/OAuthAccountRepository';

@@ -8,7 +8,14 @@
 // CONNECTOR TYPES
 // ============================================================================
 
-export type ConnectorProvider = 'linkedin' | 'discord' | 'starships' | 'google_drive' | 'github';
+/**
+ * ConnectorProvider
+ *
+ * Historically this was a closed union of first-party providers. To allow
+ * entirely DB-driven connectors, this is now an open string type. Known
+ * first-party providers are kept as a documentation aid only.
+ */
+export type ConnectorProvider = 'linkedin' | 'discord' | 'starships' | 'google_drive' | 'github' | string;
 
 export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
@@ -74,9 +81,8 @@ export interface ConnectWithApiKeyResponse {
   connector: ConnectorModel;
 }
 
-export interface StartOAuthRequest {
-  // reserved for future use
-}
+// Reserved for future request fields; currently empty.
+export type StartOAuthRequest = Record<string, never>;
 
 export interface StartOAuthResponse {
   authorizationUrl: string;

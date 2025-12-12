@@ -25,7 +25,8 @@
     "@bufbuild/protobuf": "^2.2.2",
     "@connectrpc/connect": "^2.0.0",
     "@connectrpc/connect-node": "^2.0.0",
-    "@starships/autopilot": "workspace:*"
+    "@starships/autopilot": "workspace:*",
+    "openai": "^6.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.6",

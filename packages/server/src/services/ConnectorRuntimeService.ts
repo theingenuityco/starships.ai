@@ -372,6 +372,18 @@ export class ConnectorRuntimeService {
           clearTimeout(timeoutId);
         }
       },
+      /**
+       * Expose selected environment values to the runner via HostRuntime.
+       * This is primarily used by LLM nodes to resolve provider keys
+       * (for example, OPENROUTER_API_KEY) without reading process.env
+       * inside the Autopilot execution environment.
+       */
+      env: (key: string): string | undefined => {
+        if (!key) return undefined;
+        const cfg = env as Record<string, unknown>;
+        const val = cfg[key];
+        return typeof val === 'string' && val.length > 0 ? val : undefined;
+      },
     };
 
     return hostRuntime;

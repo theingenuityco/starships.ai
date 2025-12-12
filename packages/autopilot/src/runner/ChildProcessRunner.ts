@@ -237,9 +237,8 @@ export class ChildProcessRunner implements Runner {
       }
 
       const safeConfig = config ? { ...config, eventCallback: undefined, callConnector: undefined, hostRuntime: undefined } : undefined;
-      const autopilotCredentials = { openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined };
       child.send({ type: 'parent_ready' });
-      child.send({ type: 'start', payload: { blueprint, execution, config: safeConfig, autopilotCredentials } });
+      child.send({ type: 'start', payload: { blueprint, execution, config: safeConfig } });
     });
 
     const cancel = () => {

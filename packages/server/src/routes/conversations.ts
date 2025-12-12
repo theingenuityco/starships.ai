@@ -117,12 +117,14 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         const conversationService = new ConversationService();
         const conversation = await conversationService.getConversationById(conversationId);
         const convState = conversation?.state || {};
+        const lastCompleteAtRaw = (convState as { lastCompleteAt?: unknown })?.lastCompleteAt;
+        const lastCompleteAt = typeof lastCompleteAtRaw === 'string' ? lastCompleteAtRaw : null;
         const bufferedState = streamingService.getBufferedTurnActive(conversationId);
         turnActiveFlag = typeof bufferedState === 'boolean' ? bufferedState : !!convState.turnActive;
         await streamingService.broadcastTurnState(conversationId, {
           conversationId,
           turnActive: turnActiveFlag,
-          lastCompleteAt: convState.lastCompleteAt,
+          lastCompleteAt,
         });
       } catch (err) {
         console.warn('[ROUTE] Failed to emit initial turn_state snapshot', err);
@@ -473,7 +475,10 @@ router.post(
             ...(agentId && { agentId }),
             ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
           },
-          { authorization: req.headers.authorization as string | undefined }
+          {
+            authorization: req.headers.authorization as string | undefined,
+            authContext: req.authContext,
+          }
         )
         .catch((error) => {
           console.error('[ROUTE] Conversation processing failed:', error);

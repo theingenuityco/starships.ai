@@ -1,4 +1,4 @@
-import type { StreamingError } from '@starships/protocol';
+import type { MessageModel, SSEEventType, StreamingError, UIActionPayload } from '@starships/protocol';
 import type { Response } from 'express';
 import type { Operation } from 'fast-json-patch';
 
@@ -13,6 +13,35 @@ interface ConversationResponse {
     completionTokens: number;
   };
 }
+
+interface TurnStatePayload {
+  conversationId: string;
+  turnActive: boolean;
+  lastCompleteAt?: string | null;
+}
+
+interface TurnLifecyclePayload {
+  conversationId: string;
+  at: string;
+}
+
+type LogicalEventPayloadMap = {
+  message: MessageModel;
+  delta: Operation;
+  complete: ConversationResponse;
+  error: StreamingError;
+  ui_action: UIActionPayload;
+  turn_started: TurnLifecyclePayload;
+  turn_completed: TurnLifecyclePayload;
+};
+
+type LogicalEventType = keyof LogicalEventPayloadMap;
+
+type BufferedEvent = {
+  [K in LogicalEventType]: { type: K; payload: LogicalEventPayloadMap[K] };
+}[LogicalEventType];
+
+type ReplayFilter = (evt: BufferedEvent) => boolean;
 
 interface ConnectionInfo {
   res: Response;
@@ -37,10 +66,7 @@ export class StreamingService {
   private connections: Map<string, Set<ConnectionInfo>> = new Map();
 
   // Resume ring buffer: store recent logical events per conversation (no per-event IDs)
-  private eventBuffers: Map<
-    string,
-    Array<{ type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action' | 'turn_started' | 'turn_completed'; payload: any }>
-  > = new Map();
+  private eventBuffers: Map<string, BufferedEvent[]> = new Map();
   private readonly bufferLimit: number = 300; // retain recent events per conversation
   private suppressBuffering: boolean = false; // used during replay to avoid re-buffering
 
@@ -87,16 +113,16 @@ export class StreamingService {
       if (typeof maybe.flushHeaders === 'function') {
         maybe.flushHeaders();
       }
-    } catch (e: unknown) {
+    } catch (error) {
       // Non-fatal: some environments do not expose flushHeaders
-
-      console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, e);
+      console.error(`[StreamingService] flushHeaders failed for ${streamId}:`, error);
     }
     // SSE prelude/comment to ensure the connection is established before first event
     try {
       res.write(':ok\n\n');
-    } catch (e: unknown) {
-      console.debug(`[StreamingService] prelude write failed for ${streamId}:`, e);
+    } catch (error) {
+      // Ignore prelude write failures; connection may already be closed
+      console.error(`[StreamingService] prelude write failed for ${streamId}:`, error);
     }
 
     // Send connection confirmation
@@ -171,7 +197,7 @@ export class StreamingService {
   /**
    * Broadcast complete message object to a specific stream
    */
-  async broadcastMessage(streamId: string, message: any): Promise<void> {
+  async broadcastMessage(streamId: string, message: MessageModel): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
     this.bufferLogicalEvent(streamId, 'message', message);
@@ -187,7 +213,7 @@ export class StreamingService {
   /**
    * Broadcast complete message object to all active streams
    */
-  async broadcastMessageToAll(message: any): Promise<void> {
+  async broadcastMessageToAll(message: MessageModel): Promise<void> {
     const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastMessage(streamId, message));
     await Promise.all(broadcastPromises);
   }
@@ -195,7 +221,7 @@ export class StreamingService {
   /**
    * Broadcast UI action payload to a specific stream
    */
-  async broadcastUIAction(streamId: string, payload: any): Promise<void> {
+  async broadcastUIAction(streamId: string, payload: UIActionPayload): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
     this.bufferLogicalEvent(streamId, 'ui_action', payload);
@@ -211,7 +237,7 @@ export class StreamingService {
   /**
    * Broadcast UI action payload to all active streams
    */
-  async broadcastUIActionToAll(payload: any): Promise<void> {
+  async broadcastUIActionToAll(payload: UIActionPayload): Promise<void> {
     const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastUIAction(streamId, payload));
     await Promise.all(broadcastPromises);
   }
@@ -219,7 +245,7 @@ export class StreamingService {
   /**
    * Broadcast initial turn state to current connections (not buffered)
    */
-  async broadcastTurnState(streamId: string, payload: any): Promise<void> {
+  async broadcastTurnState(streamId: string, payload: TurnStatePayload): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
     await Promise.all(
@@ -234,7 +260,7 @@ export class StreamingService {
   /**
    * Broadcast turn_started and buffer it for replay
    */
-  async broadcastTurnStarted(streamId: string, payload: any): Promise<void> {
+  async broadcastTurnStarted(streamId: string, payload: TurnLifecyclePayload): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
     this.bufferLogicalEvent(streamId, 'turn_started', payload);
@@ -250,7 +276,7 @@ export class StreamingService {
   /**
    * Broadcast turn_completed and buffer it for replay
    */
-  async broadcastTurnCompleted(streamId: string, payload: any): Promise<void> {
+  async broadcastTurnCompleted(streamId: string, payload: TurnLifecyclePayload): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
     this.bufferLogicalEvent(streamId, 'turn_completed', payload);
@@ -269,11 +295,11 @@ export class StreamingService {
    */
   private normalizeDelta(streamId: string, delta: Operation, connection?: ConnectionInfo): Operation {
     // When broadcasting to multiple connections, a specific connection must be provided
-    if (!connection) return delta as any;
+    if (!connection) return delta;
 
-    const raw = delta as any;
+    const raw: Operation & { value?: unknown } = delta;
     const op: string = raw.op;
-    let path: string = typeof raw.path === 'string' ? raw.path : '';
+    let path = typeof raw.path === 'string' ? raw.path : '';
 
     // Helper: current placeholder index (top of stack)
     const topPlaceholder = (): number | undefined =>
@@ -286,11 +312,19 @@ export class StreamingService {
       const index = connection.baseLength + connection.runningAdds;
 
       // If this is the assistant streaming shell, push its index to placeholder stack
+      const value = raw.value as
+        | {
+            role?: unknown;
+            streaming?: unknown;
+            content?: unknown;
+          }
+        | undefined;
+
       const isAssistantPlaceholder =
-        raw?.value &&
-        typeof raw.value === 'object' &&
-        raw.value.role === 'assistant' &&
-        (raw.value.streaming === true || (typeof raw.value.content === 'string' && raw.value.content.length === 0));
+        value &&
+        typeof value === 'object' &&
+        value.role === 'assistant' &&
+        (value.streaming === true || (typeof value.content === 'string' && value.content.length === 0));
 
       if (isAssistantPlaceholder) {
         if (!connection.placeholderStack) connection.placeholderStack = [];
@@ -300,7 +334,7 @@ export class StreamingService {
       // Increment running adds
       connection.runningAdds += 1;
 
-      return { ...raw, path: `/messages/${index}` } as Operation;
+      return { ...raw, path: `/messages/${index}` };
     }
 
     // 2) '-1' refers to the current streaming placeholder message for this connection
@@ -309,7 +343,7 @@ export class StreamingService {
       const targetIndex = typeof topPlaceholder() === 'number' ? (topPlaceholder() as number) : fallbackLast;
 
       const newPath = path.replace(/^\/messages\/-1/, `/messages/${targetIndex}`);
-      const normalized = { ...raw, path: newPath } as Operation;
+      const normalized: Operation = { ...raw, path: newPath };
 
       // Pop placeholder on completion events:
       // - replace '/streaming' -> false
@@ -377,7 +411,12 @@ export class StreamingService {
   /**
    * Send Server-Sent Event to a specific stream
    */
-  private sendEventToStream(streamId: string, res: Response, event: string, data: any): void {
+  private sendEventToStream<TData>(
+    streamId: string,
+    res: Response,
+    event: SSEEventType | 'turn_state' | 'turn_started' | 'turn_completed' | 'resume_token',
+    data: TData
+  ): void {
     try {
       if (res.destroyed || res.writableEnded) {
         return;
@@ -389,28 +428,12 @@ export class StreamingService {
           const maybe = res as unknown as { flushHeaders?: () => void };
           if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
         }
-      } catch (flushError: unknown) {
-        console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
+      } catch (error) {
+        // Header flush failures are non-fatal but useful to log
+        console.error(`[StreamingService] flushHeaders failed for ${streamId}:`, error);
       }
 
       const json = JSON.stringify(data);
-
-      // Lightweight debug logging to understand SSE payload volume without dumping full data
-      // Avoid logging the entire payload to keep logs readable.
-      let debugMeta: Record<string, unknown> = {};
-      if (event === 'message' && data && typeof data === 'object') {
-        debugMeta = {
-          messageId: (data as { id?: unknown }).id,
-          role: (data as { role?: unknown }).role,
-          messageType: (data as { messageType?: unknown }).messageType,
-        };
-      }
-      console.debug('[StreamingService] SSE send', {
-        streamId,
-        event,
-        sizeBytes: Buffer.byteLength(json, 'utf8'),
-        ...debugMeta,
-      });
 
       res.write(`event: ${event}\n`);
       res.write(`data: ${json}\n\n`);
@@ -419,8 +442,9 @@ export class StreamingService {
       try {
         const maybe = res as unknown as { flush?: () => void };
         if (typeof maybe.flush === 'function') maybe.flush();
-      } catch (flushError: unknown) {
-        console.debug(`[StreamingService] flush failed for ${streamId}:`, flushError);
+      } catch (error) {
+        // Body flush failures do not prevent SSE from functioning, but log for observability
+        console.error(`[StreamingService] flush failed for ${streamId}:`, error);
       }
     } catch (error) {
       console.error(`[StreamingService] Failed to send event to ${streamId}:`, error);
@@ -444,11 +468,11 @@ export class StreamingService {
    * starting AFTER a given Last-Event-ID (exclusive). If fromId is 0 or missing,
    * replays the entire buffer.
    */
-  async replayBufferedEvents(streamId: string, filter?: (evt: { type: string; payload: any }) => boolean): Promise<void> {
+  async replayBufferedEvents(streamId: string, filter?: ReplayFilter): Promise<void> {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
 
-    const buffer = this.eventBuffers.get(streamId) || [];
+    const buffer: BufferedEvent[] = this.eventBuffers.get(streamId) || [];
     if (buffer.length === 0) return;
 
     // Suppress buffering while replaying to avoid duplicating into the buffer
@@ -497,18 +521,14 @@ export class StreamingService {
   }
 
   /** Buffer a logical event for potential replay */
-  private bufferLogicalEvent(
-    streamId: string,
-    type: 'message' | 'delta' | 'complete' | 'error' | 'ui_action' | 'turn_started' | 'turn_completed',
-    payload: any
-  ): void {
+  private bufferLogicalEvent(streamId: string, type: LogicalEventType, payload: LogicalEventPayloadMap[LogicalEventType]): void {
     if (this.suppressBuffering) return;
-    let buf = this.eventBuffers.get(streamId);
-    if (!buf) {
-      buf = [];
+    const existing = this.eventBuffers.get(streamId);
+    const buf: BufferedEvent[] = existing ?? [];
+    if (!existing) {
       this.eventBuffers.set(streamId, buf);
     }
-    buf.push({ type, payload });
+    buf.push({ type, payload } as BufferedEvent);
     if (buf.length > this.bufferLimit) {
       buf.splice(0, buf.length - this.bufferLimit);
     }

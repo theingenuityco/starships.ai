@@ -706,7 +706,7 @@ export class ConversationService {
 
   async addConversationMessage(
     data: Message & { conversationId: string; attachmentIds?: string[] },
-    ctx?: { authorization?: string }
+    ctx?: { authorization?: string; authContext?: { userId: string; agentId?: string; starshipId?: string } }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
@@ -840,7 +840,12 @@ export class ConversationService {
         CONVERSATION_ID: data.conversationId,
       };
 
-      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);
+      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, {
+        authorizationHeader: ctx?.authorization,
+        userId: ctx?.authContext?.userId,
+        agentId: ctx?.authContext?.agentId,
+        starshipId: ctx?.authContext?.starshipId ?? starship.id,
+      });
 
       // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {

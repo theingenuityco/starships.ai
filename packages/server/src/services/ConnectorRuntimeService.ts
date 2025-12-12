@@ -4,6 +4,7 @@ import type { StarshipModel } from '@starships/protocol';
 import type { EnvironmentService } from '@/services/EnvironmentService';
 import { importPKCS8, SignJWT } from 'jose';
 import { ConnectorRepository } from '@starships/models';
+import { generateJWT } from '@/utils/jwt';
 
 // Connector base URLs for relative paths
 // LinkedIn REST APIs are served under /rest; base URL must NOT include a version suffix.
@@ -28,7 +29,7 @@ export class ConnectorRuntimeService {
   }
 
   /**
-   * Create a HostRuntime for a given starship and optional caller auth header.
+   * Create a HostRuntime for a given starship and optional caller auth context.
    *
    * - Normalizes relative URLs:
    *   - connector === 'starships' or undefined => SERVER_URL/api/v1
@@ -37,11 +38,14 @@ export class ConnectorRuntimeService {
    * - Injects Starships JWT when connector === 'starships'
    * - Injects LinkedIn access token from managed env when connector === 'linkedin'
    */
-  createHostRuntime(starship: StarshipModel, authorizationHeader?: string): HostRuntime {
+  createHostRuntime(
+    starship: StarshipModel,
+    opts?: { authorizationHeader?: string; userId?: string; agentId?: string; starshipId?: string }
+  ): HostRuntime {
     const env = getEnvConfig();
     const starshipsBaseUrl = `${env.SERVER_URL}/api/v1`;
 
-    const rawAuth = authorizationHeader ?? '';
+    const rawAuth = opts?.authorizationHeader ?? '';
     const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
 
     const hostRuntime: HostRuntime = {
@@ -80,8 +84,33 @@ export class ConnectorRuntimeService {
 
         // Connector-aware auth injection
         if (connector === 'starships') {
-          // Ensure Authorization header is present when we have an auth token
-          if (authToken) {
+          // Prefer structured JWT context (userId/agentId/starshipId) when available.
+          // Fallback to caller-provided auth token when context is missing.
+          let finalAuthHeader: string | undefined;
+
+          if (opts?.userId) {
+            try {
+              const token = await generateJWT({
+                id: opts.userId,
+                agentId: opts.agentId,
+                starshipId: opts.starshipId ?? starship.id,
+              });
+              finalAuthHeader = `Bearer ${token}`;
+            } catch (err) {
+              console.error('[ConnectorRuntimeService] Failed to generate starships JWT from auth context', {
+                userId: opts.userId,
+                agentId: opts.agentId,
+                starshipId: opts.starshipId ?? starship.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+
+          if (!finalAuthHeader && authToken) {
+            finalAuthHeader = `Bearer ${authToken}`;
+          }
+
+          if (finalAuthHeader) {
             const lowered: Record<string, unknown> = {};
             Object.entries(headers).forEach(([k, v]) => {
               lowered[k.toLowerCase()] = v;
@@ -89,7 +118,7 @@ export class ConnectorRuntimeService {
             if (!lowered['authorization']) {
               headers = {
                 ...headers,
-                Authorization: `Bearer ${authToken}`,
+                Authorization: finalAuthHeader,
               };
             }
           }

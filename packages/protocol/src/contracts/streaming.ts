@@ -55,9 +55,6 @@ export interface UIActionPayload extends Record<string, unknown> {
    * to stay in sync with real-world usages without requiring frequent updates.
    */
   __ui_action: string;
-  formData?: Record<string, unknown>;
-  patch?: Record<string, unknown>;
-  data?: Record<string, unknown>;
 }
 
 /**

@@ -3,7 +3,7 @@ import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM, RunnerFactory } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, RunnerFactory } from '@starships/autopilot';
 import type {
   ToolParams,
   AgentParams,
@@ -20,14 +20,15 @@ import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
+import { getEnvConfig } from '@starships/env';
+import OpenAI from 'openai';
 import { Operation } from 'fast-json-patch';
-import type { HostRuntime, Runner } from '@starships/autopilot';
+import type { Runner } from '@starships/autopilot';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
-import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 
 /**
@@ -65,7 +66,6 @@ export class ConversationService {
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
-  private connectorRuntimeService!: ConnectorRuntimeService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
@@ -147,7 +147,6 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
-    this.connectorRuntimeService = new ConnectorRuntimeService(this.environmentService);
     // Choose default runner based on AUTOPILOT_RUNNER:
     // - 'remote' -> RemoteRunner via RunnerFactory (uses autopilot.setRunnerConfig)
     // - anything else -> ChildProcessRunner with local process isolation and limits
@@ -836,13 +835,6 @@ export class ConversationService {
         CONVERSATION_ID: data.conversationId,
       };
 
-      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, {
-        authorizationHeader: ctx?.authorization,
-        userId: ctx?.authContext?.userId,
-        agentId: ctx?.authContext?.agentId,
-        starshipId: ctx?.authContext?.starshipId ?? starship.id,
-      });
-
       // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
         const agentModel = agentQueue.shift()!;
@@ -896,7 +888,6 @@ export class ConversationService {
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-          hostRuntime,
         });
         // Execute with cancellation controller at top level (depth=0 implied inside Agent)
         // Use ChildProcessRunner directly to capture cancel handle
@@ -904,7 +895,6 @@ export class ConversationService {
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-          hostRuntime,
         } as EngineConfig;
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
@@ -1148,6 +1138,21 @@ export class ConversationService {
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
+      const { OPENROUTER_API_KEY } = getEnvConfig();
+      if (!OPENROUTER_API_KEY) {
+        console.warn('[TITLE] OPENROUTER_API_KEY not configured; skipping title generation');
+        return null;
+      }
+
+      const client = new OpenAI({
+        apiKey: OPENROUTER_API_KEY,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://starships.ai',
+          'X-Title': 'Starships.ai',
+        },
+      });
+
       const sys = [
         'You generate concise, helpful conversation titles.',
         'Rules:',
@@ -1160,55 +1165,33 @@ export class ConversationService {
         .replace(/\n+/g, ' ')
         .slice(0, 400)}"\n\nReturn only the title text.`;
 
-      // Use autopilot LLM node directly (no runner/engine), delegating provider
-      // configuration and credentials to the HostRuntime implementation.
-      const starship = await this.getConversationStarship(conversationId);
-      if (!starship) {
-        console.warn('[TITLE] Starship not found for conversation; skipping title generation', {
-          starshipId,
-          conversationId,
-        });
-        return null;
-      }
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 32,
+      });
 
-      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship);
-
-      const llm = new LLM(
-        {
-          model,
-          messages: [
-            { role: 'system' as const, content: sys },
-            { role: 'user' as const, content: prompt },
-          ],
-          temperature: 0.3,
-          maxTokens: 32,
-        },
-        { hostRuntime }
-      );
-
-      const items = await llm.execute();
-      const res = (items?.[0]?.json || {}) as {
-        model?: string;
-        usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cost?: number };
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-
-      const choice = res?.choices?.[0]?.message?.content || '';
-      const usage = res?.usage || null;
-      const modelUsed = res?.model || model;
+      const choice = completion.choices?.[0]?.message?.content || '';
+      const usage = (
+        completion as unknown as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } }
+      ).usage;
 
       // Record usage if provided by LLM (camelCase fields)
       try {
-        if (usage && typeof usage.totalTokens === 'number') {
+        if (usage && typeof usage.total_tokens === 'number') {
           await this.usageService
             .createUsageForTurn({
               starshipId,
               conversationId,
-              promptTokens: Number(usage.promptTokens ?? 0),
-              completionTokens: Number(usage.completionTokens ?? 0),
-              totalTokens: Number(usage.totalTokens ?? 0),
-              cost: Number(usage.cost ?? 0),
-              model: String(modelUsed || model),
+              promptTokens: Number(usage.prompt_tokens ?? 0),
+              completionTokens: Number(usage.completion_tokens ?? 0),
+              totalTokens: Number(usage.total_tokens ?? 0),
+              cost: Number((usage as any).cost ?? 0),
+              model: String(model),
             })
             .then(async (row) => {
               try {

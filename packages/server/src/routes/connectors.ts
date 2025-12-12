@@ -33,14 +33,14 @@ const GitHubAppConfigSchema = z.object({
 
 const ProviderParamSchema = z.object({
   id: IdSchema,
-  provider: z.enum(['linkedin', 'discord', 'google_drive']),
+  provider: z.string().min(1, 'provider is required'),
 });
 
 // GET /connectors/catalog - Static connector catalog
 router.get('/connectors/catalog', async (req: Request, res: Response): Promise<void> => {
   try {
     const connectorService = new ConnectorService();
-    const catalog = connectorService.getConnectorCatalog();
+    const catalog = await connectorService.getConnectorCatalog();
     const response: ConnectorCatalogResponse = {
       connectors: catalog,
     };
@@ -257,7 +257,7 @@ const OAuthCallbackSchema = z.object({
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
     const paramsValidation = validateData(
-      z.object({ provider: z.enum(['linkedin', 'discord', 'google_drive']) }),
+      z.object({ provider: z.string().min(1, 'provider is required') }),
       req.params,
       res,
       'connector OAuth provider'

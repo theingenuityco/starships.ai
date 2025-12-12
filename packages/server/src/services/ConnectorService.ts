@@ -1,6 +1,6 @@
 import { getConnectorCatalog, getConnectorDefinition } from '@/config/connectors';
 import type { ConnectorCatalogItem, ConnectorListItem, ConnectorProvider, ConnectWithApiKeyRequest } from '@starships/protocol';
-import { ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
+import { ConnectorProviderRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
@@ -50,18 +50,54 @@ function getProviderScopes(provider: ConnectorProvider): string[] {
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
+  private connectorProviderRepository: ConnectorProviderRepository;
   private environmentRepository: EnvironmentRepository;
   private environmentService: EnvironmentService;
   private starshipRepository: StarshipRepository;
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
+    this.connectorProviderRepository = new ConnectorProviderRepository();
     this.environmentRepository = new EnvironmentRepository();
     this.environmentService = new EnvironmentService();
     this.starshipRepository = new StarshipRepository();
   }
 
-  getConnectorCatalog(): ConnectorCatalogItem[] {
+  /**
+   * Get the connector catalog.
+   *
+   * Primary source of truth is the DB-backed connector_providers table.
+   * If the table is empty or unavailable (e.g. during migration), this
+   * falls back to the existing static CONNECTOR_CATALOG.
+   */
+  async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
+    try {
+      const providers = await this.connectorProviderRepository.list();
+      if (providers.length) {
+        return providers.map(
+          (provider: {
+            id: string;
+            displayName: string;
+            description: string;
+            authType: string;
+            requiredEnvKeys?: string[];
+            optionalEnvKeys?: string[];
+            docsSlug?: string | null;
+          }): ConnectorCatalogItem => ({
+            provider: provider.id as ConnectorProvider,
+            displayName: provider.displayName,
+            description: provider.description,
+            authType: provider.authType as unknown as ConnectorCatalogItem['authType'],
+            requiredEnvKeys: provider.requiredEnvKeys || [],
+            optionalEnvKeys: provider.optionalEnvKeys || [],
+            docsSlug: provider.docsSlug ?? undefined,
+          })
+        );
+      }
+    } catch (error) {
+      console.warn('[ConnectorService] Failed to load connector providers from DB, falling back to static catalog', error);
+    }
+
     return getConnectorCatalog();
   }
 
@@ -328,10 +364,7 @@ export class ConnectorService {
    * List connectors for a starship, enriched with managed env key presence.
    */
   async listStarshipConnectors(starshipId: string): Promise<ConnectorListItem[]> {
-    const [catalog, connectors] = await Promise.all([
-      Promise.resolve(getConnectorCatalog()),
-      this.connectorRepository.findByStarship(starshipId),
-    ]);
+    const [catalog, connectors] = await Promise.all([this.getConnectorCatalog(), this.connectorRepository.findByStarship(starshipId)]);
     const byProvider = new Map(connectors.map((c) => [c.provider, c]));
 
     const now = new Date().toISOString();

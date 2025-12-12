@@ -6,7 +6,7 @@
  *
  * Protocol:
  * Parent sends:
- *   { type: 'start', payload: { blueprint, execution, config, autopilotCredentials } }
+ *   { type: 'start', payload: { blueprint, execution, config } }
  *
  * Child responds with:
  *   { type: 'event', event }
@@ -120,20 +120,8 @@ process.on('message', async (msg) => {
   const blueprint = payload.blueprint;
   const execution = payload.execution;
   const config = payload.config || {};
-  const autopilotCredentials = payload.autopilotCredentials || undefined;
 
   try {
-    // Optional: set credentials if provided
-    try {
-      const mod = require('../Autopilot.js');
-      const autopilot = mod && (mod.autopilot || (mod.default && mod.default.autopilot));
-      if (autopilot && typeof autopilot.setCredentials === 'function' && autopilotCredentials) {
-        autopilot.setCredentials(autopilotCredentials);
-      }
-    } catch (_e) {
-      // ignore if Autopilot manager is not available
-    }
-
     const { Engine } = require('../engine/Engine.js');
 
     // Bridge event callback to parent and hostRuntime HTTP via IPC

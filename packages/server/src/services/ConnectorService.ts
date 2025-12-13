@@ -1,4 +1,3 @@
-import { getConnectorCatalog } from '@/config/connectors';
 import type {
   ConnectorCatalogItem,
   ConnectorConnectInput,
@@ -286,31 +285,21 @@ export class ConnectorService {
   /**
    * Get the connector catalog.
    *
-   * Primary source of truth is the DB-backed connector_templates table.
-   * If the table is empty or unavailable (e.g. during migration), this
-   * falls back to the existing static CONNECTOR_CATALOG.
+   * Source of truth is the DB-backed connector_templates table.
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
-    try {
-      const templates = await this.connectorTemplateRepository.list();
-      if (templates.length) {
-        return templates.map(
-          (tpl): ConnectorCatalogItem => ({
-            provider: tpl.provider as ConnectorProvider,
-            displayName: tpl.displayName,
-            description: tpl.description,
-            authType: tpl.authType as ConnectorCatalogItem['authType'],
-            requiredEnvKeys: tpl.requiredEnvKeys || [],
-            optionalEnvKeys: tpl.optionalEnvKeys || [],
-            docsSlug: tpl.docsSlug ?? undefined,
-          })
-        );
-      }
-    } catch (error) {
-      console.warn('[ConnectorService] Failed to load connector templates from DB, falling back to static catalog', error);
-    }
-
-    return getConnectorCatalog();
+    const templates = await this.connectorTemplateRepository.list();
+    return templates.map(
+      (tpl): ConnectorCatalogItem => ({
+        provider: tpl.provider as ConnectorProvider,
+        displayName: tpl.displayName,
+        description: tpl.description,
+        authType: tpl.authType as ConnectorCatalogItem['authType'],
+        requiredEnvKeys: tpl.requiredEnvKeys || [],
+        optionalEnvKeys: tpl.optionalEnvKeys || [],
+        docsSlug: tpl.docsSlug ?? undefined,
+      })
+    );
   }
 
   /**

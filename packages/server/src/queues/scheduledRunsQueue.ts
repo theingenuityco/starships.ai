@@ -9,6 +9,12 @@ export interface ScheduledRunJobData {
   agentId: string;
   prompt: string;
   timezone?: string | null;
+  /**
+   * The user who owns/created this schedule. Used by the worker
+   * to mint a JWT and execute the scheduled run under that user's
+   * authentication context.
+   */
+  ownerUserId: string;
 }
 
 let queueInstance: Queue<ScheduledRunJobData> | null = null;

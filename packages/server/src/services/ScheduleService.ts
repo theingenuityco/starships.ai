@@ -23,6 +23,7 @@ export class ScheduleService {
   async createSchedule(data: {
     starshipId: string;
     agentId: string;
+    ownerUserId: string;
     prompt: string;
     cronExpression: string;
     timezone: string;
@@ -106,12 +107,23 @@ export class ScheduleService {
         }
 
         // Enqueue a job for the worker to materialize the scheduled run.
+        // Older rows may not have ownerUserId populated; in that case we
+        // cannot safely execute under a specific user's JWT context, so
+        // skip enqueueing and log for visibility.
+        if (!claimed.ownerUserId) {
+          console.error('[ScheduleService] Skipping schedule without ownerUserId', {
+            scheduleId: claimed.id,
+          });
+          continue;
+        }
+
         const jobData: ScheduledRunJobData = {
           scheduleId: claimed.id,
           starshipId: claimed.starshipId,
           agentId: claimed.agentId,
           prompt: claimed.prompt,
           timezone: claimed.timezone,
+          ownerUserId: claimed.ownerUserId,
         };
 
         await queue.add('scheduled-run', jobData, {

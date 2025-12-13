@@ -5,6 +5,7 @@ import type {
   ConnectorCatalogResponse,
   ConnectorListItem,
   ConnectorListResponse,
+  ConnectorProvider,
 } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
@@ -49,7 +50,7 @@ export function useDisconnectConnector(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (provider: 'linkedin' | 'discord' /* | 'google_drive' | 'github' */): Promise<void> => {
+    mutationFn: async (provider: ConnectorProvider): Promise<void> => {
       await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/disconnect`)
     },
     onSuccess: (_, provider) => {
@@ -70,34 +71,18 @@ export function useDisconnectConnector(starshipId: string) {
   })
 }
 
-export function useStartLinkedInOAuth(starshipId: string) {
+export function useStartOAuthConnector(starshipId: string) {
   return useMutation({
-    mutationFn: async (): Promise<string> => {
+    mutationFn: async (provider: ConnectorProvider): Promise<string> => {
       const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
-        `/api/v1/starships/${starshipId}/connectors/linkedin/oauth/start`,
+        `/api/v1/starships/${starshipId}/connectors/${provider}/oauth/start`,
       )
       return response.data.data.authorizationUrl
     },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start LinkedIn connection'
-      toast.error('Failed to connect LinkedIn', {
-        description: errorMessage,
-      })
-    },
-  })
-}
-
-export function useStartDiscordOAuth(starshipId: string) {
-  return useMutation({
-    mutationFn: async (): Promise<string> => {
-      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
-        `/api/v1/starships/${starshipId}/connectors/discord/oauth/start`,
-      )
-      return response.data.data.authorizationUrl
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start Discord connection'
-      toast.error('Failed to connect Discord', {
+    onError: (error: any, provider) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start connector OAuth flow'
+      const providerLabel = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Connector'
+      toast.error(`Failed to connect ${providerLabel}`, {
         description: errorMessage,
       })
     },

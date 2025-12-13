@@ -1,13 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import {
-  useConnectorCatalog,
-  useDisconnectConnector,
-  useStarshipConnectors,
-  useStartDiscordOAuth,
-  useStartLinkedInOAuth,
-} from '@/hooks/useConnectors'
+import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,22 +19,19 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const { data: catalog = [] } = useConnectorCatalog()
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
-  const linkedinMutation = useStartLinkedInOAuth(starshipId)
-  const discordMutation = useStartDiscordOAuth(starshipId)
+  const oauthMutation = useStartOAuthConnector(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [pendingDisconnect, setPendingDisconnect] = useState<'linkedin' | 'discord' /* | 'google_drive' | 'github' */ | null>(null)
+  const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
   // GitHub connector configuration temporarily disabled on client
   // const [githubDialogOpen, setGithubDialogOpen] = useState(false)
   // const [githubInstallationId, setGithubInstallationId] = useState('')
   // const [githubDefaultOwner, setGithubDefaultOwner] = useState('')
   // const [githubDefaultRepo, setGithubDefaultRepo] = useState('')
 
-  type ConnectorProviderId = 'linkedin' | 'discord' // | 'google_drive' | 'github'
+  const getConnectorState = (provider: string) => connectors.find(connector => connector.provider === provider)
 
-  const getConnectorState = (provider: ConnectorProviderId) => connectors.find(connector => connector.provider === provider)
-
-  const openDisconnectConfirm = (provider: 'linkedin' | 'discord' /* | 'google_drive' | 'github' */) => {
+  const openDisconnectConfirm = (provider: string) => {
     setPendingDisconnect(provider)
   }
 
@@ -50,15 +41,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     setPendingDisconnect(null)
   }
 
-  const handleLinkedInConnect = async () => {
-    const result = await linkedinMutation.mutateAsync()
-    if (result) {
-      window.location.href = result
-    }
-  }
-
-  const handleDiscordConnect = async () => {
-    const result = await discordMutation.mutateAsync()
+  const handleConnect = async (provider: string) => {
+    const result = await oauthMutation.mutateAsync(provider as any)
     if (result) {
       window.location.href = result
     }
@@ -99,6 +83,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     [normalizedQuery]
   )
 
+  const oauthCatalog = useMemo(
+    () => catalog.filter(entry => entry.authType === 'oauth2'),
+    [catalog],
+  )
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -107,33 +96,12 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     )
   }
 
-  const PROVIDERS: ConnectorProviderId[] = ['linkedin', 'discord'] // 'google_drive', 'github' temporarily disabled
-
-  const CONNECTOR_LABELS: Record<ConnectorProviderId, string> = {
-    linkedin: 'LinkedIn',
-    discord: 'Discord',
-  }
-
-  const hasAnyVisibleConnector = PROVIDERS.some(provider => {
-    const item = catalog.find(c => c.provider === provider)
-    return item && matchesQuery({ displayName: item.displayName, description: item.description })
+  const hasAnyVisibleConnector = oauthCatalog.some(item => {
+    return matchesQuery({ displayName: item.displayName, description: item.description })
   })
 
-  const handleConnect = (provider: ConnectorProviderId) => {
-    switch (provider) {
-      case 'linkedin':
-        return handleLinkedInConnect()
-      case 'discord':
-        return handleDiscordConnect()
-      // case 'google_drive':
-      //   return handleGoogleDriveConnect()
-      // case 'github':
-      //   return handleGitHubConnect()
-    }
-  }
-
-  const renderConnectorCard = (provider: ConnectorProviderId, connectedFirst: boolean) => {
-    const catalogItem = catalog.find(c => c.provider === provider)
+  const renderConnectorCard = (provider: string, connectedFirst: boolean) => {
+    const catalogItem = oauthCatalog.find(c => c.provider === provider)
     if (!catalogItem || !matchesQuery({ displayName: catalogItem.displayName, description: catalogItem.description })) {
       return null
     }
@@ -142,7 +110,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const isConnected = state?.status === 'connected'
     if (!!isConnected !== connectedFirst) return null
 
-    const label = CONNECTOR_LABELS[provider]
+    const label = catalogItem.displayName
     const logoSrc = CONNECTOR_LOGOS[provider]
 
     return (
@@ -173,7 +141,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               variant={isConnected ? 'primaryOutline' : 'default'}
               className="min-w-[140px]"
               onClick={() => handleConnect(provider)}
-              disabled={provider === 'linkedin' ? linkedinMutation.isPending : discordMutation.isPending}
+              disabled={oauthMutation.isPending}
             >
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
               {isConnected ? 'Reconnect' : `Connect ${label}`}
@@ -215,21 +183,21 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Connected first */}
-        {PROVIDERS.map(provider => renderConnectorCard(provider, true))}
+        {oauthCatalog.map(entry => renderConnectorCard(entry.provider, true))}
 
         {/* Then not connected */}
-        {PROVIDERS.map(provider => renderConnectorCard(provider, false))}
+        {oauthCatalog.map(entry => renderConnectorCard(entry.provider, false))}
       </div>
 
       <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
-              <DialogDescription>
-                {pendingDisconnect
-                  ? `If you disconnect ${pendingDisconnect === 'linkedin' ? 'LinkedIn' : 'Discord'}, any tools that rely on this connector will stop working until you reconnect.`
-                  : null}
-              </DialogDescription>
+            <DialogDescription>
+              {pendingDisconnect
+                ? `If you disconnect ${pendingDisconnect}, any tools that rely on this connector will stop working until you reconnect.`
+                : null}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>

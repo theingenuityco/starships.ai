@@ -911,19 +911,45 @@ export class AgentService {
       const envConfig = getEnvConfig();
       let connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
       try {
-        const token = await generateJWT({
-          id: userId,
-          starshipId,
-        });
-        const baseUrl = `${envConfig.SERVER_URL}/api/v1`;
-        connectors = {
-          starships: {
+        // Starships connector (same as ConversationService.buildConnectorHttpConfig)
+        try {
+          const token = await generateJWT({
+            id: userId,
+            starshipId,
+          });
+          const baseUrl = `${envConfig.SERVER_URL}/api/v1`;
+          connectors.starships = {
             baseUrl,
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          },
-        };
+          };
+        } catch (error) {
+          console.error('[AGENT-TEST] Failed to build starships connector HTTP configuration:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        // Google Drive connector: mirror ConversationService so http_request
+        // nodes with connector: "google_drive" work in agent tests too.
+        try {
+          const envService = new EnvironmentService();
+          const decryptedEnv = await envService.getDecryptedEnvironment(starshipId);
+          const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
+
+          if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
+            connectors.google_drive = {
+              baseUrl: 'https://www.googleapis.com',
+              headers: {
+                Authorization: `Bearer ${googleDriveToken}`,
+              },
+            };
+          }
+        } catch (error) {
+          console.error('[AGENT-TEST] Failed to build google_drive connector HTTP configuration:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       } catch (e) {
         console.error('[AGENT-TEST] Failed to build connector HTTP configuration:', e);
       }

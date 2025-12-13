@@ -134,7 +134,7 @@ export class ConversationService {
    * EngineConfig and is ONLY consumed inside the runner HostRuntime.
    *
    * Workflows and blueprints never see this data; they only reference
-   * connectors by slug (e.g., "starships") on HttpRequest nodes.
+   * connectors by slug (e.g., "starships", "google_drive") on HttpRequest nodes.
    */
   private async buildConnectorHttpConfig(
     starshipId: string,
@@ -146,24 +146,55 @@ export class ConversationService {
 
     const env = getEnvConfig();
 
+    const connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
+
     // Generate a JWT representing the current user acting in the context of
     // this starship. This token will be used by the runner when it performs
     // HTTP requests via the "starships" connector.
-    const token = await generateJWT({
-      id: authUserId,
-      starshipId,
-    });
+    try {
+      const token = await generateJWT({
+        id: authUserId,
+        starshipId,
+      });
 
-    const baseUrl = `${env.SERVER_URL}/api/v1`;
+      const baseUrl = `${env.SERVER_URL}/api/v1`;
 
-    return {
-      starships: {
+      connectors.starships = {
         baseUrl,
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      },
-    };
+      };
+    } catch (error) {
+      // If we fail to generate a JWT, fall back to no starships connector;
+      // tools that rely on it will fail explicitly when invoked.
+      console.error('[ConversationService] Failed to build starships connector HTTP configuration', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Google Drive connector: resolve relative URLs like "/drive/v3/..."
+    // against the Google APIs base URL and inject a bearer token managed in
+    // the starship environment (GOOGLE_DRIVE_ACCESS_TOKEN).
+    try {
+      const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
+      const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
+
+      if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
+        connectors.google_drive = {
+          baseUrl: 'https://www.googleapis.com',
+          headers: {
+            Authorization: `Bearer ${googleDriveToken}`,
+          },
+        };
+      }
+    } catch (error) {
+      console.error('[ConversationService] Failed to build google_drive connector HTTP configuration', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return connectors;
   }
 
   // Autopilot configuration

@@ -565,7 +565,7 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
     }
 
     // Execute agent test
-    const testResult = await agentService.testAgent(agent.id, input, starshipId, parentConversationId);
+    const testResult = await agentService.testAgent(agent.id, input, starshipId, userId, parentConversationId);
 
     sendSuccess(res, {
       success: testResult.success,

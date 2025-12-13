@@ -938,12 +938,27 @@ export class ConversationService {
         const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
         const connectors = await this.buildConnectorHttpConfig(starship.id, authUserId);
 
+        // Build LLM runtime configuration from server env; this will be passed
+        // to the remote runner so it does not need to read provider keys from
+        // its own environment.
+        const env = getEnvConfig();
+        const llm = env.OPENROUTER_API_KEY
+          ? {
+              apiKey: env.OPENROUTER_API_KEY,
+              baseUrl: 'https://openrouter.ai/api/v1',
+            }
+          : undefined;
+
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
           // Extra config understood by remote runner (connector-aware HostRuntime).
           connectors,
-        } as EngineConfig & { connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }> };
+          llm,
+        } as EngineConfig & {
+          connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+          llm?: { apiKey: string; baseUrl?: string };
+        };
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
         // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages

@@ -153,16 +153,12 @@ export class StreamingService {
 
     // Handle connection close
     res.on('close', () => {
-      console.log(`[StreamingService] <<CLOSED BY CLOSE EVENT>> streamId=${streamId}`);
       this.cleanupConnection(streamId, info);
     });
-
     res.on('error', (error) => {
       console.error(`[StreamingService] Streaming errored ${streamId}`, error);
       this.cleanupConnection(streamId, info);
     });
-
-    console.log(`[StreamingService] New connection added: ${streamId}`);
   }
 
   /**
@@ -598,7 +594,6 @@ export class StreamingService {
       }
       this.connections.delete(streamId);
     }
-    console.log(`[StreamingService] Cleaned up connection for stream: ${streamId}. Remaining=${this.connections.get(streamId)?.size ?? 0}`);
   }
 
   /**

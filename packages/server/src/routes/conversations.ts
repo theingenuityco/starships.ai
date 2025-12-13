@@ -113,6 +113,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         });
       } catch (err) {
         // Swallow initial snapshot failure; SSE will continue without initial turn_state event
+        console.error('[CONVERSATIONS] Failed to send initial turn_state snapshot:', {
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       // If this is a reconnection with Last-Event-ID, prefer event replay from buffer

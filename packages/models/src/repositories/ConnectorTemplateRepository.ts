@@ -1,5 +1,5 @@
 import { ConnectorTemplateEntity } from '@/entities/ConnectorTemplateEntity';
-import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
+import { fromDatabase } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { ConnectorProvider } from '@starships/protocol';
 
@@ -13,13 +13,13 @@ export class ConnectorTemplateRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
-          'SELECT * FROM connector_templates ORDER BY provider, created_at DESC',
+          'SELECT * FROM connector_templates ORDER BY provider, created_at DESC'
         );
 
         return result.map((record) => fromDatabase(ConnectorTemplateEntity, record));
       },
       'list',
-      'ConnectorTemplate',
+      'ConnectorTemplate'
     );
   }
 
@@ -31,16 +31,13 @@ export class ConnectorTemplateRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM connector_templates WHERE id = $1',
-          [id],
-        );
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM connector_templates WHERE id = $1', [id]);
 
         return result ? fromDatabase(ConnectorTemplateEntity, result) : null;
       },
       'findById',
       'ConnectorTemplate',
-      id,
+      id
     );
   }
 
@@ -54,16 +51,14 @@ export class ConnectorTemplateRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.queryOne<Record<string, unknown>>(
           'SELECT * FROM connector_templates WHERE provider = $1 ORDER BY created_at DESC',
-          [provider],
+          [provider]
         );
 
         return result ? fromDatabase(ConnectorTemplateEntity, result) : null;
       },
       'findByProvider',
       'ConnectorTemplate',
-      provider,
+      provider
     );
   }
 }
-
-

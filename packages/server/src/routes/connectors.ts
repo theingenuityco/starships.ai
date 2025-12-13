@@ -223,19 +223,7 @@ router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware
     const connectorService = new ConnectorService();
     const _body = req.body as StartOAuthRequest | undefined;
 
-    let authorizationUrl: string;
-    if (provider === 'linkedin') {
-      authorizationUrl = await connectorService.startLinkedInOAuth(starshipId, userId);
-    } else if (provider === 'discord') {
-      authorizationUrl = await connectorService.startDiscordOAuth(starshipId, userId);
-    } else if (provider === 'google_drive') {
-      authorizationUrl = await connectorService.startGoogleDriveOAuth(starshipId, userId);
-    } else {
-      sendError(res, 'OPERATION_NOT_ALLOWED', 'OAuth start is not supported for this provider', 400, {
-        provider,
-      });
-      return;
-    }
+    const authorizationUrl = await connectorService.startOAuthConnector(starshipId, userId, provider);
 
     const response: StartOAuthResponse = {
       authorizationUrl,

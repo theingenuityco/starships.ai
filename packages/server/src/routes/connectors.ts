@@ -80,6 +80,82 @@ router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, 
   }
 });
 
+// POST /starships/:id/connectors/:provider/refresh - Refresh connector via blueprint (if configured)
+router.post('/starships/:id/connectors/:provider/refresh', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const connectorService = new ConnectorService();
+    const connector = await connectorService.refreshConnector(starshipId, provider);
+
+    if (!connector) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector or refresh blueprint not found for this starship', 404, {
+        starshipId,
+        provider,
+      });
+      return;
+    }
+
+    sendSuccess(res, { connector });
+  } catch (error) {
+    handleError(error, res, 'refreshing connector via blueprint');
+  }
+});
+
+// POST /starships/:id/connectors/:provider/test - Test connector via blueprint (if configured)
+router.post('/starships/:id/connectors/:provider/test', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const connectorService = new ConnectorService();
+    const result = await connectorService.testConnector(starshipId, provider as ConnectorProvider);
+
+    if (!result) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector or test blueprint not found for this starship', 404, {
+        starshipId,
+        provider,
+      });
+      return;
+    }
+
+    sendSuccess(res, result);
+  } catch (error) {
+    handleError(error, res, 'testing connector via blueprint');
+  }
+});
+
 // POST /starships/:id/connectors/:provider/api-key - Connect via API key
 router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

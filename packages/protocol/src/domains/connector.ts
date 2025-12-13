@@ -31,6 +31,8 @@ export interface ConnectorModel {
   lastError?: string;
   createdAt: string;
   updatedAt: string;
+  templateId?: string;
+  version?: string;
 }
 
 // ============================================================================
@@ -70,6 +72,29 @@ export interface ConnectorCatalogItem {
 
 export interface ConnectorCatalogResponse {
   connectors: ConnectorCatalogItem[];
+}
+
+/**
+ * ConnectorTemplate
+ *
+ * Template-level definition of a connector (connector_templates table),
+ * mirroring the patterns used for AgentTemplate and ToolTemplate.
+ */
+export interface ConnectorTemplateModel {
+  id: string;
+  slug: string;
+  provider: ConnectorProvider;
+  displayName: string;
+  description: string;
+  authType: ConnectorAuthType;
+  requiredEnvKeys: string[];
+  optionalEnvKeys?: string[];
+  docsSlug?: string;
+  version: string;
+  category: string;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ConnectWithApiKeyRequest {

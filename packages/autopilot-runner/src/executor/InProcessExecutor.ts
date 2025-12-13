@@ -1,17 +1,35 @@
 import { Executor, ExecuteInput } from './Executor';
 import { Engine } from '@starships/autopilot';
-import { createRunnerHostRuntime } from '../hostRuntime/RunnerHostRuntime';
+import { createRunnerHostRuntime, type ConnectorHttpConfig } from '../hostRuntime/RunnerHostRuntime';
 
 export class InProcessExecutor implements Executor {
   async execute(input: ExecuteInput): Promise<unknown> {
     const blueprint = JSON.parse(input.blueprintJson || '{}');
     const execution = JSON.parse(input.executionJson || '{}');
-    const config = JSON.parse(input.configJson || '{}');
+    const rawConfig = JSON.parse(input.configJson || '{}') as {
+      failOnNodeError?: boolean;
+      runtimeEnv?: Record<string, unknown>;
+      /**
+       * Optional connector HTTP configuration passed from the embedding host.
+       * This is consumed ONLY by the runner HostRuntime and is never exposed
+       * to workflows as runtimeEnv or execution state.
+       */
+      connectors?: Record<string, ConnectorHttpConfig | undefined>;
+      [key: string]: unknown;
+    };
 
-    const hostRuntime = createRunnerHostRuntime();
+    // Extract connector configuration for HostRuntime only; do NOT pass it
+    // through to Engine, so workflows cannot access connector secrets.
+    const { connectors, ...engineConfig } = rawConfig;
+
+    const hostRuntime = createRunnerHostRuntime({
+      // The HostRuntime implementation interprets this map; values are kept
+      // opaque here to avoid coupling InProcessExecutor to Starships types.
+      connectors: connectors ?? {},
+    });
 
     const engine = new Engine({
-      ...(config || {}),
+      ...(engineConfig || {}),
       hostRuntime,
       eventCallback: input.onEvent
         ? async (event: unknown) => {
@@ -24,7 +42,7 @@ export class InProcessExecutor implements Executor {
             }
           }
         : undefined,
-      failOnNodeError: config?.failOnNodeError ?? true,
+      failOnNodeError: engineConfig.failOnNodeError ?? true,
     });
 
     const result = await engine.executeBlueprint(blueprint, execution);

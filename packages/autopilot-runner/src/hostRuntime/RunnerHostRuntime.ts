@@ -2,27 +2,92 @@ import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
 import OpenAI from 'openai';
 
 /**
+ * Connector-aware HTTP configuration passed from the embedding host (API server)
+ * to the runner process.
+ *
+ * IMPORTANT: This data is ONLY consumed inside the HostRuntime implementation.
+ * It is never exposed to workflows as runtimeEnv or node state, so secrets
+ * carried in headers remain invisible to blueprints/code nodes.
+ */
+export interface ConnectorHttpConfig {
+  /**
+   * Optional base URL used when HttpRequest nodes specify a relative URL
+   * (e.g., "/starships/{id}/connectors"). When provided and the request URL
+   * is relative, the final URL will be resolved against this base.
+   */
+  baseUrl?: string;
+
+  /**
+   * Headers to inject on every HTTP request executed via this connector.
+   * Typically used for Authorization or other connector-specific metadata.
+   */
+  headers?: Record<string, string>;
+}
+
+export interface RunnerHostRuntimeOptions {
+  /**
+   * Map of connector slug -> HTTP configuration. Keys MUST match the
+   * connector identifiers used in HttpRequestParams.connector, e.g.:
+   *   { starships: { baseUrl, headers }, linkedin: { baseUrl, headers } }
+   */
+  connectors?: Record<string, ConnectorHttpConfig | undefined>;
+}
+
+/**
  * HostRuntime implementation for the autopilot-runner process.
  *
  * This is responsible for:
  * - Performing HTTP calls on behalf of HttpRequest nodes
  * - Executing LLM calls via OpenRouter (or other providers in the future)
  *
- * NOTE: This implementation is runner-local; it does not know about Starships
- * connectors or per-starship encrypted environments. Those remain a concern of
- * the API server-side HostRuntime used by ConnectorRuntimeService.
+ * The embedding host (Starships API server) may pass connector-aware HTTP
+ * configuration (base URLs, auth headers, etc.) via RunnerHostRuntimeOptions.
+ * Workflows only see the connector slug; they never see the underlying
+ * headers or URLs used here.
  */
-export function createRunnerHostRuntime(): HostRuntime {
-  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
+export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}): HostRuntime {
+  const connectorConfigs = options.connectors ?? {};
+
+  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs, connector }) => {
     const controller = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
       const finalMethod = method.toUpperCase();
+
+      // Start from caller-provided URL and headers
+      let finalUrl = url;
+      let finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
+
+      // If a connector slug is provided and we have configuration for it,
+      // apply baseUrl + header injection. This keeps connector-specific
+      // behavior entirely inside the HostRuntime.
+      if (connector && typeof connector === 'string') {
+        const cfg = connectorConfigs[connector];
+        if (cfg) {
+          const { baseUrl, headers: connectorHeaders } = cfg;
+
+          // Resolve relative URLs against connector baseUrl, when provided.
+          if (typeof baseUrl === 'string' && typeof finalUrl === 'string' && !/^https?:\/\//i.test(finalUrl)) {
+            const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+            const normalizedPath = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
+            finalUrl = `${normalizedBase}${normalizedPath}`;
+          }
+
+          // Merge connector headers last so they can override generic ones.
+          if (connectorHeaders && typeof connectorHeaders === 'object') {
+            finalHeaders = {
+              ...finalHeaders,
+              ...connectorHeaders,
+            };
+          }
+        }
+      }
+
       const init: RequestInit = {
         method: finalMethod,
-        headers: headers as RequestInit['headers'],
+        headers: finalHeaders as RequestInit['headers'],
         signal: controller.signal,
       };
 
@@ -50,7 +115,7 @@ export function createRunnerHostRuntime(): HostRuntime {
         init.body = bodyInit;
       }
 
-      const resp: Response = await fetch(url, init);
+      const resp: Response = await fetch(finalUrl, init);
       const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;
 

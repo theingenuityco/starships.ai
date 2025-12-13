@@ -30,6 +30,7 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
+import { generateJWT } from '@/utils/jwt';
 
 /**
  * Autopilot child process configuration
@@ -126,6 +127,44 @@ export class ConversationService {
   private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
+
+  /**
+   * Build connector-aware HTTP configuration for the current starship/user
+   * context. This configuration is passed to the remote Autopilot runner via
+   * EngineConfig and is ONLY consumed inside the runner HostRuntime.
+   *
+   * Workflows and blueprints never see this data; they only reference
+   * connectors by slug (e.g., "starships") on HttpRequest nodes.
+   */
+  private async buildConnectorHttpConfig(
+    starshipId: string,
+    authUserId?: string
+  ): Promise<Record<string, { baseUrl: string; headers: Record<string, string> }>> {
+    if (!authUserId) {
+      return {};
+    }
+
+    const env = getEnvConfig();
+
+    // Generate a JWT representing the current user acting in the context of
+    // this starship. This token will be used by the runner when it performs
+    // HTTP requests via the "starships" connector.
+    const token = await generateJWT({
+      id: authUserId,
+      starshipId,
+    });
+
+    const baseUrl = `${env.SERVER_URL}/api/v1`;
+
+    return {
+      starships: {
+        baseUrl,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    };
+  }
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -892,10 +931,19 @@ export class ConversationService {
         // Execute with cancellation controller at top level (depth=0 implied inside Agent)
         // Use ChildProcessRunner directly to capture cancel handle
         const runner = this.defaultRunner;
+
+        // Build connector HTTP configuration for this starship/user context.
+        // This is only used by the remote runner HostRuntime and is not exposed
+        // to workflows (runtimeEnv/state).
+        const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
+        const connectors = await this.buildConnectorHttpConfig(starship.id, authUserId);
+
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-        } as EngineConfig;
+          // Extra config understood by remote runner (connector-aware HostRuntime).
+          connectors,
+        } as EngineConfig & { connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }> };
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
         // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages

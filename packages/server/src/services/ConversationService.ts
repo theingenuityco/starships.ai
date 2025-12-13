@@ -740,7 +740,7 @@ export class ConversationService {
 
   async addConversationMessage(
     data: Message & { conversationId: string; attachmentIds?: string[] },
-    ctx?: { authorization?: string; authContext?: { userId: string; agentId?: string; starshipId?: string } }
+    ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations

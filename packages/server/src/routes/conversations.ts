@@ -400,7 +400,7 @@ router.post(
               ...(agentId && { agentId }),
               ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
             },
-            { authorization: req.headers.authorization as string | undefined }
+            { authContext: req.authContext }
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
@@ -433,10 +433,7 @@ router.post(
             ...(agentId && { agentId }),
             ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
           },
-          {
-            authorization: req.headers.authorization as string | undefined,
-            authContext: req.authContext,
-          }
+          { authContext: req.authContext }
         )
         .catch((error) => {
           // Background conversation processing failure; main request already acknowledged

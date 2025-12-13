@@ -359,17 +359,12 @@ export class ConversationService {
           childConversationId: conversation.id,
           starshipId: conversation.starshipId,
         };
-        try {
-          console.log('[UI_ACTION] Emitting child_conversation_created', payload);
-        } catch {
-          // logging best-effort only
-        }
         await this.streamingService.broadcastUIAction(conversation.parentConversationId, payload);
       }
     } catch (e) {
       // Non-fatal: failure to emit UI hint must not break conversation creation
       try {
-        console.warn('[UI_ACTION] Failed to emit child_conversation_created', {
+        console.error('[UI_ACTION] Failed to emit child_conversation_created', {
           error: e instanceof Error ? e.message : String(e),
           parentConversationId: conversation.parentConversationId,
           starshipId: conversation.starshipId,
@@ -2185,16 +2180,6 @@ export class ConversationService {
           }
 
           if (uiPayload && typeof uiPayload.__ui_action === 'string') {
-            try {
-              console.log('[UI_ACTION] Detected UI payload on node_completed', {
-                conversationId,
-                action: uiPayload.__ui_action,
-                payload: uiPayload,
-              });
-            } catch {
-              // logging best-effort only
-            }
-
             // Emit structured UI event over SSE; modern clients should listen to 'ui_action'
             // and no longer rely on back-compat assistant messages that duplicate tool_result JSON.
             await this.streamingService.broadcastUIAction(conversationId, uiPayload);

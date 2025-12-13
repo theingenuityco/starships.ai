@@ -40,6 +40,16 @@ export class ConnectorEntity implements ConnectorModel {
   @IsISO8601()
   updatedAt!: string;
 
+  @Expose()
+  @IsOptional()
+  @IsString()
+  templateId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  version?: string;
+
   /**
    * Simple validation function using class-validator
    */

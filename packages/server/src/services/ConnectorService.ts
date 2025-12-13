@@ -7,7 +7,7 @@ import type {
   ConnectorProvider,
   ConnectWithApiKeyRequest,
 } from '@starships/protocol';
-import { ConnectorProviderRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
+import { ConnectorTemplateRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
@@ -57,14 +57,14 @@ function getProviderScopes(provider: ConnectorProvider): string[] {
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
-  private connectorProviderRepository: ConnectorProviderRepository;
+  private connectorTemplateRepository: ConnectorTemplateRepository;
   private environmentRepository: EnvironmentRepository;
   private environmentService: EnvironmentService;
   private starshipRepository: StarshipRepository;
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
-    this.connectorProviderRepository = new ConnectorProviderRepository();
+    this.connectorTemplateRepository = new ConnectorTemplateRepository();
     this.environmentRepository = new EnvironmentRepository();
     this.environmentService = new EnvironmentService();
     this.starshipRepository = new StarshipRepository();
@@ -81,8 +81,8 @@ export class ConnectorService {
   private async runConnectBlueprintIfPresent(
     input: ConnectorConnectInput,
   ): Promise<ConnectorConnectOutput | null> {
-    const providerEntity = await this.connectorProviderRepository.findById(input.provider);
-    if (!providerEntity || !providerEntity.connectBlueprint) {
+    const template = await this.connectorTemplateRepository.findByProvider(input.provider);
+    if (!template || !template.connectBlueprint) {
       return null;
     }
 
@@ -96,7 +96,7 @@ export class ConnectorService {
     });
 
     const execution = await engine.run({
-      blueprint: providerEntity.connectBlueprint,
+      blueprint: template.connectBlueprint,
       input,
     });
 
@@ -111,36 +111,28 @@ export class ConnectorService {
   /**
    * Get the connector catalog.
    *
-   * Primary source of truth is the DB-backed connector_providers table.
+   * Primary source of truth is the DB-backed connector_templates table.
    * If the table is empty or unavailable (e.g. during migration), this
    * falls back to the existing static CONNECTOR_CATALOG.
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
     try {
-      const providers = await this.connectorProviderRepository.list();
-      if (providers.length) {
-        return providers.map(
-          (provider: {
-            id: string;
-            displayName: string;
-            description: string;
-            authType: string;
-            requiredEnvKeys?: string[];
-            optionalEnvKeys?: string[];
-            docsSlug?: string | null;
-          }): ConnectorCatalogItem => ({
-            provider: provider.id as ConnectorProvider,
-            displayName: provider.displayName,
-            description: provider.description,
-            authType: provider.authType as unknown as ConnectorCatalogItem['authType'],
-            requiredEnvKeys: provider.requiredEnvKeys || [],
-            optionalEnvKeys: provider.optionalEnvKeys || [],
-            docsSlug: provider.docsSlug ?? undefined,
-          })
+      const templates = await this.connectorTemplateRepository.list();
+      if (templates.length) {
+        return templates.map(
+          (tpl): ConnectorCatalogItem => ({
+            provider: tpl.provider as ConnectorProvider,
+            displayName: tpl.displayName,
+            description: tpl.description,
+            authType: tpl.authType as ConnectorCatalogItem['authType'],
+            requiredEnvKeys: tpl.requiredEnvKeys || [],
+            optionalEnvKeys: tpl.optionalEnvKeys || [],
+            docsSlug: tpl.docsSlug ?? undefined,
+          }),
         );
       }
     } catch (error) {
-      console.warn('[ConnectorService] Failed to load connector providers from DB, falling back to static catalog', error);
+      console.warn('[ConnectorService] Failed to load connector templates from DB, falling back to static catalog', error);
     }
 
     return getConnectorCatalog();

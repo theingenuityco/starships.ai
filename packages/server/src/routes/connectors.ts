@@ -26,12 +26,6 @@ const ApiKeyConnectSchema = z.object({
   extraConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
-const GitHubAppConfigSchema = z.object({
-  installationId: z.string().min(1, 'installationId is required'),
-  defaultOwner: z.string().optional(),
-  defaultRepo: z.string().optional(),
-});
-
 const ProviderParamSchema = z.object({
   id: IdSchema,
   provider: z.string().min(1, 'provider is required'),
@@ -196,34 +190,6 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
   }
 });
 
-// POST /starships/:id/connectors/github/app-config - Configure GitHub App connector per starship
-router.post('/starships/:id/connectors/github/app-config', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
-    const paramsValidation = validateData(z.object({ id: IdSchema }), { id: req.params.id }, res, 'starship parameter');
-    if (!paramsValidation) return;
-
-    const { id: starshipId } = paramsValidation;
-
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
-
-    const bodyValidation = validateData(GitHubAppConfigSchema, req.body as unknown, res, 'GitHub App connector configuration');
-    if (!bodyValidation) return;
-
-    const connectorService = new ConnectorService();
-    await connectorService.configureGitHubConnector(starshipId, userId, bodyValidation);
-
-    res.status(204).send();
-  } catch (error) {
-    handleError(error, res, 'configuring GitHub connector');
-  }
-});
-
 // POST /starships/:id/connectors/:provider/disconnect - Disconnect connector
 router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -334,27 +300,28 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       return `${env.PUBLIC_URL}${basePath}?${params.toString()}`;
     };
 
-    // Custom connectors like GitHub App: delegate completion to a
-    // provider-specific connect blueprint via completeCustomConnector.
-    if (provider === 'github') {
-      try {
-        const { starshipId, starshipSlug } = await connectorService.completeCustomConnector(
-          provider as ConnectorProvider,
-          state,
-          req.query as Record<string, unknown>
-        );
+    // Custom connectors (authType = 'custom', e.g. GitHub App) delegate
+    // completion to a provider-specific connect blueprint via
+    // completeCustomConnector. The service method inspects the connector
+    // template's authType, so we don't hard-code provider ids here.
+    try {
+      const { starshipId, starshipSlug } = await connectorService.completeCustomConnector(
+        provider as ConnectorProvider,
+        state,
+        req.query as Record<string, unknown>
+      );
 
-        const redirectParams = new URLSearchParams({
-          connector: provider,
-          status: 'success',
-        });
+      const redirectParams = new URLSearchParams({
+        connector: provider,
+        status: 'success',
+      });
 
-        const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
-        res.redirect(redirectUrl);
-        return;
-      } catch {
-        // Fall through to generic error handling below.
-      }
+      const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
+      res.redirect(redirectUrl);
+      return;
+    } catch {
+      // Fall through to generic OAuth error handling below when connector is
+      // not custom or completion fails.
     }
 
     if (error || !code) {

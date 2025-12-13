@@ -738,52 +738,6 @@ export class ConnectorService {
   }
 
   /**
-   * Configure GitHub connector for a starship using a GitHub App installation.
-   * Stores non-secret configuration (installationId, defaults) in connector metadata.
-   */
-  async configureGitHubConnector(
-    starshipId: string,
-    userId: string,
-    payload: { installationId: string; defaultOwner?: string; defaultRepo?: string }
-  ) {
-    const baseMetadata: Record<string, unknown> = {
-      provider: 'github',
-      githubInstallationId: payload.installationId,
-      ...(payload.defaultOwner ? { defaultOwner: payload.defaultOwner } : {}),
-      ...(payload.defaultRepo ? { defaultRepo: payload.defaultRepo } : {}),
-    };
-
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'github');
-
-    if (!existing) {
-      await this.connectorRepository.create({
-        starshipId,
-        provider: 'github',
-        status: 'connected',
-        metadata: baseMetadata,
-        lastError: undefined,
-      });
-    } else {
-      await this.connectorRepository.update(existing.id, {
-        status: 'connected',
-        metadata: {
-          ...(existing.metadata || {}),
-          ...baseMetadata,
-        },
-        lastError: null,
-      });
-    }
-
-    // No env entries are managed for GitHub App; all auth is via app-level env.
-    const starship = await this.starshipRepository.findById(starshipId);
-    return {
-      starshipId,
-      starshipSlug: starship?.slug,
-      userId,
-    };
-  }
-
-  /**
    * Connect a provider using an API key.
    * Currently no connectors use API keys; this method is kept for
    * future providers that may adopt API-key-based flows.

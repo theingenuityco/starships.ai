@@ -1,8 +1,5 @@
-import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection } from '@starships/models';
 import { Worker } from 'bullmq';
-import { ConversationService } from '@/services/ConversationService';
 import {
   closeScheduledRunsQueue,
   getRedisConnection,
@@ -10,37 +7,18 @@ import {
   SCHEDULED_RUNS_QUEUE_NAME,
   type ScheduledRunJobData,
 } from '@/queues/scheduledRunsQueue';
+import { generateJWT } from '@/utils/jwt';
 
 async function main(): Promise<void> {
   const env = getEnvConfig();
 
-  // Configure remote runner for Autopilot so scheduled conversations behave like API-triggered ones.
-  autopilot.setRunnerConfig({
-    url: env.RUNNER_URL,
-    token: env.RUNNER_AUTH_TOKEN,
-  });
-
-  const connection = createConnection({
-    host: env.POSTGRES_HOST,
-    port: env.POSTGRES_PORT,
-    user: env.POSTGRES_USER,
-    password: env.POSTGRES_PASSWORD,
-    database: env.POSTGRES_DATABASE,
-    ssl: env.POSTGRES_SSL,
-  });
-
-  await connection.connect();
-  console.log('[ScheduledRunsWorker] Connected to PostgreSQL');
-
   // Ensure queue instance is initialized with Redis connection from env.
   getScheduledRunsQueue();
-
-  const conversationService = new ConversationService();
 
   const worker = new Worker<ScheduledRunJobData>(
     SCHEDULED_RUNS_QUEUE_NAME,
     async (job) => {
-      const { scheduleId, starshipId, agentId, prompt } = job.data;
+      const { scheduleId, starshipId, agentId, prompt, ownerUserId } = job.data;
 
       console.log('[ScheduledRunsWorker] Processing scheduled run job', {
         jobId: job.id,
@@ -49,29 +27,78 @@ async function main(): Promise<void> {
         agentId,
       });
 
-      // Materialize as a new conversation + first message, mirroring the previous inline behavior.
-      const conversation = await conversationService.createConversation({
-        title: `Scheduled – ${scheduleId}`,
-        status: 'active',
-        starshipId,
+      // Materialize as a new conversation + first message via HTTP API.
+      const baseUrl = (env.SERVER_URL || 'http://localhost:4000').replace(/\/+$/, '');
+      const apiBase = `${baseUrl}/api/v1`;
+
+      // Mint a JWT that represents the schedule owner acting via this
+      // agent/starship. This reuses the normal auth path and ensures
+      // all existing authorization/billing checks apply.
+      const token = await generateJWT({
+        id: ownerUserId,
         agentId,
+        starshipId,
       });
 
-      await conversationService.addConversationMessage(
-        {
-          conversationId: conversation.id,
-          content: prompt,
-          role: 'user',
-          messageType: 'user_input',
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      } as const;
+
+      // 1) Create conversation
+      const createRes = await fetch(`${apiBase}/conversations`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          title: `Scheduled – ${scheduleId}`,
+          status: 'active',
+          starshipId,
           agentId,
-        },
-        {}
-      );
+        }),
+      });
+
+      if (!createRes.ok) {
+        const text = await createRes.text().catch(() => '');
+        throw new Error(
+          `[ScheduledRunsWorker] Failed to create conversation via API: ${createRes.status} ${
+            createRes.statusText
+          }${text ? ` - ${text}` : ''}`
+        );
+      }
+
+      // Standard API responses wrap payload in { data: T }
+      const createBody = (await createRes.json().catch(() => null)) as { data?: { id?: string } } | null;
+      const conversationId = createBody?.data?.id;
+
+      if (!conversationId) {
+        throw new Error('[ScheduledRunsWorker] Conversation creation response missing id');
+      }
+
+      // 2) Post first user message (fire-and-forget turn)
+      const messageRes = await fetch(`${apiBase}/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          content: prompt,
+          agentId,
+          // Fire-and-forget; streaming / final response is handled by ConversationService
+          sync: false,
+        }),
+      });
+
+      if (!messageRes.ok) {
+        const text = await messageRes.text().catch(() => '');
+        throw new Error(
+          `[ScheduledRunsWorker] Failed to enqueue first message via API: ${messageRes.status} ${
+            messageRes.statusText
+          }${text ? ` - ${text}` : ''}`
+        );
+      }
 
       console.log('[ScheduledRunsWorker] Completed scheduled run job', {
         jobId: job.id,
         scheduleId,
-        conversationId: conversation.id,
+        conversationId,
       });
     },
     {
@@ -107,12 +134,6 @@ async function main(): Promise<void> {
       await closeScheduledRunsQueue();
     } catch (err) {
       console.error('[ScheduledRunsWorker] Failed to close scheduled runs queue', err);
-    }
-
-    try {
-      await connection.disconnect();
-    } catch (err) {
-      console.error('[ScheduledRunsWorker] Failed to disconnect database', err);
     }
 
     process.exit(0);

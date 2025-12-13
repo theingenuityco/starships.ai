@@ -3,7 +3,7 @@ import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, LLM, RunnerFactory } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, RunnerFactory } from '@starships/autopilot';
 import type {
   ToolParams,
   AgentParams,
@@ -20,19 +20,17 @@ import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
-import { Operation } from 'fast-json-patch';
 import { getEnvConfig } from '@starships/env';
-import type { HostRuntime, Runner } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Operation } from 'fast-json-patch';
+import type { Runner } from '@starships/autopilot';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
-import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
-
-// Debug flags
-const DEBUG_TOOLCALLS = false;
+import { generateJWT } from '@/utils/jwt';
 
 /**
  * Autopilot child process configuration
@@ -69,7 +67,6 @@ export class ConversationService {
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
-  private connectorRuntimeService!: ConnectorRuntimeService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
@@ -131,6 +128,75 @@ export class ConversationService {
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
 
+  /**
+   * Build connector-aware HTTP configuration for the current starship/user
+   * context. This configuration is passed to the remote Autopilot runner via
+   * EngineConfig and is ONLY consumed inside the runner HostRuntime.
+   *
+   * Workflows and blueprints never see this data; they only reference
+   * connectors by slug (e.g., "starships", "google_drive") on HttpRequest nodes.
+   */
+  private async buildConnectorHttpConfig(
+    starshipId: string,
+    authUserId?: string
+  ): Promise<Record<string, { baseUrl: string; headers: Record<string, string> }>> {
+    if (!authUserId) {
+      return {};
+    }
+
+    const env = getEnvConfig();
+
+    const connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
+
+    // Generate a JWT representing the current user acting in the context of
+    // this starship. This token will be used by the runner when it performs
+    // HTTP requests via the "starships" connector.
+    try {
+      const token = await generateJWT({
+        id: authUserId,
+        starshipId,
+      });
+
+      const baseUrl = `${env.SERVER_URL}/api/v1`;
+
+      connectors.starships = {
+        baseUrl,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+    } catch (error) {
+      // If we fail to generate a JWT, fall back to no starships connector;
+      // tools that rely on it will fail explicitly when invoked.
+      console.error('[ConversationService] Failed to build starships connector HTTP configuration', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Google Drive connector: resolve relative URLs like "/drive/v3/..."
+    // against the Google APIs base URL and inject a bearer token managed in
+    // the starship environment (GOOGLE_DRIVE_ACCESS_TOKEN).
+    try {
+      const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
+      const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
+
+      if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
+        connectors.google_drive = {
+          baseUrl: 'https://www.googleapis.com',
+          headers: {
+            Authorization: `Bearer ${googleDriveToken}`,
+          },
+        };
+      }
+    } catch (error) {
+      console.error('[ConversationService] Failed to build google_drive connector HTTP configuration', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return connectors;
+  }
+
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
     memoryLimitMB: 256, // 256MB memory limit
@@ -151,7 +217,6 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
-    this.connectorRuntimeService = new ConnectorRuntimeService(this.environmentService);
     // Choose default runner based on AUTOPILOT_RUNNER:
     // - 'remote' -> RemoteRunner via RunnerFactory (uses autopilot.setRunnerConfig)
     // - anything else -> ChildProcessRunner with local process isolation and limits
@@ -706,7 +771,7 @@ export class ConversationService {
 
   async addConversationMessage(
     data: Message & { conversationId: string; attachmentIds?: string[] },
-    ctx?: { authorization?: string }
+    ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
@@ -840,8 +905,6 @@ export class ConversationService {
         CONVERSATION_ID: data.conversationId,
       };
 
-      const hostRuntime: HostRuntime = this.connectorRuntimeService.createHostRuntime(starship, ctx?.authorization);
-
       // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
         const agentModel = agentQueue.shift()!;
@@ -895,16 +958,38 @@ export class ConversationService {
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-          hostRuntime,
         });
         // Execute with cancellation controller at top level (depth=0 implied inside Agent)
         // Use ChildProcessRunner directly to capture cancel handle
         const runner = this.defaultRunner;
+
+        // Build connector HTTP configuration for this starship/user context.
+        // This is only used by the remote runner HostRuntime and is not exposed
+        // to workflows (runtimeEnv/state).
+        const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
+        const connectors = await this.buildConnectorHttpConfig(starship.id, authUserId);
+
+        // Build LLM runtime configuration from server env; this will be passed
+        // to the remote runner so it does not need to read provider keys from
+        // its own environment.
+        const env = getEnvConfig();
+        const llm = env.OPENROUTER_API_KEY
+          ? {
+              apiKey: env.OPENROUTER_API_KEY,
+              baseUrl: 'https://openrouter.ai/api/v1',
+            }
+          : undefined;
+
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-          hostRuntime,
-        } as EngineConfig;
+          // Extra config understood by remote runner (connector-aware HostRuntime).
+          connectors,
+          llm,
+        } as EngineConfig & {
+          connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+          llm?: { apiKey: string; baseUrl?: string };
+        };
         const blueprint = agent.getCurrentBlueprint();
         const exec = ExecutionItemUtils.createExecution();
         // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages
@@ -1144,9 +1229,23 @@ export class ConversationService {
    */
   private async generateConversationTitle(starshipId: string, conversationId: string, userContent: string): Promise<string | null> {
     try {
-      const env = getEnvConfig();
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
+
+      const { OPENROUTER_API_KEY } = getEnvConfig();
+      if (!OPENROUTER_API_KEY) {
+        console.warn('[TITLE] OPENROUTER_API_KEY not configured; skipping title generation');
+        return null;
+      }
+
+      const client = new OpenAI({
+        apiKey: OPENROUTER_API_KEY,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://starships.ai',
+          'X-Title': 'Starships.ai',
+        },
+      });
 
       const sys = [
         'You generate concise, helpful conversation titles.',
@@ -1160,41 +1259,33 @@ export class ConversationService {
         .replace(/\n+/g, ' ')
         .slice(0, 400)}"\n\nReturn only the title text.`;
 
-      // Use autopilot LLM node directly (no runner/engine).
-      // The LLM node reads OPENROUTER_API_KEY from the host environment; we only pass non-secret config here.
-      const llm = new LLM({
+      const completion = await client.chat.completions.create({
         model,
         messages: [
-          { role: 'system' as const, content: sys },
-          { role: 'user' as const, content: prompt },
+          { role: 'system', content: sys },
+          { role: 'user', content: prompt },
         ],
         temperature: 0.3,
-        maxTokens: 32,
+        max_tokens: 32,
       });
 
-      const items = await llm.execute();
-      const res = (items?.[0]?.json || {}) as {
-        model?: string;
-        usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cost?: number };
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-
-      const choice = res?.choices?.[0]?.message?.content || '';
-      const usage = res?.usage || null;
-      const modelUsed = res?.model || model;
+      const choice = completion.choices?.[0]?.message?.content || '';
+      const usage = (
+        completion as unknown as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } }
+      ).usage;
 
       // Record usage if provided by LLM (camelCase fields)
       try {
-        if (usage && typeof usage.totalTokens === 'number') {
+        if (usage && typeof usage.total_tokens === 'number') {
           await this.usageService
             .createUsageForTurn({
               starshipId,
               conversationId,
-              promptTokens: Number(usage.promptTokens ?? 0),
-              completionTokens: Number(usage.completionTokens ?? 0),
-              totalTokens: Number(usage.totalTokens ?? 0),
-              cost: Number(usage.cost ?? 0),
-              model: String(modelUsed || model),
+              promptTokens: Number(usage.prompt_tokens ?? 0),
+              completionTokens: Number(usage.completion_tokens ?? 0),
+              totalTokens: Number(usage.total_tokens ?? 0),
+              cost: Number((usage as any).cost ?? 0),
+              model: String(model),
             })
             .then(async (row) => {
               try {

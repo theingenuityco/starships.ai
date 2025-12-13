@@ -6,6 +6,7 @@ export { EnvironmentRepository } from './EnvironmentRepository';
 export { MessageRepository } from './MessageRepository';
 export { OAuthAccountRepository } from './OAuthAccountRepository';
 export { StarshipRepository } from './StarshipRepository';
+export { ConnectorTemplateRepository } from './ConnectorTemplateRepository';
 export { ConnectorRepository } from './ConnectorRepository';
 export { ToolRepository } from './ToolRepository';
 export { ToolTemplateRepository } from './ToolTemplateRepository';

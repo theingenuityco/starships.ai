@@ -179,7 +179,10 @@ router.get('/attachments', jwtAuthMiddleware, async (req: Request, res: Response
       return;
     }
 
-    const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean);
+    const ids = idsParam
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
 
     if (ids.length === 0) {
       sendSuccess(res, [], 200);
@@ -207,81 +210,70 @@ router.get('/attachments', jwtAuthMiddleware, async (req: Request, res: Response
  * Proxy endpoint to fetch image/file data from S3
  * Returns image data directly (security: S3 URL never exposed to client)
  */
-router.get(
-  '/attachments/:attachmentId/preview',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      // Authentication check
-      if (!checkAuth(req, res)) return;
+router.get('/attachments/:attachmentId/preview', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-      // Validate attachment ID
-      const paramValidation = validateData(AttachmentIdSchema, req.params, res, 'attachment parameter');
-      if (!paramValidation) return;
+    // Validate attachment ID
+    const paramValidation = validateData(AttachmentIdSchema, req.params, res, 'attachment parameter');
+    if (!paramValidation) return;
 
-      const { attachmentId } = paramValidation;
+    const { attachmentId } = paramValidation;
 
-      // Get starship ID for access control
-      const starshipId = req.query.starshipId as string;
-      if (!starshipId) {
-        sendError(res, 'VALIDATION_ERROR', 'starshipId query parameter required', 400);
-        return;
-      }
-
-      // Authorization: verify user has access to this starship
-      const authUserId = req.user!.id;
-      if (!(await verifyResourceAccess(starshipId, authUserId, 'attachment', attachmentId, res))) {
-        return;
-      }
-
-      // Get attachment with presigned URL (internal use)
-      const service = new AttachmentService();
-      const attachment = await service.getAttachmentWithUrl(attachmentId, starshipId);
-
-      if (!attachment) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Attachment not found', 404);
-        return;
-      }
-
-      // Fetch file from S3 and stream to client
-      const response = await fetch(attachment.url);
-      if (!response.ok) {
-        sendError(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch file from storage', 500);
-        return;
-      }
-
-      // Set appropriate headers
-      res.setHeader('Content-Type', attachment.mimeType);
-      res.setHeader('Content-Disposition', `inline; filename="${attachment.filename}"`);
-      res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
-
-      // Stream response
-      if (response.body) {
-        const reader = response.body.getReader();
-        const stream = new ReadableStream({
-          async start(controller) {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              controller.enqueue(value);
-            }
-            controller.close();
-          },
-        });
-
-        for await (const chunk of stream) {
-          res.write(chunk);
-        }
-        res.end();
-      } else {
-        const buffer = await response.arrayBuffer();
-        res.send(Buffer.from(buffer));
-      }
-    } catch (error: any) {
-      handleError(error, res, 'fetching attachment preview');
+    // Get starship ID for access control
+    const starshipId = req.query.starshipId as string;
+    if (!starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'starshipId query parameter required', 400);
+      return;
     }
+
+    // Authorization: verify user has access to this starship
+    const authUserId = req.user!.id;
+    if (!(await verifyResourceAccess(starshipId, authUserId, 'attachment', attachmentId, res))) {
+      return;
+    }
+
+    // Get attachment with presigned URL (internal use)
+    const service = new AttachmentService();
+    const attachment = await service.getAttachmentWithUrl(attachmentId, starshipId);
+
+    if (!attachment) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Attachment not found', 404);
+      return;
+    }
+
+    // Fetch file from S3 and stream to client
+    const response = await fetch(attachment.url);
+    if (!response.ok) {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch file from storage', 500);
+      return;
+    }
+
+    // Set appropriate headers
+    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${attachment.filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
+
+    // Stream response
+    if (response.body) {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          res.write(Buffer.from(value));
+        }
+      }
+      res.end();
+    } else {
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    }
+  } catch (error: any) {
+    handleError(error, res, 'fetching attachment preview');
   }
-);
+});
 
 /**
  * DELETE /api/v1/attachments/:attachmentId

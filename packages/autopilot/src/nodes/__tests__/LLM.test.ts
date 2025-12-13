@@ -7,10 +7,7 @@
 import { LLM } from '../LLM';
 import type { LlmParams } from '@/types/node-parameters';
 import type { LLMResponse } from '@/types/llm';
-
-// Mock OpenAI SDK
-jest.mock('openai');
-
+import type { HostRuntime, LlmHostRequest } from '@/types/node-handler';
 import OpenAI from 'openai';
 
 // Mock console to reduce test noise
@@ -28,37 +25,21 @@ function createMockStream(chunks: OpenAI.Chat.Completions.ChatCompletionChunk[])
 }
 
 describe('LLM Node Handler', () => {
-  let mockCreate: jest.Mock;
-  let previousApiKey: string | undefined;
+  let hostRuntime: HostRuntime;
+  let llmMock: jest.Mock<Promise<AsyncIterable<unknown>>, [LlmHostRequest]>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCreate = jest.fn();
-    (OpenAI as jest.MockedClass<typeof OpenAI>).mockImplementation(() => {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as unknown as OpenAI;
-    });
-
-    // Ensure an API key is available by default for tests that expect
-    // execution to reach the OpenAI client. Individual tests can override.
-    previousApiKey = process.env.OPENROUTER_API_KEY;
-    process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+    llmMock = jest.fn();
+    hostRuntime = {
+      // HTTP is unused in these tests but required by the HostRuntime type
+      http: jest.fn() as HostRuntime['http'],
+      llm: llmMock as HostRuntime['llm'],
+    };
   });
 
   afterEach(() => {
     consoleSpy.mockClear();
-
-    // Restore previous API key state
-    if (previousApiKey === undefined) {
-      delete process.env.OPENROUTER_API_KEY;
-    } else {
-      process.env.OPENROUTER_API_KEY = previousApiKey;
-    }
   });
 
   describe('Basic LLM Functionality', () => {
@@ -71,7 +52,7 @@ describe('LLM Node Handler', () => {
         ],
       };
 
-      // Mock successful streaming response
+      // Mock successful streaming response via hostRuntime.llm
       const mockStream = createMockStream([
         {
           id: 'test-123',
@@ -97,11 +78,12 @@ describe('LLM Node Handler', () => {
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
-      mockCreate.mockResolvedValue(mockStream);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
 
       const eventCallback = jest.fn();
       const llm = new LLM(params, {
         eventCallback,
+        hostRuntime,
       });
 
       const responseItems = await llm.execute();
@@ -160,21 +142,20 @@ describe('LLM Node Handler', () => {
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
-      mockCreate.mockResolvedValue(mockStream);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
       await llm.execute();
 
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(llmMock).toHaveBeenCalledWith(
         expect.objectContaining({
           model: 'openai/gpt-4-turbo',
-          messages: params.messages,
+          messages: expect.any(Array),
           temperature: 0.9,
-          max_tokens: 2000,
-          top_p: 0.8,
-          frequency_penalty: 0.5,
-          presence_penalty: -0.2,
-          stream: true,
+          maxTokens: 2000,
+          topP: 0.8,
+          frequencyPenalty: 0.5,
+          presencePenalty: -0.2,
         })
       );
     });
@@ -187,10 +168,10 @@ describe('LLM Node Handler', () => {
         messages: [{ role: 'user', content: 'Hello!' }],
       };
 
-      // Explicitly remove API key for this test
-      delete process.env.OPENROUTER_API_KEY;
+      // Simulate host-level credential failure
+      llmMock.mockRejectedValue(new Error('OpenRouter API key is required'));
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
 
       await expect(llm.execute()).rejects.toThrow(/OpenRouter API key is required/);
     });
@@ -201,11 +182,11 @@ describe('LLM Node Handler', () => {
         messages: [{ role: 'user', content: 'Hello!' }],
       };
 
-      mockCreate.mockRejectedValue(new Error('HTTP 401: Unauthorized'));
+      llmMock.mockRejectedValue(new Error('HTTP 401: Unauthorized'));
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
 
-      await expect(llm.execute()).rejects.toThrow('HTTP 401: Unauthorized');
+      await expect(llm.execute()).rejects.toThrow(/HTTP 401: Unauthorized/);
     });
 
     it('should handle streaming errors', async () => {
@@ -228,11 +209,11 @@ describe('LLM Node Handler', () => {
         },
       };
 
-      mockCreate.mockResolvedValue(mockStream);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
 
-      await expect(llm.execute()).rejects.toThrow('LLM streaming execution failed: Stream error');
+      await expect(llm.execute()).rejects.toThrow(/LLM streaming execution failed: Stream error/);
     });
 
     it('should handle malformed JSON in stream', async () => {
@@ -259,9 +240,9 @@ describe('LLM Node Handler', () => {
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
-      mockCreate.mockResolvedValue(mockStream);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
       const response = await llm.execute();
 
       // Should recover and process valid chunks
@@ -364,9 +345,9 @@ describe('LLM Node Handler', () => {
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
-      mockCreate.mockResolvedValue(mockStream);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
       const response = await llm.execute();
 
       const responseData = response[0].json as LLMResponse;
@@ -399,9 +380,9 @@ describe('LLM Node Handler', () => {
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
 
-      mockCreate.mockResolvedValue(mockStream);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
 
-      const llm = new LLM(params);
+      const llm = new LLM(params, { hostRuntime });
       const response = await llm.execute();
 
       const responseData = response[0].json as LLMResponse;

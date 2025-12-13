@@ -15,7 +15,6 @@ export class ConnectorEntity implements ConnectorModel {
 
   @Expose()
   @IsString()
-  @IsIn(['linkedin', 'discord', 'google_drive'] satisfies ConnectorProvider[])
   provider!: ConnectorProvider;
 
   @Expose()
@@ -40,6 +39,16 @@ export class ConnectorEntity implements ConnectorModel {
   @Expose()
   @IsISO8601()
   updatedAt!: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  templateId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  version?: string;
 
   /**
    * Simple validation function using class-validator

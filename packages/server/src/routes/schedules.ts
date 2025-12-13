@@ -73,6 +73,7 @@ router.post('/starships/:starshipId/schedules', jwtAuthMiddleware, async (req: R
     const schedule = await scheduleService.createSchedule({
       starshipId: params.starshipId,
       agentId: body.agentId,
+      ownerUserId: authUserId,
       prompt: body.prompt,
       cronExpression: body.cronExpression,
       timezone: body.timezone,

@@ -39,11 +39,22 @@ export interface StreamingHeartbeat {
 /**
  * UI action payload for out-of-band UI instructions over SSE
  */
-export interface UIActionPayload {
-  __ui_action: 'open_tool_form' | 'update_tool_form' | 'submit_tool_form' | 'close_tool_form';
-  formData?: Record<string, unknown>;
-  patch?: Record<string, unknown>;
-  data?: Record<string, unknown>;
+export interface UIActionPayload extends Record<string, unknown> {
+  /**
+   * Discriminator for the UI action type.
+   *
+   * Core actions used by the builder/runtime:
+   * - open_tool_form
+   * - update_tool_form
+   * - submit_tool_form
+   * - close_tool_form
+   *
+   * Additional server-emitted UI hints (e.g. conversation_title_updated,
+   * child_conversation_created, insufficient_balance, tool_call_detected, etc.)
+   * are also allowed here. Keeping this a string allows the protocol contract
+   * to stay in sync with real-world usages without requiring frequent updates.
+   */
+  __ui_action: string;
 }
 
 /**

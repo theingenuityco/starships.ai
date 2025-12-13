@@ -288,19 +288,19 @@ export class ConnectorService {
    * Source of truth is the DB-backed connector_templates table.
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
-      const templates = await this.connectorTemplateRepository.list();
-        return templates.map(
-          (tpl): ConnectorCatalogItem => ({
-            provider: tpl.provider as ConnectorProvider,
-            displayName: tpl.displayName,
-            description: tpl.description,
-            authType: tpl.authType as ConnectorCatalogItem['authType'],
-            requiredEnvKeys: tpl.requiredEnvKeys || [],
-            optionalEnvKeys: tpl.optionalEnvKeys || [],
-            docsSlug: tpl.docsSlug ?? undefined,
-          })
-        );
-      }
+    const templates = await this.connectorTemplateRepository.list();
+    return templates.map(
+      (tpl): ConnectorCatalogItem => ({
+        provider: tpl.provider as ConnectorProvider,
+        displayName: tpl.displayName,
+        description: tpl.description,
+        authType: tpl.authType as ConnectorCatalogItem['authType'],
+        requiredEnvKeys: tpl.requiredEnvKeys || [],
+        optionalEnvKeys: tpl.optionalEnvKeys || [],
+        docsSlug: tpl.docsSlug ?? undefined,
+      })
+    );
+  }
 
   /**
    * Start a connector flow for a starship and return the authorization URL.
@@ -316,6 +316,7 @@ export class ConnectorService {
 
     const runtimeConfig = (template.runtimeConfig || {}) as {
       clientIdEnvKey?: string;
+      clientSecretEnvKey?: string;
       accessType?: string;
       prompt?: string;
       /**
@@ -324,9 +325,8 @@ export class ConnectorService {
        * query param when installing a bot.
        */
       permissions?: string | number;
-      // Custom connectors (e.g. GitHub App) may use additional keys such as
-      // appSlugEnvKey; these are treated as opaque config by the host and
-      // interpreted by provider-specific blueprints.
+      // Custom connectors (e.g. GitHub App installation) may use additional
+      // keys interpreted by provider-specific blueprints.
       [key: string]: unknown;
     };
 
@@ -376,7 +376,7 @@ export class ConnectorService {
 
     const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
     const authorizeUrl = template.oauthAuthorizeUrl;
-    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${provider}/oauth/callback`;
+    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${provider}/callback`;
 
     if (!authorizeUrl) {
       throw new Error(`oauthAuthorizeUrl is not configured for connector template ${template.id}`);
@@ -487,7 +487,7 @@ export class ConnectorService {
     const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
     const clientSecret = (env as unknown as Record<string, string | undefined>)[clientSecretEnvKey];
     const tokenUrl = template.oauthTokenUrl;
-    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${providerFromCallback}/oauth/callback`;
+    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${providerFromCallback}/callback`;
 
     if (!tokenUrl) {
       throw new Error(`oauthTokenUrl is not configured for connector template ${template.id}`);

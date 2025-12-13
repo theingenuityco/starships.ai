@@ -66,10 +66,16 @@ async function main(): Promise<void> {
         );
       }
 
-      const conversation = (await createRes.json()) as { id: string };
+      // Standard API responses wrap payload in { data: T }
+      const createBody = (await createRes.json().catch(() => null)) as { data?: { id?: string } } | null;
+      const conversationId = createBody?.data?.id;
+
+      if (!conversationId) {
+        throw new Error('[ScheduledRunsWorker] Conversation creation response missing id');
+      }
 
       // 2) Post first user message (fire-and-forget turn)
-      const messageRes = await fetch(`${apiBase}/conversations/${conversation.id}/messages`, {
+      const messageRes = await fetch(`${apiBase}/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -92,7 +98,7 @@ async function main(): Promise<void> {
       console.log('[ScheduledRunsWorker] Completed scheduled run job', {
         jobId: job.id,
         scheduleId,
-        conversationId: conversation.id,
+        conversationId,
       });
     },
     {

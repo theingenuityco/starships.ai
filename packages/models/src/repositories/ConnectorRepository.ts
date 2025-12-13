@@ -54,6 +54,8 @@ export class ConnectorRepository extends BaseRepository {
     status?: ConnectorStatus;
     metadata?: Record<string, unknown>;
     lastError?: string;
+    templateId?: string;
+    version?: string;
   }): Promise<ConnectorModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -65,6 +67,8 @@ export class ConnectorRepository extends BaseRepository {
           status: data.status || 'connected',
           metadata: data.metadata || {},
           lastError: data.lastError,
+          templateId: data.templateId,
+          version: data.version,
           createdAt: now,
           updatedAt: now,
         };

@@ -103,6 +103,7 @@ export function getEnvConfig(): EnvironmentConfig {
     // GitHub App Configuration (used for GitHub connector)
     GITHUB_APP_ID: process.env.GITHUB_APP_ID,
     GITHUB_APP_PRIVATE_KEY_BASE64: process.env.GITHUB_APP_PRIVATE_KEY_BASE64,
+    GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,

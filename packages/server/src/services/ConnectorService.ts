@@ -317,15 +317,41 @@ export class ConnectorService {
    * Start generic OAuth flow for a starship and return the authorization URL,
    * driven by connector_templates configuration instead of per-provider
    * hard-coded logic.
+   *
+   * NOTE: Although this method is named for OAuth, it also handles the GitHub
+   * App connector by returning a GitHub App installation URL instead of a
+   * traditional OAuth authorize URL. Callers should treat the result as a
+   * generic "connect this provider" URL.
    */
   async startOAuthConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
+    const env = getEnvConfig();
+
+    // Special-case GitHub: use GitHub App installation flow instead of OAuth2.
+    // The app slug is used to build the installation URL; the state parameter
+    // encodes the starship/user context and is validated in the callback.
+    if (provider === 'github') {
+      const appSlug = (env as unknown as { GITHUB_APP_SLUG?: string }).GITHUB_APP_SLUG;
+      if (!appSlug) {
+        throw new Error('GitHub connector is not configured. Missing env: GITHUB_APP_SLUG');
+      }
+
+      const state = await generateOAuthState(true, userId, {
+        starshipId,
+        provider,
+      });
+
+      const installBaseUrl = `https://github.com/apps/${encodeURIComponent(appSlug)}/installations/new`;
+      const url = `${installBaseUrl}?state=${encodeURIComponent(state)}`;
+
+      return url;
+    }
+
     const template = await this.loadTemplateOrThrow(provider);
 
     if (template.authType !== 'oauth2') {
       throw new Error(`Connector ${provider} does not use OAuth2 authentication`);
     }
 
-    const env = getEnvConfig();
     const runtimeConfig = (template.runtimeConfig || {}) as {
       clientIdEnvKey?: string;
       accessType?: string;

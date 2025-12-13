@@ -53,7 +53,7 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
       logger.error('[JWT-AUTH] Database error during user lookup', {
         userId: payload.sub,
         error: dbError?.message,
-        operation: 'user_lookup'
+        operation: 'user_lookup',
       });
       sendError(res, 'DATABASE_ERROR', 'Database error during authentication', 500);
       return;
@@ -67,11 +67,24 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
     // Attach user info to request for use in route handlers
     req.user = user;
 
+    // Attach authenticated context (user + optional agent/starship) for downstream attribution
+    try {
+      const agentId = typeof (payload as any).agentId === 'string' ? (payload as any).agentId : undefined;
+      const starshipId = typeof (payload as any).starshipId === 'string' ? (payload as any).starshipId : undefined;
+      (req as any).authContext = {
+        userId: user.id,
+        agentId,
+        starshipId,
+      };
+    } catch {
+      // Non-fatal: if we cannot derive authContext, continue with user-only context.
+    }
+
     next();
   } catch (error: any) {
     logger.error('[JWT-AUTH] Token validation failed', {
       error: error?.message,
-      operation: 'token_validation'
+      operation: 'token_validation',
     });
 
     // Provide more specific error messages

@@ -23,7 +23,6 @@ import {
 } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
-import type { Stream } from 'openai/streaming';
 
 // Typed view over the normalized streaming chunk we forward to the ConversationService
 type NormalizedToolCallDelta = {
@@ -105,15 +104,10 @@ export class LLM extends BaseNode<LlmParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    let apiKey: string | null = null;
-
-    // TODO: migrate LLM execution behind slug-based callConnector; for now, read
-    // OpenRouter API key directly from process.env in the host environment.
-    if (typeof process !== 'undefined') {
-      apiKey = process.env.OPENROUTER_API_KEY ?? null;
-    }
-    if (!apiKey) {
-      throw this.handleExecutionError(new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY in the host environment.'));
+    const opts = this.getOptions();
+    const hostRuntime = opts?.hostRuntime;
+    if (!hostRuntime || typeof hostRuntime.llm !== 'function') {
+      throw this.handleExecutionError(new Error('Host runtime LLM is not configured.'));
     }
 
     try {
@@ -125,60 +119,8 @@ export class LLM extends BaseNode<LlmParams> {
         messages = [{ role: 'user', content: inputContent }];
       }
 
-      // Initialize OpenAI client with OpenRouter base URL
-      const client = new OpenAI({
-        apiKey,
-        baseURL: 'https://openrouter.ai/api/v1',
-        defaultHeaders: {
-          'HTTP-Referer': 'https://starships.ai',
-          'X-Title': 'Starships.ai',
-        },
-      });
-
-      // Prepare request options - only include params that are explicitly provided
-      // This allows OpenRouter/model providers to use their own defaults
+      // Canonical messages for LLM execution
       const sourceMessages = this.coerceToLlmMessages(messages || params.messages);
-      const openaiMessages = this.convertMessagesToOpenAI(sourceMessages);
-      const requestOptions: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-        model: params.model,
-        messages: openaiMessages,
-        stream: true,
-        stream_options: { include_usage: true }, // OpenRouter usage accounting
-      };
-
-      // Only add optional parameters if explicitly provided
-      if (typeof params.temperature === 'number') {
-        requestOptions.temperature = params.temperature;
-      }
-      if (typeof params.maxTokens === 'number') {
-        requestOptions.max_tokens = params.maxTokens;
-      }
-      if (typeof params.topP === 'number') {
-        requestOptions.top_p = params.topP;
-      }
-      if (typeof params.frequencyPenalty === 'number') {
-        requestOptions.frequency_penalty = params.frequencyPenalty;
-      }
-      if (typeof params.presencePenalty === 'number') {
-        requestOptions.presence_penalty = params.presencePenalty;
-      }
-
-      // Pass through OpenRouter/OpenAI unified reasoning configuration when provided
-      if (params.reasoning && typeof params.reasoning === 'object') {
-        // The official OpenAI types do not yet expose the `reasoning` field, so we extend at runtime.
-        (requestOptions as OpenAI.Chat.ChatCompletionCreateParamsStreaming & { reasoning?: unknown }).reasoning = params.reasoning;
-      }
-
-      // Add function calling support if tools are provided
-      if (params.tools && Array.isArray(params.tools) && params.tools.length > 0) {
-        requestOptions.tools = this.convertToOpenAITools(params.tools);
-        requestOptions.tool_choice = 'auto';
-        // Prevent multiple tool calls within a single assistant response
-        // OpenAI/compatible providers honor `parallel_tool_calls: false`
-        requestOptions.parallel_tool_calls = false;
-      } else {
-        // No tools configured; leave provider defaults
-      }
 
       // Condensed request log: essential params only, with truncated message previews
       // const truncate = (text: unknown, max = 160): string => {
@@ -227,10 +169,21 @@ export class LLM extends BaseNode<LlmParams> {
       //   messages: summarizedMessages,
       // };
 
-      // console.log('>>> REQUEST >>>', JSON.stringify(requestOptions, null, 2));
-      // Stream with OpenAI SDK (handles all accumulation reliably)
-      const stream = await client.chat.completions.create(requestOptions);
-      const llmResponse = await this.processOpenAIStream(stream);
+      // Delegate provider selection and credential management to HostRuntime;
+      // the host returns an AsyncIterable of provider-native chunks.
+      const stream = await hostRuntime.llm({
+        model: params.model,
+        messages: this.convertMessagesToOpenAI(sourceMessages),
+        tools: Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined,
+        temperature: typeof params.temperature === 'number' ? params.temperature : undefined,
+        maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
+        topP: typeof params.topP === 'number' ? params.topP : undefined,
+        frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
+        presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
+        reasoning: params.reasoning,
+      });
+
+      const llmResponse = await this.processOpenAIStream(stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>);
 
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
@@ -450,10 +403,11 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
-   * Process OpenAI streaming response using the SDK's reliable accumulation
-   * This replaces our custom SSE parsing with battle-tested logic
+   * Process OpenAI-compatible streaming response.
+   * Expects an AsyncIterable of ChatCompletionChunk values (as returned by
+   * the hostRuntime.llm provider implementation).
    */
-  private async processOpenAIStream(stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>): Promise<LLMResponse> {
+  private async processOpenAIStream(stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>): Promise<LLMResponse> {
     const executionDepth = this.getOptions()?.execution?.depth ?? 0;
     const eventCallback = this.getEventCallback();
 

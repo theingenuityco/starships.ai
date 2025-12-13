@@ -1,6 +1,6 @@
 /**
  * JWT Utility Functions
- * 
+ *
  * Centralized JWT token generation and validation utilities
  * Extracted from duplicate code in auth routes to eliminate technical debt
  */
@@ -16,20 +16,40 @@ const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 
 export interface JWTUser {
+  /**
+   * User identifier (remains the JWT subject).
+   */
   id: string;
   email?: string;
   name?: string;
+
+  /**
+   * Optional agent/starship context for this token.
+   * These do NOT change the subject; they describe which agent/starship
+   * the caller is currently acting through.
+   */
+  agentId?: string;
+  starshipId?: string;
 }
 
 /**
  * Generate JWT token for authenticated user (EXTRACTED FROM DUPLICATE CODE)
  */
 export async function generateJWT(user: JWTUser): Promise<string> {
-  return await new SignJWT({
+  const payload: Record<string, unknown> = {
     sub: user.id,
     email: user.email,
     name: user.name || user.email?.split('@')[0],
-  })
+  };
+
+  if (user.agentId) {
+    payload.agentId = user.agentId;
+  }
+  if (user.starshipId) {
+    payload.starshipId = user.starshipId;
+  }
+
+  return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(JWT_ISSUER)
     .setAudience(JWT_AUDIENCE)
@@ -41,17 +61,13 @@ export async function generateJWT(user: JWTUser): Promise<string> {
 /**
  * Generate OAuth state token for CSRF protection
  */
-export async function generateOAuthState(
-  isLinking: boolean = false,
-  userId?: string,
-  context?: Record<string, unknown>,
-): Promise<string> {
+export async function generateOAuthState(isLinking: boolean = false, userId?: string, context?: Record<string, unknown>): Promise<string> {
   const payload: any = {
     purpose: 'oauth_state',
     nonce: crypto.randomBytes(16).toString('hex'),
     isLinking,
   };
-  
+
   // If linking, include the authenticated user ID for security
   if (isLinking && userId) {
     payload.userId = userId;
@@ -60,7 +76,7 @@ export async function generateOAuthState(
   if (context && typeof context === 'object') {
     payload.context = context;
   }
-  
+
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(JWT_ISSUER)
@@ -73,13 +89,13 @@ export async function generateOAuthState(
  * Validate OAuth state token
  */
 export async function validateOAuthState(
-  state: string,
+  state: string
 ): Promise<{ valid: boolean; isLinking?: boolean; userId?: string; context?: Record<string, unknown> }> {
   try {
     const { payload } = await jwtVerify(state, JWT_SECRET, { issuer: JWT_ISSUER });
     if (payload.purpose === 'oauth_state') {
-      return { 
-        valid: true, 
+      return {
+        valid: true,
         isLinking: payload.isLinking as boolean,
         userId: payload.userId as string | undefined,
         context: (payload as any).context as Record<string, unknown> | undefined,

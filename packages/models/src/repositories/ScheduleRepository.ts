@@ -43,6 +43,7 @@ export class ScheduleRepository extends BaseRepository {
   async create(data: {
     starshipId: string;
     agentId: string;
+    ownerUserId: string;
     prompt: string;
     cronExpression: string;
     timezone: string;
@@ -59,6 +60,7 @@ export class ScheduleRepository extends BaseRepository {
         const scheduleData = {
           starshipId: data.starshipId,
           agentId: data.agentId,
+          ownerUserId: data.ownerUserId,
           prompt: data.prompt,
           cronExpression: data.cronExpression,
           timezone: data.timezone,

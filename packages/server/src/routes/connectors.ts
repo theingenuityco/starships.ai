@@ -3,22 +3,23 @@ import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ConnectorService } from '@/services/ConnectorService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
-import type {
-  ConnectorCatalogResponse,
-  ConnectorListResponse,
-  ConnectWithApiKeyRequest,
-  StartOAuthRequest,
-  StartOAuthResponse,
-} from '@starships/protocol';
+import type { ConnectorCatalogResponse, ConnectorListResponse, ConnectWithApiKeyRequest, StartOAuthResponse } from '@starships/protocol';
 import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getEnvConfig } from '@starships/env';
+import { validateOAuthState } from '@/utils/jwt';
+import type { ConnectorProvider } from '@starships/protocol';
 
 const env = getEnvConfig();
 
 const router: Router = Router();
+
+interface OAuthStateContext {
+  starshipId?: string;
+  provider?: string;
+}
 
 const ApiKeyConnectSchema = z.object({
   apiKey: z.string().min(1, 'API key is required'),
@@ -33,14 +34,14 @@ const GitHubAppConfigSchema = z.object({
 
 const ProviderParamSchema = z.object({
   id: IdSchema,
-  provider: z.enum(['linkedin', 'discord', 'google_drive']),
+  provider: z.string().min(1, 'provider is required'),
 });
 
 // GET /connectors/catalog - Static connector catalog
 router.get('/connectors/catalog', async (req: Request, res: Response): Promise<void> => {
   try {
     const connectorService = new ConnectorService();
-    const catalog = connectorService.getConnectorCatalog();
+    const catalog = await connectorService.getConnectorCatalog();
     const response: ConnectorCatalogResponse = {
       connectors: catalog,
     };
@@ -54,7 +55,7 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
 router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id: starshipId } = req.params;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
@@ -79,10 +80,86 @@ router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, 
   }
 });
 
+// POST /starships/:id/connectors/:provider/refresh - Refresh connector via blueprint (if configured)
+router.post('/starships/:id/connectors/:provider/refresh', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const connectorService = new ConnectorService();
+    const connector = await connectorService.refreshConnector(starshipId, provider);
+
+    if (!connector) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector or refresh blueprint not found for this starship', 404, {
+        starshipId,
+        provider,
+      });
+      return;
+    }
+
+    sendSuccess(res, { connector });
+  } catch (error) {
+    handleError(error, res, 'refreshing connector via blueprint');
+  }
+});
+
+// POST /starships/:id/connectors/:provider/test - Test connector via blueprint (if configured)
+router.post('/starships/:id/connectors/:provider/test', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const connectorService = new ConnectorService();
+    const result = await connectorService.testConnector(starshipId, provider as ConnectorProvider);
+
+    if (!result) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector or test blueprint not found for this starship', 404, {
+        starshipId,
+        provider,
+      });
+      return;
+    }
+
+    sendSuccess(res, result);
+  } catch (error) {
+    handleError(error, res, 'testing connector via blueprint');
+  }
+});
+
 // POST /starships/:id/connectors/:provider/api-key - Connect via API key
 router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -120,51 +197,37 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
 });
 
 // POST /starships/:id/connectors/github/app-config - Configure GitHub App connector per starship
-router.post(
-  '/starships/:id/connectors/github/app-config',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = (req as any).user?.id;
-      if (!userId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-
-      const paramsValidation = validateData(
-        z.object({ id: IdSchema }),
-        { id: req.params.id },
-        res,
-        'starship parameter',
-      );
-      if (!paramsValidation) return;
-
-      const { id: starshipId } = paramsValidation;
-
-      if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
-
-      const bodyValidation = validateData(
-        GitHubAppConfigSchema,
-        req.body as unknown,
-        res,
-        'GitHub App connector configuration',
-      );
-      if (!bodyValidation) return;
-
-      const connectorService = new ConnectorService();
-      await connectorService.configureGitHubConnector(starshipId, userId, bodyValidation);
-
-      res.status(204).send();
-    } catch (error) {
-      handleError(error, res, 'configuring GitHub connector');
+router.post('/starships/:id/connectors/github/app-config', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
     }
-  },
-);
+
+    const paramsValidation = validateData(z.object({ id: IdSchema }), { id: req.params.id }, res, 'starship parameter');
+    if (!paramsValidation) return;
+
+    const { id: starshipId } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const bodyValidation = validateData(GitHubAppConfigSchema, req.body as unknown, res, 'GitHub App connector configuration');
+    if (!bodyValidation) return;
+
+    const connectorService = new ConnectorService();
+    await connectorService.configureGitHubConnector(starshipId, userId, bodyValidation);
+
+    res.status(204).send();
+  } catch (error) {
+    handleError(error, res, 'configuring GitHub connector');
+  }
+});
 
 // POST /starships/:id/connectors/:provider/disconnect - Disconnect connector
 router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -202,7 +265,7 @@ router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware,
 // POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (LinkedIn, Discord, Google Drive)
 router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
@@ -221,21 +284,8 @@ router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware
     if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
 
     const connectorService = new ConnectorService();
-    const _body = req.body as StartOAuthRequest | undefined;
 
-    let authorizationUrl: string;
-    if (provider === 'linkedin') {
-      authorizationUrl = await connectorService.startLinkedInOAuth(starshipId, userId);
-    } else if (provider === 'discord') {
-      authorizationUrl = await connectorService.startDiscordOAuth(starshipId, userId);
-    } else if (provider === 'google_drive') {
-      authorizationUrl = await connectorService.startGoogleDriveOAuth(starshipId, userId);
-    } else {
-      sendError(res, 'OPERATION_NOT_ALLOWED', 'OAuth start is not supported for this provider', 400, {
-        provider,
-      });
-      return;
-    }
+    const authorizationUrl = await connectorService.startOAuthConnector(starshipId, userId, provider);
 
     const response: StartOAuthResponse = {
       authorizationUrl,
@@ -257,7 +307,7 @@ const OAuthCallbackSchema = z.object({
 router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
   try {
     const paramsValidation = validateData(
-      z.object({ provider: z.enum(['linkedin', 'discord', 'google_drive']) }),
+      z.object({ provider: z.string().min(1, 'provider is required') }),
       req.params,
       res,
       'connector OAuth provider'
@@ -271,65 +321,95 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
 
     const { code, state, error } = queryValidation;
 
-    if (error || !code) {
-      const redirectParams = new URLSearchParams({
-        connector: provider,
-        status: 'error',
-      });
-      const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
-      res.redirect(redirectUrl);
-      return;
-    }
-
     const connectorService = new ConnectorService();
-    let starshipId: string;
-    let starshipSlug: string | undefined;
 
-    if (provider === 'linkedin') {
-      const result = await connectorService.completeLinkedInOAuth(code, state);
-      starshipId = result.starshipId;
-      starshipSlug = result.starshipSlug;
-    } else if (provider === 'discord') {
-      const result = await connectorService.completeDiscordOAuth(code, state, {
-        guild_id: typeof (req.query as any).guild_id === 'string' ? ((req.query as any).guild_id as string) : undefined,
-        permissions: typeof (req.query as any).permissions === 'string' ? ((req.query as any).permissions as string) : undefined,
-      });
-      starshipId = result.starshipId;
-      starshipSlug = result.starshipSlug;
-    } else if (provider === 'google_drive') {
-      const result = await connectorService.completeGoogleDriveOAuth(code, state);
-      starshipId = result.starshipId;
-      starshipSlug = result.starshipSlug;
-    } else {
+    const buildStarshipRedirect = (starshipId: string, starshipSlug: string | undefined, params: URLSearchParams): string => {
+      const basePath =
+        starshipSlug !== undefined && starshipSlug.length > 0
+          ? `/ship/${encodeURIComponent(starshipSlug)}/connectors`
+          : `/ship/${encodeURIComponent(starshipId)}/connectors`;
+      return `${env.PUBLIC_URL}${basePath}?${params.toString()}`;
+    };
+
+    if (error || !code) {
+      try {
+        const stateValidation = await validateOAuthState(state);
+        if (stateValidation.valid) {
+          const ctx = stateValidation.context as OAuthStateContext | undefined;
+          const starshipId = ctx?.starshipId as string | undefined;
+          const providerFromState = ctx?.provider as string | undefined;
+
+          if (starshipId) {
+            const redirectParams = new URLSearchParams({
+              connector: providerFromState || provider,
+              status: 'error',
+            });
+            const redirectUrl = buildStarshipRedirect(starshipId, undefined, redirectParams);
+            res.redirect(redirectUrl);
+            return;
+          }
+        }
+      } catch {
+        // fall through to generic callback redirect below
+      }
+
       const redirectParams = new URLSearchParams({
         connector: provider,
         status: 'error',
       });
-      const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
+      const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
       res.redirect(redirectUrl);
       return;
     }
+
+    const { starshipId, starshipSlug } = await connectorService.completeOAuthConnector(
+      provider as ConnectorProvider,
+      code,
+      state,
+      req.query as Record<string, unknown>
+    );
 
     const redirectParams = new URLSearchParams({
       connector: provider,
       status: 'success',
     });
 
-    const basePath =
-      starshipSlug !== undefined && starshipSlug.length > 0
-        ? `/ship/${encodeURIComponent(starshipSlug)}/connectors`
-        : `/ship/${encodeURIComponent(starshipId)}/connectors`;
-
-    const redirectUrl = `${env.PUBLIC_URL}${basePath}?${redirectParams.toString()}`;
+    const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
 
     res.redirect(redirectUrl);
-  } catch (error) {
-    // On error, redirect back with a generic failure state
+  } catch {
+    // On error, try to redirect back to the starship connectors page with an error flag
+    try {
+      const provider = req.params.provider as string | undefined;
+      const rawState = req.query.state as string | undefined;
+
+      if (rawState) {
+        const stateValidation = await validateOAuthState(rawState);
+        if (stateValidation.valid) {
+          const ctx = stateValidation.context as OAuthStateContext | undefined;
+          const starshipId = ctx?.starshipId as string | undefined;
+          const redirectParams = new URLSearchParams({
+            connector: provider || ctx?.provider || 'unknown',
+            status: 'error',
+          });
+
+          if (starshipId) {
+            const basePath = `/ship/${encodeURIComponent(starshipId)}/connectors`;
+            const redirectUrl = `${env.PUBLIC_URL}${basePath}?${redirectParams.toString()}`;
+            res.redirect(redirectUrl);
+            return;
+          }
+        }
+      }
+    } catch {
+      // ignore and fall back to generic callback redirect
+    }
+
     const redirectParams = new URLSearchParams({
-      connector: (req.params as any).provider || 'linkedin',
+      connector: req.params.provider || 'linkedin',
       status: 'error',
     });
-    const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
+    const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
     res.redirect(redirectUrl);
   }
 });

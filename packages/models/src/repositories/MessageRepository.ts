@@ -103,7 +103,6 @@ export class MessageRepository extends BaseRepository {
         // node-postgres treats top-level Arrays as PostgreSQL arrays, not JSON
         // Note: After toDatabase(), property names are in snake_case
         if (serializedData.tool_calls && Array.isArray(serializedData.tool_calls)) {
-          console.log('[MessageRepository] Stringifying tool_calls for JSONB storage, count:', serializedData.tool_calls.length);
           serializedData.tool_calls = JSON.stringify(serializedData.tool_calls);
         }
 

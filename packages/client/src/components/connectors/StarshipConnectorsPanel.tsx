@@ -193,11 +193,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
-            <DialogDescription>
-              {pendingDisconnect
+              <DialogDescription>
+                {pendingDisconnect
                 ? `If you disconnect ${pendingDisconnect}, any tools that rely on this connector will stop working until you reconnect.`
-                : null}
-            </DialogDescription>
+                  : null}
+              </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>

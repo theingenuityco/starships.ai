@@ -12,6 +12,24 @@ export async function up(client: Client): Promise<void> {
   try {
     console.log('🚀 Updating GitHub connector template to auth_type = custom...');
 
+    // Expand auth_type check constraint to allow 'custom' in addition to the
+    // existing values ('oauth2', 'api_key', 'none'). This matches the updated
+    // ConnectorTemplateEntity validation and ConnectorAuthType union.
+    await client.query(
+      `
+      ALTER TABLE connector_templates
+      DROP CONSTRAINT IF EXISTS connector_templates_auth_type_check;
+      `
+    );
+
+    await client.query(
+      `
+      ALTER TABLE connector_templates
+      ADD CONSTRAINT connector_templates_auth_type_check
+      CHECK (auth_type IN ('oauth2', 'api_key', 'custom', 'none'));
+      `
+    );
+
     await client.query(
       `
       UPDATE connector_templates
@@ -37,6 +55,9 @@ export async function down(client: Client): Promise<void> {
   try {
     console.log('🔄 Reverting GitHub connector template auth_type back to oauth2...');
 
+    // First, revert GitHub template auth_type so it satisfies the stricter
+    // constraint we are about to restore.
+
     await client.query(
       `
       UPDATE connector_templates
@@ -44,6 +65,22 @@ export async function down(client: Client): Promise<void> {
         auth_type = 'oauth2',
         updated_at = NOW()
       WHERE provider = 'github'
+      `
+    );
+
+    // Restore original auth_type check constraint (without 'custom').
+    await client.query(
+      `
+      ALTER TABLE connector_templates
+      DROP CONSTRAINT IF EXISTS connector_templates_auth_type_check;
+      `
+    );
+
+    await client.query(
+      `
+      ALTER TABLE connector_templates
+      ADD CONSTRAINT connector_templates_auth_type_check
+      CHECK (auth_type IN ('oauth2', 'api_key', 'none'));
       `
     );
 

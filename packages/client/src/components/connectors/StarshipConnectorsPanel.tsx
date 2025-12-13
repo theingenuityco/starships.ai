@@ -83,10 +83,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     [normalizedQuery]
   )
 
-  const oauthCatalog = useMemo(
-    () => catalog.filter(entry => entry.authType === 'oauth2'),
-    [catalog],
-  )
+  // Show connectors that have an interactive connect flow: OAuth2 or custom
+  // (e.g. GitHub App, which uses a custom connect blueprint).
+  const connectableCatalog = useMemo(() => catalog.filter(entry => entry.authType === 'oauth2' || entry.authType === 'custom'), [catalog])
 
   if (isLoading) {
     return (
@@ -96,12 +95,12 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     )
   }
 
-  const hasAnyVisibleConnector = oauthCatalog.some(item => {
+  const hasAnyVisibleConnector = connectableCatalog.some(item => {
     return matchesQuery({ displayName: item.displayName, description: item.description })
   })
 
   const renderConnectorCard = (provider: string, connectedFirst: boolean) => {
-    const catalogItem = oauthCatalog.find(c => c.provider === provider)
+    const catalogItem = connectableCatalog.find((c: { provider: string }) => c.provider === provider)
     if (!catalogItem || !matchesQuery({ displayName: catalogItem.displayName, description: catalogItem.description })) {
       return null
     }
@@ -136,13 +135,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={isConnected ? 'primaryOutline' : 'default'}
-              className="min-w-[140px]"
-              onClick={() => handleConnect(provider)}
-              disabled={oauthMutation.isPending}
-            >
+            <Button size="sm" variant={isConnected ? 'primaryOutline' : 'default'} className="min-w-[140px]" onClick={() => handleConnect(provider)} disabled={oauthMutation.isPending}>
               <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
               {isConnected ? 'Reconnect' : `Connect ${label}`}
             </Button>
@@ -183,21 +176,17 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Connected first */}
-        {oauthCatalog.map(entry => renderConnectorCard(entry.provider, true))}
+        {connectableCatalog.map(entry => renderConnectorCard(entry.provider, true))}
 
         {/* Then not connected */}
-        {oauthCatalog.map(entry => renderConnectorCard(entry.provider, false))}
+        {connectableCatalog.map(entry => renderConnectorCard(entry.provider, false))}
       </div>
 
       <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
-              <DialogDescription>
-                {pendingDisconnect
-                ? `If you disconnect ${pendingDisconnect}, any tools that rely on this connector will stop working until you reconnect.`
-                  : null}
-              </DialogDescription>
+            <DialogDescription>{pendingDisconnect ? `If you disconnect ${pendingDisconnect}, any tools that rely on this connector will stop working until you reconnect.` : null}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>

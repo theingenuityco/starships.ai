@@ -39,7 +39,7 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsString()
-  @IsIn(['oauth2', 'api_key', 'none'])
+  @IsIn(['oauth2', 'api_key', 'custom', 'none'])
   authType!: ConnectorAuthType | 'none';
 
   @Expose()
@@ -176,5 +176,3 @@ export class ConnectorTemplateEntity {
     }
   }
 }
-
-

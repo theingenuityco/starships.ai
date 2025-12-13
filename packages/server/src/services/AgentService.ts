@@ -40,7 +40,7 @@ import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
-import { generateJWT } from '@/utils/jwt';
+import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -72,12 +72,14 @@ export class AgentService {
   private starshipRepository: StarshipRepository;
   private messageService: MessageService;
   private environmentService: EnvironmentService;
+  private connectorRuntimeService: ConnectorRuntimeService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
     this.starshipRepository = new StarshipRepository();
     this.messageService = new MessageService();
     this.environmentService = new EnvironmentService();
+    this.connectorRuntimeService = new ConnectorRuntimeService();
   }
 
   /** Safely get starshipId from agent */
@@ -911,55 +913,7 @@ export class AgentService {
       const envConfig = getEnvConfig();
       let connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
       try {
-        // Starships connector (same as ConversationService.buildConnectorHttpConfig)
-        try {
-          const token = await generateJWT({
-            id: userId,
-            starshipId,
-          });
-          const baseUrl = `${envConfig.SERVER_URL}/api/v1`;
-          connectors.starships = {
-            baseUrl,
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          };
-        } catch (error) {
-          console.error('[AGENT-TEST] Failed to build starships connector HTTP configuration:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-
-        // Google Drive + GitHub connectors: mirror ConversationService so
-        // http_request nodes with connector: "google_drive" or "github" work in agent tests too.
-        try {
-          const envService = new EnvironmentService();
-          const decryptedEnv = await envService.getDecryptedEnvironment(starshipId);
-          const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
-          const githubAccessToken = (decryptedEnv as Record<string, unknown>).GITHUB_ACCESS_TOKEN;
-
-          if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
-            connectors.google_drive = {
-              baseUrl: 'https://www.googleapis.com',
-              headers: {
-                Authorization: `Bearer ${googleDriveToken}`,
-              },
-            };
-          }
-
-          if (githubAccessToken && typeof githubAccessToken === 'string' && githubAccessToken.trim().length > 0) {
-            connectors.github = {
-              baseUrl: 'https://api.github.com',
-              headers: {
-                Authorization: `Bearer ${githubAccessToken}`,
-              },
-            };
-          }
-        } catch (error) {
-          console.error('[AGENT-TEST] Failed to build connector HTTP configuration from decrypted env:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starshipId, userId);
       } catch (e) {
         console.error('[AGENT-TEST] Failed to build connector HTTP configuration:', e);
       }

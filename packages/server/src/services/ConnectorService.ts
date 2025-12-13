@@ -8,7 +8,7 @@ import type {
   ConnectWithApiKeyRequest,
 } from '@starships/protocol';
 import { ConnectorTemplateRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
@@ -49,18 +49,12 @@ export class ConnectorService {
       return null;
     }
 
-    const engine = new Engine({
-      // NOTE: For now we do not provide a HostRuntime; this means connector
-      // connect blueprints should limit themselves to pure computation (Code,
-      // Transform, etc.) and not perform HTTP. Future work can add a
-      // server-side HostRuntime that is connector-aware.
-    });
-
     const execution = ExecutionItemUtils.createExecution();
     const initialItems = ExecutionItemUtils.wrapSingle(input);
     execution.results.push({ nodeRef: '__initial__', items: initialItems });
 
-    const resultItems = await engine.executeBlueprint(template.connectBlueprint, execution);
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const resultItems = await runner.run(template.connectBlueprint, execution);
     const result = ExecutionItemUtils.unwrapSingle(resultItems) as ConnectorConnectOutput | undefined;
     if (!result || typeof result !== 'object') {
       throw new Error(`Connector connect blueprint for provider ${input.provider} did not return a valid result`);

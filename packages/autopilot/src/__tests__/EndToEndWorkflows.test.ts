@@ -16,7 +16,7 @@ import OpenAI from 'openai';
 
 let hostRuntime: HostRuntime;
 let httpMock: jest.Mock;
-let mockCreate: jest.Mock;
+let llmMock: jest.Mock;
 
 // Helper to create async iterable streams for OpenAI ChatCompletion chunks
 function createMockStream(chunks: OpenAI.Chat.Completions.ChatCompletionChunk[]) {
@@ -45,24 +45,12 @@ describe('End-to-End Workflow Execution', () => {
       url,
     }));
 
+    llmMock = jest.fn();
+
     hostRuntime = {
       http: httpMock as HostRuntime['http'],
+      llm: llmMock as HostRuntime['llm'],
     };
-
-    // Default OpenAI client mock for LLM usage (tests customize per-scenario)
-    mockCreate = jest.fn();
-    (OpenAI as jest.MockedClass<typeof OpenAI>).mockImplementation(() => {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as unknown as OpenAI;
-    });
-
-    // Unless a test explicitly sets it, ensure OPENROUTER_API_KEY is unset
-    delete process.env.OPENROUTER_API_KEY;
   });
 
   afterEach(() => {
@@ -134,25 +122,16 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      // Provide API key so we exercise the LLM network path, then mock failure
-      const previousKey = process.env.OPENROUTER_API_KEY;
-      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
-      mockCreate.mockRejectedValueOnce(new Error('LLM API unavailable'));
+      // Simulate host-level LLM failure
+      llmMock.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      const engine = new Engine();
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
 
-      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM API unavailable');
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow(/LLM API unavailable/);
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toMatch(/LLM API unavailable/);
-
-      // Restore previous API key
-      if (previousKey === undefined) {
-        delete process.env.OPENROUTER_API_KEY;
-      } else {
-        process.env.OPENROUTER_API_KEY = previousKey;
-      }
     });
 
     it('should handle missing credentials gracefully', async () => {
@@ -178,10 +157,13 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      const engine = new Engine();
+      // Simulate missing credentials as a host-level error
+      llmMock.mockRejectedValueOnce(new Error('OpenRouter API key is required'));
+
+      const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
 
-      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('OpenRouter API key is required');
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow(/OpenRouter API key is required/);
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('OpenRouter API key is required');
@@ -372,9 +354,7 @@ describe('End-to-End Workflow Execution', () => {
         body: { data: 'test response' },
       });
 
-      // Mock LLM streaming via OpenAI SDK
-      const previousKey = process.env.OPENROUTER_API_KEY;
-      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+      // Mock LLM streaming via hostRuntime.llm
       const llmStream = createMockStream([
         {
           id: 'test-123',
@@ -405,7 +385,7 @@ describe('End-to-End Workflow Execution', () => {
           ],
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
-      mockCreate.mockResolvedValueOnce(llmStream);
+      llmMock.mockResolvedValueOnce(llmStream as unknown as AsyncIterable<unknown>);
 
       const eventCallback = jest.fn();
 
@@ -413,13 +393,6 @@ describe('End-to-End Workflow Execution', () => {
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
-
-      // Restore previous API key
-      if (previousKey === undefined) {
-        delete process.env.OPENROUTER_API_KEY;
-      } else {
-        process.env.OPENROUTER_API_KEY = previousKey;
-      }
 
       // Verify comprehensive event coverage
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'workflow_started' }));
@@ -535,8 +508,6 @@ describe('End-to-End Workflow Execution', () => {
         });
 
       // Mock LLM streaming response that contains "positive" in final content
-      const previousKey = process.env.OPENROUTER_API_KEY;
-      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
       const llmStream = createMockStream([
         {
           id: 'test-llm-1',
@@ -555,7 +526,7 @@ describe('End-to-End Workflow Execution', () => {
           ],
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
       ]);
-      mockCreate.mockResolvedValueOnce(llmStream);
+      llmMock.mockResolvedValueOnce(llmStream as unknown as AsyncIterable<unknown>);
 
       const engine = new Engine({ hostRuntime });
       const execution = ExecutionItemUtils.createExecution();
@@ -570,13 +541,6 @@ describe('End-to-End Workflow Execution', () => {
 
       // fetch-content + approve-content
       expect(httpMock).toHaveBeenCalledTimes(2);
-
-      // Restore previous API key
-      if (previousKey === undefined) {
-        delete process.env.OPENROUTER_API_KEY;
-      } else {
-        process.env.OPENROUTER_API_KEY = previousKey;
-      }
     });
 
     it('should handle multi-step data processing pipeline', async () => {

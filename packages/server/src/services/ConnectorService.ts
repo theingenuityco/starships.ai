@@ -314,43 +314,16 @@ export class ConnectorService {
   }
 
   /**
-   * Start generic OAuth flow for a starship and return the authorization URL,
-   * driven by connector_templates configuration instead of per-provider
-   * hard-coded logic.
+   * Start a connector flow for a starship and return the authorization URL.
    *
-   * NOTE: Although this method is named for OAuth, it also handles the GitHub
-   * App connector by returning a GitHub App installation URL instead of a
-   * traditional OAuth authorize URL. Callers should treat the result as a
-   * generic "connect this provider" URL.
+   * For authType = 'oauth2', this builds a standard OAuth authorization URL
+   * driven by connector_templates configuration. For authType = 'custom'
+   * (e.g. GitHub App), this delegates URL construction to a provider-specific
+   * connect blueprint.
    */
-  async startOAuthConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
-    const env = getEnvConfig();
-
-    // Special-case GitHub: use GitHub App installation flow instead of OAuth2.
-    // The app slug is used to build the installation URL; the state parameter
-    // encodes the starship/user context and is validated in the callback.
-    if (provider === 'github') {
-      const appSlug = (env as unknown as { GITHUB_APP_SLUG?: string }).GITHUB_APP_SLUG;
-      if (!appSlug) {
-        throw new Error('GitHub connector is not configured. Missing env: GITHUB_APP_SLUG');
-      }
-
-      const state = await generateOAuthState(true, userId, {
-        starshipId,
-        provider,
-      });
-
-      const installBaseUrl = `https://github.com/apps/${encodeURIComponent(appSlug)}/installations/new`;
-      const url = `${installBaseUrl}?state=${encodeURIComponent(state)}`;
-
-      return url;
-    }
-
+  async startConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
-
-    if (template.authType !== 'oauth2') {
-      throw new Error(`Connector ${provider} does not use OAuth2 authentication`);
-    }
+    const env = getEnvConfig();
 
     const runtimeConfig = (template.runtimeConfig || {}) as {
       clientIdEnvKey?: string;
@@ -362,8 +335,50 @@ export class ConnectorService {
        * query param when installing a bot.
        */
       permissions?: string | number;
+      // Custom connectors (e.g. GitHub App) may use additional keys such as
+      // appSlugEnvKey; these are treated as opaque config by the host and
+      // interpreted by provider-specific blueprints.
       [key: string]: unknown;
     };
+
+    // Custom connectors (authType = 'custom') are started via connect
+    // blueprints so that providers like GitHub can compute their own
+    // installation URLs while the host still owns secrets and state tokens.
+    if (template.authType === 'custom') {
+      const appSlugEnvKey = (runtimeConfig.appSlugEnvKey as string | undefined) || 'GITHUB_APP_SLUG';
+      const appSlug = (env as unknown as Record<string, string | undefined>)[appSlugEnvKey];
+
+      if (!appSlug) {
+        throw new Error(`Custom connector ${provider} is not configured. Missing env: ${appSlugEnvKey}`);
+      }
+
+      const state = await generateOAuthState(true, userId, {
+        starshipId,
+        provider,
+      });
+
+      const output = await this.runConnectBlueprint(template, {
+        starshipId,
+        provider,
+        authType: 'custom',
+        phase: 'start',
+        stateToken: state,
+        config: {
+          ...((template.runtimeConfig || {}) as Record<string, unknown>),
+          appSlug,
+        },
+      });
+
+      if (!output.authorizationUrl) {
+        throw new Error(`Custom connector ${provider} did not return an authorizationUrl from connect blueprint`);
+      }
+
+      return output.authorizationUrl;
+    }
+
+    if (template.authType !== 'oauth2') {
+      throw new Error(`Connector ${provider} does not support start flow for authType ${template.authType}`);
+    }
 
     const clientIdEnvKey = runtimeConfig.clientIdEnvKey;
     if (!clientIdEnvKey) {
@@ -605,6 +620,63 @@ export class ConnectorService {
     }
 
     const { starshipSlug } = await this.applyConnectOutput(starshipId, userId, providerFromCallback, template, finalOutput);
+
+    return {
+      starshipId,
+      starshipSlug,
+      userId,
+    };
+  }
+
+  /**
+   * Complete a custom connector flow driven by a connect blueprint.
+   *
+   * This is used for providers like GitHub where the external callback does
+   * not follow a traditional OAuth code exchange. The host validates the
+   * state token and delegates env/metadata/status computation to the
+   * connect blueprint, then applies the resulting ConnectorConnectOutput.
+   */
+  async completeCustomConnector(
+    providerFromCallback: ConnectorProvider,
+    stateToken: string,
+    callbackQuery: Record<string, unknown> | undefined
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+    const template = await this.loadTemplateOrThrow(providerFromCallback);
+
+    if (template.authType !== 'custom') {
+      throw new Error(`Connector ${providerFromCallback} does not use custom authentication`);
+    }
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) {
+      throw new Error('Invalid or expired connector state');
+    }
+
+    const { userId, context } = stateValidation;
+    if (!userId) {
+      throw new Error('Connector state missing user information');
+    }
+
+    const starshipId = context?.starshipId as string | undefined;
+    const provider = (context?.provider as string | undefined) || providerFromCallback;
+
+    if (!starshipId || provider !== providerFromCallback) {
+      throw new Error('Connector state missing starship context');
+    }
+
+    const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+
+    const output = await this.runConnectBlueprint(template, {
+      starshipId,
+      provider: providerFromCallback,
+      authType: 'custom',
+      phase: 'complete',
+      stateToken,
+      callbackQuery,
+      config: runtimeConfig,
+    });
+
+    const { starshipSlug } = await this.applyConnectOutput(starshipId, userId, providerFromCallback, template, output);
 
     return {
       starshipId,

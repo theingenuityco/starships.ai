@@ -30,8 +30,7 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
   {
     provider: 'discord',
     displayName: 'Discord',
-    description:
-      'Connect a Discord bot to enable tools that send messages or notifications to your Discord servers via an installed bot.',
+    description: 'Connect a Discord bot to enable tools that send messages or notifications to your Discord servers via an installed bot.',
     authType: 'oauth2',
     requiredEnvKeys: [],
     optionalEnvKeys: [],
@@ -54,7 +53,7 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
     displayName: 'GitHub',
     description:
       'Connect a GitHub App installation to enable tools that read and write repositories, issues, and pull requests via the GitHub API.',
-    authType: 'oauth2',
+    authType: 'custom',
     // GitHub connector uses a GitHub App installation token obtained from
     // platform-level env (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_BASE64) plus
     // a per-starship GitHub connector configuration (githubInstallationId).
@@ -66,8 +65,7 @@ export const CONNECTOR_CATALOG: ConnectorCatalogEntry[] = [
   {
     provider: 'starships',
     displayName: 'Starships',
-    description:
-      'Use the Starships API itself (tools, docs, models, etc.) as a connector-backed capability for this starship.',
+    description: 'Use the Starships API itself (tools, docs, models, etc.) as a connector-backed capability for this starship.',
     authType: 'oauth2',
     // Starships connector reuses the platform\'s existing JWT + SERVER_URL; no extra env keys are required.
     requiredEnvKeys: [],

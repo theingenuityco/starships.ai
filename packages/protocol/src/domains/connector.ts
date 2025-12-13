@@ -63,7 +63,7 @@ export interface ConnectorListResponse {
   connectors: ConnectorListItem[];
 }
 
-export type ConnectorAuthType = 'oauth2' | 'api_key';
+export type ConnectorAuthType = 'oauth2' | 'api_key' | 'custom';
 
 export interface ConnectorCatalogItem {
   provider: ConnectorProvider;

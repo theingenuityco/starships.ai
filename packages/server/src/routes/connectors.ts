@@ -285,9 +285,7 @@ async function startConnectorHandler(req: Request, res: Response): Promise<void>
 
     const connectorService = new ConnectorService();
 
-    // startOAuthConnector now handles both traditional OAuth2 providers and
-    // the GitHub App connector (by returning an installation URL).
-    const authorizationUrl = await connectorService.startOAuthConnector(starshipId, userId, provider as ConnectorProvider);
+    const authorizationUrl = await connectorService.startConnector(starshipId, userId, provider as ConnectorProvider);
 
     const response: StartOAuthResponse = {
       authorizationUrl,
@@ -336,35 +334,24 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       return `${env.PUBLIC_URL}${basePath}?${params.toString()}`;
     };
 
-    // GitHub App connector callback flow: GitHub redirects back with an
-    // installation_id (no OAuth authorization code). In this case we treat
-    // the callback as a successful connect and persist the installation ID
-    // via configureGitHubConnector, then redirect to the connectors page.
-    const installationId = req.query.installation_id as string | undefined;
-    if (provider === 'github' && installationId) {
+    // Custom connectors like GitHub App: delegate completion to a
+    // provider-specific connect blueprint via completeCustomConnector.
+    if (provider === 'github') {
       try {
-        const stateValidation = await validateOAuthState(state);
-        if (stateValidation.valid && stateValidation.userId) {
-          const ctx = stateValidation.context as OAuthStateContext | undefined;
-          const starshipId = ctx?.starshipId as string | undefined;
-          const providerFromState = ctx?.provider as string | undefined;
+        const { starshipId, starshipSlug } = await connectorService.completeCustomConnector(
+          provider as ConnectorProvider,
+          state,
+          req.query as Record<string, unknown>
+        );
 
-          if (starshipId && (!providerFromState || providerFromState === provider)) {
-            const userId = stateValidation.userId;
-            const { starshipSlug } = await connectorService.configureGitHubConnector(starshipId, userId, {
-              installationId,
-            });
+        const redirectParams = new URLSearchParams({
+          connector: provider,
+          status: 'success',
+        });
 
-            const redirectParams = new URLSearchParams({
-              connector: provider,
-              status: 'success',
-            });
-
-            const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
-            res.redirect(redirectUrl);
-            return;
-          }
-        }
+        const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
+        res.redirect(redirectUrl);
+        return;
       } catch {
         // Fall through to generic error handling below.
       }

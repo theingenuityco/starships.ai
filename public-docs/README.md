@@ -22,6 +22,7 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
   - [Overview](./connectors/README.md)
   - [LinkedIn](./connectors/linkedin.md)
   - [Discord](./connectors/discord.md)
+  - [GitHub](./connectors/github.md)
 
 Audience and access modes
 
@@ -76,3 +77,8 @@ Notes:
 
 - Template expressions use `{{ ... }}` and are resolved by the Engine prior to handler execution (full-only mode). Inline fields are executed post-handler; see Engine.
 - Execution input/output items are arrays of `ExecutionItem` internally; examples show plain JSON for clarity.
+
+For authenticated external APIs, the **GitHub connector** docs are the canonical reference:
+
+- See `connectors/github.md` for how `connector: "github"` works with relative URLs (for example `"/user"`, `"/user/repos"`, `"/repos/{owner}/{repo}/issues"`) and OAuth App user tokens.
+- Use the GitHub examples as a model when designing tools for other connectors (LinkedIn, Discord, Google Drive) that rely on HttpRequest + connector + full-string templates.

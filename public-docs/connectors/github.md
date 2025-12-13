@@ -28,7 +28,12 @@ The connector can therefore:
 
 ---
 
-### 1. Connector behavior
+### 1. Connector behavior and token type
+
+- **Token type (OAuth App user token)**
+  - This connector uses a **GitHub OAuth App user access token**, not an installation token.
+  - The token acts as the authenticated user and can call any REST endpoints that accept OAuth user tokens with the granted scopes (`repo`, `read:org`), subject to the user’s permissions.
+  - Endpoints that are specific to GitHub App installations (for example, `/installation/repositories`) are **not** the primary target for this connector; prefer user-scoped endpoints like `/user`, `/user/repos`, `/repos/{owner}/{repo}/...`, `/orgs/{org}/...`.
 
 - **URL resolution**
   - When `connector: "github"` is set and `url` starts with `/`, the HostRuntime resolves:
@@ -67,10 +72,10 @@ These patterns assume your GitHub OAuth App and user token have been granted per
 #### 2.1 List issues in a repository
 
 - **Method**: `GET`
-- **URL**: `"/repos/{{ input.owner }}/{{ input.repo }}/issues"` (maps to `GET /repos/{owner}/{repo}/issues`)
+- **URL**: `"/repos/{owner}/{repo}/issues"` (maps to `GET /repos/{owner}/{repo}/issues`)
 - **Connector**: `"github"`
 
-Example `http_request` node parameters:
+Example `http_request` node parameters (full-string template for URL):
 
 ```ts
 {
@@ -79,7 +84,8 @@ Example `http_request` node parameters:
   name: "GitHub List Issues",
   parameters: {
     method: "GET",
-    url: "/repos/{{ input.owner }}/{{ input.repo }}/issues?state={{ input.state || 'open' }}",
+    // full-string template builds the final URL
+    url: "{{ '/repos/' + input.owner + '/' + input.repo + '/issues?state=' + (input.state || 'open') }}",
     connector: "github",
     timeout: 15000
   }
@@ -95,7 +101,7 @@ Typical inputs:
 #### 2.2 Create an issue
 
 - **Method**: `POST`
-- **URL**: `"/repos/{{ input.owner }}/{{ input.repo }}/issues"` (maps to `POST /repos/{owner}/{repo}/issues`)
+- **URL**: `"/repos/{owner}/{repo}/issues"` (maps to `POST /repos/{owner}/{repo}/issues`)
 - **Connector**: `"github"`
 
 ```ts
@@ -105,17 +111,13 @@ Typical inputs:
   name: "GitHub Create Issue",
   parameters: {
     method: "POST",
-    url: "/repos/{{ input.owner }}/{{ input.repo }}/issues",
+    url: "{{ '/repos/' + input.owner + '/' + input.repo + '/issues' }}",
     connector: "github",
     headers: {
       "Content-Type": "application/json"
     },
-    body: {
-      title: "{{ input.title }}",
-      body: "{{ input.body || '' }}",
-      assignees: "{{ input.assignees || [] }}",
-      labels: "{{ input.labels || [] }}"
-    },
+    // full-string template returns the final JSON body object
+    body: "{{ { title: input.title, body: input.body || '', assignees: input.assignees || [], labels: input.labels || [] } }}",
     timeout: 15000
   }
 }
@@ -133,7 +135,7 @@ Typical inputs:
 #### 2.3 Read repository contents (e.g. a config file)
 
 - **Method**: `GET`
-- **URL**: `"/repos/{{ input.owner }}/{{ input.repo }}/contents/{{ input.path }}"` (maps to `GET /repos/{owner}/{repo}/contents/{path}`)
+- **URL**: `"/repos/{owner}/{repo}/contents/{path}"` (maps to `GET /repos/{owner}/{repo}/contents/{path}`)
 - **Connector**: `"github"`
 
 ```ts
@@ -143,7 +145,7 @@ Typical inputs:
   name: "GitHub Get File",
   parameters: {
     method: "GET",
-    url: "/repos/{{ input.owner }}/{{ input.repo }}/contents/{{ input.path }}",
+    url: "{{ '/repos/' + input.owner + '/' + input.repo + '/contents/' + input.path }}",
     connector: "github",
     timeout: 15000
   }
@@ -185,3 +187,7 @@ Tools should treat this as the source of truth for file metadata and contents an
 - **Normalize outputs**
   - After each GitHub call, use Transform/Code nodes to project just the fields your tool’s public interface needs (e.g. `{ success, issueNumber, issueUrl }`).
   - Avoid leaking full raw GitHub payloads into user-facing surfaces unless explicitly required.
+
+- **Troubleshooting**
+  - `401 Unauthorized` usually means the GitHub connector is not connected for this starship or the stored access token is missing/expired. Reconnect the GitHub connector and retry.
+  - If you use `connector: "github"` with a **relative URL** (for example, `"/user/repos"`) but no GitHub connector configuration exists at all for the current starship, the HostRuntime will surface a clear error about the missing connector configuration rather than a low-level URL parsing failure.

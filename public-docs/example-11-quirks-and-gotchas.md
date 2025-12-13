@@ -17,6 +17,13 @@
 
 - Template evaluation mode is full-only for parameters
   - Strings must be a single `{{ ... }}` to be evaluated; no partial concatenations during parameter resolution.
+  - **Bad (partial templates)**:
+    - `url: "/repos/{{ input.owner }}/{{ input.repo }}?state={{ input.state || 'open' }}"`
+  - **Good (single full-string template)**:
+    - `url: "{{ '/repos/' + input.owner + '/' + input.repo + '?state=' + (input.state || 'open') }}"`
+  - For complex URLs (including when using connectors like GitHub), prefer either:
+    - One expression that returns the final URL string, or
+    - A Code node that returns `{ url }`, then an HttpRequest node with `url: "{{ (lastOutputOf('build_url') || {}).url }}"`.
 
 - Mutate vs Transform
   - Transform changes input→output; Mutate changes `execution.state`.

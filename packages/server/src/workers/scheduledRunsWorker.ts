@@ -7,6 +7,7 @@ import {
   SCHEDULED_RUNS_QUEUE_NAME,
   type ScheduledRunJobData,
 } from '@/queues/scheduledRunsQueue';
+import { generateJWT } from '@/utils/jwt';
 
 async function main(): Promise<void> {
   const env = getEnvConfig();
@@ -17,7 +18,7 @@ async function main(): Promise<void> {
   const worker = new Worker<ScheduledRunJobData>(
     SCHEDULED_RUNS_QUEUE_NAME,
     async (job) => {
-      const { scheduleId, starshipId, agentId, prompt } = job.data;
+      const { scheduleId, starshipId, agentId, prompt, ownerUserId } = job.data;
 
       console.log('[ScheduledRunsWorker] Processing scheduled run job', {
         jobId: job.id,
@@ -29,19 +30,25 @@ async function main(): Promise<void> {
       // Materialize as a new conversation + first message via HTTP API.
       const baseUrl = (env.SERVER_URL || 'http://localhost:4000').replace(/\/+$/, '');
       const apiBase = `${baseUrl}/api/v1`;
-      const scheduleToken = process.env.SCHEDULE_WORKER_TOKEN;
 
-      if (!scheduleToken) {
-        throw new Error('[ScheduledRunsWorker] SCHEDULE_WORKER_TOKEN is not configured; cannot authenticate internal API calls.');
-      }
+      // Mint a JWT that represents the schedule owner acting via this
+      // agent/starship. This reuses the normal auth path and ensures
+      // all existing authorization/billing checks apply.
+      const token = await generateJWT({
+        id: ownerUserId,
+        agentId,
+        starshipId,
+      });
+
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      } as const;
 
       // 1) Create conversation
       const createRes = await fetch(`${apiBase}/conversations`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-schedule-token': scheduleToken,
-        },
+        headers: authHeaders,
         body: JSON.stringify({
           title: `Scheduled – ${scheduleId}`,
           status: 'active',
@@ -64,10 +71,7 @@ async function main(): Promise<void> {
       // 2) Post first user message (fire-and-forget turn)
       const messageRes = await fetch(`${apiBase}/conversations/${conversation.id}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-schedule-token': scheduleToken,
-        },
+        headers: authHeaders,
         body: JSON.stringify({
           content: prompt,
           agentId,

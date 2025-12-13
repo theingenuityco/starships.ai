@@ -14,6 +14,14 @@ export interface ScheduleModel {
   id: string;
   starshipId: string;
   agentId: string;
+  /**
+   * The user who created/owns this schedule.
+   *
+   * This field may be null/undefined for legacy rows created before
+   * ownership tracking was introduced; new schedules should always
+   * populate it.
+   */
+  ownerUserId?: string | null;
   prompt: string;
   cronExpression: string;
   timezone: string;

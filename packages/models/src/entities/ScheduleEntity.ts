@@ -27,6 +27,11 @@ export class ScheduleEntity implements ScheduleModel {
 
   @Expose()
   @IsString()
+  @Length(1, 255)
+  ownerUserId!: string;
+
+  @Expose()
+  @IsString()
   @MaxLength(10000)
   prompt!: string;
 
@@ -104,6 +109,7 @@ export class ScheduleEntity implements ScheduleModel {
         id: dataRecord.id || 'temp-id',
         starshipId: dataRecord.starshipId || 'temp-starship-id',
         agentId: dataRecord.agentId || 'temp-agent-id',
+        ownerUserId: dataRecord.ownerUserId || 'temp-owner-user-id',
         prompt: dataRecord.prompt || '',
         cronExpression: dataRecord.cronExpression || '* * * * *',
         timezone: dataRecord.timezone || 'UTC',

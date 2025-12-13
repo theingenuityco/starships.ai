@@ -55,7 +55,8 @@ You can use the Google Drive connector for any documented Drive REST API. These 
   name: "Google Drive List Files",
   parameters: {
     method: "GET",
-    url: "/drive/v3/files?q={{ input.query }}&pageSize={{ input.pageSize || 10 }}",
+    // full-string template builds the final URL
+    url: "{{ '/drive/v3/files?q=' + encodeURIComponent(input.query) + '&pageSize=' + (input.pageSize || 10) }}",
     connector: "google_drive",
     timeout: 15000
   }
@@ -70,10 +71,32 @@ Typical inputs:
 #### 2.2 Download a file
 
 - **Method**: `GET`
-- **URL**: `"/drive/v3/files/{{ input.fileId }}?alt=media"`
+- **URL**: `"/drive/v3/files/{fileId}?alt=media"`
 - **Connector**: `"google_drive"`
 
 You can use this pattern when you need raw file contents; the response `body` will contain the file data (string or binary-like string depending on the API’s response headers).
+
+#### 2.3 Upload a file (simple upload)
+
+- **Method**: `POST`
+- **URL**: `"/upload/drive/v3/files?uploadType=media"`
+- **Connector**: `"google_drive"`
+
+**Blueprint node (DSL – download by fileId):**
+
+```ts
+{
+  ref: "gdrive_download_file",
+  type: "http_request",
+  name: "Google Drive Download File",
+  parameters: {
+    method: "GET",
+    url: "{{ '/drive/v3/files/' + input.fileId + '?alt=media' }}",
+    connector: "google_drive",
+    timeout: 15000
+  }
+}
+```
 
 #### 2.3 Upload a file (simple upload)
 

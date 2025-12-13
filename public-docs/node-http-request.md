@@ -52,6 +52,60 @@ Validation rules
 - method required; must be one of the supported methods.
 - timeout (if provided) must be >= 1000ms.
 
+### Template rules (full-string only)
+
+- The Engine resolves string parameters in **full-only** mode: a string is only evaluated when the **entire** value is a single `{{ ... }}` template.
+- This applies to `url`, `headers`, and `body` on `http_request` nodes (including when you use `connector`).
+- **Bad (partial templates)**:
+
+  ```ts
+  // Mixed literal + {{ ... }} segments – will be rejected by validation
+  url: "/repos/{{ input.owner }}/{{ input.repo }}?state={{ input.state || 'open' }}";
+  ```
+
+- **Good (single full-string template)**:
+
+  ```ts
+  // One expression that returns the final URL string
+  url: "{{ '/repos/' + input.owner + '/' + input.repo + '?state=' + (input.state || 'open') }}";
+  ```
+
+- **Good (Code + HttpRequest pattern)**:
+
+  ```ts
+  // Code node builds { url: string }
+  {
+    ref: "build_url",
+    type: "code",
+    parameters: {
+      code: `
+        async function main(ctx) {
+          const input = ctx.input || {};
+          const state = input.state || "open";
+          return {
+            url: "/repos/" + input.owner + "/" + input.repo + "?state=" + state
+          };
+        }
+      `,
+      timeout: 2000
+    }
+  }
+
+  // Downstream HttpRequest node uses a single full-string template
+  {
+    ref: "github_list_issues",
+    type: "http_request",
+    parameters: {
+      method: "GET",
+      url: "{{ (lastOutputOf('build_url') || {}).url }}",
+      connector: "github",
+      timeout: 15000
+    }
+  }
+  ```
+
+Use the same pattern for `body` and `headers`: either keep them as plain JSON literals, or make the entire value a single `{{ ... }}` expression that returns the final object/string. Avoid mixing raw JSON with embedded `{{ ... }}` segments.
+
 Example (POST JSON)
 
 ```ts
@@ -119,5 +173,3 @@ Cross-links
   - undefined is omitted
 - Prefer passing objects (either from upstream `input` via an explicit template, or literals) rather than manually stringifying JSON yourself.
 - When chaining requests, remember HttpRequest returns a wrapper (see Return value shape). If you need only the payload for the next request, forward `body` via a Transform/Code node.
-
-

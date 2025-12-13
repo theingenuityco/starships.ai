@@ -24,9 +24,9 @@ These are the main Discord surfaces this connector is typically used for. Exact 
   - **Purpose**: post a text (or embed-rich) message into a specific channel.
   - **Example call (blueprint parameters)**:
     - `method: "POST"`
-    - `url: "/api/channels/{{ input.channelId }}/messages"`
+    - `url: "{{ '/api/channels/' + input.channelId + '/messages' }}"`
     - `connector: "discord"`
-    - `body`: JSON such as `{ "content": "{{ input.message }}" }`
+    - `body`: `"{{ { content: input.message } }}"`
   - **Typical tool parameters**:
     - `channelId` (string, required): Discord channel ID to post into.
     - `message` (string, required): message text.
@@ -51,5 +51,3 @@ These are the main Discord surfaces this connector is typically used for. Exact 
 - **Let the connector handle auth**: always use `connector: "discord"` with relative URLs; do not manually inject the bot token.
 - **Handle permission errors clearly**: treat `403` responses as missing permissions/intents and return actionable error messages.
 - **Keep Discord logic localized**: keep Discord-specific `http_request` nodes together so it’s easy to adjust paths or payloads if the API changes.
-
-

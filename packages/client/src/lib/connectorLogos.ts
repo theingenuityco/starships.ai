@@ -10,6 +10,6 @@ import type { ConnectorProvider } from '@starships/protocol'
 export const CONNECTOR_LOGOS: Partial<Record<ConnectorProvider, string>> = {
   linkedin: '/connectors/linkedin.svg',
   discord: '/connectors/discord.svg',
-  // google_drive: '/connectors/google-drive.svg', // Temporarily disabled
-  // github: '/connectors/github.svg', // Temporarily disabled
+  google_drive: '/connectors/google-drive.svg',
+  github: '/connectors/github.svg',
 }

@@ -599,7 +599,8 @@ export class ConnectorService {
           lastError: existing.lastError,
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
-          scopes: template.oauthScopes || [],
+          // Expose non-secret connector metadata (e.g. Discord guild_id) to tools/agents.
+          metadata: existing.metadata || {},
         };
       }
 
@@ -618,6 +619,7 @@ export class ConnectorService {
         createdAt: now,
         updatedAt: now,
         scopes: template.oauthScopes || [],
+        metadata: {},
       };
     });
   }

@@ -41,16 +41,6 @@ export function createOAuthConnectBlueprint(config: OAuthConnectBlueprintConfig)
     async function main(ctx) {
       const input = ctx.input || {};
 
-      // Debug logging to verify blueprint execution via runner.
-      try {
-        console.log('[ConnectorBlueprint][OAuthConnect] running', {
-          phase: input.phase,
-          provider: input.provider,
-        });
-      } catch (e) {
-        // ignore logging errors
-      }
-
       // Phase: start -> build authorizationUrl from provided fields.
       if (input.phase === 'start') {
         const authorizeUrl = String(input.authorizeUrl || '');
@@ -128,13 +118,6 @@ export function createApiKeyConnectBlueprint(config: ApiKeyConnectBlueprintConfi
      */
     async function main(ctx) {
       const input = ctx.input || {};
-      try {
-        console.log('[ConnectorBlueprint][ApiKeyConnect] running', {
-          provider: input.provider,
-        });
-      } catch (e) {
-        // ignore logging errors
-      }
       const payload = input.apiKeyPayload || {};
       const apiKey = payload.apiKey;
 

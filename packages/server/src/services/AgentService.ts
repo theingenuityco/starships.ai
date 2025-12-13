@@ -930,12 +930,13 @@ export class AgentService {
           });
         }
 
-        // Google Drive connector: mirror ConversationService so http_request
-        // nodes with connector: "google_drive" work in agent tests too.
+        // Google Drive + GitHub connectors: mirror ConversationService so
+        // http_request nodes with connector: "google_drive" or "github" work in agent tests too.
         try {
           const envService = new EnvironmentService();
           const decryptedEnv = await envService.getDecryptedEnvironment(starshipId);
           const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
+          const githubAccessToken = (decryptedEnv as Record<string, unknown>).GITHUB_ACCESS_TOKEN;
 
           if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
             connectors.google_drive = {
@@ -945,8 +946,17 @@ export class AgentService {
               },
             };
           }
+
+          if (githubAccessToken && typeof githubAccessToken === 'string' && githubAccessToken.trim().length > 0) {
+            connectors.github = {
+              baseUrl: 'https://api.github.com',
+              headers: {
+                Authorization: `Bearer ${githubAccessToken}`,
+              },
+            };
+          }
         } catch (error) {
-          console.error('[AGENT-TEST] Failed to build google_drive connector HTTP configuration:', {
+          console.error('[AGENT-TEST] Failed to build connector HTTP configuration from decrypted env:', {
             error: error instanceof Error ? error.message : String(error),
           });
         }

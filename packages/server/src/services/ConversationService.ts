@@ -134,7 +134,7 @@ export class ConversationService {
    * EngineConfig and is ONLY consumed inside the runner HostRuntime.
    *
    * Workflows and blueprints never see this data; they only reference
-   * connectors by slug (e.g., "starships", "google_drive") on HttpRequest nodes.
+   * connectors by slug (e.g., "starships", "google_drive", "github") on HttpRequest nodes.
    */
   private async buildConnectorHttpConfig(
     starshipId: string,
@@ -173,12 +173,13 @@ export class ConversationService {
       });
     }
 
-    // Google Drive connector: resolve relative URLs like "/drive/v3/..."
-    // against the Google APIs base URL and inject a bearer token managed in
-    // the starship environment (GOOGLE_DRIVE_ACCESS_TOKEN).
+    // Google Drive + GitHub connectors: resolve relative URLs against their
+    // API base URLs and inject bearer tokens managed in the starship
+    // environment (GOOGLE_DRIVE_ACCESS_TOKEN, GITHUB_ACCESS_TOKEN).
     try {
       const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
       const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
+      const githubAccessToken = (decryptedEnv as Record<string, unknown>).GITHUB_ACCESS_TOKEN;
 
       if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
         connectors.google_drive = {
@@ -188,8 +189,17 @@ export class ConversationService {
           },
         };
       }
+
+      if (githubAccessToken && typeof githubAccessToken === 'string' && githubAccessToken.trim().length > 0) {
+        connectors.github = {
+          baseUrl: 'https://api.github.com',
+          headers: {
+            Authorization: `Bearer ${githubAccessToken}`,
+          },
+        };
+      }
     } catch (error) {
-      console.error('[ConversationService] Failed to build google_drive connector HTTP configuration', {
+      console.error('[ConversationService] Failed to build connector HTTP configuration from decrypted env', {
         error: error instanceof Error ? error.message : String(error),
       });
     }

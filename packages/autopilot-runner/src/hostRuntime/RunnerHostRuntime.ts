@@ -94,12 +94,19 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
             finalUrl = `${normalizedBase}${normalizedPath}`;
           }
 
-          // Merge connector headers last so they can override generic ones.
+          // Merge connector headers last so they can override generic ones,
+          // EXCEPT for Authorization: if the caller explicitly set any
+          // Authorization header, we must not overwrite it (matches connector
+          // docs and keeps "escape hatches" predictable).
           if (connectorHeaders && typeof connectorHeaders === 'object') {
-            finalHeaders = {
-              ...finalHeaders,
-              ...connectorHeaders,
-            };
+            const hasCallerAuth = Object.keys(finalHeaders).some((key) => key.toLowerCase() === 'authorization');
+
+            for (const [key, value] of Object.entries(connectorHeaders)) {
+              if (key.toLowerCase() === 'authorization' && hasCallerAuth) {
+                continue;
+              }
+              finalHeaders[key] = value as unknown;
+            }
           }
         }
       }

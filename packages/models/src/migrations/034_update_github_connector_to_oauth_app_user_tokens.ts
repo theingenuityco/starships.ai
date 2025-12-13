@@ -29,8 +29,8 @@ export async function up(client: Client): Promise<void> {
         runtime_config = jsonb_build_object(
           'clientIdEnvKey', 'GH_OAUTH_CLIENT_ID',
           'clientSecretEnvKey', 'GH_OAUTH_CLIENT_SECRET',
-          'accessTokenEnvKey', 'GITHUB_USER_ACCESS_TOKEN',
-          'refreshTokenEnvKey', 'GITHUB_USER_REFRESH_TOKEN'
+          'accessTokenEnvKey', 'GITHUB_ACCESS_TOKEN',
+          'refreshTokenEnvKey', 'GITHUB_REFRESH_TOKEN'
         ),
         connect_blueprint = NULL,
         updated_at = NOW()

@@ -107,7 +107,7 @@ export function useTestConnector(starshipId: string) {
 export function useStartOAuthConnector(starshipId: string) {
   return useMutation({
     mutationFn: async (provider: ConnectorProvider): Promise<string> => {
-      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/oauth/start`)
+      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/start`)
       return response.data.data.authorizationUrl
     },
     onError: (error: any, provider) => {

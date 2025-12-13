@@ -47,6 +47,8 @@ export interface EnvironmentConfig {
   // GitHub App Configuration (used for GitHub connector)
   GITHUB_APP_ID?: string;
   GITHUB_APP_PRIVATE_KEY_BASE64?: string;
+  // GitHub App slug used to construct installation URLs, e.g. "starships-runner-controller"
+  GITHUB_APP_SLUG?: string;
 
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;

@@ -1,6 +1,6 @@
 import { Executor, ExecuteInput } from './Executor';
 import { Engine } from '@starships/autopilot';
-import { createRunnerHostRuntime, type ConnectorHttpConfig } from '../hostRuntime/RunnerHostRuntime';
+import { createRunnerHostRuntime, type ConnectorHttpConfig, type LlmRuntimeConfig } from '../hostRuntime/RunnerHostRuntime';
 
 export class InProcessExecutor implements Executor {
   async execute(input: ExecuteInput): Promise<unknown> {
@@ -15,17 +15,21 @@ export class InProcessExecutor implements Executor {
        * to workflows as runtimeEnv or execution state.
        */
       connectors?: Record<string, ConnectorHttpConfig | undefined>;
+      /**
+       * Optional LLM runtime configuration used by HostRuntime.llm. When set,
+       * the runner does not need to read provider keys from its own env.
+       */
+      llm?: LlmRuntimeConfig;
       [key: string]: unknown;
     };
 
-    // Extract connector configuration for HostRuntime only; do NOT pass it
-    // through to Engine, so workflows cannot access connector secrets.
-    const { connectors, ...engineConfig } = rawConfig;
+    // Extract host-runtime-only configuration; do NOT expose this via Engine
+    // runtimeEnv or execution state so secrets remain hidden from workflows.
+    const { connectors, llm, ...engineConfig } = rawConfig;
 
     const hostRuntime = createRunnerHostRuntime({
-      // The HostRuntime implementation interprets this map; values are kept
-      // opaque here to avoid coupling InProcessExecutor to Starships types.
       connectors: connectors ?? {},
+      llm,
     });
 
     const engine = new Engine({

@@ -24,6 +24,19 @@ export interface ConnectorHttpConfig {
   headers?: Record<string, string>;
 }
 
+/**
+ * LLM runtime configuration passed from the embedding host.
+ *
+ * This is used by HostRuntime.llm to talk to the underlying provider
+ * (currently OpenRouter). Workflows never see this configuration; they
+ * just specify model/messages and the host owns provider details.
+ */
+export interface LlmRuntimeConfig {
+  apiKey: string;
+  baseUrl?: string;
+  defaultHeaders?: Record<string, string>;
+}
+
 export interface RunnerHostRuntimeOptions {
   /**
    * Map of connector slug -> HTTP configuration. Keys MUST match the
@@ -31,6 +44,12 @@ export interface RunnerHostRuntimeOptions {
    *   { starships: { baseUrl, headers }, linkedin: { baseUrl, headers } }
    */
   connectors?: Record<string, ConnectorHttpConfig | undefined>;
+
+  /**
+   * Optional LLM runtime configuration. When provided, HostRuntime.llm will
+   * use this instead of reading from process.env.
+   */
+  llm?: LlmRuntimeConfig;
 }
 
 /**
@@ -147,17 +166,24 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const llmConfig = options.llm;
+
+    // Prefer host-provided LLM configuration; fall back to process.env for
+    // backwards compatibility when running the runner standalone.
+    const apiKey = llmConfig?.apiKey ?? process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY in the runner environment.');
+      throw new Error(
+        'OpenRouter API key is required. Provide it via llm.apiKey in RunnerHostRuntimeOptions or set OPENROUTER_API_KEY in the runner environment.'
+      );
     }
 
     const client = new OpenAI({
       apiKey,
-      baseURL: 'https://openrouter.ai/api/v1',
+      baseURL: llmConfig?.baseUrl ?? 'https://openrouter.ai/api/v1',
       defaultHeaders: {
         'HTTP-Referer': 'https://starships.ai',
         'X-Title': 'Starships.ai',
+        ...(llmConfig?.defaultHeaders ?? {}),
       },
     });
 

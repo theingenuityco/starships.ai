@@ -213,10 +213,39 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       (openaiRequest as OpenAI.Chat.ChatCompletionCreateParamsStreaming & { reasoning?: unknown }).reasoning = request.reasoning;
     }
 
-    // Tools are currently passed as-is; this can be extended to convert
-    // ToolParams into provider-native tool definitions when needed.
+    // Convert ToolParams[] into provider-native tool definitions for OpenAI/OpenRouter.
+    // ToolParams come from the host as rich tool configs (including blueprint, transforms, etc.).
+    // For function calling we only need the JSON-schema parameters and stable function name.
     if (Array.isArray(request.tools) && request.tools.length > 0) {
-      openaiRequest.tools = request.tools as unknown as OpenAI.Chat.ChatCompletionTool[];
+      const tools: OpenAI.Chat.ChatCompletionTool[] = request.tools.map((tool) => {
+        const t = tool as unknown as {
+          name?: string;
+          slug?: string;
+          description?: string;
+          parameters?: Record<string, unknown>;
+        };
+
+        // Prefer slug as the function name (matches how tools are referenced elsewhere),
+        // fall back to name if slug is not present.
+        const functionName =
+          (typeof t.slug === 'string' && t.slug.trim().length > 0
+            ? t.slug.trim()
+            : typeof t.name === 'string' && t.name.trim().length > 0
+              ? t.name.trim()
+              : 'tool') || 'tool';
+
+        return {
+          type: 'function',
+          function: {
+            name: functionName,
+            description: typeof t.description === 'string' ? t.description : '',
+            // parameters is already a JSON Schema object on ToolParams; pass through as‑is.
+            parameters: t.parameters as Record<string, unknown> | undefined,
+          },
+        } as OpenAI.Chat.ChatCompletionTool;
+      });
+
+      openaiRequest.tools = tools;
     }
 
     const stream = await client.chat.completions.create(openaiRequest);

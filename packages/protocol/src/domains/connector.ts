@@ -87,3 +87,93 @@ export type StartOAuthRequest = Record<string, never>;
 export interface StartOAuthResponse {
   authorizationUrl: string;
 }
+
+// ============================================================================
+// CONNECTOR BLUEPRINT IO CONTRACTS
+// ============================================================================
+
+export interface ConnectorConnectInput {
+  starshipId: string;
+  provider: ConnectorProvider;
+
+  authType: ConnectorAuthType;
+  phase: 'start' | 'complete';
+
+  // OAuth-specific fields
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  scopes?: string[];
+  redirectPath?: string;
+  stateToken?: string;
+  code?: string;
+  callbackQuery?: Record<string, unknown>;
+
+  // API key / custom payload from HTTP API
+  apiKeyPayload?: {
+    apiKey?: string;
+    extraConfig?: Record<string, unknown>;
+  };
+
+  /**
+   * Provider-specific configuration derived from connector_providers.runtime_config.
+   * Must never contain raw secrets; those remain server-side only.
+   */
+  config?: Record<string, unknown>;
+}
+
+export interface ConnectorConnectOutput {
+  /**
+   * For OAuth "start" phase, the URL the client should redirect the user to.
+   */
+  authorizationUrl?: string;
+
+  /**
+   * Environment variables to persist for this connector (per starship).
+   * Keys map directly to the existing environments table.
+   */
+  env?: Record<string, string>;
+
+  /**
+   * Connector metadata to persist on the connectors row.
+   */
+  metadata?: Record<string, unknown>;
+
+  /**
+   * Optional status override for the connector after this flow completes.
+   */
+  status?: ConnectorStatus;
+
+  /**
+   * Optional lastError value for the connector.
+   */
+  lastError?: string;
+}
+
+export interface ConnectorRefreshInput {
+  starshipId: string;
+  provider: ConnectorProvider;
+  envSnapshot: Record<string, string>;
+  metadata?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+}
+
+export interface ConnectorRefreshOutput {
+  env?: Record<string, string>;
+  metadata?: Record<string, unknown>;
+  status?: ConnectorStatus;
+  lastError?: string;
+}
+
+export interface ConnectorTestInput {
+  starshipId: string;
+  provider: ConnectorProvider;
+  envSnapshot: Record<string, string>;
+  metadata?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+}
+
+export interface ConnectorTestOutput {
+  ok: boolean;
+  error?: string;
+  details?: Record<string, unknown>;
+}

@@ -1,5 +1,6 @@
 import { Expose } from 'class-transformer';
 import { IsArray, IsIn, IsObject, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import type { Blueprint } from '@starships/autopilot';
 
 /**
  * ConnectorProviderEntity
@@ -90,6 +91,21 @@ export class ConnectorProviderEntity {
   @IsOptional()
   testBlueprintId?: string;
 
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  connectBlueprint?: Blueprint;
+
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  refreshBlueprint?: Blueprint;
+
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  testBlueprint?: Blueprint;
+
   static async validate(data: unknown): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
@@ -118,5 +134,3 @@ export class ConnectorProviderEntity {
     }
   }
 }
-
-

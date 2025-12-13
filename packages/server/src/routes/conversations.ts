@@ -77,14 +77,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = new StreamingService();
 
-      // Debug: log incoming SSE request context
-      console.info('[ROUTE] /conversations/:id/messages SSE requested', {
-        conversationId,
-        query: req.query,
-        accept: req.get('Accept'),
-        streamFlag: req.query.stream,
-      });
-
       // Server-driven resume via query param (avoid custom headers)
       const resumeToken = typeof req.query.resumeToken === 'string' ? req.query.resumeToken : '';
 
@@ -100,13 +92,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Use the larger of client hint and server truth to avoid undercounting
       const baseLength = Math.max(clientBase, serverCount);
-
-      console.info('[ROUTE] SSE baseline resolved', {
-        conversationId,
-        clientBase,
-        serverCount,
-        baseLength,
-      });
 
       // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
@@ -127,7 +112,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           lastCompleteAt,
         });
       } catch (err) {
-        console.warn('[ROUTE] Failed to emit initial turn_state snapshot', err);
+        // Swallow initial snapshot failure; SSE will continue without initial turn_state event
       }
 
       // If this is a reconnection with Last-Event-ID, prefer event replay from buffer
@@ -138,23 +123,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         const svc = ResumeTokenService.getInstance();
         const claims = svc.verify(resumeToken);
 
-        console.info('[ROUTE] SSE resume requested', {
-          conversationId,
-          hasClaims: !!claims,
-          claimsConversationId: claims?.c,
-          claimsMessageId: claims?.m,
-        });
-
         if (!claims || claims.c !== conversationId) {
           // Invalid token; use baseline mode
           const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
           const messagesToSend = conversationMessages.slice(startIndexForSend);
-
-          console.info('[ROUTE] SSE resume fallback to baseline', {
-            conversationId,
-            startIndexForSend,
-            messagesToSend: messagesToSend.length,
-          });
 
           if (messagesToSend.length > 0) {
             for (const message of messagesToSend) {
@@ -171,12 +143,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           const persistedTail = conversationMessages.slice(startIdx);
           let replayHasAssistantShell = false;
           if (persistedTail.length > 0) {
-            console.info('[ROUTE] SSE resume persisted tail', {
-              conversationId,
-              startIdx,
-              persistedTail: persistedTail.length,
-            });
-
             for (const message of persistedTail) {
               await streamingService.broadcastMessage(conversationId, message);
             }
@@ -196,14 +162,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // Send only messages the client may be missing based on their baselineLength hint
         const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
         const messagesToSend = conversationMessages.slice(startIndexForSend);
-
-        console.info('[ROUTE] SSE baseline snapshot send', {
-          conversationId,
-          clientBase,
-          serverCount,
-          startIndexForSend,
-          messagesToSend: messagesToSend.length,
-        });
 
         if (messagesToSend.length > 0) {
           for (const message of messagesToSend) {
@@ -481,7 +439,8 @@ router.post(
           }
         )
         .catch((error) => {
-          console.error('[ROUTE] Conversation processing failed:', error);
+          // Background conversation processing failure; main request already acknowledged
+          console.error('Conversation processing failed:', error);
         });
 
       // Acknowledge request; client should be listening on GET SSE channel for updates

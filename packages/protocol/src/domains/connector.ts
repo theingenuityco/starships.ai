@@ -52,6 +52,11 @@ export interface ConnectorListItem {
    * For non-OAuth connectors, this may be an empty array or undefined.
    */
   scopes?: string[];
+  /**
+   * Non-secret connector metadata from the connectors row.
+   * For example, Discord stores guild_id and permissions here.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 export interface ConnectorListResponse {

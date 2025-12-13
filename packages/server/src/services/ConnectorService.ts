@@ -14,42 +14,6 @@ import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
 
-const LINKEDIN_SCOPES = [
-  // Member-level posting and analytics
-  'r_basicprofile',
-  'w_member_social',
-  'r_member_postAnalytics',
-  'r_member_profileAnalytics',
-  // Organization-level posting and analytics
-  'rw_organization_admin',
-  'r_organization_social',
-  'w_organization_social',
-  'r_organization_social_feed',
-  'r_organization_followers',
-];
-
-const GOOGLE_DRIVE_SCOPES = [
-  // Per-file access created/opened via the app
-  'https://www.googleapis.com/auth/drive.file',
-  // Read metadata for files
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
-];
-
-const DISCORD_SCOPES = ['bot', 'applications.commands', 'identify'];
-
-function getProviderScopes(provider: ConnectorProvider): string[] {
-  switch (provider) {
-    case 'linkedin':
-      return LINKEDIN_SCOPES;
-    case 'google_drive':
-      return GOOGLE_DRIVE_SCOPES;
-    case 'discord':
-      return DISCORD_SCOPES;
-    default:
-      return [];
-  }
-}
-
 /**
  * Connector Service - Layer 4
  *
@@ -202,101 +166,6 @@ export class ConnectorService {
     }
 
     return `${authorizeUrl}?${params.toString()}`;
-  }
-
-  /**
-   * Complete LinkedIn OAuth flow: validate state, exchange code for token,
-   * store LINKEDIN_ACCESS_TOKEN env var, and update connector status/metadata.
-   *
-   * NOTE: This remains provider-specific for now; it can be refactored to use
-   * connector_templates and blueprints once a generic OAuth completion path
-   * is in place.
-   */
-  async completeLinkedInOAuth(code: string, stateToken: string): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
-    const env = getEnvConfig();
-    const clientId = env.LINKEDIN_CLIENT_ID;
-    const clientSecret = env.LINKEDIN_CLIENT_SECRET;
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/linkedin/oauth/callback`;
-
-    if (!clientId || !clientSecret) {
-      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.');
-    }
-
-    const stateValidation = await validateOAuthState(stateToken);
-    if (!stateValidation.valid) {
-      throw new Error('Invalid or expired OAuth state');
-    }
-
-    const { userId, context } = stateValidation;
-    if (!userId) {
-      throw new Error('OAuth state missing user information');
-    }
-
-    const starshipId = context?.starshipId as string | undefined;
-    const provider = context?.provider as string | undefined;
-
-    if (!starshipId || provider !== 'linkedin') {
-      throw new Error('OAuth state missing starship context');
-    }
-
-    const tokenParams = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-
-    const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', tokenParams.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-
-    const accessToken = tokenResponse.data.access_token as string | undefined;
-    const expiresIn = tokenResponse.data.expires_in as number | undefined;
-
-    if (!accessToken) {
-      throw new Error('Failed to obtain LinkedIn access token');
-    }
-
-    const metadata: Record<string, unknown> = {
-      ...(expiresIn ? { expiresIn } : {}),
-      provider: 'linkedin',
-    };
-
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'linkedin');
-    const connector =
-      existing ??
-      (await this.connectorRepository.create({
-        starshipId,
-        provider: 'linkedin',
-        status: 'connected',
-        metadata,
-        lastError: undefined,
-      }));
-
-    if (existing) {
-      await this.connectorRepository.update(existing.id, {
-        status: 'connected',
-        metadata: {
-          ...(existing.metadata || {}),
-          ...metadata,
-        },
-        lastError: null,
-      });
-    }
-
-    // Persist env var for this starship and link it to the connector
-    await this.upsertEnvironmentVariable(starshipId, 'LINKEDIN_ACCESS_TOKEN', accessToken, userId, connector.id);
-
-    const starship = await this.starshipRepository.findById(starshipId);
-
-    return {
-      starshipId,
-      starshipSlug: starship?.slug,
-      userId,
-    };
   }
 
   /**
@@ -461,13 +330,16 @@ export class ConnectorService {
    * List connectors for a starship, enriched with managed env key presence.
    */
   async listStarshipConnectors(starshipId: string): Promise<ConnectorListItem[]> {
-    const [catalog, connectors] = await Promise.all([this.getConnectorCatalog(), this.connectorRepository.findByStarship(starshipId)]);
+    const [templates, connectors] = await Promise.all([
+      this.connectorTemplateRepository.list(),
+      this.connectorRepository.findByStarship(starshipId),
+    ]);
     const byProvider = new Map(connectors.map((c) => [c.provider, c]));
 
     const now = new Date().toISOString();
 
-    return catalog.map<ConnectorListItem>((entry) => {
-      const existing = byProvider.get(entry.provider);
+    return templates.map<ConnectorListItem>((template) => {
+      const existing = byProvider.get(template.provider);
 
       if (existing) {
         return {
@@ -478,7 +350,7 @@ export class ConnectorService {
           lastError: existing.lastError,
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
-          scopes: getProviderScopes(entry.provider),
+          scopes: template.oauthScopes || [],
         };
       }
 
@@ -486,17 +358,17 @@ export class ConnectorService {
       // For Starships, treat the connector as always available for the current
       // starship; it reuses the platform's JWT + SERVER_URL and does not
       // require additional managed env vars.
-      const status = entry.provider === 'starships' ? 'connected' : 'disconnected';
+      const status = template.provider === 'starships' ? 'connected' : 'disconnected';
 
       return {
-        id: `${starshipId}:${entry.provider}`,
+        id: `${starshipId}:${template.provider}`,
         starshipId,
-        provider: entry.provider,
+        provider: template.provider,
         status,
         lastError: undefined,
         createdAt: now,
         updatedAt: now,
-        scopes: getProviderScopes(entry.provider),
+        scopes: template.oauthScopes || [],
       };
     });
   }

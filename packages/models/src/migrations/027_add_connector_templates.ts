@@ -80,14 +80,25 @@ export async function up(client: Client): Promise<void> {
         '/public-docs/environment#linkedin-connector',
         'https://www.linkedin.com/oauth/v2/authorization',
         'https://www.linkedin.com/oauth/v2/accessToken',
-        ['openid', 'profile', 'w_member_social', 'rw_organization_admin', 'w_organization_social', 'r_organization_social'],
+        // -- Scopes mirror LINKEDIN_SCOPES in ConnectorService
+        [
+          'r_basicprofile',
+          'w_member_social',
+          'r_member_postAnalytics',
+          'r_member_profileAnalytics',
+          'rw_organization_admin',
+          'r_organization_social',
+          'w_organization_social',
+          'r_organization_social_feed',
+          'r_organization_followers',
+        ],
         '/api/v1/connectors/linkedin/oauth/callback',
         {
           clientIdEnvKey: 'LINKEDIN_CLIENT_ID',
           clientSecretEnvKey: 'LINKEDIN_CLIENT_SECRET',
           accessTokenEnvKey: 'LINKEDIN_ACCESS_TOKEN',
         },
-      ],
+      ]
     );
 
     // Discord
@@ -124,14 +135,16 @@ export async function up(client: Client): Promise<void> {
         '/public-docs/environment#discord-connector',
         'https://discord.com/oauth2/authorize',
         'https://discord.com/api/oauth2/token',
-        ['identify', 'guilds', 'applications.commands.update', 'bot'],
+        // -- Scopes mirror DISCORD_SCOPES in ConnectorService
+        ['bot', 'applications.commands', 'identify'],
         '/api/v1/connectors/discord/oauth/callback',
         {
           clientIdEnvKey: 'DISCORD_CLIENT_ID',
           clientSecretEnvKey: 'DISCORD_CLIENT_SECRET',
+          permissions: '805317649',
           metadataFromQuery: ['guild_id', 'permissions'],
         },
-      ],
+      ]
     );
 
     // Google Drive
@@ -168,6 +181,7 @@ export async function up(client: Client): Promise<void> {
         '/public-docs/environment#google-drive-connector',
         'https://accounts.google.com/o/oauth2/v2/auth',
         'https://oauth2.googleapis.com/token',
+        // Scopes mirror GOOGLE_DRIVE_SCOPES in ConnectorService
         ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata.readonly'],
         '/api/v1/connectors/google_drive/oauth/callback',
         {
@@ -178,7 +192,7 @@ export async function up(client: Client): Promise<void> {
           accessTokenEnvKey: 'GOOGLE_DRIVE_ACCESS_TOKEN',
           refreshTokenEnvKey: 'GOOGLE_DRIVE_REFRESH_TOKEN',
         },
-      ],
+      ]
     );
 
     // GitHub
@@ -213,7 +227,7 @@ export async function up(client: Client): Promise<void> {
           appIdEnvKey: 'GITHUB_APP_ID',
           privateKeyEnvKey: 'GITHUB_APP_PRIVATE_KEY_BASE64',
         },
-      ],
+      ]
     );
 
     // Starships (internal, no auth)
@@ -247,7 +261,7 @@ export async function up(client: Client): Promise<void> {
         {
           usesPlatformJwt: true,
         },
-      ],
+      ]
     );
 
     // Drop legacy connector_providers table if it exists; connector_templates
@@ -278,5 +292,3 @@ export async function down(client: Client): Promise<void> {
     throw error;
   }
 }
-
-

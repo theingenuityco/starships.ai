@@ -85,6 +85,7 @@ export async function up(client: Client): Promise<void> {
         {
           clientIdEnvKey: 'LINKEDIN_CLIENT_ID',
           clientSecretEnvKey: 'LINKEDIN_CLIENT_SECRET',
+          accessTokenEnvKey: 'LINKEDIN_ACCESS_TOKEN',
         },
       ],
     );
@@ -128,6 +129,7 @@ export async function up(client: Client): Promise<void> {
         {
           clientIdEnvKey: 'DISCORD_CLIENT_ID',
           clientSecretEnvKey: 'DISCORD_CLIENT_SECRET',
+          metadataFromQuery: ['guild_id', 'permissions'],
         },
       ],
     );
@@ -173,6 +175,8 @@ export async function up(client: Client): Promise<void> {
           clientSecretEnvKey: 'GOOGLE_DRIVE_CLIENT_SECRET',
           accessType: 'offline',
           prompt: 'consent',
+          accessTokenEnvKey: 'GOOGLE_DRIVE_ACCESS_TOKEN',
+          refreshTokenEnvKey: 'GOOGLE_DRIVE_REFRESH_TOKEN',
         },
       ],
     );

@@ -205,18 +205,21 @@ export class ConnectorService {
   }
 
   /**
-   * Complete Google Drive OAuth flow: validate state, exchange code for token,
-   * store GOOGLE_DRIVE_ACCESS_TOKEN / GOOGLE_DRIVE_REFRESH_TOKEN env vars,
-   * and update connector status/metadata.
+   * Complete LinkedIn OAuth flow: validate state, exchange code for token,
+   * store LINKEDIN_ACCESS_TOKEN env var, and update connector status/metadata.
+   *
+   * NOTE: This remains provider-specific for now; it can be refactored to use
+   * connector_templates and blueprints once a generic OAuth completion path
+   * is in place.
    */
-  async completeGoogleDriveOAuth(code: string, stateToken: string): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+  async completeLinkedInOAuth(code: string, stateToken: string): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const env = getEnvConfig();
-    const clientId = env.GOOGLE_DRIVE_CLIENT_ID;
-    const clientSecret = env.GOOGLE_DRIVE_CLIENT_SECRET;
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/google_drive/oauth/callback`;
+    const clientId = env.LINKEDIN_CLIENT_ID;
+    const clientSecret = env.LINKEDIN_CLIENT_SECRET;
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/linkedin/oauth/callback`;
 
     if (!clientId || !clientSecret) {
-      throw new Error('Google Drive OAuth is not configured. Please set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET.');
+      throw new Error('LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.');
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -232,7 +235,7 @@ export class ConnectorService {
     const starshipId = context?.starshipId as string | undefined;
     const provider = context?.provider as string | undefined;
 
-    if (!starshipId || provider !== 'google_drive') {
+    if (!starshipId || provider !== 'linkedin') {
       throw new Error('OAuth state missing starship context');
     }
 
@@ -244,32 +247,30 @@ export class ConnectorService {
       client_secret: clientSecret,
     });
 
-    const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', tokenParams.toString(), {
+    const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', tokenParams.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
 
     const accessToken = tokenResponse.data.access_token as string | undefined;
-    const refreshToken = tokenResponse.data.refresh_token as string | undefined;
     const expiresIn = tokenResponse.data.expires_in as number | undefined;
 
     if (!accessToken) {
-      throw new Error('Failed to obtain Google Drive access token');
+      throw new Error('Failed to obtain LinkedIn access token');
     }
 
     const metadata: Record<string, unknown> = {
-      provider: 'google_drive',
       ...(expiresIn ? { expiresIn } : {}),
-      hasRefreshToken: !!refreshToken,
+      provider: 'linkedin',
     };
 
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'google_drive');
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'linkedin');
     const connector =
       existing ??
       (await this.connectorRepository.create({
         starshipId,
-        provider: 'google_drive',
+        provider: 'linkedin',
         status: 'connected',
         metadata,
         lastError: undefined,
@@ -286,10 +287,162 @@ export class ConnectorService {
       });
     }
 
+    // Persist env var for this starship and link it to the connector
+    await this.upsertEnvironmentVariable(starshipId, 'LINKEDIN_ACCESS_TOKEN', accessToken, userId, connector.id);
+
+    const starship = await this.starshipRepository.findById(starshipId);
+
+    return {
+      starshipId,
+      starshipSlug: starship?.slug,
+      userId,
+    };
+  }
+
+  /**
+   * Complete generic OAuth flow for a connector. Uses connector_templates
+   * configuration (token URL, redirect path, runtime_config) to exchange the
+   * code for tokens and persist connector/env state.
+   */
+  async completeOAuthConnector(
+    providerFromCallback: ConnectorProvider,
+    code: string,
+    stateToken: string,
+    callbackQuery: Record<string, unknown> | undefined
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+    const template = await this.connectorTemplateRepository.findByProvider(providerFromCallback);
+    if (!template) {
+      throw new Error(`Connector template not found for provider: ${providerFromCallback}`);
+    }
+
+    if (template.authType !== 'oauth2') {
+      throw new Error(`Connector ${providerFromCallback} does not use OAuth2 authentication`);
+    }
+
+    const env = getEnvConfig();
+    const runtimeConfig = (template.runtimeConfig || {}) as {
+      clientIdEnvKey?: string;
+      clientSecretEnvKey?: string;
+      accessTokenEnvKey?: string;
+      refreshTokenEnvKey?: string;
+      metadataFromQuery?: string[];
+      [key: string]: unknown;
+    };
+
+    const clientIdEnvKey = runtimeConfig.clientIdEnvKey;
+    const clientSecretEnvKey = runtimeConfig.clientSecretEnvKey;
+    if (!clientIdEnvKey || !clientSecretEnvKey) {
+      throw new Error(`clientIdEnvKey/clientSecretEnvKey not configured for connector template ${template.id}`);
+    }
+
+    const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
+    const clientSecret = (env as unknown as Record<string, string | undefined>)[clientSecretEnvKey];
+    const tokenUrl = template.oauthTokenUrl;
+    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${providerFromCallback}/oauth/callback`;
+
+    if (!tokenUrl) {
+      throw new Error(`oauthTokenUrl is not configured for connector template ${template.id}`);
+    }
+
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        `OAuth is not configured for provider ${providerFromCallback}. Missing envs: ${clientIdEnvKey}, ${clientSecretEnvKey}`
+      );
+    }
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) {
+      throw new Error('Invalid or expired OAuth state');
+    }
+
+    const { userId, context } = stateValidation;
+    if (!userId) {
+      throw new Error('OAuth state missing user information');
+    }
+
+    const starshipId = context?.starshipId as string | undefined;
+    const provider = context?.provider as string | undefined;
+
+    if (!starshipId || provider !== providerFromCallback) {
+      throw new Error('OAuth state missing starship context');
+    }
+
+    const redirectUri = `${env.PUBLIC_URL}${redirectPath}`;
+
+    const tokenParams = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+
+    const tokenResponse = await axios.post(tokenUrl, tokenParams.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    const body = tokenResponse.data as {
+      access_token?: string;
+      refresh_token?: string;
+      expires_in?: number;
+      scope?: string;
+      [key: string]: unknown;
+    };
+
+    const envUpdates: Record<string, string> = {};
+
+    if (runtimeConfig.accessTokenEnvKey && body.access_token) {
+      envUpdates[runtimeConfig.accessTokenEnvKey] = String(body.access_token);
+    }
+    if (runtimeConfig.refreshTokenEnvKey && body.refresh_token) {
+      envUpdates[runtimeConfig.refreshTokenEnvKey] = String(body.refresh_token);
+    }
+
+    const metadata: Record<string, unknown> = {
+      provider,
+      ...(typeof body.expires_in === 'number' ? { expiresIn: body.expires_in } : {}),
+      ...(body.scope ? { scope: body.scope } : {}),
+    };
+
+    // Optionally copy selected fields from callback query into metadata
+    if (Array.isArray(runtimeConfig.metadataFromQuery) && callbackQuery) {
+      for (const key of runtimeConfig.metadataFromQuery) {
+        const val = callbackQuery[key];
+        if (val !== undefined) {
+          metadata[key] = val;
+        }
+      }
+    }
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+    const connector =
+      existing ??
+      (await this.connectorRepository.create({
+        starshipId,
+        provider,
+        status: 'connected',
+        metadata,
+        lastError: undefined,
+        templateId: template.id,
+        version: template.version,
+      }));
+
+    if (existing) {
+      await this.connectorRepository.update(existing.id, {
+        status: 'connected',
+        metadata: {
+          ...(existing.metadata || {}),
+          ...metadata,
+        },
+        lastError: null,
+      });
+    }
+
     // Persist env vars for this starship and link them to the connector
-    await this.upsertEnvironmentVariable(starshipId, 'GOOGLE_DRIVE_ACCESS_TOKEN', accessToken, userId, connector.id);
-    if (refreshToken) {
-      await this.upsertEnvironmentVariable(starshipId, 'GOOGLE_DRIVE_REFRESH_TOKEN', refreshToken, userId, connector.id);
+    for (const [key, value] of Object.entries(envUpdates)) {
+      await this.upsertEnvironmentVariable(starshipId, key, value, userId, connector.id);
     }
 
     const starship = await this.starshipRepository.findById(starshipId);
@@ -413,129 +566,9 @@ export class ConnectorService {
     throw new Error(`API key connector not implemented for provider: ${provider}`);
   }
 
-  /**
-   * Start Discord OAuth flow for a starship and return the authorization URL.
-   */
-  async startDiscordOAuth(starshipId: string, userId: string): Promise<string> {
-    const env = getEnvConfig();
-    const clientId = env.DISCORD_CLIENT_ID;
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/discord/oauth/callback`;
-
-    if (!clientId) {
-      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID.');
-    }
-
-    const state = await generateOAuthState(true, userId, {
-      starshipId,
-      provider: 'discord',
-    });
-
-    // Permissions bitmask: Make-style admin-ish set + SEND_MESSAGES.
-    // Includes: CREATE_INSTANT_INVITE, MANAGE_CHANNELS, VIEW_CHANNEL,
-    // SEND_MESSAGES, MANAGE_MESSAGES, MANAGE_ROLES, MANAGE_WEBHOOKS.
-    const permissions = '805317649';
-    const scope = DISCORD_SCOPES.join(' ');
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope,
-      permissions,
-      state,
-    });
-
-    return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
-  }
-
-  /**
-   * Complete Discord OAuth flow: validate state, exchange code (if needed),
-   * record guild configuration, and update connector status/metadata.
-   */
-  async completeDiscordOAuth(
-    code: string,
-    stateToken: string,
-    callbackParams: { guild_id?: string; permissions?: string }
-  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
-    const env = getEnvConfig();
-    const clientId = env.DISCORD_CLIENT_ID;
-    const clientSecret = env.DISCORD_CLIENT_SECRET;
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/discord/oauth/callback`;
-
-    if (!clientId || !clientSecret) {
-      throw new Error('Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');
-    }
-
-    const stateValidation = await validateOAuthState(stateToken);
-    if (!stateValidation.valid) {
-      throw new Error('Invalid or expired OAuth state');
-    }
-
-    const { userId, context } = stateValidation;
-    if (!userId) {
-      throw new Error('OAuth state missing user information');
-    }
-
-    const starshipId = context?.starshipId as string | undefined;
-    const provider = context?.provider as string | undefined;
-
-    if (!starshipId || provider !== 'discord') {
-      throw new Error('OAuth state missing starship context');
-    }
-
-    // Exchange code for an access token (not strictly needed for posting as a bot,
-    // but kept for future use or validation if necessary).
-    const tokenParams = new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-    });
-
-    await axios.post('https://discord.com/api/oauth2/token', tokenParams.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-
-    const guildId = callbackParams.guild_id;
-    const permissions = callbackParams.permissions;
-
-    const metadata: Record<string, unknown> = {
-      provider: 'discord',
-      ...(guildId ? { guildId } : {}),
-      ...(permissions ? { permissions } : {}),
-    };
-
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'discord');
-    if (!existing) {
-      await this.connectorRepository.create({
-        starshipId,
-        provider: 'discord',
-        status: 'connected',
-        metadata,
-        lastError: undefined,
-      });
-    } else {
-      await this.connectorRepository.update(existing.id, {
-        status: 'connected',
-        metadata: {
-          ...(existing.metadata || {}),
-          ...metadata,
-        },
-        lastError: null,
-      });
-    }
-
-    const starship = await this.starshipRepository.findById(starshipId);
-
-    return {
-      starshipId,
-      starshipSlug: starship?.slug,
-      userId,
-    };
-  }
+  // Discord OAuth start/completion are now handled generically via
+  // startOAuthConnector / completeOAuthConnector and connector_templates
+  // configuration.
 
   /**
    * Disconnect a provider for a starship and clean up related env vars.

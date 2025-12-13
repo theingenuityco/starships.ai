@@ -270,33 +270,12 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     }
 
     const connectorService = new ConnectorService();
-    let starshipId: string;
-    let starshipSlug: string | undefined;
-
-    if (provider === 'linkedin') {
-      const result = await connectorService.completeLinkedInOAuth(code, state);
-      starshipId = result.starshipId;
-      starshipSlug = result.starshipSlug;
-    } else if (provider === 'discord') {
-      const result = await connectorService.completeDiscordOAuth(code, state, {
-        guild_id: typeof (req.query as any).guild_id === 'string' ? ((req.query as any).guild_id as string) : undefined,
-        permissions: typeof (req.query as any).permissions === 'string' ? ((req.query as any).permissions as string) : undefined,
-      });
-      starshipId = result.starshipId;
-      starshipSlug = result.starshipSlug;
-    } else if (provider === 'google_drive') {
-      const result = await connectorService.completeGoogleDriveOAuth(code, state);
-      starshipId = result.starshipId;
-      starshipSlug = result.starshipSlug;
-    } else {
-      const redirectParams = new URLSearchParams({
-        connector: provider,
-        status: 'error',
-      });
-      const redirectUrl = `${env.PUBLIC_URL}/connectors/callback?${redirectParams.toString()}`;
-      res.redirect(redirectUrl);
-      return;
-    }
+    const { starshipId, starshipSlug } = await connectorService.completeOAuthConnector(
+      provider as any,
+      code,
+      state,
+      req.query as Record<string, unknown>,
+    );
 
     const redirectParams = new URLSearchParams({
       connector: provider,

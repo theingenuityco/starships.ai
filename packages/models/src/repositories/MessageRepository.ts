@@ -108,9 +108,6 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await this.createEntity<Record<string, unknown>>('messages', serializedData);
-
-        console.log('[MessageRepository] Message created successfully with id:', result.id);
-
         return fromDatabase(MessageEntity, result);
       },
       'create',

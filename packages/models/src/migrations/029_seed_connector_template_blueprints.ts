@@ -1,5 +1,9 @@
 import type { Client } from 'pg';
-import { createOAuthConnectBlueprint, createApiKeyConnectBlueprint, createNoopTestBlueprint } from '@/seeders/connectors/createConnectorBlueprints';
+import {
+  createOAuthConnectBlueprint,
+  createApiKeyConnectBlueprint,
+  createNoopTestBlueprint,
+} from '@/seeders/connectors/createConnectorBlueprints';
 
 /**
  * Seed common inline blueprints onto connector_templates.
@@ -37,7 +41,7 @@ export async function up(client: Client): Promise<void> {
           updated_at = NOW()
         WHERE provider = $3
         `,
-        [JSON.stringify(oauthBlueprint), JSON.stringify(oauthTestBlueprint), provider],
+        [JSON.stringify(oauthBlueprint), JSON.stringify(oauthTestBlueprint), provider]
       );
     }
 
@@ -62,7 +66,7 @@ export async function up(client: Client): Promise<void> {
         updated_at = NOW()
       WHERE auth_type = 'api_key'
       `,
-      [JSON.stringify(apiKeyBlueprint), JSON.stringify(apiKeyTestBlueprint)],
+      [JSON.stringify(apiKeyBlueprint), JSON.stringify(apiKeyTestBlueprint)]
     );
 
     await client.query('COMMIT');
@@ -87,7 +91,7 @@ export async function down(client: Client): Promise<void> {
         connect_blueprint = NULL,
         test_blueprint = NULL,
         updated_at = NOW()
-      `,
+      `
     );
 
     await client.query('COMMIT');
@@ -97,5 +101,3 @@ export async function down(client: Client): Promise<void> {
     throw error;
   }
 }
-
-

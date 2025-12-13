@@ -8,6 +8,7 @@ import type {
   ConnectWithApiKeyRequest,
 } from '@starships/protocol';
 import { ConnectorTemplateRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
+import { Engine, ExecutionItemUtils } from '@starships/autopilot';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
@@ -78,16 +79,12 @@ export class ConnectorService {
    * hard-coded TypeScript flows unless a connect blueprint is explicitly
    * configured on the provider.
    */
-  private async runConnectBlueprintIfPresent(
-    input: ConnectorConnectInput,
-  ): Promise<ConnectorConnectOutput | null> {
+  private async runConnectBlueprintIfPresent(input: ConnectorConnectInput): Promise<ConnectorConnectOutput | null> {
     const template = await this.connectorTemplateRepository.findByProvider(input.provider);
     if (!template || !template.connectBlueprint) {
       return null;
     }
 
-    // Lazy-load Engine to avoid impacting startup if Autopilot is unused.
-    const { Engine } = await import('@starships/autopilot');
     const engine = new Engine({
       // NOTE: For now we do not provide a HostRuntime; this means connector
       // connect blueprints should limit themselves to pure computation (Code,
@@ -95,14 +92,14 @@ export class ConnectorService {
       // server-side HostRuntime that is connector-aware.
     });
 
-    const execution = await engine.run({
-      blueprint: template.connectBlueprint,
-      input,
-    });
+    const execution = ExecutionItemUtils.createExecution();
+    const initialItems = ExecutionItemUtils.wrapSingle(input);
+    execution.results.push({ nodeRef: '__initial__', items: initialItems });
 
-    const result = execution.result?.json as ConnectorConnectOutput | undefined;
-    if (!result) {
-      throw new Error(`Connector connect blueprint for provider ${input.provider} did not return a result`);
+    const resultItems = await engine.executeBlueprint(template.connectBlueprint, execution);
+    const result = ExecutionItemUtils.unwrapSingle(resultItems) as ConnectorConnectOutput | undefined;
+    if (!result || typeof result !== 'object') {
+      throw new Error(`Connector connect blueprint for provider ${input.provider} did not return a valid result`);
     }
 
     return result;
@@ -128,7 +125,7 @@ export class ConnectorService {
             requiredEnvKeys: tpl.requiredEnvKeys || [],
             optionalEnvKeys: tpl.optionalEnvKeys || [],
             docsSlug: tpl.docsSlug ?? undefined,
-          }),
+          })
         );
       }
     } catch (error) {

@@ -140,8 +140,10 @@ export interface ConnectorConnectInput {
   };
 
   /**
-   * Provider-specific configuration derived from connector_providers.runtime_config.
-   * Must never contain raw secrets; those remain server-side only.
+   * Provider-specific configuration derived from connector_templates.runtime_config.
+   * Must never contain raw secrets; those remain server-side only. Blueprints may
+   * rely on this config for non-secret options such as env key names, OAuth
+   * parameters, or other connector behavior hints.
    */
   config?: Record<string, unknown>;
 }

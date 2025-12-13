@@ -1,4 +1,4 @@
-import { getConnectorCatalog, getConnectorDefinition } from '@/config/connectors';
+import { getConnectorCatalog } from '@/config/connectors';
 import type {
   ConnectorCatalogItem,
   ConnectorConnectInput,
@@ -6,8 +6,15 @@ import type {
   ConnectorListItem,
   ConnectorProvider,
   ConnectWithApiKeyRequest,
+  ConnectorModel,
 } from '@starships/protocol';
-import { ConnectorTemplateRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
+import {
+  ConnectorTemplateRepository,
+  ConnectorRepository,
+  EnvironmentRepository,
+  StarshipRepository,
+  ConnectorTemplateEntity,
+} from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
@@ -36,17 +43,25 @@ export class ConnectorService {
   }
 
   /**
-   * Execute an inline connector connect blueprint if configured for the provider.
-   *
-   * This is a low-level primitive used to support fully DB-driven connector
-   * behavior. For existing first-party providers, we continue to use the
-   * hard-coded TypeScript flows unless a connect blueprint is explicitly
-   * configured on the provider.
+   * Load a connector template for a provider or throw a descriptive error.
    */
-  private async runConnectBlueprintIfPresent(input: ConnectorConnectInput): Promise<ConnectorConnectOutput | null> {
-    const template = await this.connectorTemplateRepository.findByProvider(input.provider);
-    if (!template || !template.connectBlueprint) {
-      return null;
+  private async loadTemplateOrThrow(provider: ConnectorProvider): Promise<ConnectorTemplateEntity> {
+    const template = await this.connectorTemplateRepository.findByProvider(provider);
+    if (!template) {
+      throw new Error(`Connector template not found for provider: ${provider}`);
+    }
+    return template;
+  }
+
+  /**
+   * Execute a connector connect blueprint for the given template + input.
+   *
+   * All blueprint-driven connect flows should go through this helper so that
+   * execution and error handling remain consistent across providers.
+   */
+  private async runConnectBlueprint(template: ConnectorTemplateEntity, input: ConnectorConnectInput): Promise<ConnectorConnectOutput> {
+    if (!template.connectBlueprint) {
+      throw new Error(`Connector template ${template.id} for provider ${input.provider} does not have a connect blueprint configured`);
     }
 
     const execution = ExecutionItemUtils.createExecution();
@@ -58,6 +73,211 @@ export class ConnectorService {
     const result = ExecutionItemUtils.unwrapSingle(resultItems) as ConnectorConnectOutput | undefined;
     if (!result || typeof result !== 'object') {
       throw new Error(`Connector connect blueprint for provider ${input.provider} did not return a valid result`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Execute an inline connector connect blueprint if configured for the provider.
+   *
+   * This is a compatibility helper used to support DB-driven connector behavior
+   * while still allowing legacy TypeScript flows to run when no blueprint is
+   * present. New code should prefer loadTemplateOrThrow + runConnectBlueprint.
+   */
+  private async runConnectBlueprintIfPresent(input: ConnectorConnectInput): Promise<ConnectorConnectOutput | null> {
+    const template = await this.connectorTemplateRepository.findByProvider(input.provider);
+    if (!template || !template.connectBlueprint) {
+      return null;
+    }
+
+    return this.runConnectBlueprint(template, input);
+  }
+
+  /**
+   * Apply the side effects described by a ConnectorConnectOutput:
+   * - Persist/update the connector row (status, metadata, lastError, template link)
+   * - Persist any env vars returned in output.env to the environments table
+   *
+   * Returns the connector id and optional starship slug for downstream use.
+   */
+  private async applyConnectOutput(
+    starshipId: string,
+    userId: string,
+    provider: ConnectorProvider,
+    template: ConnectorTemplateEntity,
+    output: ConnectorConnectOutput
+  ): Promise<{ connector: ConnectorModel; starshipSlug?: string }> {
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+
+    const status = output.status ?? 'connected';
+    const metadata = output.metadata ?? {};
+    const lastError: string | null | undefined = output.lastError ?? null;
+
+    let connector =
+      existing ??
+      (await this.connectorRepository.create({
+        starshipId,
+        provider,
+        status,
+        metadata,
+        lastError: lastError ?? undefined,
+        templateId: template.id,
+        version: template.version,
+      }));
+
+    if (existing) {
+      const updated = await this.connectorRepository.update(existing.id, {
+        status,
+        metadata: {
+          ...(existing.metadata || {}),
+          ...metadata,
+        },
+        lastError,
+      });
+
+      if (updated) {
+        connector = updated;
+      }
+    }
+
+    if (output.env) {
+      for (const [key, value] of Object.entries(output.env)) {
+        await this.upsertEnvironmentVariable(starshipId, key, value, userId, connector.id);
+      }
+    }
+
+    const starship = await this.starshipRepository.findById(starshipId);
+
+    return { connector, starshipSlug: starship?.slug };
+  }
+
+  /**
+   * Run a refresh blueprint for a connector, given the current env snapshot and metadata.
+   * Applies any resulting env/metadata/status/lastError changes and returns the updated connector.
+   */
+  async refreshConnector(starshipId: string, provider: ConnectorProvider): Promise<ConnectorModel | null> {
+    const template = await this.connectorTemplateRepository.findByProvider(provider);
+    if (!template || !template.refreshBlueprint) {
+      // No refresh behavior defined for this connector.
+      return null;
+    }
+
+    const connector = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+    if (!connector) {
+      return null;
+    }
+
+    // Snapshot env vars managed for this connector based on template configuration.
+    const envSnapshot: Record<string, string> = {};
+    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
+    for (const key of envKeys) {
+      const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
+      if (existing && typeof (existing as unknown as { decryptedValue?: string }).decryptedValue === 'string') {
+        envSnapshot[key] = (existing as unknown as { decryptedValue: string }).decryptedValue;
+      }
+    }
+
+    const execution = ExecutionItemUtils.createExecution();
+    const input = {
+      starshipId,
+      provider,
+      envSnapshot,
+      metadata: connector.metadata || {},
+      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+    };
+    const initialItems = ExecutionItemUtils.wrapSingle(input);
+    execution.results.push({ nodeRef: '__initial__', items: initialItems });
+
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const resultItems = await runner.run(template.refreshBlueprint, execution);
+    const result = ExecutionItemUtils.unwrapSingle(resultItems) as
+      | {
+          env?: Record<string, string>;
+          metadata?: Record<string, unknown>;
+          status?: string;
+          lastError?: string;
+        }
+      | undefined;
+
+    if (!result || typeof result !== 'object') {
+      throw new Error(`Connector refresh blueprint for provider ${provider} did not return a valid result`);
+    }
+
+    // Apply env updates
+    if (result.env) {
+      for (const [key, value] of Object.entries(result.env)) {
+        // No user context for refresh flows; attribute to system.
+        await this.upsertEnvironmentVariable(starshipId, key, value, 'system', connector.id);
+      }
+    }
+
+    const updated = await this.connectorRepository.update(connector.id, {
+      status: (result.status as ConnectorModel['status']) ?? connector.status,
+      metadata: {
+        ...(connector.metadata || {}),
+        ...(result.metadata || {}),
+      },
+      lastError: result.lastError ?? null,
+    });
+
+    return updated ?? connector;
+  }
+
+  /**
+   * Run a test blueprint for a connector and return the result.
+   * Does not mutate connector or env state.
+   */
+  async testConnector(
+    starshipId: string,
+    provider: ConnectorProvider
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    details?: Record<string, unknown>;
+  } | null> {
+    const template = await this.connectorTemplateRepository.findByProvider(provider);
+    if (!template || !template.testBlueprint) {
+      return null;
+    }
+
+    const connector = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+    if (!connector) {
+      return null;
+    }
+
+    const envSnapshot: Record<string, string> = {};
+    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
+    for (const key of envKeys) {
+      const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
+      if (existing && typeof (existing as unknown as { decryptedValue?: string }).decryptedValue === 'string') {
+        envSnapshot[key] = (existing as unknown as { decryptedValue: string }).decryptedValue;
+      }
+    }
+
+    const execution = ExecutionItemUtils.createExecution();
+    const input = {
+      starshipId,
+      provider,
+      envSnapshot,
+      metadata: connector.metadata || {},
+      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+    };
+    const initialItems = ExecutionItemUtils.wrapSingle(input);
+    execution.results.push({ nodeRef: '__initial__', items: initialItems });
+
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const resultItems = await runner.run(template.testBlueprint, execution);
+    const result = ExecutionItemUtils.unwrapSingle(resultItems) as
+      | {
+          ok: boolean;
+          error?: string;
+          details?: Record<string, unknown>;
+        }
+      | undefined;
+
+    if (!result || typeof result !== 'object') {
+      throw new Error(`Connector test blueprint for provider ${provider} did not return a valid result`);
     }
 
     return result;
@@ -99,10 +319,7 @@ export class ConnectorService {
    * hard-coded logic.
    */
   async startOAuthConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
-    const template = await this.connectorTemplateRepository.findByProvider(provider);
-    if (!template) {
-      throw new Error(`Connector template not found for provider: ${provider}`);
-    }
+    const template = await this.loadTemplateOrThrow(provider);
 
     if (template.authType !== 'oauth2') {
       throw new Error(`Connector ${provider} does not use OAuth2 authentication`);
@@ -159,7 +376,34 @@ export class ConnectorService {
       params.set('prompt', runtimeConfig.prompt);
     }
 
-    return `${authorizeUrl}?${params.toString()}`;
+    const baseAuthorizationUrl = `${authorizeUrl}?${params.toString()}`;
+
+    // If a connect blueprint is configured, let it optionally refine the URL.
+    try {
+      const output = await this.runConnectBlueprint(template, {
+        starshipId,
+        provider,
+        authType: 'oauth2',
+        phase: 'start',
+        authorizeUrl: baseAuthorizationUrl,
+        redirectPath,
+        scopes: template.oauthScopes || [],
+        stateToken: state,
+        config: runtimeConfig as Record<string, unknown>,
+      });
+
+      if (output.authorizationUrl) {
+        return output.authorizationUrl;
+      }
+    } catch (error) {
+      // Fall back to the static TypeScript flow if blueprint execution fails.
+      console.warn('[ConnectorService] Connect blueprint failed for startOAuthConnector, falling back to static flow', {
+        provider,
+        error,
+      });
+    }
+
+    return baseAuthorizationUrl;
   }
 
   /**
@@ -173,10 +417,7 @@ export class ConnectorService {
     stateToken: string,
     callbackQuery: Record<string, unknown> | undefined
   ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
-    const template = await this.connectorTemplateRepository.findByProvider(providerFromCallback);
-    if (!template) {
-      throw new Error(`Connector template not found for provider: ${providerFromCallback}`);
-    }
+    const template = await this.loadTemplateOrThrow(providerFromCallback);
 
     if (template.authType !== 'oauth2') {
       throw new Error(`Connector ${providerFromCallback} does not use OAuth2 authentication`);
@@ -279,40 +520,54 @@ export class ConnectorService {
       }
     }
 
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
-    const connector =
-      existing ??
-      (await this.connectorRepository.create({
-        starshipId,
-        provider,
-        status: 'connected',
-        metadata,
-        lastError: undefined,
-        templateId: template.id,
-        version: template.version,
-      }));
+    // Host-computed baseline output derived from the token response. Blueprints
+    // can refine or override this, but we always fall back to these values.
+    const hostOutput: ConnectorConnectOutput = {
+      env: envUpdates,
+      metadata,
+      status: 'connected',
+    };
 
-    if (existing) {
-      await this.connectorRepository.update(existing.id, {
-        status: 'connected',
-        metadata: {
-          ...(existing.metadata || {}),
-          ...metadata,
+    let finalOutput = hostOutput;
+
+    try {
+      const blueprintOutput = await this.runConnectBlueprint(template, {
+        starshipId,
+        provider: providerFromCallback,
+        authType: 'oauth2',
+        phase: 'complete',
+        tokenUrl,
+        redirectPath,
+        stateToken,
+        code,
+        callbackQuery,
+        config: runtimeConfig as Record<string, unknown>,
+      });
+
+      finalOutput = {
+        ...hostOutput,
+        ...blueprintOutput,
+        env: {
+          ...(hostOutput.env || {}),
+          ...(blueprintOutput.env || {}),
         },
-        lastError: null,
+        metadata: {
+          ...(hostOutput.metadata || {}),
+          ...(blueprintOutput.metadata || {}),
+        },
+      };
+    } catch (error) {
+      console.warn('[ConnectorService] Connect blueprint failed for completeOAuthConnector, falling back to static flow', {
+        provider: providerFromCallback,
+        error,
       });
     }
 
-    // Persist env vars for this starship and link them to the connector
-    for (const [key, value] of Object.entries(envUpdates)) {
-      await this.upsertEnvironmentVariable(starshipId, key, value, userId, connector.id);
-    }
-
-    const starship = await this.starshipRepository.findById(starshipId);
+    const { starshipSlug } = await this.applyConnectOutput(starshipId, userId, providerFromCallback, template, finalOutput);
 
     return {
       starshipId,
-      starshipSlug: starship?.slug,
+      starshipSlug,
       userId,
     };
   }
@@ -419,17 +674,28 @@ export class ConnectorService {
    * future providers that may adopt API-key-based flows.
    */
   async connectWithApiKey(starshipId: string, provider: ConnectorProvider, payload: ConnectWithApiKeyRequest, userId: string) {
-    const definition = getConnectorDefinition(provider);
-    if (!definition) {
-      throw new Error(`Unsupported connector provider: ${provider}`);
-    }
+    const template = await this.loadTemplateOrThrow(provider);
 
-    if (definition.authType !== 'api_key') {
+    if (template.authType !== 'api_key') {
       throw new Error(`Connector ${provider} does not use API key authentication`);
     }
 
-    // No current providers use API key authentication.
-    throw new Error(`API key connector not implemented for provider: ${provider}`);
+    const input: ConnectorConnectInput = {
+      starshipId,
+      provider,
+      authType: 'api_key',
+      phase: 'complete',
+      apiKeyPayload: {
+        apiKey: payload.apiKey,
+        extraConfig: payload.extraConfig,
+      },
+      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+    };
+
+    const output = await this.runConnectBlueprint(template, input);
+    const { connector } = await this.applyConnectOutput(starshipId, userId, provider, template, output);
+
+    return connector;
   }
 
   // Discord OAuth start/completion are now handled generically via
@@ -440,13 +706,13 @@ export class ConnectorService {
    * Disconnect a provider for a starship and clean up related env vars.
    */
   async disconnect(starshipId: string, provider: ConnectorProvider) {
-    const definition = getConnectorDefinition(provider);
-    if (!definition) {
-      throw new Error(`Unsupported connector provider: ${provider}`);
+    const template = await this.connectorTemplateRepository.findByProvider(provider);
+    if (!template) {
+      throw new Error(`Connector template not found for provider: ${provider}`);
     }
 
-    // Remove managed env vars for this provider
-    const envKeys = [...definition.requiredEnvKeys, ...(definition.optionalEnvKeys || [])];
+    // Remove managed env vars for this provider based on connector template configuration.
+    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
     await Promise.all(
       envKeys.map(async (key) => {
         const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);

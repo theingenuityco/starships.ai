@@ -44,28 +44,24 @@ export function createOAuthConnectBlueprint(config: OAuthConnectBlueprintConfig)
       // Phase: start -> build authorizationUrl from provided fields.
       if (input.phase === 'start') {
         const authorizeUrl = String(input.authorizeUrl || '');
-        const redirectPath = String(input.redirectPath || '');
-        const scopes = Array.isArray(input.scopes) ? input.scopes : [];
 
         if (!authorizeUrl) {
           throw new Error('authorizeUrl is required for OAuth start phase');
         }
 
-        // Build a minimal URL with query params; the server is responsible
-        // for passing any pre-composed URL if it prefers.
-        const url = new URL(authorizeUrl);
-        if (scopes.length) {
-          url.searchParams.set('scope', scopes.join(' '));
-        }
-
+        // In the current design, the host (ConnectorService) is responsible
+        // for composing the full authorization URL including query params
+        // such as client_id, redirect_uri, state, and scope. The blueprint
+        // can still adjust or validate the URL if desired, but by default
+        // it simply echoes the provided value.
         return {
-          authorizationUrl: url.toString(),
+          authorizationUrl: authorizeUrl,
         };
       }
 
-      // Phase: complete -> delegate to server to persist env/metadata. Here we
-      // simply echo back an empty ConnectorConnectOutput; the server may ignore
-      // or extend this behavior in a future iteration.
+      // Phase: complete -> delegate to host to persist env/metadata. Here we
+      // simply pass through status/metadata if supplied, allowing templates to
+      // tweak these values without changing the core TypeScript flow.
       if (input.phase === 'complete') {
         return {
           status: input.status || 'connected',

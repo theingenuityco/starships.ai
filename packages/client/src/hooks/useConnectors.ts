@@ -1,12 +1,5 @@
 import api from '@/lib/api'
-import type {
-  ApiResponse,
-  ConnectorCatalogItem,
-  ConnectorCatalogResponse,
-  ConnectorListItem,
-  ConnectorListResponse,
-  ConnectorProvider,
-} from '@starships/protocol'
+import type { ApiResponse, ConnectorCatalogItem, ConnectorCatalogResponse, ConnectorListItem, ConnectorListResponse, ConnectorProvider } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -34,9 +27,7 @@ export function useStarshipConnectors(starshipId: string, enabled: boolean = tru
   return useQuery({
     queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId),
     queryFn: async (): Promise<ConnectorListItem[]> => {
-      const response: FetchResponse<ApiResponse<ConnectorListResponse>> = await api.get(
-        `/api/v1/starships/${starshipId}/connectors`,
-      )
+      const response: FetchResponse<ApiResponse<ConnectorListResponse>> = await api.get(`/api/v1/starships/${starshipId}/connectors`)
       return response.data.data.connectors
     },
     enabled: !!starshipId && enabled,
@@ -71,12 +62,52 @@ export function useDisconnectConnector(starshipId: string) {
   })
 }
 
+export function useRefreshConnector(starshipId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (provider: ConnectorProvider): Promise<void> => {
+      await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/refresh`)
+    },
+    onSuccess: (_, provider) => {
+      queryClient.invalidateQueries({
+        queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId),
+      })
+
+      toast.success('Connector refreshed', {
+        description: `${provider.charAt(0).toUpperCase() + provider.slice(1)} connector has been refreshed.`,
+      })
+    },
+    onError: (error: any, provider) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to refresh connector'
+      const providerLabel = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Connector'
+      toast.error(`Failed to refresh ${providerLabel}`, {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
+export function useTestConnector(starshipId: string) {
+  return useMutation({
+    mutationFn: async (provider: ConnectorProvider): Promise<{ ok: boolean; error?: string }> => {
+      const response: FetchResponse<ApiResponse<{ ok: boolean; error?: string }>> = await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/test`)
+      return response.data.data
+    },
+    onError: (error: any, provider) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to test connector'
+      const providerLabel = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Connector'
+      toast.error(`Failed to test ${providerLabel}`, {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 export function useStartOAuthConnector(starshipId: string) {
   return useMutation({
     mutationFn: async (provider: ConnectorProvider): Promise<string> => {
-      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(
-        `/api/v1/starships/${starshipId}/connectors/${provider}/oauth/start`,
-      )
+      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/oauth/start`)
       return response.data.data.authorizationUrl
     },
     onError: (error: any, provider) => {

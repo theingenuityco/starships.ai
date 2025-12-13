@@ -288,19 +288,19 @@ export class ConnectorService {
    * Source of truth is the DB-backed connector_templates table.
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
-    const templates = await this.connectorTemplateRepository.list();
-    return templates.map(
-      (tpl): ConnectorCatalogItem => ({
-        provider: tpl.provider as ConnectorProvider,
-        displayName: tpl.displayName,
-        description: tpl.description,
-        authType: tpl.authType as ConnectorCatalogItem['authType'],
-        requiredEnvKeys: tpl.requiredEnvKeys || [],
-        optionalEnvKeys: tpl.optionalEnvKeys || [],
-        docsSlug: tpl.docsSlug ?? undefined,
-      })
-    );
-  }
+      const templates = await this.connectorTemplateRepository.list();
+        return templates.map(
+          (tpl): ConnectorCatalogItem => ({
+            provider: tpl.provider as ConnectorProvider,
+            displayName: tpl.displayName,
+            description: tpl.description,
+            authType: tpl.authType as ConnectorCatalogItem['authType'],
+            requiredEnvKeys: tpl.requiredEnvKeys || [],
+            optionalEnvKeys: tpl.optionalEnvKeys || [],
+            docsSlug: tpl.docsSlug ?? undefined,
+          })
+        );
+      }
 
   /**
    * Start a connector flow for a starship and return the authorization URL.

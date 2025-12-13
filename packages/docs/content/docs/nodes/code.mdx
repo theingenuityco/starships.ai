@@ -1,0 +1,80 @@
+---
+title: Code Node
+description: Run custom JavaScript logic inside blueprints with a safe async main(ctx) entrypoint
+icon: Code
+---
+
+## What the Code node does
+
+The `code` node lets you run small pieces of JavaScript logic inside a blueprint. It is ideal for:
+
+- **Input validation** and shaping
+- **Lightweight data processing** between HTTP calls
+- **Branch-specific computations** that are easier in code than templates
+
+The node takes the current input as `ctx.input`, executes your function, and returns whatever `main(ctx)` resolves to as its output.
+
+## Required entrypoint: async function main(ctx)
+
+Every Code node must define an **async entrypoint**:
+
+```js
+async function main(ctx) {
+  // ctx.input: unwrapped input value
+  // ctx.state: shared execution state object
+  // ctx.outputs: array of { nodeRef, items } results so far
+  // ctx.lastOutputOf(ref): convenience helper to read another node's output
+  // ctx.exists(value): true if value is not null/undefined
+  // ctx.env(key): non-secret runtime config injected by the host
+
+  return { ok: true };
+}
+```
+
+If the code does not contain `async function main(ctx)`, validation will fail with:
+
+> **Missing required entrypoint: async function main(ctx)**
+
+At runtime, the engine wraps your code and calls `main(ctx)`. Any thrown error will fail the node.
+
+## URL building pattern for http_request
+
+Because templates are **full-string only**, Code nodes are the preferred place to build complex URLs:
+
+1. Use a Code node to build a URL object:
+
+```js
+async function main(ctx) {
+  const input = ctx.input || {};
+  const type = input.type || 'all';
+  const sort = input.sort || 'updated';
+
+  return {
+    url: `/user/repos?type=${encodeURIComponent(type)}&sort=${encodeURIComponent(sort)}`,
+  };
+}
+```
+
+2. In a downstream `http_request` node, reference that value with a **single full-string template**:
+
+```json
+{
+  "type": "http_request",
+  "parameters": {
+    "method": "GET",
+    "url": "{{ (lastOutputOf('build_url') || {}).url }}",
+    "connector": "github"
+  }
+}
+```
+
+This avoids partial templates like `"/user/repos?type={{ ... }}&sort={{ ... }}"`, which are rejected by the engine.
+
+## No direct HTTP or connector access
+
+Code nodes **cannot** call connectors or the HostRuntime directly (there is no `ctx.hostRuntime.http`). To talk to external services:
+
+- Build request data (URL, headers, body) in a Code node, then
+- Use an `http_request` node with `connector` and templates to actually perform the call.
+
+This keeps secrets and network configuration in the host, not inside user-authored code.

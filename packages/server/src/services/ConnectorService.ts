@@ -674,8 +674,8 @@ export class ConnectorService {
     };
   }
 
-  // NOTE: GitHub connector now uses a GitHub App installation token via
-  // ConnectorRuntimeService. There is no per-starship OAuth flow for GitHub.
+  // NOTE: GitHub connector now uses a GitHub OAuth App user token with
+  // per-starship access/refresh tokens managed via the environments table.
 
   /**
    * List connectors for a starship, enriched with managed env key presence.

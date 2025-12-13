@@ -330,6 +330,12 @@ export class ConnectorService {
       clientIdEnvKey?: string;
       accessType?: string;
       prompt?: string;
+      /**
+       * Optional provider-specific permissions value to include in the OAuth
+       * authorization URL. For example, Discord expects the "permissions"
+       * query param when installing a bot.
+       */
+      permissions?: string | number;
       [key: string]: unknown;
     };
 
@@ -374,6 +380,15 @@ export class ConnectorService {
 
     if (runtimeConfig.prompt && typeof runtimeConfig.prompt === 'string') {
       params.set('prompt', runtimeConfig.prompt);
+    }
+
+    // Include provider-specific permissions when configured (e.g. Discord bot install).
+    if (runtimeConfig.permissions !== undefined && runtimeConfig.permissions !== null) {
+      const permissionsValue =
+        typeof runtimeConfig.permissions === 'number' ? String(runtimeConfig.permissions) : String(runtimeConfig.permissions);
+      if (permissionsValue) {
+        params.set('permissions', permissionsValue);
+      }
     }
 
     const baseAuthorizationUrl = `${authorizeUrl}?${params.toString()}`;

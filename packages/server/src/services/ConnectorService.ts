@@ -1,5 +1,12 @@
 import { getConnectorCatalog, getConnectorDefinition } from '@/config/connectors';
-import type { ConnectorCatalogItem, ConnectorListItem, ConnectorProvider, ConnectWithApiKeyRequest } from '@starships/protocol';
+import type {
+  ConnectorCatalogItem,
+  ConnectorConnectInput,
+  ConnectorConnectOutput,
+  ConnectorListItem,
+  ConnectorProvider,
+  ConnectWithApiKeyRequest,
+} from '@starships/protocol';
 import { ConnectorProviderRepository, ConnectorRepository, EnvironmentRepository, StarshipRepository } from '@starships/models';
 import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
@@ -61,6 +68,44 @@ export class ConnectorService {
     this.environmentRepository = new EnvironmentRepository();
     this.environmentService = new EnvironmentService();
     this.starshipRepository = new StarshipRepository();
+  }
+
+  /**
+   * Execute an inline connector connect blueprint if configured for the provider.
+   *
+   * This is a low-level primitive used to support fully DB-driven connector
+   * behavior. For existing first-party providers, we continue to use the
+   * hard-coded TypeScript flows unless a connect blueprint is explicitly
+   * configured on the provider.
+   */
+  private async runConnectBlueprintIfPresent(
+    input: ConnectorConnectInput,
+  ): Promise<ConnectorConnectOutput | null> {
+    const providerEntity = await this.connectorProviderRepository.findById(input.provider);
+    if (!providerEntity || !providerEntity.connectBlueprint) {
+      return null;
+    }
+
+    // Lazy-load Engine to avoid impacting startup if Autopilot is unused.
+    const { Engine } = await import('@starships/autopilot');
+    const engine = new Engine({
+      // NOTE: For now we do not provide a HostRuntime; this means connector
+      // connect blueprints should limit themselves to pure computation (Code,
+      // Transform, etc.) and not perform HTTP. Future work can add a
+      // server-side HostRuntime that is connector-aware.
+    });
+
+    const execution = await engine.run({
+      blueprint: providerEntity.connectBlueprint,
+      input,
+    });
+
+    const result = execution.result?.json as ConnectorConnectOutput | undefined;
+    if (!result) {
+      throw new Error(`Connector connect blueprint for provider ${input.provider} did not return a result`);
+    }
+
+    return result;
   }
 
   /**

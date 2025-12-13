@@ -1,11 +1,20 @@
 import type { Client } from 'pg';
 
+/**
+ * Create and seed connector_providers with full connector config, including
+ * inline blueprint JSONB columns for future blueprint-driven flows.
+ *
+ * This migration subsumes the earlier 009_add_connector_providers.ts on this
+ * branch so that master only needs a single, latest connector_providers
+ * migration.
+ */
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    console.log('🚀 Creating connector_providers table...');
+    console.log('🚀 Creating/updating connector_providers table with inline blueprints...');
 
+    // Create table with full schema if it does not yet exist
     await client.query(`
       CREATE TABLE IF NOT EXISTS connector_providers (
         id TEXT PRIMARY KEY,
@@ -20,10 +29,26 @@ export async function up(client: Client): Promise<void> {
         oauth_scopes TEXT[] NOT NULL DEFAULT '{}',
         oauth_redirect_path TEXT,
         runtime_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+        -- Optional external blueprint ids (kept for compatibility, may be unused)
         connect_blueprint_id TEXT,
         refresh_blueprint_id TEXT,
-        test_blueprint_id TEXT
+        test_blueprint_id TEXT,
+        -- Inline Autopilot blueprints for connector flows
+        connect_blueprint JSONB,
+        refresh_blueprint JSONB,
+        test_blueprint JSONB
       )
+    `);
+
+    // Ensure columns exist even if table predated this migration (defensive)
+    await client.query(`
+      ALTER TABLE connector_providers
+      ADD COLUMN IF NOT EXISTS connect_blueprint_id TEXT,
+      ADD COLUMN IF NOT EXISTS refresh_blueprint_id TEXT,
+      ADD COLUMN IF NOT EXISTS test_blueprint_id TEXT,
+      ADD COLUMN IF NOT EXISTS connect_blueprint JSONB,
+      ADD COLUMN IF NOT EXISTS refresh_blueprint JSONB,
+      ADD COLUMN IF NOT EXISTS test_blueprint JSONB
     `);
 
     console.log('➡️  Seeding connector_providers with built-in providers...');
@@ -209,10 +234,10 @@ export async function up(client: Client): Promise<void> {
     );
 
     await client.query('COMMIT');
-    console.log('✅ connector_providers table created and seeded successfully');
+    console.log('✅ connector_providers table created/updated and seeded successfully');
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('❌ Failed to create connector_providers table:', error);
+    console.error('❌ Failed to create/update connector_providers table:', error);
     throw error;
   }
 }
@@ -232,3 +257,5 @@ export async function down(client: Client): Promise<void> {
     throw error;
   }
 }
+
+

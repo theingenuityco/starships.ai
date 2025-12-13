@@ -6,8 +6,8 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage } from '@starships/autopilot';
-import type { AutopilotEvent, EventCallback, LLMEvent, ToolEvent, ToolParams } from '@starships/autopilot';
+import { Agent, AgentParams, ChildProcessRunner, ExecutionItemUtils, LlmMessage, RunnerFactory } from '@starships/autopilot';
+import type { AutopilotEvent, EventCallback, LLMEvent, ToolEvent, ToolParams, EngineConfig } from '@starships/autopilot';
 import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
 import {
   AgentRepository,
@@ -39,6 +39,8 @@ import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
+import { getEnvConfig } from '@starships/env';
+import { generateJWT } from '@/utils/jwt';
 
 export interface ConversationRequest {
   agentId: string;
@@ -741,6 +743,7 @@ export class AgentService {
     agentId: string,
     testInput: string | LlmMessage[],
     starshipId: string,
+    userId: string,
     parentConversationId?: string
   ): Promise<{
     success: boolean;
@@ -902,17 +905,43 @@ export class AgentService {
         runtimeEnv,
       });
 
-      // 7. Execute with runner (same pattern as ConversationService)
-      const runner = new ChildProcessRunner({
-        memoryLimitMB: 256,
-        timeoutMs: 60000, // 1 minute timeout for tests
-        killGraceMs: 5000,
-      });
+      // 7. Build HostRuntime configuration (connectors + LLM) for remote runner,
+      // mirroring the ConversationService behavior so tools and LLM calls work
+      // the same way during tests.
+      const envConfig = getEnvConfig();
+      let connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
+      try {
+        const token = await generateJWT({
+          id: userId,
+          starshipId,
+        });
+        const baseUrl = `${envConfig.SERVER_URL}/api/v1`;
+        connectors = {
+          starships: {
+            baseUrl,
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        };
+      } catch (e) {
+        console.error('[AGENT-TEST] Failed to build connector HTTP configuration:', e);
+      }
 
-      const blueprint = agent.getCurrentBlueprint();
+      const llm =
+        envConfig.OPENROUTER_API_KEY && typeof envConfig.OPENROUTER_API_KEY === 'string'
+          ? {
+              apiKey: envConfig.OPENROUTER_API_KEY,
+              baseUrl: 'https://openrouter.ai/api/v1',
+            }
+          : undefined;
+
+      // 8. Choose appropriate runner (remote vs local), mirroring ConversationService
+      const mode = 'remote';
       const exec = ExecutionItemUtils.createExecution();
+      const blueprint = agent.getCurrentBlueprint();
 
-      // 8. Seed execution state with ordered messages
+      // 9. Seed execution state with ordered messages
       const orderedMessages: LlmMessage[] = [];
 
       // Add system prompt if present
@@ -939,7 +968,7 @@ export class AgentService {
       exec.state.messages = orderedMessages;
       exec.state.tools = resolvedTools;
 
-      // 9. Execute the agent
+      // 10. Execute the agent
       console.log('🚀 Starting agent execution:', {
         agentName: agentModel.name,
         inputMessages: llmMessages.length,
@@ -948,10 +977,30 @@ export class AgentService {
         toolsCount: resolvedTools.length,
       });
 
-      await runner.run(blueprint, exec, {
-        eventCallback: onEvent,
-        runtimeEnv,
-      });
+      if (mode === 'remote') {
+        const runner = RunnerFactory.getTopLevelRunner(exec.depth ?? 0);
+        const engineConfig = {
+          eventCallback: onEvent,
+          runtimeEnv,
+          connectors,
+          llm,
+          failOnNodeError: true,
+        } as unknown as EngineConfig & {
+          connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+          llm?: { apiKey: string; baseUrl?: string };
+        };
+        await runner.run(blueprint, exec, engineConfig);
+      } else {
+        const runner = new ChildProcessRunner({
+          memoryLimitMB: 256,
+          timeoutMs: 60000, // 1 minute timeout for tests
+          killGraceMs: 5000,
+        });
+        await runner.run(blueprint, exec, {
+          eventCallback: onEvent,
+          runtimeEnv,
+        });
+      }
 
       console.log('🔍 Post-execution state:', {
         messagesCount: Array.isArray(exec.state.messages) ? exec.state.messages.length : 0,
@@ -967,7 +1016,7 @@ export class AgentService {
         toolsUsed: toolsUsed,
       });
 
-      // 10. Try to extract final response from execution state
+      // 11. Try to extract final response from execution state
       if (exec.state.messages && Array.isArray(exec.state.messages)) {
         console.log('🔍 All messages in final state:');
         exec.state.messages.forEach((msg, idx) => {

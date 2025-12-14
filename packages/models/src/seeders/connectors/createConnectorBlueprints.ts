@@ -129,9 +129,12 @@ export function createApiKeyConnectBlueprint(config: ApiKeyConnectBlueprintConfi
         throw new Error('apiKey is required for API key connector');
       }
 
-      // envKey should be provided via config.runtimeConfig.envKey or similar.
+      // Env var key-name where the host should store the API key.
+      // Canonical location: config.oauth.apiKey (ConnectorRuntimeConfig)
+      // Legacy fallback: config.envKey
       const config = (input.config && typeof input.config === 'object') ? input.config : {};
-      const envKey = config.envKey || 'API_KEY';
+      const oauth = (config.oauth && typeof config.oauth === 'object') ? config.oauth : {};
+      const envKey = oauth.apiKey || config.envKey || 'API_KEY';
 
       if (typeof envKey !== 'string' || !envKey.trim()) {
         throw new Error('envKey must be provided in connector runtimeConfig for API key connector');

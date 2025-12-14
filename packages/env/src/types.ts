@@ -39,8 +39,8 @@ export interface EnvironmentConfig {
   GH_OAUTH_CLIENT_SECRET?: string;
 
   // GitHub App Configuration (used for GitHub connector)
-  GITHUB_APP_CLIENT_ID?: string;
-  GITHUB_APP_CLIENT_SECRET?: string;
+  GH_APP_CLIENT_ID?: string;
+  GH_APP_CLIENT_SECRET?: string;
   GITHUB_APP_ID?: string;
   GITHUB_APP_PRIVATE_KEY_BASE64?: string;
   // GitHub App slug used to construct installation URLs, e.g. "starships-runner-controller"

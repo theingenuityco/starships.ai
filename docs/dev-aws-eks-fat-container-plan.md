@@ -166,7 +166,7 @@ The legacy DigitalOcean stack relied on the in-cluster Kubernetes NGINX Ingress 
 
 ## 5. Secrets and Configuration
 
-- Mirror secrets from `docker-compose.yml` into K8s Secrets or use AWS Secrets Manager with External Secrets operator.
+- Mirror required environment variables into K8s Secrets or use AWS Secrets Manager with External Secrets operator.
 - Ensure Stripe/OpenAI keys and JWT secret exist before rollout.
 - For dev, manual `kubectl create secret` is acceptable; note plan to externalize later.
 

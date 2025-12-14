@@ -708,6 +708,8 @@ export class ConnectorService {
           lastError: existing.lastError,
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
+          // Keep list item schema consistent with virtual connectors.
+          scopes: template.oauthScopes || [],
           // Expose non-secret connector metadata (e.g. Discord guild_id) to tools/agents.
           metadata: existing.metadata || {},
         };

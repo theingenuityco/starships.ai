@@ -156,6 +156,12 @@ export class EnvironmentRepository extends BaseRepository {
     updates: {
       value?: string;
       description?: string;
+      /**
+       * Optional connector owner to associate this env var with.
+       * Used by connector-managed env vars so they can be cleaned up without
+       * needing template-managed key lists.
+       */
+      connectorId?: string;
       updatedBy: string;
     }
   ): Promise<EnvironmentModel | null> {
@@ -185,6 +191,10 @@ export class EnvironmentRepository extends BaseRepository {
 
         if (updates.description !== undefined) {
           updateProps.description = updates.description;
+        }
+
+        if (updates.connectorId !== undefined) {
+          updateProps.connectorId = updates.connectorId;
         }
 
         await EnvironmentEntity.validate(updateProps, 'update');
@@ -241,6 +251,62 @@ export class EnvironmentRepository extends BaseRepository {
       },
       'deleteByStarshipAndKey',
       'Environment'
+    );
+  }
+
+  async deleteByConnectorId(connectorId: string): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!connectorId?.trim()) {
+          throw new Error('connectorId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>('DELETE FROM environments WHERE connector_id = $1 RETURNING id', [
+          connectorId,
+        ]);
+
+        return result.length;
+      },
+      'deleteByConnectorId',
+      'Environment',
+      connectorId
+    );
+  }
+
+  /**
+   * Get decrypted env vars for a specific connector.
+   *
+   * Connector-managed env vars are linked via environments.connector_id, so we
+   * can safely snapshot secrets for refresh/test flows without relying on
+   * connector_templates.required_env_keys / optional_env_keys.
+   */
+  async getDecryptedEnvironmentByConnector(connectorId: string): Promise<Record<string, string>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!connectorId?.trim()) {
+          throw new Error('connectorId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM environments WHERE connector_id = $1', [connectorId]);
+
+        const env: Record<string, string> = {};
+
+        for (const record of result) {
+          const environment = fromDatabase(EnvironmentEntity, record);
+          try {
+            env[environment.key] = this.decrypt(environment.encryptedValue, environment.starshipId);
+          } catch (error) {
+            console.error(`Failed to decrypt environment variable ${environment.key}:`, error);
+          }
+        }
+
+        return env;
+      },
+      'getDecryptedEnvironmentByConnector',
+      'Environment',
+      connectorId
     );
   }
 

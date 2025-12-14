@@ -56,6 +56,10 @@ export class ConnectorRuntimeService {
     for (const tpl of templates) {
       const provider = tpl.provider as ConnectorProvider;
       const runtimeConfig = (tpl.runtimeConfig || {}) as Record<string, unknown>;
+      const oauthConfig =
+        runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+          ? (runtimeConfig.oauth as Record<string, unknown>)
+          : ({} as Record<string, unknown>);
 
       /**
        * Discord is a special case:
@@ -109,7 +113,7 @@ export class ConnectorRuntimeService {
       }
 
       // OAuth-style connectors typically specify which env key holds the access token.
-      const accessTokenEnvKey = runtimeConfig.accessTokenEnvKey as string | undefined;
+      const accessTokenEnvKey = oauthConfig.accessToken as string | undefined;
       if (!accessTokenEnvKey) {
         continue;
       }

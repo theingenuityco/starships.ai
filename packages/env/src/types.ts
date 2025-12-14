@@ -41,10 +41,13 @@ export interface EnvironmentConfig {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_DRIVE_CLIENT_ID?: string;
   GOOGLE_DRIVE_CLIENT_SECRET?: string;
+  // GitHub OAuth App (used for user login)
   GH_OAUTH_CLIENT_ID?: string;
   GH_OAUTH_CLIENT_SECRET?: string;
 
   // GitHub App Configuration (used for GitHub connector)
+  GITHUB_APP_CLIENT_ID?: string;
+  GITHUB_APP_CLIENT_SECRET?: string;
   GITHUB_APP_ID?: string;
   GITHUB_APP_PRIVATE_KEY_BASE64?: string;
   // GitHub App slug used to construct installation URLs, e.g. "starships-runner-controller"

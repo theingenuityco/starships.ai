@@ -8,7 +8,7 @@ import type { Client } from 'pg';
  * This migration:
  * - Sets auth_type = 'oauth2' for provider = 'github'
  * - Configures oauth_authorize_url, oauth_token_url, oauth_redirect_path, oauth_scopes
- * - Updates runtime_config to use GH_OAUTH_CLIENT_ID/SECRET and per-starship
+ * - Updates runtime_config to use GITHUB_APP_CLIENT_ID/SECRET and per-starship
  *   env keys for the user access/refresh tokens.
  */
 export async function up(client: Client): Promise<void> {
@@ -27,10 +27,10 @@ export async function up(client: Client): Promise<void> {
         oauth_redirect_path = '/api/v1/connectors/github/callback',
         oauth_scopes = ARRAY['repo', 'read:org'],
         runtime_config = jsonb_build_object(
-          'clientIdEnvKey', 'GH_OAUTH_CLIENT_ID',
-          'clientSecretEnvKey', 'GH_OAUTH_CLIENT_SECRET',
-          'accessTokenEnvKey', 'GITHUB_ACCESS_TOKEN',
-          'refreshTokenEnvKey', 'GITHUB_REFRESH_TOKEN'
+          'clientIdEnvKey', 'GITHUB_APP_CLIENT_ID',
+          'clientSecretEnvKey', 'GITHUB_APP_CLIENT_SECRET',
+          'accessTokenEnvKey', 'GITHUB_APP_ACCESS_TOKEN',
+          'refreshTokenEnvKey', 'GITHUB_APP_REFRESH_TOKEN'
         ),
         connect_blueprint = NULL,
         updated_at = NOW()

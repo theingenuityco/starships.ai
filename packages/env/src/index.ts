@@ -97,10 +97,13 @@ export function getEnvConfig(): EnvironmentConfig {
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     GOOGLE_DRIVE_CLIENT_ID: process.env.GOOGLE_DRIVE_CLIENT_ID,
     GOOGLE_DRIVE_CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+    // GitHub OAuth App (used for user login)
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
 
     // GitHub App Configuration (used for GitHub connector)
+    GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID,
+    GITHUB_APP_CLIENT_SECRET: process.env.GITHUB_APP_CLIENT_SECRET,
     GITHUB_APP_ID: process.env.GITHUB_APP_ID,
     GITHUB_APP_PRIVATE_KEY_BASE64: process.env.GITHUB_APP_PRIVATE_KEY_BASE64,
     GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,

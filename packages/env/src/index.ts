@@ -49,7 +49,7 @@ export function getEnvConfig(): EnvironmentConfig {
   const defaultRunnerPort = process.env.RUNNER_PORT ? parseInt(process.env.RUNNER_PORT, 10) : 50051;
   const resolvedRunnerUrl = process.env.RUNNER_URL || `http://localhost:${defaultRunnerPort}`;
 
-  // PostgreSQL defaults to match our Kubernetes/docker-compose setup:
+  // PostgreSQL defaults to match our Kubernetes/local setup:
   // - Service name "postgres" inside the cluster
   // - Default port/user/database aligned with the official image
   const resolvedPostgresHost = process.env.POSTGRES_HOST || 'postgres';
@@ -96,8 +96,8 @@ export function getEnvConfig(): EnvironmentConfig {
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
 
     // GitHub App Configuration (used for GitHub connector)
-    GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID,
-    GITHUB_APP_CLIENT_SECRET: process.env.GITHUB_APP_CLIENT_SECRET,
+    GH_APP_CLIENT_ID: process.env.GH_APP_CLIENT_ID,
+    GH_APP_CLIENT_SECRET: process.env.GH_APP_CLIENT_SECRET,
     GITHUB_APP_ID: process.env.GITHUB_APP_ID,
     GITHUB_APP_PRIVATE_KEY_BASE64: process.env.GITHUB_APP_PRIVATE_KEY_BASE64,
     GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,

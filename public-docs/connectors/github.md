@@ -4,7 +4,7 @@ This document specifies how to call GitHub APIs from tools using the `http_reque
 
 Auth is provided by a **GitHub OAuth App user token**:
 
-- **Global env config** (backend only): `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`
+- **Global env config** (backend only): `GH_APP_CLIENT_ID`, `GH_APP_CLIENT_SECRET`
 - **Per-starship env config** (encrypted environments table): `GITHUB_APP_ACCESS_TOKEN`, `GITHUB_APP_REFRESH_TOKEN`
   Tools never see the OAuth client secret or raw access/refresh tokens.
 
@@ -44,7 +44,7 @@ The connector can therefore:
 
 - **Auth injection**
   - For `connector: "github"`, the HostRuntime:
-    - Uses the configured GitHub App (`GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET`) to complete the OAuth 2.0 code exchange for the current starship.
+    - Uses the configured GitHub App (`GH_APP_CLIENT_ID` / `GH_APP_CLIENT_SECRET`) to complete the OAuth 2.0 code exchange for the current starship.
     - Stores the resulting `GITHUB_APP_ACCESS_TOKEN` (and optional `GITHUB_APP_REFRESH_TOKEN`) in the encrypted environments table for that starship.
     - Injects an `Authorization: Bearer <access_token>` header into the outgoing request using the stored `GITHUB_APP_ACCESS_TOKEN`.
   - If you explicitly set an `Authorization` header (any casing) in `parameters.headers`, that value **takes precedence** and the connector does not overwrite it.

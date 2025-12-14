@@ -272,6 +272,18 @@ const OAuthCallbackSchema = z.object({
   error: z.string().optional(),
 });
 
+function redactOAuthCallbackQueryForLogs(query: Record<string, unknown>): Record<string, unknown> {
+  const redacted: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(query)) {
+    if (key === 'code' || key === 'state') {
+      redacted[key] = '[REDACTED]';
+      continue;
+    }
+    redacted[key] = val;
+  }
+  return redacted;
+}
+
 // Shared handler for connector callbacks (OAuth2 and provider-specific flows like GitHub App).
 async function connectorCallbackHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -319,7 +331,12 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
       res.redirect(redirectUrl);
       return;
-    } catch {
+    } catch (customError) {
+      console.error('[CONNECTOR_CALLBACK] Custom connector completion failed; falling back to oauth2', {
+        provider,
+        errorMessage: (customError as Error | undefined)?.message,
+        errorName: (customError as Error | undefined)?.name,
+      });
       // Fall through to generic OAuth error handling below when connector is
       // not custom or completion fails.
     }
@@ -342,7 +359,12 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
             return;
           }
         }
-      } catch {
+      } catch (stateError) {
+        console.error('[CONNECTOR_CALLBACK] Failed to validate OAuth state for error redirect', {
+          provider,
+          errorMessage: (stateError as Error | undefined)?.message,
+          errorName: (stateError as Error | undefined)?.name,
+        });
         // fall through to generic callback redirect below
       }
 
@@ -370,7 +392,15 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
     const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
 
     res.redirect(redirectUrl);
-  } catch {
+  } catch (err) {
+    // Keep error logs minimal and safe (no code/state leakage).
+    console.error('[CONNECTOR_CALLBACK] Unhandled error during connector callback', {
+      provider: req.params.provider,
+      query: redactOAuthCallbackQueryForLogs(req.query as Record<string, unknown>),
+      errorMessage: (err as Error | undefined)?.message,
+      errorName: (err as Error | undefined)?.name,
+    });
+
     // On error, try to redirect back to the starship connectors page with an error flag
     try {
       const provider = req.params.provider as string | undefined;
@@ -394,7 +424,12 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
           }
         }
       }
-    } catch {
+    } catch (redirectError) {
+      console.error('[CONNECTOR_CALLBACK] Failed to build error redirect after unhandled error', {
+        provider: req.params.provider,
+        errorMessage: (redirectError as Error | undefined)?.message,
+        errorName: (redirectError as Error | undefined)?.name,
+      });
       // ignore and fall back to generic callback redirect
     }
 

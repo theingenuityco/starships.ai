@@ -31,7 +31,7 @@ services:
       POSTGRES_SSL: ${POSTGRES_SSL:-false}
 
       # Authentication
-      JWT_SECRET: ${JWT_SECRET:-your-super-secure-jwt-secret-key-at-least-32-characters-long}
+      JWT_SECRET: ${JWT_SECRET}
 
       # Environment Variables Encryption
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}

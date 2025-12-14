@@ -152,6 +152,19 @@ export class ConnectorService {
   }
 
   /**
+   * Build a decrypted snapshot of env vars for a connector.
+   *
+   * Source of truth is environments.connector_id linkage.
+   */
+  private async getConnectorEnvSnapshot(
+    starshipId: string,
+    connectorId: string,
+    template: ConnectorTemplateEntity
+  ): Promise<Record<string, string>> {
+    return this.environmentRepository.getDecryptedEnvironmentByConnector(connectorId);
+  }
+
+  /**
    * Run a refresh blueprint for a connector, given the current env snapshot and metadata.
    * Applies any resulting env/metadata/status/lastError changes and returns the updated connector.
    */
@@ -167,15 +180,7 @@ export class ConnectorService {
       return null;
     }
 
-    // Snapshot env vars managed for this connector based on template configuration.
-    const envSnapshot: Record<string, string> = {};
-    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
-    for (const key of envKeys) {
-      const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
-      if (existing && typeof (existing as unknown as { decryptedValue?: string }).decryptedValue === 'string') {
-        envSnapshot[key] = (existing as unknown as { decryptedValue: string }).decryptedValue;
-      }
-    }
+    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id, template);
 
     const execution = ExecutionItemUtils.createExecution();
     const input = {
@@ -245,14 +250,7 @@ export class ConnectorService {
       return null;
     }
 
-    const envSnapshot: Record<string, string> = {};
-    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
-    for (const key of envKeys) {
-      const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
-      if (existing && typeof (existing as unknown as { decryptedValue?: string }).decryptedValue === 'string') {
-        envSnapshot[key] = (existing as unknown as { decryptedValue: string }).decryptedValue;
-      }
-    }
+    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id, template);
 
     const execution = ExecutionItemUtils.createExecution();
     const input = {
@@ -295,9 +293,6 @@ export class ConnectorService {
         displayName: tpl.displayName,
         description: tpl.description,
         authType: tpl.authType as ConnectorCatalogItem['authType'],
-        requiredEnvKeys: tpl.requiredEnvKeys || [],
-        optionalEnvKeys: tpl.optionalEnvKeys || [],
-        docsSlug: tpl.docsSlug ?? undefined,
       })
     );
   }
@@ -314,21 +309,15 @@ export class ConnectorService {
     const template = await this.loadTemplateOrThrow(provider);
     const env = getEnvConfig();
 
-    const runtimeConfig = (template.runtimeConfig || {}) as {
-      clientIdEnvKey?: string;
-      clientSecretEnvKey?: string;
-      accessType?: string;
-      prompt?: string;
-      /**
-       * Optional provider-specific permissions value to include in the OAuth
-       * authorization URL. For example, Discord expects the "permissions"
-       * query param when installing a bot.
-       */
-      permissions?: string | number;
-      // Custom connectors (e.g. GitHub App installation) may use additional
-      // keys interpreted by provider-specific blueprints.
-      [key: string]: unknown;
-    };
+    const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+    const oauthConfig =
+      runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+        ? (runtimeConfig.oauth as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
+    const oauthParams =
+      oauthConfig.params && typeof oauthConfig.params === 'object'
+        ? (oauthConfig.params as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
 
     // Custom connectors (authType = 'custom') are started via connect
     // blueprints so that providers like GitHub can compute their own
@@ -369,17 +358,21 @@ export class ConnectorService {
       throw new Error(`Connector ${provider} does not support start flow for authType ${template.authType}`);
     }
 
-    const clientIdEnvKey = runtimeConfig.clientIdEnvKey;
+    const clientIdEnvKey = oauthConfig.clientId as string | undefined;
     if (!clientIdEnvKey) {
-      throw new Error(`clientIdEnvKey is not configured for connector template ${template.id}`);
+      throw new Error(`oauth.clientId is not configured for connector template ${template.id}`);
     }
 
     const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
-    const authorizeUrl = template.oauthAuthorizeUrl;
-    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${provider}/callback`;
+    const authorizeUrl = oauthConfig.authorizeUrl as string | undefined;
+    const redirectPath = oauthConfig.redirectPath as string | undefined;
 
     if (!authorizeUrl) {
-      throw new Error(`oauthAuthorizeUrl is not configured for connector template ${template.id}`);
+      throw new Error(`oauth.authorizeUrl is not configured for connector template ${template.id}`);
+    }
+
+    if (!redirectPath) {
+      throw new Error(`oauth.redirectPath is not configured for connector template ${template.id}`);
     }
 
     if (!clientId) {
@@ -400,22 +393,26 @@ export class ConnectorService {
       state,
     });
 
-    if (Array.isArray(template.oauthScopes) && template.oauthScopes.length) {
-      params.set('scope', template.oauthScopes.join(' '));
+    const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
+
+    if (scopes.length) {
+      params.set('scope', scopes.join(' '));
     }
 
-    if (runtimeConfig.accessType && typeof runtimeConfig.accessType === 'string') {
-      params.set('access_type', runtimeConfig.accessType);
+    const accessType = oauthParams.accessType as string | undefined;
+    if (accessType && typeof accessType === 'string') {
+      params.set('access_type', accessType);
     }
 
-    if (runtimeConfig.prompt && typeof runtimeConfig.prompt === 'string') {
-      params.set('prompt', runtimeConfig.prompt);
+    const prompt = oauthParams.prompt as string | undefined;
+    if (prompt && typeof prompt === 'string') {
+      params.set('prompt', prompt);
     }
 
     // Include provider-specific permissions when configured (e.g. Discord bot install).
-    if (runtimeConfig.permissions !== undefined && runtimeConfig.permissions !== null) {
-      const permissionsValue =
-        typeof runtimeConfig.permissions === 'number' ? String(runtimeConfig.permissions) : String(runtimeConfig.permissions);
+    const permissionsRaw = oauthParams.permissions;
+    if (permissionsRaw !== undefined && permissionsRaw !== null) {
+      const permissionsValue = typeof permissionsRaw === 'number' ? String(permissionsRaw) : String(permissionsRaw);
       if (permissionsValue) {
         params.set('permissions', permissionsValue);
       }
@@ -433,7 +430,7 @@ export class ConnectorService {
           phase: 'start',
           authorizeUrl: baseAuthorizationUrl,
           redirectPath,
-          scopes: template.oauthScopes || [],
+          scopes,
           stateToken: state,
           config: runtimeConfig as Record<string, unknown>,
         });
@@ -471,28 +468,29 @@ export class ConnectorService {
     }
 
     const env = getEnvConfig();
-    const runtimeConfig = (template.runtimeConfig || {}) as {
-      clientIdEnvKey?: string;
-      clientSecretEnvKey?: string;
-      accessTokenEnvKey?: string;
-      refreshTokenEnvKey?: string;
-      metadataFromQuery?: string[];
-      [key: string]: unknown;
-    };
+    const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+    const oauthConfig =
+      runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+        ? (runtimeConfig.oauth as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
 
-    const clientIdEnvKey = runtimeConfig.clientIdEnvKey;
-    const clientSecretEnvKey = runtimeConfig.clientSecretEnvKey;
+    const clientIdEnvKey = oauthConfig.clientId as string | undefined;
+    const clientSecretEnvKey = oauthConfig.clientSecret as string | undefined;
     if (!clientIdEnvKey || !clientSecretEnvKey) {
-      throw new Error(`clientIdEnvKey/clientSecretEnvKey not configured for connector template ${template.id}`);
+      throw new Error(`oauth.clientId/oauth.clientSecret not configured for connector template ${template.id}`);
     }
 
     const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
     const clientSecret = (env as unknown as Record<string, string | undefined>)[clientSecretEnvKey];
-    const tokenUrl = template.oauthTokenUrl;
-    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${providerFromCallback}/callback`;
+    const tokenUrl = oauthConfig.tokenUrl as string | undefined;
+    const redirectPath = oauthConfig.redirectPath as string | undefined;
 
     if (!tokenUrl) {
-      throw new Error(`oauthTokenUrl is not configured for connector template ${template.id}`);
+      throw new Error(`oauth.tokenUrl is not configured for connector template ${template.id}`);
+    }
+
+    if (!redirectPath) {
+      throw new Error(`oauth.redirectPath is not configured for connector template ${template.id}`);
     }
 
     if (!clientId || !clientSecret) {
@@ -577,11 +575,14 @@ export class ConnectorService {
 
     const envUpdates: Record<string, string> = {};
 
-    if (runtimeConfig.accessTokenEnvKey && body.access_token) {
-      envUpdates[runtimeConfig.accessTokenEnvKey] = String(body.access_token);
+    const accessTokenEnvKey = oauthConfig.accessToken as string | undefined;
+    const refreshTokenEnvKey = oauthConfig.refreshToken as string | undefined;
+
+    if (accessTokenEnvKey && body.access_token) {
+      envUpdates[accessTokenEnvKey] = String(body.access_token);
     }
-    if (runtimeConfig.refreshTokenEnvKey && body.refresh_token) {
-      envUpdates[runtimeConfig.refreshTokenEnvKey] = String(body.refresh_token);
+    if (refreshTokenEnvKey && body.refresh_token) {
+      envUpdates[refreshTokenEnvKey] = String(body.refresh_token);
     }
 
     const metadata: Record<string, unknown> = {
@@ -591,8 +592,12 @@ export class ConnectorService {
     };
 
     // Optionally copy selected fields from callback query into metadata
-    if (Array.isArray(runtimeConfig.metadataFromQuery) && callbackQuery) {
-      for (const key of runtimeConfig.metadataFromQuery) {
+    const metadataFromQuery = Array.isArray(oauthConfig.metadataFromQuery)
+      ? oauthConfig.metadataFromQuery.map((k) => String(k))
+      : undefined;
+
+    if (Array.isArray(metadataFromQuery) && callbackQuery) {
+      for (const key of metadataFromQuery) {
         const val = callbackQuery[key];
         if (val !== undefined) {
           metadata[key] = val;
@@ -808,22 +813,14 @@ export class ConnectorService {
       throw new Error(`Connector template not found for provider: ${provider}`);
     }
 
-    // Remove managed env vars for this provider based on connector template configuration.
-    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
-    await Promise.all(
-      envKeys.map(async (key) => {
-        const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
-        if (existing) {
-          await this.environmentRepository.delete(existing.id);
-        }
-      })
-    );
-
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
     if (!existing) {
       // Nothing else to do
       return false;
     }
+
+    // Remove env vars managed by this connector (connector_id linkage).
+    await this.environmentRepository.deleteByConnectorId(existing.id);
 
     let newMetadata = existing.metadata || {};
 
@@ -873,6 +870,7 @@ export class ConnectorService {
     await this.environmentRepository.update(existing.id, {
       value,
       description: existing.description,
+      connectorId,
       updatedBy: userId,
     });
   }

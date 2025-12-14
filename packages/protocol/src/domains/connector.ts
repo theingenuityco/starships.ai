@@ -70,9 +70,6 @@ export interface ConnectorCatalogItem {
   displayName: string;
   description: string;
   authType: ConnectorAuthType;
-  requiredEnvKeys: string[];
-  optionalEnvKeys?: string[];
-  docsSlug?: string;
 }
 
 export interface ConnectorCatalogResponse {
@@ -92,9 +89,6 @@ export interface ConnectorTemplateModel {
   displayName: string;
   description: string;
   authType: ConnectorAuthType;
-  requiredEnvKeys: string[];
-  optionalEnvKeys?: string[];
-  docsSlug?: string;
   version: string;
   category: string;
   usageCount: number;

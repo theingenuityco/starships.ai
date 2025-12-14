@@ -42,20 +42,6 @@ export class ConnectorTemplateEntity {
   @IsIn(['oauth2', 'api_key', 'custom', 'none'])
   authType!: ConnectorAuthType | 'none';
 
-  @Expose()
-  @IsArray()
-  requiredEnvKeys!: string[];
-
-  @Expose()
-  @IsArray()
-  @IsOptional()
-  optionalEnvKeys?: string[];
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  docsSlug?: string;
-
   // OAuth2 configuration (for authType = 'oauth2')
 
   @Expose()
@@ -146,9 +132,6 @@ export class ConnectorTemplateEntity {
       displayName: dataRecord.displayName || '',
       description: dataRecord.description || '',
       authType: (dataRecord.authType as ConnectorAuthType) || 'oauth2',
-      requiredEnvKeys: dataRecord.requiredEnvKeys || [],
-      optionalEnvKeys: dataRecord.optionalEnvKeys || [],
-      docsSlug: dataRecord.docsSlug,
       oauthAuthorizeUrl: dataRecord.oauthAuthorizeUrl,
       oauthTokenUrl: dataRecord.oauthTokenUrl,
       oauthScopes: dataRecord.oauthScopes || [],

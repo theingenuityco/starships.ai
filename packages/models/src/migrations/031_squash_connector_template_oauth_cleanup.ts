@@ -258,6 +258,38 @@ export async function up(client: Client): Promise<void> {
       END $$;
     `);
 
+    // Persist default apiBaseUrl for known HTTP-based connectors.
+    // We still keep ConnectorRuntimeService fallbacks, but storing this in the DB
+    // makes connector_templates self-describing and supports DB-driven connectors.
+    await client.query(`
+      UPDATE connector_templates
+      SET
+        runtime_config = jsonb_set(COALESCE(runtime_config, '{}'::jsonb), '{apiBaseUrl}', to_jsonb('https://api.linkedin.com'::text), true),
+        updated_at = NOW()
+      WHERE provider = 'linkedin' AND (runtime_config->>'apiBaseUrl' IS NULL OR runtime_config->>'apiBaseUrl' = '')
+    `);
+    await client.query(`
+      UPDATE connector_templates
+      SET
+        runtime_config = jsonb_set(COALESCE(runtime_config, '{}'::jsonb), '{apiBaseUrl}', to_jsonb('https://discord.com'::text), true),
+        updated_at = NOW()
+      WHERE provider = 'discord' AND (runtime_config->>'apiBaseUrl' IS NULL OR runtime_config->>'apiBaseUrl' = '')
+    `);
+    await client.query(`
+      UPDATE connector_templates
+      SET
+        runtime_config = jsonb_set(COALESCE(runtime_config, '{}'::jsonb), '{apiBaseUrl}', to_jsonb('https://www.googleapis.com'::text), true),
+        updated_at = NOW()
+      WHERE provider = 'google_drive' AND (runtime_config->>'apiBaseUrl' IS NULL OR runtime_config->>'apiBaseUrl' = '')
+    `);
+    await client.query(`
+      UPDATE connector_templates
+      SET
+        runtime_config = jsonb_set(COALESCE(runtime_config, '{}'::jsonb), '{apiBaseUrl}', to_jsonb('https://api.github.com'::text), true),
+        updated_at = NOW()
+      WHERE provider = 'github' AND (runtime_config->>'apiBaseUrl' IS NULL OR runtime_config->>'apiBaseUrl' = '')
+    `);
+
     // Always normalize runtime_config.oauth shape and drop legacy duplicated keys.
     // This is safe even if oauth_* columns are already dropped (it uses only runtime_config JSONB).
     await client.query(`

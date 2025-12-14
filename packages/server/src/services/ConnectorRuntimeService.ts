@@ -80,7 +80,10 @@ export class ConnectorRuntimeService {
           continue;
         }
 
-        const baseUrl = this.getApiBaseUrl('discord', runtimeConfig) ?? 'https://discord.com';
+        const baseUrl = this.getApiBaseUrl('discord', runtimeConfig);
+        if (!baseUrl) {
+          continue;
+        }
         connectors[provider] = {
           baseUrl,
           headers: {
@@ -143,26 +146,13 @@ export class ConnectorRuntimeService {
   /**
    * Resolve the base API URL for a connector provider.
    *
-   * Prefer an explicit apiBaseUrl in runtime_config when present, then fall
-   * back to known first-party defaults for built-in connectors.
+   * Source of truth is connector_templates.runtime_config.apiBaseUrl.
    */
   private getApiBaseUrl(provider: string, runtimeConfig: Record<string, unknown>): string | undefined {
     const rcBase = runtimeConfig.apiBaseUrl;
     if (typeof rcBase === 'string' && rcBase.trim().length > 0) {
       return rcBase.trim();
     }
-
-    switch (provider) {
-      case 'google_drive':
-        return 'https://www.googleapis.com';
-      case 'github':
-        return 'https://api.github.com';
-      case 'linkedin':
-        return 'https://api.linkedin.com';
-      case 'discord':
-        return 'https://discord.com';
-      default:
-        return undefined;
-    }
+    return undefined;
   }
 }

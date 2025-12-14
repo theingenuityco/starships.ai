@@ -136,16 +136,6 @@ spec:
                   key: POSTGRES_SSL
 
             # LLM Providers
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: OPENAI_API_KEY
-            - name: ANTHROPIC_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: ANTHROPIC_API_KEY
             - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:

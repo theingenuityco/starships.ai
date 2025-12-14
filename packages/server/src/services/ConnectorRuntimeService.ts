@@ -1,4 +1,4 @@
-import { ConnectorTemplateRepository } from '@starships/models';
+import { ConnectorRepository, ConnectorTemplateRepository } from '@starships/models';
 import type { ConnectorProvider } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { EnvironmentService } from './EnvironmentService';
@@ -22,10 +22,12 @@ export interface ConnectorHttpConfig {
  */
 export class ConnectorRuntimeService {
   private connectorTemplateRepository: ConnectorTemplateRepository;
+  private connectorRepository: ConnectorRepository;
   private environmentService: EnvironmentService;
 
   constructor() {
     this.connectorTemplateRepository = new ConnectorTemplateRepository();
+    this.connectorRepository = new ConnectorRepository();
     this.environmentService = new EnvironmentService();
   }
 
@@ -54,6 +56,35 @@ export class ConnectorRuntimeService {
     for (const tpl of templates) {
       const provider = tpl.provider as ConnectorProvider;
       const runtimeConfig = (tpl.runtimeConfig || {}) as Record<string, unknown>;
+
+      /**
+       * Discord is a special case:
+       * - We use a single bot token configured on the host (server env)
+       * - OAuth "connect" captures install metadata (guild_id, permissions) per-starship
+       * - There is no per-starship access token to read from decrypted env
+       */
+      if (provider === 'discord') {
+        const botToken = env.DISCORD_BOT_TOKEN;
+        if (!botToken || typeof botToken !== 'string' || !botToken.trim()) {
+          continue;
+        }
+
+        // Only expose the Discord connector to workflows if it is actually connected
+        // for this starship (i.e. bot installed via OAuth).
+        const discordConnector = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'discord');
+        if (!discordConnector || discordConnector.status !== 'connected') {
+          continue;
+        }
+
+        const baseUrl = this.getApiBaseUrl('discord', runtimeConfig) ?? 'https://discord.com';
+        connectors[provider] = {
+          baseUrl,
+          headers: {
+            Authorization: `Bot ${botToken.trim()}`,
+          },
+        };
+        continue;
+      }
 
       // Starships connector uses a platform JWT instead of a stored access token.
       if (runtimeConfig.usesPlatformJwt === true && provider === 'starships') {

@@ -518,20 +518,22 @@ export class ConnectorService {
 
     const redirectUri = `${env.PUBLIC_URL}${redirectPath}`;
 
-    const tokenParams = new URLSearchParams({
+    const tokenPayload = {
       grant_type: 'authorization_code',
       code,
       redirect_uri: redirectUri,
       client_id: clientId,
       client_secret: clientSecret,
-    });
+    };
 
-    const tokenResponse = await axios.post(tokenUrl, tokenParams.toString(), {
+    const tokenResponse = await axios.post(tokenUrl, tokenPayload, {
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
     });
 
+    // Normalise token response into a common shape. We expect providers to
+    // return JSON here; tokenResponse.data should already be the parsed object.
     const body = tokenResponse.data as {
       access_token?: string;
       refresh_token?: string;

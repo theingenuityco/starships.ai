@@ -531,6 +531,7 @@ export class ConnectorService {
     const tokenResponse = await axios.post(tokenUrl, tokenPayload, {
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
     });
 

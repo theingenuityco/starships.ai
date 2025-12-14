@@ -11,6 +11,7 @@ import { createOAuthConnectBlueprint } from '@/seeders/connectors/createConnecto
  * - Ensure GitHub template is configured for OAuth App user-token flow.
  * - Rename persisted env keys for GitHub user tokens: GITHUB_APP_* -> GH_APP_* (environments + runtime_config keys).
  * - Structure connector_templates.runtime_config.oauth and drop legacy columns.
+ * - Drop legacy top-level oauth runtime_config keys (clientIdEnvKey, permissions, etc.) in favor of runtime_config.oauth.*
  * - Clear connector_templates.test_blueprint and drop redundant oauth_* columns.
  *
  * Important: this migration is written to be safe if executed on a DB that already
@@ -255,6 +256,72 @@ export async function up(client: Client): Promise<void> {
             OR runtime_config ?| ARRAY['envKeys', 'oauth'];
         END IF;
       END $$;
+    `);
+
+    // Always normalize runtime_config.oauth shape and drop legacy duplicated keys.
+    // This is safe even if oauth_* columns are already dropped (it uses only runtime_config JSONB).
+    await client.query(`
+      UPDATE connector_templates
+      SET
+        runtime_config =
+          (
+            (
+              COALESCE(runtime_config, '{}'::jsonb)
+              - 'envKeys'
+              - 'clientIdEnvKey'
+              - 'clientSecretEnvKey'
+              - 'accessTokenEnvKey'
+              - 'refreshTokenEnvKey'
+              - 'envKey'
+              - 'accessType'
+              - 'prompt'
+              - 'permissions'
+              - 'metadataFromQuery'
+            )
+            || jsonb_build_object(
+              'oauth',
+              jsonb_strip_nulls(
+                (
+                  COALESCE(runtime_config->'oauth', '{}'::jsonb)
+                  || jsonb_strip_nulls(
+                    jsonb_build_object(
+                      'clientId', COALESCE(runtime_config->'oauth'->>'clientId', runtime_config->>'clientIdEnvKey'),
+                      'clientSecret', COALESCE(runtime_config->'oauth'->>'clientSecret', runtime_config->>'clientSecretEnvKey'),
+                      'accessToken', COALESCE(runtime_config->'oauth'->>'accessToken', runtime_config->>'accessTokenEnvKey'),
+                      'refreshToken', COALESCE(runtime_config->'oauth'->>'refreshToken', runtime_config->>'refreshTokenEnvKey'),
+                      'apiKey', COALESCE(runtime_config->'oauth'->>'apiKey', runtime_config->>'envKey'),
+                      'metadataFromQuery', COALESCE(runtime_config->'oauth'->'metadataFromQuery', runtime_config->'metadataFromQuery'),
+                      'params',
+                        jsonb_strip_nulls(
+                          COALESCE(runtime_config->'oauth'->'params', '{}'::jsonb)
+                          || jsonb_strip_nulls(
+                            jsonb_build_object(
+                              'accessType', COALESCE(runtime_config->'oauth'->'params'->>'accessType', runtime_config->>'accessType'),
+                              'prompt', COALESCE(runtime_config->'oauth'->'params'->>'prompt', runtime_config->>'prompt'),
+                              'permissions', COALESCE(runtime_config->'oauth'->'params'->'permissions', runtime_config->'permissions')
+                            )
+                          )
+                        )
+                    )
+                  )
+                )
+              )
+            )
+          ),
+        updated_at = NOW()
+      WHERE
+        runtime_config ? 'oauth'
+        OR runtime_config ?| ARRAY[
+          'clientIdEnvKey',
+          'clientSecretEnvKey',
+          'accessTokenEnvKey',
+          'refreshTokenEnvKey',
+          'envKey',
+          'accessType',
+          'prompt',
+          'permissions',
+          'metadataFromQuery'
+        ]
     `);
 
     // 037: drop legacy columns (env/docs).

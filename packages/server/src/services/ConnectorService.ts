@@ -424,28 +424,30 @@ export class ConnectorService {
     const baseAuthorizationUrl = `${authorizeUrl}?${params.toString()}`;
 
     // If a connect blueprint is configured, let it optionally refine the URL.
-    try {
-      const output = await this.runConnectBlueprint(template, {
-        starshipId,
-        provider,
-        authType: 'oauth2',
-        phase: 'start',
-        authorizeUrl: baseAuthorizationUrl,
-        redirectPath,
-        scopes: template.oauthScopes || [],
-        stateToken: state,
-        config: runtimeConfig as Record<string, unknown>,
-      });
+    if (template.connectBlueprint) {
+      try {
+        const output = await this.runConnectBlueprint(template, {
+          starshipId,
+          provider,
+          authType: 'oauth2',
+          phase: 'start',
+          authorizeUrl: baseAuthorizationUrl,
+          redirectPath,
+          scopes: template.oauthScopes || [],
+          stateToken: state,
+          config: runtimeConfig as Record<string, unknown>,
+        });
 
-      if (output.authorizationUrl) {
-        return output.authorizationUrl;
+        if (output.authorizationUrl) {
+          return output.authorizationUrl;
+        }
+      } catch (error) {
+        // Fall back to the static TypeScript flow if blueprint execution fails.
+        console.warn('[ConnectorService] Connect blueprint failed for startOAuthConnector, falling back to static flow', {
+          provider,
+          error,
+        });
       }
-    } catch (error) {
-      // Fall back to the static TypeScript flow if blueprint execution fails.
-      console.warn('[ConnectorService] Connect blueprint failed for startOAuthConnector, falling back to static flow', {
-        provider,
-        error,
-      });
     }
 
     return baseAuthorizationUrl;
@@ -532,6 +534,8 @@ export class ConnectorService {
       },
     });
 
+    console.log('tokenResponse', tokenResponse.data);
+
     // Normalise token response into a common shape. We expect providers to
     // return JSON here; tokenResponse.data should already be the parsed object.
     const body = tokenResponse.data as {
@@ -577,37 +581,39 @@ export class ConnectorService {
 
     let finalOutput = hostOutput;
 
-    try {
-      const blueprintOutput = await this.runConnectBlueprint(template, {
-        starshipId,
-        provider: providerFromCallback,
-        authType: 'oauth2',
-        phase: 'complete',
-        tokenUrl,
-        redirectPath,
-        stateToken,
-        code,
-        callbackQuery,
-        config: runtimeConfig as Record<string, unknown>,
-      });
+    if (template.connectBlueprint) {
+      try {
+        const blueprintOutput = await this.runConnectBlueprint(template, {
+          starshipId,
+          provider: providerFromCallback,
+          authType: 'oauth2',
+          phase: 'complete',
+          tokenUrl,
+          redirectPath,
+          stateToken,
+          code,
+          callbackQuery,
+          config: runtimeConfig as Record<string, unknown>,
+        });
 
-      finalOutput = {
-        ...hostOutput,
-        ...blueprintOutput,
-        env: {
-          ...(hostOutput.env || {}),
-          ...(blueprintOutput.env || {}),
-        },
-        metadata: {
-          ...(hostOutput.metadata || {}),
-          ...(blueprintOutput.metadata || {}),
-        },
-      };
-    } catch (error) {
-      console.warn('[ConnectorService] Connect blueprint failed for completeOAuthConnector, falling back to static flow', {
-        provider: providerFromCallback,
-        error,
-      });
+        finalOutput = {
+          ...hostOutput,
+          ...blueprintOutput,
+          env: {
+            ...(hostOutput.env || {}),
+            ...(blueprintOutput.env || {}),
+          },
+          metadata: {
+            ...(hostOutput.metadata || {}),
+            ...(blueprintOutput.metadata || {}),
+          },
+        };
+      } catch (error) {
+        console.warn('[ConnectorService] Connect blueprint failed for completeOAuthConnector, falling back to static flow', {
+          provider: providerFromCallback,
+          error,
+        });
+      }
     }
 
     const { starshipSlug } = await this.applyConnectOutput(starshipId, userId, providerFromCallback, template, finalOutput);

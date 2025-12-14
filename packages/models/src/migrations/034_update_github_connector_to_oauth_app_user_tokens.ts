@@ -26,6 +26,8 @@ export async function up(client: Client): Promise<void> {
         oauth_token_url = 'https://github.com/login/oauth/access_token',
         oauth_redirect_path = '/api/v1/connectors/github/callback',
         oauth_scopes = ARRAY['repo', 'read:org'],
+        required_env_keys = ARRAY['GITHUB_APP_ACCESS_TOKEN'],
+        optional_env_keys = ARRAY['GITHUB_APP_REFRESH_TOKEN'],
         runtime_config = jsonb_build_object(
           'clientIdEnvKey', 'GITHUB_APP_CLIENT_ID',
           'clientSecretEnvKey', 'GITHUB_APP_CLIENT_SECRET',

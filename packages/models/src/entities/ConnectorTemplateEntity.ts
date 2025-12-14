@@ -42,28 +42,6 @@ export class ConnectorTemplateEntity {
   @IsIn(['oauth2', 'api_key', 'custom', 'none'])
   authType!: ConnectorAuthType | 'none';
 
-  // OAuth2 configuration (for authType = 'oauth2')
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  oauthAuthorizeUrl?: string;
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  oauthTokenUrl?: string;
-
-  @Expose()
-  @IsArray()
-  @IsOptional()
-  oauthScopes?: string[];
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  oauthRedirectPath?: string;
-
   /**
    * runtimeConfig is an open-ended JSON object that can hold:
    * - env key names for client_id / client_secret
@@ -132,10 +110,6 @@ export class ConnectorTemplateEntity {
       displayName: dataRecord.displayName || '',
       description: dataRecord.description || '',
       authType: (dataRecord.authType as ConnectorAuthType) || 'oauth2',
-      oauthAuthorizeUrl: dataRecord.oauthAuthorizeUrl,
-      oauthTokenUrl: dataRecord.oauthTokenUrl,
-      oauthScopes: dataRecord.oauthScopes || [],
-      oauthRedirectPath: dataRecord.oauthRedirectPath,
       runtimeConfig: dataRecord.runtimeConfig || {},
       version: (dataRecord.version as string) || '1.0.0',
       category: (dataRecord.category as string) || 'connector',
